@@ -18,6 +18,7 @@ import pygame
 from combat.damage import apply_armor
 from combat.status import StatusState
 from entities.enemy_ai import EnemyContext
+from game import config
 
 
 class Boss:
@@ -30,6 +31,10 @@ class Boss:
         self.speed = float(definition["speed"])
         self._base_contact = float(definition["contact_damage"])
         self.contact_damage = self._base_contact
+        # Contact lands as a timed bite, like ordinary enemies (see Enemy).
+        self.contact_interval = float(
+            definition.get("contact_interval", config.INCOMING_TICK_INTERVAL))
+        self.contact_cd = 0.0
         self.radius = float(definition["radius"])
         self.xp_reward = int(definition.get("experience_reward", 200))
         self.reward_currency = int(definition.get("reward_currency", 50))
@@ -89,6 +94,7 @@ class Boss:
 
     def update(self, ctx: EnemyContext) -> None:
         dt = ctx.dt
+        self.contact_cd = max(0.0, self.contact_cd - dt)
         if self.hit_flash > 0.0:
             self.hit_flash = max(0.0, self.hit_flash - dt)
         self.status.update(dt, lambda amt: self._status_damage(amt, ctx))

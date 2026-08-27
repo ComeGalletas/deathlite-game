@@ -1,0 +1,36 @@
+{
+  "soldier": {
+    "frame": [100, 100],
+    "content": [30, 27, 46, 40],
+    "scale": [69, 60],
+    "anchor": [34, 40],
+    "face": "right",
+    "anims": {
+      "idle":   {"file": "sprites/soldier/Soldier_Idle.png",    "frames": 6, "fps": 8,  "loop": true},
+      "walk":   {"file": "sprites/soldier/Soldier_Walk.png",    "frames": 8, "fps": 12, "loop": true},
+      "attack": {"file": "sprites/soldier/Soldier_Attack01.png", "frames": 6, "fps": 16, "loop": false},
+      "hurt":   {"file": "sprites/soldier/Soldier_Hurt.png",    "frames": 4, "fps": 14, "loop": false},
+      "death":  {"file": "sprites/soldier/Soldier_Death.png",   "frames": 4, "fps": 9,  "loop": false}
+    }
+  },
+  "orc": {
+    "frame": [100, 100],
+    "content": [31, 34, 42, 32],
+    "scale": [63, 48],
+    "anchor": [31, 33],
+    "face": "right",
+    "anims": {
+      "idle":  {"file": "sprites/orc/Orc_Idle.png",  "frames": 6, "fps": 8,  "loop": true},
+      "walk":  {"file": "sprites/orc/Orc_Walk.png",  "frames": 8, "fps": 11, "loop": true},
+      "hurt":  {"file": "sprites/orc/Orc_Hurt.png",  "frames": 4, "fps": 14, "loop": false},
+      "death": {"file": "sprites/orc/Orc_Death.png", "frames": 4, "fps": 9,  "loop": false}
+    }
+  },
+  "arrow": {
+    "file": "projectiles/arrow.png",
+    "frame": [32, 32],
+    "content": [6, 12, 21, 9],
+    "scale": [30, 13],
+    "anchor": [15, 6]
+  }
+}

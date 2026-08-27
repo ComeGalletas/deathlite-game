@@ -30,7 +30,7 @@ class EnemyContext:
     resolve_movement: Callable[..., pygame.Vector2] = (
         lambda prev, new, radius: new)   # wall sliding; identity by default
     spawn_hazard: Callable[..., None] = (
-        lambda pos, radius, dps, duration: None)   # area-denial pools
+        lambda pos, radius, dps, duration, tick_interval=None: None)   # area-denial pools
 
 
 def _toward(enemy, target: pygame.Vector2) -> pygame.Vector2:
@@ -123,6 +123,10 @@ def brute(enemy, ctx: EnemyContext) -> None:
 def _fsm_enter(enemy, state: str, duration: float) -> None:
     enemy.ai["fs"] = state
     enemy.ai["ft"] = duration
+    if state == "attack":
+        # A charge / blink is a discrete impact -- clear the contact cooldown so
+        # its first overlap always lands a bite at the bumped contact damage.
+        enemy.contact_cd = 0.0
 
 
 def _fsm_common(enemy, ctx, *, trigger_range: float, telegraph: float,
@@ -211,7 +215,7 @@ def fsm_warlock(enemy, ctx) -> None:
         target = e.ai.get("cast_at", cx.player_pos)
         cx.spawn_hazard(pygame.Vector2(target),
                         c.get("hazard_radius", 90), c.get("hazard_dps", 20),
-                        c.get("hazard_duration", 3.5))
+                        c.get("hazard_duration", 3.5), c.get("hazard_tick"))
 
     def enter_telegraph_snapshot(e, cx):
         e.ai["cast_at"] = pygame.Vector2(cx.player_pos)

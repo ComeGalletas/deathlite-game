@@ -35,6 +35,7 @@ from progression.upgrades import roll_choices
 from progression.blessings import BlessingLibrary, roll_blessing_choices, rebuild as rebuild_blessings
 from progression.items import Item, generate_item
 from progression.stats import FLAT, MULT, PCT, Modifier
+from systems.animation import Animator
 from systems.camera import Camera
 from systems.collision import SpatialGrid, circles_overlap
 from systems.object_pool import Pool
@@ -54,8 +55,12 @@ ALTAR_HP_COST_FRACTION = 0.25
 
 class PlayingState(State):
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
-              **kwargs) -> None:
+              dev: bool = False, **kwargs) -> None:
         self.content = get_content()
+        self.dev_mode = bool(dev)     # developer sandbox: no save, restart on end
+        self._dev_unlimited_hp = False   # HP ratchet (dev menu D2)
+        self._dev_no_attack = False      # hero weapons silenced (dev menu D2)
+        self._dev_hp_floor = 0.0
         self.run_seed = seed if seed is not None else random.randrange(1 << 30)
         self.rng = random.Random(self.run_seed)
 
@@ -71,6 +76,12 @@ class PlayingState(State):
                              character_id=self.character_id)
         weapon_id = cdef.get("starting_weapon", STARTING_WEAPON)
         self.player.weapons = [Weapon(weapon_id, self.content.weapon(weapon_id))]
+
+        # Hero sprite: only the characters that declare a rig get one; the rest
+        # keep the primitive circle (fallback in `_draw_player`).
+        hero_rig = cdef.get("sprite")
+        self._hero_anim = Animator(self.game.assets, hero_rig) if hero_rig else None
+        self._death_seq_t: float | None = None   # brief window to play the death anim
 
         # Meta-progression + equipped items applied before the run starts.
         self._apply_persistent_bonuses()
@@ -99,6 +110,7 @@ class PlayingState(State):
         self.levels = LevelTracker()
 
         self._explosions: list[dict] = []   # transient blast visuals
+        self._dying: list = []              # [enemy, seconds_left] -- death anim only
         self._last_move_dir = pygame.Vector2(1, 0)
         self._awaiting_level_up = False
         self._hurt_flash_t = 0.0
@@ -137,6 +149,9 @@ class PlayingState(State):
             self.game.state_machine.push(PausedState(self.game))
         elif event.key == pygame.K_e:
             self._activate_nearby_interactable()
+        elif event.key == pygame.K_BACKQUOTE and self.dev_mode:
+            from game.states.dev_menu_state import DevMenuState
+            self.game.state_machine.push(DevMenuState(self.game), playing=self)
 
     def handle_debug_key(self, key: int) -> bool:
         keys = config.DEBUG_KEYS
@@ -157,15 +172,70 @@ class PlayingState(State):
 
     # --- pipeline ---------------------------------------------
     def update(self, dt: float) -> None:
+        if self._death_seq_t is not None:
+            self._run_death_sequence(dt)
+            return
+
         self._phase_input()
         self._phase_update(dt)
         self._phase_combat(dt)
         self._phase_progression(dt)
 
         self.stats["time"] += dt
+        self._apply_dev_unlimited_hp()
         if not self.player.alive:
-            self._end_run(victory=False)
+            # If the hero has a death animation, hold the run open briefly so it
+            # can play; otherwise end immediately as before.
+            if self._hero_anim is not None:
+                self._death_seq_t = 0.6
+            else:
+                self._end_run(victory=False)
         self._report_debug()
+
+    def _apply_dev_unlimited_hp(self) -> None:
+        """Dev toggle: HP never ends a frame lower than it started (it may still
+        dip and flash mid-frame). Healing raises the floor; it never drops."""
+        if not (self.dev_mode and self._dev_unlimited_hp):
+            return
+        self._dev_hp_floor = max(self._dev_hp_floor, self.player.hp)
+        if self.player.hp < self._dev_hp_floor:
+            self.player.hp = self._dev_hp_floor
+        if not self.player.alive and self._dev_hp_floor > 0.0:
+            self.player.alive = True
+
+    def _run_death_sequence(self, dt: float) -> None:
+        if self.dev_mode and self._dev_unlimited_hp:
+            # Unlimited HP switched on mid-death-animation: cancel the end.
+            self._death_seq_t = None
+            self.player.alive = True
+            self.player.hp = max(self.player.hp, self._dev_hp_floor,
+                                 self.player.max_hp * 0.5)
+            return
+        self._death_seq_t -= dt
+        self._update_hero_anim(dt)
+        self.camera.update(dt, self.player.pos)
+        self.particles.update(dt)
+        self.damage_numbers.update(dt)
+        self.shake.update(dt)
+        if self._death_seq_t <= 0.0:
+            self._death_seq_t = None
+            self._end_run(victory=False)
+
+    def _hero_anim_name(self) -> str:
+        p = self.player
+        if not p.alive:
+            return "death"
+        if p._hurt_t > 0.0:
+            return "hurt"
+        if p._attack_t > 0.0:
+            return "attack"
+        return "walk" if p._move_dir.length_squared() > 0 else "idle"
+
+    def _update_hero_anim(self, dt: float) -> None:
+        if self._hero_anim is None:
+            return
+        self._hero_anim.play(self._hero_anim_name())
+        self._hero_anim.update(dt)
 
     def _phase_input(self) -> None:
         self.player.handle_input(pygame.key.get_pressed())
@@ -174,6 +244,7 @@ class PlayingState(State):
 
     def _phase_update(self, dt: float) -> None:
         self.player.update(dt, self.game_map)
+        self._update_hero_anim(dt)
         self.camera.update(dt, self.player.pos)
 
         elapsed = self.stats["time"]
@@ -203,6 +274,7 @@ class PlayingState(State):
         self._update_summons(dt)
         self._update_hazards(dt)
         self._update_elite_arenas()
+        self._update_dying(dt)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
         self.shake.update(dt)
@@ -224,12 +296,13 @@ class PlayingState(State):
             crit_chance=min(0.75, 0.02 * s["luck"] + s["crit_chance"]),
             crit_multiplier=2.0 + s["crit_damage"],
             rng=self.rng, spawn_summon=self._spawn_summon)
-        for weapon in self.player.weapons:
-            weapon.update(dt, ctx)
+        if not (self.dev_mode and self._dev_no_attack):
+            for weapon in self.player.weapons:
+                weapon.update(dt, ctx)
 
         self._resolve_projectile_hits()
         self._resolve_hostile_hits()
-        self._resolve_enemy_contact(dt)
+        self._resolve_enemy_contact()
         self._cull_dead_enemies()
 
     def _phase_progression(self, dt: float) -> None:
@@ -419,6 +492,10 @@ class PlayingState(State):
             return None
         proj.reset(**kw)
         self.game.audio.play_shoot()
+        # Drive the hero attack animation off the same beat as the shoot cue.
+        # (A summon totem's bolt also trips this -- acceptable; the starting
+        #  hero has no summon.)
+        self.player.trigger_attack_anim()
         return proj
 
     def _fire_hostile(self, *, pos, vel, damage, radius) -> None:
@@ -453,16 +530,21 @@ class PlayingState(State):
         self.summons.sweep()
 
     # --- ground hazards (spec 5.6) -----------------------
-    def _spawn_hazard(self, pos, radius, dps, duration) -> None:
-        self.hazards.append(Hazard(pos.x, pos.y, radius, dps, duration))
+    def _spawn_hazard(self, pos, radius, dps, duration, tick_interval=None) -> None:
+        self.hazards.append(
+            Hazard(pos.x, pos.y, radius, dps, duration, tick_interval=tick_interval))
 
     def _update_hazards(self, dt: float) -> None:
         for hz in self.hazards:
             hz.update(dt)
             if hz.alive and hz.contains(self.player.pos, self.player.radius):
-                taken = self.player.take_damage(hz.dps * dt)
-                if taken > 0:
-                    self.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
+                bite = hz.due_damage(dt)       # dps * tick_interval per interval
+                if bite > 0.0:
+                    taken = self.player.take_damage(bite)
+                    if taken > 0:
+                        self.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
+            else:
+                hz.reset_ticks()               # partial exposure does not bank
         self.hazards = [h for h in self.hazards if h.alive]
 
     def _explosion(self, pos: pygame.Vector2, radius: float, damage: float) -> None:
@@ -573,17 +655,22 @@ class PlayingState(State):
                 if taken > 0:
                     self.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
 
-    def _resolve_enemy_contact(self, dt: float) -> None:
+    def _resolve_enemy_contact(self) -> None:
+        """Each touching enemy deals a bite (`contact_damage * contact_interval`,
+        before armor) once per its `contact_interval`; `contact_cd` -- ticked
+        down in Enemy/Boss.update -- paces it."""
         pr = self.player.radius
         contacts = list(self.grid.query_circle(self.player.pos.x, self.player.pos.y, pr + 48))
         if self.boss is not None and self.boss.alive:
             contacts.append(self.boss)
         for enemy in contacts:
-            if not enemy.alive:
+            if not enemy.alive or enemy.contact_cd > 0.0:
                 continue
             if circles_overlap(self.player.pos.x, self.player.pos.y, pr,
                                enemy.pos.x, enemy.pos.y, enemy.radius):
-                taken = self.player.take_damage(enemy.contact_damage * dt)
+                enemy.contact_cd = enemy.contact_interval
+                taken = self.player.take_damage(
+                    enemy.contact_damage * enemy.contact_interval)
                 if taken > 0:
                     self.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
 
@@ -598,6 +685,7 @@ class PlayingState(State):
             if e.alive:
                 survivors.append(e)
                 continue
+            # Death effects fire NOW, at the instant of death.
             self.stats["kills"] += 1
             if e.explode_radius > 0.0:
                 self._explosion(e.pos, e.explode_radius, e.explode_damage)
@@ -605,7 +693,17 @@ class PlayingState(State):
             self.game.events.publish(Events.ENEMY_KILLED, pos=e.pos.copy(),
                                      color=e.color, xp=e.xp_reward, tags=e.tags,
                                      elite=e.is_elite)
+            # A sprited enemy lingers, render-only, to play its death animation.
+            if e.anim is not None:
+                e.anim.play("death", restart=True)
+                self._dying.append([e, 0.42])
         self.enemies = survivors
+
+    def _update_dying(self, dt: float) -> None:
+        for entry in self._dying:
+            entry[1] -= dt
+            entry[0].anim.update(dt)
+        self._dying = [en for en in self._dying if en[1] > 0.0]
 
     def _apply_on_kill_effects(self, enemy) -> None:
         for effect, chance, amount in self.player.blessing_fx.on_kill:
@@ -717,13 +815,27 @@ class PlayingState(State):
         summary["seed"] = self.run_seed
         summary["character"] = self.content.character(self.character_id)["name"]
         summary["blessings"] = dict(self.player.blessings)
-        self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory)
+        self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
+                                 dev=self.dev_mode)
+        if self.dev_mode:
+            # A dev run never shows a summary or banks anything -- it just wipes
+            # back to a clean level-1 state on the same world (the "Reset run"
+            # behaviour, also triggered on death).
+            self._restart_dev_run()
+            return
         if victory:
             from game.states.victory_state import VictoryState
             self.game.state_machine.change(VictoryState(self.game), stats=summary)
         else:
             from game.states.game_over_state import GameOverState
             self.game.state_machine.change(GameOverState(self.game), stats=summary)
+
+    def _restart_dev_run(self) -> None:
+        """Reload the developer run from scratch: same world seed, fresh hero,
+        level 1, no blessings / items / upgrades, enemies cleared."""
+        self.game.state_machine.change(
+            PlayingState(self.game), character_id=self.character_id,
+            seed=self.run_seed, dev=True)
 
     # --- debug -----------------------------------
     def _report_debug(self) -> None:
@@ -851,26 +963,54 @@ class PlayingState(State):
 
     def _draw_enemies(self, surface) -> None:
         for e in self.enemies:
-            sx, sy = self.camera.world_to_screen(e.pos)
+            self._draw_one_enemy(surface, e)
+        for entry in self._dying:                 # render-only death animations
+            self._draw_enemy_sprite(surface, entry[0])
+
+    def _draw_one_enemy(self, surface, e) -> None:
+        sx, sy = self.camera.world_to_screen(e.pos)
+
+        if e.anim is not None:
+            self._draw_enemy_sprite(surface, e)
+            # keep status readable without per-frame surface tinting
+            for sid, tint in self._STATUS_TINT.items():
+                if sid in e.status:
+                    pygame.draw.circle(surface, tint, (int(sx), int(sy)),
+                                       int(e.radius) + 2, 2)
+                    break
+        else:
             colour = (255, 255, 255) if e.hit_flash > 0 else e.color
             for sid, tint in self._STATUS_TINT.items():
                 if sid in e.status:
                     colour = tint
                     break
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), int(e.radius))
-            if e.is_elite:
-                pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
-                                   int(e.radius) + 3, 2)
-            if e.shield_hp > 0:
-                pygame.draw.circle(surface, (150, 200, 255), (int(sx), int(sy)),
-                                   int(e.radius) + 5, 1)
-            if e.telegraphing:
-                r = e.cfg.get("slam_radius", 120)
-                pygame.draw.circle(surface, (255, 90, 90), (int(sx), int(sy)),
-                                   int(r), 2)
-            if self.game.show_collision:
-                pygame.draw.circle(surface, config.COLOR_DEBUG,
-                                   (int(sx), int(sy)), int(e.radius), 1)
+
+        if e.is_elite:
+            pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
+                               int(e.radius) + 3, 2)
+        if e.shield_hp > 0:
+            pygame.draw.circle(surface, (150, 200, 255), (int(sx), int(sy)),
+                               int(e.radius) + 5, 1)
+        if e.telegraphing:
+            r = e.cfg.get("slam_radius", 120)
+            pygame.draw.circle(surface, (255, 90, 90), (int(sx), int(sy)),
+                               int(r), 2)
+        if self.game.show_collision:
+            pygame.draw.circle(surface, config.COLOR_DEBUG,
+                               (int(sx), int(sy)), int(e.radius), 1)
+
+    def _draw_enemy_sprite(self, surface, e) -> None:
+        assets = self.game.assets
+        rig = e.anim.rig
+        flip = e._facing < 0 and assets.face(rig) == "right"
+        frame = e.anim.frame(size=assets.scale_for(rig), flip=flip)
+        sx, sy = self.camera.world_to_screen(e.pos)
+        if frame is None:                        # sprite file missing -> primitive
+            pygame.draw.circle(surface, e.color, (int(sx), int(sy)), int(e.radius))
+            return
+        ax, ay = assets.anchor(rig)
+        surface.blit(frame, (sx - ax, sy - ay))
 
     def _draw_boss(self, surface) -> None:
         b = self.boss
@@ -897,20 +1037,55 @@ class PlayingState(State):
                 pygame.draw.circle(surface, (150, 220, 160), (int(sx), int(sy)),
                                    int(b.radius) + int(20 * frac), 2)
 
+    _HOSTILE_ARROW_TINT = (150, 26, 12)
+
     def _draw_projectiles(self, surface) -> None:
+        # Player projectiles: unchanged glow dots.
         for p in self.projectiles:
             sx, sy = self.camera.world_to_screen(p.pos)
             pygame.draw.circle(surface, p.color, (int(sx), int(sy)), max(2, int(p.radius)))
+
+        # Enemy / boss shots: a rotated arrow (falls back to a dot if the
+        # sprite is missing). Rotation is cached in 8-degree buckets.
+        assets = self.game.assets
+        arrow_size = assets.scale_for("arrow")
         for p in self.hostiles:
             sx, sy = self.camera.world_to_screen(p.pos)
-            pygame.draw.circle(surface, p.color, (int(sx), int(sy)), max(3, int(p.radius)))
+            spr = assets.rotated(
+                "arrow", math.degrees(math.atan2(p.vel.y, p.vel.x)),
+                size=arrow_size, tint=self._HOSTILE_ARROW_TINT)
+            if spr is not None:
+                surface.blit(spr, spr.get_rect(center=(int(sx), int(sy))))
+            else:
+                pygame.draw.circle(surface, p.color, (int(sx), int(sy)),
+                                   max(3, int(p.radius)))
 
     def _draw_player(self, surface) -> None:
         sx, sy = self.camera.world_to_screen(self.player.pos)
-        body = (255, 120, 120) if self.player.invulnerable else config.COLOR_PLAYER
-        pygame.draw.circle(surface, body, (sx, sy), self.player.radius)
-        pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
-                           self.player.radius, width=2)
+
+        frame = self._hero_sprite_frame()
+        if frame is not None:
+            # `anchor` is the pixel in the final sprite that sits on the world
+            # position (bottom-centre-ish -- the art is bottom-heavy).
+            ax, ay = self.game.assets.anchor(self._hero_anim.rig)
+            surface.blit(frame, (sx - ax, sy - ay))
+            if self.player.invulnerable:
+                pygame.draw.circle(surface, (255, 120, 120), (sx, sy),
+                                   self.player.radius + 4, width=2)
+        else:
+            body = (255, 120, 120) if self.player.invulnerable else config.COLOR_PLAYER
+            pygame.draw.circle(surface, body, (sx, sy), self.player.radius)
+            pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
+                               self.player.radius, width=2)
+
         if self.game.show_collision:
             pygame.draw.circle(surface, config.COLOR_DEBUG, (sx, sy),
                                int(self.player.pickup_radius), width=1)
+
+    def _hero_sprite_frame(self):
+        if self._hero_anim is None:
+            return None
+        assets = self.game.assets
+        rig = self._hero_anim.rig
+        flip = self.player._facing < 0 and assets.face(rig) == "right"
+        return self._hero_anim.frame(size=assets.scale_for(rig), flip=flip)

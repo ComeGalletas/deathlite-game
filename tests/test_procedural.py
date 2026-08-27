@@ -62,5 +62,32 @@ class StructureTests(unittest.TestCase):
             self.assertTrue(c.rect.colliderect(ra) and c.rect.colliderect(rb))
 
 
+class GridAlignmentTests(unittest.TestCase):
+    """T7: room rects and corridor widths snap to config.TILE_PX so the tiled
+    renderer covers each cell exactly."""
+
+    def test_room_dims_are_tile_multiples(self):
+        from game import config
+        for seed in (1, 7, 99, 1234):
+            for r in generate_world(seed).rooms:
+                self.assertEqual(r.rect.width % config.TILE_PX, 0, f"seed {seed}")
+                self.assertEqual(r.rect.height % config.TILE_PX, 0, f"seed {seed}")
+                self.assertGreaterEqual(min(r.rect.width, r.rect.height),
+                                        3 * config.TILE_PX)
+
+    def test_corridors_are_one_tile_wide(self):
+        from game import config
+        for seed in (1, 7, 99, 1234):
+            for c in generate_world(seed).corridors:
+                self.assertEqual(min(c.rect.width, c.rect.height), config.TILE_PX)
+
+    def test_snapped_layout_still_connected_and_non_overlapping(self):
+        w = generate_world(2024)
+        self.assertTrue(w.is_connected())
+        for i, r in enumerate(w.rooms):
+            for other in w.rooms[i + 1:]:
+                self.assertFalse(r.rect.colliderect(other.rect))
+
+
 if __name__ == "__main__":
     unittest.main()

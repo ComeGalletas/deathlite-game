@@ -1,0 +1,80 @@
+{
+  "tile_px": 64,
+  "floor_sheet": "terrain/tileset/Tilemap_color1.png",
+  "grid": [9, 6],
+  "water_tile": "terrain/tileset/Water_Background.png",
+
+  "slots": {
+    "interior": 10,
+    "edge_n": 1, "edge_s": 19, "edge_w": 9, "edge_e": 11,
+    "corner_nw": 0, "corner_ne": 2, "corner_sw": 18, "corner_se": 20,
+    "strip_v": [3, 12, 21],
+    "strip_h": [27, 28, 29],
+    "single": 30
+  },
+
+  "bridge": {
+    "sheet": "Bridge/Bridge_All.png",
+    "grid": [3, 4],
+    "slots": {
+      "h_left": 0, "h_mid": 1, "h_right": 2,
+      "v_top": 3, "v_mid": 6, "v_bot": 9
+    }
+  },
+
+  "room_palettes": {
+    "default":  "terrain/tileset/Tilemap_color1.png",
+    "boss":     "terrain/tileset/Tilemap_color4.png",
+    "treasure": "terrain/tileset/Tilemap_color2.png",
+    "shrine":   "terrain/tileset/Tilemap_color3.png",
+    "fountain": "terrain/tileset/Tilemap_color5.png"
+  },
+
+  "decorations": [
+    {"id": "pebble_small",  "rig": "deco_rock_1", "placement": "room_interior", "scale": 0.45, "per_room": [1, 4], "collision": false},
+    {"id": "pebble_flat",   "rig": "deco_rock_3", "placement": "room_interior", "scale": 0.5,  "per_room": [0, 3], "collision": false},
+    {"id": "water_rock_a",  "rig": "deco_water_rock_1", "placement": "void", "scale": 1.0, "chance": 0.05},
+    {"id": "water_rock_b",  "rig": "deco_water_rock_2", "placement": "void", "scale": 1.0, "chance": 0.05},
+    {"id": "water_rock_c",  "rig": "deco_water_rock_3", "placement": "void", "scale": 0.85, "chance": 0.04},
+    {"id": "water_rock_d",  "rig": "deco_water_rock_4", "placement": "void", "scale": 0.85, "chance": 0.04},
+    {"id": "duck",          "rig": "deco_duck", "placement": "void", "scale": 1.0, "chance": 0.02}
+  ],
+
+  "obstacle_decor": {
+    "size_boost": 1.25,
+    "shadow": "terrain/tileset/Shadow.png",
+    "shadow_blob": 70,
+    "rigs": {
+      "tree":   ["deco_tree_1", "deco_tree_2", "deco_tree_3", "deco_tree_4"],
+      "shrub":  ["deco_bush_1", "deco_bush_2", "deco_bush_3", "deco_bush_4"],
+      "rock":   ["deco_rock_1", "deco_rock_2", "deco_rock_3", "deco_rock_4"],
+      "pillar": ["deco_rock_1", "deco_rock_2", "deco_rock_3", "deco_rock_4"]
+    }
+  },
+
+  "rigs": {
+    "deco_bush_1": {"frame": [128, 128], "anchor": [64, 76], "footprint": 67, "anims": {"loop": {"file": "terrain/decorations/bushes/Bushe1.png", "frames": 8, "fps": 6, "loop": true}}},
+    "deco_bush_2": {"frame": [128, 128], "anchor": [64, 76], "footprint": 46, "anims": {"loop": {"file": "terrain/decorations/bushes/Bushe2.png", "frames": 8, "fps": 6, "loop": true}}},
+    "deco_bush_3": {"frame": [128, 128], "anchor": [64, 80], "footprint": 79, "anims": {"loop": {"file": "terrain/decorations/bushes/Bushe3.png", "frames": 8, "fps": 6, "loop": true}}},
+    "deco_bush_4": {"frame": [128, 128], "anchor": [64, 76], "footprint": 46, "anims": {"loop": {"file": "terrain/decorations/bushes/Bushe4.png", "frames": 8, "fps": 6, "loop": true}}},
+
+    "deco_rock_1": {"frame": [64, 64], "anchor": [32, 50], "footprint": 32, "anims": {"loop": {"file": "terrain/decorations/rocks/Rock1.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_rock_2": {"frame": [64, 64], "anchor": [32, 50], "footprint": 50, "anims": {"loop": {"file": "terrain/decorations/rocks/Rock2.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_rock_3": {"frame": [64, 64], "anchor": [32, 50], "footprint": 39, "anims": {"loop": {"file": "terrain/decorations/rocks/Rock3.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_rock_4": {"frame": [64, 64], "anchor": [32, 50], "footprint": 59, "anims": {"loop": {"file": "terrain/decorations/rocks/Rock4.png", "frames": 1, "fps": 0, "loop": false}}},
+
+    "deco_tree_1": {"frame": [192, 256], "anchor": [94, 241], "footprint": 59, "anims": {"loop": {"file": "terrain/resources/trees/Tree1.png", "frames": 8, "fps": 5, "loop": true}}},
+    "deco_tree_2": {"frame": [192, 256], "anchor": [95, 249], "footprint": 63, "anims": {"loop": {"file": "terrain/resources/trees/Tree2.png", "frames": 8, "fps": 5, "loop": true}}},
+    "deco_tree_3": {"frame": [192, 192], "anchor": [96, 170], "footprint": 43, "anims": {"loop": {"file": "terrain/resources/trees/Tree3.png", "frames": 8, "fps": 5, "loop": true}}},
+    "deco_tree_4": {"frame": [192, 192], "anchor": [98, 168], "footprint": 32, "anims": {"loop": {"file": "terrain/resources/trees/Tree4.png", "frames": 8, "fps": 5, "loop": true}}},
+
+    "deco_water_rock_1": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/decorations/water_rocks/Water_Rocks_01.png", "frames": 16, "fps": 10, "loop": true}}},
+    "deco_water_rock_2": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/decorations/water_rocks/Water_Rocks_02.png", "frames": 16, "fps": 10, "loop": true}}},
+    "deco_water_rock_3": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/decorations/water_rocks/Water_Rocks_03.png", "frames": 16, "fps": 10, "loop": true}}},
+    "deco_water_rock_4": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/decorations/water_rocks/Water_Rocks_04.png", "frames": 16, "fps": 10, "loop": true}}},
+
+    "deco_duck": {"frame": [32, 32], "anchor": [16, 24], "anims": {"loop": {"file": "terrain/decorations/duck/Rubber_Duck.png", "frames": 3, "fps": 5, "loop": true}}},
+
+    "terrain_foam": {"frame": [192, 192], "anims": {"loop": {"file": "terrain/tileset/Water_Foam.png", "frames": 16, "fps": 12, "loop": true}}}
+  }
+}

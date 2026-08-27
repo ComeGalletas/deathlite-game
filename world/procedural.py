@@ -111,12 +111,15 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         edges.append((occupied[parent], new_id))
 
     # --- build rooms (random floor size within each cell) --------
+    # Snapped to config.TILE_PX so the tiled renderer's cell grid covers the
+    # room exactly (no clipped autotile edge). Min 3 tiles -> a real interior.
+    px = config.TILE_PX
     rooms: list[Room] = []
     for cell in order:
         rid = occupied[cell]
         full = _cell_rect(cell, chunk)
-        w = int(full.width * rng.uniform(0.55, 0.86))
-        h = int(full.height * rng.uniform(0.55, 0.86))
+        w = max(3 * px, round(full.width * rng.uniform(0.55, 0.86) / px) * px)
+        h = max(3 * px, round(full.height * rng.uniform(0.55, 0.86) / px) * px)
         rect = pygame.Rect(0, 0, w, h)
         rect.center = full.center
         rooms.append(Room(rid, cell, rect, "combat"))
@@ -126,8 +129,9 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         rooms[b].neighbors.append(a)
 
     # --- corridors along each tree edge -----------------------
+    # One tile wide -- rendered as a plank bridge over the water (terrain T7).
     corridors: list[Corridor] = []
-    width = max(72, chunk // 8)
+    width = px
     for a, b in edges:
         ra, rb = rooms[a].rect, rooms[b].rect
         if ra.centerx == rb.centerx:  # vertical neighbour
@@ -156,6 +160,7 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
     for c in corridors:
         union.union_ip(c.rect)
     union.inflate_ip(chunk, chunk)
+
     # Shift the whole world so bounds start at (0, 0) -- keeps camera clamp simple.
     shift = pygame.Vector2(-union.x, -union.y)
     for r in rooms:
@@ -207,6 +212,11 @@ def _scatter_obstacles(rooms, rng, start_id, boss_id) -> list:
                                    weights=(4, 3, 2, 3), k=1)[0]
                 out.append(Obstacle(kind, x, y))
                 break
+
+    # Cosmetic decoration variant per obstacle (see world/map.py). Assigned in a
+    # separate pass so placement above is byte-identical to before this existed.
+    for o in out:
+        o.variant = rng.randint(1, 4)
     return out
 
 

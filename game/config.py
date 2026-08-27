@@ -11,8 +11,8 @@ import pygame
 # --- Display -----------------------------------------------------------------
 SCREEN_WIDTH: int = 1280
 SCREEN_HEIGHT: int = 720
-FPS: int = 60
-TITLE: str = "Death Lite Die"
+FPS: int = 120
+TITLE: str = "Death Lite Game"
 
 # Largest delta time (seconds) a single frame is allowed to represent. Without
 # this a stall (e.g. window drag) produces a huge dt that tunnels entities
@@ -28,6 +28,24 @@ WORLD_HEIGHT: int = 3200
 # joined into a tree of corridors. See world/procedural.py.
 CHUNK_SIZE: int = 720
 WORLD_ROOM_COUNT: int = 16
+# World grid unit. Room rects and corridor widths are snapped to this so the
+# tiled renderer covers each cell exactly (terrain T7). Keep in sync with
+# data/terrain.json "tile_px" (Assets.tile uses that for sheet slicing).
+TILE_PX: int = 64
+
+# Animated shoreline foam where a room floor meets the water (terrain T3).
+# Off falls back to the baked autotile edge tiles alone.
+TERRAIN_FOAM: bool = True
+# Obstacle skins: every convex obstacle is drawn as a bush / rock decoration
+# sprite scaled to its collider (terrain T4). Off -> plain drawn circles.
+TERRAIN_DECORATIONS: bool = True
+# Non-colliding scenery scatter (terrain T8): clutter on room interiors and
+# water scenery (rocks / a duck) in the void. Purely cosmetic -- no effect on
+# walkability. Data-driven from data/terrain.json "decorations".
+TERRAIN_DECOR: bool = True
+# Soft contact shadow (Shadow.png) under every skinned obstacle (terrain T9).
+# Needs TERRAIN_DECORATIONS on. Off -> sprites sit flush on the grass.
+TERRAIN_SHADOWS: bool = True
 
 # --- Colours (RGB) ---------------------------------------------------------
 COLOR_BG = (16, 16, 22)
@@ -39,6 +57,24 @@ COLOR_TEXT = (230, 230, 238)
 COLOR_TEXT_DIM = (150, 150, 165)
 COLOR_ACCENT = (255, 205, 90)
 COLOR_DEBUG = (120, 255, 140)
+
+# --- Start menu ----------------------------------------------------------
+# The start screen has its own black / white palette; every other screen
+# keeps the COLOR_* palette above.
+MENU_BG = (0, 0, 0)
+MENU_FG = (255, 255, 255)
+MENU_FG_DIM = (170, 170, 170)
+# Optional full-screen title art, drawn over the fallback title text (the text
+# shows only when this file is missing). A PNG at the root of assets/ -- the
+# space in the name is intentional. MENU_SCRIM is a translucent panel (RGBA)
+# laid over the art behind the option list so the white text stays readable.
+MENU_TITLE_IMAGE: str = "title screen.png"
+MENU_SCRIM = (0, 0, 0, 205)
+
+# --- Audio ---------------------------------------------------------------
+# Master-volume step for the Options screen (0..1). The slider snaps to this
+# grid; AudioManager.set_volume() clamps to [0, 1].
+VOLUME_STEP: float = 0.05
 
 # --- Entity limits (graceful degradation, not crashes, when exceeded) -----
 MAX_ENEMIES: int = 600
@@ -72,6 +108,17 @@ PLAYER_RADIUS: int = 16
 # competent run actually finishes the loop; the boss still lands near the end.
 RUN_DURATION_SECONDS: float = 600.0
 BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
+
+# --- Combat: incoming damage -----------------------------------------
+# Contact and hazard damage land as discrete "bites" this many seconds apart,
+# not once per frame. Armor is a flat per-hit subtraction, so a per-frame slice
+# (rate / fps) would be fully absorbed -- see journals/BUG_JOURNAL.md #1. Each
+# bite is `rate * interval` before armor, so the pre-armor DPS is unchanged.
+# Individual attacks may override this via `contact_interval` (enemies / boss)
+# or `hazard_tick` (warlock hazards). Keep `rate * interval` a healthy multiple
+# of the largest expected armor, or an armored hero goes immune to that attack:
+#     interval > armor / (rate * bulwark)
+INCOMING_TICK_INTERVAL: float = 0.5
 
 # --- Spatial grid -------------------------------------------------------
 # Broad-phase collision cell size. Roughly 2x the biggest common entity.

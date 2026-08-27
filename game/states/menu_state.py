@@ -1,4 +1,17 @@
-"""MENU: title screen and entry point into a run."""
+"""MENU: title screen and entry point into a run.
+
+A keyboard-navigated option list sits under the title. ENTER / SPACE activates
+the highlighted entry; Up / Down (also W / S and the arrow keys) move the cursor
+and wrap; ESC quits.
+
+Start-screen milestones: M1 gave the list its navigation; M2 wired "Options" to
+the Options screen; M3 gave this screen its own black / white palette and an
+optional full-screen title image (`config.MENU_TITLE_IMAGE`) drawn over a text
+fallback, with a translucent scrim behind the content so the white text stays
+readable over the art; M4 moved the game instructions into their own left-hand
+column at ~85% of the option font. Developer-mode milestone D1 wired the
+"developer mode" entry to a non-persistent sandbox run.
+"""
 from __future__ import annotations
 
 import pygame
@@ -9,46 +22,125 @@ from game.state import State
 
 class MenuState(State):
     def enter(self, **kwargs) -> None:
+        self._menu_font_px = 24
+        # The instructions section is ~15% smaller than the option font.
+        self._instr_font_px = round(self._menu_font_px * 0.85)
         self._title_font = pygame.font.SysFont("georgia", 64, bold=True)
-        self._font = pygame.font.SysFont("georgia", 24)
-        self._small = pygame.font.SysFont("georgia", 18)
+        self._font = pygame.font.SysFont("georgia", self._menu_font_px)
+        self._instr_font = pygame.font.SysFont("georgia", self._instr_font_px)
+        self._small = pygame.font.SysFont("georgia", 16)
 
+        # (label, action). `action` is dispatched in _activate(); an entry whose
+        # action is None is drawn but does nothing when selected.
+        self._options: list[tuple[str, str | None]] = [
+            ("Start new game", "start"),
+            ("Start new developer mode game", "dev_start"),
+            ("Options", "options"),
+            ("Exit", "exit"),
+        ]
+        self._index = 0
+
+        # Game instructions -- a (label, keys) grid plus free lines, shown in a
+        # left-hand column (M4).
+        self._instr_rows: list[tuple[str, str]] = [
+            ("Move", "WASD / Arrows"),
+            ("Pause", "ESC"),
+            ("Mute", "M"),
+            ("Debug overlay", "F1"),
+        ]
+        self._instr_notes: list[str] = [
+            "Weapons fire on their own.",
+            "Survive, level up, beat the boss.",
+        ]
+
+    # --- input ---------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.KEYDOWN:
             return
-        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            # Imported here to avoid a circular import at module load.
-            from game.states.character_select_state import CharacterSelectState
-            self.game.state_machine.change(CharacterSelectState(self.game))
-        elif event.key == pygame.K_s:
-            from game.states.meta_state import MetaState
-            self.game.state_machine.change(MetaState(self.game))
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self._index = (self._index - 1) % len(self._options)
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self._index = (self._index + 1) % len(self._options)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._activate(self._options[self._index][1])
         elif event.key == pygame.K_ESCAPE:
             self.game.quit()
 
+    def _activate(self, action: str | None) -> None:
+        # Imported here to avoid a circular import at module load.
+        if action in ("start", "dev_start"):
+            from game.states.character_select_state import CharacterSelectState
+            self.game.state_machine.change(CharacterSelectState(self.game),
+                                           dev=(action == "dev_start"))
+        elif action == "options":
+            from game.states.options_state import OptionsState
+            self.game.state_machine.change(OptionsState(self.game))
+        elif action == "exit":
+            self.game.quit()
+        # action is None -> inert (drawn but does nothing).
+
+    # --- render ------------------------------------------------------
     def draw(self, surface: pygame.Surface) -> None:
-        surface.fill(config.COLOR_BG)
-        cx = config.SCREEN_WIDTH // 2
+        w, h = config.SCREEN_WIDTH, config.SCREEN_HEIGHT
+        cx = w // 2
+        surface.fill(config.MENU_BG)
 
-        title = self._title_font.render(config.TITLE, True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(cx, 200)))
+        art = self.game.assets.picture(config.MENU_TITLE_IMAGE, size=(w, h))
+        if art is not None:
+            surface.blit(art, (0, 0))
+        else:
+            # Fallback: the title as text when the art file is absent.
+            title = self._title_font.render(config.TITLE, True, config.MENU_FG)
+            surface.blit(title, title.get_rect(center=(cx, 170)))
 
-        for i, line in enumerate((
-            "Press  ENTER  or  SPACE  to begin",
-            "S  -  Sanctuary (spend Salvage, equip items)",
-            "WASD / Arrows to move    -    ESC to pause    -    M to mute",
-            "Weapons fire on their own. Survive, level up, beat the boss.",
-            "F1 toggles the debug overlay",
-        )):
-            colour = config.COLOR_TEXT if i == 0 else config.COLOR_TEXT_DIM
-            text = self._font.render(line, True, colour)
-            surface.blit(text, text.get_rect(center=(cx, 320 + i * 38)))
+        band = pygame.Rect(40, 338, w - 80, 360)
+        scrim = pygame.Surface(band.size, pygame.SRCALPHA)
+        pygame.draw.rect(scrim, config.MENU_SCRIM, scrim.get_rect(), border_radius=16)
+        surface.blit(scrim, band.topleft)
 
+        self._draw_instructions(surface, band)
+
+        # --- option list, centred ---
+        top, step = 372, 44
+        for i, (label, _action) in enumerate(self._options):
+            selected = i == self._index
+            colour = config.MENU_FG if selected else config.MENU_FG_DIM
+            text = self._font.render(label, True, colour)
+            rect = text.get_rect(center=(cx, top + i * step))
+            surface.blit(text, rect)
+            if selected:
+                mark = self._font.render(">", True, config.MENU_FG)
+                surface.blit(mark, mark.get_rect(midright=(rect.left - 16, rect.centery)))
+
+        nav = self._small.render("Up / Down    -    ENTER select    -    ESC quit",
+                                 True, config.MENU_FG_DIM)
+        surface.blit(nav, nav.get_rect(center=(cx, top + len(self._options) * step + 6)))
+
+        # --- save summary, bottom centre ---
         save = self.game.save
         best = save.best
         summary = (f"Salvage {save.currency}    "
                    f"Best: {best.get('time', 0):.0f}s / Lv {int(best.get('level', 1))} / "
                    f"{int(best.get('kills', 0))} kills    "
                    f"Items found {len(save.discovered_items)}")
-        s = self._small.render(summary, True, config.COLOR_TEXT_DIM)
-        surface.blit(s, s.get_rect(center=(cx, 320 + 5 * 38 + 16)))
+        s = self._small.render(summary, True, config.MENU_FG_DIM)
+        surface.blit(s, s.get_rect(center=(cx, h - 40)))
+
+    def _draw_instructions(self, surface: pygame.Surface, band: pygame.Rect) -> None:
+        """Game instructions, left-justified in a column on the left of the band
+        (M4). Left of the centred option list, at ~85% of the option font."""
+        x = band.left + 28
+        keys_right = x + 262           # right-aligned key column, clear of the menu
+        y = band.top + 26
+        surface.blit(self._instr_font.render("Instructions", True, config.MENU_FG),
+                     (x, y))
+        y += self._instr_font_px + 12
+        for label, keys in self._instr_rows:
+            surface.blit(self._instr_font.render(label, True, config.MENU_FG_DIM), (x, y))
+            val = self._instr_font.render(keys, True, config.MENU_FG_DIM)
+            surface.blit(val, val.get_rect(topright=(keys_right, y)))
+            y += self._instr_font_px + 7
+        y += 12
+        for note in self._instr_notes:
+            surface.blit(self._instr_font.render(note, True, config.MENU_FG_DIM), (x, y))
+            y += self._instr_font_px + 7

@@ -61,6 +61,13 @@ class Player:
         self.still_time: float = 0.0     # Aegis / Bulwark
         self._hexed: set[int] = set()    # Nihil / Cursebrand -- enemies already cursed
 
+        # Sprite-animation state (read by PlayingState's animator; harmless when
+        # the hero has no sprite rig). `_facing` is +1 right / -1 left, kept
+        # from the last non-zero horizontal input.
+        self._hurt_t: float = 0.0
+        self._attack_t: float = 0.0
+        self._facing: int = 1
+
     # --- stats -----------------------------------------------------
     def recompute(self) -> None:
         self.stats = self.statset.as_dict()
@@ -102,6 +109,11 @@ class Player:
     def handle_input(self, pressed) -> None:
         self._move_dir = input_vector(pressed)
 
+    def trigger_attack_anim(self, duration: float = 0.38) -> None:
+        """Called by PlayingState when a weapon fires -- drives the attack
+        animation. No gameplay effect."""
+        self._attack_t = max(self._attack_t, duration)
+
     def update(self, dt: float, world) -> None:
         target = self.pos + self._move_dir * self.move_speed * dt
         self.pos = world.resolve_movement(self.pos, target, self.radius)
@@ -112,12 +124,21 @@ class Player:
             self.momentum = (min(5.0, self.momentum + dt * 2.5) if moving
                              else max(0.0, self.momentum - dt * 3.5))
 
+        if self._move_dir.x > 0.01:
+            self._facing = 1
+        elif self._move_dir.x < -0.01:
+            self._facing = -1
+        self._hurt_t = max(0.0, self._hurt_t - dt)
+        self._attack_t = max(0.0, self._attack_t - dt)
+
     def take_damage(self, amount: float) -> float:
         if self.invulnerable or not self.alive:
             return 0.0
         amount *= self.incoming_damage_multiplier()
         dealt = max(0.0, amount - self.stats["armor"])
         self.hp -= dealt
+        if dealt > 0:
+            self._hurt_t = 0.30          # ~4 frames @ 14 fps (hurt animation)
         if self.hp <= 0:
             self.hp = 0.0
             self.alive = False

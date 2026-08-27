@@ -19,12 +19,15 @@ KINDS = {
 
 
 class Obstacle:
-    __slots__ = ("pos", "radius", "kind", "blocks_projectiles", "color")
+    __slots__ = ("pos", "radius", "kind", "blocks_projectiles", "color", "variant")
 
-    def __init__(self, kind: str, x: float, y: float) -> None:
+    def __init__(self, kind: str, x: float, y: float, variant: int = 1) -> None:
         radius, blocks_proj, color = KINDS.get(kind, KINDS["rock"])
         self.kind = kind
         self.pos = pygame.Vector2(x, y)
         self.radius = radius
         self.blocks_projectiles = blocks_proj
         self.color = color
+        # Cosmetic only: which decoration variant skins this obstacle (1..4).
+        # Chosen from the run seed; never affects collision.
+        self.variant = int(variant)
