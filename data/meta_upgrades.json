@@ -1,0 +1,8 @@
+{
+  "constitution": {"name": "Constitution", "desc": "+2% max HP per level",        "stat": "max_hp",   "op": "pct",  "per_level": 0.02, "max_level": 10, "cost_base": 35, "cost_step": 20},
+  "swiftness":    {"name": "Swiftness",    "desc": "+1% movement speed per level", "stat": "move_speed","op": "pct",  "per_level": 0.01, "max_level": 10, "cost_base": 35, "cost_step": 20},
+  "fortune":      {"name": "Fortune",      "desc": "+1 luck per level",            "stat": "luck",     "op": "flat", "per_level": 1.0,  "max_level": 5,  "cost_base": 50, "cost_step": 35},
+  "scholar":      {"name": "Scholar",      "desc": "+2% XP gain per level",        "stat": "xp_gain",  "op": "flat", "per_level": 0.02, "max_level": 10, "cost_base": 40, "cost_step": 25},
+  "ferocity":     {"name": "Ferocity",     "desc": "+1% damage per level",         "stat": "damage_multiplier", "op": "flat", "per_level": 0.01, "max_level": 10, "cost_base": 45, "cost_step": 30},
+  "salvager":     {"name": "Salvager",     "desc": "+4% Salvage from runs per level", "stat": "__salvage_gain", "op": "flat", "per_level": 0.04, "max_level": 8, "cost_base": 60, "cost_step": 40}
+}

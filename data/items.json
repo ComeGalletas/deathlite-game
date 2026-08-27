@@ -1,0 +1,46 @@
+{
+  "bases": {
+    "weapon": [
+      {"id": "sigil",  "name": "Battle Sigil",  "stat": "damage_multiplier",        "op": "flat", "min": 0.05, "max": 0.12},
+      {"id": "focus",  "name": "Focusing Lens",  "stat": "attack_speed_multiplier",  "op": "flat", "min": 0.05, "max": 0.12}
+    ],
+    "armor": [
+      {"id": "plate",  "name": "Iron Plating",   "stat": "armor",   "op": "flat", "min": 2,  "max": 6},
+      {"id": "weave",  "name": "Warded Weave",    "stat": "max_hp",  "op": "flat", "min": 14, "max": 30}
+    ],
+    "accessory": [
+      {"id": "band",   "name": "Traveller Band",  "stat": "move_speed",     "op": "mult", "min": 0.04, "max": 0.09},
+      {"id": "charm",  "name": "Magpie Charm",    "stat": "pickup_radius",  "op": "flat", "min": 15,   "max": 35}
+    ]
+  },
+
+  "affixes": {
+    "vitality":     {"name": "of Vitality",   "slots": ["armor", "accessory"],          "kind": "stat", "stat": "max_hp",                     "op": "flat", "values": {"common": 8,   "uncommon": 14,  "rare": 22,   "epic": 32,   "legendary": 45}},
+    "haste":        {"name": "of Haste",      "slots": ["weapon", "accessory"],         "kind": "stat", "stat": "attack_speed_multiplier",    "op": "flat", "values": {"common": 0.03,"uncommon": 0.05,"rare": 0.08, "epic": 0.11, "legendary": 0.15}},
+    "power":        {"name": "of Power",      "slots": ["weapon"],                      "kind": "stat", "stat": "damage_multiplier",          "op": "flat", "values": {"common": 0.03,"uncommon": 0.05,"rare": 0.08, "epic": 0.12, "legendary": 0.17}},
+    "swiftness":    {"name": "of Swiftness",  "slots": ["accessory", "armor"],          "kind": "stat", "stat": "move_speed",                 "op": "mult", "values": {"common": 0.02,"uncommon": 0.04,"rare": 0.06, "epic": 0.09, "legendary": 0.13}},
+    "warding":      {"name": "of Warding",    "slots": ["armor"],                       "kind": "stat", "stat": "armor",                      "op": "flat", "values": {"common": 1,   "uncommon": 2,   "rare": 4,    "epic": 6,    "legendary": 9}},
+    "precision":    {"name": "of Precision",  "slots": ["weapon", "accessory"],         "kind": "stat", "stat": "crit_chance",                "op": "flat", "values": {"common": 0.02,"uncommon": 0.03,"rare": 0.05, "epic": 0.07, "legendary": 0.10}},
+    "cruelty":      {"name": "of Cruelty",    "slots": ["weapon"],                      "kind": "stat", "stat": "crit_damage",                "op": "flat", "values": {"common": 0.10,"uncommon": 0.18,"rare": 0.28, "epic": 0.42, "legendary": 0.60}},
+    "greed":        {"name": "of Greed",      "slots": ["accessory"],                   "kind": "stat", "stat": "pickup_radius",              "op": "flat", "values": {"common": 8,   "uncommon": 14,  "rare": 22,   "epic": 32,   "legendary": 45}},
+    "fortune":      {"name": "of Fortune",    "slots": ["accessory"],                   "kind": "stat", "stat": "luck",                       "op": "flat", "values": {"common": 1,   "uncommon": 1,   "rare": 2,    "epic": 3,    "legendary": 4}},
+    "expanse":      {"name": "of Expanse",    "slots": ["weapon", "armor"],             "kind": "stat", "stat": "area_multiplier",            "op": "pct",  "values": {"common": 0.04,"uncommon": 0.07,"rare": 0.11, "epic": 0.16, "legendary": 0.22}},
+    "velocity":     {"name": "of Velocity",   "slots": ["weapon"],                      "kind": "stat", "stat": "projectile_speed_multiplier","op": "flat", "values": {"common": 0.05,"uncommon": 0.08,"rare": 0.12, "epic": 0.17, "legendary": 0.24}},
+    "scholarship":  {"name": "of Scholarship","slots": ["accessory", "armor"],          "kind": "stat", "stat": "xp_gain",                    "op": "flat", "values": {"common": 0.03,"uncommon": 0.05,"rare": 0.08, "epic": 0.12, "legendary": 0.17}},
+    "the_pyre":     {"name": "of the Pyre",   "slots": ["weapon"],                      "kind": "tag_damage", "tag": "fire",                    "values": {"common": 0.05,"uncommon": 0.09,"rare": 0.14, "epic": 0.20, "legendary": 0.28}},
+    "the_maw":      {"name": "of the Maw",    "slots": ["weapon"],                      "kind": "tag_damage", "tag": "area",                    "values": {"common": 0.05,"uncommon": 0.09,"rare": 0.14, "epic": 0.20, "legendary": 0.28}},
+    "the_hunt":     {"name": "of the Hunt",   "slots": ["weapon", "accessory"],         "kind": "tag_damage", "tag": "elite",                   "values": {"common": 0.06,"uncommon": 0.11,"rare": 0.17, "epic": 0.25, "legendary": 0.35}},
+    "the_storm":    {"name": "of the Storm",  "slots": ["weapon"],                      "kind": "tag_damage", "tag": "lightning",               "values": {"common": 0.05,"uncommon": 0.09,"rare": 0.14, "epic": 0.20, "legendary": 0.28}},
+    "the_frost":    {"name": "of the Frost",  "slots": ["weapon"],                      "kind": "tag_damage", "tag": "frost",                   "values": {"common": 0.05,"uncommon": 0.09,"rare": 0.14, "epic": 0.20, "legendary": 0.28}}
+  },
+
+  "prefixes": {
+    "common": "Plain", "uncommon": "Fine", "rare": "Runed", "epic": "Ascendant", "legendary": "Mythic"
+  },
+
+  "unique_effects": {
+    "weapon":    {"id": "overflow",   "name": "Overflow",   "desc": "+1 projectile to your first weapon."},
+    "armor":     {"id": "aegis_ward", "name": "Aegis Ward", "desc": "Start each run with a one-hit shield."},
+    "accessory": {"id": "hoarder",    "name": "Hoarder",    "desc": "+25% Salvage from a run."}
+  }
+}
