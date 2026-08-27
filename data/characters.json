@@ -6,6 +6,7 @@
     "trait_desc": "After 0.4s without moving, take 30% less damage.",
     "trait": "bulwark",
     "starting_weapon": "soul_scythe",
+    "sprite": "soldier",
     "base_stats": {
       "max_hp": 160,
       "move_speed": 210,

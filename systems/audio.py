@@ -55,8 +55,8 @@ def _tone(freq: float, dur: float, vol: float = 1.0, shape: str = "sine",
     return out
 
 
-def _noise(dur: float, vol: float = 1.0, rng: random.Random | None = None) -> list[float]:
-    rng = rng or random
+def _noise(dur: float, vol: float = 1.0, input_rng: random.Random | None = None) -> list[float]:
+    rng = input_rng or random
     n = int(_RATE * dur)
     return [(rng.uniform(-1, 1)) * ((1.0 - i / n) ** 2) * vol * _AMP for i in range(n)]
 
@@ -95,7 +95,7 @@ class AudioManager:
         self.volume = 0.7
         self._sounds: dict[str, pygame.mixer.Sound] = {}
         self._last_play: dict[str, int] = {}
-        self._min_gap_ms = {"shoot": 55, "hit": 40, "xp": 45}
+        self._min_gap_ms = {"shoot": 75, "hit": 50, "xp": 45}  # minimum gap between consecutive plays of each sound in milliseconds
 
         try:
             # Re-init to our exact format so buffers play at the right pitch
@@ -121,6 +121,12 @@ class AudioManager:
 
     def toggle_mute(self) -> None:
         self.muted = not self.muted
+
+    def set_volume(self, v: float) -> None:
+        """Master volume, clamped to [0, 1]. `play()` applies it per cue, so a
+        bare assignment would work too -- this is the one place the clamp and
+        the float tidy-up live."""
+        self.volume = round(max(0.0, min(1.0, float(v))), 4)
 
     def play(self, name: str) -> None:
         if not self.enabled or self.muted:

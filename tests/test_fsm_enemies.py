@@ -23,7 +23,7 @@ def ctx(dt=1 / 30, player=(0, 0), **cb):
         fire_projectile=lambda **kw: None,
         summon=lambda *a: None, explosion=lambda *a: None,
         resolve_movement=lambda prev, new, r: new,
-        spawn_hazard=lambda pos, radius, dps, duration:
+        spawn_hazard=lambda pos, radius, dps, duration, tick_interval=None:
             calls["hazards"].append((tuple(pos), radius, dps, duration)),
     )
     base.update(cb)

@@ -12,6 +12,9 @@ import pygame
 from combat.damage import apply_armor
 from combat.status import StatusState
 from entities.enemy_ai import BEHAVIORS, EnemyContext, chase
+from game import config
+from game.assets import get_assets
+from systems.animation import Animator
 
 
 class Enemy:
@@ -24,6 +27,11 @@ class Enemy:
         self.speed = float(definition["speed"])
         self.contact_damage = float(definition["contact_damage"])
         self._base_contact = self.contact_damage  # FSM attacks bump this transiently
+        # Contact damage lands as a bite every `contact_interval` s (armor is a
+        # flat per-hit subtraction). `contact_cd` counts down to the next bite.
+        self.contact_interval = float(
+            definition.get("contact_interval", config.INCOMING_TICK_INTERVAL))
+        self.contact_cd = 0.0
         self.radius = float(definition["radius"])
         self.xp_reward = int(definition.get("experience_reward", 1))
         self.behavior = definition.get("behavior", "chase")
@@ -44,6 +52,13 @@ class Enemy:
         self.ai: dict = {}
         self.status = StatusState()
 
+        # Sprite animation (only for variants that declare a rig; the rest draw
+        # a primitive). `_hurt_t` drives the flinch anim; `_facing` is +1/-1.
+        rig = definition.get("sprite")
+        self.anim = Animator(get_assets(), rig) if rig else None
+        self._hurt_t = 0.0
+        self._facing = -1
+
     # --- combat -----------------------------------------------------
     def apply_knockback(self, direction: pygame.Vector2, strength: float) -> None:
         # Elites and bosses resist being shoved around.
@@ -55,6 +70,9 @@ class Enemy:
     def take_damage(self, amount: float, armor: float = 0.0) -> float:
         dealt = apply_armor(amount, armor)
         self.hit_flash = 0.08
+        if self.anim is not None:
+            self._hurt_t = 0.26                     # ~4 frames @ 14 fps (flinch)
+            self.anim.play("hurt", restart=True)
         if self.shield_hp > 0.0:
             absorbed = min(self.shield_hp, dealt)
             self.shield_hp -= absorbed
@@ -68,6 +86,7 @@ class Enemy:
     # --- per-frame ------------------------------------------------
     def update(self, ctx: EnemyContext) -> None:
         self.contact_damage = self._base_contact
+        self.contact_cd = max(0.0, self.contact_cd - ctx.dt)
         BEHAVIORS.get(self.behavior, chase)(self, ctx)
 
         dt = ctx.dt
@@ -81,6 +100,23 @@ class Enemy:
             self._knock.update(0, 0)
         if self.hit_flash > 0.0:
             self.hit_flash = max(0.0, self.hit_flash - dt)
+
+        if self.anim is not None:
+            self._hurt_t = max(0.0, self._hurt_t - dt)
+            fdx = ctx.player_pos.x - self.pos.x
+            if fdx > 1.0:
+                self._facing = 1
+            elif fdx < -1.0:
+                self._facing = -1
+            self.anim.play(self._anim_name())
+            self.anim.update(dt)
+
+    def _anim_name(self) -> str:
+        if not self.alive:
+            return "death"
+        if self._hurt_t > 0.0:
+            return "hurt"
+        return "walk" if self.vel.length_squared() > 1.0 else "idle"
 
     def _status_damage(self, amount: float, ctx: EnemyContext) -> None:
         if not self.alive:

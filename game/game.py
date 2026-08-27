@@ -16,6 +16,7 @@ import time
 import pygame
 
 from game import config, save as save_mod
+from game.assets import get_assets
 from game.content import get_content
 from game.events import EventBus, Events
 from game.state import StateMachine
@@ -39,6 +40,9 @@ class Game:
 
         # Persistent progression (spec 4.7). Load is corruption-tolerant.
         self.content = get_content()
+        # Sprite/image cache. Lazy -- no disk read until a draw asks for a frame,
+        # and a missing file degrades to primitive drawing (never raises).
+        self.assets = get_assets()
         self.save_path = save_path or save_mod.DEFAULT_PATH
         self.save = save_mod.load(self.save_path)
         self.meta_catalog = MetaCatalog(self.content.meta_upgrades)
@@ -68,7 +72,9 @@ class Game:
         except OSError:
             log.exception("could not write save file")
 
-    def _on_run_ended(self, *, stats: dict, victory: bool) -> None:
+    def _on_run_ended(self, *, stats: dict, victory: bool, dev: bool = False) -> None:
+        if dev:
+            return  # developer-mode runs never bank salvage / best / loot or save
         gained = int(stats.get("currency", 0)
                      * self.meta_catalog.salvage_multiplier(self.save.meta))
         self.save.currency += gained

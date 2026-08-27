@@ -95,5 +95,46 @@ class DamageTests(unittest.TestCase):
         self.assertEqual(p.hp, p.max_hp)
 
 
+class AnimStateTests(unittest.TestCase):
+    """Phase B: sprite-animation timers/facing on Player (no gameplay effect)."""
+
+    def _world(self):
+        return _RectWorld(config.WORLD_WIDTH, config.WORLD_HEIGHT)
+
+    def test_hurt_timer_set_on_damage_and_decays(self):
+        p = Player(100, 100)
+        p.take_damage(10.0)
+        self.assertGreater(p._hurt_t, 0.0)
+        for _ in range(30):                       # 0.5 s
+            p.update(1 / 60, self._world())
+        self.assertEqual(p._hurt_t, 0.0)
+
+    def test_no_hurt_timer_when_damage_is_fully_mitigated(self):
+        p = Player(0, 0)
+        p.stats["armor"] = 999
+        p.take_damage(5.0)
+        self.assertEqual(p._hurt_t, 0.0)
+
+    def test_attack_timer_via_trigger_and_decays(self):
+        p = Player(0, 0)
+        p.trigger_attack_anim()
+        self.assertGreater(p._attack_t, 0.0)
+        for _ in range(40):
+            p.update(1 / 60, self._world())
+        self.assertEqual(p._attack_t, 0.0)
+
+    def test_facing_follows_horizontal_input_and_persists_when_still(self):
+        p = Player(1000, 1000)
+        p.handle_input(keys(pygame.K_d))
+        p.update(1 / 60, self._world())
+        self.assertEqual(p._facing, 1)
+        p.handle_input(keys(pygame.K_a))
+        p.update(1 / 60, self._world())
+        self.assertEqual(p._facing, -1)
+        p.handle_input(keys())                    # released -> keep last facing
+        p.update(1 / 60, self._world())
+        self.assertEqual(p._facing, -1)
+
+
 if __name__ == "__main__":
     unittest.main()

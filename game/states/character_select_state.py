@@ -14,6 +14,7 @@ from game.state import State
 
 class CharacterSelectState(State):
     def enter(self, **kwargs) -> None:
+        self._dev = bool(kwargs.get("dev", False))   # forwarded to the run
         self.content = get_content()
         self.ids = list(self.content.characters.keys())
         self.index = 0
@@ -32,7 +33,8 @@ class CharacterSelectState(State):
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             from game.states.playing_state import PlayingState
             self.game.state_machine.change(PlayingState(self.game),
-                                           character_id=self.ids[self.index])
+                                           character_id=self.ids[self.index],
+                                           dev=self._dev)
         elif event.key == pygame.K_ESCAPE:
             from game.states.menu_state import MenuState
             self.game.state_machine.change(MenuState(self.game))
