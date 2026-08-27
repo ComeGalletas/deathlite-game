@@ -1,0 +1,45 @@
+{
+  "aegis": {
+    "name": "Aegis",
+    "identity": "Slow, armoured, holds ground. Rewards standing still.",
+    "trait_name": "Bulwark",
+    "trait_desc": "After 0.4s without moving, take 30% less damage.",
+    "trait": "bulwark",
+    "starting_weapon": "soul_scythe",
+    "base_stats": {
+      "max_hp": 160,
+      "move_speed": 210,
+      "armor": 4,
+      "pickup_radius": 80
+    }
+  },
+  "kestrel": {
+    "name": "Kestrel",
+    "identity": "Fast and fragile. Damage scales with staying in motion.",
+    "trait_name": "Windborne",
+    "trait_desc": "Moving builds Momentum (max 5); each stack is +7% damage. Standing still bleeds it away.",
+    "trait": "windborne",
+    "starting_weapon": "frost_shards",
+    "base_stats": {
+      "max_hp": 92,
+      "move_speed": 320,
+      "armor": 0,
+      "pickup_radius": 110
+    }
+  },
+  "nihil": {
+    "name": "Nihil",
+    "identity": "Fragile status caster. Every enemy meets a curse first.",
+    "trait_name": "Cursebrand",
+    "trait_desc": "Your first hit on each enemy applies Shock (they take +10% damage for 4s).",
+    "trait": "cursebrand",
+    "starting_weapon": "thunder_orb",
+    "base_stats": {
+      "max_hp": 96,
+      "move_speed": 265,
+      "armor": 0,
+      "pickup_radius": 100,
+      "luck": 2
+    }
+  }
+}

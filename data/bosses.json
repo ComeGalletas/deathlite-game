@@ -1,0 +1,40 @@
+{
+  "the_first_hunger": {
+    "name": "The First Hunger",
+    "hp": 4200,
+    "speed": 78,
+    "contact_damage": 26,
+    "radius": 46,
+    "experience_reward": 400,
+    "reward_currency": 60,
+    "color": [180, 40, 70],
+    "tags": ["boss"],
+    "patterns": [
+      {
+        "id": "radial_barrage",
+        "telegraph": 0.9,
+        "duration": 0.4,
+        "recover": 1.6,
+        "bullets": 20,
+        "bullet_speed": 190,
+        "bullet_damage": 12
+      },
+      {
+        "id": "charge",
+        "telegraph": 1.0,
+        "duration": 0.55,
+        "recover": 1.4,
+        "charge_speed": 720,
+        "charge_damage": 30
+      },
+      {
+        "id": "summon_brood",
+        "telegraph": 0.7,
+        "duration": 0.2,
+        "recover": 2.2,
+        "summon_id": "swarm",
+        "summon_count": 8
+      }
+    ]
+  }
+}
