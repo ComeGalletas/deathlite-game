@@ -177,7 +177,7 @@ PLAYER_RADIUS: int = 10
 # of the collider radius, lifting `entity.pos` into the lower torso so more of
 # the sprite sits inside the circle. Render-only: collision, hit tests and the
 # depth sort keep using the unshifted `entity.pos`. 0.0 == no shift.
-SPRITE_ANCHOR_DROP: float = 0.87
+SPRITE_ANCHOR_DROP: float = 0.85
 
 # --- Run structure (spec 3.8) ----------------------------------------
 # Target run length. Spec suggests ~15-20 min but explicitly allows tuning
