@@ -1237,3 +1237,199 @@ the circle. At the shipped `PLAYER_RADIUS = 16` / `CAMERA_ZOOM = 1.5` that is
 Screenshots: F7 overlay before (rings at the feet / trunk base) vs after (rings
 around the lower torso / trunk, sprites sitting inside the circle). Tune via the
 single constant; `0.0` disables it everywhere.
+
+---
+
+## Wired the leftover `terrain/props` decorations (2026-08-28)
+
+`assets/terrain/props/` had unused PNGs. Added them as **non-colliding**
+decorations, data-only in `data/terrain.json` (no code):
+
+- **`deco_ground_1..18`** rigs -> `deco_1..18.png` (`deco_1..15` are 64x64,
+  `deco_16/17` 64x128, `deco_18` 192x192 -- all single static frames, anchored
+  at the art's base). 9 wired as `room_interior` entries (`sprout_a/b`, `twig`,
+  `flower_a/b`, `mushroom`, `reed_a/b`, `flower_patch`) at `per_room [0,1]` /
+  `[0,2]`, scale 0.35-0.6; the rest stay available.
+- **`deco_stump_1..4`** rigs -> `stump_1..4.png` (192x256, static). Two wired
+  (`stump_a`, `stump_b`) as `room_interior`, scale 0.5-0.55.
+- **`deco_cloud_1..8`** rigs -> `cloud_1..8.png` (576x256, static). Four wired
+  as `void` decorations, `chance` 0.005-0.006, scale 0.26-0.32 -- sparse cloud
+  puffs on the open water between islands. They sit on the void layer (behind
+  the islands), like the water rocks; an overhead/parallax pass could move them
+  later.
+
+All go through the existing `_build_decor_scatter` path: room clutter is
+spacing-capped (>= 40 px apart, fully-interior cells only, clear of the centre
+disc and obstacles) so the extra entries do not crowd a room; nothing here
+touches `obstacles` / `is_walkable`. `tests/test_terrain.py` (registry coherence
++ strip-width checks) validates every new rig/entry. Suite unchanged at 438.
+
+---
+
+## Houses — plan (2026-08-28)
+
+Place a house (large circular `Obstacle`) in sufficiently large rooms, reusing
+the whole obstacle pipeline; colour + type randomised from the run seed.
+Assets: `assets/buildings/<5 colours>/house_1..3.png` (128x192).
+
+- [x] `game/config.py` -- `TERRAIN_BUILDINGS: bool = True`.
+- [x] `entities/obstacle.py` -- `KINDS["house"] = (48, True, (150, 120, 90))`.
+- [x] `data/terrain.json` -- 15 `house_<colour>_<n>` rigs (`frame [128,192]`,
+  per-type `footprint` 112/128/122, feet anchors [64,173]/[64,178]/[64,172]) +
+  `obstacle_decor.rigs["house"]` list (blue, red, yellow, purple, black x 1..3).
+- [x] `world/procedural.py` `_scatter_houses(rooms, all_doors, rng, boss_id, out)`
+  -- runs **before** the small-obstacle loop, gated on `TERRAIN_BUILDINGS` (off
+  => pass skipped, draws no RNG):
+  - eligible: any room kind **except `boss`** (so `combat`, `start`, special).
+  - size gate: `min(w,h) >= 6*TILE_PX` **and** `len(cells) >= 60`; ~35% roll
+    (`_HOUSE_ROOM_CHANCE`); one house per room before the village step; global cap
+    `_HOUSE_GLOBAL_CAP = 7`.
+  - centre keep-clear disc, measured from **both** the shaped-room centroid and
+    the bbox centre: `combat` `max(min(w,h)*0.30, R+2t)`, special
+    `max(min(w,h)*0.22, R+2t)`, `start` `max(min(w,h)*0.25, R+2t)` (`R=_HOUSE_RADIUS`,
+    `t=TILE_PX`).
+  - house cell + its 8 neighbours all in `room.cells` (inland); `>= 2R` from
+    doorway slabs inflated by `2R`; `>= 2R` from every other house.
+  - `o.variant` for a house encodes `colour_band*3 + type` -> 1..15; small
+    obstacles keep their 1..4 in the later cosmetic pass, which now skips houses.
+- [x] **Village clusters.** If the room is roomy (`len(cells) >=
+  _VILLAGE_MIN_ROOM_CELLS = 100`), after the first house add `rng.randint(1, 3)`
+  (`_VILLAGE_EXTRA`) more:
+  - one colour band rolled per room, so a village is colour-cohesive; each extra
+    house takes the next unused `house_*` type (1,2,3) then falls back to a random
+    type once all three are used.
+  - each extra house is within `_VILLAGE_RADIUS[1] * TILE_PX` (5 tiles = 320 px)
+    of the **first** house, `>= 2R` from all others, and still passes every rule
+    above.
+  - `_spot()` retries 16 times per house; the cluster stops early if it runs out
+    of room. Total still bounded by `_HOUSE_GLOBAL_CAP`.
+- [x] Tests -- `tests/test_houses.py` (13): eligible-room / never-boss / off-centre
+  / doorway-clear / deterministic / variant range; collider blocks standing +
+  projectiles; village = one colour band, varied types, `>= 2R` apart, all within
+  the cluster radius of the anchor; flag-off = no houses + stable stream + special
+  centres clear both ways. `tests/test_terrain.py` updated: `test_obstacle_
+  variants_in_range` allows 1..15 for houses; `test_sprite_width_matches_the_
+  scaling_formula` indexes the rig list by `% len(choices)` not `% 4`.
+- [x] No changes to `world/map.py` render, `is_walkable`, `resolve_movement`,
+  depth sort -- houses ride the existing obstacle path.
+
+### Implemented — 2026-08-28
+
+Suite: **451 green** (was 438; +13 in `test_houses.py`).
+
+Notes / deviations from the plan:
+- **Both-centres keep-clear.** The small-obstacle special-room disc in
+  `_scatter_obstacles` was widened from `0.22` about the centroid to `0.24` about
+  *both* the centroid and the bbox centre. Adding the house pass shifts the shared
+  RNG stream, which on seed 5 nudged a `pillar` to ~103 px from an `altar` bbox
+  centre (`test_special_room_centres_kept_clear` checks a `0.2` disc there). For an
+  L / T room the centroid and bbox centre sit a cell or two apart, so clearing
+  only one left a shot-blocker readable as "mid-room". Houses got the same
+  both-centres treatment.
+- **Concurrent rename fallout.** Several `deco_ground_*` rigs were renamed on disk
+  during this pass (`_12/_13` -> `_pumpkin_1/2`, `_16/_17/_18` ->
+  `_cross_sign/_left_arrow_sign/_scarecrow`); the matching `decorations` entries
+  still pointed at the old rig names and were repointed here so
+  `test_decoration_registry_is_coherent` passes.
+- **House sprite scale.** `_build_obstacle_decor` scales a rig so its `footprint`
+  covers `2*R*size_boost`. The sprite tracks the collider, so house size is tuned
+  purely through `_HOUSE_RADIUS` / `KINDS["house"]` -- initially `48`, then pulled
+  to **31** (~35% smaller) so a house reads as roughly one tile wide instead of
+  dominating the room. The frame stays taller than the collider (a house rises
+  well above its footprint) and the anchor drop seats the door sill on the
+  collider centre.
+- Over 40 seeds every seed places at least one house; villages (>= 2 in a room)
+  show up on roughly one seed in six.
+
+---
+
+## Obstacle split — minerals vs. trees, shrubs demoted to decor (2026-08-28)
+
+Goal from the request: two obstacle families instead of a flat weighted pick.
+**Minerals** (`rock`, `pillar`) keep everything as-is. **Trees** get a smaller
+*collision* ring (the art stays full size) and ~25% more of them for a lusher
+canopy. **Shrubs stop being obstacles** and come back as sparse, non-colliding
+decoration; other low flora (mushrooms, flowers) may now cluster into patches.
+
+### Design decisions (locked with the user)
+- Shrub is removed from `KINDS` entirely; bushes return purely as `decorations`
+  data, no collision of any kind.
+- Rock / pillar placement is left byte-identical: the per-room loop keeps its
+  4-way `rng.choices(("tree","rock","pillar","shrub"), (4,3,2,3))` draw and still
+  materialises a throw-away `Obstacle("shrub")` so the `(radius + gap)` spacing
+  maths is unchanged, then a final pass strips every `shrub` from the list.
+- Tree collider radius **15 -> 11**; the sprite and the canopy shade keep the
+  size they have today via a new `obstacle_decor.render_radius` map
+  (`{"tree": 15}`) that `_build_obstacle_decor` / `_build_tree_shadows` read in
+  place of `o.radius`. `is_walkable` / `resolve_movement` keep using the real
+  (smaller) `o.radius`. The render-only `SPRITE_ANCHOR_DROP` stays keyed to the
+  collider (sub-pixel effect).
+- Tree count boost is **global, +25%** (`_TREE_DENSITY_BOOST = 0.25`), applied as
+  a top-up pass after the main loop: `round(0.25 * total_trees)` extra trees,
+  each seeded near a randomly chosen existing tree (drawn across the whole world)
+  and placed inside that tree's room, clear of doorway slabs + special-room
+  centre discs. New trees land in existing groves -> denser forest, no new maze
+  walls.
+- Tree spacing is tightened but only tree-to-tree: separation `radius + 22`
+  (centre distance ~44 px) for a tree against another tree, `radius + 46`
+  everywhere else. The kind is picked before the spacing test so the gap can be
+  chosen per pair.
+- Bushes stay **sparse**: four entries `bush_a..d` -> `deco_bush_1..4`,
+  `placement:"room_interior"`, `collision:false`, `scale ~0.8`, `per_room:[0,1]`
+  each, and **no `min_gap`** so they keep the full 40 px separation and never
+  bunch.
+- New optional `decorations` field **`min_gap`**: `_build_decor_scatter` uses
+  `max(gap_a, gap_b)` between a candidate and each already-placed prop (the gap
+  is stored in the placed tuple), default 40. Small flora gets a small gap so a
+  handful fills roughly one tile:
+  - `mushroom` (`deco_ground_pumpkin_2`) `min_gap 14`, `per_room [0,4]`
+  - `mushroom_b` (new, `deco_ground_pumpkin_1`, previously unused) `min_gap 14`,
+    `per_room [0,3]`
+  - `flower_a` / `flower_b` `min_gap 16`, `per_room [0,4]`
+  - `sprout_a` / `sprout_b` / `twig` `min_gap 18`
+  - `pebble_small` / `pebble_flat` `min_gap 20`
+- `obstacle_decor.rigs["shrub"]` is deleted (unused once shrub is not an
+  obstacle). `deco_bush_*` rigs stay -- now consumed by the `decorations` list.
+
+### Implementation steps
+- [x] **S1** Retire the `shrub` obstacle. `entities/obstacle.py` -- drop
+  `KINDS["shrub"]`, rewrote the module docstring. `world/procedural.py`
+  `_scatter_obstacles` -- keeps the 4-way weighted pick, still materialises the
+  `shrub` slot (and its `variant` draw), then returns
+  `[o for o in out if o.kind != "shrub"]`. `test_obstacles` -- the shrub test
+  became `test_every_obstacle_kind_blocks_projectiles`.
+- [x] **S2** Bushes as sparse decor. `data/terrain.json` -- `bush_a..d` ->
+  `deco_bush_1..4`, `scale 0.75`, `per_room:[0,1]` each, no `min_gap`;
+  `obstacle_decor.rigs["shrub"]` removed. `test_tree_kind_maps_to_tree_rigs`
+  now asserts `"shrub" not in rigs`; `test_obstacle_decor_covers_every_obstacle_
+  kind` already enforces the mapping matches `KINDS`.
+- [x] **S3** `min_gap` in `_build_decor_scatter`: a `gaps` list runs parallel to
+  `placed` (kept out of the instance tuple -- `_blit_one_decor` unpacks 6), and
+  separation between a candidate and each placed prop is `max(my_gap, that_gap)`,
+  default 40. Wired: `mushroom`/`mushroom_b` (new, `deco_ground_pumpkin_1`) 14,
+  `flower_a/b` 16, `sprout_a/b`/`twig` 18, `pebble_*` 20.
+- [x] **S4** `KINDS["tree"]` radius `15 -> 11`; `obstacle_decor.render_radius =
+  {"tree": 15}`; `_build_obstacle_decor` + `_build_tree_shadows` take
+  `draw_r = render_radius.get(kind, o.radius)` for the sprite scale, anchor, and
+  shade radius. Tree skin widths (114/122/167/225) and shade radius (28) are
+  unchanged from radius 15.
+- [x] **S5** `_TREE_DENSITY_BOOST = 0.25` + `_topup_trees(...)` in
+  `world/procedural.py`, called after the variant pass: `round(0.25 * tree_count)`
+  extra trees, each offset `_TREE_THICKET_MIN..MAX` (36-96 px) from a uniformly
+  chosen existing tree, kept on that tree's room cells and clear of doorways /
+  special-room centre discs. Measured 1.248x over 30 seeds; minerals unchanged.
+- [x] **S6** Kind-aware placement gap: `_TREE_TREE_GAP = 22` between two trees,
+  `_OBSTACLE_GAP = 46` for every other pairing, in both the main loop (kind is
+  now drawn first) and `_topup_trees`. Tree-tree nearest-neighbour min drops to
+  ~36 px (was 76). Trading byte-identical mineral *positions* held S1-S5; S6's
+  hoisted kind draw shifts the main-loop stream, so rock/pillar coordinates move
+  for a seed (their count, size, and behaviour are unchanged).
+- [x] **S7** `tests/test_obstacle_families.py` (11) + `test_terrain`
+  `test_min_gap_lets_small_flora_cluster_but_not_bushes`. **Suite 451 -> 462.**
+
+### Implemented -- 2026-08-28
+
+Verified on seed 48 room 5: eight trees, the top-up packed into a tight grove
+with overlapping canopies while the trunk rings stay small; bushes / mushrooms /
+pumpkins scatter as non-colliding decor with mushrooms visibly bunching; rocks
+untouched; every obstacle base sits on a walkable floor cell.

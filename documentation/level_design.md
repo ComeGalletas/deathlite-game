@@ -34,13 +34,38 @@ critical rooms"). Stops at `config.WORLD_ROOM_COUNT` (16) cells.
 
 ### 1.2 Rooms
 
-One room per cell. `Room(id, cell, rect, kind, neighbors)` where `rect` is an
-axis-aligned world-pixel rectangle sized `55–86 %` of the cell
-(`rng.uniform(0.55, 0.86)` per axis), then **each dimension is snapped to a
-`config.TILE_PX` (64) multiple** — `round(dim / 64) * 64`, floor-clamped to
-`3 × 64` — and re-centred (T7). Snapping means the tiled renderer's 64 px cell
-grid covers a room exactly, with no clipped autotile edge tile. `room.center` is
-the `Vector2` centre; `room.neighbors` is filled from the tree edges.
+One room per cell. `Room(id, cell, rect, kind, neighbors, cells)`.
+
+`rect` is the axis-aligned world-pixel **bounding box**, sized `42–88 %` of the
+cell (`rng.uniform`, with an 18 % roll for a `78–94 %` "big" room), then **each
+dimension snapped to a `config.TILE_PX` (64) multiple** — `round(dim / 64) * 64`,
+floor-clamped to `3 × 64` — and re-centred (T7). Snapping means the tiled
+renderer's 64 px cell grid covers a room exactly.
+
+`cells: frozenset[(col, row)]` is the floor as **room-relative tile coords**
+(relative because a room is tile-*sized* but not world-tile-*aligned*). With
+`config.IRREGULAR_ROOMS` on (default):
+
+- `_grow_rooms` first lets some `combat` rooms (`_MULTICHUNK_ROOM_CHANCE`)
+  extend a full-width/height 3–7-cell block into **one empty adjacent chunk
+  cell** (the spanning tree leaves cells free) — a large 2-chunk arena. Rejected
+  if the block escapes the home + target chunk, hits another room / corridor, or
+  breaks `ROOM_SIZE_MAX_CELLS`. `_relink_corridors` then re-seats each corridor
+  in the overlap of its (possibly moved) two rooms.
+- `_carve_room_shapes` then bites **1–3 corner blocks** (2–3 cells each,
+  depth-capped at `w//2−1` / `h//2−1`) out of each `combat` room → L / T / plus /
+  stepped floors; `start` / `boss` and rooms smaller than 6×6 stay full
+  rectangles; special rooms get 0–1 bites. Every bite is validated: the mask
+  stays 4-connected, ≥ 9 cells, ≤ `ROOM_SIZE_MAX_CELLS`, and every border
+  row/column keeps a cell (so `rect` never shrinks and corridors — which attach
+  at edge midpoints, never corners — are never blocked).
+
+Flag off → every room is the full `W × H` rectangle on the old `55–86 %` band.
+
+`room.center` is the bbox centre for a plain rectangle, or the floor centroid
+snapped to an occupied cell for a shaped room. `room.neighbors` comes from the
+tree edges; the corridor axis keys off the two rooms' **chunk cells**, not their
+(now movable) bbox centres.
 
 ### 1.3 Corridors
 
@@ -84,12 +109,16 @@ Per room, **skipping `start` and `boss`**, a few convex circular colliders:
 | `pillar` | 18 | yes | `2` in a shrine/treasure/fountain/altar/merchant |
 | `shrub`  | 14 | no  | |
 
-Never placed on a **corridor doorway** tile (`_corridor_doorways` — the mouth
-cell of each corridor + one tile of margin) so an entrance is always walkable,
-and ≥ 46 px from every other obstacle. **Special** rooms (`shrine` / `treasure`
-/ `fountain` / `altar` / `merchant` / `elite_arena`) additionally keep a clear
-central `min(w,h) * 0.22` disc for their interaction / fight space; plain
-`combat` rooms may place obstacles anywhere. Each gets a cosmetic
+Each obstacle is placed on a **random floor cell** (`room.cells`) with an
+in-cell jitter, so nothing lands in a bitten-out region; the per-room count is
+the base rule above **plus `len(room.cells) // 48`** (bigger rooms get a few
+more, capped at 14). Never placed on a **corridor doorway** tile
+(`_corridor_doorways` — the mouth cell of each corridor + one tile of margin) so
+an entrance is always walkable, and ≥ 46 px from every other obstacle.
+**Special** rooms (`shrine` / `treasure` / `fountain` / `altar` / `merchant` /
+`elite_arena`) additionally keep a clear central `min(w,h) * 0.22` disc around
+`room.center` (the centroid for a shaped room) for their interaction / fight
+space; plain `combat` rooms fill freely. Each gets a cosmetic
 `Obstacle.variant` (1–4, from the seed) used only by the renderer.
 (`entities/obstacle.py — KINDS`.)
 
@@ -188,11 +217,18 @@ circles. Fully playable.
 
 - **Rooms** — `paint_room(r)` allocates one **`Surface(rect.size, pygame.SRCALPHA)`**
   (T6: per-pixel alpha, so the autotile edge/corner tiles' transparent
-  water-facing side is *kept*, not flattened to black), walks every 64 px cell,
-  and blits the tile `_slot_for(row, col, rows, cols)` picks — `corner_*` at the
-  four corners, `edge_*` along the sides, `interior` inside — from that room
-  kind's palette (`room_palettes[kind]`, e.g. the boss floor is
-  `tilemap_4.png`). Perimeter cells are added to `self._shore`.
+  water-facing side is *kept*, not flattened to black), then walks **only the
+  cells in `room.cells`** (bitten-out cells stay transparent — foam / water show
+  through) and blits the tile `_mask_slot(cells, col, row, slots)` picks: a
+  **4-bit autotile** on which of the cell's four orthogonal neighbours are also
+  floor — 0 gaps → `interior`, 1 → the matching `edge_*`, 2-adjacent → the outer
+  `corner_*`; opposite-pair / nub / **concave (inner) corners fall back to
+  `interior`** (the sheet has only the 8 rectangle slots — the two adjoining
+  `edge_*` cells form the visible inner corner, and decor fills it). Tiles come
+  from that room kind's palette (`room_palettes[kind]`). Any cell with a
+  non-floor orthogonal neighbour is added to `self._shore`, so foam traces the
+  true irregular coastline. (`_slot_for`, the old rectangle 9-slice, is kept
+  only for its unit test.)
 - **Corridors** — `paint_corridor(c)` bakes a **directional plank bridge** from
   `bridge.sheet` (`terrain/bridge/bridge_all.png`, its *own* 3-wide grid — passed to
   `Assets.tile(..., cols=3)`). The surface spans from **one tile inside

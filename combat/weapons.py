@@ -84,21 +84,26 @@ class Weapon:
         return (float(self.definition.get("area", 5)) + self.bonus["area"]) * area_multiplier
 
     # --- per-frame ---------------------------------------------
-    def update(self, dt: float, ctx: FireContext) -> None:
+    def update(self, dt: float, ctx: FireContext) -> bool:
+        """Advance the weapon; return True on the frame it produced an attack
+        (a straight / chain / cone fire beat). Orbit + summon never report an
+        attack -- they are not a hero "swing" -- so the attack animation, which
+        only syncs to the main weapon, stays meaningful."""
         if self.special == "orbit":
             self._maintain_orbit(ctx)
-            return
+            return False
         if self.special == "summon":
             self._maintain_summons(dt, ctx)
-            return
+            return False
 
         self._cd -= dt
         if self._cd > 0.0:
-            return
+            return False
         if self._fire(ctx):
             self._cd = self._cooldown(ctx.attack_speed_multiplier)
-        else:
-            self._cd = 0.1  # nothing to shoot yet; retry soon
+            return True
+        self._cd = 0.1  # nothing to shoot yet; retry soon
+        return False
 
     # --- summon --------------------------------------------
     def _maintain_summons(self, dt: float, ctx: FireContext) -> None:

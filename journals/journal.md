@@ -1828,3 +1828,386 @@ is explored — small grass/prop surfaces). **Suite 391 → 397** (+6, all in
   memory. Negligible at this scale.
 - **Perf.** All scaling is amortised into the C3 build caches; the per-frame path
   is plain blits, same as today. Damage-number fonts cache per `(pt, zoom)`.
+
+---
+
+## Post-Phase-4 — Dev collision overlay + state-ring flag (2026-08-28)
+
+**Ask:** show the true circular colliders in developer mode, and stop the
+circles that still appear around *some* enemies when sprites are loaded.
+
+**Diagnostic first.** Spawned one of every enemy id + the boss at
+`CAMERA_ZOOM = 1.5`: none fall through to the primitive-circle fallback — every
+rig resolves a frame. The stray circles were the **always-on elite / shield /
+status-effect rings** in `_draw_one_enemy`, drawn at the collider edge and not
+gated on anything, so an elite / shielded / burning enemy always had a ring that
+reads as "the collision circle".
+
+### State rings — `config.SHOW_ENEMY_STATE_RINGS` (new, default `False`)
+
+`_draw_one_enemy` restructured around a `sprited = e.anim is not None` check:
+
+- **sprited enemy** — just the sprite; the status / elite / shield rings draw
+  only when `SHOW_ENEMY_STATE_RINGS` is on.
+- **primitive-fallback enemy** (no tileset) — always keeps the rings + the
+  status-tinted body disc; with no art they are the only state cue.
+- the **attack telegraph** (red slam ring) is untouched — always shown, it is a
+  genuine danger zone (left as-is per the request).
+
+Independent of the dev overlay below.
+
+### Developer collision overlay
+
+- `game.show_collision` (the old global F7 flag) is **removed**; the F7 branch is
+  gone from `game._handle_debug_key`.
+- `PlayingState._dev_show_colliders` — toggled by **F7** (via `handle_debug_key`,
+  which now returns `False` / does nothing outside a `dev_mode` run) and by a new
+  dev-menu root row **"Collision shapes"** (between *Stop attacking* and
+  *Difficulty*, with the `[ON]/[  ]` marker).
+- `PlayingState._draw_collider_overlay(surface)` — one pass, dev-gated, drawn on
+  top of the world layer (before the HUD). Reads radii straight off the entities
+  the physics uses:
+  - hero body + pickup radius, every enemy + the boss body, every obstacle →
+    `config.COLOR_DEBUG` green (2 px body, 1 px pickup via `COLOR_DEBUG_SOFT`);
+  - player + hostile projectiles → `config.COLOR_DEBUG_HIT` magenta 1 px.
+  - view-culled with `camera.visible_rect().inflate(200, 200)`.
+- The scattered `if self.game.show_collision:` circles are deleted from
+  `_draw_one_enemy` and `_draw_player` (the latter drew the *pickup* radius, not
+  the body — now correct in the overlay).
+- New config: `COLOR_DEBUG_SOFT`, `COLOR_DEBUG_HIT`.
+
+### Tests — `tests/test_dev_mode.py`, `tests/test_enemy_sprite.py`
+
+- the "Collision shapes" row flips `_dev_show_colliders`, shows `[ON]`, and
+  `draw()` runs headless with it on;
+- F7 through the game-loop debug handler is inert in a regular run, flips the
+  flag in a dev run;
+- a sprited elite draws **0** circles from `_draw_one_enemy` by default and
+  **≥1** with `SHOW_ENEMY_STATE_RINGS = True`;
+- a primitive (`e.anim = None`) elite always draws its body disc + ring.
+
+Suite **403 → 407**. Screenshots: normal run — elite / shielded / spider render
+ring-free; dev run with the overlay on — green collider rings on every enemy,
+the boss, the hero (+ faint pickup radius) and the scattered obstacles.
+
+---
+
+## Worldgen — irregular (rectilinear) rooms + size variety (W1–W5)
+
+**Date:** 2026-08-28. **Status:** ✅ W1–W5 complete. Suite 407 → 434. Irregular + multi-chunk rooms shipped behind `config.IRREGULAR_ROOMS`.
+
+Rooms stop being plain rectangles. They become **tile-aligned orthogonal
+polygons** -- a rectangle with 2-3-cell **corner bites** (L / T / plus / stepped).
+Every cell stays a 64 px square so the tileset renders as now; only *which*
+autotile tile a cell gets has to become neighbour-aware. Size also varies more
+(smaller mins, bigger maxes) within a chunk; genuinely large multi-chunk rooms
+are a later, separately-tested milestone.
+
+**Representation.** `Room.cells: frozenset[(col,row)]` -- **room-relative** tile
+coords (sidesteps the fact that room rects are tile-*sized* but not world-tile-
+*aligned*). `Room.rect` stays the bounding box; `Room.center` becomes the
+centroid snapped to an occupied cell (a big notch can push the bbox centre into
+the void). Corridors are untouched -- notches are **corner-only** with a
+centre-line clearance, and corridors attach at edge midpoints.
+
+**Confirmed:** `config.IRREGULAR_ROOMS` default on (`False` = today's rooms +
+old size band, for pinned-seed repro) · seed break accepted · concave corners
+reuse the `interior` tile (decor fills them) · assetless mode draws bounding
+rects · `start`/`boss` stay rectangular, `combat` full variety, special mild ·
+`config.ROOM_SIZE_MAX_CELLS` caps a single room.
+
+### Milestones
+
+- [x] **W1 — data model + generation.** *(done 2026-08-28)*
+  `game/config.py`: `IRREGULAR_ROOMS` (on), `ROOM_SIZE_MAX_CELLS` (160).
+  `world/procedural.py`: `Room.cells: frozenset[(col,row)]` (**room-relative**),
+  `Room.tile_dims`, `Room.center` → centroid snapped to an occupied cell.
+  `_room_frac` widens the band to `0.42-0.88` with an 18 % roll for `0.78-0.94`
+  (flag off keeps the legacy `0.55-0.86`). `_carve_room_shapes` bites 1-3
+  **corner** blocks (2-3 cells, `w//2-1` / `h//2-1` depth cap) out of each
+  combat room; `_try_one_notch` always consumes the same 3 rng draws and keeps
+  the mask 4-connected (`_four_connected`), ≥ 9 cells, and every border row/col
+  occupied (`_borders_intact`) so the bounding box never shrinks. `start` /
+  `boss` and rooms smaller than 6×6 stay full rectangles; special rooms get
+  0-1 bites. Corridor axis now keyed off `rooms[a].cell[0] == rooms[b].cell[0]`
+  (was `rect.centerx`, fragile once bboxes can move) -- behaviourally identical
+  today. Renderer + walkability still read `Room.rect`, so rooms *look*
+  rectangular; W1 is verified on the masks alone.
+  Tests (`tests/test_procedural.py`, new `IrregularRoomTests`, 8): valid +
+  in-range mask, 4-connected, 9 ≤ cells ≤ cap, bbox matches the mask,
+  `start`/`boss` rectangular, `center` lands on an occupied cell, some rooms
+  shaped, deterministic frozensets, flag-off = plain rects, size band wider
+  both ways than the legacy range. Verified by mask dump: 11/16 rooms shaped on
+  seed 42 (L / Z / plus), start + boss full 8×8.
+  **Suite 407 → 415.**
+- [x] **W2 — walkability.** *(done 2026-08-28)*
+  `world/map.py`: `_point_ok(x, y)` finds the room whose bbox holds the point
+  (bboxes are disjoint), computes the room-relative `(col, row)` via a new
+  `GameMap.room_cell` helper, and returns `True` only if that cell is in
+  `room.cells` -- then falls through to the corridor rects. `is_walkable` /
+  `resolve_movement` unchanged (they call `_point_ok`). `room_at` left
+  bbox-based (no callers need cell strictness yet).
+  `random_point_in_room` picks `rng.choice(sorted(room.cells))` + in-cell jitter
+  (plain-rect fallback when `cells` is empty / flag off) -- always lands on the
+  floor, where the old rect version could hit a bite.
+  `world/procedural.py`: `_scatter_obstacles` rejects a candidate whose cell is
+  not in `room.cells` (minimal W2 guard so nothing floats in the void once W3
+  renders the bites; fuller "scatter from cells" is W4).
+  Fix: `Room.center` returns the exact bbox centre for a *plain rectangle*
+  (`len(cells) == w*h`) -- only genuinely shaped rooms get the centroid-cell, so
+  the start room / camera / player spawn are byte-identical
+  (`test_depth_sort` caught a 32 px shift from an even-dimension centroid).
+  Tests (`tests/test_room_shapes.py`, new, 6): a bitten cell is not walkable and
+  a floor cell is; `_point_ok` matches the mask exactly; the shaped floor is one
+  connected component; `random_point_in_room` always lands in `cells`; corridors
+  still walkable; no obstacle in a bite; flag-off walkability = the full
+  rectangle. Verified: `_point_ok` grid == mask for a 9×10 stepped room, and
+  `resolve_movement` walks a point diagonally across it.
+  **Suite 415 → 421.**
+- [x] **W3 — tiled renderer.** *(done 2026-08-28)*
+  `world/map.py`: new `_mask_slot(cells, col, row, slots)` -- a 4-bit autotile
+  keyed on which of a cell's 4 orthogonal neighbours are also floor: 0 gaps →
+  `interior`, 1 gap → the matching `edge_*`, 2-adjacent gaps → the outer
+  `corner_*`; opposite-pair / nub / concave (inner) corners fall back to
+  `interior` (the sheet has only the 8 rectangle slots -- confirmed, decor fills
+  the inner corners). `paint_room` now iterates `r.cells` (bitten cells left
+  transparent so foam / water show through the SRCALPHA surface) and seeds
+  `_shore` from any cell with a non-floor orthogonal neighbour -- the foam then
+  traces the true irregular coastline. `_slot_for` (the old rectangle 9-slice)
+  kept for its unit test but no longer used by the bake. `_build_decor_scatter`
+  skips interior cells that were bitten out. `_draw_flat_layout` (assetless)
+  already drew bounding rects -- unchanged.
+  Fix: `tests/test_depth_sort.py::test_items_sorted_by_ground_contact_y` spawns
+  two enemies first -- it used a *random* run seed and W1's wider size band made
+  the "≥ 2 depth items" assumption flake when the player landed in a bare start
+  room.
+  Verified (seed 63, room 4 -- a plus/T): the tiled grass fills exactly the mask,
+  autotile edges + foam wrap the irregular outline, inner corners read fine as
+  plain grass, bridges meet the arm midpoints, no obstacle floats in a bite.
+  **Suite unchanged at 421.**
+- [x] **W4 — scatter + polish.** *(done 2026-08-28)*
+  `world/procedural.py` `_scatter_obstacles`: obstacles now pick a random cell
+  from `room.cells` (+ in-cell jitter) instead of rejection-sampling the bbox;
+  per-room count = the base rule **+ `len(room.cells) // 48`**, capped at 14, so
+  bigger rooms are denser; the special-room clear disc is centred on
+  `room.center` (the centroid for a shaped room, was the bbox centre).
+  `world/map.py` `_build_decor_scatter`: clutter picks from the room's
+  **fully-interior** cells (all four neighbours floor) -- never a shoreline /
+  notch-edge tile -- also centred-clear against `room.center`.
+  `_corridor_doorways` unchanged: W1's corner-only bites already guarantee the
+  mouth cells are floor, and the existing inflated keep-clear slabs still hold
+  (tested against shaped rooms).
+  `documentation/level_design.md` §1.2 (the `cells` mask + `_carve_room_shapes`),
+  §1.5 (cell-based scatter + area-scaled count), §3.3 (`_mask_slot` 4-bit
+  autotile, shore = true perimeter).
+  Tests: `tests/test_room_shapes.py` new `ScatterMaskTests` (5) -- every obstacle
+  on a floor cell, count scales with area, doorway tiles stay clear on shaped
+  rooms, biggest room within `bounds` / ≤ cap, clutter only on fully-interior
+  cells; `tests/test_terrain.py::test_room_clutter...` updated to check
+  `room.center` + `cell ∈ room.cells`; `test_depth_sort` flake fix folded in
+  under W3.
+  **Suite 421 → 426.**
+- [x] **W5 — multi-chunk large rooms.** *(done 2026-08-28)*
+  `world/procedural.py`: `_grow_rooms` (runs before `_carve_room_shapes`, gated
+  on `IRREGULAR_ROOMS`) -- each combat room rolls `_MULTICHUNK_ROOM_CHANCE`
+  (0.16) and, if it has an **empty** orthogonal chunk-lattice neighbour, extends
+  a full-width/height tile block `_GROW_TILES` (3-7) cells into it. Rejected if
+  the block leaves the home+target chunk footprint, overlaps another room's rect
+  or a corridor rect, or would push the room past `config.ROOM_SIZE_MAX_CELLS`
+  (the depth is trimmed first, then skipped). The block is merged into the
+  room's relative `cells` (shifting the existing cells when growth is west /
+  north) and `rect` is re-`union`ed; `_carve_room_shapes` then bites the grown
+  shape. `_relink_corridors` (only when something grew) re-seats each corridor's
+  collision rect in the x/y overlap of its two rooms, mouth-to-mouth, so a room
+  that shifted still connects.
+  `world/map.py`: `_point_ok` drops the `break` -- with grown rooms, two bboxes
+  can overlap in the void, so it checks every room, not just the first bbox hit.
+  Tests (`tests/test_room_shapes.py` new `MultiChunkRoomTests`, 8): a
+  multi-chunk room exists (bbox > `CHUNK_SIZE` on an axis); growth respects the
+  cap + stays 4-connected; a grown room is fully walkable; every room within
+  `bounds` and the world stays connected; **no two rooms share a floor tile**
+  (world-pixel cell rects -- the cell-disjointness the plan called for; bbox
+  `colliderect` still happens to hold, so `test_procedural` was left as-is);
+  corridors still bridge both rooms after the relink; deterministic; flag-off
+  keeps every room inside its chunk.
+  Verified: seed 20 room 12 -- a **17×10** (1088 px) arena spanning ~1.5 chunks,
+  grown west then corner-bitten, autotile coastline + foam wrapping the whole
+  outline, area-scaled obstacle scatter, bridge still attached.
+  **Suite 426 → 434.**
+
+---
+
+## Combat — hero attack anim syncs to the main weapon only (2026-08-28)
+
+The hero `attack` animation was triggered from `_spawn_projectile` on **every**
+projectile from **every** weapon (plus orbiter re-spawns and a summon totem's
+bolt). After a couple of level-ups the hero has 2+ weapons up at all times, so
+`player._attack_t` was refreshed continuously and the pose never dropped -- the
+animation stopped meaning "this hero just swung", and the `attack` rig is
+authored to match each hero's **starting** weapon.
+
+Now the cue is bound to `player.weapons[0]` (the starting weapon; level-up
+upgrades append or bump `bonus`, they never replace or reorder index 0).
+
+- `combat/weapons.py` -- `Weapon.update(dt, ctx)` returns `bool`: `True` on the
+  frame it produced an attack (a straight / chain / cone `_fire()` beat),
+  `False` on cooldown, no-target, and always for `orbit` / `summon` (persistent
+  effects, not a swing).
+- `game/states/playing_state.py`
+  - `_phase_combat` binds `main = weapons[0]` and calls
+    `player.trigger_attack_anim()` only when `weapon.update(...)` returned `True`
+    **and** `weapon is main`.
+  - the unconditional `trigger_attack_anim()` (and its stale summon-bolt
+    comment) is removed from `_spawn_projectile`.
+- No change to `trigger_attack_anim` / `_hero_anim_name` / the rigs / any data.
+  Multishot + crits already fire once per beat, so it is one trigger per beat,
+  not per projectile. `_dev_no_attack` still gates the whole weapon loop.
+
+Tests: `tests/test_weapons.py` -- `update()` reports the fire beat (`True` on
+fire, `False` cooling / no target); `orbit` / `summon` never report one.
+`tests/test_weapons_special.py` `MainWeaponAttackAnimTests` -- a `_phase_combat`
+tick where `weapons[0]` fires sets `_attack_t`; with the main weapon parked
+(`_cd = 999`) and a second `arcane_bolt` appended, the secondary's fire beat
+spawns a projectile but leaves `_attack_t == 0`.
+
+**Suite 434 -> 438.**
+
+---
+
+## Worldgen — obstacle families + asset-driven scatter tuning (2026-08-28)
+
+Split the flat obstacle scatter into **minerals** (`rock`, `pillar` -- unchanged)
+and **trees**, and moved most decoration tuning into `data/terrain.json` so the
+look can be adjusted without code.
+
+- `shrub` is no longer an obstacle. Bushes come back through the existing
+  `decorations` pipeline as sparse, non-colliding props -- a pure data change
+  (new `bush_a..d` entries, `deco_bush_*` rigs reused).
+- Trees: collider ring shrinks (15 -> 11) while the sprite and canopy shade keep
+  their size via a new `obstacle_decor.render_radius` map; a `_TREE_DENSITY_BOOST`
+  adds ~25% more trees globally, clumped into existing groves; tree-to-tree
+  spacing is tightened (other pairs unchanged).
+- New `decorations.min_gap` field lets small flora (mushrooms, flowers) cluster
+  into patches while bushes and pebbles keep the default separation.
+
+Full breakdown, decisions, and the S1-S7 step list live in
+`journals/assets_journal.md` ("Obstacle split — minerals vs. trees").
+
+**Suite 451 -> 462.**
+
+---
+
+## Planned Phase — Enemy navigation (shared flow field)
+
+**Date:** 2026-08-28 · **Status:** design confirmed; implementation not started.
+**Revised 2026-08-28:** the core mechanism is a **shared flow field**, not
+per-enemy A*. The world is static for a run (rooms, corridors, obstacles never
+move) and `enemy_count_cap` climbs to 600, so hundreds of independent A* searches
+per second -- even staggered and bounded -- is a lot of machinery for a problem
+one distance field solves once per rebuild. Every chaser then samples the field
+gradient in O(1) with no per-enemy path, waypoint, or repath state.
+
+### Approach
+- Build a static **NavGrid** once per run: a lattice over `layout.bounds` whose
+  cells are marked walkable by the existing geometry test (room `cells` +
+  corridor rects, i.e. what `_point_ok` already checks). Room boundaries are
+  blocked; rooms connect only through their generated corridors.
+- Bake a **clearance value per cell** once (distance in px to the nearest blocked
+  cell / obstacle circle). A cell is passable for an enemy of radius `r` iff
+  `clearance >= r`, so obstacle avoidance uses the real collision radius without
+  a per-radius grid rebuild.
+- Each navigation cycle, rebuild a **Dijkstra distance field toward the player's
+  cell** over the whole reachable grid (see "full-world coverage" below), then
+  each enemy sets `vel` from the downhill gradient at its own cell, blended with
+  a local separation vector and (rarely) a short unstick nudge.
+- `resolve_movement()` stays the final per-step collision safeguard; the field
+  already hugs walls so it should seldom trip.
+- A bounded A* stays available in the same module as an optional per-enemy
+  fallback for a special mover that needs a specific route -- not expected to be
+  needed at first.
+
+### Design decisions
+- [ ] **Dual grid, kept for now.** `32 px` field for enemies with radius
+  `<= 16 px`; `48 px` field for radius `> 16 px`. Grid size trades path precision
+  against rebuild cost; the clearance test still uses the actual radius. Two
+  fields are rebuilt per cycle (one per resolution). **Reevaluation trigger:** if
+  testing shows the two grids disagree in a way that misbehaves -- a corridor
+  passable on one but not the other, the fields routing differently around the
+  same obstacle, enemies clumping at a class boundary -- collapse to a single
+  `32 px` grid with per-radius-class clearance and drop the `48 px` field.
+- [ ] **Full-world coverage -- off-screen enemies are pathed too.** The field
+  rebuild covers every reachable cell, not a radius around the player, so an
+  enemy two rooms away still follows a correct route. This is the deliberately
+  costlier choice; the performance section covers keeping it affordable.
+- [ ] Obstacles are blocked by their collision radius (via the clearance bake).
+- [ ] No gameplay path-length cap; only a technical node/relaxation safeguard to
+  protect the frame.
+- [ ] Rebuild the field on a fixed staggered interval (`~0.4 s`), not every
+  frame. Rebuild early when the player crosses into a new navigation cell.
+- [ ] Change direction gradually when the sampled gradient shifts (slew the
+  steering vector, don't snap it).
+- [ ] Consider an enemy stuck when its position barely changes for `~0.8 s`
+  (was 2.5 s -- too slow for fast movers); response is a brief perpendicular
+  nudge drawn from the seeded run RNG, not a full replan.
+- [ ] Separation radius `~1.5x` the collision radius (a weak, capped push); the
+  bare radius still lets sprites overlap heavily. Use the existing per-frame
+  `SpatialGrid`, never an all-pairs scan.
+- [ ] **Determinism:** the field is a pure function of the player cell + the
+  static grid; separation uses no RNG; the unstick nudge draws from `self.rng`.
+  Existing determinism tests must keep passing.
+
+### Performance approach
+- [ ] Rebuild each field with a **bucket-queue BFS / Dijkstra** (costs are near
+  uniform -- 1 orthogonal, ~1.41 diagonal), not a binary heap.
+- [ ] Stagger the two field rebuilds and offset them from other heavy phases so
+  they do not all land on one frame; amorte / time-slice a rebuild across two
+  frames if profiling shows a spike (world is up to 6000 px per side -> ~36k
+  cells at 32 px, ~15k at 48 px).
+- [ ] Bake NavGrid walkable mask + clearance once at run start; never scan
+  obstacles per frame.
+- [ ] Gradient sampling is O(1) per enemy per frame -- no per-enemy search, no
+  repath bookkeeping to stagger.
+- [ ] Enable for basic chasers first; extend to other movers after profiling.
+- [ ] Debug-overlay counters: field-rebuild ms, live enemy count, frame time in
+  a crowded scene, before turning the flag on by default.
+
+### Implementation order
+- [ ] **M1 — NavGrid (pure, tested).** `world/pathfinding.py`:
+  `NavGrid(layout, obstacles, cell)` -> walkable mask + clearance array from the
+  room/corridor geometry and obstacle circles; world<->cell conversion. Tests:
+  mask agrees with `is_walkable` on samples; corridors connect rooms; obstacle /
+  room-void cells blocked; deterministic; build-time budget.
+- [ ] **M2 — FlowField (pure, tested).** `FlowField(navgrid)` with
+  `rebuild(target_world, min_clearance)` (full-grid bucket-queue Dijkstra) and
+  `direction_at(world_pos) -> Vector2` (downhill gradient, zero if unreachable).
+  Tests: gradient descends to target; routes around an obstacle wall and through
+  a doorway; respects `min_clearance`; deterministic; relaxation-count cap holds.
+- [ ] **M3 — Wire into PlayingState.** Own the NavGrid + one FlowField per grid
+  in `enter`; rebuild on the staggered timer at `self.player.pos`; expose
+  `nav_dir(pos, radius) -> Vector2` on `EnemyContext`. Add
+  `config.ENEMY_PATHFINDING` (default off initially).
+- [ ] **M4 — `path_chase` behavior + separation.** New behavior in
+  `entities/enemy_ai.py`: `vel = nav_dir(...) * speed`, slewed, blended with a
+  `SpatialGrid` separation vector and the unstick nudge; fall back to
+  `_toward(player)` when the field returns zero. Enable it in `data/enemies.json`
+  for `chaser` / `fast` / `tank` / `swarm` / `shielded` / `elite`.
+- [ ] **M5 — FSM / special movement phases.** Swap the chase-phase `_toward`
+  calls in `_fsm_common`, `summoner`, `kite_shoot`, `fsm_warlock` for the nav
+  direction; leave telegraph / charge / blink / attack phases straight-line.
+- [ ] **M6 — Profile + enable.** Overlay counters, crowded-scene test, then flip
+  `ENEMY_PATHFINDING` on by default once frame time holds.
+
+### Baseline verification before implementation
+- Suite green at **462** on 2026-08-28 (post obstacle-families work).
+- Current limitation confirmed: ordinary enemy movement uses direct steering
+  (`entities/enemy_ai.py` `chase`) and one-step axis sliding; no pathfinding.
+- Current map contract confirmed: `is_walkable(pos, radius)` checks room/corridor
+  geometry + obstacle clearance; `resolve_movement()` does direct / X-slide /
+  Y-slide / stop.
+- Current enemy contract confirmed: `Enemy` dispatches data-selected strategies
+  from `entities/enemy_ai.py` via `BEHAVIORS`, so navigation slots in as a new
+  behavior without replacing the one-class, data-driven model.
+
+### Expected next phase
+Build and test the standalone NavGrid + FlowField (M1-M2) -- grid conversion,
+clearance bake, obstacle / room-boundary routing -- before any enemy integration.

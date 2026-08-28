@@ -67,6 +67,10 @@ class DepthOrderTests(unittest.TestCase):
     def test_items_sorted_by_ground_contact_y(self):
         game, p = fresh_playing()
         try:
+            # a couple of enemies so the layer has >1 entry regardless of which
+            # room the random seed drops the player in
+            p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(120, 30))
+            p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(-90, -40))
             ys = [y for y, _ in p._depth_items()]
             self.assertEqual(ys, sorted(ys))
             self.assertGreater(len(ys), 1)

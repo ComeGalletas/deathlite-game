@@ -256,6 +256,37 @@ class DevMenuTests(unittest.TestCase):
         self.assertEqual(playing.difficulty, "normal")          # wraps
         self.assertIn("difficulty", _ROOT_ROWS)
 
+    def test_collision_shapes_row_toggles_the_dev_overlay(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        self.assertFalse(playing._dev_show_colliders)
+        menu._activate("colliders")
+        self.assertTrue(playing._dev_show_colliders)
+        self.assertIn("[ON]", menu._row_label("colliders"))
+        _key(game, pygame.K_BACKQUOTE)                  # close, resume
+        playing._spawn_enemy("chaser", at=playing.player.pos + pygame.Vector2(60, 0))
+        playing.draw(game.screen)                       # overlay path must not raise
+        menu._activate("colliders")                     # via the menu again
+        self.assertFalse(playing._dev_show_colliders)
+
+    def test_f7_toggles_the_overlay_only_in_a_dev_run(self):
+        # regular run: F7 (routed through the game-loop debug-key handler) is inert
+        game = _game()
+        game.state_machine.change(MenuState(game))
+        _key(game, pygame.K_RETURN)
+        _key(game, pygame.K_RETURN)
+        regular = game.state_machine.current
+        self.assertIsInstance(regular, PlayingState)
+        self.assertFalse(game._handle_debug_key(pygame.K_F7))   # not consumed
+        self.assertFalse(regular._dev_show_colliders)
+        # dev run: F7 flips it
+        game2 = _game()
+        dev = _start_dev_run(game2)
+        self.assertTrue(game2._handle_debug_key(pygame.K_F7))   # consumed
+        self.assertTrue(dev._dev_show_colliders)
+        game2._handle_debug_key(pygame.K_F7)
+        self.assertFalse(dev._dev_show_colliders)
+
     def test_draw_runs_headless_on_every_page(self):
         from game.states.dev_menu_state import _ROOT_ROWS
         game = _game()

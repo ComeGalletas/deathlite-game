@@ -25,12 +25,13 @@ from game.state import State
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
-_ROOT_ROWS = ("unlimited_hp", "no_attack", "difficulty", "spawn", "blessings",
-              "items", "reset", "exit", "close")
+_ROOT_ROWS = ("unlimited_hp", "no_attack", "colliders", "difficulty", "spawn",
+              "blessings", "items", "reset", "exit", "close")
 
 _LABELS = {
     "unlimited_hp": "Unlimited HP",
     "no_attack":    "Stop attacking",
+    "colliders":    "Collision shapes",
     "difficulty":   "Difficulty",
     "spawn":        "Spawn enemy...",
     "blessings":    "Blessings...",
@@ -133,6 +134,9 @@ class DevMenuState(State):
         elif rid == "no_attack":
             p._dev_no_attack = not p._dev_no_attack
             self._status = f"Stop attacking {'ON' if p._dev_no_attack else 'off'}"
+        elif rid == "colliders":
+            p._dev_show_colliders = not p._dev_show_colliders
+            self._status = f"Collision shapes {'ON' if p._dev_show_colliders else 'off'}"
         elif rid == "difficulty":
             order = config.DIFFICULTY_ORDER
             nxt = order[(order.index(p.difficulty) + 1) % len(order)]
@@ -228,6 +232,8 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_unlimited_hp else "   [  ]"
         elif rid == "no_attack" and p is not None:
             label += "   [ON]" if p._dev_no_attack else "   [  ]"
+        elif rid == "colliders" and p is not None:
+            label += "   [ON]" if p._dev_show_colliders else "   [  ]"
         elif rid == "difficulty" and p is not None:
             label += f"   [{config.DIFFICULTY_LABELS[p.difficulty]}]"
         return label

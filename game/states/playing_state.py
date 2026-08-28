@@ -64,6 +64,7 @@ class PlayingState(State):
         self._dev_unlimited_hp = False   # HP ratchet (dev menu D2)
         self._dev_no_attack = False      # hero weapons silenced (dev menu D2)
         self._dev_hp_floor = 0.0
+        self._dev_show_colliders = False  # F7 / dev menu: true collider overlay
         self.run_seed = seed if seed is not None else random.randrange(1 << 30)
         self.rng = random.Random(self.run_seed)
 
@@ -182,6 +183,10 @@ class PlayingState(State):
             self.levels.add_xp(xp_for_level(self.levels.level) - self.levels.xp_into_level)
         elif key == keys["spawn_boss"]:
             self._spawn_boss()
+        elif key == keys["toggle_collision_vis"]:
+            if not self.dev_mode:
+                return False                     # collider overlay is dev-only
+            self._dev_show_colliders = not self._dev_show_colliders
         else:
             return False
         return True
@@ -323,8 +328,11 @@ class PlayingState(State):
             crit_multiplier=2.0 + s["crit_damage"],
             rng=self.rng, spawn_summon=self._spawn_summon)
         if not (self.dev_mode and self._dev_no_attack):
+            main = self.player.weapons[0] if self.player.weapons else None
             for weapon in self.player.weapons:
-                weapon.update(dt, ctx)
+                fired = weapon.update(dt, ctx)
+                if fired and weapon is main:
+                    self.player.trigger_attack_anim()   # anim syncs to the main weapon only
 
         self._resolve_projectile_hits()
         self._resolve_hostile_hits()
@@ -518,10 +526,6 @@ class PlayingState(State):
             return None
         proj.reset(**kw)
         self.game.audio.play_shoot()
-        # Drive the hero attack animation off the same beat as the shoot cue.
-        # (A summon totem's bolt also trips this -- acceptable; the starting
-        #  hero has no summon.)
-        self.player.trigger_attack_anim()
         return proj
 
     def _fire_hostile(self, *, pos, vel, damage, radius) -> None:
@@ -917,6 +921,7 @@ class PlayingState(State):
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
             self.particles.draw(surface, self.camera)
             self.damage_numbers.draw(surface, self.camera)
+            self._draw_collider_overlay(surface)        # dev-only, on top of the world
         finally:
             self.camera.pos += offset
 
@@ -1017,12 +1022,35 @@ class PlayingState(State):
         for _, fn in self._depth_items():
             fn(surface)
 
+    _ORB_RIGS = {0: "xp_orb_small", 1: "xp_orb_medium", 2: "xp_orb_large"}
+
     def _draw_gems(self, surface) -> None:
         z = self.camera.zoom
+        assets = self.game.assets
+
         for gem in self.gems:
             sx, sy = self.camera.world_to_screen(gem.pos)
-            pygame.draw.circle(surface, XP_TIER_COLORS.get(gem.tier, (150, 220, 150)),
-                               (int(sx), int(sy)), round((3 + gem.tier) * z))
+            rig = self._ORB_RIGS.get(gem.tier, "xp_orb_small")
+            base_size = assets.scale_for(rig) or (8, 8)
+            size = (
+                max(1, round(base_size[0] * z)),
+                max(1, round(base_size[1] * z)),
+            )
+
+            orb = assets.image(rig, size=size)
+
+            if orb is not None:
+                surface.blit(
+                    orb,
+                    orb.get_rect(center=(int(sx), int(sy))),
+                )
+            else:
+                pygame.draw.circle(
+                    surface,
+                    XP_TIER_COLORS.get(gem.tier, (150, 220, 150)),
+                    (int(sx), int(sy)),
+                    round((3 + gem.tier) * z),
+                )
 
     def _draw_explosions(self, surface) -> None:
         z = self.camera.zoom
@@ -1050,14 +1078,9 @@ class PlayingState(State):
         sx, sy = self.camera.world_to_screen(e.pos)
         er = e.radius * z
 
-        if e.anim is not None:
+        sprited = e.anim is not None
+        if sprited:
             self._draw_enemy_sprite(surface, e)
-            # keep status readable without per-frame surface tinting
-            for sid, tint in self._STATUS_TINT.items():
-                if sid in e.status:
-                    pygame.draw.circle(surface, tint, (int(sx), int(sy)),
-                                       round(er) + 2, 2)
-                    break
         else:
             colour = (255, 255, 255) if e.hit_flash > 0 else e.color
             for sid, tint in self._STATUS_TINT.items():
@@ -1066,19 +1089,26 @@ class PlayingState(State):
                     break
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(er))
 
-        if e.is_elite:
-            pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
-                               round(er) + 3, 2)
-        if e.shield_hp > 0:
-            pygame.draw.circle(surface, (150, 200, 255), (int(sx), int(sy)),
-                               round(er) + 5, 1)
-        if e.telegraphing:
+        # Thin state rings at the collider edge -- always for the primitive
+        # fallback (the only cue with no art); for a sprited enemy only when
+        # config.SHOW_ENEMY_STATE_RINGS is on (else it just reads as a collider).
+        if not sprited or config.SHOW_ENEMY_STATE_RINGS:
+            for sid, tint in self._STATUS_TINT.items():
+                if sid in e.status:
+                    pygame.draw.circle(surface, tint, (int(sx), int(sy)),
+                                       round(er) + 2, 2)
+                    break
+            if e.is_elite:
+                pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
+                                   round(er) + 3, 2)
+            if e.shield_hp > 0:
+                pygame.draw.circle(surface, (150, 200, 255), (int(sx), int(sy)),
+                                   round(er) + 5, 1)
+
+        if e.telegraphing:                        # attack telegraph -- always on
             r = e.cfg.get("slam_radius", 120)
             pygame.draw.circle(surface, (255, 90, 90), (int(sx), int(sy)),
                                round(r * z), 2)
-        if self.game.show_collision:
-            pygame.draw.circle(surface, config.COLOR_DEBUG,
-                               (int(sx), int(sy)), round(er), 1)
 
     def _draw_death_fx(self, surface, fx) -> None:
         anim, pos, facing, scale, radius = fx
@@ -1229,9 +1259,35 @@ class PlayingState(State):
             pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
                                round(pr), width=2)
 
-        if self.game.show_collision:
-            pygame.draw.circle(surface, config.COLOR_DEBUG, (sx, sy),
-                               round(self.player.pickup_radius * z), width=1)
+    def _draw_collider_overlay(self, surface) -> None:
+        """Dev-mode: every true circular collider / hitbox in one pass, read
+        straight off the fields the physics uses. Toggle with F7 or the dev
+        menu's 'Collision shapes' row."""
+        if not (self.dev_mode and self._dev_show_colliders):
+            return
+        cam = self.camera
+        z = cam.zoom
+        view = cam.visible_rect().inflate(200, 200)
+
+        def ring(pos, r, col, w=2):
+            sx, sy = cam.world_to_screen(pos)
+            pygame.draw.circle(surface, col, (int(sx), int(sy)),
+                               max(1, round(r * z)), w)
+
+        ring(self.player.pos, self.player.radius, config.COLOR_DEBUG)
+        ring(self.player.pos, self.player.pickup_radius, config.COLOR_DEBUG_SOFT, 1)
+        for e in self.enemies:
+            if view.collidepoint(e.pos.x, e.pos.y):
+                ring(e.pos, e.radius, config.COLOR_DEBUG)
+        if self.boss is not None and self.boss.alive:
+            ring(self.boss.pos, self.boss.radius, config.COLOR_DEBUG)
+        for o in self.game_map.obstacles:
+            if view.collidepoint(o.pos.x, o.pos.y):
+                ring(o.pos, o.radius, config.COLOR_DEBUG)
+        for p in self.projectiles:
+            ring(p.pos, p.radius, config.COLOR_DEBUG_HIT, 1)
+        for p in self.hostiles:
+            ring(p.pos, p.radius, config.COLOR_DEBUG_HIT, 1)
 
     def _hero_sprite_frame(self):
         if self._hero_anim is None:

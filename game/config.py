@@ -44,6 +44,15 @@ WORLD_ROOM_COUNT: int = 16
 # data/terrain.json "tile_px" (Assets.tile uses that for sheet slicing).
 TILE_PX: int = 64
 
+# Rooms are tile-aligned irregular (rectilinear) polygons -- a rectangle with
+# 2-3-cell corner bites (L / T / plus / stepped) -- and their size varies more.
+# Off -> the old plain rectangles + old size band, for reproducing pinned-seed
+# layouts. See world/procedural.py (`Room.cells`, `_carve_room_shapes`).
+IRREGULAR_ROOMS: bool = True
+# Hard ceiling on one room's tile-cell count (a room can't eat the world); also
+# the cap for the deferred multi-chunk "large room" pass.
+ROOM_SIZE_MAX_CELLS: int = 160
+
 # Animated shoreline foam where a room floor meets the water (terrain T3).
 # Off falls back to the baked autotile edge tiles alone.
 TERRAIN_FOAM: bool = True
@@ -58,6 +67,18 @@ TERRAIN_DECOR: bool = True
 # characters so a hero / enemy standing under a tree is slightly darkened
 # (terrain B3). Needs TERRAIN_DECORATIONS on. Off -> no tree shade.
 TERRAIN_SHADOWS: bool = True
+# Buildings: a `house` obstacle (large circular collider, blocks shots) placed
+# off-centre in big rooms; the roomiest rooms grow a small colour-matched village
+# cluster. Off -> no house obstacles at all: the `_scatter_houses` pass is
+# skipped and draws no RNG, so the small-obstacle scatter stream is undisturbed.
+TERRAIN_BUILDINGS: bool = True
+
+# The thin elite / shield / status-effect rings drawn at the collider edge of a
+# *sprited* enemy read like a collision circle. Off by default -- a sprited enemy
+# is just its sprite. Primitive-fallback enemies (no sprite) always keep the
+# rings, since with no art they are the only state cue. Independent of the
+# developer collider overlay (F7 / dev menu), which draws the true colliders.
+SHOW_ENEMY_STATE_RINGS: bool = False
 
 # --- Colours (RGB) ---------------------------------------------------------
 COLOR_BG = (16, 16, 22)
@@ -68,7 +89,9 @@ COLOR_PLAYER_OUTLINE = (220, 245, 255)
 COLOR_TEXT = (230, 230, 238)
 COLOR_TEXT_DIM = (150, 150, 165)
 COLOR_ACCENT = (255, 205, 90)
-COLOR_DEBUG = (120, 255, 140)
+COLOR_DEBUG = (120, 255, 140)         # solid bodies in the dev collider overlay
+COLOR_DEBUG_SOFT = (70, 150, 95)      # pickup / trigger radii in that overlay
+COLOR_DEBUG_HIT = (255, 120, 255)     # projectile hitboxes in that overlay
 COLOR_DAMAGE_IN = (235, 70, 70)      # damage the hero takes -- floating red numbers
 
 # --- Start menu ----------------------------------------------------------
@@ -146,7 +169,7 @@ PLAYER_DEFAULTS = {
     "crit_damage": 0.0,            # added to the base 2.0x crit multiplier
     "xp_gain": 0.0,                # +fraction of XP from gems
 }
-PLAYER_RADIUS: int = 16
+PLAYER_RADIUS: int = 10
 
 # Sprite seating: a rig's `anchor` pixel lands on `entity.pos` (the collider
 # centre), and rig anchors sit at the feet -- so the body renders entirely above
@@ -154,7 +177,7 @@ PLAYER_RADIUS: int = 16
 # of the collider radius, lifting `entity.pos` into the lower torso so more of
 # the sprite sits inside the circle. Render-only: collision, hit tests and the
 # depth sort keep using the unshifted `entity.pos`. 0.0 == no shift.
-SPRITE_ANCHOR_DROP: float = 0.7
+SPRITE_ANCHOR_DROP: float = 0.87
 
 # --- Run structure (spec 3.8) ----------------------------------------
 # Target run length. Spec suggests ~15-20 min but explicitly allows tuning

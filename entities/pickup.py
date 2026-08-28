@@ -50,18 +50,23 @@ class XPGem:
         self.age += dt
         to_player = player.pos - self.pos
         dist_sq = to_player.length_squared()
+        collect_r = player.radius + 6
+
+        if dist_sq <= collect_r * collect_r:
+            self.active = False
+            return True
 
         if not self.homing and dist_sq <= player.pickup_radius ** 2:
             self.homing = True
 
         if self.homing and dist_sq > 1e-6:
-            # Accelerate toward the player, capped.
-            self.vel += to_player.normalize() * 900 * dt
-            if self.vel.length() > 620:
-                self.vel.scale_to_length(620)
+            direction = to_player / dist_sq ** 0.5
+            travel_limit = max(0.0, dist_sq ** 0.5 - collect_r)
+            speed = min(320.0, travel_limit / dt) if dt > 0.0 else 0.0
+            self.vel.update(direction * speed)
             self.pos += self.vel * dt
 
-        collect_r = player.radius + 6
+        dist_sq = (player.pos - self.pos).length_squared()
         if dist_sq <= collect_r * collect_r:
             self.active = False
             return True

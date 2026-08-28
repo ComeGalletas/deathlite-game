@@ -253,5 +253,66 @@ class SpriteAnchorDropTests(unittest.TestCase):
         pygame.quit()
 
 
+class EnemyStateRingsTests(unittest.TestCase):
+    """The elite / shield / status rings at the collider edge read like a
+    collision circle. config.SHOW_ENEMY_STATE_RINGS gates them for sprited
+    enemies (default off); a primitive-fallback enemy always keeps them."""
+
+    def _playing(self):
+        from game.game import Game
+        from game.states.menu_state import MenuState
+        g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
+        g.state_machine.change(MenuState(g))
+        for _ in range(2):
+            g.state_machine.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        return g, g.state_machine.current
+
+    def _circles(self, p, e):
+        """Count pygame.draw.circle calls made by _draw_one_enemy(e)."""
+        n = [0]
+        real = pygame.draw.circle
+        pygame.draw.circle = lambda *a, **k: (n.__setitem__(0, n[0] + 1),
+                                              real(*a, **k))[1]
+        try:
+            p._draw_one_enemy(pygame.Surface((1600, 900)), e)
+        finally:
+            pygame.draw.circle = real
+        return n[0]
+
+    def test_sprited_elite_draws_no_ring_by_default_but_does_when_flag_on(self):
+        from game import config
+        g, p = self._playing()
+        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(80, 0))
+        e = p.enemies[-1]
+        e.is_elite = True
+        self.assertIsNotNone(e.anim)                       # sprited
+        old = config.SHOW_ENEMY_STATE_RINGS
+        try:
+            config.SHOW_ENEMY_STATE_RINGS = False
+            self.assertEqual(self._circles(p, e), 0)       # sprite only, no ring
+            config.SHOW_ENEMY_STATE_RINGS = True
+            self.assertGreaterEqual(self._circles(p, e), 1)  # elite ring back
+        finally:
+            config.SHOW_ENEMY_STATE_RINGS = old
+        pygame.quit()
+
+    def test_primitive_enemy_always_shows_its_state_rings(self):
+        from game import config
+        g, p = self._playing()
+        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(80, 0))
+        e = p.enemies[-1]
+        e.anim = None                                     # force the primitive path
+        e.is_elite = True
+        old = config.SHOW_ENEMY_STATE_RINGS
+        try:
+            config.SHOW_ENEMY_STATE_RINGS = False
+            # body disc + elite ring at least
+            self.assertGreaterEqual(self._circles(p, e), 2)
+        finally:
+            config.SHOW_ENEMY_STATE_RINGS = old
+        pygame.quit()
+
+
 if __name__ == "__main__":
     unittest.main()
