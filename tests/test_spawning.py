@@ -7,7 +7,7 @@ import pygame
 
 from game import config
 from systems.camera import Camera
-from world.spawning import SpawnDirector, ring_point_outside_view
+from world.spawning import _PHASES, SpawnDirector, ring_point_outside_view
 
 
 class RingPointTests(unittest.TestCase):
@@ -82,8 +82,88 @@ class SpawnDirectorTests(unittest.TestCase):
 
     def test_never_exceeds_global_hard_cap(self):
         d = SpawnDirector(run_duration=10, rng=random.Random(1))
-        out = d.update(5.0, 9.0, config.MAX_ENEMIES)
+        out = d.update(5.0, 9.0, config.ENEMY_COUNT_HARD_CAP)
         self.assertEqual(out, [])
+
+
+class DifficultyTests(unittest.TestCase):
+    """Phase 4 D1 / D2: Normal / Fast / Super Fast resolve to four independent
+    factors on the director."""
+
+    def test_normal_is_unchanged_from_the_shipped_numbers(self):
+        d = SpawnDirector(run_duration=1000, difficulty="normal")
+        self.assertEqual(d.run_duration, 1000)
+        self.assertEqual(d.boss_time(), config.BOSS_FRACTION * 1000)
+        self.assertAlmostEqual(d._interval(0.0), _PHASES[0]["interval"][0])
+        self.assertEqual(d.stat_multipliers(1000), (1.0 + 1.4, 1.0 + 0.30))
+
+    def test_unknown_difficulty_falls_back_to_normal(self):
+        d = SpawnDirector(run_duration=600, difficulty="nightmare")
+        self.assertEqual(d.difficulty, "normal")
+        self.assertEqual(d.run_duration, 600)
+
+    def test_spawn_rate_shortens_the_interval(self):
+        base = SpawnDirector(run_duration=1000, difficulty="normal")._interval(0.0)
+        fast = SpawnDirector(run_duration=1000, difficulty="fast")._interval(0.0)
+        sfast = SpawnDirector(run_duration=1000, difficulty="super_fast")._interval(0.0)
+        self.assertAlmostEqual(fast, base / 1.25)
+        self.assertAlmostEqual(sfast, base / 1.5)
+
+    def test_timeline_pace_pulls_the_boss_and_phases_in(self):
+        base = SpawnDirector(run_duration=1000, difficulty="normal")
+        fast = SpawnDirector(run_duration=1000, difficulty="fast")
+        sfast = SpawnDirector(run_duration=1000, difficulty="super_fast")
+        self.assertAlmostEqual(fast.boss_time(), base.boss_time() / 1.25)
+        self.assertAlmostEqual(sfast.boss_time(), base.boss_time() / 1.5)
+        # a mid-run instant that is still the chaser-only opening on Normal has
+        # already moved on to a varied composition on Super Fast
+        self.assertEqual(base._phase(150)["types"], {"chaser": 1.0})
+        self.assertGreater(len(sfast._phase(150)["types"]),
+                           len(base._phase(150)["types"]))
+
+    def test_stat_ramp_accelerates_but_still_tops_out_at_run_end(self):
+        base = SpawnDirector(run_duration=600, difficulty="normal")
+        fast = SpawnDirector(run_duration=600, difficulty="fast")
+        sfast = SpawnDirector(run_duration=600, difficulty="super_fast")
+        # same real elapsed -> harder difficulty ramps enemies higher
+        at = 200.0
+        self.assertLess(base.stat_multipliers(at)[0], fast.stat_multipliers(at)[0])
+        self.assertLess(fast.stat_multipliers(at)[0], sfast.stat_multipliers(at)[0])
+        # each difficulty still reaches the full ramp by its own (earlier) end
+        for d in (base, fast, sfast):
+            hp, spd = d.stat_multipliers(d.run_duration)
+            self.assertAlmostEqual(hp, 1.0 + 1.4)
+            self.assertAlmostEqual(spd, 1.0 + 0.30)
+
+    def test_enemy_count_cap_grows_on_the_in_game_clock(self):
+        d = SpawnDirector(run_duration=600, difficulty="normal")
+        self.assertEqual(d.enemy_count_cap(0.0), config.ENEMY_COUNT_BASE)
+        self.assertEqual(d.enemy_count_cap(19.9), config.ENEMY_COUNT_BASE)
+        self.assertEqual(d.enemy_count_cap(20.0), config.ENEMY_COUNT_BASE + 5)
+        self.assertEqual(d.enemy_count_cap(60.0), config.ENEMY_COUNT_BASE + 15)
+        # the cap is a pure function of the in-game elapsed it is handed --
+        # frame count / real time never enter into it
+        for _ in range(50):
+            d.update(1 / 30, 5.0, 0)
+        self.assertEqual(d.enemy_count_cap(5.0), config.ENEMY_COUNT_BASE)
+
+    def test_step_scales_with_difficulty_and_clamps_to_the_hard_cap(self):
+        normal = SpawnDirector(run_duration=600, difficulty="normal")
+        fast = SpawnDirector(run_duration=600, difficulty="fast")
+        sfast = SpawnDirector(run_duration=600, difficulty="super_fast")
+        # ceil(5 * 1.0 / 1.5 / 2.0) -> +5 / +8 / +10 per 20 s
+        self.assertEqual(normal.enemy_count_cap(20.0), config.ENEMY_COUNT_BASE + 5)
+        self.assertEqual(fast.enemy_count_cap(20.0), config.ENEMY_COUNT_BASE + 8)
+        self.assertEqual(sfast.enemy_count_cap(20.0), config.ENEMY_COUNT_BASE + 10)
+        self.assertEqual(sfast.enemy_count_cap(10_000.0), config.ENEMY_COUNT_HARD_CAP)
+
+    def test_set_difficulty_rebinds_live(self):
+        d = SpawnDirector(run_duration=1000, difficulty="normal")
+        base_boss = d.boss_time()
+        d.set_difficulty("super_fast")
+        self.assertEqual(d.difficulty, "super_fast")
+        self.assertAlmostEqual(d.boss_time(), base_boss / 1.5)
+        self.assertEqual(d.enemy_count_cap(20.0), config.ENEMY_COUNT_BASE + 10)
 
 
 if __name__ == "__main__":

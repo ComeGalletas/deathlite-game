@@ -52,6 +52,7 @@ class GameMap:
         self._tiles_ready = False
         self._tiles_ok = False
         self._water_buf: pygame.Surface | None = None
+        self._water_tile = 0            # water tile size in world px (scroll stride)
         self._room_surfs: dict[int, pygame.Surface] = {}
         self._corr_surfs: list[tuple[pygame.Rect, pygame.Surface]] = []
         self._shore: list[tuple[int, int]] = []       # top-left world px of shoreline tiles
@@ -67,6 +68,13 @@ class GameMap:
         # instance is (frames, anchor_x, anchor_y, fps, world_x, world_y).
         self._room_decor: dict[int, list[tuple]] = {}   # room id -> interior clutter
         self._void_decor: list[tuple] = []              # water scenery in the void
+
+        # Draw-time zoom (C3): the baked terrain surfaces are 1:1 world pixels;
+        # every render method scales blit positions by `camera.zoom` and blits a
+        # `_z_surf()`-scaled copy so the tiled world matches the zoomed entities.
+        # `_z_surf` caches by source-surface id for the current zoom.
+        self._render_zoom: float = 1.0
+        self._blit_cache: dict[int, pygame.Surface] = {}
 
     # --- geometry ------------------------------------------------
     @property
@@ -310,12 +318,16 @@ class GameMap:
         water = a.tile(t.get("water_tile"), 0)
         if water is not None:
             wt = water.get_width()
-            buf = pygame.Surface((config.SCREEN_WIDTH + wt,
-                                  config.SCREEN_HEIGHT + wt)).convert()
-            for y in range(0, buf.get_height(), wt):
-                for x in range(0, buf.get_width(), wt):
+            # Big enough to cover the visible world extent (SCREEN / zoom) plus
+            # one tile of scroll slack; `_z_surf` blows it up to the screen.
+            span_w = round(config.SCREEN_WIDTH / config.CAMERA_ZOOM) + wt
+            span_h = round(config.SCREEN_HEIGHT / config.CAMERA_ZOOM) + wt
+            buf = pygame.Surface((span_w, span_h)).convert()
+            for y in range(0, span_h, wt):
+                for x in range(0, span_w, wt):
                     buf.blit(water, (x, y))
             self._water_buf = buf
+            self._water_tile = wt
 
         if config.TERRAIN_FOAM:
             self._foam = a.frames("terrain_foam", "loop")
@@ -511,6 +523,20 @@ class GameMap:
         self._draw_obstacles(surface, camera)
         self.draw_tree_shadows(surface, camera)
 
+    def _z_surf(self, surf: pygame.Surface | None) -> pygame.Surface | None:
+        """`surf` scaled by the current render zoom (cached by source id).
+        Identity at zoom 1.0 -- callers and tests see the original object."""
+        z = self._render_zoom
+        if z == 1.0 or surf is None:
+            return surf
+        got = self._blit_cache.get(id(surf))
+        if got is None:
+            w, h = surf.get_size()
+            got = pygame.transform.smoothscale(
+                surf, (max(1, round(w * z)), max(1, round(h * z))))
+            self._blit_cache[id(surf)] = got
+        return got
+
     def draw_ground(self, surface: pygame.Surface, camera) -> None:
         """Terrain only -- water, void scenery, foam, room floors, bridges (or
         the flat fallback). The depth-sorted layer (`scenery_drawables` +
@@ -518,10 +544,16 @@ class GameMap:
         if not self._tiles_ready:
             self._build_tiles()
 
+        z = getattr(camera, "zoom", 1.0)
+        if z != self._render_zoom:
+            self._render_zoom = z
+            self._blit_cache.clear()
+
         ox, oy = camera.pos.x, camera.pos.y
         if self.layout is None:
             surface.fill(_VOID)
-            floor = pygame.Rect(-ox, -oy, self.width, self.height)
+            floor = pygame.Rect(round(-ox * z), round(-oy * z),
+                                round(self.width * z), round(self.height * z))
             pygame.draw.rect(surface, _FLOOR, floor)
             pygame.draw.rect(surface, _WALL, floor, width=3)
             self._draw_grid(surface, camera, floor)
@@ -532,8 +564,14 @@ class GameMap:
         else:
             self._draw_flat_layout(surface, camera)
             for r in self.layout.rooms:      # grey wall border (flat mode only)
-                pygame.draw.rect(surface, _WALL,
-                                 r.rect.move(-camera.pos.x, -camera.pos.y), width=3)
+                pygame.draw.rect(surface, _WALL, self._screen_rect(r.rect, camera),
+                                 width=3)
+
+    def _screen_rect(self, rect: pygame.Rect, camera) -> pygame.Rect:
+        z = self._render_zoom
+        ox, oy = camera.pos.x, camera.pos.y
+        return pygame.Rect(round((rect.x - ox) * z), round((rect.y - oy) * z),
+                           round(rect.width * z), round(rect.height * z))
 
     def scenery_drawables(self, camera) -> list:
         """`(depth_y, draw_fn)` for every visible interior-clutter decoration and
@@ -561,10 +599,12 @@ class GameMap:
         return out
 
     def _draw_tiled(self, surface, camera) -> None:
+        z = self._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         if self._water_buf is not None:
-            wt = self._water_buf.get_width() - config.SCREEN_WIDTH
-            surface.blit(self._water_buf, (-(ox % wt), -(oy % wt)))
+            wt = self._water_tile
+            surface.blit(self._z_surf(self._water_buf),
+                         (-(ox % wt) * z, -(oy % wt) * z))
         else:
             surface.fill(_VOID)
 
@@ -579,17 +619,20 @@ class GameMap:
             frame = self._foam[int(pygame.time.get_ticks() * 0.001 * 12) % len(self._foam)]
             half = frame.get_width() // 2 - 32
             fview = view.inflate(frame.get_width(), frame.get_height())
+            zframe = self._z_surf(frame)
             for wx, wy in self._shore:
                 if fview.collidepoint(wx, wy):
-                    surface.blit(frame, (wx - ox - half, wy - oy - half))
+                    surface.blit(zframe, ((wx - ox - half) * z, (wy - oy - half) * z))
         # ... then the baked room floors (autotile edges baked in) ...
         for r in self.layout.rooms:
             if r.rect.colliderect(view):
-                surface.blit(self._room_surfs[r.id], (r.rect.x - ox, r.rect.y - oy))
+                surface.blit(self._z_surf(self._room_surfs[r.id]),
+                             ((r.rect.x - ox) * z, (r.rect.y - oy) * z))
         # ... corridors last, so their grass covers the foam at doorways.
         for rect, surf in self._corr_surfs:
             if rect.colliderect(view):
-                surface.blit(surf, (rect.x - ox, rect.y - oy))
+                surface.blit(self._z_surf(surf),
+                             ((rect.x - ox) * z, (rect.y - oy) * z))
         # Interior clutter is NOT drawn here -- it is depth-sorted with the
         # obstacles and the characters (see `scenery_drawables`).
 
@@ -607,10 +650,12 @@ class GameMap:
         """Blit one `(frames, anchor_x, anchor_y, fps, wx, wy)` scenery instance:
         current animation frame, base on `(wx, wy)`."""
         frs, ax, ay, fps, wx, wy = inst
+        z = self._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
                  if fps else frs[0])
-        surface.blit(frame, (round(wx - ax - ox), round(wy - ay - oy)))
+        surface.blit(self._z_surf(frame),
+                     (round((wx - ox) * z - ax * z), round((wy - oy) * z - ay * z)))
 
     def _blit_decor(self, surface, camera, instances, view=None) -> None:
         """View-culled batch blit of scenery instances (void scatter + the
@@ -623,31 +668,35 @@ class GameMap:
                 self._blit_one_decor(surface, camera, inst)
 
     def _draw_flat_layout(self, surface, camera) -> None:
-        ox, oy = camera.pos.x, camera.pos.y
         surface.fill(_VOID)
         for c in self.layout.corridors:
-            pygame.draw.rect(surface, _FLOOR, c.rect.move(-ox, -oy))
+            pygame.draw.rect(surface, _FLOOR, self._screen_rect(c.rect, camera))
         for r in self.layout.rooms:
             pygame.draw.rect(surface, _SPECIAL_FLOORS.get(r.kind, _FLOOR),
-                             r.rect.move(-ox, -oy))
+                             self._screen_rect(r.rect, camera))
 
     def _draw_one_obstacle(self, surface, camera, i, o) -> None:
-        """One obstacle: the scaled decoration skin (base on the collider centre),
-        or a fallback circle if no rig resolved. Trees also cast a canopy shadow,
-        but that is a separate late pass (`draw_tree_shadows`)."""
+        """One obstacle: the scaled decoration skin, seated below the collider
+        centre by `config.SPRITE_ANCHOR_DROP` (same as the characters -- more of
+        the skin sits inside the collision circle), or a fallback circle if no
+        rig resolved. Trees also cast a canopy shadow, but that is a separate
+        late pass (`draw_tree_shadows`) and stays on the world anchor."""
+        z = self._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
+        sx, sy = (o.pos.x - ox) * z, (o.pos.y - oy) * z
         entry = self._decos.get(i)
         if entry is not None:
             ax, ay, fps, frs = entry
             frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
                      if fps else frs[0])
-            surface.blit(frame, (round(o.pos.x - ax - ox),
-                                 round(o.pos.y - ay - oy)))
+            drop = config.SPRITE_ANCHOR_DROP * o.radius * z
+            surface.blit(self._z_surf(frame),
+                         (round(sx - ax * z), round(sy - ay * z + drop)))
         else:
-            pygame.draw.circle(surface, o.color,
-                               (int(o.pos.x - ox), int(o.pos.y - oy)), o.radius)
-            pygame.draw.circle(surface, _WALL,
-                               (int(o.pos.x - ox), int(o.pos.y - oy)), o.radius, 2)
+            pygame.draw.circle(surface, o.color, (int(sx), int(sy)),
+                               round(o.radius * z))
+            pygame.draw.circle(surface, _WALL, (int(sx), int(sy)),
+                               round(o.radius * z), 2)
 
     def draw_tree_shadows(self, surface, camera) -> None:
         """Blit each visible tree's soft canopy shadow. The caller runs this
@@ -655,11 +704,14 @@ class GameMap:
         under a tree is gently darkened by its shade."""
         if not self._tree_shadows:
             return
+        z = self._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         view = camera.visible_rect().inflate(200, 200)
         for wx, wy, r, surf in self._tree_shadows:
             if view.collidepoint(wx, wy):
-                surface.blit(surf, (round(wx - r - ox), round(wy - r - oy)))
+                surface.blit(self._z_surf(surf),
+                             (round((wx - ox) * z - r * z),
+                              round((wy - oy) * z - r * z)))
 
     def _draw_obstacles(self, surface, camera) -> None:
         """Every visible obstacle, unsorted -- only the whole-map `draw()` path."""
@@ -669,10 +721,12 @@ class GameMap:
                 self._draw_one_obstacle(surface, camera, i, o)
 
     def _draw_grid(self, surface, camera, floor_rect) -> None:
+        z = self._render_zoom
+        ox, oy = camera.pos.x, camera.pos.y
         step = 128
         for x in range(0, self.width + step, step):
-            sx = x - camera.pos.x
+            sx = (x - ox) * z
             pygame.draw.line(surface, _GRID, (sx, floor_rect.top), (sx, floor_rect.bottom))
         for y in range(0, self.height + step, step):
-            sy = y - camera.pos.y
+            sy = (y - oy) * z
             pygame.draw.line(surface, _GRID, (floor_rect.left, sy), (floor_rect.right, sy))

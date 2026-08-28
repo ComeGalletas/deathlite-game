@@ -9,8 +9,11 @@ from __future__ import annotations
 import pygame
 
 # --- Display -----------------------------------------------------------------
-SCREEN_WIDTH: int = 1280
-SCREEN_HEIGHT: int = 720
+# The window / render target. The world is drawn straight to it at this
+# resolution (no intermediate buffer), so a larger screen = more pixels per
+# sprite / tile. 16:9.
+SCREEN_WIDTH: int = 1600
+SCREEN_HEIGHT: int = 900
 FPS: int = 120
 TITLE: str = "Death Lite Game"
 
@@ -18,6 +21,14 @@ TITLE: str = "Death Lite Game"
 # this a stall (e.g. window drag) produces a huge dt that tunnels entities
 # through walls / each other -- the classic "spiral of death".
 MAX_DT: float = 1.0 / 20.0
+
+# Draw-time camera magnification: `Camera.world_to_screen` multiplies world
+# positions by this, and every renderer scales its sprite / tile sizes to match,
+# so the picture is a "closer" view that stays crisp (sprites scale *down* from
+# their large source frames -- no upscale blur). The HUD and feedback overlays
+# are drawn afterwards at full resolution and are unaffected. 1.0 == no zoom.
+# The visible world extent is therefore SCREEN_* / CAMERA_ZOOM.
+CAMERA_ZOOM: float = 1.5
 
 # --- World -----------------------------------------------------------------
 # Fallback size used only before a procedural layout exists (menus / tests).
@@ -78,10 +89,45 @@ MENU_SCRIM = (0, 0, 0, 205)
 VOLUME_STEP: float = 0.05
 
 # --- Entity limits (graceful degradation, not crashes, when exceeded) -----
-MAX_ENEMIES: int = 600
+# Absolute enemy concurrency ceiling -- a perf safety net, rarely the real
+# limiter. The live limit is SpawnDirector.enemy_count_cap(): it starts at
+# ENEMY_COUNT_BASE and grows by ENEMY_COUNT_STEP every ENEMY_COUNT_STEP_PERIOD
+# seconds of *in-game* time (the value the HUD timer shows -- not wall clock),
+# the step scaled by the run's difficulty. BASE + STEP are tuned so the Normal
+# schedule tracks the old fixed per-phase soft caps (40 / 70 / 100 / 130 / 150).
+ENEMY_COUNT_HARD_CAP: int = 600
+ENEMY_COUNT_BASE: int = 40
+ENEMY_COUNT_STEP: int = 5
+ENEMY_COUNT_STEP_PERIOD: float = 20.0
 MAX_PROJECTILES: int = 800
 MAX_PARTICLES: int = 1200
 MAX_DAMAGE_NUMBERS: int = 200
+
+# --- Difficulty (chosen per run on the character-select screen) ----------
+# Normal is the shipped game. A level resolves to four independent factors on
+# SpawnDirector, each its own tuning knob:
+#   spawn_rate             - divides the spawn interval (higher => more spawns)
+#   timeline_pace          - run_duration is divided by this, so harder enemy
+#                            types and the boss arrive sooner and the run ends
+#                            sooner
+#   stat_ramp_pace         - multiplies elapsed when ramping enemy HP / speed --
+#                            the inverse of the timeline division, so the full
+#                            stat ramp is still reached by the (earlier) run end
+#   enemy_count_step_scale - scales the +ENEMY_COUNT_STEP growth of the live
+#                            enemy ceiling, so a faster run also gets a bigger
+#                            crowd (steps of +5 / +8 / +10 per period)
+DIFFICULTIES: dict[str, dict[str, float]] = {
+    "normal":     {"spawn_rate": 1.0,  "timeline_pace": 1.0,
+                   "stat_ramp_pace": 1.0,  "enemy_count_step_scale": 1.0},
+    "fast":       {"spawn_rate": 1.25, "timeline_pace": 1.25,
+                   "stat_ramp_pace": 1.25, "enemy_count_step_scale": 1.5},
+    "super_fast": {"spawn_rate": 1.5,  "timeline_pace": 1.5,
+                   "stat_ramp_pace": 1.5,  "enemy_count_step_scale": 2.0},
+}
+DIFFICULTY_ORDER: tuple[str, ...] = ("normal", "fast", "super_fast")
+DIFFICULTY_DEFAULT: str = "normal"
+DIFFICULTY_LABELS: dict[str, str] = {
+    "normal": "Normal", "fast": "Fast", "super_fast": "Super Fast"}
 
 # --- Player defaults -----------------------------------------------------
 # Mirrors the stat list in spec section 3.1. Concrete hero data will move to
@@ -101,6 +147,14 @@ PLAYER_DEFAULTS = {
     "xp_gain": 0.0,                # +fraction of XP from gems
 }
 PLAYER_RADIUS: int = 16
+
+# Sprite seating: a rig's `anchor` pixel lands on `entity.pos` (the collider
+# centre), and rig anchors sit at the feet -- so the body renders entirely above
+# the collision circle. This drops every character sprite down by this fraction
+# of the collider radius, lifting `entity.pos` into the lower torso so more of
+# the sprite sits inside the circle. Render-only: collision, hit tests and the
+# depth sort keep using the unshifted `entity.pos`. 0.0 == no shift.
+SPRITE_ANCHOR_DROP: float = 0.7
 
 # --- Run structure (spec 3.8) ----------------------------------------
 # Target run length. Spec suggests ~15-20 min but explicitly allows tuning

@@ -1,11 +1,17 @@
 """Enemy spawning: geometry helper + the wave/budget director (spec 3.4 / 3.8).
 
 `SpawnDirector` drives difficulty over the length of a run through a phase
-schedule. Each phase defines its enemy composition, spawn interval, pack size,
-elite chance and a soft concurrency cap. Separately, `stat_multipliers` ramps
-enemy HP and speed with elapsed time. Difficulty therefore rises through several
-independent knobs, not one master number (spec 3.4: "Do not increase every
-variable simultaneously without reason").
+schedule. Each phase defines its enemy composition, spawn interval, pack size
+and elite chance. Concurrency is limited by `enemy_count_cap`, which grows with
+in-game time. Separately, `stat_multipliers` ramps enemy HP and speed with
+elapsed time. Difficulty therefore rises through several independent knobs, not
+one master number (spec 3.4: "Do not increase every variable simultaneously
+without reason").
+
+The run's chosen difficulty (`config.DIFFICULTIES`) feeds four independent
+multipliers -- `spawn_rate` (spawn cadence), `timeline_pace` (how fast the phase
+schedule and the boss arrive), `stat_ramp_pace` (the HP/speed ramp) and
+`enemy_count_step_scale` (crowd growth). Normal leaves every one at 1.0.
 """
 from __future__ import annotations
 
@@ -33,35 +39,56 @@ def ring_point_outside_view(camera, world_w: int, world_h: int,
 
 
 # fraction-of-run -> composition. `until` is the upper bound (exclusive).
+# Concurrency is no longer a per-phase field: SpawnDirector.enemy_count_cap()
+# is the single, time-growing limit (see config.ENEMY_COUNT_*).
 _PHASES = [
     {"until": 0.20, "interval": (1.20, 1.00), "pack": (1, 1), "elite": 0.0,
-     "cap": 40, "types": {"chaser": 1.0}},
+     "types": {"chaser": 1.0}},
     {"until": 0.45, "interval": (1.00, 0.82), "pack": (1, 2), "elite": 0.02,
-     "cap": 70, "types": {"chaser": 0.6, "fast": 0.25, "swarm": 0.15}},
+     "types": {"chaser": 0.6, "fast": 0.25, "swarm": 0.15}},
     {"until": 0.70, "interval": (0.82, 0.66), "pack": (2, 3), "elite": 0.05,
-     "cap": 100, "types": {"chaser": 0.28, "fast": 0.16, "swarm": 0.1,
-                            "tank": 0.1, "ranged": 0.12, "exploder": 0.07,
-                            "shielded": 0.04, "charger": 0.08, "teleporter": 0.05}},
+     "types": {"chaser": 0.28, "fast": 0.16, "swarm": 0.1,
+               "tank": 0.1, "ranged": 0.12, "exploder": 0.07,
+               "shielded": 0.04, "charger": 0.08, "teleporter": 0.05}},
     {"until": 0.95, "interval": (0.66, 0.52), "pack": (2, 4), "elite": 0.10,
-     "cap": 130, "types": {"chaser": 0.18, "fast": 0.12, "swarm": 0.09,
-                            "tank": 0.12, "ranged": 0.1, "exploder": 0.09,
-                            "shielded": 0.07, "summoner": 0.08,
-                            "charger": 0.09, "teleporter": 0.06, "warlock": 0.06}},
+     "types": {"chaser": 0.18, "fast": 0.12, "swarm": 0.09,
+               "tank": 0.12, "ranged": 0.1, "exploder": 0.09,
+               "shielded": 0.07, "summoner": 0.08,
+               "charger": 0.09, "teleporter": 0.06, "warlock": 0.06}},
     {"until": 1.01, "interval": (0.54, 0.44), "pack": (3, 4), "elite": 0.14,
-     "cap": 150, "types": {"chaser": 0.14, "fast": 0.12, "tank": 0.13,
-                            "ranged": 0.1, "exploder": 0.1, "shielded": 0.09,
-                            "summoner": 0.1, "swarm": 0.05,
-                            "charger": 0.1, "teleporter": 0.08, "warlock": 0.08}},
+     "types": {"chaser": 0.14, "fast": 0.12, "tank": 0.13,
+               "ranged": 0.1, "exploder": 0.1, "shielded": 0.09,
+               "summoner": 0.1, "swarm": 0.05,
+               "charger": 0.1, "teleporter": 0.08, "warlock": 0.08}},
 ]
 
 
 class SpawnDirector:
     def __init__(self, run_duration: float = config.RUN_DURATION_SECONDS,
-                 rng: random.Random | None = None) -> None:
-        self.run_duration = max(1.0, run_duration)
+                 rng: random.Random | None = None,
+                 difficulty: str = config.DIFFICULTY_DEFAULT) -> None:
+        self._base_run_duration = max(1.0, run_duration)
         self.rng = rng or random.Random()
         self._timer = 0.8
         self.boss_spawned = False
+        self.set_difficulty(difficulty)
+
+    def set_difficulty(self, difficulty: str) -> None:
+        """(Re)bind the four difficulty factors. Safe to call mid-run (the
+        dev-menu live switch does): the phase schedule and the boss re-key off
+        the new `run_duration` immediately -- raising the pace late can arm the
+        boss on the next frame, which is intentional (dev testing)."""
+        if difficulty not in config.DIFFICULTIES:
+            difficulty = config.DIFFICULTY_DEFAULT
+        f = config.DIFFICULTIES[difficulty]
+        self.difficulty = difficulty
+        self._spawn_rate = f["spawn_rate"]
+        self._timeline_pace = f["timeline_pace"]
+        self._stat_ramp_pace = f["stat_ramp_pace"]
+        self._enemy_count_step_scale = f["enemy_count_step_scale"]
+        # Harder enemy types + the boss arrive sooner: the whole phase schedule
+        # is compressed by dividing the run length it is measured against.
+        self.run_duration = max(1.0, self._base_run_duration / self._timeline_pace)
 
     # --- schedule lookup ------------------------------------
     def _phase(self, elapsed: float) -> dict:
@@ -73,19 +100,33 @@ class SpawnDirector:
 
     def _interval(self, elapsed: float) -> float:
         p = self._phase(elapsed)
-        # Lerp the interval across the whole run so it tightens smoothly.
+        # Lerp the interval across the whole run so it tightens smoothly, then
+        # divide by the spawn-rate factor so a harder run spawns more often.
         f = min(1.0, elapsed / self.run_duration)
         lo, hi = p["interval"]
-        return lo + (hi - lo) * f
+        return (lo + (hi - lo) * f) / self._spawn_rate
 
     def stat_multipliers(self, elapsed: float) -> tuple[float, float]:
         """(hp_mult, speed_mult) for enemies spawned at `elapsed`.
 
         Tuned in Milestone 10: the HP ramp was too steep for a mediocre build --
         a reasonable build should be pressed, not overrun, on the way to the boss.
+        `stat_ramp_pace` accelerates the ramp on the faster difficulties (the
+        inverse of the timeline compression), so a shorter run still reaches the
+        full ramp by its end.
         """
-        f = min(1.0, elapsed / self.run_duration)
+        f = min(1.0, elapsed * self._stat_ramp_pace / self._base_run_duration)
         return (1.0 + 1.4 * f, 1.0 + 0.30 * f)
+
+    def enemy_count_cap(self, elapsed: float) -> int:
+        """The live ceiling on concurrent enemies. Starts at ENEMY_COUNT_BASE
+        and grows by ceil(STEP * step_scale) every STEP_PERIOD seconds of
+        in-game time (`elapsed` is PlayingState.stats["time"] -- the HUD clock,
+        pause-safe, no wall clock), clamped to the hard cap."""
+        steps = int(max(0.0, elapsed) // config.ENEMY_COUNT_STEP_PERIOD)
+        step = math.ceil(config.ENEMY_COUNT_STEP * self._enemy_count_step_scale)
+        return min(config.ENEMY_COUNT_HARD_CAP,
+                   config.ENEMY_COUNT_BASE + step * steps)
 
     def boss_time(self) -> float:
         return config.BOSS_FRACTION * self.run_duration
@@ -99,11 +140,11 @@ class SpawnDirector:
     # --- per-frame -------------------------------------------
     def update(self, dt: float, elapsed: float, active_count: int) -> list[str]:
         """Return a list of enemy ids to spawn this frame (possibly empty).
-        Respects the phase soft cap and the global hard cap (spec 6.3)."""
+        Respects the time-growing concurrency cap (spec 6.3)."""
         if self.boss_spawned:
             return []  # stop the tide while the boss fight is on
         phase = self._phase(elapsed)
-        cap = min(phase["cap"], config.MAX_ENEMIES)
+        cap = self.enemy_count_cap(elapsed)
         if active_count >= cap:
             return []
 

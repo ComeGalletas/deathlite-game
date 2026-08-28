@@ -49,6 +49,7 @@ def _run(hero_index=0):
         should_spawn_boss=lambda e: False,
         update=lambda dt, e, n: [],
         stat_multipliers=lambda t: (1.0, 1.0),
+        enemy_count_cap=lambda t: config.ENEMY_COUNT_HARD_CAP,
         mark_boss_spawned=lambda: None)
     return game, p
 

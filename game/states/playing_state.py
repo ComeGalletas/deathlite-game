@@ -56,9 +56,11 @@ ALTAR_HP_COST_FRACTION = 0.25
 
 class PlayingState(State):
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
-              dev: bool = False, **kwargs) -> None:
+              dev: bool = False, difficulty: str | None = None, **kwargs) -> None:
         self.content = get_content()
         self.dev_mode = bool(dev)     # developer sandbox: no save, restart on end
+        self.difficulty = (difficulty if difficulty in config.DIFFICULTIES
+                           else config.DIFFICULTY_DEFAULT)
         self._dev_unlimited_hp = False   # HP ratchet (dev menu D2)
         self._dev_no_attack = False      # hero weapons silenced (dev menu D2)
         self._dev_hp_floor = 0.0
@@ -97,7 +99,11 @@ class PlayingState(State):
         self.player._blessing_library = self.blessing_lib
         rebuild_blessings(self.player, self.blessing_lib)
 
-        self.camera = Camera(self.game_map.width, self.game_map.height)
+        # The world is drawn straight to the screen; `Camera.zoom` magnifies at
+        # draw time (config.CAMERA_ZOOM), so sprites stay crisp. HUD is unscaled.
+        self.camera = Camera(self.game_map.width, self.game_map.height,
+                             config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
+                             zoom=config.CAMERA_ZOOM)
         self.camera.snap_to(self.player.pos)
 
         self.enemies: list[Enemy] = []
@@ -111,7 +117,8 @@ class PlayingState(State):
         self.damage_numbers = DamageNumbers()
         self.shake = ScreenShake()
         self.grid = SpatialGrid()
-        self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng)
+        self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng,
+                                      difficulty=self.difficulty)
         self.hud = HUD()
         self.levels = LevelTracker()
 
@@ -194,7 +201,8 @@ class PlayingState(State):
         self._apply_dev_unlimited_hp()
         if not self.player.alive:
             # Hold the run open for the shared death poof, then end.
-            self._spawn_death_fx(self.player.pos, getattr(self.player, "_facing", 1))
+            self._spawn_death_fx(self.player.pos, getattr(self.player, "_facing", 1),
+                                 radius=self.player.radius)
             self._death_seq_t = 1.05
         self._report_debug()
 
@@ -208,6 +216,16 @@ class PlayingState(State):
             self.player.hp = self._dev_hp_floor
         if not self.player.alive and self._dev_hp_floor > 0.0:
             self.player.alive = True
+
+    def _set_difficulty(self, name: str) -> None:
+        """Dev-menu live switch. Re-binds the run's difficulty on the fly; the
+        spawn schedule and the boss re-key off the new pace immediately -- see
+        SpawnDirector.set_difficulty (raising the pace late can arm the boss on
+        the next frame, which is intentional for testing)."""
+        if name not in config.DIFFICULTIES:
+            return
+        self.difficulty = name
+        self.director.set_difficulty(name)
 
     def _run_death_sequence(self, dt: float) -> None:
         if self.dev_mode and self._dev_unlimited_hp:
@@ -372,7 +390,7 @@ class PlayingState(State):
                 and -margin <= pos.y <= self.game_map.height + margin)
 
     def _spawn_enemy(self, enemy_id: str, at: pygame.Vector2 | None = None) -> None:
-        if len(self.enemies) >= config.MAX_ENEMIES:
+        if len(self.enemies) >= self.director.enemy_count_cap(self.stats["time"]):
             return
         definition = self.content.enemy(enemy_id)
         pos = at if at is not None else self.game_map.offscreen_spawn_point(
@@ -702,15 +720,22 @@ class PlayingState(State):
                                      color=e.color, xp=e.xp_reward, tags=e.tags,
                                      elite=e.is_elite)
             self._spawn_death_fx(e.pos, getattr(e, "_facing", 1),
-                                 scale=self._ENEMY_DEATH_FX_SCALE)
+                                 scale=self._ENEMY_DEATH_FX_SCALE, radius=e.radius)
         self.enemies = survivors
 
     _ENEMY_DEATH_FX_SCALE = 0.55        # enemy death poof at 55% (hero stays 1.0)
 
-    def _spawn_death_fx(self, pos, facing: int = 1, scale: float = 1.0) -> None:
+    def _sprite_drop(self, radius: float) -> float:
+        """Downward render offset (screen px) that seats a rig's feet-anchor
+        below the collider centre -- see config.SPRITE_ANCHOR_DROP. Render-only."""
+        return config.SPRITE_ANCHOR_DROP * radius * self.camera.zoom
+
+    def _spawn_death_fx(self, pos, facing: int = 1, scale: float = 1.0,
+                        radius: float = float(config.PLAYER_RADIUS)) -> None:
         self._death_fx.append(
             [Animator(self.game.assets, "dead", start="loop"),
-             pygame.Vector2(pos), 1 if facing >= 0 else -1, float(scale)])
+             pygame.Vector2(pos), 1 if facing >= 0 else -1, float(scale),
+             float(radius)])
 
     def _update_death_fx(self, dt: float) -> None:
         for fx in self._death_fx:
@@ -818,7 +843,7 @@ class PlayingState(State):
         self.particles.burst(self.boss.pos, self.boss.color, count=60,
                              speed=340, life=0.9)
         self._spawn_death_fx(self.boss.pos, getattr(self.boss, "_facing", 1),
-                             scale=1.4)          # (mostly unseen -- victory follows)
+                             scale=1.4, radius=self.boss.radius)   # (mostly unseen -- victory follows)
         self.shake.add(1.0)
         self.game.events.publish(Events.BOSS_KILLED, name=self.boss.name)
         self.boss = None
@@ -829,6 +854,7 @@ class PlayingState(State):
         summary = dict(self.stats)
         summary["weapons"] = [(w.name, w.level) for w in self.player.weapons]
         summary["seed"] = self.run_seed
+        summary["difficulty"] = self.difficulty
         summary["character"] = self.content.character(self.character_id)["name"]
         summary["blessings"] = dict(self.player.blessings)
         self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
@@ -874,7 +900,9 @@ class PlayingState(State):
 
     # --- render ---------------------------------
     def draw(self, surface: pygame.Surface) -> None:
-        offset = self.shake.offset
+        # Screen-shake is an amplitude in screen pixels; camera.pos is world
+        # space, so convert through the zoom before nudging it.
+        offset = self.shake.offset / self.camera.zoom
         self.camera.pos -= offset
         try:
             self.game_map.draw_ground(surface, self.camera)
@@ -883,10 +911,10 @@ class PlayingState(State):
             self._draw_hazards(surface)
             self._draw_gems(surface)
             self._draw_explosions(surface)
-            self._draw_player_projectiles(surface)     # weapon effects sit behind the characters
+            self._draw_player_projectiles(surface)      # weapon effects sit behind the characters
             self._draw_depth_layer(surface)
             self.game_map.draw_tree_shadows(surface, self.camera)
-            self._draw_hostile_projectiles(surface)    # enemy shots stay on top (danger readability)
+            self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
             self.particles.draw(surface, self.camera)
             self.damage_numbers.draw(surface, self.camera)
         finally:
@@ -931,34 +959,39 @@ class PlayingState(State):
             surface.blit(prompt, prompt.get_rect(center=(w // 2, h - 96)))
 
     def _draw_interactables(self, surface) -> None:
+        z = self.camera.zoom
         for it in self.interactables:
             sx, sy = self.camera.world_to_screen(it.pos)
             done = it.used or it.state == "done"
             col = (90, 90, 100) if done else it.colour
-            pygame.draw.circle(surface, col, (int(sx), int(sy)), it.radius, 0 if done else 3)
-            pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), 4)
+            pygame.draw.circle(surface, col, (int(sx), int(sy)),
+                               round(it.radius * z), 0 if done else 3)
+            pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), round(4 * z))
             if it.kind == "elite_arena" and it.state == "active":
                 pygame.draw.circle(surface, (255, 120, 120), (int(sx), int(sy)),
-                                   it.radius + 120, 1)
+                                   round((it.radius + 120) * z), 1)
 
     def _draw_hazards(self, surface) -> None:
+        z = self.camera.zoom
         for hz in self.hazards:
             sx, sy = self.camera.world_to_screen(hz.pos)
             frac = max(0.0, hz.life / hz.max_life)
-            surf = pygame.Surface((hz.radius * 2, hz.radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*hz.color, int(70 * frac + 20)),
-                               (hz.radius, hz.radius), int(hz.radius))
-            surface.blit(surf, (sx - hz.radius, sy - hz.radius))
-            pygame.draw.circle(surface, hz.color, (int(sx), int(sy)), int(hz.radius), 2)
+            rr = max(1, round(hz.radius * z))
+            surf = pygame.Surface((rr * 2, rr * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*hz.color, int(70 * frac + 20)), (rr, rr), rr)
+            surface.blit(surf, (sx - rr, sy - rr))
+            pygame.draw.circle(surface, hz.color, (int(sx), int(sy)), rr, 2)
 
     def _draw_one_summon(self, surface, s) -> None:
+        z = self.camera.zoom
         sx, sy = self.camera.world_to_screen(s.pos)
         if s.kind == "totem":
             pygame.draw.rect(surface, s.color,
-                             (int(sx) - 7, int(sy) - 12, 14, 24), border_radius=3)
+                             (int(sx - 7 * z), int(sy - 12 * z),
+                              round(14 * z), round(24 * z)), border_radius=3)
         else:
-            pygame.draw.circle(surface, s.color, (int(sx), int(sy)), 9)
-        pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), 3)
+            pygame.draw.circle(surface, s.color, (int(sx), int(sy)), round(9 * z))
+        pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), round(3 * z))
 
     def _depth_items(self) -> list:
         """`(depth_y, draw_fn)` for the whole depth-sorted layer -- map scenery
@@ -985,17 +1018,19 @@ class PlayingState(State):
             fn(surface)
 
     def _draw_gems(self, surface) -> None:
+        z = self.camera.zoom
         for gem in self.gems:
             sx, sy = self.camera.world_to_screen(gem.pos)
             pygame.draw.circle(surface, XP_TIER_COLORS.get(gem.tier, (150, 220, 150)),
-                               (int(sx), int(sy)), 3 + gem.tier)
+                               (int(sx), int(sy)), round((3 + gem.tier) * z))
 
     def _draw_explosions(self, surface) -> None:
+        z = self.camera.zoom
         for ex in self._explosions:
             frac = ex["t"] / ex["dur"]
             sx, sy = self.camera.world_to_screen(ex["pos"])
             pygame.draw.circle(surface, (255, 180, 90),
-                               (int(sx), int(sy)), int(ex["radius"] * frac), 3)
+                               (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
 
     _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
                     "shock": (255, 230, 120)}
@@ -1011,7 +1046,9 @@ class PlayingState(State):
         return out
 
     def _draw_one_enemy(self, surface, e) -> None:
+        z = self.camera.zoom
         sx, sy = self.camera.world_to_screen(e.pos)
+        er = e.radius * z
 
         if e.anim is not None:
             self._draw_enemy_sprite(surface, e)
@@ -1019,7 +1056,7 @@ class PlayingState(State):
             for sid, tint in self._STATUS_TINT.items():
                 if sid in e.status:
                     pygame.draw.circle(surface, tint, (int(sx), int(sy)),
-                                       int(e.radius) + 2, 2)
+                                       round(er) + 2, 2)
                     break
         else:
             colour = (255, 255, 255) if e.hit_flash > 0 else e.color
@@ -1027,24 +1064,26 @@ class PlayingState(State):
                 if sid in e.status:
                     colour = tint
                     break
-            pygame.draw.circle(surface, colour, (int(sx), int(sy)), int(e.radius))
+            pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(er))
 
         if e.is_elite:
             pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
-                               int(e.radius) + 3, 2)
+                               round(er) + 3, 2)
         if e.shield_hp > 0:
             pygame.draw.circle(surface, (150, 200, 255), (int(sx), int(sy)),
-                               int(e.radius) + 5, 1)
+                               round(er) + 5, 1)
         if e.telegraphing:
             r = e.cfg.get("slam_radius", 120)
             pygame.draw.circle(surface, (255, 90, 90), (int(sx), int(sy)),
-                               int(r), 2)
+                               round(r * z), 2)
         if self.game.show_collision:
             pygame.draw.circle(surface, config.COLOR_DEBUG,
-                               (int(sx), int(sy)), int(e.radius), 1)
+                               (int(sx), int(sy)), round(er), 1)
 
     def _draw_death_fx(self, surface, fx) -> None:
-        anim, pos, facing, scale = fx
+        anim, pos, facing, scale, radius = fx
+        z = self.camera.zoom
+        scale *= z
         assets = self.game.assets
         bw, bh = assets.scale_for("dead")
         size = (max(1, round(bw * scale)), max(1, round(bh * scale)))
@@ -1054,49 +1093,58 @@ class PlayingState(State):
             return
         ax, ay = assets.anchor("dead")
         sx, sy = self.camera.world_to_screen(pos)
-        surface.blit(frame, (int(sx - ax * scale), int(sy - ay * scale)))
+        drop = self._sprite_drop(radius)     # match the sprite this poof replaced
+        surface.blit(frame, (int(sx - ax * scale), int(sy - ay * scale + drop)))
 
     def _draw_enemy_sprite(self, surface, e) -> None:
+        z = self.camera.zoom
         assets = self.game.assets
         rig = e.anim.rig
         flip = e._facing < 0 and assets.face(rig) == "right"
-        frame = e.anim.frame(size=assets.scale_for(rig), flip=flip)
+        bw, bh = assets.scale_for(rig)
+        frame = e.anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))),
+                             flip=flip)
         sx, sy = self.camera.world_to_screen(e.pos)
         if frame is None:                        # sprite file missing -> primitive
-            pygame.draw.circle(surface, e.color, (int(sx), int(sy)), int(e.radius))
+            pygame.draw.circle(surface, e.color, (int(sx), int(sy)),
+                               round(e.radius * z))
             return
         if e._hurt_t > 0.0:
             frame = self._hit_tinted(frame)     # red flash, no pop to a circle
         ax, ay = assets.anchor(rig)
-        surface.blit(frame, (sx - ax, sy - ay))
+        surface.blit(frame, (sx - ax * z, sy - ay * z + self._sprite_drop(e.radius)))
 
     def _draw_boss(self, surface) -> None:
         b = self.boss
         if b is None or not b.alive:
             return
+        z = self.camera.zoom
         sx, sy = self.camera.world_to_screen(b.pos)
+        br = b.radius * z
         assets = self.game.assets
         frame = None
         if b.anim is not None:
             rig = b.anim.rig
-            frame = b.anim.frame(size=assets.scale_for(rig),
+            bw, bh = assets.scale_for(rig)
+            frame = b.anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))),
                                  flip=(b._facing < 0 and assets.face(rig) == "right"))
         if frame is not None:
             if b._hurt_t > 0.0:
                 frame = self._hit_tinted(frame)
             ax, ay = assets.anchor(rig)
-            surface.blit(frame, (int(sx - ax), int(sy - ay)))
+            surface.blit(frame, (int(sx - ax * z),
+                                 int(sy - ay * z + self._sprite_drop(b.radius))))
         else:
             colour = (255, 255, 255) if b.hit_flash > 0 else b.color
-            pygame.draw.circle(surface, colour, (int(sx), int(sy)), int(b.radius))
+            pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
             pygame.draw.circle(surface, (255, 210, 210), (int(sx), int(sy)),
-                               int(b.radius), 3)
+                               round(br), 3)
         if b.phase == "telegraph":
             pid = b.pattern.get("id")
             frac = b.telegraph_fraction
             if pid == "radial_barrage":
                 pygame.draw.circle(surface, (255, 140, 140), (int(sx), int(sy)),
-                                   int(40 + 220 * frac), 2)
+                                   round((40 + 220 * frac) * z), 2)
             elif pid == "charge":
                 d = self.player.pos - b.pos
                 if d.length_squared() > 1:
@@ -1105,26 +1153,27 @@ class PlayingState(State):
                     pygame.draw.line(surface, (255, 120, 120), (sx, sy), (ex, ey), 3)
             elif pid == "summon_brood":
                 pygame.draw.circle(surface, (150, 220, 160), (int(sx), int(sy)),
-                                   int(b.radius) + int(20 * frac), 2)
+                                   round(br + 20 * frac * z), 2)
 
     _HOSTILE_ARROW_TINT = (150, 26, 12)
 
     def _draw_player_projectiles(self, surface) -> None:
         cam = self.camera
+        z = cam.zoom
         for p in self.projectiles:
             sx, sy = cam.world_to_screen(p.pos)
             if p.cone_half_angle > 0.0:
-                self._draw_cone(surface, sx, sy, p)     # reaping arc = a sector, not a circle
+                self._draw_cone(surface, sx, sy, p, z)  # reaping arc = a sector, not a circle
             else:
                 pygame.draw.circle(surface, p.color, (int(sx), int(sy)),
-                                   max(2, int(p.radius)))
+                                   max(2, round(p.radius * z)))
 
     @staticmethod
-    def _draw_cone(surface, cx: float, cy: float, p) -> None:
+    def _draw_cone(surface, cx: float, cy: float, p, zoom: float = 1.0) -> None:
         """Draw the exact region `_resolve_projectile_hits` / `_in_cone` test:
         a circular **sector** with apex at the player, radius `p.radius`, spanning
         `cone_dir ± cone_half_angle`. (Was a full circle -- the wrong shape.)"""
-        r = max(2.0, float(p.radius))
+        r = max(2.0, float(p.radius)) * zoom
         base = math.atan2(p.cone_dir.y, p.cone_dir.x)
         half = float(p.cone_half_angle)
         steps = max(2, int(math.degrees(half) / 4))
@@ -1139,8 +1188,10 @@ class PlayingState(State):
     def _draw_hostile_projectiles(self, surface) -> None:
         # Enemy / boss shots: a rotated arrow (falls back to a dot if the
         # sprite is missing). Rotation is cached in 8-degree buckets.
+        z = self.camera.zoom
         assets = self.game.assets
-        arrow_size = assets.scale_for("arrow")
+        aw, ah = assets.scale_for("arrow")
+        arrow_size = (max(1, round(aw * z)), max(1, round(ah * z)))
         for p in self.hostiles:
             sx, sy = self.camera.world_to_screen(p.pos)
             spr = assets.rotated(
@@ -1150,33 +1201,37 @@ class PlayingState(State):
                 surface.blit(spr, spr.get_rect(center=(int(sx), int(sy))))
             else:
                 pygame.draw.circle(surface, p.color, (int(sx), int(sy)),
-                                   max(3, int(p.radius)))
+                                   max(3, round(p.radius * z)))
 
     def _draw_player(self, surface) -> None:
         if not self.player.alive:
             return                              # the death poof (_death_fx) stands in
+        z = self.camera.zoom
         sx, sy = self.camera.world_to_screen(self.player.pos)
+        pr = self.player.radius * z
 
         frame = self._hero_sprite_frame()
         if frame is not None:
             # `anchor` is the pixel in the final sprite that sits on the world
-            # position (bottom-centre-ish -- the art is bottom-heavy).
+            # position (bottom-centre-ish -- the art is bottom-heavy); the drop
+            # then seats it below the collider centre (config.SPRITE_ANCHOR_DROP).
             ax, ay = self.game.assets.anchor(self._hero_anim.rig)
             if self.player._hurt_t > 0.0:
                 frame = self._hit_tinted(frame)
-            surface.blit(frame, (sx - ax, sy - ay))
+            surface.blit(frame, (sx - ax * z,
+                                 sy - ay * z + self._sprite_drop(self.player.radius)))
             if self.player.invulnerable:
                 pygame.draw.circle(surface, (255, 120, 120), (sx, sy),
-                                   self.player.radius + 4, width=2)
+                                   round(pr + 4 * z), width=2)
         else:
             body = (255, 120, 120) if self.player.invulnerable else self._hero_color
-            pygame.draw.circle(surface, body, (sx, sy), self.player.radius)
+            pygame.draw.circle(surface, body, (sx, sy), round(pr))
             pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
-                               self.player.radius, width=2)
+                               round(pr), width=2)
 
         if self.game.show_collision:
             pygame.draw.circle(surface, config.COLOR_DEBUG, (sx, sy),
-                               int(self.player.pickup_radius), width=1)
+                               round(self.player.pickup_radius * z), width=1)
 
     def _hero_sprite_frame(self):
         if self._hero_anim is None:
@@ -1184,4 +1239,7 @@ class PlayingState(State):
         assets = self.game.assets
         rig = self._hero_anim.rig
         flip = self.player._facing < 0 and assets.face(rig) == "right"
-        return self._hero_anim.frame(size=assets.scale_for(rig), flip=flip)
+        z = self.camera.zoom
+        bw, bh = assets.scale_for(rig)
+        return self._hero_anim.frame(
+            size=(max(1, round(bw * z)), max(1, round(bh * z))), flip=flip)

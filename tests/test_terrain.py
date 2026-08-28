@@ -633,6 +633,31 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         self.assertTrue(all(c in skin_ids for c in rec.calls),
                         "_draw_obstacles blitted something other than a skin frame")
 
+    def test_obstacle_skin_is_seated_below_the_collider_by_the_drop(self):
+        from game import config
+        from systems.camera import Camera
+        gm = self._map()
+        i, o = next((i, o) for i, o in enumerate(gm.obstacles) if i in gm._decos)
+        ax, ay, _fps, _frs = gm._decos[i]
+        cam = Camera(gm.width, gm.height)
+        cam.snap_to(o.pos)
+
+        class _Rec:
+            def __init__(self): self.calls = []
+            def blit(self, src, dest, *a, **k): self.calls.append(dest[1])
+            def fill(self, *a, **k): pass
+
+        old = config.SPRITE_ANCHOR_DROP
+        try:
+            config.SPRITE_ANCHOR_DROP = 0.0
+            r0 = _Rec(); gm._draw_one_obstacle(r0, cam, i, o)
+            config.SPRITE_ANCHOR_DROP = 0.7
+            r1 = _Rec(); gm._draw_one_obstacle(r1, cam, i, o)
+        finally:
+            config.SPRITE_ANCHOR_DROP = old
+        self.assertAlmostEqual(r1.calls[0] - r0.calls[0],
+                               round(0.7 * o.radius * gm._render_zoom), delta=1)
+
     def test_tree_shade_blits_after_the_characters(self):
         from systems.camera import Camera
         gm = self._map()

@@ -1189,3 +1189,51 @@ See E2.
   heroes + all 13 enemies + boss + the hit-tint / death-poof note), the Content
   bullet. `journals/journal.md` — "Enemy + boss sprite pass (E1–E6)" pointer.
   Suite **359**.
+
+---
+
+## Sprite anchor drop — seat the sprite in the collider (2026-08-28)
+
+Every rig is blitted so its `anchor` pixel lands on `entity.pos` (the collider
+centre), and the character anchors sit at the **feet** — so the body rendered
+entirely *above* the collision circle and the circle hugged the ground at the
+character's ankles. Verified with the F7 collision overlay: the green rings sat
+below the sprites.
+
+Added one knob, **`config.SPRITE_ANCHOR_DROP = 0.7`** — a downward render offset
+of `SPRITE_ANCHOR_DROP * collider_radius * camera.zoom` screen px, so `entity.pos`
+effectively rises into the lower torso and far more of the sprite falls inside
+the circle. At the shipped `PLAYER_RADIUS = 16` / `CAMERA_ZOOM = 1.5` that is
+16.8 px; for enemies it scales with each `enemy.radius`, so it tracks size
+(small `swarm` barely shifts, `tank` / boss shift more).
+
+- `game/states/playing_state.py` — new `_sprite_drop(radius)` helper; the offset
+  is added to the blit `y` in `_draw_enemy_sprite`, `_draw_player`, `_draw_boss`
+  and `_draw_death_fx`. `_spawn_death_fx` gained a `radius` arg (5th tuple slot,
+  default `PLAYER_RADIUS`) threaded from the enemy / hero / boss it replaces, so
+  the poof drops by the same amount and doesn't jump.
+- `world/map.py` — `_draw_one_obstacle` applies the same drop
+  (`SPRITE_ANCHOR_DROP * o.radius * _render_zoom`) to the obstacle **skin**, so
+  trees / rocks / bushes seat into their colliders too (added in a follow-up on
+  the same day). The fallback circle branch stays on `o.pos` (it *is* the
+  collider), and the **tree canopy shade** (`draw_tree_shadows`) stays on the
+  world anchor — it's a ground-plane pool, not the billboard sprite.
+- **Render-only.** `entity.pos`, `resolve_movement` / `is_walkable`, projectile
+  and cone hit tests, off-screen spawn, world-gen placement and the depth sort
+  (`_depth_items` / `scenery_drawables` key on the *unshifted* `.pos.y`) are all
+  untouched.
+- The primitive fallbacks, status / elite / shield rings and the F7
+  collision-vis circle stay on the collider centre — the rings now read around
+  the torso, the debug circle still shows the true collider.
+- `tests/test_enemy_sprite.py` — new `SpriteAnchorDropTests` (4): the offset is
+  `fraction * radius * zoom`; the hero blit `y` is exactly `collider_y - ay*z +
+  drop`; `SPRITE_ANCHOR_DROP = 0.0` puts the anchor back on the collider
+  (byte-identical); the depth-sort key is still the unshifted entity `y`. Plus
+  `DeathPoofTests` — the poof tuple carries the entity radius (hero + enemy).
+  `tests/test_terrain.py` — `test_obstacle_skin_is_seated_below_the_collider_by
+  _the_drop` (the skin blit `y` shifts by `0.7 * o.radius` between drop 0.0 and
+  0.7). Suite **397 → 403**.
+
+Screenshots: F7 overlay before (rings at the feet / trunk base) vs after (rings
+around the lower torso / trunk, sprites sitting inside the circle). Tune via the
+single constant; `0.0` disables it everywhere.

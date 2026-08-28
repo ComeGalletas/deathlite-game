@@ -84,8 +84,12 @@ Per room, **skipping `start` and `boss`**, a few convex circular colliders:
 | `pillar` | 18 | yes | `2` in a shrine/treasure/fountain/altar/merchant |
 | `shrub`  | 14 | no  | |
 
-Kept out of the room's central `min(w,h) * 0.22` disc (spawn / doorway paths)
-and ≥ 46 px from every other obstacle. Each gets a cosmetic
+Never placed on a **corridor doorway** tile (`_corridor_doorways` — the mouth
+cell of each corridor + one tile of margin) so an entrance is always walkable,
+and ≥ 46 px from every other obstacle. **Special** rooms (`shrine` / `treasure`
+/ `fountain` / `altar` / `merchant` / `elite_arena`) additionally keep a clear
+central `min(w,h) * 0.22` disc for their interaction / fight space; plain
+`combat` rooms may place obstacles anywhere. Each gets a cosmetic
 `Obstacle.variant` (1–4, from the seed) used only by the renderer.
 (`entities/obstacle.py — KINDS`.)
 

@@ -74,5 +74,59 @@ class SaveLoadTests(unittest.TestCase):
         self.assertEqual(d.best["time"], 100)
 
 
+class DifficultyRecordsTests(unittest.TestCase):
+    """Phase 4 D5: best runs are bucketed per difficulty and never compared
+    across buckets."""
+
+    def setUp(self):
+        self.path = Path(tempfile.mkdtemp()) / "save.json"
+
+    def test_default_has_a_bucket_per_difficulty(self):
+        self.assertEqual(set(SaveData().records), {"normal", "fast", "super_fast"})
+        self.assertEqual(SaveData().records["fast"], {})
+
+    def test_records_are_independent_per_bucket(self):
+        d = SaveData()
+        d.record_best({"time": 300, "kills": 40}, difficulty="normal")
+        d.record_best({"time": 120, "kills": 90}, difficulty="fast")
+        self.assertEqual(d.records["normal"]["time"], 300)
+        self.assertEqual(d.records["fast"]["time"], 120)      # not clobbered by 300
+        self.assertEqual(d.records["fast"]["kills"], 90)
+        self.assertEqual(d.records["super_fast"], {})
+
+    def test_bucket_record_only_improves(self):
+        d = SaveData()
+        d.record_best({"level": 12}, difficulty="fast")
+        d.record_best({"level": 5}, difficulty="fast")
+        self.assertEqual(d.records["fast"]["level"], 12)
+
+    def test_unknown_difficulty_falls_into_normal(self):
+        d = SaveData()
+        d.record_best({"time": 77}, difficulty="nightmare")
+        self.assertEqual(d.records["normal"]["time"], 77)
+
+    def test_legacy_best_still_tracks_the_all_difficulty_max(self):
+        d = SaveData()
+        d.record_best({"time": 100}, difficulty="normal")
+        d.record_best({"time": 250}, difficulty="super_fast")
+        self.assertEqual(d.best["time"], 250)
+
+    def test_records_round_trip_and_tolerate_junk(self):
+        d = SaveData()
+        d.record_best({"time": 200, "damage_dealt": 5000}, difficulty="fast")
+        save(d, self.path)
+        back = load(self.path)
+        self.assertEqual(back.records["fast"]["time"], 200)
+        self.assertEqual(back.records["fast"]["damage_dealt"], 5000)
+
+        import json
+        self.path.write_text(json.dumps({"records": {
+            "fast": {"time": "nope", "kills": 12}, "bogus": {"time": 5}}}),
+            encoding="utf-8")
+        back = load(self.path)
+        self.assertEqual(back.records["fast"], {"kills": 12.0})
+        self.assertNotIn("bogus", back.records)
+
+
 if __name__ == "__main__":
     unittest.main()

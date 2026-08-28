@@ -237,10 +237,30 @@ class DevMenuTests(unittest.TestCase):
         self.assertEqual(menu.page, "root")
         self.assertEqual(menu._status, "(coming soon)")
 
+    def test_difficulty_row_cycles_the_live_run_difficulty(self):
+        from game.states.dev_menu_state import _ROOT_ROWS
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        self.assertEqual(playing.difficulty, "normal")          # dev default
+        d0 = playing.director.boss_time()
+
+        menu._activate("difficulty")
+        self.assertEqual(playing.difficulty, "fast")
+        self.assertEqual(playing.director.difficulty, "fast")   # director re-bound
+        self.assertAlmostEqual(playing.director.boss_time(), d0 / 1.25)
+        self.assertIn("[Fast]", menu._row_label("difficulty"))
+
+        menu._activate("difficulty")
+        self.assertEqual(playing.difficulty, "super_fast")
+        menu._activate("difficulty")
+        self.assertEqual(playing.difficulty, "normal")          # wraps
+        self.assertIn("difficulty", _ROOT_ROWS)
+
     def test_draw_runs_headless_on_every_page(self):
+        from game.states.dev_menu_state import _ROOT_ROWS
         game = _game()
         _, menu = _open_dev_menu(game)
-        for i in range(8):
+        for i in range(len(_ROOT_ROWS)):
             menu.sel = i
             menu.draw(game.screen)
         menu._activate("spawn")
