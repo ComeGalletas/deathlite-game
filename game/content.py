@@ -47,13 +47,15 @@ class Content:
         self.meta_upgrades: dict[str, dict] = _load("meta_upgrades.json")
         self.sprites: dict[str, dict] = _load("sprites.json")
         self.terrain: dict = _load("terrain.json")
+        self.ui_sprites: dict[str, dict] = _load("ui_sprites.json")
         log.info("content loaded: %d weapons, %d enemies, %d bosses, "
                  "%d characters, %d blessings, %d affixes, %d meta upgrades, "
-                 "%d sprite rigs, %d terrain rigs",
+                 "%d sprite rigs, %d terrain rigs, %d ui rigs",
                  len(self.weapons), len(self.enemies), len(self.bosses),
                  len(self.characters), len(self.blessings),
                  len(self.items.get("affixes", {})), len(self.meta_upgrades),
-                 len(self.sprites), len(self.terrain.get("rigs", {})))
+                 len(self.sprites), len(self.terrain.get("rigs", {})),
+                 len(self.ui_sprites))
 
     def weapon(self, weapon_id: str) -> dict:
         try:

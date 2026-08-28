@@ -7,27 +7,26 @@ import unittest
 import pygame
 
 from entities.enemy import Enemy
-from entities.enemy_ai import EnemyContext
 from game.content import get_content
+from tests.aictx import ai_ctx
 
 
 def make(eid, x=200, y=0):
     return Enemy(eid, get_content().enemy(eid), x, y)
 
 
+def fs(e):
+    """The FSM phase name from the composable behaviour machine."""
+    return e.bb.slot("__machine__").get("state")
+
+
 def ctx(dt=1 / 30, player=(0, 0), **cb):
     calls = {"hazards": []}
-    base = dict(
-        dt=dt, player_pos=pygame.Vector2(*player), player=object(),
-        rng=random.Random(0),
-        fire_projectile=lambda **kw: None,
-        summon=lambda *a: None, explosion=lambda *a: None,
-        resolve_movement=lambda prev, new, r: new,
-        spawn_hazard=lambda pos, radius, dps, duration, tick_interval=None:
-            calls["hazards"].append((tuple(pos), radius, dps, duration)),
-    )
-    base.update(cb)
-    return EnemyContext(**base), calls
+    cb.setdefault(
+        "spawn_hazard",
+        lambda pos, radius, dps, duration, tick_interval=None:
+        calls["hazards"].append((tuple(pos), radius, dps, duration)))
+    return ai_ctx(dt=dt, player=player, **cb), calls
 
 
 class ChargerTests(unittest.TestCase):
@@ -38,8 +37,8 @@ class ChargerTests(unittest.TestCase):
         for _ in range(600):
             c, _ = ctx(player=(0, 0))
             e.update(c)
-            states.add(e.ai.get("fs"))
-            if e.ai.get("fs") == "attack":
+            states.add(fs(e))
+            if fs(e) == "attack":
                 dashed_damage = max(dashed_damage, e.contact_damage)
         self.assertEqual({"chase", "telegraph", "attack", "recover"} & states,
                          {"chase", "telegraph", "attack", "recover"})
@@ -51,8 +50,8 @@ class ChargerTests(unittest.TestCase):
         for _ in range(400):
             c, _ = ctx(player=(0, 0))
             e.update(c)
-            if not seq or seq[-1] != e.ai.get("fs"):
-                seq.append(e.ai.get("fs"))
+            if not seq or seq[-1] != fs(e):
+                seq.append(fs(e))
         # find first attack, ensure a telegraph immediately precedes it
         i = seq.index("attack")
         self.assertEqual(seq[i - 1], "telegraph")
@@ -64,7 +63,7 @@ class TeleporterTests(unittest.TestCase):
         for _ in range(500):
             c, _ = ctx(player=(0, 0))
             e.update(c)
-            if e.ai.get("fs") in ("attack", "recover"):
+            if fs(e) in ("attack", "recover"):
                 break
         self.assertLess((e.pos - pygame.Vector2(0, 0)).length(), 200)
 

@@ -6,7 +6,7 @@ import unittest
 import pygame
 
 from entities.boss import Boss
-from entities.enemy_ai import EnemyContext
+from tests.aictx import ai_ctx
 from game.content import get_content
 
 
@@ -16,12 +16,10 @@ def boss():
 
 
 def ctx(dt, sink):
-    return EnemyContext(
-        dt=dt, player_pos=pygame.Vector2(300, 0), player=object(),
-        rng=random.Random(0),
+    return ai_ctx(
+        dt=dt, player=(300, 0),
         fire_projectile=lambda **kw: sink["fired"].append(kw),
-        summon=lambda eid, pos, n: sink["summoned"].append((eid, n)),
-        explosion=lambda *a: None)
+        summon=lambda eid, pos, n: sink["summoned"].append((eid, n)))
 
 
 class BossTests(unittest.TestCase):

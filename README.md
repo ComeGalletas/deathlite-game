@@ -40,7 +40,11 @@ python main.py
 python -m unittest discover -s tests -v
 ```
 
-391 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+`tests/` is split into `ai/`, `rendering/` and `characters/` sub-packages (each
+an `__init__.py` package so `discover` walks it) plus the uncategorised suites at
+the root; `tests/aictx.py` is a shared fake-AI-context helper, not a test.
+
+573 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
 terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
 depth-sorted rendering, the start menu + options + rankings screens, developer
@@ -148,7 +152,11 @@ deathlite-game/
 │                       projectiles/, terrain/{tiles,bridge,props,resources}/,
 │                       buildings/, effects/, ui/title.png, CREDITS.md
 │                       (PNG sprites only — see assets/CREDITS.md)
-└── tests/              391 tests: pure logic + headless integration
+└── tests/              573 tests: pure logic + headless integration
+    ├── ai/             behaviours, FSM enemies, pathfinding, nav, boss
+    ├── rendering/      camera, animation, depth sort, terrain, sprites, screens
+    ├── characters/     hero definitions + movement
+    └── *.py            everything else + the aictx.py AI-context helper
 ```
 
 ## Content

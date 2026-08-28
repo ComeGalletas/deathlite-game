@@ -2,7 +2,7 @@
 
 Pipeline order (spec 1.3): INPUT -> UPDATE -> COLLISION/COMBAT -> PROGRESSION,
 with RENDER in draw(). Milestone 4 adds: 10 enemy variants driven by
-`entities.enemy_ai`, the phase-based `SpawnDirector` with HP/speed scaling,
+`entities.ai` behaviours, the phase-based `SpawnDirector` with HP/speed scaling,
 hostile projectiles + explosions that damage the player, two more weapons
 (orbit, cone), and the telegraphed multi-pattern `Boss` whose death wins the run.
 """
@@ -23,7 +23,6 @@ from game.events import Events
 from game.state import State
 from entities.player import Player
 from entities.enemy import Enemy
-from entities.enemy_ai import EnemyContext
 from entities.boss import Boss
 from entities.projectile import Projectile
 from entities.pickup import XPGem, XP_TIER_COLORS
@@ -386,15 +385,20 @@ class PlayingState(State):
             return self.enemies + [self.boss]
         return self.enemies
 
-    def _enemy_context(self, dt: float) -> EnemyContext:
-        return EnemyContext(
-            dt=dt, player_pos=self.player.pos, player=self.player, rng=self.rng,
-            fire_projectile=self._fire_hostile, summon=self._summon,
-            explosion=self._explosion, report_damage=self._report_dot,
+    def _enemy_context(self, dt: float):
+        """One object per frame, handed to every enemy and the boss. Satisfies
+        the `entities.ai` `Perception` + `Combat` protocols; the boss duck-types
+        the same callbacks."""
+        return SimpleNamespace(
+            dt=dt, now=self.stats["time"], player_pos=self.player.pos,
+            player=self.player, rng=self.rng,
+            nav_dir=self._nav_dir, neighbors=self._nav_neighbors,
+            obstacles_near=self._obstacles_near,
+            is_walkable=self.game_map.is_walkable,
             resolve_movement=self.game_map.resolve_movement,
-            spawn_hazard=self._spawn_hazard, nav_dir=self._nav_dir,
-            nav_enabled=self._nav is not None, neighbors=self._nav_neighbors,
-            obstacles_near=self._obstacles_near)
+            fire_projectile=self._fire_hostile, summon=self._summon,
+            explosion=self._explosion, spawn_hazard=self._spawn_hazard,
+            report_damage=self._report_dot)
 
     def _nav_neighbors(self, pos, radius) -> list:
         return self.grid.query_circle(pos.x, pos.y, radius)

@@ -1,9 +1,9 @@
 """Enemy entity, data-driven from data/enemies.json.
 
-One class, many variants: behavior comes from `entities.enemy_ai.BEHAVIORS`
-keyed by the `behavior` field; variant-specific numbers (shield, explosion,
-summon, slam, ...) are kept in `self.cfg` and read by the behavior functions.
-Ordinary enemies use cheap steering, never pathfinding (spec 3.3).
+One class, many variants: `self.behavior` names a builder in `entities/ai`
+(`build_behavior`) which composes a component pipeline; variant-specific numbers
+(shield, explosion, summon, slam, ...) come from `self.cfg`. Per-frame behaviour
+state lives on `self.bb` (a namespaced `Blackboard`).
 """
 from __future__ import annotations
 
@@ -11,10 +11,12 @@ import pygame
 
 from combat.damage import apply_armor
 from combat.status import StatusState
-from entities.enemy_ai import BEHAVIORS, EnemyContext, chase
+from entities.ai import Blackboard, build_behavior
 from game import config
 from game.assets import get_assets
 from systems.animation import Animator
+
+_MACHINE = "__machine__"
 
 
 class Enemy:
@@ -48,8 +50,9 @@ class Enemy:
         self.alive = True
         self.hit_flash = 0.0
         self._knock = pygame.Vector2()
-        # Per-enemy transient behavior state (timers, sub-state).
-        self.ai: dict = {}
+        # Per-enemy transient behaviour state, in namespaced blackboard slots.
+        self.bb = Blackboard()
+        self._behavior = build_behavior(self.behavior, self.cfg)
         self.status = StatusState()
 
         # Sprite animation (only for variants that declare a rig; the rest draw
@@ -89,10 +92,10 @@ class Enemy:
         return dealt
 
     # --- per-frame ------------------------------------------------
-    def update(self, ctx: EnemyContext) -> None:
+    def update(self, ctx) -> None:
         self.contact_damage = self._base_contact
         self.contact_cd = max(0.0, self.contact_cd - ctx.dt)
-        BEHAVIORS.get(self.behavior, chase)(self, ctx)
+        self._behavior.tick(self, ctx, ctx)          # ctx satisfies Perception + Combat
 
         dt = ctx.dt
         # Status DoT (burn) is dealt straight to HP and reported for stats.
@@ -127,11 +130,9 @@ class Enemy:
 
     @property
     def _attacking(self) -> bool:
-        return (self.telegraphing
-                or self.ai.get("fs") == "attack"
-                or self.ai.get("slam_state") == "attack")
+        return self.bb.slot(_MACHINE).get("state") in ("telegraph", "attack")
 
-    def _status_damage(self, amount: float, ctx: EnemyContext) -> None:
+    def _status_damage(self, amount: float, ctx) -> None:
         if not self.alive:
             return
         self.hp -= amount
@@ -142,5 +143,4 @@ class Enemy:
 
     @property
     def telegraphing(self) -> bool:
-        return (self.ai.get("slam_state") == "telegraph"
-                or self.ai.get("fs") == "telegraph")
+        return self.bb.slot(_MACHINE).get("state") == "telegraph"

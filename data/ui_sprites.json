@@ -1,0 +1,5 @@
+{
+  "ui_banner_cap_left":  {"file": "ui/banners/banner_connection_left.png",  "frame": [192, 192], "content": [0, 0, 96, 192]},
+  "ui_banner_cap_right": {"file": "ui/banners/banner_connection_right.png", "frame": [192, 192], "content": [96, 0, 96, 192]},
+  "ui_banner_mid":       {"file": "ui/banners/banner_middle.png",       "frame": [192, 192]}
+}
