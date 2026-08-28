@@ -44,7 +44,16 @@ class Room:
 class Corridor:
     a: int
     b: int
-    rect: pygame.Rect
+    rect: pygame.Rect          # collision span: room centre to room centre
+    # Bridge edge identity (terrain). `axis` fixes the pair of end tiles the
+    # renderer uses; `end_low` / `end_high` name the two edges (the low one is
+    # at the smaller world x for "h", smaller y for "v"); `room_low` / `room_high`
+    # are the rooms those edges butt against.
+    axis: str = "h"                    # "h" -> west/east ends | "v" -> north/south
+    end_low: str = "west"             # "west"  (h) | "north" (v)
+    end_high: str = "east"            # "east"  (h) | "south" (v)
+    room_low: int = -1
+    room_high: int = -1
 
 
 @dataclass
@@ -130,19 +139,25 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
 
     # --- corridors along each tree edge -----------------------
     # One tile wide -- rendered as a plank bridge over the water (terrain T7).
+    # Each corridor records which edge is which (west/east or north/south) so the
+    # renderer draws the matching end-cap tile at each mouth.
     corridors: list[Corridor] = []
     width = px
     for a, b in edges:
         ra, rb = rooms[a].rect, rooms[b].rect
-        if ra.centerx == rb.centerx:  # vertical neighbour
-            top, bot = sorted((ra, rb), key=lambda r: r.centery)
-            rect = pygame.Rect(0, 0, width, bot.centery - top.centery)
-            rect.center = (ra.centerx, (top.centery + bot.centery) // 2)
-        else:                          # horizontal neighbour
-            left, right = sorted((ra, rb), key=lambda r: r.centerx)
-            rect = pygame.Rect(0, 0, right.centerx - left.centerx, width)
-            rect.center = ((left.centerx + right.centerx) // 2, ra.centery)
-        corridors.append(Corridor(a, b, rect))
+        if ra.centerx == rb.centerx:                       # vertical neighbour
+            (lo, lo_r), (hi, hi_r) = sorted(
+                ((a, ra), (b, rb)), key=lambda t: t[1].centery)
+            rect = pygame.Rect(0, 0, width, hi_r.centery - lo_r.centery)
+            rect.center = (ra.centerx, (lo_r.centery + hi_r.centery) // 2)
+            axis, e_lo, e_hi = "v", "north", "south"
+        else:                                              # horizontal neighbour
+            (lo, lo_r), (hi, hi_r) = sorted(
+                ((a, ra), (b, rb)), key=lambda t: t[1].centerx)
+            rect = pygame.Rect(0, 0, hi_r.centerx - lo_r.centerx, width)
+            rect.center = ((lo_r.centerx + hi_r.centerx) // 2, ra.centery)
+            axis, e_lo, e_hi = "h", "west", "east"
+        corridors.append(Corridor(a, b, rect, axis, e_lo, e_hi, lo, hi))
 
     # --- assign roles ------------------------------------------
     start_id = 0
@@ -193,7 +208,7 @@ def _scatter_obstacles(rooms, rng, start_id, boss_id) -> list:
     for room in rooms:
         if room.id in (start_id, boss_id):
             continue
-        density = 10 if room.kind == "elite_arena" else (
+        density = 4 if room.kind == "elite_arena" else (
             2 if room.kind in ("shrine", "treasure", "fountain", "altar", "merchant")
             else rng.randint(3, 7))
         r = room.rect

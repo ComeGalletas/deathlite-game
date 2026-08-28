@@ -319,12 +319,13 @@ class BridgeCorridorTests(unittest.TestCase):
     def test_bridge_slot_helper_picks_end_caps_and_mid(self):
         from world.map import GameMap
         bs = GameMap._bridge_slot
-        self.assertEqual(bs(True, 0, 0, 1, 5), "h_left")
-        self.assertEqual(bs(True, 0, 4, 1, 5), "h_right")
-        self.assertEqual(bs(True, 0, 2, 1, 5), "h_mid")
-        self.assertEqual(bs(False, 0, 0, 5, 1), "v_top")
-        self.assertEqual(bs(False, 4, 0, 5, 1), "v_bot")
-        self.assertEqual(bs(False, 2, 0, 5, 1), "v_mid")
+        self.assertEqual(bs("h", 0, 5), "h_left")
+        self.assertEqual(bs("h", 4, 5), "h_right")
+        self.assertEqual(bs("h", 2, 5), "h_mid")
+        self.assertEqual(bs("v", 0, 5), "v_top")
+        self.assertEqual(bs("v", 4, 5), "v_bot")
+        self.assertEqual(bs("v", 2, 5), "v_mid")
+        self.assertEqual(bs("h", 0, 1), "h_mid")           # degenerate single cell
 
     def test_tile_slices_bridge_sheet_with_its_own_grid(self):
         from game.assets import Assets, reset_assets
@@ -356,6 +357,76 @@ class BridgeCorridorTests(unittest.TestCase):
                          if any(rect.collidepoint(p[0] + 1, p[1] + 1)
                                 for rect, _ in gm._corr_surfs)]
         self.assertTrue(in_a_corridor, "no corridor cell seeded the shore")
+
+    def test_corridor_carries_bridge_edge_properties(self):
+        from world.procedural import generate_world
+        for seed in (1, 7, 99, 1234):
+            w = generate_world(seed)
+            for c in w.corridors:
+                self.assertIn(c.axis, ("h", "v"))
+                self.assertEqual((c.end_low, c.end_high),
+                                 ("west", "east") if c.axis == "h"
+                                 else ("north", "south"))
+                self.assertEqual({c.room_low, c.room_high}, {c.a, c.b})
+                lo, hi = w.room(c.room_low).rect, w.room(c.room_high).rect
+                if c.axis == "h":
+                    self.assertLess(lo.centerx, hi.centerx)
+                else:
+                    self.assertLess(lo.centery, hi.centery)
+
+    def test_bridge_bakes_the_matching_end_cap_at_each_mouth(self):
+        from game.assets import Assets, reset_assets
+        from world.map import GameMap
+        reset_assets()
+        a = Assets()
+        b = self.t["bridge"]
+        bcols = b["grid"][0]
+        want = {name: pygame.image.tostring(a.tile(b["sheet"], idx, cols=bcols), "RGBA")
+                for name, idx in b["slots"].items()}
+        px = self.t["tile_px"]
+
+        gm = GameMap(seed=1234)
+        gm._build_tiles()
+        self.assertTrue(gm._corr_surfs)
+        checked_h = checked_v = 0
+        for c, (rect, surf) in zip(gm.layout.corridors, gm._corr_surfs):
+            if c.axis == "h":
+                first = surf.subsurface((0, 0, px, px))
+                last = surf.subsurface((surf.get_width() - px, 0, px, px))
+                lo_name, hi_name = "h_left", "h_right"
+                checked_h += 1
+            else:
+                first = surf.subsurface((0, 0, px, px))
+                last = surf.subsurface((0, surf.get_height() - px, px, px))
+                lo_name, hi_name = "v_top", "v_bot"
+                checked_v += 1
+            self.assertEqual(pygame.image.tostring(first, "RGBA"), want[lo_name],
+                             f"corridor {c.a}-{c.b}: wrong low-end cap")
+            self.assertEqual(pygame.image.tostring(last, "RGBA"), want[hi_name],
+                             f"corridor {c.a}-{c.b}: wrong high-end cap")
+        self.assertTrue(checked_h and checked_v, "need both axes in the sample")
+
+    def test_bridge_surface_overlaps_one_tile_into_each_room(self):
+        from world.map import GameMap
+        px = self.t["tile_px"]
+        gm = GameMap(seed=1234)
+        gm._build_tiles()
+        for c, (rect, _surf) in zip(gm.layout.corridors, gm._corr_surfs):
+            lo = gm.layout.room(c.room_low).rect
+            hi = gm.layout.room(c.room_high).rect
+            if c.axis == "h":
+                # ends reach ~one tile past each room edge, not the room centres
+                self.assertLess(rect.left, lo.right)
+                self.assertGreaterEqual(rect.left, lo.right - 2 * px)
+                self.assertGreater(rect.right, hi.left)
+                self.assertLessEqual(rect.right, hi.left + 2 * px)
+                self.assertLess(rect.width, c.rect.width)
+            else:
+                self.assertLess(rect.top, lo.bottom)
+                self.assertGreaterEqual(rect.top, lo.bottom - 2 * px)
+                self.assertGreater(rect.bottom, hi.top)
+                self.assertLessEqual(rect.bottom, hi.top + 2 * px)
+                self.assertLess(rect.height, c.rect.height)
 
 
 class DecorationScatterTests(unittest.TestCase):
@@ -470,9 +541,9 @@ class DecorationScatterTests(unittest.TestCase):
 
 
 class TreeSkinShadowSeamTests(unittest.TestCase):
-    """T9: real animated tree sprites skin the `tree` obstacle, a soft contact
-    shadow sits under every skinned obstacle, and foam is dropped at the
-    bridge/room doorway seam."""
+    """T9 / B3: real animated tree sprites skin the `tree` obstacle; only trees
+    cast a shade (a round shadow drawn *over* the characters, no under-skin
+    contact shadow); foam is dropped at the bridge/room doorway seam."""
 
     @classmethod
     def setUpClass(cls):
@@ -515,32 +586,40 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         self.assertTrue(trees)
         self.assertFalse(gm.is_walkable(pg.Vector2(trees[0].pos.x, trees[0].pos.y)))
 
-    def test_shadow_under_every_skinned_obstacle_and_squashed(self):
+    def test_only_trees_cast_a_shade_and_no_under_skin_shadow(self):
         gm = self._map()
-        self.assertTrue(gm._obst_shadow)
-        self.assertEqual(set(gm._obst_shadow), set(gm._decos))
-        for surf in gm._obst_shadow.values():
+        self.assertFalse(hasattr(gm, "_obst_shadow"),
+                         "the per-obstacle contact shadow was removed")
+        self.assertTrue(gm._tree_shadows)
+        tree_idx = {i for i, o in enumerate(gm.obstacles)
+                    if o.kind == "tree" and i in gm._decos}
+        self.assertEqual(len(gm._tree_shadows), len(tree_idx))
+        for wx, wy, r, surf in gm._tree_shadows:
             self.assertIsInstance(surf, pygame.Surface)
-            self.assertGreater(surf.get_width(), surf.get_height())   # oblique squash
+            self.assertTrue(surf.get_flags() & pygame.SRCALPHA)
+            self.assertEqual(surf.get_size(), (2 * r, 2 * r))
+            # the shade is bigger than a trunk but stays translucent
+            self.assertGreater(r, 26)
+            self.assertLess(surf.get_at((r, r))[3], 200)
 
-    def test_shadow_flag_off_keeps_skins_but_drops_shadows(self):
+    def test_shade_flag_off_keeps_skins_but_drops_the_shade(self):
         from game import config
         old = config.TERRAIN_SHADOWS
         config.TERRAIN_SHADOWS = False
         try:
             gm = self._map()
             self.assertTrue(gm._decos)
-            self.assertEqual(gm._obst_shadow, {})
+            self.assertEqual(gm._tree_shadows, [])
         finally:
             config.TERRAIN_SHADOWS = old
 
-    def test_shadow_is_drawn_before_the_skin(self):
+    def test_draw_obstacles_blits_only_skins_no_shadow(self):
         from systems.camera import Camera
         gm = self._map()
-        i = next(iter(gm._obst_shadow))
-        o = gm.obstacles[i]
+        i = next(i for i, o in enumerate(gm.obstacles)
+                 if o.kind == "tree" and i in gm._decos)
         cam = Camera(gm.width, gm.height)
-        cam.snap_to(o.pos)
+        cam.snap_to(gm.obstacles[i].pos)
 
         class _Recorder:
             def __init__(self): self.calls = []
@@ -549,10 +628,27 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
 
         rec = _Recorder()
         gm._draw_obstacles(rec, cam)
-        shadow_i = rec.calls.index(id(gm._obst_shadow[i]))
-        skin_ids = {id(f) for f in gm._decos[i][3]}
-        skin_i = next(k for k, s in enumerate(rec.calls) if s in skin_ids)
-        self.assertLess(shadow_i, skin_i)
+        skin_ids = {id(f) for e in gm._decos.values() for f in e[3]}
+        self.assertTrue(rec.calls)
+        self.assertTrue(all(c in skin_ids for c in rec.calls),
+                        "_draw_obstacles blitted something other than a skin frame")
+
+    def test_tree_shade_blits_after_the_characters(self):
+        from systems.camera import Camera
+        gm = self._map()
+        cam = Camera(gm.width, gm.height)
+        cam.snap_to(pygame.Vector2(gm._tree_shadows[0][0], gm._tree_shadows[0][1]))
+
+        class _Recorder:
+            def __init__(self): self.calls = []
+            def blit(self, src, *a, **k): self.calls.append(id(src))
+            def fill(self, *a, **k): pass
+
+        rec = _Recorder()
+        gm.draw_tree_shadows(rec, cam)
+        shade_ids = {id(s) for _x, _y, _r, s in gm._tree_shadows}
+        self.assertTrue(any(c in shade_ids for c in rec.calls),
+                        "no tree shade blitted for an in-view tree")
 
     def test_no_foam_cell_straddles_a_bridge_and_a_room(self):
         gm = self._map(1234)

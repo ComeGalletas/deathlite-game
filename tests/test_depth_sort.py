@@ -1,0 +1,176 @@
+"""Depth-sorted render layer: obstacles + interior decorations + characters are
+painted back-to-front by ground-contact Y, so a character with a smaller Y than
+an obstacle is drawn behind it (hidden by e.g. a tree canopy)."""
+import os
+import tempfile
+import unittest
+
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+import pygame
+
+from game.game import Game
+from game.states.menu_state import MenuState
+from game.states.playing_state import PlayingState
+from world.map import GameMap
+
+
+def fresh_playing():
+    game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+    game.state_machine.change(MenuState(game))
+    game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    p = game.state_machine.current
+    assert isinstance(p, PlayingState)
+    return game, p
+
+
+class SceneryDrawablesTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        pygame.init()
+        if pygame.display.get_surface() is None:
+            pygame.display.set_mode((1, 1))
+
+    def test_one_entry_per_visible_obstacle_keyed_by_its_y(self):
+        from systems.camera import Camera
+        gm = GameMap(seed=1234)
+        gm._build_tiles()
+        cam = Camera(gm.width, gm.height)
+        cam.snap_to(gm.center)
+        view = cam.visible_rect().inflate(320, 320)
+        want = {round(o.pos.y) for o in gm.obstacles
+                if view.collidepoint(o.pos.x, o.pos.y)}
+        got = {round(y) for y, fn in gm.scenery_drawables(cam)}
+        self.assertTrue(want)
+        self.assertTrue(want.issubset(got), "an in-view obstacle is missing a drawable")
+
+    def test_drawables_are_callable_with_a_surface(self):
+        from systems.camera import Camera
+        gm = GameMap(seed=7)
+        gm._build_tiles()
+        cam = Camera(gm.width, gm.height)
+        cam.snap_to(gm.center)
+        surf = pygame.Surface((320, 240))
+        for _y, fn in gm.scenery_drawables(cam):
+            fn(surf)                                # must not raise
+
+    def test_no_layout_returns_empty(self):
+        from systems.camera import Camera
+        gm = GameMap()                              # one big room, no procedural obstacles
+        cam = Camera(gm.width, gm.height)
+        self.assertEqual(gm.scenery_drawables(cam), [])
+
+
+class DepthOrderTests(unittest.TestCase):
+    def test_items_sorted_by_ground_contact_y(self):
+        game, p = fresh_playing()
+        try:
+            ys = [y for y, _ in p._depth_items()]
+            self.assertEqual(ys, sorted(ys))
+            self.assertGreater(len(ys), 1)
+        finally:
+            pygame.quit()
+
+    def test_player_rank_follows_the_player_y(self):
+        game, p = fresh_playing()
+        try:
+            obst = p.game_map.obstacles
+            self.assertTrue(obst)
+            oys = sorted(o.pos.y for o in obst)
+            below_all = oys[-1] + 500          # player lower on the map than every obstacle
+            above_all = oys[0] - 500           # player higher than every obstacle
+
+            p.player.pos.y = below_all
+            items = p._depth_items()
+            player_idx = next(i for i, (_, fn) in enumerate(items)
+                              if getattr(fn, "__func__", None) is PlayingState._draw_player)
+            self.assertEqual(player_idx, len(items) - 1, "player should paint last (in front)")
+
+            p.player.pos.y = above_all
+            items = p._depth_items()
+            player_idx = next(i for i, (_, fn) in enumerate(items)
+                              if getattr(fn, "__func__", None) is PlayingState._draw_player)
+            self.assertEqual(player_idx, 0, "player should paint first (behind)")
+        finally:
+            pygame.quit()
+
+    def test_draw_runs_clean_after_the_split(self):
+        game, p = fresh_playing()
+        try:
+            for _ in range(8):
+                game.state_machine.update(1 / 120)
+            p.draw(game.screen)                     # must not raise
+        finally:
+            pygame.quit()
+
+    def test_render_pipeline_order(self):
+        game, p = fresh_playing()
+        try:
+            order = []
+            p._draw_player_projectiles = lambda s: order.append("weapon_fx")
+            p._draw_depth_layer = lambda s: order.append("depth")
+            p.game_map.draw_tree_shadows = lambda s, c: order.append("tree_shade")
+            p._draw_hostile_projectiles = lambda s: order.append("hostile")
+            p.draw(game.screen)
+            # weapon effects behind the characters; enemy shots on top
+            self.assertLess(order.index("weapon_fx"), order.index("depth"))
+            self.assertLess(order.index("depth"), order.index("tree_shade"))
+            self.assertLess(order.index("tree_shade"), order.index("hostile"))
+        finally:
+            pygame.quit()
+
+
+class ConeWeaponVisualTests(unittest.TestCase):
+    """The reaping-arc weapons (Soul Scythe) hit a circular *sector*; the drawn
+    range must be that sector, not a full circle -- matching `_in_cone`."""
+
+    @classmethod
+    def setUpClass(cls):
+        pygame.init()
+        if pygame.display.get_surface() is None:
+            pygame.display.set_mode((1, 1))
+
+    def _proj(self, cx, cy, r=60, half_deg=55, dir=(1, 0)):
+        import math
+        from game.states.playing_state import PlayingState
+
+        class P:
+            radius = r
+            color = (200, 120, 255)
+            cone_half_angle = math.radians(half_deg)
+            cone_dir = pygame.Vector2(*dir)
+        surf = pygame.Surface((2 * cx, 2 * cy))
+        surf.fill((0, 0, 0))
+        PlayingState._draw_cone(surf, cx, cy, P())
+        return surf
+
+    def test_pixels_inside_the_arc_are_painted_outside_are_not(self):
+        import math
+        cx = cy = 120
+        surf = self._proj(cx, cy, r=80, half_deg=50, dir=(1, 0))
+        painted = lambda a, dist: surf.get_at(
+            (int(cx + math.cos(a) * dist), int(cy + math.sin(a) * dist)))[:3] != (0, 0, 0)
+        # along the aim, well inside the radius -> painted
+        self.assertTrue(painted(0.0, 40))
+        # 30 deg off-aim (< 50 half-angle) -> painted
+        self.assertTrue(painted(math.radians(30), 40))
+        # 80 deg off-aim (> 50) -> NOT painted  (a circle would paint here)
+        self.assertFalse(painted(math.radians(80), 40))
+        # directly behind the apex -> NOT painted
+        self.assertFalse(painted(math.pi, 40))
+        # beyond the radius along the aim -> NOT painted
+        self.assertFalse(painted(0.0, 95))
+
+    def test_cone_apex_is_the_projectile_position(self):
+        cx = cy = 100
+        surf = self._proj(cx, cy, r=50, half_deg=40, dir=(0, 1))
+        # the wedge points down (+y); a point just below the apex is painted,
+        # a point just above (opposite the cone) is not
+        self.assertNotEqual(surf.get_at((cx, cy + 20))[:3], (0, 0, 0))
+        self.assertEqual(surf.get_at((cx, cy - 20))[:3], (0, 0, 0))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -11,6 +11,25 @@ combat, or collision is affected — sprites are a cosmetic layer.
 
 ---
 
+## Utility update — Sprite Sheet Lab split-window viewer — ✅ DONE (2026-08-27)
+
+**What changed:** Added the external `utilities/sprite_sheet_lab.py` authoring
+tool as a standalone sprite metadata/crop previewer, then revised it so the
+large sprite sheet renders in its own SDL2 window instead of sharing space with
+the control/metadata UI. The sheet viewer now has a clipped viewport below a
+fixed header, independent vertical and horizontal scroll state, crop dragging
+inside the sheet window, and fractional zoom from 50% to 600%.
+
+**Expected next phase:** Use the utility interactively against a few raw PNGs
+and existing metadata entries, then tune any requested authoring controls such
+as editable frame dimensions, anchor editing, grid-sheet support, or direct
+merge/export into `data/sprites.json`.
+
+**Verified:**
+- `python -m py_compile utilities\\sprite_sheet_lab.py`
+- Dummy-display smoke draw: created the main control window plus the separate
+  sheet-view window, loaded `enemies/bear/attack.png`, and built 9 frames.
+
 ## Scope of this pass (locked by the request)
 
 | Sprite | Used for | Everything else |
@@ -732,3 +751,441 @@ the pack — registry is ready for them).
 - `documentation/level_design.md`, `journals/assets_journal.md`,
   `journals/journal.md`, `README.md` (T10).
 - **No new dependencies. Nothing committed.**
+
+---
+
+## Bridge corridor rework — B1 (2026-08-27)
+
+Follow-up after T6–T10: the T7 bridge ran its tiles across the corridor's
+centre-to-centre collision rect, so `h_left` / `h_right` (and `v_top` / `v_bot`)
+end-caps sat buried at the room centres and only middle planks ever showed over
+the water. Checked `assets/Bridge/Bridge_All.png` (3 × 4 @ 64): row 0 =
+`#0 h_left` (posts left) / `#1 h_mid` / `#2 h_right` (posts right); col 0 =
+`#3 v_top` (posts top) / `#6 v_mid` / `#9 v_bot` (posts bottom); the other cells
+are loose-plank debris. The slot indices were already right — the placement was
+the bug.
+
+- `world/procedural.py` — `Corridor` now carries `axis` (`"h"` west/east |
+  `"v"` north/south), `end_low` / `end_high` (the named edge at the smaller /
+  larger world coordinate), `room_low` / `room_high`.
+- `world/map.py` — `_bridge_slot(axis, index, ncells)` (was
+  `(horizontal, row, col, rows, cols)`); `paint_corridor(c)` bakes a surface
+  spanning **one tile inside `room_low` → one tile inside `room_high`**
+  (`edge ∓ tile_px`, centred) and returns its own `(blit_rect, surface)`, so the
+  end-cap planks overlap each room's shoreline tile (no water sliver between the
+  bridge and the grass). Collision `rect` untouched.
+- `tests/test_terrain.py` `BridgeCorridorTests` +3 (edge properties; matching
+  cap baked at each mouth; surface overlaps one tile into each room). Suite
+  **340 → 343**.
+- Screenshots: every bridge has a posted end-cap that meets the grass on both
+  shores with middle planks between; doorway seams still clean; flat renderer
+  unchanged.
+
+---
+
+## Depth-sorted scenery + characters — B2 (2026-08-27)
+
+Follow-up: obstacle skins and interior clutter were part of the map draw and so
+always sat *under* every entity — the hero could never stand behind a tree.
+
+- `world/map.py` — `draw()` split into `draw_ground()` (terrain only) +
+  `scenery_drawables(camera)` → `[(depth_y, fn), …]` for each in-view obstacle
+  (`_draw_one_obstacle`) and clutter instance (`_blit_one_decor`). `_draw_tiled`
+  no longer paints clutter; `draw()` kept (unsorted) for non-`PlayingState` use.
+- `game/states/playing_state.py` — `_draw_depth_layer` merges `scenery_drawables`
+  with `(entity.pos.y, fn)` for hero / enemies / boss / summons / dying, sorts by
+  ground-contact Y, paints back-to-front. Lower-on-map (larger Y) draws on top;
+  a character with a smaller Y than a tree is hidden by its canopy.
+- `tests/test_depth_sort.py` (new, 6). Suite **343 → 349**. Screenshots: a 12 px
+  Y move flips whether the hero is in front of or behind a tree. Flat renderer,
+  `GameMap.draw`, and per-frame cost (`_depth_items` ≈ 0.006 ms) unaffected.
+
+---
+
+## Tree shade replaces obstacle contact shadows — B3 (2026-08-27)
+
+The T9 per-obstacle contact shadow (`Shadow.png`, squashed, under every skinned
+tree / rock / bush) is removed. Only **trees** now cast anything: a soft round
+shade patch drawn *over* the characters so a hero / enemy under a tree is gently
+darkened.
+
+- `game/config.py` — `TERRAIN_SHADOWS` repurposed to gate the tree shade.
+- `data/terrain.json` — `obstacle_decor.shadow` / `shadow_blob` → `tree_shadow`
+  `{radius_scale: 1.9, color, alpha: 66}`.
+- `world/map.py` — `_obst_shadow` + `Shadow.png` scaling gone; new
+  `_build_tree_shadows` (one SRCALPHA disc per distinct `R = radius · 1.9`,
+  concentric translucent fills) → `self._tree_shadows`; new `draw_tree_shadows`
+  blits them after the depth layer (`PlayingState.draw` + `GameMap.draw`).
+- `tests/test_terrain.py` shadow cases rewritten (+1 net), `test_depth_sort.py`
+  +1 ordering check. Suite **349 → 351**. Screenshots: trees sit in a round
+  shade; the hero under one is subtly darkened; rocks / bushes cast nothing.
+
+---
+
+
+## Asset library reorganization — A1 ✅
+
+**Date:** 2026-08-27. **Status:** DONE. Plan + decisions below; results at the
+end.
+
+`assets/` has grown to **576 files** (493 png, 43 `.aseprite`, 39 `.DS_Store`,
+1 `.md`). Folder names are inconsistent (`Bridge/`, `Deco/`, `Enemy Pack/`,
+`Units/`, `Trees/` capitalised at the root beside `terrain/`, `fx/`,
+`projectiles/`); `title screen.png` sits loose at the root with a space in the
+name; and the character sprites the game loads were removed from disk (`git`
+shows `D assets/sprites/soldier/*` and `D assets/sprites/orc/*`) — so the suite
+is **currently red** (6 fails in `test_assets`) and the hero + chaser render as
+primitives. A new `assets/Units/` pack (`{Black,Blue,Purple,Red,Yellow}
+Units/{Archer,Lancer,Monk,Pawn,Warrior}/*.png`, 192×192 strips) was added to
+replace them.
+
+### Decisions (from the user, 2026-08-27)
+
+1. **Heroes:** Aegis = **blue**, Kestrel = **yellow**, Nihil = **purple**.
+2. **Unit type varies by hero** — Aegis = **Warrior**, Kestrel = **Archer**,
+   Nihil = **Monk** (a caster silhouette for the status hero).
+3. **Hurt / death:** omit — the `Animator` clamps a missing anim, so the hero
+   holds `idle` when hit or during the death sequence. No fake art.
+4. **Unused packs are NOT deleted.** Instead: normalise the *whole* library into
+   one consistent, conventionally-named tree and rename/move every PNG so each
+   pack is ready to wire up later. Only true metadata is removed — every
+   `*.aseprite` (43) and every `.DS_Store` (39). `CREDITS.md` stays.
+
+### Naming convention (every category)
+
+- **lower-case**, `snake_case`; spaces → `_`; no capitals or spaces anywhere in
+  a path.
+- **Animated entity** → one folder, one file per animation strip:
+  `<category>/<entity>/<anim>.png`. `<anim>` is the pack's own suffix,
+  lower-cased (`idle`, `run`, `walk`, `move`, `attack`, `attack1`, `attack2`,
+  `shoot`, `throw`, `heal`, `guard`, `windup`, `recovery`, `death`, `hurt`,
+  `avatar`…). Anim names are **not** force-normalised across packs — a mob that
+  ships `Move` keeps `move`; one that ships `Run` keeps `run`.
+- **Single image** → `<category>/<group>/<name>.png`.
+- **Colour variants** → colour is a folder level: `<category>/<colour>/…`.
+
+### Target layout
+
+```
+assets/
+├── characters/                      # 5 colours × the unit types (playable + reserve)
+│   ├── blue/warrior/{idle,run,attack1,attack2,guard}.png    <- Aegis (wired)
+│   ├── yellow/archer/{idle,run,shoot}.png  + arrow.png      <- Kestrel (wired)
+│   ├── purple/monk/{idle,run,heal,heal_effect}.png          <- Nihil (wired)
+│   ├── {blue,yellow,purple,red,black}/{archer,lancer,monk,pawn,warrior}/…   (reserve)
+│   └── lancer keeps its directional strips:
+│       {up,down,right,upright,downright}_{attack,defence}.png
+├── enemies/
+│   ├── orc/{idle,walk,hurt,death}.png                       <- chaser (wired; restore from git)
+│   ├── bear/ bomb_fish/ bumblebee/ giant_bat/ gnoll/ gnome/ harpoon_shark/
+│   │   hex_shaman/ lizard/ minotaur/ paddle_shark/ panda/ skull/ slingshot_gnome/
+│   │   snake/ spider/ spear_goblin/ thief/ torch_goblin/ troll/ turtle/  (reserve)
+│   │       each: {idle, run|walk|move, attack|throw|shoot, avatar, …}.png
+│   └── extra/  boat/ cannon/ cave/ dead_tree/ fish_hut/ gnome_buildings/ goblin_hut/
+│       minotaur_guard/ panda_guard/ pig/ pig_rider/ pirate_tower/ seahorse_boat/
+│       skull_guard/ skull_decorations/ turtle_guard/ wooden_fence/  (reserve)
+├── projectiles/
+│   ├── arrow.png                                            (wired)
+│   └── acorn.png harpoon.png cannon_ball.png gnoll_bone.png hex_bolt.png …  (reserve)
+├── buildings/
+│   └── {black,blue,purple,red,yellow}/{archery,barracks,castle,house_1,house_2,house_3,monastery,tower}.png
+├── effects/
+│   └── dust_1.png dust_2.png explosion_1.png explosion_2.png fire_1.png fire_2.png fire_3.png water_splash.png
+├── terrain/
+│   ├── tiles/     tilemap_1..5.png  water_background.png  water_foam.png  shadow.png
+│   ├── bridge/    bridge_all.png
+│   ├── props/     bush_1..4  rock_1..4  tree_1..4  stump_1..4  water_rock_1..4  duck
+│   │              cloud_1..8  deco_1..18  dead_tree     (bush/rock/tree/water_rock/duck wired)
+│   └── resources/ gold/  meat/  tools/  wood/            (lower-cased, otherwise as-is)
+├── ui/
+│   └── title.png                                          (was "title screen.png"; wired)
+└── CREDITS.md
+```
+
+Every current PNG lands somewhere; nothing is dropped except `*.aseprite` /
+`.DS_Store`.
+
+### The 3 wired heroes — `data/sprites.json`
+
+| hero | colour | unit | rig name | anims (source → key, frames) |
+|------|--------|------|----------|------------------------------|
+| **Aegis** | blue | Warrior | `hero_aegis` | `idle` (8), `run`→`walk` (6), `attack1`→`attack` (4) |
+| **Kestrel** | yellow | Archer | `hero_kestrel` | `idle` (6), `run`→`walk` (6), `shoot`→`attack` (8) |
+| **Nihil** | purple | Monk | `hero_nihil` | `idle` (6), `run`→`walk` (4), `heal`→`attack` (8) |
+
+192×192 frames; `face: "right"`; `content` / `scale` / `anchor` measured from
+each hero's art (as was done for `soldier`). No `hurt` / `death` keys.
+
+`data/characters.json`: `aegis.sprite: "hero_aegis"`,
+`kestrel.sprite: "hero_kestrel"`, `nihil.sprite: "hero_nihil"`; plus a
+primitive-fallback / HUD accent `color` — `aegis (70,130,210)`,
+`kestrel (230,200,90)`, `nihil (170,110,210)`.
+
+### Touch list (code / data / tests / docs)
+
+- `data/sprites.json` — drop `soldier`; add `hero_aegis` / `hero_kestrel` /
+  `hero_nihil`; repoint `orc` (→ `enemies/orc/…`) and `arrow`
+  (→ `projectiles/arrow.png`, path unchanged).
+- `data/characters.json` — the 3 `sprite` keys + a `color` per hero.
+- `data/terrain.json` — every `"file"`, `floor_sheet`, `water_tile`,
+  `bridge.sheet` → new `terrain/tiles|bridge|props/` paths + renamed files
+  (`Tilemap_color1.png` → `terrain/tiles/tilemap_1.png`, `Bushe1.png` →
+  `terrain/props/bush_1.png`, `Tree1.png` → `terrain/props/tree_1.png`, …).
+- `game/config.py` — `MENU_TITLE_IMAGE = "ui/title.png"`.
+- `game/states/playing_state.py` / `entities/player.py` — use the hero's
+  `color` for the `_draw_player` primitive fallback + HUD accent instead of the
+  single `config.COLOR_PLAYER`.
+- `.gitignore` — add `*.aseprite` and `.DS_Store`.
+- Tests — `test_assets.py` (`test_expected_rigs_present` → `hero_aegis`,
+  `hero_kestrel`, `hero_nihil`, `orc`, `arrow`; `test_files_exist` picks up new
+  paths), `test_terrain.py` (`test_rig_files_and_strip_widths`,
+  `test_referenced_sheets_exist`, decoration-rig names),
+  `test_characters.py` (all 3 now carry a `sprite`),
+  `test_enemy_sprite.py` (orc path), `test_animation.py`,
+  `test_menu.py` (title path).
+- Docs — `README.md` (Assets section + the `assets/` tree),
+  `documentation/level_design.md` §3.3 / §3.4 / §4 (paths + rig names),
+  `documentation/terrain_tile_slots_formula.md`
+  (`Tilemap_color1.png` → `terrain/tiles/tilemap_1.png`),
+  `assets/CREDITS.md` (rewrite the file lists; add `Units/` as "Pack 3"; note
+  the enemy / buildings / fx packs are filed for future use),
+  `journals/journal.md` pointer, this section → a completion note.
+
+### Execution
+
+`git mv` for every move (keeps history), `git rm` for the `*.aseprite` /
+`.DS_Store` deletes. A short script generates the move list from the tables
+above; run it, then `python -m unittest discover -s tests` back to green
+(6 currently red from the missing `soldier`), a windowed `python main.py`
+(each hero renders as its coloured unit, chaser as the orc, title loads,
+terrain unchanged), and a headless screenshot per hero.
+
+### Results (done 2026-08-27)
+
+- **591 → 509 files.** 82 deletes (43 `.aseprite` + 39 `.DS_Store`), 507
+  moves/renames into the tree above. `git` detects ~238 as renames; the untracked
+  `Units/` pack lands as adds. `.gitignore` now blocks `*.aseprite` / `.DS_Store`.
+- Confirmed conventions: wired heroes keep the game's `idle/walk/attack`
+  vocabulary — `sprites.json` maps `walk`→`run.png`, `attack`→`attack1.png` /
+  `shoot.png` / `heal.png` (source files renamed to `run` / `shoot` / `heal`,
+  not to `walk`/`attack`). Reserve enemy packs keep their `avatar.png` portraits.
+- `data/sprites.json`: `soldier` dropped as a hero but re-declared as a **reserve
+  rig** pointing at `characters/soldier/` (keeps `test_assets` honest and the set
+  usable later); new `hero_aegis` (blue Warrior, idle 8 / walk←run 6 / attack←attack1 4),
+  `hero_kestrel` (yellow Archer, 6 / 4 / shoot 8), `hero_nihil` (purple Monk,
+  6 / 4 / heal 11) — all 192×192, measured `content`/`scale`/`anchor`, no
+  hurt/death; `orc` repointed to `enemies/orc/`; `arrow` unchanged.
+- `data/characters.json`: `sprite` + `color` on all three
+  (`aegis (70,130,210)` / `kestrel (230,200,90)` / `nihil (170,110,210)`).
+- `data/terrain.json`: every path → `terrain/tiles|bridge|props/` + renamed
+  files. `game/config.py`: `MENU_TITLE_IMAGE = "ui/title.png"`.
+- `game/states/playing_state.py`: `self._hero_color` from `cdef["color"]` feeds
+  the `_draw_player` primitive fallback (was the single `config.COLOR_PLAYER`).
+- Tests: `test_assets.py` — `test_expected_rigs_present` now covers the 3 hero
+  rigs + `soldier` + `orc` + `arrow`; `test_strip_width_…` iterates every
+  animated rig generically. Suite back to **351 green** (was 6 red).
+- Docs: `assets/CREDITS.md` rewritten (Pack 1 orc / Pack 2 terrain / Pack 3
+  units + a reserve-enemy note); `README.md` Assets section + project tree +
+  "currently sprited" (3 heroes now); `documentation/level_design.md` +
+  `terrain_tile_slots_formula.md` paths (`Tilemap_color1.png` →
+  `terrain/tiles/tilemap_1.png`).
+- Screenshots: each hero renders as its distinct coloured unit
+  (blue Warrior / yellow Archer / purple Monk), HUD trait + HP correct per hero;
+  chaser renders the orc; menu title loads from the new path; terrain unchanged.
+
+**Fix (2026-08-27):** the first `content` crops were measured from the **idle
+strip only**, so the wider walk / attack frames (the warrior's sword swing, the
+archer's bow draw, the monk's heal aura) were clipped. Recomputed each hero's
+`content` as the **union bounding box over every anim** and re-derived
+`scale` / `anchor` from that, targeting a ~58 px on-screen idle-body height:
+`hero_aegis` content `[43,44,120,112]` scale `[78,73]` anchor `[38,61]`;
+`hero_kestrel` `[53,46,87,90]` / `[57,59]` / `[25,59]`;
+`hero_nihil` `[35,63,121,71]` / `[102,60]` / `[51,60]` (the heal frame is wide).
+Screenshots re-verified — full sprite, no clipping, size in line with the
+terrain. Suite still 351 green.
+
+**Downscale (2026-08-27):** the heroes still read as much larger than the
+`PLAYER_RADIUS = 16` collider. Re-scaled so ≤ ~10 % of the sprite's opaque
+pixels (measured across idle + walk + attack) fall outside an `R = 16` circle on
+the body centre — the standing body is now ~32–37 px, close to the 32 px collider
+diameter: `hero_aegis` scale `[46,43]` anchor `[22,35]`; `hero_kestrel`
+`[37,38]` / `[16,38]`; `hero_nihil` `[56,33]` / `[28,33]` (`content` unchanged —
+still the full union bbox, so the swing / bow / heal aura never clip). Verified
+with the collider ring drawn: the body hugs the circle, only the head + the
+transient attack reach sit outside. Suite 351 green.
+
+---
+
+## Enemy sprite pass — E1–E6 ✅ (2026-08-27)
+
+**Date raised:** 2026-08-27.
+
+`assets/enemies/orc/` was removed from disk; `chaser` (its only user) now draws
+a primitive, and the other 12 enemies + the boss have never had a sprite. The
+reorganised `assets/enemies/` holds **21 full mob sets** (each `idle` +
+`run`/`walk`/`move` + usually `attack`/`shoot`/`throw` + `avatar`) — enough to
+cover every current enemy and the boss with 7 to spare. All from the same
+Tiny Swords enemy pack, so after this pass the whole `assets/` tree is one
+source and `CREDITS.md` collapses to a single entry.
+
+`assets/characters/dead/dead.png` — a **14-frame 64 × 256 one-shot** skull-poof
+(flash → skull + light ring → bounce → sink) — is the **shared death animation**
+for every entity, hero or enemy (the packs ship no per-creature death strip).
+See E2.
+
+### Sprite → enemy
+
+| sprite (`assets/enemies/…`) | enemy (`data/enemies.json`) | move anim | attack anim |
+|---|---|---|---|
+| `skull`           | `chaser`     | run  | attack (7f) |
+| `spider`          | `fast`       | run  | attack (8f) |
+| `turtle`          | `tank`       | walk | attack (10f) |
+| `bumblebee`       | `swarm`      | move | attack (11f) |
+| `slingshot_gnome` | `ranged`     | run  | shoot (9f) + `acorn_projectile` |
+| `bomb_fish`       | `exploder`   | run  | `bomb_fuse_lit` / `bomb_spinning` |
+| `panda`           | `shielded`   | run  | attack (13f) |
+| `bear`            | `elite`      | run  | attack (9f) |
+| `gnome`           | `summoner`   | run  | attack (7f) |
+| `troll`           | `brute`      | walk | `windup` (5f) → `attack` (6f) → `recovery` (10f) |
+| `minotaur`        | `charger`    | walk | attack (12f) |
+| `thief`           | `teleporter` | run  | attack (6f) |
+| `hex_shaman`      | `warlock`    | run  | attack (10f) + `projectile` + `explosion` |
+| `giant_bat`       | `the_first_hunger` (boss) | move | attack (7f) |
+
+### Reserve (unused mob sets)
+
+`gnoll`, `harpoon_shark`, `lizard`, `paddle_shark`, `snake`, `spear_goblin`,
+`torch_goblin`, plus everything under `assets/enemies/extra/`.
+
+### Milestones
+
+- **E1 — rig infra. ✅ (2026-08-27)** The dead `orc` rig (files removed with the
+  folder) was replaced in `data/sprites.json` by **14 rigs** — one per set in
+  the table — each `idle` + `walk` (←the set's `run` / `walk` / `move` strip) +
+  `attack` (←`attack` / `shoot`). `frame` = the strip's native cell (192 / 256 /
+  320 / 384 px); `content` / `scale` / `anchor` computed from the union bbox
+  across those anims, scaled so the idle body ≈ `2.4 × radius` on screen (same
+  method as the hero fix). No `hurt` / `death` strips ship — the flinch / death
+  anim names still resolve (`Animator.play` sets the name; `frame()` returns the
+  held pose), exactly as for the heroes. `chaser.sprite` re-pointed `orc` →
+  `skull` here too (its rig is what broke); the other 5 of the chase family stay
+  primitive until E2. `test_assets.py` / `test_enemy_sprite.py` moved their
+  representative-rig refs `orc` → `skull`. **Verified:** all 14 rigs slice to
+  the declared frame counts with `content` inside `frame`, no clipping (montage
+  + in-game — the chaser renders as skeleton warriors again). Suite **353 green**
+  (was 5 red from the missing `orc` files).
+- **E2 — shared hit tint + `dead` death animation, then the chase family. ✅
+  (2026-08-27)**
+  Two pieces of render infra that every sprited entity (heroes included) needs
+  because the Tiny Swords packs ship no `hurt` / `death` strips, followed by the
+  first batch of enemy wiring.
+
+  **Shipped:** `entities/enemy.py` — `_has_hurt` (rig has a real `hurt` strip?),
+  `take_damage` sets `_hurt_t` always but only `anim.play("hurt")` when
+  `_has_hurt`, `_anim_name` guards `"hurt"` likewise, `_hurt_t` decays even for
+  animless enemies. `game/states/playing_state.py` — `_HIT_TINT (150,30,30)` +
+  `_hit_tinted(frame)` (`BLEND_RGBA_ADD` copy); `_draw_enemy_sprite` /
+  `_draw_player` blit the tinted frame while `_hurt_t > 0` (no more circle pop);
+  `_hero_has_hurt` + `_hero_anim_name` guard. Death: `_dying` / `_update_dying`
+  replaced by `_death_fx` (`[Animator("dead", start="loop"), pos, facing]`) +
+  `_spawn_death_fx` / `_update_death_fx` (drop on `Animator.finished`) /
+  `_draw_death_fx`; `_cull_dead_enemies` poofs **every** dead enemy (sprited or
+  not); `update()` on hero death spawns a poof and holds `_death_seq_t = 1.05`;
+  `_run_death_sequence` advances `_update_death_fx`; `_draw_player` early-returns
+  while `not alive` so the poof stands in; `_depth_items` carries the poofs.
+  `data/sprites.json` — new `dead` rig. **`dead.png` shipped as a 7 × 2 grid of
+  128 px frames**, but the loader (`_build_frames`) only does a single
+  horizontal row — the first cut declared `frame [64,256]` and sliced 14
+  half-column strips straddling both rows ("cut in half"). Fixed by **repacking
+  `dead.png` to a 1792 × 128 14 × 1 strip**; rig is `frame [128,128]`, one-shot
+  `loop` anim `fps 15`, `content [35,32,60,67]`, `scale [39,44]`,
+  `anchor [19,41]`. `_spawn_death_fx(pos, facing, scale=1.0)` carries a scale
+  factor on the fx entry; `_draw_death_fx` scales `size` **and** `anchor` by it.
+  `_ENEMY_DEATH_FX_SCALE = 0.55` — **enemy** death poofs render at 55 %, the
+  **hero** poof stays full size. `data/enemies.json` — `sprite` on
+  `fast` → `spider`, `tank` → `turtle`, `swarm` → `bumblebee`,
+  `shielded` → `panda`, `elite` → `bear`. `tests/test_enemy_sprite.py` rewritten
+  (`HitTintTests`, `DeathPoofTests` incl. the 0.55 / 1.0 scale checks,
+  chase-family / no-hurt-anim assertions). Suite **353 → 356**. Screenshots:
+  chase-family crowd renders; a hit spider flashes red (no disc); enemy poof is
+  visibly smaller than the hero poof.
+
+  1. **Hit tint (replaces the circle flicker).** Today `take_damage` sets
+     `_hurt_t` and calls `anim.play("hurt")`; the rig has no `hurt` strip, so
+     `Animator.frame()` returns `None` and `_draw_enemy_sprite` /
+     `_draw_player` fall back to a `pygame.draw.circle` for ~0.26 s after every
+     hit — the sprite visibly pops to a coloured disc. Change: **do not switch
+     to `"hurt"`** when the rig lacks it (`assets.frame_count(rig, "hurt") == 0`);
+     keep the current idle / walk / attack frame and, while `_hurt_t > 0`, blit
+     a **red-tinted copy** of that frame — `frame.copy()` +
+     `fill((150, 30, 30, 0), special_flags=BLEND_RGBA_ADD)` (brightens toward
+     red, keeps the silhouette + detail). Shared helper (or a `tint=` arg on
+     `Assets.frame()` / `frames()`, memoised, alongside the existing
+     `image(tint=)` path). Rigs that *do* have a `hurt` strip keep using it.
+  2. **`dead` death animation.** New shared rig `dead` from
+     `assets/characters/dead/dead.png` — **14 frames, 64 × 256, one-shot**
+     (white flash → skull poof + light ring → bounce → sink into the ground),
+     `fps ≈ 15`, `content` = union bbox, `anchor` = feet. On death of **any**
+     entity (hero or enemy), the creature sprite stops and a one-shot `dead`
+     animation plays at the death position (feet-anchored, `_facing`-flipped),
+     then is removed — replacing the enemy "linger on the held last frame"
+     (`_dying`) and the hero "freeze on `idle`" (`_run_death_sequence`). Enemy:
+     push `[Animator("dead"), pos]` to a `_death_fx` list drawn in the depth
+     layer, drop the `e.anim.play("death")` hold. Hero: play `dead` for its full
+     length (~0.9 s) inside `_death_seq_t` before `_end_run`. Non-sprited enemies
+     also get the poof now (uniform feedback).
+
+  3. **Chase family wiring.** `sprite` on `fast` / `tank` / `swarm` / `shielded`
+     / `elite` (chaser done in E1). The E1 rigs carry first-pass
+     `content` / `scale` / `anchor` (idle body ≈ 2.4 · `radius` = 10 / 24 / 7 /
+     16 / 22); re-tune from a mixed-crowd screenshot.
+
+  Green + screenshots: a hit enemy flashes red (no disc), a dying enemy + a
+  dying hero both play the skull poof.
+- **E3 — ranged / special. ✅ (2026-08-27)** `data/enemies.json` — `sprite` on
+  `ranged` → `slingshot_gnome`, `exploder` → `bomb_fish`, `summoner` → `gnome`,
+  `brute` → `troll` (the E1 rigs' first-pass `content`/`scale`/`anchor` at
+  2.4 · `radius` = 13 / 16 / 20 / 30 read fine in-game — small gnome skirmisher,
+  puffer, wizard, club-raising troll with the elite ring). `test_enemy_sprite.py`
+  `SPRITED` / `PRIMITIVE` updated (only `charger` / `teleporter` / `warlock` stay
+  primitive, for E4). Suite **356**. **Deferred:** the `bomb_fish` bomb strips
+  on the exploder blast telegraph and `slingshot_gnome` `acorn_projectile` as
+  the ranged shot — both touch the projectile / explosion renderers, out of
+  scope for the sprite wiring; revisit as polish.
+- **E4 — FSM enemies. ✅ (2026-08-27)** `data/enemies.json` — `sprite` on
+  `charger` → `minotaur`, `teleporter` → `thief`, `warlock` → `hex_shaman`.
+  **All 13 enemies are now sprited.** `entities/enemy.py` — `_anim_name` gained
+  an `"attack"` branch driven by a new `_attacking` property
+  (`telegraphing or ai["fs"] == "attack" or ai["slam_state"] == "attack"`), so
+  the FSM wind-up + strike (and the brute's slam) play the rig's one-shot
+  `attack` strip; the shared `if e.telegraphing:` red ring still draws over the
+  sprite. `tests/test_enemy_sprite.py` — `test_every_enemy_has_an_animator`
+  (drives off `get_content().enemies`), `test_fsm_telegraph_and_attack_states_play_the_attack_anim`
+  (charger `ai["fs"]`, brute `ai["slam_state"]`). Suite **356 → 357**.
+  Screenshots: minotaur / thief / hex_shaman each render mid-telegraph in their
+  attack pose inside the telegraph ring.
+- **E5 — boss. ✅ (2026-08-27)** `entities/boss.py` — `Animator` + `_facing` +
+  `_hurt_t` / `_has_hurt`; `_anim_name` maps `intro`/`recover` → `idle`,
+  `telegraph`/`active` → `attack`, else `walk`/`idle`, `not alive` → `death`;
+  `update` advances the anim + tracks facing + decays `_hurt_t`; `take_damage`
+  sets `_hurt_t`. `data/bosses.json` — `the_first_hunger.sprite = "giant_bat"`.
+  `game/states/playing_state.py` — `_draw_boss` blits the frame (feet-anchored,
+  facing-flipped, hit-tinted while `_hurt_t > 0`) and keeps the three telegraph
+  overlays; primitive circle stays as the fallback; the HUD health bar is
+  untouched. `_on_boss_killed` spawns a `dead` poof at 1.4× (mostly unseen — the
+  victory transition follows). `tests/test_boss.py` `BossSpriteTests` (+2).
+  Suite **357 → 359**. Screenshot: the boss renders as a large winged bat in its
+  attack pose under each of the radial-barrage / charge / summon-brood
+  telegraphs.
+- **E6 — docs / credits + single source. ✅ (2026-08-27)** Made `assets/`
+  genuinely one-source: `projectiles/arrow.png` swapped to the Tiny Swords
+  archer arrow (64 px; `arrow` rig `content [10,26,43,12]` / `scale [26,7]` /
+  `anchor [13,3]`); the unused `characters/soldier/` reserve rig **and folder
+  removed** (its ~8 `test_assets.py` refs repointed to `hero_aegis` — the
+  one-shot `attack` covers the death-clamp / no-loop cases). `assets/CREDITS.md`
+  rewritten as a single **"Tiny Swords" by Pixel Frog** entry (wired list +
+  reserve list); the standalone `assets/ui/title.png` illustration is the only
+  noted non-pack asset. `README.md` — top blurb, "currently sprited" (all 3
+  heroes + all 13 enemies + boss + the hit-tint / death-poof note), the Content
+  bullet. `journals/journal.md` — "Enemy + boss sprite pass (E1–E6)" pointer.
+  Suite **359**.

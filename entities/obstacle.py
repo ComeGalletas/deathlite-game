@@ -1,9 +1,9 @@
 """Static obstacles (spec 5.3): trees, rocks, pillars, low walls.
 
-All block movement. Rocks and pillars also block projectiles; trees and shrubs
-do not (you can shoot through foliage). Circular colliders -- convex, so
-entities using axis-slide movement resolution slide around them rather than
-getting wedged.
+All block movement. Trees, rocks and pillars also block projectiles (a solid
+trunk / mass); only shrubs let shots pass (you fire over low foliage). Circular
+colliders -- convex, so entities using axis-slide movement resolution slide
+around them rather than getting wedged.
 """
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ import pygame
 
 # kind -> (radius, blocks_projectiles, color)
 KINDS = {
-    "tree":   (26, False, (54, 82, 54)),
-    "rock":   (30, True,  (92, 92, 100)),
-    "pillar": (22, True,  (120, 118, 130)),
-    "shrub":  (18, False, (64, 96, 60)),
+    "tree":   (15, True,  (54, 82, 54)),
+    "rock":   (25, True,  (92, 92, 100)),
+    "pillar": (15, True,  (120, 118, 130)),
+    "shrub":  (12, False, (64, 96, 60)),
 }
 
 

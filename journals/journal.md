@@ -673,7 +673,7 @@ two pooled player summons.
 | File | Responsibility |
 |------|----------------|
 | `combat/status.py` | Rewritten generic: `StatusType.family` (`dot` / `slow` / `amp`) drives **one** update loop — no per-effect branch. Added **poison** and **bleed** (both `dot`) → 5 effects. `speed_multiplier` / `damage_taken_multiplier` combine across all matching-family stacks. |
-| `entities/obstacle.py` | `Obstacle` (tree / rock / pillar / shrub), circular collider. Rocks + pillars also block projectiles. |
+| `entities/obstacle.py` | `Obstacle` (tree / rock / pillar / shrub), circular collider. Rocks + pillars also block projectiles (trees too as of B4). |
 | `world/procedural.py` | `_scatter_obstacles`: deterministic per-room placement, room centres kept clear, none in start / boss rooms, dense in `elite_arena`. `WorldLayout.obstacles`. |
 | `world/map.py` | `is_walkable` rejects obstacle overlap; `blocking_obstacle_hit` for projectiles; obstacles culled + drawn. |
 | `entities/enemy_ai.py` | `_fsm_common` (chase → telegraph → attack → recover → chase) + `fsm_charger` (locked dash, bumped contact damage), `fsm_teleporter` (blink near player), `fsm_warlock` (snapshots target, spawns a ground hazard after the telegraph). `EnemyContext.spawn_hazard`. |
@@ -1126,3 +1126,257 @@ second-grass / decorative slot list baked into `paint_room`) — pure polish, no
 started; the `Deco/*` mushroom/signpost/brazier props named in the early asset
 inventory don't exist in the pack, so `room_interior` ships wired to the small
 rocks and takes new props as JSON when art arrives.
+
+---
+
+## Post-Phase-3 — Bridge corridor rework (B1)
+
+**Date:** 2026-08-27. Full log in `assets_journal.md`; renderer detail in
+`../documentation/level_design.md` §1.3 / §3.3.
+
+The T7 bridge laid `h_left … h_mid … h_right` (or `v_top/mid/bot`) across the
+corridor's **centre-to-centre** collision rect, so the end-cap tiles were buried
+near the room centres and only middle planks showed over the water — every mouth
+looked unfinished.
+
+- **`world/procedural.py`** — `Corridor` gains four fields identifying its bridge
+  edges: `axis` (`"h"` → west/east, `"v"` → north/south), `end_low` / `end_high`
+  (the named edge at the smaller / larger world coordinate), and `room_low` /
+  `room_high` (the rooms those edges butt against). Generation sorts the pair by
+  `centerx` / `centery` and fills them.
+- **`world/map.py`** — `_bridge_slot(axis, index, ncells)` replaces the old
+  `(horizontal, row, col, rows, cols)` form: cap at index 0 (`end_low`), cap at
+  `ncells-1` (`end_high`), mid between. `paint_corridor(c)` now bakes a surface
+  that spans from **one tile inside `room_low`** to **one tile inside
+  `room_high`** (`edge ∓ tile_px`, centred), returns its own
+  `(blit_rect, surface)`; `_corr_surfs` carries that tighter rect. The end-cap
+  planks overlap each room's shoreline tile so the bridge meets the grass rather
+  than falling short over a sliver of water. The collision `rect` is untouched,
+  so walkability is unchanged.
+
+**Verification:** suite **340 → 343** — new `BridgeCorridorTests`:
+`test_corridor_carries_bridge_edge_properties` (axis ↔ end names, `room_low`
+really is the lower-coordinate room), `test_bridge_bakes_the_matching_end_cap_at_each_mouth`
+(first / last baked cell == the `h_left`/`h_right` or `v_top`/`v_bot` sheet tile,
+both axes sampled), `test_bridge_surface_overlaps_one_tile_into_each_room`.
+Screenshots: horizontal and vertical bridges show a posted end-cap that overlaps
+each room's shoreline tile (planks meet the grass, no water sliver), middle planks
+over the water between; doorway seams still clean. Flat renderer unchanged.
+
+---
+
+## Post-Phase-3 — Depth-sorted scenery + characters (B2)
+
+**Date:** 2026-08-27. Renderer detail in `../documentation/level_design.md`
+§3.3 / §3.7.
+
+Before this, `GameMap.draw` painted the whole map (terrain + all obstacle skins +
+all interior clutter) and *then* `PlayingState` drew every entity on top — so the
+hero always covered a tree, never walked "behind" it.
+
+- **`world/map.py`** — `draw()` split into `draw_ground(surface, camera)`
+  (water / void scenery / foam / room floors / bridges only) and
+  `scenery_drawables(camera)` → `[(depth_y, fn), …]`, one entry per in-view
+  obstacle (`_draw_one_obstacle`, extracted from `_draw_obstacles`) and per
+  in-view clutter instance (`_blit_one_decor`, extracted from `_blit_decor`).
+  `_draw_tiled` no longer draws clutter. `draw()` is kept for non-`PlayingState`
+  callers (ground + `_draw_room_clutter` + `_draw_obstacles`, unsorted).
+- **`game/states/playing_state.py`** — `draw()` now calls `draw_ground` then
+  `_draw_depth_layer`, which merges `scenery_drawables` with `(entity.pos.y, fn)`
+  for the hero / enemies / boss / summons / death animations, `sort`s by
+  `depth_y` (feet contact Y), and paints in order. Stable sort → on a tie the
+  player wins (drawn last). Interactables / hazards / gems / explosions stay
+  between the ground and this layer; projectiles / particles / damage numbers /
+  HUD stay on top. `_draw_enemies` / `_draw_summons` folded into
+  `_draw_one_enemy` / `_draw_one_summon`.
+
+**Verification:** suite **343 → 349** — new `tests/test_depth_sort.py`:
+`scenery_drawables` has one callable entry per visible obstacle keyed by its Y
+(and `[]` with no layout); `_depth_items()` is Y-sorted; the player's rank
+follows `player.pos.y` (last when below every obstacle, first when above every
+one); `draw()` runs clean after the split. Screenshots: with the hero 6 px above
+a tree's base it is hidden behind the trunk/canopy; 6 px below, it draws fully in
+front — a 12 px Y move flips the occlusion. `_depth_items` ≈ 0.006 ms; full
+`_render` ≈ 3 ms. Flat renderer + `GameMap.draw` unchanged.
+
+---
+
+## Post-Phase-3 — Tree shade replaces obstacle contact shadows (B3)
+
+**Date:** 2026-08-27. Renderer detail in `../documentation/level_design.md`
+§3.4 / §3.7.
+
+Dropped the T9 per-obstacle contact shadow (the squashed `Shadow.png` decal
+under every tree / rock / bush) and gave **only trees** a round shade patch that
+is drawn *over* the characters.
+
+- **`game/config.py`** — `TERRAIN_SHADOWS` repurposed: now gates the tree shade.
+- **`data/terrain.json`** — `obstacle_decor.shadow` / `shadow_blob` removed;
+  `obstacle_decor.tree_shadow = {radius_scale: 1.9, color: [12,18,22], alpha: 66}`.
+- **`world/map.py`** — `_obst_shadow` dict and all `Shadow.png` scaling code
+  gone from `_build_obstacle_decor`; `_draw_one_obstacle` just blits the skin.
+  New `_build_tree_shadows(conf)` precomputes one SRCALPHA disc (concentric
+  translucent fills, `R = round(radius · 1.9)`) per distinct radius, into
+  `self._tree_shadows = [(wx, wy, R, surf), …]` for every skinned `tree`. New
+  `draw_tree_shadows(surface, camera)` blits them, view-culled.
+- **`game/states/playing_state.py`** — `draw()` calls
+  `game_map.draw_tree_shadows` right after `_draw_depth_layer` (before
+  projectiles), so a hero / enemy under a tree is gently darkened. `GameMap.draw`
+  also runs it last, for parity.
+
+**Verification:** suite **349 → 351** — `TreeSkinShadowSeamTests` shadow cases
+rewritten: no `_obst_shadow` attribute; `_tree_shadows` has one SRCALPHA disc
+per skinned tree (and nothing for rocks / bushes); `TERRAIN_SHADOWS=False` →
+`_tree_shadows == []` with skins intact; `_draw_obstacles` blits only skin
+frames; `draw_tree_shadows` blits the discs. `test_depth_sort` gains an ordering
+check (shade pass after the depth layer, before projectiles). Screenshots: each
+tree sits in a soft round shade; the hero standing under one is visibly (subtly)
+darkened; rocks / bushes cast nothing. Flat renderer unchanged.
+
+---
+
+## Post-Phase-3 — Trees block projectiles (B4)
+
+**Date:** 2026-08-27.
+
+`entities/obstacle.py` `KINDS` was retuned (radii `tree/rock/pillar/shrub`
+`26/30/22/18 → 20/25/18/14`) and **`tree` now blocks projectiles** (`True`) — a
+solid trunk stops a shot the way a rock or pillar does. Only `shrub` still lets
+shots pass ("fire over low foliage"). No logic change: `blocking_obstacle_hit`
+already reads `Obstacle.blocks_projectiles`.
+
+- `entities/obstacle.py` — `KINDS["tree"]` → `(20, True, …)`; module docstring
+  updated.
+- `tests/test_obstacles.py` — `test_only_solid_obstacles_block_projectiles` →
+  `test_solid_obstacles_block_projectiles_shrubs_do_not`: rock **and** tree
+  block, a `shrub` does not.
+- `documentation/level_design.md` §1.5 obstacle table — radii + `tree` blocks
+  column; `journals/journal.md` M9 row parenthetical.
+
+Suite **351** (unchanged count), all green.
+
+---
+
+## Post-Phase-3 — Asset library reorganization (A1)
+
+**Date:** 2026-08-27. Full plan + results in `assets_journal.md` ("Asset library
+reorganization — A1").
+
+`assets/` (591 files) was normalised into one lower-`snake_case` category tree —
+`characters/<colour>/<unit>/`, `enemies/<mob>/`, `projectiles/`, `terrain/{tiles,
+bridge,props,resources}/`, `buildings/`, `effects/`, `ui/title.png`, `CREDITS.md`
+— one PNG per animation strip, source anim-names kept for the reserve packs.
+82 metadata files (`*.aseprite`, `.DS_Store`) deleted; `.gitignore` blocks them
+returning. **509 files, no PNG dropped.**
+
+The 3 heroes are now each skinned from a distinct Tiny-Swords unit colour:
+**Aegis** = blue Warrior, **Kestrel** = yellow Archer, **Nihil** = purple Monk
+(new `hero_aegis` / `hero_kestrel` / `hero_nihil` rigs in `data/sprites.json`,
+192×192, `idle`/`walk`←run/`attack`←attack1|shoot|heal; no hurt/death — the
+animator holds `idle`). Each also carries a `color` in `data/characters.json`
+that feeds the primitive fallback. The old `soldier` set is kept as a reserve
+rig. `data/terrain.json`, `game/config.py` (`MENU_TITLE_IMAGE`) and the
+`_draw_player` fallback were repointed; `test_assets.py` de-hardcoded off
+`soldier`. Suite **351 green** (was 6 red from the pre-reorg deletion of the
+hero sprites). Screenshots confirm each hero renders as its coloured unit and
+the chaser as the orc.
+
+---
+
+## Post-Phase-3 — Cone weapon telegraph + weapon-effect layer (B5)
+
+**Date:** 2026-08-27.
+
+Two render fixes for the reaping-arc weapons (Soul Scythe, Aegis's starter).
+
+### Checklist
+
+- [x] **Draw the real hit region.** `_resolve_projectile_hits` / `_in_cone`
+      accept a target only when it is inside a circular **sector** — apex at the
+      player, radius `proj.radius` (Soul Scythe `area` = 74), span
+      `cone_dir ± cone_half_angle` (55°). The renderer drew a full circle of
+      that radius, so the shown range was wrong on both the angle and (visually)
+      the shape. New `PlayingState._draw_cone` builds the exact sector polygon
+      (`base ± half`, `steps = max(2, deg(half)/4)` arc points + the apex) and
+      fills it translucent (`gfxdraw.filled_polygon`, alpha 70) with an
+      anti-aliased rim (alpha 210). Non-cone player projectiles keep the dot.
+- [x] **Weapon effects behind the characters.** `_draw_projectiles` split into
+      `_draw_player_projectiles` (friendly pool — the scythe arc, bolts,
+      orbiters) and `_draw_hostile_projectiles` (enemy / boss arrows). `draw()`
+      now runs the player pass **before** `_draw_depth_layer`, so every weapon
+      effect sits under the scenery + hero + enemies; the hostile pass stays
+      after the depth layer (enemy shots on top, for danger readability).
+- [x] `import pygame.gfxdraw` added to `game/states/playing_state.py`.
+
+### Verification
+
+Suite **351 → 353** — `tests/test_depth_sort.py`: `test_render_pipeline_order`
+(weapon fx < depth < tree shade < hostile shots) replaced the old order test;
+new `ConeWeaponVisualTests` — a point along the aim within the radius is painted,
+a point 80° off-aim (inside the old circle, outside the 50° sector) is **not**,
+nothing behind the apex or past the radius is painted, and the wedge points
+along `cone_dir`. Screenshot: the Soul Scythe renders as a translucent purple
+pie-slice from the hero toward the target, drawn under both the hero and the
+struck enemy.
+
+---
+
+## Post-Phase-3 — Enemy + boss sprite pass (E1–E6)
+
+**Date:** 2026-08-27. Full plan / results in `assets_journal.md` ("Enemy sprite
+pass — E1–E6").
+
+`assets/enemies/orc/` was deleted (chaser back to a primitive); every enemy and
+the boss got skinned from the Tiny Swords enemy pack.
+
+- **E1** — 14 rigs added to `data/sprites.json` (idle + walk + attack, measured
+  content/scale/anchor at ~2.4·radius); `chaser` re-pointed `orc` → `skull`.
+- **E2** — shared render infra: no `hurt`/`death` strips in the packs, so a hit
+  **red-tints the live frame** (`_hit_tinted`, `BLEND_RGBA_ADD`) instead of
+  popping to a circle, and death plays a shared one-shot **`dead` poof**
+  (`characters/dead/dead.png`, repacked 7×2 → 14×1) — every entity, hero and
+  enemy; enemy poof at 55 %, hero at full size. Chase family wired
+  (`fast`/`tank`/`swarm`/`shielded`/`elite` → spider/turtle/bumblebee/panda/bear).
+- **E3** — `ranged`/`exploder`/`summoner`/`brute` → slingshot_gnome/bomb_fish/
+  gnome/troll.
+- **E4** — `charger`/`teleporter`/`warlock` → minotaur/thief/hex_shaman; `Enemy._anim_name`
+  gained an `attack` branch so FSM wind-up/strike (and the brute slam) animate.
+  **All 13 enemies sprited.**
+- **E5** — `entities/boss.py` gained an `Animator` + phase→anim map; boss →
+  `giant_bat`; `_draw_boss` blits the frame under the existing telegraph
+  overlays.
+- **E6** — `assets/` is now single-source: `projectiles/arrow.png` swapped to
+  the Tiny Swords archer arrow, the unused `characters/soldier/` reserve rig +
+  folder removed. `assets/CREDITS.md` collapsed to one "Tiny Swords by Pixel
+  Frog" entry (the standalone `ui/title.png` illustration is the only noted
+  exception). `README.md` refreshed.
+
+Suite **353 → 359**. Screenshots per milestone (crowd, hit tint, death poofs,
+FSM telegraphs, boss patterns).
+
+---
+
+## Post-Phase-3 — Incoming-damage numbers (B6)
+
+**Date:** 2026-08-27.
+
+The floating damage numbers only showed damage the hero *deals*. Added a second
+style for damage the hero *takes*: **red** (`config.COLOR_DAMAGE_IN =
+(235,70,70)`), **25 % larger** than the common number (16 pt → 20 pt; crits stay
+22 pt / accent-gold).
+
+- `ui/damage_numbers.py` — `DamageNumber.incoming` flag; `_font_in` at
+  `round(16 * 1.25)`; `add(pos, amount, crit=False, incoming=False)`; `draw`
+  picks font + colour by `incoming` → `crit` → common.
+- `game/states/playing_state.py` — `_on_player_damaged` pushes
+  `damage_numbers.add(self.player.pos, amount, incoming=True)` (guarded on
+  `amount > 0`, so a fully-absorbed hit shows nothing). Every damage path already
+  publishes `PLAYER_DAMAGED` (contact bite, hazard tick, hostile shot,
+  explosion), so this one hook covers them all.
+- `tests/test_damage_numbers.py` (new, 4): the incoming font is taller than the
+  common one; `add(incoming=True)` sets the flag; a drawn incoming number puts a
+  `COLOR_DAMAGE_IN` pixel on the surface; `_on_player_damaged(amount>0)` adds one
+  incoming number, `amount == 0` adds none.
+
+Suite **359 → 363**. Screenshot: red `21` / `13` over the hero next to a common
+white `8` over an enemy.

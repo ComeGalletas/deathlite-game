@@ -79,5 +79,28 @@ class BossTests(unittest.TestCase):
         self.assertEqual(sink["summoned"][0][0], "swarm")
 
 
+class BossSpriteTests(unittest.TestCase):
+    def test_boss_has_an_animator_and_phase_anim_map(self):
+        from systems.animation import Animator
+        b = boss()
+        self.assertIsInstance(b.anim, Animator)
+        self.assertEqual(b.anim.rig, "giant_bat")
+        b.phase = "intro"
+        self.assertEqual(b._anim_name(), "idle")
+        b.phase = "telegraph"
+        self.assertEqual(b._anim_name(), "attack")
+        b.phase = "active"
+        self.assertEqual(b._anim_name(), "attack")
+        b.phase = "recover"
+        self.assertIn(b._anim_name(), ("idle", "walk"))
+        b.alive = False
+        self.assertEqual(b._anim_name(), "death")
+
+    def test_hit_sets_the_tint_timer(self):
+        b = boss()
+        b.take_damage(50.0)
+        self.assertGreater(b._hurt_t, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

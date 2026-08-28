@@ -137,7 +137,7 @@ class MenuPaletteAndTitleTests(unittest.TestCase):
         art = game.assets.picture(
             config.MENU_TITLE_IMAGE,
             size=(config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        self.assertIsNotNone(art, "assets/title screen.png is missing")
+        self.assertIsNotNone(art, "assets/ui/title.png is missing")
         self.assertEqual(art.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
 
     def test_missing_title_image_falls_back_to_black_plus_text(self):

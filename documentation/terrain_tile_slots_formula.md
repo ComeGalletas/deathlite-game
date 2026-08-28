@@ -1,6 +1,6 @@
 # Terrain tiles — slot formula (how a cell is cut and placed)
 
-How the tiled floor renderer turns a tilemap PNG (`Tilemap_color1.png`) into a
+How the tiled floor renderer turns a tilemap PNG (`tilemap_1.png`) into a
 room's grass floor: address a cell by a flat index, cut it, pick the right one
 for each position in the room, bake, blit.
 
@@ -10,7 +10,7 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
 
 ---
 
-## 1 · The asset — `assets/terrain/tileset/Tilemap_color1.png`
+## 1 · The asset — `assets/terrain/tiles/tilemap_1.png`
 
 - **`576 × 384` px**, loaded once via `pygame.image.load(...).convert_alpha()`
   → a **32-bit surface with a real alpha channel** (`game/assets.py —
@@ -23,7 +23,7 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
   The core's **edge and corner cells are transparent on their water-facing
   side**; the `interior` cell is fully opaque. (Columns 5–8 hold a second grass
   tint and a grey stone set — unused today.)
-- `Tilemap_color2..5.png` have the **identical grid layout**, only a different
+- `tilemap_2..5.png` have the **identical grid layout**, only a different
   grass tint; `room_palettes` picks which file a room kind uses.
 
 ## 2 · The vocabulary — `data/terrain.json`
@@ -32,7 +32,7 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
 {
   "tile_px": 64,
   "grid": [9, 6],
-  "floor_sheet": "terrain/tileset/Tilemap_color1.png",
+  "floor_sheet": "terrain/tiles/tilemap_1.png",
   "slots": {
     "interior": 10,
     "edge_n": 1, "edge_s": 19, "edge_w": 9, "edge_e": 11,
@@ -40,11 +40,11 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
     "strip_v": [3, 12, 21], "strip_h": [27, 28, 29], "single": 30
   },
   "room_palettes": {
-    "default": "terrain/tileset/Tilemap_color1.png",
-    "boss": "terrain/tileset/Tilemap_color4.png",
-    "treasure": "terrain/tileset/Tilemap_color2.png",
-    "shrine": "terrain/tileset/Tilemap_color3.png",
-    "fountain": "terrain/tileset/Tilemap_color5.png"
+    "default": "terrain/tiles/tilemap_1.png",
+    "boss": "terrain/tiles/tilemap_4.png",
+    "treasure": "terrain/tiles/tilemap_2.png",
+    "shrine": "terrain/tiles/tilemap_3.png",
+    "fountain": "terrain/tiles/tilemap_5.png"
   }
 }
 ```
@@ -71,7 +71,7 @@ row  = index // cols
 rect = (col * px, row * px, px, px)
 ```
 
-Examples on `Tilemap_color1.png` (`cols = 9`, `px = 64`):
+Examples on `tilemap_1.png` (`cols = 9`, `px = 64`):
 
 | slot | index | `index % 9` → col | `index // 9` → row | pixel rect |
 |------|------:|:-----------------:|:------------------:|------------|
@@ -195,7 +195,7 @@ A cell in a room's **leftmost column** (not a corner):
 
 1. `_slot_for(row, col=0, rows, cols)` → `w` is true, `n/s` false →
    returns `slots["edge_w"]` → **`9`**.
-2. `Assets.tile("terrain/tileset/Tilemap_color1.png", 9)`:
+2. `Assets.tile("terrain/tiles/tilemap_1.png", 9)`:
    `col = 9 % 9 = 0`, `row = 9 // 9 = 1` → `rect = (0, 64, 64, 64)` →
    `sheet.subsurface((0, 64, 64, 64)).copy()` — grass on the right ~90 %,
    pixel-art shore fringe + transparent water on the **left** ~10 %.
@@ -210,9 +210,9 @@ direction is a separate authored cell.
 ## 9 · Per-room-kind palettes
 
 `paint_room` starts with `sheet = room_palettes.get(r.kind, floor_sheet)`. The
-`slots` indices are the same for every `Tilemap_colorN.png` (identical layout),
+`slots` indices are the same for every `tilemap_N.png` (identical layout),
 so a boss room bakes exactly the same autotile pattern out of
-`Tilemap_color4.png` and just looks a different colour.
+`tilemap_4.png` and just looks a different colour.
 
 ## 10 · Re-mapping `slots` for a different tileset
 
