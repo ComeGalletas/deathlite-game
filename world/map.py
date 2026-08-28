@@ -60,9 +60,9 @@ class GameMap:
         # is skinned with a decoration rig scaled to its collider; obstacles with
         # no entry (missing tileset / flag off) fall back to a drawn circle.
         self._decos: dict[int, tuple] = {}
-        # Obstacle index -> a soft contact-shadow Surface, scaled to the collider
-        # and squashed for the oblique top-down view (T9). Drawn under the skin.
-        self._obst_shadow: dict[int, pygame.Surface] = {}
+        # (world_x, world_y, radius, surf) per tree -- a soft round canopy shadow
+        # drawn *over* the characters (B3), so anyone under a tree is darkened.
+        self._tree_shadows: list[tuple] = []
         # Non-colliding scenery scatter (T8), resolved at build time. Each
         # instance is (frames, anchor_x, anchor_y, fps, world_x, world_y).
         self._room_decor: dict[int, list[tuple]] = {}   # room id -> interior clutter
@@ -187,15 +187,20 @@ class GameMap:
         return slots["interior"]
 
     @staticmethod
-    def _bridge_slot(horizontal: bool, row: int, col: int,
-                     rows: int, cols: int) -> str:
-        """Which bridge cell a corridor position needs: end caps at the run's
-        extremes, `mid` in between (see data/terrain.json 'bridge')."""
-        if horizontal:
-            return ("h_left" if col == 0 else
-                    "h_right" if col == cols - 1 else "h_mid")
-        return ("v_top" if row == 0 else
-                "v_bot" if row == rows - 1 else "v_mid")
+    def _bridge_slot(axis: str, index: int, ncells: int) -> str:
+        """The bridge tile for cell `index` of an `ncells`-long run. The corridor
+        `axis` ('h' | 'v') fixes the tile family; the two ends get the matching
+        cap (`Corridor.end_low` -> `h_left` / `v_top`, `end_high` -> `h_right` /
+        `v_bot`), everything between gets `mid` (see data/terrain.json 'bridge')."""
+        low, mid, high = (("h_left", "h_mid", "h_right") if axis == "h"
+                          else ("v_top", "v_mid", "v_bot"))
+        if ncells <= 1:
+            return mid
+        if index == 0:
+            return low
+        if index == ncells - 1:
+            return high
+        return mid
 
     def _build_tiles(self) -> None:
         self._tiles_ready = True
@@ -244,29 +249,46 @@ class GameMap:
                         self._shore.append((r.rect.x + col * px, r.rect.y + row * px))
             return surf
 
-        def paint_corridor(rect: pygame.Rect) -> pygame.Surface:
-            horizontal = rect.width >= rect.height
-            cols = max(1, -(-rect.width // px))       # ceil
-            rows = max(1, -(-rect.height // px))
-            surf = pygame.Surface(rect.size, pygame.SRCALPHA)
-            for row in range(rows):
-                for col in range(cols):
-                    if bridge_ok:
-                        name = self._bridge_slot(horizontal, row, col, rows, cols)
-                        tile_surf = cell(b_sheet, b_slots.get(name, b_slots["h_mid"]),
-                                         b_cols)
-                    else:
-                        tile_surf = cell(floor_sheet, interior)
-                    surf.blit(tile_surf, (col * px, row * px))
-                    # Every corridor cell is a shore cell -- foam behind the
-                    # bridge shows through the plank gaps over open water.
-                    self._shore.append((rect.x + col * px, rect.y + row * px))
-            return surf
+        def paint_corridor(c) -> tuple[pygame.Rect, pygame.Surface]:
+            """Bake the plank bridge for corridor `c`. It spans mouth to mouth
+            and **one tile past each mouth into the room**, so the end-cap tile
+            overlaps the room's shoreline tile (the bridge reads as anchored to
+            the shore, not falling short of it) -- not buried at the room centres
+            the collision rect runs between. Returns the blit rect (differs from
+            `c.rect`) and the surface."""
+            lo = self.layout.room(c.room_low).rect
+            hi = self.layout.room(c.room_high).rect
+            if c.axis == "h":
+                span0, span1 = lo.right - px, hi.left + px   # 1 tile into each room
+                ncells = max(2, round((span1 - span0) / px))
+                w, h = ncells * px, px
+                bx = span0 - (w - (span1 - span0)) // 2      # centre the run
+                blit = pygame.Rect(bx, c.rect.y, w, h)
+            else:
+                span0, span1 = lo.bottom - px, hi.top + px
+                ncells = max(2, round((span1 - span0) / px))
+                w, h = px, ncells * px
+                by = span0 - (h - (span1 - span0)) // 2
+                blit = pygame.Rect(c.rect.x, by, w, h)
+            surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            for i in range(ncells):
+                if bridge_ok:
+                    name = self._bridge_slot(c.axis, i, ncells)
+                    tile_surf = cell(b_sheet, b_slots.get(name, b_slots["h_mid"]),
+                                     b_cols)
+                else:
+                    tile_surf = cell(floor_sheet, interior)
+                pos = (i * px, 0) if c.axis == "h" else (0, i * px)
+                surf.blit(tile_surf, pos)
+                # Each plank cell is a shore cell -- foam behind the bridge shows
+                # through the plank gaps over open water.
+                self._shore.append((blit.x + pos[0], blit.y + pos[1]))
+            return blit, surf
 
         for r in self.layout.rooms:
             self._room_surfs[r.id] = paint_room(r)
         for c in self.layout.corridors:
-            self._corr_surfs.append((c.rect.copy(), paint_corridor(c.rect)))
+            self._corr_surfs.append(paint_corridor(c))
 
         # Doorway seam (T9): where a bridge end meets a room edge the two shore
         # rings overlap and foam would bite into the connection. Drop any shore
@@ -321,25 +343,6 @@ class GameMap:
         boost = float(conf.get("size_boost", 1.25))
         resolved: dict[tuple, tuple | None] = {}      # (rig, size) -> entry | None
 
-        # A soft contact shadow (T9), one per distinct collider radius. Scaled
-        # so the source's opaque blob (`shadow_blob` px within the frame) spans
-        # ~2.2 * radius, then squashed to 0.55 h for the oblique view.
-        shadow_src = None
-        if config.TERRAIN_SHADOWS and conf.get("shadow"):
-            shadow_src = a.picture(conf["shadow"])
-        blob = float(conf.get("shadow_blob", 70)) or 70.0
-        shadow_cache: dict[int, pygame.Surface] = {}
-
-        def shadow_for(radius: int) -> pygame.Surface | None:
-            if shadow_src is None:
-                return None
-            if radius not in shadow_cache:
-                s = (2.2 * radius) / blob
-                sw = max(1, round(shadow_src.get_width() * s))
-                sh = max(1, round(shadow_src.get_height() * s * 0.55))
-                shadow_cache[radius] = pygame.transform.smoothscale(shadow_src, (sw, sh))
-            return shadow_cache[radius]
-
         for i, o in enumerate(self.obstacles):
             choices = rig_map.get(o.kind)
             if not choices:
@@ -364,9 +367,34 @@ class GameMap:
             entry = resolved[key]
             if entry is not None:
                 self._decos[i] = entry
-                sh = shadow_for(int(o.radius))
-                if sh is not None:
-                    self._obst_shadow[i] = sh
+
+        if config.TERRAIN_SHADOWS:
+            self._build_tree_shadows(conf)
+
+    def _build_tree_shadows(self, conf: dict) -> None:
+        """A soft round shade patch under every skinned `tree` obstacle. Drawn
+        after the characters (see `draw_tree_shadows`) so a hero / enemy under a
+        tree is slightly obscured -- the only obstacle that casts one."""
+        spec = conf.get("tree_shadow", {})
+        rs = float(spec.get("radius_scale", 1.9))
+        color = tuple(spec.get("color", (12, 18, 22)))[:3]
+        alpha = int(spec.get("alpha", 66))
+        cache: dict[int, pygame.Surface] = {}
+
+        def disc(r: int) -> pygame.Surface:
+            if r not in cache:
+                surf = pygame.Surface((2 * r, 2 * r), pygame.SRCALPHA)
+                # a few concentric fills -> denser at the centre, soft at the rim
+                for k in range(4, 0, -1):
+                    aa = max(1, round(alpha * k / 4 * 0.62))
+                    pygame.draw.circle(surf, (*color, aa), (r, r), r * k / 4)
+                cache[r] = surf
+            return cache[r]
+
+        for i, o in enumerate(self.obstacles):
+            if o.kind == "tree" and i in self._decos:
+                r = max(1, round(o.radius * rs))
+                self._tree_shadows.append((o.pos.x, o.pos.y, r, disc(r)))
 
     def _build_decor_scatter(self, a) -> None:
         """Seeded, non-colliding scenery from `terrain.json` "decorations":
@@ -473,11 +501,24 @@ class GameMap:
 
     # --- render -----------------------------------------------
     def draw(self, surface: pygame.Surface, camera) -> None:
+        """Whole map in one pass: ground, then interior clutter + obstacles
+        unsorted on top. `PlayingState` uses `draw_ground` + `scenery_drawables`
+        instead, so scenery interleaves with the characters by depth."""
+        self.draw_ground(surface, camera)
+        if self.layout is None:
+            return
+        #self._draw_room_clutter(surface, camera)
+        self._draw_obstacles(surface, camera)
+        self.draw_tree_shadows(surface, camera)
+
+    def draw_ground(self, surface: pygame.Surface, camera) -> None:
+        """Terrain only -- water, void scenery, foam, room floors, bridges (or
+        the flat fallback). The depth-sorted layer (`scenery_drawables` +
+        entities) is composited on top by the caller."""
         if not self._tiles_ready:
             self._build_tiles()
 
         ox, oy = camera.pos.x, camera.pos.y
-
         if self.layout is None:
             surface.fill(_VOID)
             floor = pygame.Rect(-ox, -oy, self.width, self.height)
@@ -494,7 +535,30 @@ class GameMap:
                 pygame.draw.rect(surface, _WALL,
                                  r.rect.move(-camera.pos.x, -camera.pos.y), width=3)
 
-        self._draw_obstacles(surface, camera)
+    def scenery_drawables(self, camera) -> list:
+        """`(depth_y, draw_fn)` for every visible interior-clutter decoration and
+        obstacle. `depth_y` is the world y of the sprite's ground contact; the
+        caller merges these with the entities and paints them back-to-front, so
+        a sprite lower on the map overlaps the ones above it and a character
+        standing behind (a lower y than) an obstacle is hidden by it."""
+        if self.layout is None:
+            return []
+        cull = camera.visible_rect().inflate(320, 320)
+        out: list = []
+        """
+        for inst_list in self._room_decor.values():
+            for inst in inst_list:
+                if cull.collidepoint(inst[4], inst[5]):
+                    out.append((inst[5],
+                                lambda s, c=camera, it=inst:
+                                self._blit_one_decor(s, c, it)))
+        """
+        for i, o in enumerate(self.obstacles):
+            if cull.collidepoint(o.pos.x, o.pos.y):
+                out.append((o.pos.y,
+                            lambda s, c=camera, idx=i, ob=o:
+                            self._draw_one_obstacle(s, c, idx, ob)))
+        return out
 
     def _draw_tiled(self, surface, camera) -> None:
         ox, oy = camera.pos.x, camera.pos.y
@@ -522,30 +586,41 @@ class GameMap:
         for r in self.layout.rooms:
             if r.rect.colliderect(view):
                 surface.blit(self._room_surfs[r.id], (r.rect.x - ox, r.rect.y - oy))
-        # ... corridors, so their grass covers the foam at doorways ...
+        # ... corridors last, so their grass covers the foam at doorways.
         for rect, surf in self._corr_surfs:
             if rect.colliderect(view):
                 surface.blit(surf, (rect.x - ox, rect.y - oy))
-        # ... then interior clutter, on the grass, below the entities.
-        if self._room_decor:
-            for r in self.layout.rooms:
-                inst = self._room_decor.get(r.id)
-                if inst and r.rect.colliderect(view):
-                    self._blit_decor(surface, camera, inst, view)
+        # Interior clutter is NOT drawn here -- it is depth-sorted with the
+        # obstacles and the characters (see `scenery_drawables`).
+
+    def draw_room_clutter(self, surface, camera) -> None:
+        """All interior clutter, unsorted -- only the whole-map `draw()` path.
+            Public method so it can be called from outside the class to draw room clutter and don't belong in the depth culling / sorting of the main draw pass.
+        """
+        view = camera.visible_rect()
+        for r in self.layout.rooms:
+            inst = self._room_decor.get(r.id)
+            if inst and r.rect.colliderect(view):
+                self._blit_decor(surface, camera, inst, view)
+
+    def _blit_one_decor(self, surface, camera, inst) -> None:
+        """Blit one `(frames, anchor_x, anchor_y, fps, wx, wy)` scenery instance:
+        current animation frame, base on `(wx, wy)`."""
+        frs, ax, ay, fps, wx, wy = inst
+        ox, oy = camera.pos.x, camera.pos.y
+        frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
+                 if fps else frs[0])
+        surface.blit(frame, (round(wx - ax - ox), round(wy - ay - oy)))
 
     def _blit_decor(self, surface, camera, instances, view=None) -> None:
-        """Blit a list of `(frames, anchor_x, anchor_y, fps, wx, wy)` scenery
-        instances: current animation frame, base at `(wx, wy)`, view-culled."""
-        ox, oy = camera.pos.x, camera.pos.y
+        """View-culled batch blit of scenery instances (void scatter + the
+        unsorted `draw()` clutter path)."""
         if view is None:
             view = camera.visible_rect()
         cull = view.inflate(256, 256)
-        now = pygame.time.get_ticks() * 0.001
-        for frs, ax, ay, fps, wx, wy in instances:
-            if not cull.collidepoint(wx, wy):
-                continue
-            frame = frs[int(now * fps) % len(frs)] if fps else frs[0]
-            surface.blit(frame, (round(wx - ax - ox), round(wy - ay - oy)))
+        for inst in instances:
+            if cull.collidepoint(inst[4], inst[5]):
+                self._blit_one_decor(surface, camera, inst)
 
     def _draw_flat_layout(self, surface, camera) -> None:
         ox, oy = camera.pos.x, camera.pos.y
@@ -556,33 +631,42 @@ class GameMap:
             pygame.draw.rect(surface, _SPECIAL_FLOORS.get(r.kind, _FLOOR),
                              r.rect.move(-ox, -oy))
 
-    def _draw_obstacles(self, surface, camera) -> None:
-        """Each obstacle draws as its scaled decoration sprite (base on the
-        collider centre); obstacles with no resolved rig fall back to a circle."""
+    def _draw_one_obstacle(self, surface, camera, i, o) -> None:
+        """One obstacle: the scaled decoration skin (base on the collider centre),
+        or a fallback circle if no rig resolved. Trees also cast a canopy shadow,
+        but that is a separate late pass (`draw_tree_shadows`)."""
         ox, oy = camera.pos.x, camera.pos.y
+        entry = self._decos.get(i)
+        if entry is not None:
+            ax, ay, fps, frs = entry
+            frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
+                     if fps else frs[0])
+            surface.blit(frame, (round(o.pos.x - ax - ox),
+                                 round(o.pos.y - ay - oy)))
+        else:
+            pygame.draw.circle(surface, o.color,
+                               (int(o.pos.x - ox), int(o.pos.y - oy)), o.radius)
+            pygame.draw.circle(surface, _WALL,
+                               (int(o.pos.x - ox), int(o.pos.y - oy)), o.radius, 2)
+
+    def draw_tree_shadows(self, surface, camera) -> None:
+        """Blit each visible tree's soft canopy shadow. The caller runs this
+        *after* the depth-sorted character layer, so a hero / enemy standing
+        under a tree is gently darkened by its shade."""
+        if not self._tree_shadows:
+            return
+        ox, oy = camera.pos.x, camera.pos.y
+        view = camera.visible_rect().inflate(200, 200)
+        for wx, wy, r, surf in self._tree_shadows:
+            if view.collidepoint(wx, wy):
+                surface.blit(surf, (round(wx - r - ox), round(wy - r - oy)))
+
+    def _draw_obstacles(self, surface, camera) -> None:
+        """Every visible obstacle, unsorted -- only the whole-map `draw()` path."""
         view = camera.visible_rect().inflate(260, 260)
-        decos = self._decos
-        shadows = self._obst_shadow
-        now = pygame.time.get_ticks() * 0.001
         for i, o in enumerate(self.obstacles):
-            if not view.collidepoint(o.pos.x, o.pos.y):
-                continue
-            entry = decos.get(i)
-            if entry is not None:
-                sh = shadows.get(i)
-                if sh is not None:
-                    surface.blit(sh, (round(o.pos.x - sh.get_width() / 2 - ox),
-                                      round(o.pos.y - sh.get_height() / 2
-                                            + o.radius * 0.15 - oy)))
-                ax, ay, fps, frs = entry
-                frame = frs[int(now * fps) % len(frs)] if fps else frs[0]
-                surface.blit(frame, (round(o.pos.x - ax - ox),
-                                     round(o.pos.y - ay - oy)))
-            else:
-                pygame.draw.circle(surface, o.color,
-                                   (int(o.pos.x - ox), int(o.pos.y - oy)), o.radius)
-                pygame.draw.circle(surface, _WALL,
-                                   (int(o.pos.x - ox), int(o.pos.y - oy)), o.radius, 2)
+            if view.collidepoint(o.pos.x, o.pos.y):
+                self._draw_one_obstacle(surface, camera, i, o)
 
     def _draw_grid(self, surface, camera, floor_rect) -> None:
         step = 128

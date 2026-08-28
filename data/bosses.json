@@ -9,6 +9,7 @@
     "reward_currency": 60,
     "color": [180, 40, 70],
     "tags": ["boss"],
+    "sprite": "giant_bat",
     "patterns": [
       {
         "id": "radial_barrage",

@@ -28,7 +28,8 @@ class SpriteMetadataTests(unittest.TestCase):
         cls.meta = get_content().sprites
 
     def test_expected_rigs_present(self):
-        for rig in ("soldier", "orc", "arrow"):
+        for rig in ("hero_aegis", "hero_kestrel", "hero_nihil",
+                    "skull", "arrow"):
             self.assertIn(rig, self.meta)
 
     def test_files_exist(self):
@@ -39,7 +40,7 @@ class SpriteMetadataTests(unittest.TestCase):
                 self.assertTrue((ASSETS_DIR / f).is_file(), f"missing {f}")
 
     def test_strip_width_matches_declared_frame_count(self):
-        for rig in ("soldier", "orc"):
+        for rig in (r for r, m in self.meta.items() if "anims" in m):
             fw, fh = self.meta[rig]["frame"]
             for anim, spec in self.meta[rig]["anims"].items():
                 surf = pygame.image.load(str(ASSETS_DIR / spec["file"]))
@@ -59,41 +60,41 @@ class AssetsLoaderTests(unittest.TestCase):
         self.a = Assets()
 
     def test_slices_every_declared_frame(self):
-        self.assertEqual(len(self.a.frames("soldier", "walk")), 8)
-        self.assertEqual(len(self.a.frames("orc", "death")), 4)
+        self.assertEqual(len(self.a.frames("hero_aegis", "idle")), 8)
+        self.assertEqual(len(self.a.frames("skull", "attack")), 7)
 
     def test_unscaled_frame_is_the_content_crop_size(self):
-        rig = get_content().sprites["orc"]
-        f = self.a.frame("orc", "idle", 0)
+        rig = get_content().sprites["skull"]
+        f = self.a.frame("skull", "idle", 0)
         expect = tuple(rig["content"][2:]) if "content" in rig else tuple(rig["frame"])
         self.assertEqual(f.get_size(), expect)
 
     def test_scaled_frame_matches_requested_size(self):
-        f = self.a.frame("soldier", "walk", 2, size=(48, 48))
+        f = self.a.frame("hero_aegis", "idle", 2, size=(48, 48))
         self.assertIsInstance(f, pygame.Surface)
         self.assertEqual(f.get_size(), (48, 48))
 
     def test_loop_wraps_index(self):
-        self.assertIs(self.a.frame("soldier", "walk", 0),
-                      self.a.frame("soldier", "walk", 8))
+        self.assertIs(self.a.frame("hero_aegis", "idle", 0),
+                      self.a.frame("hero_aegis", "idle", 8))
 
     def test_oneshot_clamps_past_the_end(self):
-        self.assertIs(self.a.frame("soldier", "death", 99),
-                      self.a.frame("soldier", "death", 3))
+        self.assertIs(self.a.frame("hero_aegis", "attack", 99),
+                      self.a.frame("hero_aegis", "attack", 3))
 
     def test_frames_list_is_cached(self):
-        self.assertIs(self.a.frames("orc", "walk", flip=True),
-                      self.a.frames("orc", "walk", flip=True))
+        self.assertIs(self.a.frames("skull", "walk", flip=True),
+                      self.a.frames("skull", "walk", flip=True))
 
     def test_flip_produces_a_distinct_surface(self):
-        normal = self.a.frame("orc", "walk", 0)
-        flipped = self.a.frame("orc", "walk", 0, flip=True)
+        normal = self.a.frame("skull", "walk", 0)
+        flipped = self.a.frame("skull", "walk", 0, flip=True)
         self.assertIsNot(normal, flipped)
         self.assertEqual(normal.get_size(), flipped.get_size())
 
     def test_missing_rig_or_anim_returns_none(self):
         self.assertIsNone(self.a.frame("ghost", "walk", 0))
-        self.assertIsNone(self.a.frames("soldier", "nope"))
+        self.assertIsNone(self.a.frames("hero_aegis", "nope"))
 
     def test_missing_file_returns_none_and_warns_once(self):
         self.a._meta = {"ghost": {"frame": [10, 10],
@@ -142,12 +143,12 @@ class AssetsLoaderTests(unittest.TestCase):
 
     def test_metadata_helpers(self):
         meta = get_content().sprites
-        self.assertEqual(self.a.frame_count("soldier", "idle"), 6)
-        self.assertTrue(self.a.loops("soldier", "walk"))
-        self.assertFalse(self.a.loops("soldier", "death"))
-        self.assertEqual(self.a.anchor("orc"), tuple(meta["orc"]["anchor"]))
-        self.assertEqual(self.a.scale_for("soldier"), tuple(meta["soldier"]["scale"]))
-        self.assertEqual(self.a.face("soldier"), "right")
+        self.assertEqual(self.a.frame_count("hero_aegis", "idle"), 8)
+        self.assertTrue(self.a.loops("hero_aegis", "walk"))
+        self.assertFalse(self.a.loops("hero_aegis", "attack"))
+        self.assertEqual(self.a.anchor("skull"), tuple(meta["skull"]["anchor"]))
+        self.assertEqual(self.a.scale_for("hero_aegis"), tuple(meta["hero_aegis"]["scale"]))
+        self.assertEqual(self.a.face("hero_aegis"), "right")
 
 
 if __name__ == "__main__":

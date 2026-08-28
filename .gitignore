@@ -9,3 +9,7 @@ __pycache__/
 # Runtime save file (per-machine progression)
 save.json
 save.json.*
+
+# Asset cruft (editor sources / OS metadata) -- the game only loads PNGs
+*.aseprite
+.DS_Store

@@ -56,6 +56,10 @@ class Enemy:
         # a primitive). `_hurt_t` drives the flinch anim; `_facing` is +1/-1.
         rig = definition.get("sprite")
         self.anim = Animator(get_assets(), rig) if rig else None
+        # `_hurt_t` drives the hit tint; only switch to a real "hurt" strip if
+        # the rig actually has one (the current packs do not -- the renderer
+        # red-tints the live frame instead).
+        self._has_hurt = self.anim is not None and get_assets().frame_count(rig, "hurt") > 0
         self._hurt_t = 0.0
         self._facing = -1
 
@@ -71,8 +75,9 @@ class Enemy:
         dealt = apply_armor(amount, armor)
         self.hit_flash = 0.08
         if self.anim is not None:
-            self._hurt_t = 0.26                     # ~4 frames @ 14 fps (flinch)
-            self.anim.play("hurt", restart=True)
+            self._hurt_t = 0.26                     # hit-tint window
+            if self._has_hurt:
+                self.anim.play("hurt", restart=True)
         if self.shield_hp > 0.0:
             absorbed = min(self.shield_hp, dealt)
             self.shield_hp -= absorbed
@@ -101,8 +106,8 @@ class Enemy:
         if self.hit_flash > 0.0:
             self.hit_flash = max(0.0, self.hit_flash - dt)
 
+        self._hurt_t = max(0.0, self._hurt_t - dt)
         if self.anim is not None:
-            self._hurt_t = max(0.0, self._hurt_t - dt)
             fdx = ctx.player_pos.x - self.pos.x
             if fdx > 1.0:
                 self._facing = 1
@@ -114,9 +119,17 @@ class Enemy:
     def _anim_name(self) -> str:
         if not self.alive:
             return "death"
-        if self._hurt_t > 0.0:
+        if self._hurt_t > 0.0 and self._has_hurt:
             return "hurt"
+        if self._attacking:
+            return "attack"                 # FSM wind-up + strike / brute slam
         return "walk" if self.vel.length_squared() > 1.0 else "idle"
+
+    @property
+    def _attacking(self) -> bool:
+        return (self.telegraphing
+                or self.ai.get("fs") == "attack"
+                or self.ai.get("slam_state") == "attack")
 
     def _status_damage(self, amount: float, ctx: EnemyContext) -> None:
         if not self.alive:

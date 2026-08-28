@@ -44,13 +44,25 @@ the `Vector2` centre; `room.neighbors` is filled from the tree edges.
 
 ### 1.3 Corridors
 
-One `Corridor(a, b, rect)` per tree edge — a straight axis-aligned rectangle,
-**one tile wide** (`config.TILE_PX`, 64 px; T7), spanning centre-to-centre of
-the two rooms (vertical or horizontal by cell offset). The tiled renderer draws
-it as a directional plank **bridge** over the water (§3.3); the flat renderer
-draws it as a plain `_FLOOR` strip. A 1-wide corridor is deliberate — the bridge
-art is one tile on its short axis — and is accepted as a pinch point for the
-largest enemy colliders (brute r30); revisit if playtests show it bottlenecking.
+One `Corridor` per tree edge — a straight axis-aligned rectangle, **one tile
+wide** (`config.TILE_PX`, 64 px; T7), spanning **centre-to-centre** of the two
+rooms (that overlap into both rooms is what keeps walkability seamless at the
+mouths). Each corridor also records its **bridge edge identity**:
+
+```python
+axis: str          # "h"  -> west/east ends | "v" -> north/south ends
+end_low:  str      # "west"  (h) | "north" (v)  — the edge at the smaller x / y
+end_high: str      # "east"  (h) | "south" (v)  — the edge at the larger  x / y
+room_low, room_high: int   # the room ids those two edges butt against
+```
+
+The tiled renderer uses `axis` + `room_low` / `room_high` to draw a directional
+plank **bridge** whose end-cap tiles land on each room's shoreline tile — the
+bake spans one tile *into* each room so the planks overlap the grass (§3.3); the
+flat renderer draws a plain `_FLOOR` strip along `rect`. A 1-wide corridor is
+deliberate — the bridge art is one tile on its short axis — and is accepted as a
+pinch point for the largest enemy colliders (brute r30); revisit if playtests
+show it bottlenecking.
 
 ### 1.4 Roles & special kinds
 
@@ -67,10 +79,10 @@ Per room, **skipping `start` and `boss`**, a few convex circular colliders:
 
 | kind | radius | blocks projectiles | count rule |
 |------|--------|--------------------|------------|
-| `tree`   | 26 | no  | `rng.randint(3,7)` per combat room |
-| `rock`   | 30 | yes | `10` in an `elite_arena` |
-| `pillar` | 22 | yes | `2` in a shrine/treasure/fountain/altar/merchant |
-| `shrub`  | 18 | no  | |
+| `tree`   | 20 | yes | `rng.randint(3,7)` per combat room |
+| `rock`   | 25 | yes | `10` in an `elite_arena` |
+| `pillar` | 18 | yes | `2` in a shrine/treasure/fountain/altar/merchant |
+| `shrub`  | 14 | no  | |
 
 Kept out of the room's central `min(w,h) * 0.22` disc (spawn / doorway paths)
 and ≥ 46 px from every other obstacle. Each gets a cosmetic
@@ -152,7 +164,7 @@ non-run context.
 
 ### 3.2 Flat renderer — **assetless fallback** (`_draw_flat_layout`)
 
-Triggered when `assets/terrain/tileset/Tilemap_color1.png` (the `floor_sheet`)
+Triggered when `assets/terrain/tiles/tilemap_1.png` (the `floor_sheet`)
 is missing or unreadable. Pure `pygame.draw`:
 
 | element | how |
@@ -176,14 +188,20 @@ circles. Fully playable.
   and blits the tile `_slot_for(row, col, rows, cols)` picks — `corner_*` at the
   four corners, `edge_*` along the sides, `interior` inside — from that room
   kind's palette (`room_palettes[kind]`, e.g. the boss floor is
-  `Tilemap_color4.png`). Perimeter cells are added to `self._shore`.
-- **Corridors** — `paint_corridor(rect)` bakes a **directional plank bridge**
-  from `bridge.sheet` (`Bridge/Bridge_All.png`, its *own* 3-wide grid — passed
-  to `Assets.tile(..., cols=3)`): a horizontal run is `h_left … h_mid … h_right`
-  along its length, a vertical run `v_top … v_mid … v_bot` (`_bridge_slot`).
-  SRCALPHA too — the plank gaps are transparent. **Every** corridor cell is
-  added to `self._shore`, so foam shows through the gaps over open water. No
-  bridge sheet → falls back to the plain `interior` grass tile.
+  `tilemap_4.png`). Perimeter cells are added to `self._shore`.
+- **Corridors** — `paint_corridor(c)` bakes a **directional plank bridge** from
+  `bridge.sheet` (`terrain/bridge/bridge_all.png`, its *own* 3-wide grid — passed to
+  `Assets.tile(..., cols=3)`). The surface spans from **one tile inside
+  `room_low`** to **one tile inside `room_high`** (`edge ∓ tile_px`), *not* the
+  centre-to-centre collision `rect`: the end-cap tiles land on each room's
+  shoreline tile so the planks visibly meet the grass instead of falling short
+  of it or being buried at the room centres. `_bridge_slot(c.axis, i, ncells)` gives the
+  low cap (`h_left` / `v_top`) at cell 0, the high cap (`h_right` / `v_bot`) at
+  the last cell, `h_mid` / `v_mid` between — matching `Corridor.end_low` /
+  `end_high`. SRCALPHA (the plank gaps are transparent); every plank cell is
+  added to `self._shore` so foam shows through the gaps over open water. No
+  bridge sheet → the plain `interior` grass tile. `_corr_surfs` holds
+  `(blit_rect, surface)` — the blit rect is this tight mouth-to-mouth span.
 - **Doorway seam** (T9) — after both rings are collected, any `self._shore` cell
   whose 64 px tile touches *both* a room rect and a corridor rect (inflated by
   `tile_px`) is dropped: the bridge/room junction then reads as solid ground,
@@ -191,11 +209,11 @@ circles. Fully playable.
   (room only) keep their shoreline.
 - Also baked: `self._water_buf` (the `water_tile` tiled into a `SCREEN + 1 tile`
   scroll buffer, opaque `.convert()` — bottom layer, biggest blit); if enabled,
-  `self._foam` (`Water_Foam.png`, 16 frames); `self._decos` + `self._obst_shadow`
-  (one scaled rig + one contact shadow per obstacle — §3.4); and the seeded
+  `self._foam` (`Water_Foam.png`, 16 frames); `self._decos` (one scaled rig per
+  obstacle) + `self._tree_shadows` (a round shade per tree — §3.4); and the seeded
   non-colliding scatter `self._room_decor` / `self._void_decor` (§3.6).
 
-**Composite (per frame), `_draw_tiled`** — bottom to top:
+**Ground pass (per frame), `GameMap.draw_ground` → `_draw_tiled`** — bottom to top:
 
 1. `self._water_buf` blitted at `(-(ox % wt), -(oy % wt))` — the scrolling water
    void (one blit). `water_tile` missing → `surface.fill(_VOID)` instead; the
@@ -208,42 +226,52 @@ circles. Fully playable.
    bridge plank gaps, plus on the open water just outside a room.
 4. each in-view room's baked surface at `room.rect - camera`.
 5. each in-view corridor's baked bridge surface.
-6. **interior clutter** (`self._room_decor`) — pebbles etc. on the grass,
-   per-room, view-culled, below the entities (§3.6).
-7. `_draw_obstacles` — §3.4 (contact shadow, then the skin).
 
-**Per-frame cost** ≈ 1 water blit + ~5 baked-surface blits + ~30–60 foam blits +
-~50 scatter/decoration blits ≈ 1–1.5 ms.
+Interior clutter and obstacles are **not** drawn here — they go in the
+depth-sorted layer (§3.7). `GameMap.draw` (the whole-map convenience used
+outside `PlayingState`) instead follows `draw_ground` with `_draw_room_clutter`
++ `_draw_obstacles`, both unsorted.
+
+**Per-frame cost** ≈ 1 water blit + ~5 baked-surface blits + ~30–60 foam blits
+≈ 1 ms, plus ~50 scatter/decoration blits and the obstacle skins in §3.7.
 
 ### 3.4 Obstacles in each renderer
 
-`_draw_obstacles` is shared:
+`_draw_one_obstacle(surface, camera, i, o)` is shared (looped by
+`_draw_obstacles` for the unsorted path, and wrapped as a depth entry by
+`scenery_drawables` for the sorted one):
 
-- **tiled + `TERRAIN_DECORATIONS`**: each obstacle is skinned with a decoration
+- **tiled + `TERRAIN_DECORATIONS`**: the obstacle is skinned with a decoration
   rig (`obstacle_decor.rigs[kind]`, `Obstacle.variant` picks one of four) scaled
   so the rig's measured `footprint` covers `2 · radius · size_boost` on screen;
   `tree` → the animated `deco_tree_1..4` (8-frame sway), `shrub` → `deco_bush_*`,
-  `rock` / `pillar` → `deco_rock_*`. If `config.TERRAIN_SHADOWS` is on (T9), a
-  soft `Shadow.png` blob — scaled so its opaque core spans `2.2 · radius`,
-  squashed to 0.55 height — is blitted at the collider centre **first**, then the
-  skin frame with its base on the centre.
+  `rock` / `pillar` → `deco_rock_*`. No under-skin shadow — obstacles just blit
+  their frame at the collider centre.
 - **flat renderer, `TERRAIN_DECORATIONS` off, or a decoration rig missing**:
-  the obstacle falls back to the drawn circle from §3.2 (no shadow).
+  the obstacle falls back to the drawn circle from §3.2.
 
 So collision is always the circle; only the *pixels* differ.
+
+**Tree shade (B3).** When `config.TERRAIN_SHADOWS` is on, each skinned `tree`
+gets a soft round patch — a small SRCALPHA surface of concentric translucent
+fills (`obstacle_decor.tree_shadow = {radius_scale, color, alpha}`,
+`R = radius · 1.9`), precomputed once per distinct `R` in `_build_tree_shadows`.
+`draw_tree_shadows` blits it centred on the trunk **after** the depth-sorted
+layer (§3.7), so a hero / enemy standing under a tree is gently darkened. It is
+the only obstacle that casts anything.
 
 ### 3.5 Independent degradation
 
 | missing / off | effect |
 |---|---|
-| `floor_sheet` (`Tilemap_color1.png`) | whole level falls back to §3.2 flat |
+| `floor_sheet` (`tilemap_1.png`) | whole level falls back to §3.2 flat |
 | `water_tile` | tiled rooms still draw; void becomes `surface.fill(_VOID)` |
 | `bridge.sheet` (`Bridge_All.png`) | corridors bake plain `interior` grass instead of planks |
 | `Water_Foam.png` **or** `config.TERRAIN_FOAM = False` | no shoreline foam (autotile edge tiles are the boundary) |
-| a `deco_*` rig / `config.TERRAIN_DECORATIONS = False` | that obstacle draws a circle (and gets no shadow) |
-| `Shadow.png` / `config.TERRAIN_SHADOWS = False` | skins sit flush on the grass, no contact shadow |
+| a `deco_*` rig / `config.TERRAIN_DECORATIONS = False` | that obstacle draws a circle |
+| `config.TERRAIN_SHADOWS = False` | no tree shade patch (nothing else changes) |
 | `config.TERRAIN_DECOR = False` or empty `decorations` | no interior clutter, no void scenery (§3.6) |
-| one `Tilemap_colorN.png` palette | that room kind falls back to `floor_sheet` (`cell()` returns the `probe` tile) |
+| one `tilemap_N.png` palette | that room kind falls back to `floor_sheet` (`cell()` returns the `probe` tile) |
 
 Every flag is independent; hero / enemy / projectile sprites degrade the same
 way — see `README.md` "Assets" and `COMBAT_CALCS.md`.
@@ -265,9 +293,34 @@ per frame. **Nothing here touches `self.obstacles` or `is_walkable`.**
   only where the point *and* ±36 px all fail `_point_ok` (never clipping a
   shore); per-cell `chance`, capped at 240.
 - Instances are `(frames, anchor_x·scale, anchor_y·scale, fps, world_x, world_y)`,
-  resolved once. `_blit_decor` picks the current `get_ticks` frame, blits the
-  base at `(world_x, world_y)`, view-culled. `collision: true` entries are the
-  world generator's job (trees are already obstacles), not this scatter.
+  resolved once. `_blit_one_decor` picks the current `get_ticks` frame and blits
+  the base at `(world_x, world_y)`. `collision: true` entries are the world
+  generator's job (trees are already obstacles), not this scatter.
+
+### 3.7 Depth-sorted layer — scenery + characters interleaved
+
+Obstacles, interior clutter and the characters (hero, enemies, boss, summons,
+death animations) are painted in **one back-to-front pass ordered by
+ground-contact world Y** — so a sprite lower on the map (larger Y) draws over the
+ones above it, and a character standing behind (a *smaller* Y than) a tree is
+hidden by its canopy.
+
+- `GameMap.scenery_drawables(camera)` → `[(depth_y, fn), …]` — one entry per
+  in-view obstacle (`depth_y = o.pos.y`, `fn` = `_draw_one_obstacle`, the skin
+  frame) and per in-view clutter instance (`depth_y = world_y`,
+  `fn` = `_blit_one_decor`).
+- `PlayingState._depth_items()` appends the characters — `depth_y = entity.pos.y`
+  (the sprite anchor sits on `pos`, i.e. the feet) — then `sort`s by `depth_y`
+  (stable: on a tie, scenery < enemies < dying < boss < summons < player).
+- `PlayingState._draw_depth_layer` just calls each `fn(surface)` in order.
+- Immediately after, `GameMap.draw_tree_shadows` blits each visible tree's shade
+  patch — *over* the characters, so anyone under a tree is darkened (§3.4).
+
+Everything else keeps its fixed layer: `draw_ground` under this pass;
+interactables / hazards / gems / explosions between the ground and this pass;
+projectiles, particles, damage numbers, then the HUD on top. `GameMap.draw`
+(non-`PlayingState` callers) still draws clutter + obstacles unsorted, then the
+tree shades.
 
 ---
 
@@ -284,7 +337,7 @@ per frame. **Nothing here touches `self.obstacles` or `is_walkable`.**
 | `room_palettes` | room kind → tilemap path (`default`, `boss`, `treasure`, `shrine`, `fountain`); other kinds use `floor_sheet` |
 | `decorations` | **array** of non-colliding scatter entries `{id, rig, placement, scale, per_room|chance, collision}` — see §3.6 |
 | `obstacle_decor.size_boost` | how much bigger than the collider a skin draws (1.25) |
-| `obstacle_decor.shadow` / `.shadow_blob` | contact-shadow sheet path + the opaque-blob px within its frame (70), for the T9 shadow scaling |
+| `obstacle_decor.tree_shadow` | `{radius_scale, color, alpha}` for the round shade patch each tree casts over the characters (§3.4) |
 | `obstacle_decor.rigs` | obstacle kind → list of interchangeable decoration rig names (`tree` → `deco_tree_*`, `shrub` → `deco_bush_*`, `rock`/`pillar` → `deco_rock_*`) |
 | `rigs` | animation rigs (`deco_bush_1..4`, `deco_rock_1..4`, `deco_tree_1..4`, `deco_water_rock_*`, `deco_duck`, `terrain_foam`): `frame`, `anchor`, `footprint`, `anims.loop = {file, frames, fps, loop}` |
 
@@ -304,15 +357,16 @@ bridge sheet. Returns `None` for a missing sheet or an out-of-range index.
 | layout, room graph, roles | `world/procedural.py` — **identical** | identical |
 | collision, `resolve_movement`, spawn points | `GameMap` — **identical** | identical |
 | camera clamp | `bounds` — **identical** | identical |
-| floor | tinted `pygame.draw.rect` per room / corridor | baked grass `Tilemap_colorN` surface, autotiled edges |
+| floor | tinted `pygame.draw.rect` per room / corridor | baked grass `tilemap_N` surface, autotiled edges |
 | room-kind cue | `_SPECIAL_FLOORS` colour | `room_palettes` tileset (boss = color4, …) |
 | void | `_VOID` fill | scrolling `Water_Background` buffer + water scenery scatter (§3.6) |
 | corridors | plain `_FLOOR` strip, 64 px wide | directional plank **bridge** (`Bridge_All.png`), foam through the gaps |
 | room boundary | 3 px grey `_WALL` rect border | autotile `edge_*` / `corner_*` tiles (+ optional foam), doorway seam trimmed |
 | shoreline foam | — | `Water_Foam` 16-frame animation *behind* the perimeter tiles |
-| obstacles | filled + outlined circle (`Obstacle.color`, `.radius`) | scaled decoration rig (`deco_tree_*` / `deco_bush_*` / `deco_rock_*`) + soft contact shadow; circle if a rig is missing |
+| obstacles | filled + outlined circle (`Obstacle.color`, `.radius`) | scaled decoration rig (`deco_tree_*` / `deco_bush_*` / `deco_rock_*`); circle if a rig is missing. Trees also cast a round shade patch over the characters |
 | interior detail | — | seeded non-colliding clutter on room interiors (§3.6) |
-| draw cost | a few dozen `draw` calls | ~1 water blit + ~5 baked + ~30–60 foam + ~50 scatter ≈ 1–1.5 ms |
+| obstacle / character order | fixed: map first, then all entities | **depth-sorted by feet Y** (§3.7) — a hero above a tree is drawn behind it |
+| draw cost | a few dozen `draw` calls | ~1 water blit + ~5 baked + ~30–60 foam + ~50 scatter + the sort ≈ 1–1.5 ms |
 | config flags | none | `TERRAIN_FOAM`, `TERRAIN_DECORATIONS`, `TERRAIN_DECOR`, `TERRAIN_SHADOWS` (each independent) |
 
 **Guarantee:** an empty `assets/` still boots, generates, and plays every
@@ -347,9 +401,10 @@ of that:
 - **T8** — a data-driven `decorations` registry feeds a seeded non-colliding
   scatter (interior clutter + void water scenery), drawn per frame between the
   water and the terrain / above the terrain (§3.6).
-- **T9** — real animated tree skins for `tree` obstacles, a `Shadow.png` contact
-  shadow under every skin, and a doorway-seam trim so bridge/room junctions read
-  as solid ground.
+- **T9 / B3** — real animated tree skins for `tree` obstacles; a doorway-seam
+  trim so bridge/room junctions read as solid ground; a soft round **tree
+  shade** cast over the characters (B3 replaced the T9 per-obstacle contact
+  shadow).
 
 Blending two room palettes into one surface is now straightforward (the bake
 carries alpha) but not yet done — it would be another `decorations`-style slot

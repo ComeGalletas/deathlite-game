@@ -19,6 +19,8 @@ from combat.damage import apply_armor
 from combat.status import StatusState
 from entities.enemy_ai import EnemyContext
 from game import config
+from game.assets import get_assets
+from systems.animation import Animator
 
 
 class Boss:
@@ -59,11 +61,24 @@ class Boss:
         self.phase_len = 1.4
         self._charge_dir = pygame.Vector2()
 
+        # Sprite animation (same contract as Enemy: idle / walk / attack, no
+        # hurt/death strip -> the renderer red-tints on hit + plays the shared
+        # `dead` poof).
+        rig = definition.get("sprite")
+        self.anim = Animator(get_assets(), rig) if rig else None
+        self._has_hurt = self.anim is not None and get_assets().frame_count(rig, "hurt") > 0
+        self._hurt_t = 0.0
+        self._facing = -1
+
     # --- combat --------------------------------------------------
     def take_damage(self, amount: float, armor: float = 0.0) -> float:
         dealt = apply_armor(amount, armor)
         self.hp -= dealt
         self.hit_flash = 0.06
+        if self.anim is not None:
+            self._hurt_t = 0.22
+            if self._has_hurt:
+                self.anim.play("hurt", restart=True)
         if self.hp <= 0:
             self.hp = 0.0
             self.alive = False
@@ -92,11 +107,29 @@ class Boss:
         self.pattern = self._patterns[self._pattern_index]
         self._enter("telegraph", float(self.pattern.get("telegraph", 0.8)))
 
+    def _anim_name(self) -> str:
+        if not self.alive:
+            return "death"
+        if self._hurt_t > 0.0 and self._has_hurt:
+            return "hurt"
+        if self.phase in ("telegraph", "active"):
+            return "attack"                    # wind-up + the dangerous frames
+        return "walk" if self.vel.length_squared() > 1.0 else "idle"
+
     def update(self, ctx: EnemyContext) -> None:
         dt = ctx.dt
         self.contact_cd = max(0.0, self.contact_cd - dt)
         if self.hit_flash > 0.0:
             self.hit_flash = max(0.0, self.hit_flash - dt)
+        self._hurt_t = max(0.0, self._hurt_t - dt)
+        if self.anim is not None:
+            fdx = ctx.player_pos.x - self.pos.x
+            if fdx > 1.0:
+                self._facing = 1
+            elif fdx < -1.0:
+                self._facing = -1
+            self.anim.play(self._anim_name())
+            self.anim.update(dt)
         self.status.update(dt, lambda amt: self._status_damage(amt, ctx))
         self.contact_damage = self._base_contact
         chill = self.status.speed_multiplier()

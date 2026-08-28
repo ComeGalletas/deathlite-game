@@ -1,36 +1,165 @@
 {
-  "soldier": {
-    "frame": [100, 100],
-    "content": [30, 27, 46, 40],
-    "scale": [69, 60],
-    "anchor": [34, 40],
+  "hero_aegis": {
+    "frame": [192, 192],
+    "content": [43, 44, 120, 112],
+    "scale": [46, 43],
+    "anchor": [22, 35],
     "face": "right",
     "anims": {
-      "idle":   {"file": "sprites/soldier/Soldier_Idle.png",    "frames": 6, "fps": 8,  "loop": true},
-      "walk":   {"file": "sprites/soldier/Soldier_Walk.png",    "frames": 8, "fps": 12, "loop": true},
-      "attack": {"file": "sprites/soldier/Soldier_Attack01.png", "frames": 6, "fps": 16, "loop": false},
-      "hurt":   {"file": "sprites/soldier/Soldier_Hurt.png",    "frames": 4, "fps": 14, "loop": false},
-      "death":  {"file": "sprites/soldier/Soldier_Death.png",   "frames": 4, "fps": 9,  "loop": false}
+      "idle":   {"file": "characters/blue/warrior/idle.png",    "frames": 8, "fps": 8,  "loop": true},
+      "walk":   {"file": "characters/blue/warrior/run.png",     "frames": 6, "fps": 12, "loop": true},
+      "attack": {"file": "characters/blue/warrior/attack1.png", "frames": 4, "fps": 16, "loop": false}
     }
   },
-  "orc": {
-    "frame": [100, 100],
-    "content": [31, 34, 42, 32],
-    "scale": [63, 48],
-    "anchor": [31, 33],
+  "hero_kestrel": {
+    "frame": [192, 192],
+    "content": [53, 46, 87, 90],
+    "scale": [37, 38],
+    "anchor": [16, 38],
     "face": "right",
     "anims": {
-      "idle":  {"file": "sprites/orc/Orc_Idle.png",  "frames": 6, "fps": 8,  "loop": true},
-      "walk":  {"file": "sprites/orc/Orc_Walk.png",  "frames": 8, "fps": 11, "loop": true},
-      "hurt":  {"file": "sprites/orc/Orc_Hurt.png",  "frames": 4, "fps": 14, "loop": false},
-      "death": {"file": "sprites/orc/Orc_Death.png", "frames": 4, "fps": 9,  "loop": false}
+      "idle":   {"file": "characters/yellow/archer/idle.png",  "frames": 6, "fps": 8,  "loop": true},
+      "walk":   {"file": "characters/yellow/archer/run.png",   "frames": 4, "fps": 12, "loop": true},
+      "attack": {"file": "characters/yellow/archer/shoot.png", "frames": 8, "fps": 16, "loop": false}
+    }
+  },
+  "hero_nihil": {
+    "frame": [192, 192],
+    "content": [35, 63, 121, 71],
+    "scale": [56, 33],
+    "anchor": [28, 33],
+    "face": "right",
+    "anims": {
+      "idle":   {"file": "characters/purple/monk/idle.png", "frames": 6,  "fps": 8,  "loop": true},
+      "walk":   {"file": "characters/purple/monk/run.png",  "frames": 4,  "fps": 12, "loop": true},
+      "attack": {"file": "characters/purple/monk/heal.png", "frames": 11, "fps": 18, "loop": false}
+    }
+  },
+  "skull": {
+    "frame": [192, 192], "content": [52, 52, 121, 78], "scale": [56, 36], "anchor": [20, 36], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/skull/idle.png", "frames": 8, "fps": 7, "loop": true},
+      "walk":   {"file": "enemies/skull/run.png", "frames": 6, "fps": 9, "loop": true},
+      "attack": {"file": "enemies/skull/attack.png", "frames": 7, "fps": 14, "loop": false}
+    }
+  },
+  "spider": {
+    "frame": [192, 192], "content": [46, 42, 130, 95], "scale": [37, 27], "anchor": [14, 27], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/spider/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/spider/run.png", "frames": 5, "fps": 12, "loop": true},
+      "attack": {"file": "enemies/spider/attack.png", "frames": 8, "fps": 16, "loop": false}
+    }
+  },
+  "turtle": {
+    "frame": [320, 320], "content": [81, 115, 235, 95], "scale": [150, 61], "anchor": [54, 59], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/turtle/idle.png", "frames": 10, "fps": 6, "loop": true},
+      "walk":   {"file": "enemies/turtle/walk.png", "frames": 7, "fps": 8, "loop": true},
+      "attack": {"file": "enemies/turtle/attack.png", "frames": 10, "fps": 10, "loop": false}
+    }
+  },
+  "bumblebee": {
+    "frame": [192, 192], "content": [47, 1, 102, 154], "scale": [23, 35], "anchor": [12, 34], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/bumblebee/idle.png", "frames": 8, "fps": 10, "loop": true},
+      "walk":   {"file": "enemies/bumblebee/move.png", "frames": 4, "fps": 14, "loop": true},
+      "attack": {"file": "enemies/bumblebee/attack.png", "frames": 11, "fps": 16, "loop": false}
+    }
+  },
+  "slingshot_gnome": {
+    "frame": [192, 192], "content": [61, 70, 98, 67], "scale": [47, 32], "anchor": [20, 32], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/slingshot_gnome/idle.png", "frames": 10, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/slingshot_gnome/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/slingshot_gnome/shoot.png", "frames": 9, "fps": 14, "loop": false}
+    }
+  },
+  "bomb_fish": {
+    "frame": [192, 192], "content": [50, 49, 90, 93], "scale": [50, 52], "anchor": [23, 48], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/bomb_fish/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/bomb_fish/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/bomb_fish/shoot.png", "frames": 7, "fps": 14, "loop": false}
+    }
+  },
+  "panda": {
+    "frame": [256, 256], "content": [28, 70, 224, 134], "scale": [91, 54], "anchor": [39, 41], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/panda/idle.png", "frames": 10, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/panda/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/panda/attack.png", "frames": 13, "fps": 14, "loop": false}
+    }
+  },
+  "bear": {
+    "frame": [256, 256], "content": [28, 30, 196, 167], "scale": [113, 96], "anchor": [57, 85], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/bear/idle.png", "frames": 8, "fps": 7, "loop": true},
+      "walk":   {"file": "enemies/bear/run.png", "frames": 5, "fps": 10, "loop": true},
+      "attack": {"file": "enemies/bear/attack.png", "frames": 9, "fps": 12, "loop": false}
+    }
+  },
+  "gnome": {
+    "frame": [192, 192], "content": [43, 55, 124, 75], "scale": [85, 51], "anchor": [32, 49], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/gnome/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/gnome/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/gnome/attack.png", "frames": 7, "fps": 14, "loop": false}
+    }
+  },
+  "troll": {
+    "frame": [384, 384], "content": [41, 78, 290, 225], "scale": [99, 77], "anchor": [52, 75], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/troll/idle.png", "frames": 12, "fps": 6, "loop": true},
+      "walk":   {"file": "enemies/troll/walk.png", "frames": 10, "fps": 9, "loop": true},
+      "attack": {"file": "enemies/troll/attack.png", "frames": 6, "fps": 10, "loop": false}
+    }
+  },
+  "minotaur": {
+    "frame": [320, 320], "content": [52, 57, 245, 199], "scale": [68, 56], "anchor": [22, 44], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/minotaur/idle.png", "frames": 16, "fps": 7, "loop": true},
+      "walk":   {"file": "enemies/minotaur/walk.png", "frames": 8, "fps": 10, "loop": true},
+      "attack": {"file": "enemies/minotaur/attack.png", "frames": 12, "fps": 14, "loop": false}
+    }
+  },
+  "thief": {
+    "frame": [192, 192], "content": [26, 45, 156, 91], "scale": [64, 37], "anchor": [27, 35], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/thief/idle.png", "frames": 6, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/thief/run.png", "frames": 6, "fps": 12, "loop": true},
+      "attack": {"file": "enemies/thief/attack.png", "frames": 6, "fps": 16, "loop": false}
+    }
+  },
+  "hex_shaman": {
+    "frame": [192, 192], "content": [32, 41, 134, 96], "scale": [57, 41], "anchor": [26, 41], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/hex_shaman/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/hex_shaman/run.png", "frames": 4, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/hex_shaman/attack.png", "frames": 10, "fps": 14, "loop": false}
+    }
+  },
+  "giant_bat": {
+    "frame": [192, 192], "content": [21, 32, 143, 111], "scale": [154, 120], "anchor": [81, 120], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/giant_bat/idle.png", "frames": 6, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/giant_bat/move.png", "frames": 4, "fps": 10, "loop": true},
+      "attack": {"file": "enemies/giant_bat/attack.png", "frames": 7, "fps": 12, "loop": false}
+    }
+  },
+
+  "dead": {
+    "frame": [128, 128], "content": [35, 32, 60, 67], "scale": [39, 44], "anchor": [19, 41], "face": "right",
+    "_note": "shared one-shot death poof for every entity (hero + enemy) -- the packs have no per-creature death strip. dead.png repacked from a 7x2 grid to a 14x1 strip so the loader (horizontal-strip only) slices it right.",
+    "anims": {
+      "loop": {"file": "characters/dead/dead.png", "frames": 14, "fps": 15, "loop": false}
     }
   },
   "arrow": {
     "file": "projectiles/arrow.png",
-    "frame": [32, 32],
-    "content": [6, 12, 21, 9],
-    "scale": [30, 13],
-    "anchor": [15, 6]
+    "frame": [64, 64],
+    "content": [10, 26, 43, 12],
+    "scale": [26, 7],
+    "anchor": [13, 3]
   }
 }

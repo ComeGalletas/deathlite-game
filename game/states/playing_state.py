@@ -14,6 +14,7 @@ import random
 from types import SimpleNamespace
 
 import pygame
+import pygame.gfxdraw
 
 from game import config
 from game.content import get_content
@@ -81,7 +82,12 @@ class PlayingState(State):
         # keep the primitive circle (fallback in `_draw_player`).
         hero_rig = cdef.get("sprite")
         self._hero_anim = Animator(self.game.assets, hero_rig) if hero_rig else None
-        self._death_seq_t: float | None = None   # brief window to play the death anim
+        self._hero_has_hurt = (hero_rig is not None
+                               and self.game.assets.frame_count(hero_rig, "hurt") > 0)
+        # Per-hero accent colour (primitive fallback + any HUD tint); the shared
+        # config default covers characters with no `color`.
+        self._hero_color = tuple(cdef.get("color", config.COLOR_PLAYER))
+        self._death_seq_t: float | None = None   # window held open for the hero death poof
 
         # Meta-progression + equipped items applied before the run starts.
         self._apply_persistent_bonuses()
@@ -110,7 +116,10 @@ class PlayingState(State):
         self.levels = LevelTracker()
 
         self._explosions: list[dict] = []   # transient blast visuals
-        self._dying: list = []              # [enemy, seconds_left] -- death anim only
+        # One-shot death poofs: [Animator("dead"), world_pos, facing]. Any entity
+        # (hero or enemy) that dies pushes one; drawn in the depth layer, dropped
+        # when the animation finishes.
+        self._death_fx: list = []
         self._last_move_dir = pygame.Vector2(1, 0)
         self._awaiting_level_up = False
         self._hurt_flash_t = 0.0
@@ -184,12 +193,9 @@ class PlayingState(State):
         self.stats["time"] += dt
         self._apply_dev_unlimited_hp()
         if not self.player.alive:
-            # If the hero has a death animation, hold the run open briefly so it
-            # can play; otherwise end immediately as before.
-            if self._hero_anim is not None:
-                self._death_seq_t = 0.6
-            else:
-                self._end_run(victory=False)
+            # Hold the run open for the shared death poof, then end.
+            self._spawn_death_fx(self.player.pos, getattr(self.player, "_facing", 1))
+            self._death_seq_t = 1.05
         self._report_debug()
 
     def _apply_dev_unlimited_hp(self) -> None:
@@ -207,12 +213,14 @@ class PlayingState(State):
         if self.dev_mode and self._dev_unlimited_hp:
             # Unlimited HP switched on mid-death-animation: cancel the end.
             self._death_seq_t = None
+            self._death_fx.clear()
             self.player.alive = True
             self.player.hp = max(self.player.hp, self._dev_hp_floor,
                                  self.player.max_hp * 0.5)
             return
         self._death_seq_t -= dt
         self._update_hero_anim(dt)
+        self._update_death_fx(dt)
         self.camera.update(dt, self.player.pos)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
@@ -225,7 +233,7 @@ class PlayingState(State):
         p = self.player
         if not p.alive:
             return "death"
-        if p._hurt_t > 0.0:
+        if p._hurt_t > 0.0 and self._hero_has_hurt:
             return "hurt"
         if p._attack_t > 0.0:
             return "attack"
@@ -274,7 +282,7 @@ class PlayingState(State):
         self._update_summons(dt)
         self._update_hazards(dt)
         self._update_elite_arenas()
-        self._update_dying(dt)
+        self._update_death_fx(dt)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
         self.shake.update(dt)
@@ -693,17 +701,21 @@ class PlayingState(State):
             self.game.events.publish(Events.ENEMY_KILLED, pos=e.pos.copy(),
                                      color=e.color, xp=e.xp_reward, tags=e.tags,
                                      elite=e.is_elite)
-            # A sprited enemy lingers, render-only, to play its death animation.
-            if e.anim is not None:
-                e.anim.play("death", restart=True)
-                self._dying.append([e, 0.42])
+            self._spawn_death_fx(e.pos, getattr(e, "_facing", 1),
+                                 scale=self._ENEMY_DEATH_FX_SCALE)
         self.enemies = survivors
 
-    def _update_dying(self, dt: float) -> None:
-        for entry in self._dying:
-            entry[1] -= dt
-            entry[0].anim.update(dt)
-        self._dying = [en for en in self._dying if en[1] > 0.0]
+    _ENEMY_DEATH_FX_SCALE = 0.55        # enemy death poof at 55% (hero stays 1.0)
+
+    def _spawn_death_fx(self, pos, facing: int = 1, scale: float = 1.0) -> None:
+        self._death_fx.append(
+            [Animator(self.game.assets, "dead", start="loop"),
+             pygame.Vector2(pos), 1 if facing >= 0 else -1, float(scale)])
+
+    def _update_death_fx(self, dt: float) -> None:
+        for fx in self._death_fx:
+            fx[0].update(dt)
+        self._death_fx = [fx for fx in self._death_fx if not fx[0].finished]
 
     def _apply_on_kill_effects(self, enemy) -> None:
         for effect, chance, amount in self.player.blessing_fx.on_kill:
@@ -791,6 +803,8 @@ class PlayingState(State):
     def _on_player_damaged(self, *, amount) -> None:
         self.shake.add(min(0.4, 0.05 + amount * 0.02))
         self._hurt_flash_t = min(0.35, self._hurt_flash_t + 0.12 + amount * 0.01)
+        if amount > 0:
+            self.damage_numbers.add(self.player.pos, amount, incoming=True)
 
     def _on_boss_spawned(self, *, name) -> None:
         self._boss_warning_t = 2.6
@@ -803,6 +817,8 @@ class PlayingState(State):
         self._drop_item(item_level=max(3, int(1 + self.stats["time"] // 60)))
         self.particles.burst(self.boss.pos, self.boss.color, count=60,
                              speed=340, life=0.9)
+        self._spawn_death_fx(self.boss.pos, getattr(self.boss, "_facing", 1),
+                             scale=1.4)          # (mostly unseen -- victory follows)
         self.shake.add(1.0)
         self.game.events.publish(Events.BOSS_KILLED, name=self.boss.name)
         self.boss = None
@@ -861,16 +877,16 @@ class PlayingState(State):
         offset = self.shake.offset
         self.camera.pos -= offset
         try:
-            self.game_map.draw(surface, self.camera)
+            self.game_map.draw_ground(surface, self.camera)
+            self.game_map.draw_room_clutter(surface, self.camera)
             self._draw_interactables(surface)
             self._draw_hazards(surface)
             self._draw_gems(surface)
             self._draw_explosions(surface)
-            self._draw_enemies(surface)
-            self._draw_boss(surface)
-            self._draw_summons(surface)
-            self._draw_projectiles(surface)
-            self._draw_player(surface)
+            self._draw_player_projectiles(surface)     # weapon effects sit behind the characters
+            self._draw_depth_layer(surface)
+            self.game_map.draw_tree_shadows(surface, self.camera)
+            self._draw_hostile_projectiles(surface)    # enemy shots stay on top (danger readability)
             self.particles.draw(surface, self.camera)
             self.damage_numbers.draw(surface, self.camera)
         finally:
@@ -935,15 +951,38 @@ class PlayingState(State):
             surface.blit(surf, (sx - hz.radius, sy - hz.radius))
             pygame.draw.circle(surface, hz.color, (int(sx), int(sy)), int(hz.radius), 2)
 
-    def _draw_summons(self, surface) -> None:
-        for s in self.summons:
-            sx, sy = self.camera.world_to_screen(s.pos)
-            if s.kind == "totem":
-                pygame.draw.rect(surface, s.color,
-                                 (int(sx) - 7, int(sy) - 12, 14, 24), border_radius=3)
-            else:
-                pygame.draw.circle(surface, s.color, (int(sx), int(sy)), 9)
-            pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), 3)
+    def _draw_one_summon(self, surface, s) -> None:
+        sx, sy = self.camera.world_to_screen(s.pos)
+        if s.kind == "totem":
+            pygame.draw.rect(surface, s.color,
+                             (int(sx) - 7, int(sy) - 12, 14, 24), border_radius=3)
+        else:
+            pygame.draw.circle(surface, s.color, (int(sx), int(sy)), 9)
+        pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), 3)
+
+    def _depth_items(self) -> list:
+        """`(depth_y, draw_fn)` for the whole depth-sorted layer -- map scenery
+        (obstacles + interior decorations) plus the characters (hero, enemies,
+        boss, summons) -- sorted back-to-front by ground-contact Y."""
+        items = self.game_map.scenery_drawables(self.camera)
+        for e in self.enemies:
+            items.append((e.pos.y, lambda s, e=e: self._draw_one_enemy(s, e)))
+        for fx in self._death_fx:                  # one-shot death poofs
+            items.append((fx[1].y, lambda s, fx=fx: self._draw_death_fx(s, fx)))
+        if self.boss is not None and self.boss.alive:
+            items.append((self.boss.pos.y, self._draw_boss))
+        for sm in self.summons:
+            items.append((sm.pos.y, lambda s, sm=sm: self._draw_one_summon(s, sm)))
+        items.append((self.player.pos.y, self._draw_player))
+        items.sort(key=lambda t: t[0])
+        return items
+
+    def _draw_depth_layer(self, surface) -> None:
+        """Paint the depth-sorted layer: a sprite lower on the map draws over the
+        ones above it, so a character standing behind (a smaller Y than) a tree
+        is hidden by its canopy."""
+        for _, fn in self._depth_items():
+            fn(surface)
 
     def _draw_gems(self, surface) -> None:
         for gem in self.gems:
@@ -960,12 +999,16 @@ class PlayingState(State):
 
     _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
                     "shock": (255, 230, 120)}
+    _HIT_TINT = (150, 30, 30)
 
-    def _draw_enemies(self, surface) -> None:
-        for e in self.enemies:
-            self._draw_one_enemy(surface, e)
-        for entry in self._dying:                 # render-only death animations
-            self._draw_enemy_sprite(surface, entry[0])
+    @classmethod
+    def _hit_tinted(cls, frame):
+        """A red-tinted copy of a sprite frame -- the damage flash for rigs with
+        no `hurt` strip. `BLEND_RGBA_ADD` brightens toward red and leaves the
+        alpha silhouette intact (transparent pixels stay transparent)."""
+        out = frame.copy()
+        out.fill((*cls._HIT_TINT, 0), special_flags=pygame.BLEND_RGBA_ADD)
+        return out
 
     def _draw_one_enemy(self, surface, e) -> None:
         sx, sy = self.camera.world_to_screen(e.pos)
@@ -1000,6 +1043,19 @@ class PlayingState(State):
             pygame.draw.circle(surface, config.COLOR_DEBUG,
                                (int(sx), int(sy)), int(e.radius), 1)
 
+    def _draw_death_fx(self, surface, fx) -> None:
+        anim, pos, facing, scale = fx
+        assets = self.game.assets
+        bw, bh = assets.scale_for("dead")
+        size = (max(1, round(bw * scale)), max(1, round(bh * scale)))
+        frame = anim.frame(size=size,
+                           flip=(facing < 0 and assets.face("dead") == "right"))
+        if frame is None:
+            return
+        ax, ay = assets.anchor("dead")
+        sx, sy = self.camera.world_to_screen(pos)
+        surface.blit(frame, (int(sx - ax * scale), int(sy - ay * scale)))
+
     def _draw_enemy_sprite(self, surface, e) -> None:
         assets = self.game.assets
         rig = e.anim.rig
@@ -1009,6 +1065,8 @@ class PlayingState(State):
         if frame is None:                        # sprite file missing -> primitive
             pygame.draw.circle(surface, e.color, (int(sx), int(sy)), int(e.radius))
             return
+        if e._hurt_t > 0.0:
+            frame = self._hit_tinted(frame)     # red flash, no pop to a circle
         ax, ay = assets.anchor(rig)
         surface.blit(frame, (sx - ax, sy - ay))
 
@@ -1017,10 +1075,22 @@ class PlayingState(State):
         if b is None or not b.alive:
             return
         sx, sy = self.camera.world_to_screen(b.pos)
-        colour = (255, 255, 255) if b.hit_flash > 0 else b.color
-        pygame.draw.circle(surface, colour, (int(sx), int(sy)), int(b.radius))
-        pygame.draw.circle(surface, (255, 210, 210), (int(sx), int(sy)),
-                           int(b.radius), 3)
+        assets = self.game.assets
+        frame = None
+        if b.anim is not None:
+            rig = b.anim.rig
+            frame = b.anim.frame(size=assets.scale_for(rig),
+                                 flip=(b._facing < 0 and assets.face(rig) == "right"))
+        if frame is not None:
+            if b._hurt_t > 0.0:
+                frame = self._hit_tinted(frame)
+            ax, ay = assets.anchor(rig)
+            surface.blit(frame, (int(sx - ax), int(sy - ay)))
+        else:
+            colour = (255, 255, 255) if b.hit_flash > 0 else b.color
+            pygame.draw.circle(surface, colour, (int(sx), int(sy)), int(b.radius))
+            pygame.draw.circle(surface, (255, 210, 210), (int(sx), int(sy)),
+                               int(b.radius), 3)
         if b.phase == "telegraph":
             pid = b.pattern.get("id")
             frac = b.telegraph_fraction
@@ -1039,12 +1109,34 @@ class PlayingState(State):
 
     _HOSTILE_ARROW_TINT = (150, 26, 12)
 
-    def _draw_projectiles(self, surface) -> None:
-        # Player projectiles: unchanged glow dots.
+    def _draw_player_projectiles(self, surface) -> None:
+        cam = self.camera
         for p in self.projectiles:
-            sx, sy = self.camera.world_to_screen(p.pos)
-            pygame.draw.circle(surface, p.color, (int(sx), int(sy)), max(2, int(p.radius)))
+            sx, sy = cam.world_to_screen(p.pos)
+            if p.cone_half_angle > 0.0:
+                self._draw_cone(surface, sx, sy, p)     # reaping arc = a sector, not a circle
+            else:
+                pygame.draw.circle(surface, p.color, (int(sx), int(sy)),
+                                   max(2, int(p.radius)))
 
+    @staticmethod
+    def _draw_cone(surface, cx: float, cy: float, p) -> None:
+        """Draw the exact region `_resolve_projectile_hits` / `_in_cone` test:
+        a circular **sector** with apex at the player, radius `p.radius`, spanning
+        `cone_dir ± cone_half_angle`. (Was a full circle -- the wrong shape.)"""
+        r = max(2.0, float(p.radius))
+        base = math.atan2(p.cone_dir.y, p.cone_dir.x)
+        half = float(p.cone_half_angle)
+        steps = max(2, int(math.degrees(half) / 4))
+        pts = [(int(cx), int(cy))]
+        for i in range(steps + 1):
+            a = base - half + (2.0 * half) * i / steps
+            pts.append((int(cx + math.cos(a) * r), int(cy + math.sin(a) * r)))
+        col = tuple(p.color)
+        pygame.gfxdraw.filled_polygon(surface, pts, (*col, 70))
+        pygame.gfxdraw.aapolygon(surface, pts, (*col, 210))
+
+    def _draw_hostile_projectiles(self, surface) -> None:
         # Enemy / boss shots: a rotated arrow (falls back to a dot if the
         # sprite is missing). Rotation is cached in 8-degree buckets.
         assets = self.game.assets
@@ -1061,6 +1153,8 @@ class PlayingState(State):
                                    max(3, int(p.radius)))
 
     def _draw_player(self, surface) -> None:
+        if not self.player.alive:
+            return                              # the death poof (_death_fx) stands in
         sx, sy = self.camera.world_to_screen(self.player.pos)
 
         frame = self._hero_sprite_frame()
@@ -1068,12 +1162,14 @@ class PlayingState(State):
             # `anchor` is the pixel in the final sprite that sits on the world
             # position (bottom-centre-ish -- the art is bottom-heavy).
             ax, ay = self.game.assets.anchor(self._hero_anim.rig)
+            if self.player._hurt_t > 0.0:
+                frame = self._hit_tinted(frame)
             surface.blit(frame, (sx - ax, sy - ay))
             if self.player.invulnerable:
                 pygame.draw.circle(surface, (255, 120, 120), (sx, sy),
                                    self.player.radius + 4, width=2)
         else:
-            body = (255, 120, 120) if self.player.invulnerable else config.COLOR_PLAYER
+            body = (255, 120, 120) if self.player.invulnerable else self._hero_color
             pygame.draw.circle(surface, body, (sx, sy), self.player.radius)
             pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
                                self.player.radius, width=2)

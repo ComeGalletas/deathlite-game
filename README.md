@@ -3,12 +3,11 @@
 An original 2D action roguelite / bullet-heaven built with Python + Pygame.
 Inspired by the genre (time-survival, auto-attacks, XP, level-up choices,
 roguelite progression). All game *content* — design, code, data, and the
-procedurally synthesised sound effects — is original. The character **sprites**
-(hero, basic enemy, enemy arrows), the **terrain** tileset, and the optional
-**title-screen art** come from third-party packs; see
-[`assets/CREDITS.md`](assets/CREDITS.md). Everything not yet sprited still draws
-as a primitive shape, and every asset layer degrades cleanly when a file is
-absent.
+procedurally synthesised sound effects — is original. **All art** (heroes, every
+enemy + the boss, terrain, props) is from the **"Tiny Swords" pack by Pixel
+Frog**; the standalone title-screen illustration is separate — see
+[`assets/CREDITS.md`](assets/CREDITS.md). Every sprite is an optional layer over
+a primitive fallback, so the game runs with an empty `assets/`.
 
 ## Requirements
 
@@ -41,11 +40,11 @@ python main.py
 python -m unittest discover -s tests -v
 ```
 
-340 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+351 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
-terrain tiling / bridge corridors / the decoration scatter / obstacle skins +
-contact shadows, the start menu + options screen, developer mode, the per-hit
-damage model, and the interactables.
+terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
+depth-sorted rendering, the start menu + options screen, developer mode, the
+per-hit damage model, and the interactables.
 
 ## Controls
 
@@ -77,7 +76,7 @@ A keyboard-navigated menu: **Start new game** → hero select → run; **Start n
 developer mode game** (a stub — selecting it does nothing yet); **Options**;
 **Exit**. Options holds the **master volume** (← → in 5% steps), a **mute**
 toggle, and the entry point into the **Sanctuary** — all persisted to
-`save.json` immediately. If `assets/title screen.png` exists it fills the screen
+`save.json` immediately. If `assets/ui/title.png` exists it fills the screen
 as the backdrop (with a translucent panel behind the menu for legibility);
 without it the screen is plain black with the title as white text. The game
 instructions sit in their own smaller column to the left of the menu.
@@ -104,11 +103,11 @@ deathlite-game/
 ├── ui/                 hud, level-up panel, damage numbers
 ├── data/               JSON content (weapons, enemies, bosses, characters,
 │                       blessings, items, meta_upgrades, sprites, terrain)
-├── assets/             sprites/ (Soldier, Orc), projectiles/ (arrow),
-│                       terrain/ (tileset + decorations), buildings/, fx/,
-│                       aseprite/ (sources), title screen.png (optional),
-│                       CREDITS.md
-└── tests/              340 tests: pure logic + headless integration
+├── assets/             characters/<colour>/<unit>/, enemies/<mob>/,
+│                       projectiles/, terrain/{tiles,bridge,props,resources}/,
+│                       buildings/, effects/, ui/title.png, CREDITS.md
+│                       (PNG sprites only — see assets/CREDITS.md)
+└── tests/              351 tests: pure logic + headless integration
 ```
 
 ## Content
@@ -130,19 +129,21 @@ deathlite-game/
 - XP / leveling with a weighted 3-choice upgrade & blessing screen
 - Phase-based spawn director with independent difficulty knobs
 - Procedurally synthesised sound effects (no audio files)
-- Animated sprites for the first hero (**Aegis**) and the basic enemy
-  (**chaser**); enemy shots render as rotated arrows. Everything else draws as a
-  primitive shape — a data-driven `if sprite: … else: shape` layer, so the game
-  is fully playable with an empty `assets/`
+- Animated sprites for all 3 heroes, all 13 enemies + the boss, and enemy shots;
+  a red hit-tint and a shared skull death-poof stand in for the missing
+  hurt/death strips. A data-driven `if sprite: … else: shape` layer keeps the
+  game fully playable with an empty `assets/`
 - **Tiled terrain**: procedural rooms rendered as a grass tileset with autotile
   edges over a tiled water void; corridors are directional plank **bridges**;
   animated shoreline foam sits *behind* the terrain and shows through the
   transparent tile fringes and the bridge plank gaps. A seeded, data-driven
   **decoration scatter** adds non-colliding clutter on room interiors and water
   scenery (rocks, a duck) on the open water. Every circular obstacle draws as a
-  decoration sprite (animated tree / bush / rock) with a soft contact shadow,
-  scaled to its collider. Each layer is a `config` flag and the whole thing
-  falls back to flat coloured rects + drawn circles if the tileset is absent
+  decoration sprite (animated tree / bush / rock) scaled to its collider; trees
+  also cast a soft round shade over the characters. Obstacles, clutter and the
+  characters are painted back-to-front by ground-contact Y, so the hero walks
+  *behind* a tree when above it. Each layer is a `config` flag and the whole
+  thing falls back to flat coloured rects + drawn circles if the tileset is absent
 - Object pooling, spatial-grid collision, configurable entity caps, F1 debug
   overlay with per-system timings + the run seed
 
@@ -164,20 +165,23 @@ Sprites are an optional cosmetic layer over the primitive renderer. Metadata
 `anchor`) lives in `data/sprites.json`; `game/assets.py` loads and caches
 frames (sliced, scaled, flipped, rotated — all memoised), and returns `None`
 for a missing file so the caller falls back to a shape. A character opts in via
-a `"sprite"` key in its data (`aegis` → `soldier`, `chaser` → `orc`).
+a `"sprite"` key in its data.
 
-Currently sprited: **Aegis** (idle / walk / attack / hurt / death, flips by
-facing), the **chaser** enemy (walk / hurt / death, with a brief render-only
-"dying" phase for the death animation), and **enemy/boss projectiles** (a
-rotated, tinted arrow). Kestrel, Nihil, the other 12 enemies, the boss, XP gems
-and the HUD still draw as shapes. **Obstacles** are skinned by the terrain
-decoration rigs (below), not `sprites.json`.
+Currently sprited: all **3 heroes** (Aegis = blue Warrior, Kestrel = yellow
+Archer, Nihil = purple Monk), **all 13 enemy variants + the boss**, and the
+enemy-shot arrow. The pack ships no `hurt` / `death` strips, so on a hit the live
+frame is **red-tinted** in place (no pop to a circle) and on death *any* entity
+plays one shared one-shot **skull poof** (`characters/dead/dead.png`; enemy poof
+at 55 %, hero at full size). Each hero's `color` in `data/characters.json` is its
+primitive-fallback tint. Only XP gems and the HUD still draw as shapes.
+**Obstacles** are skinned by the terrain decoration rigs (below), not
+`sprites.json`. See `assets/CREDITS.md` for the pack layout.
 
 The **world** is tiled from `data/terrain.json` — a slot table (which sheet
 index is the interior / edge / corner tile), a `bridge` block (the corridor
 plank autotile), a `decorations` array (the non-colliding scatter registry), an
 `obstacle_decor` map (obstacle kind → decoration rigs + a size boost + the
-contact-shadow sheet), and the rigs themselves (each with a measured
+tree-shade params), and the rigs themselves (each with a measured
 `footprint`). `GameMap` pre-renders each static room to one **SRCALPHA** surface
 (autotile edges baked in, transparent water side preserved) and each corridor to
 a directional plank bridge, tiles the water void into a screen-sized buffer,
@@ -186,13 +190,14 @@ and bridge gaps, scatters seeded non-colliding clutter (`pebble_*` on interiors,
 `water_rock_*` / `duck` on the open water), and skins each circular obstacle with
 a decoration sprite scaled so its footprint covers the collider (`tree` →
 animated `deco_tree_*`, `shrub` → bushes, `rock`/`pillar` → rocks; the
-`Obstacle.variant` picks which of four) plus a soft `Shadow.png` contact shadow.
+`Obstacle.variant` picks which of four). Trees additionally cast a soft round
+shade that is drawn over the hero / enemies, so standing under one darkens you.
 Every layer is a `config` flag (`TERRAIN_FOAM`, `TERRAIN_DECORATIONS`,
 `TERRAIN_DECOR`, `TERRAIN_SHADOWS`) and the whole terrain degrades to the flat
 renderer (drawn circles) if the tileset is missing.
 
 The **start menu** is the one screen with its own palette (`config.MENU_*`):
-black background, white text. `Assets.picture()` loads `assets/title screen.png`
+black background, white text. `Assets.picture()` loads `assets/ui/title.png`
 (if present) and it's scaled to fill the screen as a backdrop, with a
 translucent scrim (`config.MENU_SCRIM`) behind the option list. No file → the
 `config.TITLE` string is drawn as the fallback and the screen stays plain black.

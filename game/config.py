@@ -43,8 +43,9 @@ TERRAIN_DECORATIONS: bool = True
 # water scenery (rocks / a duck) in the void. Purely cosmetic -- no effect on
 # walkability. Data-driven from data/terrain.json "decorations".
 TERRAIN_DECOR: bool = True
-# Soft contact shadow (Shadow.png) under every skinned obstacle (terrain T9).
-# Needs TERRAIN_DECORATIONS on. Off -> sprites sit flush on the grass.
+# Soft round canopy shadow cast on the ground by each tree, drawn *over* the
+# characters so a hero / enemy standing under a tree is slightly darkened
+# (terrain B3). Needs TERRAIN_DECORATIONS on. Off -> no tree shade.
 TERRAIN_SHADOWS: bool = True
 
 # --- Colours (RGB) ---------------------------------------------------------
@@ -57,6 +58,7 @@ COLOR_TEXT = (230, 230, 238)
 COLOR_TEXT_DIM = (150, 150, 165)
 COLOR_ACCENT = (255, 205, 90)
 COLOR_DEBUG = (120, 255, 140)
+COLOR_DAMAGE_IN = (235, 70, 70)      # damage the hero takes -- floating red numbers
 
 # --- Start menu ----------------------------------------------------------
 # The start screen has its own black / white palette; every other screen
@@ -65,10 +67,9 @@ MENU_BG = (0, 0, 0)
 MENU_FG = (255, 255, 255)
 MENU_FG_DIM = (170, 170, 170)
 # Optional full-screen title art, drawn over the fallback title text (the text
-# shows only when this file is missing). A PNG at the root of assets/ -- the
-# space in the name is intentional. MENU_SCRIM is a translucent panel (RGBA)
+# shows only when this file is missing). MENU_SCRIM is a translucent panel (RGBA)
 # laid over the art behind the option list so the white text stays readable.
-MENU_TITLE_IMAGE: str = "title screen.png"
+MENU_TITLE_IMAGE: str = "ui/title.png"
 MENU_SCRIM = (0, 0, 0, 205)
 
 # --- Audio ---------------------------------------------------------------
