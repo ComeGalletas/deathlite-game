@@ -35,6 +35,7 @@ class MenuState(State):
         self._options: list[tuple[str, str | None]] = [
             ("Start new game", "start"),
             ("Start new developer mode game", "dev_start"),
+            ("Rankings", "rankings"),
             ("Options", "options"),
             ("Exit", "exit"),
         ]
@@ -72,6 +73,9 @@ class MenuState(State):
             from game.states.character_select_state import CharacterSelectState
             self.game.state_machine.change(CharacterSelectState(self.game),
                                            dev=(action == "dev_start"))
+        elif action == "rankings":
+            from game.states.rankings_state import RankingsState
+            self.game.state_machine.change(RankingsState(self.game))
         elif action == "options":
             from game.states.options_state import OptionsState
             self.game.state_machine.change(OptionsState(self.game))

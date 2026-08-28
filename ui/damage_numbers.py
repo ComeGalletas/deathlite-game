@@ -38,19 +38,23 @@ class DamageNumber:
 class DamageNumbers:
     def __init__(self, max_numbers: int = config.MAX_DAMAGE_NUMBERS) -> None:
         self._pool: Pool[DamageNumber] = Pool(DamageNumber, max_numbers, prefill=32)
-        self._font: pygame.font.Font | None = None
-        self._font_crit: pygame.font.Font | None = None
-        self._font_in: pygame.font.Font | None = None
+        self._font_cache: dict[int, tuple] = {}   # zoom-key -> (common, crit, incoming)
 
     def __len__(self) -> int:
         return len(self._pool)
 
-    def _fonts(self):
-        if self._font is None:
-            self._font = pygame.font.SysFont("arialrounded", _BASE_PT, bold=True)
-            self._font_crit = pygame.font.SysFont("arialrounded", _CRIT_PT, bold=True)
-            self._font_in = pygame.font.SysFont("arialrounded", _IN_PT, bold=True)
-        return self._font, self._font_crit, self._font_in
+    def _fonts(self, zoom: float = 1.0):
+        """The (common, crit, incoming) font trio, sized for the camera zoom so
+        world-space numbers scale with everything else. Cached per zoom."""
+        key = max(1, round(zoom * 100))
+        trio = self._font_cache.get(key)
+        if trio is None:
+            def f(pt):
+                return pygame.font.SysFont("arialrounded",
+                                           max(6, round(pt * zoom)), bold=True)
+            trio = (f(_BASE_PT), f(_CRIT_PT), f(_IN_PT))
+            self._font_cache[key] = trio
+        return trio
 
     def add(self, pos: pygame.Vector2, amount: float, crit: bool = False,
             incoming: bool = False) -> None:
@@ -69,7 +73,7 @@ class DamageNumbers:
         self._pool.sweep()
 
     def draw(self, surface: pygame.Surface, camera) -> None:
-        font, font_crit, font_in = self._fonts()
+        font, font_crit, font_in = self._fonts(getattr(camera, "zoom", 1.0))
         for n in self._pool:
             frac = max(0.0, min(1.0, n.life / n.max_life))
             if n.incoming:

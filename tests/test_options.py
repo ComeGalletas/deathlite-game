@@ -37,8 +37,8 @@ class MenuWiringTests(unittest.TestCase):
     def test_menu_options_entry_opens_options_state(self):
         game = _game()
         game.state_machine.change(MenuState(game))
-        _key(game, pygame.K_DOWN)
-        _key(game, pygame.K_DOWN)                       # -> Options
+        for _ in range(3):
+            _key(game, pygame.K_DOWN)                   # -> Options
         _key(game, pygame.K_RETURN)
         self.assertIsInstance(game.state_machine.current, OptionsState)
 

@@ -18,10 +18,16 @@ class CharacterSelectState(State):
         self.content = get_content()
         self.ids = list(self.content.characters.keys())
         self.index = 0
+        # Per-run difficulty (never persisted). Up / Down cycles it.
+        self.diff_index = config.DIFFICULTY_ORDER.index(config.DIFFICULTY_DEFAULT)
         self._title = pygame.font.SysFont("georgia", 44, bold=True)
         self._name = pygame.font.SysFont("georgia", 30, bold=True)
         self._body = pygame.font.SysFont("georgia", 20)
         self._hint = pygame.font.SysFont("georgia", 16)
+
+    @property
+    def difficulty(self) -> str:
+        return config.DIFFICULTY_ORDER[self.diff_index]
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.KEYDOWN:
@@ -30,10 +36,15 @@ class CharacterSelectState(State):
             self.index = (self.index - 1) % len(self.ids)
         elif event.key in (pygame.K_RIGHT, pygame.K_d):
             self.index = (self.index + 1) % len(self.ids)
+        elif event.key in (pygame.K_UP, pygame.K_w):
+            self.diff_index = (self.diff_index - 1) % len(config.DIFFICULTY_ORDER)
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.diff_index = (self.diff_index + 1) % len(config.DIFFICULTY_ORDER)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             from game.states.playing_state import PlayingState
             self.game.state_machine.change(PlayingState(self.game),
                                            character_id=self.ids[self.index],
+                                           difficulty=self.difficulty,
                                            dev=self._dev)
         elif event.key == pygame.K_ESCAPE:
             from game.states.menu_state import MenuState
@@ -77,9 +88,14 @@ class CharacterSelectState(State):
                 surf = self._body.render(line, True, colour)
                 surface.blit(surf, surf.get_rect(midtop=(rect.centerx, y + 66 + j * 24)))
 
-        hint = self._hint.render("Left / Right to choose    -    ENTER to begin    -    ESC back",
-                                 True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, y + card_h + 44)))
+        diff_label = config.DIFFICULTY_LABELS[self.difficulty]
+        diff = self._name.render(f"Difficulty:  {diff_label}", True, config.COLOR_ACCENT)
+        surface.blit(diff, diff.get_rect(center=(cx, y + card_h + 30)))
+
+        hint = self._hint.render(
+            "Left / Right hero    -    Up / Down difficulty    -    ENTER begin    -    ESC back",
+            True, config.COLOR_TEXT_DIM)
+        surface.blit(hint, hint.get_rect(center=(cx, y + card_h + 62)))
 
     def _weapon_name(self, wid: str) -> str:
         return self.content.weapons.get(wid, {}).get("name", wid)

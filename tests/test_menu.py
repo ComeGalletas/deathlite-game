@@ -44,13 +44,14 @@ class MenuNavigationTests(unittest.TestCase):
         self.assertEqual([label for label, _ in menu._options], [
             "Start new game",
             "Start new developer mode game",
+            "Rankings",
             "Options",
             "Exit",
         ])
 
     def test_down_moves_and_wraps(self):
         game, menu = _menu()
-        for expected in (1, 2, 3, 0):
+        for expected in (1, 2, 3, 4, 0):
             _key(game, pygame.K_DOWN)
             self.assertEqual(menu._index, expected)
 
@@ -90,17 +91,26 @@ class MenuNavigationTests(unittest.TestCase):
         _key(game, pygame.K_RETURN)                     # -> Start new game
         self.assertFalse(game.state_machine.current._dev)
 
-    def test_options_entry_opens_options_state(self):
+    def test_rankings_entry_opens_rankings_state(self):
+        from game.states.rankings_state import RankingsState
         game, menu = _menu()
         _key(game, pygame.K_DOWN)
-        _key(game, pygame.K_DOWN)                       # -> Options
-        self.assertEqual(menu._index, 2)
+        _key(game, pygame.K_DOWN)                       # -> Rankings
+        self.assertEqual(menu._options[menu._index][0], "Rankings")
+        _key(game, pygame.K_RETURN)
+        self.assertIsInstance(game.state_machine.current, RankingsState)
+
+    def test_options_entry_opens_options_state(self):
+        game, menu = _menu()
+        for _ in range(3):
+            _key(game, pygame.K_DOWN)                   # -> Options
+        self.assertEqual(menu._index, 3)
         _key(game, pygame.K_RETURN)
         self.assertIsInstance(game.state_machine.current, OptionsState)
 
     def test_exit_entry_quits(self):
         game, menu = _menu()
-        for _ in range(3):
+        for _ in range(4):
             _key(game, pygame.K_DOWN)                   # -> Exit
         self.assertEqual(menu._options[menu._index][0], "Exit")
         _key(game, pygame.K_RETURN)
@@ -191,6 +201,56 @@ class MenuInstructionsLayoutTests(unittest.TestCase):
         finally:
             logging.disable(logging.NOTSET)
             config.MENU_TITLE_IMAGE = original
+
+
+class CharacterSelectDifficultyTests(unittest.TestCase):
+    """Phase 4 D3: the run's difficulty is picked here (per run, not persisted).
+    Up / Down cycles it; the choice is forwarded into PlayingState."""
+
+    def _select(self):
+        game, menu = _menu()
+        _key(game, pygame.K_RETURN)                 # -> character select
+        cs = game.state_machine.current
+        assert isinstance(cs, CharacterSelectState)
+        return game, cs
+
+    def test_defaults_to_normal(self):
+        _, cs = self._select()
+        self.assertEqual(cs.difficulty, config.DIFFICULTY_DEFAULT)
+
+    def test_down_and_up_cycle_the_difficulty(self):
+        game, cs = self._select()
+        _key(game, pygame.K_DOWN)
+        self.assertEqual(cs.difficulty, "fast")
+        _key(game, pygame.K_DOWN)
+        self.assertEqual(cs.difficulty, "super_fast")
+        _key(game, pygame.K_DOWN)
+        self.assertEqual(cs.difficulty, "normal")   # wraps
+        _key(game, pygame.K_UP)
+        self.assertEqual(cs.difficulty, "super_fast")
+
+    def test_left_right_still_change_hero_not_difficulty(self):
+        game, cs = self._select()
+        before = cs.difficulty
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(cs.index, 1)
+        self.assertEqual(cs.difficulty, before)
+
+    def test_choice_reaches_the_playing_state(self):
+        from game.states.playing_state import PlayingState
+        game, cs = self._select()
+        _key(game, pygame.K_DOWN)                   # -> fast
+        _key(game, pygame.K_RETURN)                 # begin
+        run = game.state_machine.current
+        self.assertIsInstance(run, PlayingState)
+        self.assertEqual(run.difficulty, "fast")
+        self.assertEqual(run.director.difficulty, "fast")
+
+    def test_draw_runs_headless_for_every_difficulty(self):
+        game, cs = self._select()
+        for _ in config.DIFFICULTY_ORDER:
+            cs.draw(game.screen)                    # must not raise
+            _key(game, pygame.K_DOWN)
 
 
 if __name__ == "__main__":

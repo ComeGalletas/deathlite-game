@@ -165,9 +165,6 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
     boss_id = max(dist, key=dist.get)
     _assign_kinds(rooms, rng, start_id, boss_id, dist)
 
-    # --- scatter obstacles (spec 5.3) ------------------------
-    obstacles = _scatter_obstacles(rooms, rng, start_id, boss_id)
-
     # --- bounds (union of everything + margin) ---------------
     union = rooms[0].rect.copy()
     for r in rooms:
@@ -182,9 +179,11 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         r.rect.move_ip(shift)
     for c in corridors:
         c.rect.move_ip(shift)
-    for o in obstacles:
-        o.pos += shift
     union.move_ip(shift)
+
+    # Scatter obstacles last, in the final (0,0)-based coordinate space, so the
+    # corridor-doorway keep-clear rects match the world the game sees.
+    obstacles = _scatter_obstacles(rooms, corridors, rng, start_id, boss_id)
 
     return WorldLayout(seed, rooms, corridors, union, start_id, boss_id, obstacles)
 
@@ -201,9 +200,38 @@ def _distances(rooms: list[Room], source: int) -> dict[int, int]:
     return dist
 
 
-def _scatter_obstacles(rooms, rng, start_id, boss_id) -> list:
-    """A few convex obstacles per room, kept away from the room centre (spawn /
-    doorway paths) so enemies do not get boxed in (spec 5.3)."""
+def _corridor_doorways(rooms, corridors) -> dict:
+    """For each room id, the keep-clear rectangle at every corridor mouth: the
+    64 px tile where the corridor meets the room edge, plus one tile of margin.
+    Obstacles are never placed inside these so a doorway is always walkable."""
+    px = config.TILE_PX
+    out: dict[int, list[pygame.Rect]] = {}
+    for c in corridors:
+        for rid in (c.a, c.b):
+            room = rooms[rid].rect
+            mouth = c.rect.clip(room)
+            if mouth.width <= 0 or mouth.height <= 0:
+                continue
+            if getattr(c, "axis", "h") == "h":
+                near_left = abs(mouth.left - room.left) <= abs(mouth.right - room.right)
+                x = room.left if near_left else room.right - px
+                door = pygame.Rect(x, mouth.top, px, mouth.height)
+            else:
+                near_top = abs(mouth.top - room.top) <= abs(mouth.bottom - room.bottom)
+                y = room.top if near_top else room.bottom - px
+                door = pygame.Rect(mouth.left, y, mouth.width, px)
+            out.setdefault(rid, []).append(door.inflate(2 * px, 2 * px))
+    return out
+
+
+def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id) -> list:
+    """A few convex obstacles per room, always clear of every corridor doorway
+    (so movement is never blocked). **Special** rooms also keep a clear central
+    disc for their interaction / fight space; plain `combat` rooms may have
+    obstacles anywhere -- spec 5.3.
+    """
+    doorways = _corridor_doorways(rooms, corridors)
+    all_doors = [d for slabs in doorways.values() for d in slabs]
     out = []
     for room in rooms:
         if room.id in (start_id, boss_id):
@@ -213,12 +241,15 @@ def _scatter_obstacles(rooms, rng, start_id, boss_id) -> list:
             else rng.randint(3, 7))
         r = room.rect
         cx, cy = r.center
-        clear = min(r.width, r.height) * 0.22   # keep the middle open
+        # Only special locations reserve the middle; combat rooms fill freely.
+        clear = min(r.width, r.height) * 0.22 if room.kind in SPECIAL_KINDS else 0.0
         for _ in range(density):
-            for _try in range(8):
+            for _try in range(12):
                 x = rng.uniform(r.left + 40, r.right - 40)
                 y = rng.uniform(r.top + 40, r.bottom - 40)
-                if (x - cx) ** 2 + (y - cy) ** 2 < clear ** 2:
+                if clear and (x - cx) ** 2 + (y - cy) ** 2 < clear ** 2:
+                    continue
+                if any(d.collidepoint(x, y) for d in all_doors):
                     continue
                 if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < (o.radius + 46) ** 2
                        for o in out):

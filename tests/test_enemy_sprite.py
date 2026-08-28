@@ -162,7 +162,94 @@ class DeathPoofTests(unittest.TestCase):
         p.update(1 / 60)
         self.assertGreaterEqual(len(p._death_fx), 1)
         self.assertEqual(p._death_fx[-1][3], 1.0)          # hero poof at full size
+        self.assertEqual(p._death_fx[-1][4], p.player.radius)   # carries the radius
         self.assertIsNotNone(p._death_seq_t)
+        pygame.quit()
+
+    def test_enemy_poof_carries_the_enemy_radius(self):
+        g, p = self._playing()
+        e = self._kill_one(p, "tank")
+        self.assertEqual(p._death_fx[-1][4], e.radius)
+        pygame.quit()
+
+
+class _BlitRecorder:
+    """A stand-in surface that logs (src, x, y) for every blit."""
+    def __init__(self, size=(1600, 900)):
+        self._size = size
+        self.calls = []
+
+    def blit(self, src, dest, *a, **k):
+        x, y = dest[0], dest[1]
+        self.calls.append((src, x, y))
+
+    def get_size(self):
+        return self._size
+
+    def fill(self, *a, **k):
+        pass
+
+
+class SpriteAnchorDropTests(unittest.TestCase):
+    """The character sprite is drawn `SPRITE_ANCHOR_DROP * radius` below the
+    collider centre so more of it sits inside the collision circle. Render-only."""
+
+    def _playing(self):
+        from game.game import Game
+        from game.states.menu_state import MenuState
+        g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
+        g.state_machine.change(MenuState(g))
+        for _ in range(2):
+            g.state_machine.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        return g, g.state_machine.current
+
+    def test_sprite_drop_is_fraction_of_radius_times_zoom(self):
+        from game import config
+        g, p = self._playing()
+        exp = config.SPRITE_ANCHOR_DROP * 20.0 * p.camera.zoom
+        self.assertAlmostEqual(p._sprite_drop(20.0), exp)
+        pygame.quit()
+
+    def test_hero_blit_sits_below_the_collider_by_the_drop(self):
+        g, p = self._playing()
+        _, collider_y = p.camera.world_to_screen(p.player.pos)
+        ax, ay = p.game.assets.anchor(p._hero_anim.rig)
+        z = p.camera.zoom
+        rec = _BlitRecorder()
+        p._draw_player(rec)
+        hero_blits = [c for c in rec.calls if c[0] is not None]
+        self.assertTrue(hero_blits)
+        _, _, blit_y = hero_blits[0]
+        # blit_y == collider_y - ay*z + drop   (drop > 0 -> lower on screen)
+        self.assertAlmostEqual(blit_y, collider_y - ay * z + p._sprite_drop(p.player.radius))
+        self.assertGreater(p._sprite_drop(p.player.radius), 0.0)
+        pygame.quit()
+
+    def test_zero_drop_puts_the_anchor_back_on_the_collider(self):
+        from game import config
+        g, p = self._playing()
+        old = config.SPRITE_ANCHOR_DROP
+        config.SPRITE_ANCHOR_DROP = 0.0
+        try:
+            self.assertEqual(p._sprite_drop(999.0), 0.0)
+            _, collider_y = p.camera.world_to_screen(p.player.pos)
+            ax, ay = p.game.assets.anchor(p._hero_anim.rig)
+            rec = _BlitRecorder()
+            p._draw_player(rec)
+            _, _, blit_y = next(c for c in rec.calls if c[0] is not None)
+            self.assertAlmostEqual(blit_y, collider_y - ay * p.camera.zoom)
+        finally:
+            config.SPRITE_ANCHOR_DROP = old
+        pygame.quit()
+
+    def test_depth_sort_key_is_still_the_unshifted_entity_y(self):
+        g, p = self._playing()
+        p._spawn_enemy("chaser", at=pygame.Vector2(p.player.pos.x, p.player.pos.y + 40))
+        e = p.enemies[-1]
+        keys = {round(y, 3) for y, _ in p._depth_items()}
+        self.assertIn(round(e.pos.y, 3), keys)
+        self.assertIn(round(p.player.pos.y, 3), keys)
         pygame.quit()
 
 

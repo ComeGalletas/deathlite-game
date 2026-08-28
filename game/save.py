@@ -25,6 +25,12 @@ DEFAULT_PATH = Path(__file__).resolve().parent.parent / "save.json"
 # Characters available from the very first launch.
 _STARTER_CHARACTERS = ["aegis", "kestrel", "nihil"]
 
+# Per-run best records are bucketed by difficulty and never compared across
+# buckets (a Fast run's time only ranks against other Fast runs). Mirror
+# config.DIFFICULTY_ORDER; kept local so this module stays dependency-free.
+_RECORD_DIFFICULTIES = ("normal", "fast", "super_fast")
+_RECORD_KEYS = ("time", "level", "kills", "damage_dealt")
+
 
 @dataclass
 class SaveData:
@@ -33,6 +39,9 @@ class SaveData:
     unlocked_characters: list[str] = field(default_factory=lambda: list(_STARTER_CHARACTERS))
     meta: dict[str, int] = field(default_factory=dict)              # upgrade id -> level
     best: dict[str, float] = field(default_factory=dict)           # stat -> best value
+    # difficulty -> {stat -> best value}; independent per bucket (see above).
+    records: dict = field(default_factory=lambda: {
+        d: {} for d in _RECORD_DIFFICULTIES})
     discovered_items: list[str] = field(default_factory=list)
     stash: list[dict] = field(default_factory=list)               # serialised Items
     equipped: dict[str, str | None] = field(default_factory=lambda: {
@@ -40,11 +49,16 @@ class SaveData:
     settings: dict = field(default_factory=lambda: {"muted": False, "volume": 0.7})
 
     # --- helpers -------------------------------------------------
-    def record_best(self, stats: dict) -> None:
-        for key in ("time", "level", "kills", "damage_dealt"):
+    def record_best(self, stats: dict, difficulty: str = "normal") -> None:
+        if difficulty not in _RECORD_DIFFICULTIES:
+            difficulty = "normal"
+        bucket = self.records.setdefault(difficulty, {})
+        for key in _RECORD_KEYS:
             val = float(stats.get(key, 0))
-            if val > self.best.get(key, 0.0):
+            if val > self.best.get(key, 0.0):          # legacy all-difficulty max
                 self.best[key] = val
+            if val > bucket.get(key, 0.0):             # per-difficulty record
+                bucket[key] = val
 
     def add_item(self, item_dict: dict) -> None:
         self.stash.append(item_dict)
@@ -71,6 +85,11 @@ def _coerce(raw: dict) -> SaveData:
         d.meta = {str(k): int(v) for k, v in raw["meta"].items() if _is_int(v)}
     if isinstance(raw.get("best"), dict):
         d.best = {str(k): float(v) for k, v in raw["best"].items() if _is_num(v)}
+    if isinstance(raw.get("records"), dict):
+        for diff, vals in raw["records"].items():
+            if diff in _RECORD_DIFFICULTIES and isinstance(vals, dict):
+                d.records[diff] = {str(k): float(v)
+                                   for k, v in vals.items() if _is_num(v)}
     if isinstance(raw.get("discovered_items"), list):
         d.discovered_items = [str(x) for x in raw["discovered_items"]]
     if isinstance(raw.get("stash"), list):

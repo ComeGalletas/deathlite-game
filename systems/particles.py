@@ -62,9 +62,10 @@ class ParticleSystem:
         self._pool.sweep()
 
     def draw(self, surface: pygame.Surface, camera) -> None:
+        z = getattr(camera, "zoom", 1.0)
         for p in self._pool:
             frac = max(0.0, p.life / p.max_life)
-            r = max(1.0, p.radius * frac)
+            r = max(1.0, p.radius * frac * z)
             sx, sy = camera.world_to_screen(p.pos)
             pygame.draw.circle(surface, p.color, (int(sx), int(sy)), int(r))
 

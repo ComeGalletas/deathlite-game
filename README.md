@@ -40,11 +40,13 @@ python main.py
 python -m unittest discover -s tests -v
 ```
 
-351 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+391 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
 terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
-depth-sorted rendering, the start menu + options screen, developer mode, the
-per-hit damage model, and the interactables.
+depth-sorted rendering, the start menu + options + rankings screens, developer
+mode, the difficulty knobs (spawn cadence / phase + boss pacing / HP ramp /
+enemy-count growth) and per-difficulty records, the per-hit damage model, and
+the interactables.
 
 ## Controls
 
@@ -52,6 +54,7 @@ per-hit damage model, and the interactables.
 |-----|--------|
 | WASD / Arrow keys | Move; also navigate menus |
 | ENTER or SPACE | Confirm / start / select a menu entry / buy / equip |
+| ← → (hero select) | Choose the hero · ↑ ↓ choose the **difficulty** (Normal / Fast / Super Fast) |
 | ← → (Options) | Adjust the master volume |
 | E | Use a special location you're standing on (shrine, chest, fountain, altar, merchant) |
 | ESC | Pause (in game) / back / quit (from the start menu) |
@@ -65,21 +68,49 @@ per-hit damage model, and the interactables.
 Debug keys are never required for normal play.
 
 Weapons attack automatically — you only move, pick upgrades/blessings, use
-special locations, and choose a hero. The world is a procedural graph of rooms
-and corridors with obstacles; explore it, survive the escalating waves, and the
-boss (**The First Hunger**) appears in its arena near the end of the run and
-drops an item. Salvage and loot carry over between runs via the Sanctuary.
+special locations, and choose a hero and difficulty. The world is a procedural
+graph of rooms and corridors with obstacles; explore it, survive the escalating
+waves, and the boss (**The First Hunger**) appears in its arena near the end of
+the run and drops an item. Salvage and loot carry over between runs via the
+Sanctuary.
+
+### Display
+
+The window is **1600×900** (`config.SCREEN_WIDTH/HEIGHT`). The in-game view is a
+**draw-time camera zoom** (`config.CAMERA_ZOOM`, default 1.5): the world is drawn
+straight to the screen with every sprite, tile and shape scaled by the zoom, so
+the picture is "closer" but stays crisp — sprites scale *down* from their large
+source frames, no upscale blur. The visible world extent is `SCREEN / CAMERA_ZOOM`.
+The HUD and damage feedback are drawn afterwards at full resolution, unscaled.
+`CAMERA_ZOOM = 1.0` disables the zoom entirely.
 
 ### Start screen
 
-A keyboard-navigated menu: **Start new game** → hero select → run; **Start new
-developer mode game** (a stub — selecting it does nothing yet); **Options**;
+A keyboard-navigated menu: **Start new game** → hero + difficulty select → run;
+**Start new developer mode game** → the same select screen → a non-persistent
+sandbox run with the dev overlay (backtick / tilde); **Rankings**; **Options**;
 **Exit**. Options holds the **master volume** (← → in 5% steps), a **mute**
 toggle, and the entry point into the **Sanctuary** — all persisted to
 `save.json` immediately. If `assets/ui/title.png` exists it fills the screen
 as the backdrop (with a translucent panel behind the menu for legibility);
 without it the screen is plain black with the title as white text. The game
 instructions sit in their own smaller column to the left of the menu.
+
+### Difficulty
+
+Picked per run on the hero-select screen (**↑ ↓**), never persisted:
+
+| | Enemy spawn rate | Harder types + boss | Enemy HP/speed ramp | Crowd growth |
+|---|---|---|---|---|
+| **Normal** | — | — | — | +5 enemies / 20 s |
+| **Fast** | +25% | 25% sooner (run ends sooner) | +25% faster | +8 / 20 s |
+| **Super Fast** | +50% | 50% sooner | +50% faster | +10 / 20 s |
+
+The stat ramp accelerates in step with the shorter run, so a faster run still
+reaches the full HP/speed curve by its (earlier) end. In a **developer** run the
+dev overlay has a **Difficulty** row that switches this live. **Rankings** (on
+the start menu) keeps a separate best run — time, level, kills, damage — for
+each difficulty; they are never compared across difficulties.
 
 Progress is stored in `save.json` next to `main.py` (human-readable; a missing
 or corrupt file is handled gracefully — the game never crashes over it).
@@ -91,8 +122,9 @@ deathlite-game/
 ├── main.py             thin entry point
 ├── game/               loop, state machine, config, event bus, content,
 │   │                   save, assets (sprite loader/cache)
-│   └── states/         one module per game state (menu, options, char-select,
-│                       playing, level-up, paused, game-over, victory, sanctuary)
+│   └── states/         one module per game state (menu, options, rankings,
+│                       char-select, playing, level-up, paused, game-over,
+│                       victory, sanctuary, dev menu)
 ├── entities/           player, enemy (+ ai), boss, projectile, pickup,
 │                       summon, hazard, obstacle, interactable
 ├── systems/            camera, spatial grid, object pool, particles,
@@ -107,7 +139,7 @@ deathlite-game/
 │                       projectiles/, terrain/{tiles,bridge,props,resources}/,
 │                       buildings/, effects/, ui/title.png, CREDITS.md
 │                       (PNG sprites only — see assets/CREDITS.md)
-└── tests/              351 tests: pure logic + headless integration
+└── tests/              391 tests: pure logic + headless integration
 ```
 
 ## Content
@@ -127,7 +159,10 @@ deathlite-game/
   arena; **6 special locations** (shrine, treasure, fountain, altar, merchant,
   elite arena)
 - XP / leveling with a weighted 3-choice upgrade & blessing screen
-- Phase-based spawn director with independent difficulty knobs
+- Phase-based spawn director; a per-run **difficulty** (Normal / Fast / Super
+  Fast) drives four independent knobs — spawn rate, how fast the phase schedule
+  and boss arrive, the enemy HP/speed ramp, and the enemy-count growth — with a
+  separate best-run ranking per difficulty
 - Procedurally synthesised sound effects (no audio files)
 - Animated sprites for all 3 heroes, all 13 enemies + the boss, and enemy shots;
   a red hit-tint and a shared skull death-poof stand in for the missing
@@ -144,16 +179,18 @@ deathlite-game/
   characters are painted back-to-front by ground-contact Y, so the hero walks
   *behind* a tree when above it. Each layer is a `config` flag and the whole
   thing falls back to flat coloured rects + drawn circles if the tileset is absent
-- Object pooling, spatial-grid collision, configurable entity caps, F1 debug
-  overlay with per-system timings + the run seed
+- Object pooling, spatial-grid collision, a difficulty-scaled enemy-count cap
+  that grows with in-game time, F1 debug overlay with per-system timings + the
+  run seed
 
 ## Development status
 
 **Phases 1–3 complete — feature-complete against the spec.** The full loop
-runs: pick hero → explore the procedural world → auto-combat → XP → upgrade /
-blessing choices → special locations → escalating waves → boss (in its arena,
-drops an item) → victory / defeat → Salvage & loot banked → Sanctuary (spend,
-equip) → next run inherits it.
+runs: pick hero + difficulty → explore the procedural world → auto-combat → XP →
+upgrade / blessing choices → special locations → escalating waves → boss (in its
+arena, drops an item) → victory / defeat → Salvage & loot banked → Sanctuary
+(spend, equip) → next run inherits it. Phase 4 adds the per-run difficulty
+(Normal / Fast / Super Fast) and per-difficulty Rankings.
 
 Not done: balance is a first tuning pass (needs human playtesting); one boss
 (the spec's Phase-1 floor); a few polish items listed in `journals/journal.md`.
@@ -184,7 +221,7 @@ plank autotile), a `decorations` array (the non-colliding scatter registry), an
 tree-shade params), and the rigs themselves (each with a measured
 `footprint`). `GameMap` pre-renders each static room to one **SRCALPHA** surface
 (autotile edges baked in, transparent water side preserved) and each corridor to
-a directional plank bridge, tiles the water void into a screen-sized buffer,
+a directional plank bridge, tiles the water void into a reusable buffer,
 draws the 16-frame `Water_Foam` animation *behind* the terrain along shorelines
 and bridge gaps, scatters seeded non-colliding clutter (`pebble_*` on interiors,
 `water_rock_*` / `duck` on the open water), and skins each circular obstacle with

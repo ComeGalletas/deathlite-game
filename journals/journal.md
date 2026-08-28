@@ -1380,3 +1380,451 @@ style for damage the hero *takes*: **red** (`config.COLOR_DAMAGE_IN =
 
 Suite **359 → 363**. Screenshot: red `21` / `13` over the hero next to a common
 white `8` over an enemy.
+
+---
+
+## Post-Phase-3 — Obstacles clear of corridor doorways (B7)
+
+**Date:** 2026-08-27.
+
+`_scatter_obstacles` already kept obstacles out of the room centre (special
+rooms too). Added a second exclusion: **no obstacle on the 64 px tile where a
+corridor connects to a room**, plus one tile of margin, so a doorway is always
+walkable.
+
+- `world/procedural.py` — new `_corridor_doorways(rooms, corridors)`: for each
+  room, the mouth tile of every corridor (`c.rect.clip(room)` reduced to the one
+  `TILE_PX` cell at the crossed edge, keyed by `c.axis`), each `inflate(2*px)`.
+  `_scatter_obstacles` gained a `corridors` param and rejects any candidate
+  whose centre lands in one of those slabs.
+- `_scatter_obstacles` is now called **after** the world is shifted to `(0,0)`
+  (it was the last rng consumer, so this is deterministic-neutral) — the
+  doorway rects are then built in the same coordinate space the game renders,
+  which removes a pre/post-shift 1 px `Rect` rounding mismatch that let ~0.1 %
+  of obstacles clip the margin.
+- `tests/test_obstacles.py` +2: no obstacle on a bare doorway tile across seven
+  seeds; combat rooms stay populated after the extra exclusion.
+
+Verified: 0 / 4360 obstacles on a doorway tile or its margin across 80 seeds,
+0 empty combat rooms, layout still deterministic per seed. Suite **363 → 365**.
+
+---
+
+## Post-Phase-3 — Combat rooms fill the middle (B8)
+
+**Date:** 2026-08-27.
+
+The central keep-clear disc in `_scatter_obstacles` used to apply to every room.
+Now only **special** rooms (`SPECIAL_KINDS` — shrine / treasure / fountain /
+altar / merchant / elite_arena) reserve their centre; plain `combat` rooms may
+place obstacles anywhere in the room. The corridor-doorway exclusion (B7) and
+`start` / `boss` getting no obstacles at all are unchanged.
+
+- `world/procedural.py` — `clear = min(w,h) * 0.22 if room.kind in SPECIAL_KINDS
+  else 0.0`; the disc check is skipped when `clear` is 0.
+- `tests/test_obstacles.py` — `test_room_centres_kept_clear` →
+  `test_special_room_centres_kept_clear` (special rooms only, three seeds); new
+  `test_combat_rooms_may_place_obstacles_near_the_centre` (some combat room does).
+- `documentation/level_design.md` §1.5 updated.
+
+Suite **365 → 366**.
+
+---
+
+## Phase 4 — Difficulty option (D1–D6)
+
+**Date:** 2026-08-27. **Status:** ✅ D1–D6 complete. Suite 366 → 391.
+
+A per-run difficulty choice — **Normal / Fast / Super Fast** — picked on the
+character-select screen. Normal is the current game. Fast makes enemies spawn
+25 % faster, brings harder enemy types and the boss on 25 % sooner, and lets the
+enemy count climb faster; Super Fast does the same at 50 % (and a steeper count
+climb). Enemy HP/speed scaling accelerates to match, so a shorter run still
+delivers the full stat ramp.
+
+### Model
+
+Difficulty resolves to **four independent factors** on `SpawnDirector`, each a
+separately tunable knob (all pure arithmetic — no RNG consumed, so a seed still
+reproduces the same world and spawn sequence):
+
+| Factor | Normal | Fast | Super Fast | Effect |
+|---|---|---|---|---|
+| `spawn_rate` | 1.0 | 1.25 | 1.5 | divides the spawn `_interval` → +25 % / +50 % spawn events |
+| `timeline_pace` | 1.0 | 1.25 | 1.5 | `run_duration ÷ this` → harder types + boss arrive sooner; the run also ends sooner |
+| `stat_ramp_pace` | 1.0 | 1.25 | 1.5 | `f_stat = min(1, elapsed × this / RUN_DURATION_SECONDS)` — inverse of the timeline division, so the HP/speed ramp still reaches 1.0 by the (earlier) run end |
+| `enemy_count_step_scale` | 1.0 | 1.5 | 2.0 | growth step `= ceil(5 × this)` → **+5 / +8 / +10** enemies per 20 s of in-game time |
+
+- **Run duration is divided** by `timeline_pace`; phase fractions and
+  `BOSS_FRACTION` are unchanged, the whole curve just plays faster.
+- **Enemy count ceiling grows** on the in-game clock (`PlayingState.stats["time"]`
+  — the same value the HUD timer shows: pause-safe, deterministic, no wall
+  clock), un-compressed. `cap(t) = min(HARD_CAP 600, BASE + ceil(5 ×
+  enemy_count_step_scale) × floor(t / 20))`.
+- **Boss spawn timing is deliberately left to shift earlier** with
+  `timeline_pace`. The dev-menu live switch can therefore arm the boss
+  immediately if `timeline_pace` is raised late in a run — this is intentional
+  and kept for testing (that is what developer mode is for). Documented, not
+  guarded.
+- The choice is **per run, never persisted** to `settings`. Records, however,
+  are persisted and kept **fully separated per difficulty** — a best time in
+  Fast is only ever compared against other Fast runs.
+- Config constant rename: `MAX_ENEMIES` → the `ENEMY_COUNT_*` family
+  (`ENEMY_COUNT_BASE`, `ENEMY_COUNT_STEP = 5`, `ENEMY_COUNT_STEP_PERIOD = 20.0`,
+  `ENEMY_COUNT_HARD_CAP = 600`).
+
+### Milestones
+
+Each ends green: full `unittest` run, plus a windowed / headless screenshot for
+the milestones with a visible effect.
+
+- [x] **D1 — Difficulty factors + `SpawnDirector`.** *(done 2026-08-27)*
+  `game/config.py`: `DIFFICULTIES` factor table
+  (`spawn_rate` / `timeline_pace` / `stat_ramp_pace` / `enemy_count_step_scale`
+  = 1.0 / 1.25 / 1.5 across the board, except `enemy_count_step_scale`
+  = 1.0 / 1.5 / 2.0), `DIFFICULTY_ORDER`, `DIFFICULTY_DEFAULT`,
+  `DIFFICULTY_LABELS`.
+  `world/spawning.py`: `__init__(..., difficulty="normal")` → `set_difficulty()`
+  resolves and stores the four factors; `run_duration = _base_run_duration /
+  timeline_pace`; `_interval` divided by `spawn_rate`; `stat_multipliers` uses
+  `min(1, elapsed × stat_ramp_pace / _base_run_duration)` (ramp coefficients
+  `1.4` / `0.30` unchanged); `set_difficulty` re-bindable mid-run.
+  Tests (`tests/test_spawning.py` — new `DifficultyTests`, 8): interval = Normal
+  ÷ `spawn_rate`; `boss_time` = Normal ÷ `timeline_pace`; equal real `elapsed` →
+  monotone HP multiplier by difficulty, each reaching the full ramp at its own
+  run end; unknown name falls back to Normal; `set_difficulty` re-binds live;
+  `difficulty="normal"` reproduces the shipped numbers.
+
+- [x] **D2 — Dynamic enemy-count cap.** *(done 2026-08-27)*
+  `game/config.py`: `MAX_ENEMIES` → `ENEMY_COUNT_HARD_CAP` (600) +
+  `ENEMY_COUNT_BASE` (40) / `_STEP` (5) / `_STEP_PERIOD` (20.0). The per-phase
+  `"cap"` field is retired from `_PHASES` — `enemy_count_cap()` is now the sole
+  concurrency limit.
+  `world/spawning.py`: `enemy_count_cap(elapsed)` =
+  `min(HARD_CAP, BASE + ceil(STEP × step_scale) × floor(elapsed / STEP_PERIOD))`
+  on the in-game clock; `update()` gates on it; docstring + module header
+  rewritten.
+  `game/states/playing_state.py`: the `_spawn_enemy` gate uses
+  `self.director.enemy_count_cap(self.stats["time"])`.
+  `tests/test_incoming_damage.py`: the frozen-director stub gained an
+  `enemy_count_cap` lambda.
+  Tests: steps +5 / +8 / +10 per 20 s; `BASE` floor, `HARD_CAP` clamp; pure
+  function of the `elapsed` handed in (frame count / real time never enter).
+  Verified numbers (600 s run): Normal cap tracks 40 → 70 (t=120) → 115 (t=300);
+  Fast 40 → 88 → 160; Super Fast 40 → 100 → 190.
+
+- [x] **D3 — Per-run selection on character select.** *(done 2026-08-27)*
+  `game/states/character_select_state.py`: `diff_index` (default
+  `DIFFICULTY_DEFAULT`), `difficulty` property; **Up / Down** (and W / S) cycle
+  it, Left / Right still pick the hero; an accent-gold "Difficulty:  <label>"
+  line under the cards; hint line updated; `difficulty=` forwarded into
+  `PlayingState`.
+  `game/states/playing_state.py`: `enter(..., difficulty=None)` validates
+  against `config.DIFFICULTIES`, stores `self.difficulty`, builds
+  `SpawnDirector(..., difficulty=self.difficulty)`; `_end_run` puts
+  `difficulty` on the run summary (ready for D5).
+  Tests (`tests/test_menu.py` — new `CharacterSelectDifficultyTests`, 5): default
+  Normal; Up / Down cycle + wrap; Left / Right leave difficulty alone; the choice
+  reaches `PlayingState` / its director; headless draw for every level.
+
+**Suite 366 → 379.** Screenshot: character-select with "Difficulty: Fast"
+selected, hero pick independent.
+
+- [x] **D4 — Dev-menu live switch.** *(done 2026-08-27)*
+  `game/states/dev_menu_state.py`: a `difficulty` row on the root page (between
+  `no_attack` and `spawn`); ENTER / SPACE cycles `config.DIFFICULTY_ORDER` with
+  wrap and calls `playing._set_difficulty(name)`; `_row_label` shows the current
+  value as `Difficulty   [Fast]`; a `Difficulty -> Fast` status line.
+  `game/states/playing_state.py`: `_set_difficulty(name)` validates against
+  `config.DIFFICULTIES`, sets `self.difficulty`, and calls
+  `self.director.set_difficulty(name)` — the phase schedule, `run_duration` and
+  the boss timer re-key immediately (raising the pace late can arm the boss next
+  frame; kept, that is what dev mode is for).
+  Tests (`tests/test_dev_mode.py`): the row cycles normal → fast → super_fast →
+  normal, the director is re-bound each time (`boss_time` tracks the new pace),
+  the label carries the current value; `test_draw_runs_headless_on_every_page`
+  now sweeps `len(_ROOT_ROWS)` rows.
+  Verified live: switching mid-run took `run_duration` 600 → 480 → 400,
+  `boss_time` 570 → 456 → 380, `enemy_count_cap(120)` 70 → 88 → 100.
+
+  **Suite 379 → 380.**
+
+- [x] **D5 — Rankings menu + per-difficulty records.** *(done 2026-08-27)*
+  `game/states/menu_state.py`: `("Rankings", "rankings")` between the dev-start
+  and `Options` rows, routed to `RankingsState`.
+  `game/states/rankings_state.py` (new): three columns (Normal / Fast / Super
+  Fast), each showing that bucket's own best **Survived / Level / Kills /
+  Damage** — same four metrics as the legacy `best`, no cross-difficulty
+  comparison, no victory ranking; an empty bucket shows "no runs yet". ESC /
+  ENTER back to the menu.
+  `game/save.py`: `_RECORD_DIFFICULTIES` / `_RECORD_KEYS`; `SaveData.records =
+  {d: {} for d in _RECORD_DIFFICULTIES}`; `record_best(stats,
+  difficulty="normal")` updates `records[difficulty]` per key and still updates
+  the legacy flat `best` (all-difficulty max) so the menu summary keeps working;
+  unknown difficulty falls into `normal`; `_coerce` rebuilds `records` with
+  per-key `_is_num` guarding and drops unknown buckets (no legacy migration).
+  `game/game.py`: `record_best(stats, difficulty=stats.get("difficulty",
+  "normal"))` — the dev no-save guard already precedes it, and `_end_run` put
+  `difficulty` on the summary in D3.
+  Tests: `tests/test_save.py` new `DifficultyRecordsTests` (6) — default shape,
+  independent per-bucket writes, per-key improve-only, unknown→normal, legacy
+  `best` still the max, round-trip + junk tolerance. `tests/test_rankings.py`
+  (new, 4) — menu routes, ESC/ENTER return, headless draw empty + populated.
+  `tests/test_menu.py` / `tests/test_options.py` — option indices shifted by the
+  new row (`Options` 2→3, `Exit` 3→4), new `test_rankings_entry_opens_...`.
+
+  **Suite 380 → 391.** Screenshots: the Rankings screen (Normal + Fast with
+  data, Super Fast "no runs yet") and the 5-row menu.
+
+- [x] **D6 — Docs + wrap.** *(done 2026-08-27)*
+  `README.md`: a new **Difficulty** subsection (the per-run choice, the
+  factor-per-level table, the accelerated stat ramp, the live dev-menu switch,
+  per-difficulty Rankings); the **Controls** table gains the ↑ ↓ hero-select
+  row; the **Start screen** list gains **Rankings** and drops the stale
+  "developer mode is a stub" note; the **Content** / **Development status** /
+  entity-caps / test-coverage lines refreshed; project tree lists `rankings` +
+  `dev menu`; test count 351 → 391.
+  `documentation/level_design.md`: unchanged — it is scoped to world generation
+  and rendering, and there is no standalone spawn-pacing doc, so **this Phase 4
+  entry is the design-of-record** for the difficulty system (`SpawnDirector`
+  factors, `enemy_count_cap`, the schedule compression and the boss/dev-switch
+  behaviour).
+
+### Outcome
+
+Per-run difficulty **Normal / Fast / Super Fast**, chosen on the hero-select
+screen (↑ ↓, never persisted) and live-switchable from the dev overlay. One name
+resolves to four independent, separately tunable `SpawnDirector` factors:
+
+| | `spawn_rate` | `timeline_pace` | `stat_ramp_pace` | `enemy_count_step_scale` |
+|---|---|---|---|---|
+| Normal | 1.0 | 1.0 | 1.0 | 1.0  → +5 / 20 s |
+| Fast | 1.25 | 1.25 | 1.25 | 1.5  → +8 / 20 s |
+| Super Fast | 1.5 | 1.5 | 1.5 | 2.0  → +10 / 20 s |
+
+`run_duration` is divided by `timeline_pace` (phases + boss arrive sooner, the
+run ends sooner); the HP/speed ramp is multiplied by `stat_ramp_pace` against
+the *base* duration so it still tops out at the earlier run end. The per-phase
+`"cap"` field is gone — `enemy_count_cap(t)` (`min(600, 40 + ceil(5 ×
+step_scale) × floor(t / 20))`, `t` = the in-game HUD clock) is the sole
+concurrency limit. Records are bucketed per difficulty and never cross-compared.
+
+**Suite 366 → 391** (+25 across D1–D6). Nothing committed.
+
+### Tuning notes (post-implementation)
+
+- `ENEMY_COUNT_BASE` is the number to get right so Normal is not quietly
+  throttled mid-game (base + growth must stay ≥ the phase soft-caps at the same
+  in-game time).
+- Hero level at boss time is likely lower on the faster difficulties (shorter
+  run). Observe in playtest; not a blocker.
+- All four factor values (and the `1.4` / `0.30` ramp coefficients) are free
+  tuning knobs once the wiring is in.
+
+---
+
+## Post-Phase-4 — Closer camera (world zoom)
+
+**Date:** 2026-08-27.
+
+The in-game camera was a straight 1:1 world→screen translation. Pulled it ~15%
+closer to the hero: the world now fills the screen at `config.CAMERA_ZOOM = 1.15`.
+
+- `game/config.py` — `CAMERA_ZOOM = 1.15`, plus `CAMERA_VIEW_WIDTH` /
+  `CAMERA_VIEW_HEIGHT` = `round(SCREEN_* / CAMERA_ZOOM)` (1113 × 626).
+- `game/states/playing_state.py`
+  - the run `Camera` is built with the reduced view size, so follow-centring,
+    `visible_rect()` culling and off-screen spawn all key off what is actually
+    shown;
+  - `enter` allocates one persistent `self._world_surf` at that size;
+  - `draw()` renders the whole world block (ground, clutter, interactables,
+    hazards, gems, explosions, weapon fx, the depth layer, tree shade, hostile
+    shots, particles, damage numbers) into `_world_surf`, then
+    `pygame.transform.smoothscale`s it up onto the screen. The **HUD and the
+    feedback overlays are drawn afterwards, directly on the screen at full
+    resolution**, so they are unscaled and unchanged.
+  - screen-shake `offset` is divided by `CAMERA_ZOOM` before it is applied to
+    `camera.pos`, so the shake amplitude in final screen pixels is unchanged.
+- `CAMERA_ZOOM = 1.0` short-circuits the scale (`_world_surf` matches the screen
+  and is blitted straight through), so the zoom is a single tunable with a clean
+  off switch.
+
+No renderer maths changed — the scene is drawn exactly as before into a smaller
+buffer and blown up, which scales sprites, primitives and text uniformly.
+`smoothscale` softens the pixel art very slightly; acceptable, and consistent
+with `assets.py` already scaling sprites to non-integer sizes.
+
+Suite unchanged at **391** (camera tests pass explicit view sizes; the render
+pipeline-order test only checks call order).
+
+**Follow-ups (2026-08-28):** `CAMERA_ZOOM` retuned 1.15 → 1.32 → **1.5**;
+`SCREEN_WIDTH/HEIGHT` raised **1280×720 → 1600×900** (world buffer 853×480 →
+1067×600, ~56% more pixels per sprite before the upscale); `world/map.py` water
+buffer re-sized to `CAMERA_VIEW_*` (was `SCREEN_*`). The `smoothscale`-up blur is
+inherent to this buffer approach — the fix is the milestone below.
+
+---
+
+## Post-Phase-4 — Crisp zoom: true draw-time camera scale (C1–C5)
+
+**Date:** 2026-08-28. **Status:** ✅ C1–C5 complete. `CAMERA_ZOOM = 1.5` at `SCREEN 1600×900`, drawn crisp at native resolution. Suite 391 → 397.
+
+**Problem.** The world is rasterised into a `SCREEN / CAMERA_ZOOM` buffer
+(1067 × 600) and `pygame.transform.smoothscale`d up 1.5× to the screen. Bilinear
+upscaling invents in-between pixels, so nothing in the world layer can be sharper
+than 1067 × 600 — characters look soft.
+
+**Fix.** Retire the intermediate buffer. `Camera` gets a real `zoom`; the world
+is drawn straight to the screen at native resolution, with every world-space size
+multiplied by `zoom` at draw time. Sprites then scale *down* from their 192 px
+source frames to a larger on-screen size than today (≈69–104 px vs ≈46–69 px) —
+still a downscale, so genuinely crisp. Terrain takes the pragmatic route: the
+baked room / corridor / decor / foam surfaces are pre-scaled by `zoom` once
+(cached), `smoothscale`d — slightly soft, but terrain tolerates that far better
+than character sprites, and it avoids re-baking the autotile / water-scroll /
+anchor maths.
+
+`camera.pos` keeps its current meaning (**world-space top-left of the visible
+region**), so every existing `worldx - camera.pos.x` stays a valid *world*
+offset; only the final pixel step gains a `* zoom`. `CAMERA_ZOOM = 1.0` makes
+every `* zoom` a no-op and the transform identical to today — a clean off switch
+and the regression baseline.
+
+### Milestones
+
+Each ends green: full `unittest`, plus before/after screenshots at `zoom = 1.0`
+(must be pixel-identical to the pre-change frame) and `zoom = 1.5` (crisp).
+
+- [x] **C1 — `Camera` gains a real `zoom`.** *(done 2026-08-28)*
+  `systems/camera.py`: `__init__(..., zoom: float = 1.0)` (clamped ≥ 0.01).
+  `world_to_screen` / `screen_to_world` scale by `zoom` about `pos`;
+  `world_span()` helper returns `(view_w / zoom, view_h / zoom)`;
+  `visible_rect()` is that world span at `pos`; `_clamp` / `snap_to` / `update`
+  centre on the target using the span, keep the view inside the world, and
+  **centre a world smaller than the span** (`pos = (world - span) / 2`).
+  `pos` still means the world-space top-left of the visible region, so
+  world-space callers are untouched.
+  Tests (`tests/test_camera.py`, new `CameraZoomTests`, 6): `zoom = 1.0` is a
+  plain translation with an unchanged `world_span` / `visible_rect`; `zoom = 2`
+  scales the screen delta about `pos` and halves the visible region; `_clamp`
+  keeps the zoomed view in-world; a sub-span world is centred; `screen_to_world`
+  inverts `world_to_screen` at `zoom = 1.5`.
+  Purely additive — nothing constructs `Camera` with a `zoom` yet, so the game
+  is byte-identical (no screenshot needed). **Suite 391 → 397.**
+
+- [x] **C2 — Entity + FX layer scales by `camera.zoom`.** *(done 2026-08-28)*
+  `game/states/playing_state.py`: `Camera(..., SCREEN_WIDTH, SCREEN_HEIGHT,
+  zoom=config.CAMERA_ZOOM)`; **`_world_surf` deleted**; `draw()` renders the
+  world block straight onto `surface` (no buffer, no `smoothscale`), HUD +
+  overlays after as before; screen-shake `offset / camera.zoom`.
+  - sprites (`_draw_enemy_sprite`, `_hero_sprite_frame`, `_draw_boss`,
+    `_draw_death_fx`): `z = camera.zoom`; `frame(size=(round(bw*z), round(bh*z)))`
+    from the large source frames; blit at `(sx - ax*z, sy - ay*z)`.
+  - primitives — every world-layer `pygame.draw.*` radius / offset × `z`
+    (`round`ed): enemy fallback circle + status / elite / shield / slam rings,
+    boss fallback + telegraph rings + `summon_brood`, player fallback + invuln
+    ring + pickup debug, interactables, hazards (incl. the temp SRCALPHA surf),
+    gems, explosions, summons (totem rect + dots), player projectiles +
+    `_draw_cone` (new `zoom=` arg, default 1.0), hostile-projectile fallback,
+    debug collision-vis. 1–3 px stroke *widths* left unscaled (they read the
+    same at any zoom and can't take a float).
+  - `systems/particles.py`: `draw` multiplies the drawn radius by
+    `getattr(camera, "zoom", 1.0)`.
+  - `ui/damage_numbers.py`: `_fonts(zoom=1.0)` builds the trio at
+    `round(pt*zoom)` and caches per rounded-zoom key; `draw` passes
+    `camera.zoom`.
+  Tests: full suite green; `_draw_cone` / `_fonts` keep their old no-arg
+  call shape (defaults). At `CAMERA_ZOOM = 1.0` the frame is coherent and
+  matches the pre-zoom game at 1600×900 (terrain now crisp — no upscale buffer);
+  at `zoom = 1.5` entities scale sharply but terrain is still 1:1 until **C3**,
+  so `config.CAMERA_ZOOM` stays **1.0** until then. **Suite unchanged at 397.**
+
+- [x] **C3 — Tiled terrain scales by `camera.zoom`.** *(done 2026-08-28)*
+  `world/map.py`: one `_z_surf(surf)` helper — a `smoothscale`d copy of a baked
+  surface, cached by source `id()` for the current `_render_zoom`; identity at
+  `zoom = 1.0` so callers/tests keep the original object. `draw_ground` reads
+  `camera.zoom` into `_render_zoom` and clears the cache when it changes.
+  - `_draw_tiled`: `_z_surf` the water buffer / foam frame / room + corridor
+    surfaces; blit positions `((x - ox) * z, (y - oy) * z)` (water scrolls by
+    `-(o % wt) * z`).
+  - `_blit_one_decor` / `_draw_one_obstacle` / `draw_tree_shadows`: `_z_surf` the
+    frame, blit at `round((wx - ox) * z - anchor * z)`; obstacle fallback circle
+    radius `* z`.
+  - `_draw_flat_layout` (+ the flat wall border) and the no-layout branch go
+    through a new `_screen_rect(rect, camera)` helper (`(x-ox)*z`, `w*z`);
+    `_draw_grid` lines `(x - ox) * z`.
+  `config.CAMERA_ZOOM` **restored to 1.5**.
+  Tests: full suite green — every existing terrain render test drives a
+  `zoom = 1.0` camera and checks blit *order* / *source id*, both preserved by
+  the `_z_surf` identity. Verified visually at `zoom = 1.5`: terrain, obstacles
+  and entities align exactly, sharper than the old buffer-upscale (rasterised at
+  the native 1600×900 instead of stretched from 1067×600); HUD unscaled.
+  **Suite unchanged at 397.**
+
+- [x] **C4 — Config cleanup + verification.** *(done 2026-08-28)*
+  `game/config.py`: `CAMERA_VIEW_WIDTH / HEIGHT` **removed**; the stale
+  `_world_surf`-era comment block replaced with the draw-time-scale description.
+  `world/map.py`: the water buffer sizes itself off `SCREEN_* / CAMERA_ZOOM`
+  (the visible world extent) and stores its tile stride as `self._water_tile`
+  instead of recovering it from `config.CAMERA_VIEW_WIDTH`.
+  Verification: full suite **397** green; frame-time sanity (headless,
+  ~20 enemies, 1600×900) — `draw()` ≈ **4.4 ms/frame** at `zoom = 1.5`, the same
+  as `zoom = 1.0`, well under the 8.3 ms / 120 fps budget; the terrain
+  `_blit_cache` fills lazily as animated frames (foam @ 12 fps etc.) first appear
+  and **plateaus at 71 entries by ~frame 500, flat across 4000 frames** — no
+  per-frame `smoothscale`.
+
+- [x] **C5 — Docs + journal wrap.** *(done 2026-08-28)*
+  `README.md`: new **Display** subsection — 1600×900 window, the draw-time
+  `CAMERA_ZOOM` (default 1.5), "sprites scale down from large sources, no upscale
+  blur", visible extent `SCREEN / CAMERA_ZOOM`, HUD unscaled, `1.0` disables it;
+  "screen-sized buffer" wording for the water tile dropped.
+  This journal: the wrap below.
+
+### Outcome
+
+The camera is a **true draw-time scale**, not a buffer blow-up. `Camera.zoom`
+(from `config.CAMERA_ZOOM`, currently **1.5**) multiplies world→screen positions;
+every renderer — `playing_state.py` entities / FX, `systems/particles.py`,
+`ui/damage_numbers.py` fonts, and the `world/map.py` tiled terrain via one
+`_z_surf()` id-cached `smoothscale` helper — scales its own sprite / tile / shape
+sizes by the same factor. The scene is rasterised at the native **1600×900**
+(`config.SCREEN_*`, up from 1280×720), so sprites (192 px source frames) scale
+*down* to their on-screen size and stay crisp; the old `_world_surf` 1067×600 →
+1600×900 upscale is gone. The HUD and feedback overlays draw afterwards at full
+resolution, untouched. `CAMERA_ZOOM = 1.0` is a byte-identical off switch
+(`_z_surf` is identity, every `* z` a no-op).
+
+Cost: `draw()` ≈ 4.4 ms/frame at 1.5×, unchanged from 1.0×; the terrain scaled-
+surface cache is bounded (~71 entries near spawn, a few hundred if the whole map
+is explored — small grass/prop surfaces). **Suite 391 → 397** (+6, all in
+`test_camera.py`). Nothing committed.
+
+### Follow-ups still open (from the plan's considerations)
+
+- Terrain is `smoothscale`d from the 1:1 bake, so marginally softer than the
+  pixel-sharp sprites. Fully crisp needs re-baking tiles at `TILE_PX * zoom`
+  (touches autotile-edge / water-scroll / anchor maths). Only worth it if it
+  reads as blurry in play.
+- A pixel-perfect mode would need integer `CAMERA_ZOOM` + nearest `scale` + the
+  camera snapped to the zoom grid.
+- A live (dev-menu) zoom slider would need `_z_surf` / the damage-number font
+  cache cleared on change — `draw_ground` already clears `_blit_cache` when
+  `camera.zoom` differs, so most of that plumbing exists.
+
+### Considerations
+
+- **Terrain still slightly soft.** C3 route (b) `smoothscale`s the baked room
+  surfaces; fully crisp terrain means re-baking tiles at `TILE_PX * zoom`
+  (autotile-edge, water-scroll and anchor maths all change — higher risk). Do (b)
+  first; keep (a) as a follow-up only if the terrain reads as blurry next to the
+  sharp sprites.
+- **`smoothscale` vs `scale`.** `smoothscale` for the non-integer 1.5×. A future
+  pixel-perfect mode = integer `CAMERA_ZOOM` + nearest `scale` + snapping the
+  camera to the zoom grid (kills sub-pixel follow jitter).
+- **Live zoom.** A dev-menu zoom slider would invalidate the C3 per-zoom caches —
+  out of scope; the caches assume `CAMERA_ZOOM` is fixed for the run.
+- **Memory.** Pre-scaled room surfaces cost ≈ `zoom²` (≈2.25×) the terrain cache
+  memory. Negligible at this scale.
+- **Perf.** All scaling is amortised into the C3 build caches; the per-frame path
+  is plain blits, same as today. Damage-number fonts cache per `(pt, zoom)`.

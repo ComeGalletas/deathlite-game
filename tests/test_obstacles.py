@@ -6,7 +6,7 @@ import pygame
 
 from entities.obstacle import Obstacle
 from world.map import GameMap
-from world.procedural import generate_world
+from world.procedural import SPECIAL_KINDS, generate_world
 
 
 class ObstacleCollisionTests(unittest.TestCase):
@@ -53,17 +53,56 @@ class ObstacleGenerationTests(unittest.TestCase):
             self.assertFalse(any(r.collidepoint(o.pos.x, o.pos.y)
                                  for o in w.obstacles))
 
-    def test_room_centres_kept_clear(self):
-        w = generate_world(9)
-        for room in w.rooms:
-            cx, cy = room.rect.center
-            clear = min(room.rect.width, room.rect.height) * 0.2
-            for o in w.obstacles:
-                if (o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2 < clear ** 2:
-                    self.fail(f"obstacle blocks the centre of room {room.id}")
+    def test_special_room_centres_kept_clear(self):
+        for seed in (5, 9, 42):
+            w = generate_world(seed)
+            for room in w.rooms:
+                if room.kind not in SPECIAL_KINDS:
+                    continue                       # combat rooms may fill the middle
+                cx, cy = room.rect.center
+                clear = min(room.rect.width, room.rect.height) * 0.2
+                for o in w.obstacles:
+                    if (o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2 < clear ** 2:
+                        self.fail(f"obstacle blocks the centre of {room.kind} "
+                                  f"room {room.id} (seed {seed})")
+
+    def test_combat_rooms_may_place_obstacles_near_the_centre(self):
+        seen = False
+        for seed in range(30):
+            w = generate_world(seed)
+            for room in w.rooms:
+                if room.kind != "combat":
+                    continue
+                cx, cy = room.rect.center
+                near = min(room.rect.width, room.rect.height) * 0.15
+                if any((o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2 < near ** 2
+                       for o in w.obstacles):
+                    seen = True
+        self.assertTrue(seen, "no combat room ever placed an obstacle mid-room")
 
     def test_some_obstacles_exist(self):
         self.assertGreater(len(generate_world(1).obstacles), 5)
+
+    def test_no_obstacle_on_a_corridor_doorway_tile(self):
+        from world.procedural import _corridor_doorways
+        px = 64
+        for seed in (1, 3, 7, 9, 42, 77, 123):
+            w = generate_world(seed)
+            slabs = _corridor_doorways(w.rooms, w.corridors)
+            door_tiles = [d.inflate(-2 * px, -2 * px)          # back to the bare 64px cell
+                          for lst in slabs.values() for d in lst]
+            for o in w.obstacles:
+                for tile in door_tiles:
+                    if tile.width > 0 and tile.collidepoint(o.pos.x, o.pos.y):
+                        self.fail(f"seed {seed}: {o.kind} sits on a corridor doorway")
+
+    def test_doorway_clearance_leaves_combat_rooms_populated(self):
+        w = generate_world(9)
+        combat = [r for r in w.rooms if r.kind == "combat"]
+        with_obstacles = sum(
+            1 for r in combat
+            if any(r.rect.collidepoint(o.pos.x, o.pos.y) for o in w.obstacles))
+        self.assertGreaterEqual(with_obstacles, max(1, len(combat) - 1))
 
 
 if __name__ == "__main__":

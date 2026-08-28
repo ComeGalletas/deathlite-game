@@ -78,7 +78,7 @@ class Game:
         gained = int(stats.get("currency", 0)
                      * self.meta_catalog.salvage_multiplier(self.save.meta))
         self.save.currency += gained
-        self.save.record_best(stats)
+        self.save.record_best(stats, difficulty=stats.get("difficulty", "normal"))
         for item in stats.get("dropped_items", ()):
             self.save.add_item(item)
         self.persist()
