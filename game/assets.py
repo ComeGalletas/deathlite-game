@@ -35,12 +35,12 @@ class Assets:
     # --- metadata -------------------------------------------------
     @property
     def meta(self) -> dict:
-        """Sprite rigs + terrain decoration rigs, one flat namespace so both use
-        the same `frames()` / `frame()` path."""
+        """Sprite rigs + terrain decoration rigs + UI rigs, one flat namespace so
+        all three use the same `frames()` / `frame()` path."""
         if self._meta is None:
             from game.content import get_content
             c = get_content()
-            self._meta = {**c.sprites, **c.terrain.get("rigs", {})}
+            self._meta = {**c.sprites, **c.terrain.get("rigs", {}), **c.ui_sprites}
         return self._meta
 
     @property

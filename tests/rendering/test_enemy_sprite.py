@@ -11,16 +11,13 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from entities.enemy import Enemy
-from entities.enemy_ai import EnemyContext
 from game.content import get_content
 from systems.animation import Animator
+from tests.aictx import ai_ctx
 
 
 def _ctx(dt=1 / 30, player=(0, 0)):
-    return EnemyContext(
-        dt=dt, player_pos=pygame.Vector2(*player), player=object(),
-        rng=random.Random(0), fire_projectile=lambda **k: None,
-        summon=lambda *a: None, explosion=lambda *a: None)
+    return ai_ctx(dt=dt, player=player)
 
 
 def make(eid, x=200, y=0):
@@ -37,17 +34,19 @@ class EnemyRigTests(unittest.TestCase):
             self.assertIsInstance(make(eid).anim, Animator, eid)
 
     def test_fsm_telegraph_and_attack_states_play_the_attack_anim(self):
+        def phase(enemy, name):
+            enemy.bb.slot("__machine__")["state"] = name
+
         e = make("charger")
         self.assertEqual(e._anim_name(), "idle")
-        e.ai["fs"] = "telegraph"
+        phase(e, "telegraph")
         self.assertEqual(e._anim_name(), "attack")
-        e.ai["fs"] = "attack"
+        phase(e, "attack")
         self.assertEqual(e._anim_name(), "attack")
-        e.ai["fs"] = "recover"
+        phase(e, "recover")
         self.assertEqual(e._anim_name(), "idle")
-        # brute uses ai["slam_state"] instead of ai["fs"]
         b = make("brute")
-        b.ai["slam_state"] = "telegraph"
+        phase(b, "telegraph")
         self.assertEqual(b._anim_name(), "attack")
 
     def test_hit_sets_the_tint_timer_but_not_a_hurt_anim(self):

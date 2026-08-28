@@ -19,6 +19,7 @@ import pygame
 
 from game import config
 from game.state import State
+from ui.panels import three_slice_h
 
 
 class MenuState(State):
@@ -74,19 +75,35 @@ class MenuState(State):
         cx = w // 2
         surface.fill(config.MENU_BG)
 
-        art = self.game.assets.picture(config.MENU_TITLE_IMAGE, size=(w, h))
-        if art is not None:
-            surface.blit(art, (0, 0))
-        else:
-            # Fallback: the title as text when the art file is absent.
-            title = self._title_font.render(config.TITLE, True, config.MENU_FG)
-            surface.blit(title, title.get_rect(center=(cx, 170)))
+        bg = (self.game.assets.picture(config.MENU_BACKGROUND_IMAGE, size=(w, h))
+             or self.game.assets.picture(config.MENU_TITLE_IMAGE, size=(w, h)))
+        if bg is not None:
+            surface.blit(bg, (0, 0))
 
-        panel_width = 500
-        band = pygame.Rect((w - panel_width) // 2, 500, panel_width, 320)
-        scrim = pygame.Surface(band.size, pygame.SRCALPHA)
-        pygame.draw.rect(scrim, config.MENU_SCRIM, scrim.get_rect(), border_radius=16)
-        surface.blit(scrim, band.topleft)
+        panel_width, panel_height = 625, 495   # +25% on both axes (was 500x320)
+        band = pygame.Rect((w - panel_width) // 2, 890 - panel_height,
+                           panel_width, panel_height)  # bottom pinned at 890, clear of the save summary
+
+        logo_native = self.game.assets.picture(config.MENU_LOGO_IMAGE)
+        if logo_native is not None:
+            logo_h = 390
+            logo_w = round(logo_h * logo_native.get_width() / logo_native.get_height())
+            logo = self.game.assets.picture(config.MENU_LOGO_IMAGE, size=(logo_w, logo_h))
+            surface.blit(logo, logo.get_rect(center=(cx, band.top - logo_h // 2 + 50 )))
+        else:
+            # Fallback: the title as text when the logo art is absent.
+            title = self._title_font.render(config.TITLE, True, config.MENU_FG)
+            surface.blit(title, title.get_rect(center=(cx, band.top - 60)))
+
+        panel = three_slice_h(self.game.assets, left="ui_banner_cap_left",
+                              mid="ui_banner_mid", right="ui_banner_cap_right",
+                              width=band.width, height=band.height)
+        if panel is not None:
+            surface.blit(panel, band.topleft)
+        else:
+            scrim = pygame.Surface(band.size, pygame.SRCALPHA)
+            pygame.draw.rect(scrim, config.MENU_SCRIM, scrim.get_rect(), border_radius=16)
+            surface.blit(scrim, band.topleft)
 
         # --- option list, centred ---
         top, step = 550, 44
@@ -102,7 +119,7 @@ class MenuState(State):
 
         nav = self._small.render("Up / Down    -    ENTER select    -    ESC quit",
                                  True, config.MENU_FG_DIM)
-        surface.blit(nav, nav.get_rect(center=(cx, top + len(self._options) * step + 6)))
+        surface.blit(nav, nav.get_rect(center=(cx, top + len(self._options) * step + 25)))
 
         # --- save summary, bottom centre ---
         save = self.game.save

@@ -111,12 +111,17 @@ COLOR_DAMAGE_IN = (235, 70, 70)      # damage the hero takes -- floating red num
 # The start screen has its own black / white palette; every other screen
 # keeps the COLOR_* palette above.
 MENU_BG = (0, 0, 0)
-MENU_FG = (255, 255, 255)
-MENU_FG_DIM = (170, 170, 170)
+MENU_FG = (170, 170, 170)
+MENU_FG_DIM = (0, 0, 0)
 # Optional full-screen title art, drawn over the fallback title text (the text
 # shows only when this file is missing). MENU_SCRIM is a translucent panel (RGBA)
 # laid over the art behind the option list so the white text stays readable.
-MENU_TITLE_IMAGE: str = "ui/title.png"
+MENU_TITLE_IMAGE: str = "ui/start_screen/title.png"
+# Full-screen backdrop, drawn under the logo; falls back to MENU_TITLE_IMAGE,
+# then to the flat MENU_BG fill.
+MENU_BACKGROUND_IMAGE: str = "ui/start_screen/menu_background.png"
+# The game logo, drawn above the options panel; falls back to rendered text.
+MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
 MENU_SCRIM = (0, 0, 0, 185)
 
 # Game instructions, surfaced on the character-select screen (they lived on the

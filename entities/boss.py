@@ -17,10 +17,12 @@ import pygame
 
 from combat.damage import apply_armor
 from combat.status import StatusState
-from entities.enemy_ai import EnemyContext
 from game import config
 from game.assets import get_assets
 from systems.animation import Animator
+
+# `ctx` in this module is the PlayingState AI adapter (satisfies entities.ai
+# Perception + Combat); duck-typed, so the methods take a bare `ctx`.
 
 
 class Boss:
@@ -116,7 +118,7 @@ class Boss:
             return "attack"                    # wind-up + the dangerous frames
         return "walk" if self.vel.length_squared() > 1.0 else "idle"
 
-    def update(self, ctx: EnemyContext) -> None:
+    def update(self, ctx) -> None:
         dt = ctx.dt
         self.contact_cd = max(0.0, self.contact_cd - dt)
         if self.hit_flash > 0.0:
@@ -153,7 +155,7 @@ class Boss:
         self.pos = ctx.resolve_movement(self.pos, self.pos + self.vel * dt * scale,
                                         self.radius)
 
-    def _status_damage(self, amount: float, ctx: EnemyContext) -> None:
+    def _status_damage(self, amount: float, ctx) -> None:
         if not self.alive:
             return
         self.hp -= amount
@@ -163,22 +165,22 @@ class Boss:
             self.alive = False
 
     # drift slowly toward the player unless a pattern overrides velocity
-    def _approach(self, ctx: EnemyContext, factor: float = 0.5) -> None:
+    def _approach(self, ctx, factor: float = 0.5) -> None:
         d = ctx.player_pos - self.pos
         self.vel = d.normalize() * self.speed * factor if d.length_squared() > 1 else pygame.Vector2()
 
-    def _phase_intro(self, ctx: EnemyContext) -> None:
+    def _phase_intro(self, ctx) -> None:
         self._approach(ctx, 0.3)
         if self.phase_t <= 0.0:
             self._next_pattern()
 
-    def _phase_telegraph(self, ctx: EnemyContext) -> None:
+    def _phase_telegraph(self, ctx) -> None:
         self._approach(ctx, 0.25)
         if self.phase_t <= 0.0:
             self._fire_pattern(ctx)
             self._enter("active", float(self.pattern.get("duration", 0.3)))
 
-    def _phase_active(self, ctx: EnemyContext) -> None:
+    def _phase_active(self, ctx) -> None:
         if self.pattern.get("id") == "charge":
             self.vel = self._charge_dir * float(self.pattern.get("charge_speed", 700))
             self.contact_damage = float(self.pattern.get("charge_damage", self._base_contact))
@@ -187,13 +189,13 @@ class Boss:
         if self.phase_t <= 0.0:
             self._enter("recover", float(self.pattern.get("recover", 1.5)))
 
-    def _phase_recover(self, ctx: EnemyContext) -> None:
+    def _phase_recover(self, ctx) -> None:
         self._approach(ctx, 0.5)
         if self.phase_t <= 0.0:
             self._next_pattern()
 
     # --- pattern effects ------------------------------------
-    def _fire_pattern(self, ctx: EnemyContext) -> None:
+    def _fire_pattern(self, ctx) -> None:
         pid = self.pattern.get("id")
         if pid == "radial_barrage":
             n = int(self.pattern.get("bullets", 18))

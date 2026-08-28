@@ -130,13 +130,25 @@ class ContactBiteTests(unittest.TestCase):
     def test_entering_the_attack_state_clears_the_contact_cooldown(self):
         """A charge / blink is a discrete impact -- it must land on first overlap
         even if the enemy bit the hero moments earlier."""
-        from entities.enemy_ai import _fsm_enter
         game, p = _run(hero_index=1)
         p._spawn_enemy("charger", at=p.player.pos.copy())
         charger = p.enemies[-1]
+
+        def state():
+            return charger.bb.slot("__machine__").get("state")
+
+        for _ in range(900):                           # run up to the wind-up
+            charger.update(p._enemy_context(DT))
+            if charger.telegraphing:
+                break
+        self.assertTrue(charger.telegraphing)
         charger.contact_cd = 5.0                        # would normally block a bite
-        _fsm_enter(charger, "attack", 0.5)             # dash begins -> cd cleared
-        self.assertEqual(charger.contact_cd, 0.0)
+        for _ in range(180):                            # ... through to the dash
+            charger.update(p._enemy_context(DT))
+            if state() == "attack":
+                break
+        self.assertEqual(state(), "attack")
+        self.assertEqual(charger.contact_cd, 0.0)       # cleared on attack entry
 
 
 # --------------------------------------------------------------------------

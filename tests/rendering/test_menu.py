@@ -140,7 +140,7 @@ class MenuPaletteAndTitleTests(unittest.TestCase):
 
     def test_palette_constants(self):
         self.assertEqual(config.MENU_BG, (0, 0, 0))
-        self.assertEqual(config.MENU_FG, (255, 255, 255))
+        self.assertEqual(config.MENU_FG, (170, 170, 170))
 
     def test_title_art_loads_at_screen_size(self):
         game, _ = _menu()
@@ -150,19 +150,34 @@ class MenuPaletteAndTitleTests(unittest.TestCase):
         self.assertIsNotNone(art, "assets/ui/title.png is missing")
         self.assertEqual(art.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
 
-    def test_missing_title_image_falls_back_to_black_plus_text(self):
+    def test_missing_background_images_fall_back_to_black(self):
         import logging
         game, menu = _menu()
-        original = config.MENU_TITLE_IMAGE
+        orig_bg, orig_title = config.MENU_BACKGROUND_IMAGE, config.MENU_TITLE_IMAGE
+        config.MENU_BACKGROUND_IMAGE = "definitely missing bg 98765.png"
         config.MENU_TITLE_IMAGE = "definitely missing 98765.png"
         logging.disable(logging.CRITICAL)
         try:
-            self.assertIsNone(game.assets.picture(config.MENU_TITLE_IMAGE))
             menu.draw(game.screen)                      # must not raise
             self.assertEqual(tuple(game.screen.get_at((2, 2)))[:3], config.MENU_BG)
         finally:
             logging.disable(logging.NOTSET)
-            config.MENU_TITLE_IMAGE = original
+            config.MENU_BACKGROUND_IMAGE, config.MENU_TITLE_IMAGE = orig_bg, orig_title
+
+    def test_missing_logo_image_falls_back_to_text(self):
+        import logging
+        game, menu = _menu()
+        original = config.MENU_LOGO_IMAGE
+        config.MENU_LOGO_IMAGE = "definitely missing logo 98765.png"
+        logging.disable(logging.CRITICAL)
+        try:
+            menu.draw(game.screen)                      # must not raise
+            logo_box = pygame.Rect(0, 0, config.SCREEN_WIDTH, 890 - 495 - 20)
+            self.assertGreater(_bright_pixels(game.screen, logo_box), 0,
+                              "no fallback text drawn when the logo art is missing")
+        finally:
+            logging.disable(logging.NOTSET)
+            config.MENU_LOGO_IMAGE = original
 
 
 def _bright_pixels(surface, rect):
@@ -189,8 +204,9 @@ class MenuHasNoInstructionsTests(unittest.TestCase):
     def test_menu_left_column_is_empty(self):
         import logging
         game, menu = _menu()
-        original = config.MENU_TITLE_IMAGE
+        orig_title, orig_bg = config.MENU_TITLE_IMAGE, config.MENU_BACKGROUND_IMAGE
         config.MENU_TITLE_IMAGE = "no image 4242.png"      # pure black bg
+        config.MENU_BACKGROUND_IMAGE = "no image 4243.png"
         logging.disable(logging.CRITICAL)
         try:
             menu.draw(game.screen)
@@ -199,7 +215,7 @@ class MenuHasNoInstructionsTests(unittest.TestCase):
                              "menu still draws something in the old instr column")
         finally:
             logging.disable(logging.NOTSET)
-            config.MENU_TITLE_IMAGE = original
+            config.MENU_TITLE_IMAGE, config.MENU_BACKGROUND_IMAGE = orig_title, orig_bg
 
 
 def _select():

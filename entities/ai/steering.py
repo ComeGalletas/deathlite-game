@@ -31,9 +31,23 @@ class Steering:
     def is_empty(self) -> bool:
         return self._absolute is None and not self._any
 
+    def direction(self) -> pygame.Vector2:
+        """The unit direction of everything accumulated so far (or the absolute
+        override's direction, or zero). Lets a late component -- `Unstick` --
+        nudge relative to where the actor is already trying to go."""
+        v = self._absolute if self._absolute is not None else self._acc
+        return v.normalize() if v.length_squared() > 1e-12 else pygame.Vector2()
+
     def resolve(self, speed: float) -> pygame.Vector2:
         if self._absolute is not None:
             return pygame.Vector2(self._absolute)
-        if not self._any or self._acc.length_squared() < 1e-12:
+        if not self._any:
             return pygame.Vector2()
-        return self._acc.normalize() * speed
+        m2 = self._acc.length_squared()
+        if m2 < 1e-12:
+            return pygame.Vector2()
+        if m2 >= 1.0 - 1e-9:
+            return self._acc.normalize() * speed
+        # magnitude below 1 -> proportional speed (a lone weight-0.3 seek moves at
+        # 0.3 * speed -- how the old FSM "recover" / summoner drift was expressed)
+        return pygame.Vector2(self._acc) * speed

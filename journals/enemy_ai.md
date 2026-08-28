@@ -240,4 +240,192 @@ weight / override / empty; single-state run, empty-state root, per-actor state
 isolation, `time_in_state` reset on transition, transition-after-tick ordering,
 construction guards; registry build/cfg/unknown/double-register.
 
-## R2 — steering components  (next)
+## R2 — steering components  ✅ (suite 544 → 561)
+
+`entities/ai/components/` -- six dataclasses, each ticked against a `Perception`,
+defaults copied verbatim from `entities/enemy_ai.py`. **Still no game wiring.**
+
+| component | params (default) | ports |
+|---|---|---|
+| `SeekTarget` | `via="nav"`, `slew=9.0`, `weight=1.0` | `_toward`, `_approach`, `path_chase` heading + slew. `via="nav"` reads `per.nav_dir`, straight-line fallback on a zero vector (so `config.ENEMY_PATHFINDING` off just means "always straight" -- `nav_enabled` disappears). `slew` state in `bb.slot(key)["heading"]`. |
+| `Flee` | `weight=1.0` | the `-_toward` retreat branches |
+| `MaintainRange` | `distance=240`, `band=30`, `close_via="nav"` | kiter / warlock hold logic. In-band ⇒ contributes nothing ⇒ actor roots (old `enemy.vel = 0` feel). |
+| `Separation` | `radius_mult=1.6`, `cap=0.6`, `weight=1.0` | `_separation` (`per.neighbors`) |
+| `AvoidObstacles` | `margin=14.0`, `cap=0.7`, `weight=1.0` | `_obstacle_avoid` (`per.obstacles_near`) |
+| `Unstick` | `seconds=0.4`, `progress_frac=0.3`, `nudge_strength=1.5`, `nudge_seconds=0.35` | `_unstick`. Order it **last** -- it reads `acc.direction()` (new `Steering` method) to nudge perpendicular to the accumulated heading, so no key coupling to `SeekTarget`. |
+
+`Steering` gained `direction()` -- unit of the running force sum (or the
+`set_velocity` override's direction, or zero).
+
+Tests: `tests/test_ai_components.py` (17) -- straight vs nav vs nav-fallback;
+slew eases a turn / snaps a 180; flee/close/hold; separation close-only,
+skip-self/dead, capped; obstacle push within/outside margin; unstick
+progress-gate / fires-after-pinned / perpendicular / deterministic; **parity**:
+`[SeekTarget(via="nav"), Separation, AvoidObstacles, Unstick]` with nav off + no
+crowd + no props + not stuck resolves to exactly the old straight `chase`.
+
+## R3 — port the simple behaviours  ✅ (suite 561 → 567)
+
+`entities/ai/behaviors/simple.py` -- one `move` state each, built from R2
+components; registered on import (`entities/ai/behaviors/__init__` is imported by
+`entities/ai/__init__`, so `build_behavior` works everywhere). **Not yet
+consumed by `Enemy`.**
+
+| name | build |
+|---|---|
+| `chase`, `chaser` | `{"move": [SeekTarget(via="straight", slew=0)]}` |
+| `path_chase` | `{"move": [SeekTarget(via="nav"), Separation, AvoidObstacles, Unstick]}` |
+| `swarm` | same as `path_chase` today -- kept as the tuning hook for the planned tighter crowd behaviour |
+
+Every component param reads `cfg.get(key, <old default>)` (`nav_slew`,
+`seek_weight`, `separation_mult/cap`, `obstacle_margin/cap`, `stuck_seconds`,
+`nudge_strength`) -- absent in `enemies.json` today so behaviour is unchanged,
+but a variant can now be re-tuned in data without a new behaviour.
+
+Tests: `tests/test_ai_behaviors_simple.py` (6) -- registration + state shape;
+**frame-by-frame parity**: `build_behavior("path_chase").tick(...)` matches the
+old `entities.enemy_ai.path_chase` `vel` to 1e-4 over 60 frames with a live nav
+route + a crowding neighbour + a prop in the margin; `chase` matches the old
+straight function; `path_chase` with the field silent reduces to the same result
+the old code's `nav_enabled=False` early-return gave.
+
+## R4 — machine + attack / timing components  ✅ (suite 567 → 579)
+
+Machine grew the FSM plumbing; the attack primitives landed. **Still no game
+wiring.**
+
+`machine.py`:
+- `time_in_state(actor)` free function (predicates need it without a `Behavior`).
+- `OneShot(Component)` base -- `fire(actor, per, cmb)` runs once per state entry
+  (tracks the machine's `visit` counter).
+- `Transition` gains `on(actor, per)` -- a side-effect fired when the transition
+  takes (locks a charge direction, snapshots a cast target).
+- `Behavior(always=[...])` -- components ticked every frame in any state (for
+  `Cooldown`, which the old FSM decremented regardless of phase); `set_state`
+  bumps `visit`.
+
+`steering.py`: `resolve()` -- a summed force with magnitude **< 1** now yields
+`|acc| * speed` (proportional), so a lone weight-0.3 `SeekTarget` gives the old
+`recover` / summoner-drift speed. `>= 1` still normalizes. Verified against the
+R2/R3 parity tests.
+
+`components/timing.py`: `Cooldown(seconds, start_ready)` (`ready` / `trigger`);
+`OnEnter(action)`; predicates `after`, `in_range`, `out_of_range`, `ready(cd)`,
+`all_of`, `any_of`.
+
+`components/ranged.py`: `FireProjectile(interval, damage, speed, radius,
+max_range)` (kiter shot -- timer stays elapsed while out of range, fires on
+re-entry, matching the old code); `SummonBrood(interval, enemy_id, count)`;
+`CastHazard(radius, dps, duration, tick_interval)` (`OneShot`; target from
+`bb.slot(ATTACK_SLOT)["cast_at"]`).
+
+`components/attacks.py`: `Charge(speed, damage)` (per-frame `set_velocity` along
+`bb.slot(ATTACK_SLOT)["dir"]`); `Blink(min_offset, max_offset, damage)`
+(`OneShot`, seeded); `Explosion(radius, damage, require_range)` (`OneShot`, the
+brute's slam); `Explode(fuse_range)` (self-destruct).
+
+`MaintainRange` gained `close_weight` (summoner closes in at 0.4x speed).
+
+Tests: `tests/test_ai_machine_components.py` (9) -- cooldown count/reload/
+start-ready; predicates; `FireProjectile` interval + range gate; `SummonBrood`
+interval; `Explode` fuse; `Blink` deterministic + lands near the player; **a full
+`chase → telegraph → attack → recover` machine** wired from the pieces: cycles
+all four states, rooted during telegraph, exactly one blast per attack visit.
+
+## R5 — port the rest + wire it in  ✅ (suite 579 → 586, `ENEMY_AI_V2` on)
+
+### Builders
+
+`entities/ai/behaviors/_telegraph.py` `telegraph_cycle(...)` -- the shared
+`chase → telegraph → attack → recover` shape from R4 pieces: `Cooldown` in
+`always`, `in_range` + `ready(cd)` guard into telegraph, `after(windup)` into
+attack (its `on` runs `contact_cd = 0` then the caller's one-shot), `after`s
+through attack/recover, `cd.trigger` on the way back to chase; `recover` drifts
+at `recover_weight * speed`.
+
+`behaviors/ranged.py` -- `kite_shoot` (`MaintainRange` + `FireProjectile`
+`max_range = prefer_distance * 1.8`), `summoner` (`MaintainRange(band=0,
+close_weight=0.4)` + `SummonBrood`).
+
+`behaviors/melee.py` -- `exploder` (`SeekTarget(nav)` + `Explode`); `brute`
+(2-state, slam fires on the `telegraph → chase` transition `on`); `fsm_charger`
+(`telegraph_cycle`, `on_windup_end` locks the dash dir, `attack=[Charge]`);
+`fsm_teleporter` (`telegraph_cycle`, `on_windup_end` = the seeded blink, empty
+`attack` state = rooted); `fsm_warlock` (`telegraph_cycle`, `on_windup_start`
+snapshots `cast_at`, `on_windup_end` drops the hazard). All 8 `enemies.json`
+behaviour names resolve.
+
+`Transition.on` now takes `(actor, per, cmb)` so a transition can fire a combat
+action (the brute's slam).
+
+### Wiring
+
+- `config.ENEMY_AI_V2 = True` (via `getattr(config, ..., True)` at the call
+  sites, so it survives config churn).
+- `entities/enemy.py`: `self.bb = Blackboard()`, `self._behavior =
+  build_behavior(self.behavior, self.cfg)` when v2; `update()` calls
+  `self._behavior.tick(self, ctx, ctx)` (the ctx satisfies `Perception` +
+  `Combat`) else the legacy `BEHAVIORS` dispatch. `_attacking` / `telegraphing`
+  read `bb.slot("__machine__")["state"]` under v2 so the sprite still plays the
+  wind-up / strike anims.
+- `game/states/playing_state.py::_enemy_context`: builds a `SimpleNamespace`
+  Perception+Combat adapter when v2 (adds `now`, `is_walkable`; drops the
+  `EnemyContext` type and `nav_enabled`), else the legacy `EnemyContext`. The
+  **boss reads it unchanged** either way (it only touches the shared callbacks).
+
+### Verification
+
+- Timer-free movers (`kite_shoot` / `summoner` / `exploder`) match the old
+  function **frame-by-frame** (`tests/test_ai_behaviors_fsm.py`).
+- The telegraph FSMs use a different timer engine (`entered >= t` vs subtractive
+  `ft`), so they drift ~1 frame on a phase boundary -- checked for behavioural
+  equivalence instead: same state set, effect counts within 1, right speed per
+  phase (dash = `charge_speed`, telegraph rooted, recover ~`0.3 * speed`).
+- `tests/test_fsm_enemies.py` / `test_enemy_sprite.py` updated to read the v2
+  machine state.
+- **Full-game A/B**: 11-type crowded PlayingState sim (600 frames) -- v1 and v2
+  give **byte-identical** aggregate results (11/11 close, mean 378 → 117).
+- One unrelated red: `test_menu.test_palette_constants` (a concurrent
+  `config.MENU_FG` edit).
+
+## R6 — delete the old path  ✅ (suite 586 → 573; **refactor complete**)
+
+- **`entities/enemy_ai.py` deleted** -- `BEHAVIORS`, the ten behaviour fns,
+  `_fsm_common` / `_fsm_enter`, the six steering helpers, the eight `_UPPER`
+  constants and `EnemyContext` all gone.
+- `config.ENEMY_AI_V2` removed; `Enemy` always builds a composable behaviour.
+- `entities/enemy.py`: no legacy dispatch, no `self.ai` dict, no `_ai_v2`;
+  `_attacking` / `telegraphing` read only `bb.slot("__machine__")["state"]`.
+- `entities/boss.py`: dropped the `EnemyContext` import; `ctx` methods are now
+  bare-annotated (the runtime object is the PlayingState adapter). Boss still
+  runs its own phase FSM -- a future milestone can port it onto the same
+  components, but it was never in this refactor's scope.
+- `game/states/playing_state.py::_enemy_context`: one code path -- the
+  `SimpleNamespace` Perception+Combat adapter, handed to every enemy **and the
+  boss**.
+- Tests: `tests/aictx.py` (`ai_ctx()` fake) replaces `EnemyContext` in
+  `test_boss` / `test_enemy_sprite` / `test_fsm_enemies` / `test_incoming_damage`
+  (the `_fsm_enter` poke became "drive the machine to `attack`, assert
+  `contact_cd == 0`"). `test_enemy_ai.py` slimmed to `ShieldTests` +
+  `BehaviorTests` (the helper-function tests moved to `test_ai_components` /
+  `test_ai_behaviors_*`); the R5 parity files became self-contained
+  behaviour tests now that there is nothing to compare against.
+- Full-loop smoke (900 frames, all 10 enemy types + boss): 0.91 ms/frame, no
+  crash, composable AI and the boss FSM coexist on the shared adapter.
+- One unrelated red throughout: `test_menu.test_palette_constants` (a
+  concurrent `config.MENU_FG` edit).
+
+---
+
+## Status: complete (R1–R6)
+
+`entities/ai/` is a self-contained package -- `Perception` / `Combat` protocols,
+`Blackboard`, `Steering`, a `Component` + state-machine core, a `@behavior`
+registry, ~15 components, 10 behaviour builders. It imports only `pygame`,
+`game.config`, and `world` is untouched. A new variant that reuses components is
+JSON; a new *kind* of move is one component file + one line in a builder.
+
+### Follow-ups parked
+- Port `Boss` onto the same components (its phase FSM is the last bespoke AI).
+- `push_radius` enemy-vs-enemy crowd-collision pass as its own system.
+- `data/behaviors.json` so behaviour *shape* is data too, not just numbers.
