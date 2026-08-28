@@ -671,7 +671,10 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         from game import config
         from systems.camera import Camera
         gm = self._map()
-        i, o = next((i, o) for i, o in enumerate(gm.obstacles) if i in gm._decos)
+        # a kind driven by the global drop, not a per-kind `sprite_drop` override
+        # (houses pin their own value, so toggling the config would do nothing).
+        i, o = next((i, o) for i, o in enumerate(gm.obstacles)
+                    if i in gm._decos and o.kind not in gm._sprite_drop)
         ax, ay, _fps, _frs = gm._decos[i]
         cam = Camera(gm.width, gm.height)
         cam.snap_to(o.pos)

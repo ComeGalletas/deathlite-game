@@ -25,6 +25,31 @@ class ObstacleCollisionTests(unittest.TestCase):
         out = self.gm.resolve_movement(prev, pygame.Vector2(1600, 1585), 12)
         self.assertLessEqual(out.y, prev.y + 1)   # blocked on the Y axis
 
+    def test_resolve_movement_hops_a_fully_wedged_entity_free(self):
+        gm = GameMap()
+        prev = pygame.Vector2(1000, 1000)
+        new = pygame.Vector2(1020, 1020)                 # a diagonal move
+        gm.obstacles = [Obstacle("tree", 1030, 1030),    # blocks the full move
+                        Obstacle("tree", 1030, 1000),    # blocks the x-slide
+                        Obstacle("tree", 1000, 1030)]    # blocks the y-slide
+        self.assertFalse(gm.is_walkable(new, 10))
+        self.assertFalse(gm.is_walkable(pygame.Vector2(new.x, prev.y), 10))
+        self.assertFalse(gm.is_walkable(pygame.Vector2(prev.x, new.y), 10))
+        out = gm.resolve_movement(prev, new, 10)
+        self.assertNotEqual(out, prev)                   # it found an out
+        self.assertTrue(gm.is_walkable(out, 10))
+        self.assertLessEqual((out - prev).length(), 13.0)   # a hop, not a teleport
+        self.assertGreater(out.x, prev.x)               # toward the goal, not away
+        self.assertGreater(out.y, prev.y)
+
+    def test_resolve_movement_stays_put_when_every_hop_is_blocked(self):
+        gm = GameMap()
+        prev = pygame.Vector2(1000, 1000)
+        gm.obstacles = [Obstacle("rock", 1000 + dx, 1000 + dy)
+                        for dx in (-24, 0, 24) for dy in (-24, 0, 24)]
+        self.assertEqual(gm.resolve_movement(prev, pygame.Vector2(1020, 1020), 10),
+                         prev)
+
     def test_every_obstacle_kind_blocks_projectiles(self):
         self.gm.obstacles = [Obstacle("rock", 1600, 1600),
                              Obstacle("tree", 1600, 1200),

@@ -8,9 +8,10 @@ Start-screen milestones: M1 gave the list its navigation; M2 wired "Options" to
 the Options screen; M3 gave this screen its own black / white palette and an
 optional full-screen title image (`config.MENU_TITLE_IMAGE`) drawn over a text
 fallback, with a translucent scrim behind the content so the white text stays
-readable over the art; M4 moved the game instructions into their own left-hand
-column at ~85% of the option font. Developer-mode milestone D1 wired the
-"developer mode" entry to a non-persistent sandbox run.
+readable over the art. Developer-mode milestone D1 wired the "developer mode"
+entry to a non-persistent sandbox run. The game instructions that M4 put in a
+left-hand column here later moved to the character-select screen (they read
+better next to the hero preview); see `config.MENU_INSTRUCTIONS`.
 """
 from __future__ import annotations
 
@@ -23,11 +24,8 @@ from game.state import State
 class MenuState(State):
     def enter(self, **kwargs) -> None:
         self._menu_font_px = 24
-        # The instructions section is ~15% smaller than the option font.
-        self._instr_font_px = round(self._menu_font_px * 0.85)
         self._title_font = pygame.font.SysFont("georgia", 64, bold=True)
         self._font = pygame.font.SysFont("georgia", self._menu_font_px)
-        self._instr_font = pygame.font.SysFont("georgia", self._instr_font_px)
         self._small = pygame.font.SysFont("georgia", 16)
 
         # (label, action). `action` is dispatched in _activate(); an entry whose
@@ -40,19 +38,6 @@ class MenuState(State):
             ("Exit", "exit"),
         ]
         self._index = 0
-
-        # Game instructions -- a (label, keys) grid plus free lines, shown in a
-        # left-hand column (M4).
-        self._instr_rows: list[tuple[str, str]] = [
-            ("Move", "WASD / Arrows"),
-            ("Pause", "ESC"),
-            ("Mute", "M"),
-            ("Debug overlay", "F1"),
-        ]
-        self._instr_notes: list[str] = [
-            "Weapons fire on their own.",
-            "Survive, level up, beat the boss.",
-        ]
 
     # --- input ---------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -97,15 +82,14 @@ class MenuState(State):
             title = self._title_font.render(config.TITLE, True, config.MENU_FG)
             surface.blit(title, title.get_rect(center=(cx, 170)))
 
-        band = pygame.Rect(40, 338, w - 80, 360)
+        panel_width = 500
+        band = pygame.Rect((w - panel_width) // 2, 500, panel_width, 320)
         scrim = pygame.Surface(band.size, pygame.SRCALPHA)
         pygame.draw.rect(scrim, config.MENU_SCRIM, scrim.get_rect(), border_radius=16)
         surface.blit(scrim, band.topleft)
 
-        self._draw_instructions(surface, band)
-
         # --- option list, centred ---
-        top, step = 372, 44
+        top, step = 550, 44
         for i, (label, _action) in enumerate(self._options):
             selected = i == self._index
             colour = config.MENU_FG if selected else config.MENU_FG_DIM
@@ -129,22 +113,3 @@ class MenuState(State):
                    f"Items found {len(save.discovered_items)}")
         s = self._small.render(summary, True, config.MENU_FG_DIM)
         surface.blit(s, s.get_rect(center=(cx, h - 40)))
-
-    def _draw_instructions(self, surface: pygame.Surface, band: pygame.Rect) -> None:
-        """Game instructions, left-justified in a column on the left of the band
-        (M4). Left of the centred option list, at ~85% of the option font."""
-        x = band.left + 28
-        keys_right = x + 262           # right-aligned key column, clear of the menu
-        y = band.top + 26
-        surface.blit(self._instr_font.render("Instructions", True, config.MENU_FG),
-                     (x, y))
-        y += self._instr_font_px + 12
-        for label, keys in self._instr_rows:
-            surface.blit(self._instr_font.render(label, True, config.MENU_FG_DIM), (x, y))
-            val = self._instr_font.render(keys, True, config.MENU_FG_DIM)
-            surface.blit(val, val.get_rect(topright=(keys_right, y)))
-            y += self._instr_font_px + 7
-        y += 12
-        for note in self._instr_notes:
-            surface.blit(self._instr_font.render(note, True, config.MENU_FG_DIM), (x, y))
-            y += self._instr_font_px + 7

@@ -2172,30 +2172,189 @@ gradient in O(1) with no per-enemy path, waypoint, or repath state.
   a crowded scene, before turning the flag on by default.
 
 ### Implementation order
-- [ ] **M1 — NavGrid (pure, tested).** `world/pathfinding.py`:
-  `NavGrid(layout, obstacles, cell)` -> walkable mask + clearance array from the
-  room/corridor geometry and obstacle circles; world<->cell conversion. Tests:
-  mask agrees with `is_walkable` on samples; corridors connect rooms; obstacle /
-  room-void cells blocked; deterministic; build-time budget.
-- [ ] **M2 — FlowField (pure, tested).** `FlowField(navgrid)` with
-  `rebuild(target_world, min_clearance)` (full-grid bucket-queue Dijkstra) and
-  `direction_at(world_pos) -> Vector2` (downhill gradient, zero if unreachable).
-  Tests: gradient descends to target; routes around an obstacle wall and through
-  a doorway; respects `min_clearance`; deterministic; relaxation-count cap holds.
-- [ ] **M3 — Wire into PlayingState.** Own the NavGrid + one FlowField per grid
-  in `enter`; rebuild on the staggered timer at `self.player.pos`; expose
-  `nav_dir(pos, radius) -> Vector2` on `EnemyContext`. Add
-  `config.ENEMY_PATHFINDING` (default off initially).
-- [ ] **M4 — `path_chase` behavior + separation.** New behavior in
-  `entities/enemy_ai.py`: `vel = nav_dir(...) * speed`, slewed, blended with a
-  `SpatialGrid` separation vector and the unstick nudge; fall back to
-  `_toward(player)` when the field returns zero. Enable it in `data/enemies.json`
-  for `chaser` / `fast` / `tank` / `swarm` / `shielded` / `elite`.
-- [ ] **M5 — FSM / special movement phases.** Swap the chase-phase `_toward`
-  calls in `_fsm_common`, `summoner`, `kite_shoot`, `fsm_warlock` for the nav
-  direction; leave telegraph / charge / blink / attack phases straight-line.
-- [ ] **M6 — Profile + enable.** Overlay counters, crowded-scene test, then flip
-  `ENEMY_PATHFINDING` on by default once frame time holds.
+- [x] **M1 — NavGrid (pure, tested).** `world/pathfinding.py` +
+  `tests/test_pathfinding.py` (13). `NavGrid(layout, obstacles, cell=32)` builds:
+  `walkable` (cell centre on room `cells` or in a corridor rect -- mirrors
+  `GameMap._point_ok`, 0 cell mismatches over 5 seeds), `corridor` (walkable cell
+  centre inside a corridor rect -- the only inter-room links), and `clearance`
+  (px to the nearest wall via a two-pass (1, sqrt2) chamfer, pulled in half a
+  cell so it never out-runs the real geometry, then lowered by the exact
+  `dist - radius` to each nearby obstacle edge, capped at 96). `passable(col,
+  row, r)` = `walkable and clearance >= r`. Conversions: `cell_of` / `world_of`
+  / `in_bounds` / `idx`. Build ~40-50 ms for a ~20 k-cell world; deterministic.
+  Findings for M2/M3:
+  * `passable(r)` vs `GameMap.is_walkable(centre, r)` agrees ~97-99%; every
+    disagreement is nav being *more* conservative at r >= 20 and only mildly
+    permissive (<= ~3 %, always within one cell of a boundary) at r <= 14 --
+    `resolve_movement` stays the final guard, as planned.
+  * The exact obstacle-edge term is load-bearing: a tree ring (22 px) is
+    narrower than a 32 px cell and can sit entirely between cell centres, so a
+    pure cell raster would miss it.
+  * **One-tile (64 px) corridors are 2 cells wide, so no cell centre clears
+    radius 24** -- a small enemy (r14) routes start -> boss fine, but the big
+    rare enemies (tank r24, brute r30) need M3 to treat `corridor` cells as
+    passable regardless of clearance (BFS with that leniency reconnects them).
+  * Unrelated pre-existing breakage found + fixed: `test_terrain.
+    test_obstacle_skin_is_seated_below_the_collider_by_the_drop` picked the first
+    skinned obstacle, now a `house`, whose committed `sprite_drop` override pins
+    its own drop -- so toggling `config.SPRITE_ANCHOR_DROP` moved nothing. The
+    test now selects a kind with no `sprite_drop` override. **Suite 462 -> 475.**
+- [x] **M2 — FlowField (pure, tested).** `world/pathfinding.FlowField(navgrid)`
+  + 10 tests. `rebuild(target_world, min_clearance=0, corridor_lenient=True)`
+  runs Dial's algorithm (integer bucket queue -- costs are sums of two fixed
+  step weights `cell` / `round(cell*sqrt2)`, so no heap) from the target cell
+  across **every** reachable cell (~4 k cells, ~7 ms). A cell is traversable iff
+  `navgrid.passable(cell, min_clearance)` or (when `corridor_lenient`) it is a
+  corridor cell; diagonal steps that would clip a blocked corner are refused;
+  the target cell is snapped to the nearest traversable cell (spiral, <= 6 rings)
+  when the raw target sits in a wall / obstacle. `direction_at(world_pos)`
+  returns the clearance-weighted blend of the steps to every strictly-lower-cost
+  neighbour (any-angle, wall-hugging), zero on the target cell / an unreachable
+  cell / before any rebuild. `cost_at(world_pos)` exposes the raw cost.
+  `relax_cap = 8 * cells` is a runaway guard only (never hit on a real world).
+  A per-`(min_clearance, corridor_lenient)` traversable mask is cached so M3's
+  two grids x one-or-two radius classes do not recompute it each cycle.
+  Tests: every reachable non-target cell has a strictly-lower-cost neighbour
+  (the invariant M4 rides); a sampled gradient walk trends down and lands on the
+  target; the field covers the whole world (boss room reached from a start-room
+  target); `min_clearance` / corridor-leniency honoured; big enemy (r24) is
+  stranded without leniency and connected with it; deterministic; route never
+  leaves navigable ground. **Suite 475 -> 485.**
+- [x] **M3 — Wire into PlayingState.** `world/pathfinding.NavField` (dual grid +
+  field coordinator) + `tests/test_enemy_nav.py` (10). Classes `_NAV_CLASSES`:
+  `small` (32 px cell, radius <= 16, field `min_clearance` 16), `large` (48 px,
+  radius > 16, `min_clearance` 22); an enemy uses the first class its radius fits.
+  `NavField.rebuild(target)` refreshes both fields (corridor-lenient);
+  `direction(pos, r)` / `cost(pos, r)` sample the fitting class;
+  `target_cell_drift(pos)` gives the Chebyshev cell distance from the last aim.
+  `config.ENEMY_PATHFINDING` (default **off**) + `ENEMY_NAV_REBUILD_INTERVAL`
+  (0.4 s). `PlayingState`: builds `self._nav` in `enter` (one-time ~55 ms) with
+  an immediate first rebuild; `_update_nav(dt)` (called from `_phase_update`
+  after the camera) rebuilds on the interval **or** once the player has drifted
+  `_NAV_DRIFT_CELLS = 2` cells (a bare `target_cell_changed` fired ~8x/s at run
+  speed -> an 8 ms rebuild every ~7 frames); `_enemy_context` passes
+  `nav_dir=self._nav_dir`. `EnemyContext.nav_dir` default returns a zero vector.
+  Rebuild cost both fields ~8 ms; M6 will stagger / time-slice it. With the flag
+  off `self._nav is None` and nothing changes; with it on the field builds and
+  rebuilds but **no behaviour reads `ctx.nav_dir` yet** -- chasers still steer
+  straight (asserted). **Suite 485 -> 495.**
+- [x] **M4 — `path_chase` behavior + separation.** `entities/enemy_ai.py`
+  `path_chase` + `tests` (6 in `test_enemy_ai.PathChaseTests`, 1 wiring in
+  `test_enemy_nav`). Steps: ease a stored `nav_head` toward `ctx.nav_dir`
+  (`_SLEW_RATE 9/s`, snap on a near-180deg flip); add `_separation` (query
+  `ctx.neighbors` within `1.6 * radius`, push scaled by closeness, capped at
+  `_SEP_MAX 0.6` so it never overrides the heading); add `_unstick` (no move
+  beyond `20 px` for `_STUCK_SECONDS 0.8` -> a `_NUDGE_SECONDS 0.35`
+  perpendicular nudge, random side from `ctx.rng`); `vel = steer.normalize() *
+  speed`, falling back to `_toward(player)` whenever the field is silent.
+  **`EnemyContext` gains `nav_enabled` + `neighbors`**; when `nav_enabled` is
+  False `path_chase` is *exactly* `chase`, so the flag still gates the whole
+  feature even though `data/enemies.json` now names `path_chase` for `chaser` /
+  `fast` / `tank` / `swarm` / `shielded` / `elite`. `PlayingState._enemy_context`
+  passes `nav_enabled=self._nav is not None` and
+  `neighbors=self._nav_neighbors` (-> `SpatialGrid.query_circle`, one phase
+  stale, fine for separation). Determinism: separation/slew are pure, the nudge
+  side draws from the seeded run RNG. **Suite 495 -> 501** (one unrelated
+  pre-existing failure: `test_menu.test_instruction_text_renders_left_of_centre`
+  -- a local uncommitted edit comments out `menu_state._draw_instructions`).
+- [x] **M5 — FSM / special movement phases.** New `entities/enemy_ai._approach`
+  (flow field when `nav_enabled` and it has a route from here, else `_toward`)
+  swapped into every *move-toward-the-player* phase: `_fsm_common` `chase` +
+  `recover` (charger / teleporter / warlock ride it), `summoner`'s close-in
+  branch, `kite_shoot`'s close-in branch, `fsm_warlock`'s close-in branch, and
+  the direct `chase()` calls in `exploder` and `brute`. Left straight-line:
+  telegraph, `fsm_charger` dash (`ai["dir"]` locked at telegraph end), teleporter
+  blink, every retreat / kite-back branch (the field only points *to* the
+  player). Retreat still calls `_toward` directly. `nav_enabled` False ->
+  `_approach` == `_toward`, so all `test_fsm_enemies` / kiter / summoner tests
+  pass untouched. Tests: `test_enemy_ai.SpecialMoverNavTests` (7) -- helper
+  fallback, charger chase routes / dash ignores the field, kiter closes via
+  field but retreats straight, summoner/exploder/brute approach via field,
+  flag-off stays straight. Sim (flag on, seed 7): charger 503->64, exploder
+  reaches + detonates, summoner holds ~200. **Suite 501 -> 507**
+  (`test_menu.test_instruction_text_renders_left_of_centre` still red from the
+  unrelated local `_draw_instructions` comment-out).
+- [x] **M6 — Profile + enable.** Staggered rebuild: `NavField.rebuild(target,
+  only=name)` rebuilds a single grid; `PlayingState._update_nav` round-robins one
+  grid per periodic tick at `ENEMY_NAV_REBUILD_INTERVAL / n_grids` spacing (each
+  grid still refreshed every 0.4 s, but only one ~4 ms rebuild per frame instead
+  of ~8 ms both). A player jump (>= `_NAV_DRIFT_CELLS` = 2) still repaths every
+  grid at once. Debug overlay gains a `nav` line (`on <last-rebuild-ms> x<count>`,
+  set from `perf_counter` around the rebuild). Crowded-scene profile (seed 7, 220
+  mixed enemies incl. all FSM types, 1200 frames, player jitter driving the drift
+  trigger too): whole-update **p50 4.3 / p90 5.2 / p99 9.9 / max 12.3 ms**;
+  rebuilds now avg **4.1 / max 6.8 ms** (was ~8 / ~11); **zero frames over the
+  60 fps budget** (was 2), ~2 % over the 120 fps budget at ~10 ms (the p50 4.3 ms
+  is the 220-enemy update itself, not nav). `config.ENEMY_PATHFINDING` flipped
+  **on by default**; full suite stays green (512, one unrelated pre-existing
+  `test_menu` failure). Tests: `test_enemy_nav.NavRebuildStaggerTests` (5) --
+  one-grid-per-tick cycling, jump rebuilds all, `only=` isolates a field, overlay
+  counter present, flag default true.
+
+**Status: complete (M1-M6). Suite 462 -> 512.** `config.ENEMY_PATHFINDING`
+default on; set it False for the old straight-steering behaviour.
+
+### Follow-up — tighten the residual stuck cases ✅ (all 4 done, suite 518 → 528)
+
+The flow field routes `path_chase` and the FSM approach phases around obstacles
+and through doorways for the common case. What can still stall an enemy: (a) an
+enemy on a cell the field never reached (clearance < its radius, or genuinely
+unreachable) falls back to a blind straight `_toward` and can beeline into an
+obstacle; (b) the deliberately-straight phases (charge dash, blink, telegraph)
+can bonk a prop -- intentional; (c) doorway crowd jams; (d) mild wall-hug near
+grid boundaries. Improvements to make next (denser nav grid deliberately left
+out -- ~2x rebuild cost for a small gain):
+
+- [x] **Smarter off-field fallback.** `FlowField.steer_at(world_pos)` -- the
+  gradient (`direction_at`) on a reached cell, else `_escape_dir`: widening
+  rings (1..3 cells) around the enemy's cell, take the lowest-cost cell in the
+  nearest ring that had *any* reached cell, and return a unit bearing toward it.
+  Zero only when the enemy is on the target cell or nothing is reached within 3
+  rings (then `_approach` / `path_chase` still fall back to straight `_toward`).
+  `NavField.direction` now calls `steer_at`, so `ctx.nav_dir` at a too-tight
+  pocket returns a real bearing toward the field instead of zero -- no code
+  change in `enemy_ai.py`. Tests: `test_pathfinding.FlowFieldEscapeTests` (5) +
+  `test_enemy_nav.test_direction_escapes_a_field_pocket_...`. Suite 518 -> 523.
+- [x] **Faster unstick.** `entities/enemy_ai._unstick`: `_STUCK_SECONDS`
+  0.8 -> 0.4, `_NUDGE_STRENGTH` 0.9 -> 1.5 (the perpendicular push now dominates
+  the heading during the 0.35 s nudge, so it decisively clears a corner). The
+  fixed 20 px "made progress" radius became **speed-relative**:
+  `reset = (speed * _STUCK_SECONDS * _STUCK_PROGRESS_FRAC[0.3])` -- a slow tank
+  (speed 45) making real headway is no longer flagged, whereas at the old fixed
+  20 px it would have been once the window shrank. Nudge still perpendicular,
+  side seeded from `ctx.rng`. Only `path_chase` uses `_unstick` (M4);
+  `resolve_movement`'s escape (follow-up 4) covers the FSM movers. Tests:
+  `test_enemy_ai` -- nudge fires within ~0.5 s of being pinned; **no** nudge
+  while an enemy keeps closing normally. 80-chaser sim: all close, zero nudge
+  frames (no false positives). Suite 523 -> 524.
+- [x] **Local obstacle-avoidance vector in `path_chase`.**
+  `entities/enemy_ai._obstacle_avoid`: for each obstacle whose edge is within
+  `_OBSTACLE_MARGIN` (14 px) of the enemy's edge, a push straight away scaled by
+  how deep inside the margin it is; the sum is capped at `_OBSTACLE_MAX` (0.7,
+  between `_SEP_MAX` and the unit heading) so it bends the path around a prop
+  without overriding the field. Added to the `path_chase` steer alongside
+  `_separation` and `_unstick`. `PlayingState` builds a static
+  `SpatialGrid` of the obstacles once in `enter` and exposes it via the new
+  `EnemyContext.obstacles_near(pos, radius)` (default `[]` -> the vector is a
+  no-op with the flag off or in bare unit tests). Tests: `test_enemy_ai` --
+  veers a chaser off a prop in its path, no-op when clear. Forested-seed sim
+  (120 mixed enemies, 6 s): 115/120 close, **zero enemies ever clip an obstacle**
+  (min gap seen -1 px), frame p99 7.5 ms. Suite 524 -> 526.
+- [x] **8-direction escape in `resolve_movement`.** `world/map.py`: after the
+  full move + both axis slides fail, hop `max(radius, 12)` px in one of the
+  eight compass directions (`_ESCAPE_DIRS`), sorted so the one nearest the
+  intended heading (`new - prev`) is tried first; return the first walkable hop,
+  else `prev` (unchanged from before). Only reached when genuinely wedged, so
+  normal movement and the "slide along a wall" behaviour are untouched -- and it
+  covers the FSM movers / boss / teleporter blink that have no `_unstick` of
+  their own. Tests: `test_obstacles` -- a diagonal move boxed on move + both
+  slides hops free toward the goal (short hop, still walkable); fully ringed ->
+  stays put; existing slide test unaffected. Suite 526 -> 528.
+- [ ] Tests: an enemy dropped onto an unreachable cell next to the player still
+  closes the gap (fallback); a wedged enemy frees itself within ~0.5 s; a
+  `path_chase` enemy started 1 px off an obstacle edge never overlaps it while
+  approaching; `resolve_movement` returns a non-`prev` point for an entity boxed
+  on the primary + both slide axes but with a diagonal open.
 
 ### Baseline verification before implementation
 - Suite green at **462** on 2026-08-28 (post obstacle-families work).
@@ -2211,3 +2370,82 @@ gradient in O(1) with no per-enemy path, waypoint, or repath state.
 ### Expected next phase
 Build and test the standalone NavGrid + FlowField (M1-M2) -- grid conversion,
 clearance bake, obstacle / room-boundary routing -- before any enemy integration.
+
+---
+
+## Planned Phase — Character-select screen: hero animation preview + moved instructions
+
+**Date:** 2026-08-28 · **Status:** ✅ done. Suite 512 -> 518.
+
+Two related tweaks to `CharacterSelectState`:
+
+1. **Show each hero's basic animation** (`idle`, `walk`, `attack`) on the select
+   screen so the pick is about how the hero *reads*, not just the stat blurb.
+   All three heroes (`aegis` / `kestrel` / `nihil`) already have a `hero_<id>`
+   rig with exactly those three anims (`data/sprites.json`).
+2. **Move the game-instructions block** (Move / Pause / Mute / Debug overlay grid
+   + the two free notes) off the start menu and onto the character-select
+   screen, positioned **below the difficulty line and above the existing
+   "Left / Right hero ... ESC back" hint**. The user has already commented out
+   `MenuState._draw_instructions`'s call site.
+
+### Current layout (for reference)
+`CharacterSelectState.draw`: title y80; hero cards y170, 340 wide x 340 tall,
+ending y510; `Difficulty: <label>` centred at ~y540; the nav hint centred at
+~y572. Screen is 900 tall, so ~y600-900 is empty. Each card renders name +
+wrapped identity / trait / weapon text from y+66 down (~220 px used of 340).
+
+### Decisions (locked)
+- **Focused-hero panel** -- one ~128 px animated preview of the highlighted hero
+  between the card row and the difficulty line; cards untouched; a single
+  `Animator` rebuilt when the selection changes.
+- **Cycling preview** -- loop `idle -> walk -> attack` one anim at a time with
+  the phase name as a caption.
+- **Shared instruction data** -- a single `config.MENU_INSTRUCTIONS` constant
+  (rows + notes); **remove every trace** of the instructions from `MenuState`.
+- **Fallback** -- if the rig / frame fails to load, draw the hero's primitive
+  colour disc (same fallback as `_draw_player`) so the screen never breaks.
+
+### What shipped
+
+**CS1 -- instructions relocated, menu cleaned.**
+- `config.MENU_INSTRUCTIONS = {"rows": [(label, combo), ...], "notes": [...]}`
+  (the Move / Pause / Mute / Debug bindings + the two free lines).
+- `MenuState` stripped of every instructions trace: `_draw_instructions`,
+  `_instr_rows` / `_instr_notes`, `_instr_font` / `_instr_font_px`, the commented
+  call, and the M4 docstring clause. The scrim `band` was left as-is (it still
+  backs the option list; nothing rendered in the old left column any more).
+- `test_menu`: the two `MenuInstructionsLayoutTests` (M4) replaced by
+  `MenuHasNoInstructionsTests` -- no instructions members, old left column now
+  empty (0 bright px).
+
+**CS2 -- instructions block on character select.**
+- `CharacterSelectState._draw_instructions(surface, cx, top) -> int` reads
+  `config.MENU_INSTRUCTIONS`, renders the bindings on **one centred line** then
+  each free note on its own line, at a 17 px font (~85 % of the 20 px body),
+  returns the last y so the caller places the hint. *Deviation:* the menu's
+  vertical label/keys grid + "Instructions" heading did not fit under the cards
+  once the preview was allowed for -- the compact one-line form is used instead.
+- `draw`: `diff_y = y + card_h + 178`, instructions at `diff_y + 34`, hint at
+  `instr_bottom + 18`.
+- `test_menu.CharacterSelectInstructionsTests` (2): block renders below the
+  difficulty line; content is `config.MENU_INSTRUCTIONS`-driven.
+
+**CS3 -- looping hero preview.**
+- `enter` builds `self._preview = Animator(self.game.assets, rig)` for the
+  focused hero (rig from `characters[id]["sprite"]`); `_sync_preview()` rebuilds
+  it and resets the phase when `self.index` changes.
+- `update(dt)` (new override -- `state_machine.update` already calls it) advances
+  the Animator, holds `idle` / `walk` for `_PREVIEW_HOLD = 1.4 s` each and plays
+  `attack` once (`Animator.finished`), then cycles.
+- `_draw_preview(surface, cx, top)` blits the current frame into a preview box
+  (`_PREVIEW_W` wide x `_PREVIEW_PX` tall, plus a per-hero `_PREVIEW_ADJUST`
+  nudge -- nihil `+24` w, kestrel `-18` h) centred in the gap under the cards;
+  falls back to the hero's `color` disc if `frame()` is `None`. No caption -- the
+  sprite alone reads the animation.
+- `test_menu.CharacterSelectPreviewTests` (4): Animator targets the focused
+  rig; `update` cycles idle/walk/attack; changing hero rebuilds + resets;
+  `draw` renders the fallback disc with `_preview = None`.
+
+Screenshot verified per hero: the sprite animating in the preview slot, then
+Difficulty / instructions / hint, all within the 900 px height.

@@ -80,6 +80,19 @@ TERRAIN_BUILDINGS: bool = True
 # developer collider overlay (F7 / dev menu), which draws the true colliders.
 SHOW_ENEMY_STATE_RINGS: bool = False
 
+# --- Enemy navigation (flow-field pathfinding) --------------------------
+# On since M6 profiling (journals/journal.md "Planned Phase -- Enemy navigation").
+# PlayingState owns a dual-resolution `NavField` toward the player: chasers and
+# the FSM movers sample its gradient instead of steering straight, so they route
+# through doorways and around obstacle clusters. `resolve_movement` stays the
+# final per-step guard. Crowded-scene cost (~220 enemies): steady p90 ~5 ms/frame
+# for the whole update, with one staggered ~4 ms field rebuild every 0.2 s.
+# Set False for the old straight-steering behaviour.
+ENEMY_PATHFINDING: bool = True
+# Seconds between full field rebuilds toward the player (also rebuilt early once
+# the player drifts a couple of navigation cells from the last rebuild target).
+ENEMY_NAV_REBUILD_INTERVAL: float = 0.4
+
 # --- Colours (RGB) ---------------------------------------------------------
 COLOR_BG = (16, 16, 22)
 COLOR_GRID = (32, 33, 44)
@@ -104,7 +117,24 @@ MENU_FG_DIM = (170, 170, 170)
 # shows only when this file is missing). MENU_SCRIM is a translucent panel (RGBA)
 # laid over the art behind the option list so the white text stays readable.
 MENU_TITLE_IMAGE: str = "ui/title.png"
-MENU_SCRIM = (0, 0, 0, 205)
+MENU_SCRIM = (0, 0, 0, 185)
+
+# Game instructions, surfaced on the character-select screen (they lived on the
+# start menu until the hero-preview rework). A (label, keys) grid plus free
+# notes; the select screen renders them at ~85% of its body font, between the
+# difficulty line and the nav hint.
+MENU_INSTRUCTIONS: dict = {
+    "rows": [
+        ("Move", "WASD / Arrows"),
+        ("Pause", "ESC"),
+        ("Mute", "M"),
+        ("Debug overlay", "F1"),
+    ],
+    "notes": [
+        "Weapons fire on their own.",
+        "Survive, level up, beat the boss.",
+    ],
+}
 
 # --- Audio ---------------------------------------------------------------
 # Master-volume step for the Options screen (0..1). The slider snaps to this

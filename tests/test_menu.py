@@ -176,31 +176,101 @@ def _bright_pixels(surface, rect):
     return n
 
 
-class MenuInstructionsLayoutTests(unittest.TestCase):
-    """M4: the game instructions are their own left-hand section at ~85% of the
-    option font."""
+class MenuHasNoInstructionsTests(unittest.TestCase):
+    """The game instructions moved to the character-select screen (they now sit
+    beside the hero preview); the start menu carries no trace of them."""
 
-    def test_instruction_font_is_15pct_smaller_than_the_option_font(self):
+    def test_menu_state_has_no_instructions_members(self):
         _, menu = _menu()
-        self.assertEqual(menu._instr_font_px, round(menu._menu_font_px * 0.85))
-        self.assertLess(menu._instr_font_px, menu._menu_font_px)
+        for attr in ("_instr_rows", "_instr_notes", "_instr_font",
+                     "_instr_font_px", "_draw_instructions"):
+            self.assertFalse(hasattr(menu, attr), attr)
 
-    def test_instruction_text_renders_left_of_centre(self):
+    def test_menu_left_column_is_empty(self):
         import logging
         game, menu = _menu()
-        cx = config.SCREEN_WIDTH // 2
         original = config.MENU_TITLE_IMAGE
         config.MENU_TITLE_IMAGE = "no image 4242.png"      # pure black bg
         logging.disable(logging.CRITICAL)
         try:
             menu.draw(game.screen)
-            left_box = pygame.Rect(56, 350, 300, 240)      # entirely left of centre
-            self.assertLess(left_box.right, cx)
-            self.assertGreater(_bright_pixels(game.screen, left_box), 40,
-                               "no instruction text in the left column")
+            left_box = pygame.Rect(56, 350, 300, 240)
+            self.assertEqual(_bright_pixels(game.screen, left_box), 0,
+                             "menu still draws something in the old instr column")
         finally:
             logging.disable(logging.NOTSET)
             config.MENU_TITLE_IMAGE = original
+
+
+def _select():
+    game, _menu_state = _menu()
+    _key(game, pygame.K_RETURN)                     # -> character select
+    cs = game.state_machine.current
+    assert isinstance(cs, CharacterSelectState)
+    return game, cs
+
+
+class CharacterSelectInstructionsTests(unittest.TestCase):
+    """The game instructions moved here from the start menu; they render from
+    `config.MENU_INSTRUCTIONS` between the difficulty line and the nav hint."""
+
+    def test_instruction_block_renders_below_the_difficulty_line(self):
+        game, cs = _select()
+        cs.draw(game.screen)
+        cx = config.SCREEN_WIDTH // 2
+        band = pygame.Rect(cx - 420, 690, 840, 70)   # where _draw_instructions lands
+        self.assertGreater(_bright_pixels(game.screen, band), 60,
+                           "no instruction text under the difficulty line")
+
+    def test_content_comes_from_config(self):
+        game, cs = _select()
+        old = config.MENU_INSTRUCTIONS
+        config.MENU_INSTRUCTIONS = {"rows": [("Jump", "SPACE")],
+                                    "notes": ["one", "two"]}
+        try:
+            bottom = cs._draw_instructions(game.screen, config.SCREEN_WIDTH // 2, 700)
+            # heading line + 2 notes -> bottom is two line-heights below `top`
+            self.assertEqual(bottom, 700 + 2 * cs._instr.get_linesize())
+        finally:
+            config.MENU_INSTRUCTIONS = old
+
+
+class CharacterSelectPreviewTests(unittest.TestCase):
+    """A looping idle -> walk -> attack preview of the focused hero, rebuilt
+    when the selection changes; primitive-disc fallback if the rig is absent."""
+
+    def test_preview_animator_targets_the_focused_hero_rig(self):
+        _game, cs = _select()
+        self.assertIsNotNone(cs._preview)
+        want = cs.content.characters[cs.ids[cs.index]]["sprite"]
+        self.assertEqual(cs._preview.rig, want)
+
+    def test_update_cycles_through_idle_walk_attack(self):
+        _game, cs = _select()
+        seen = set()
+        for _ in range(2000):                       # a few whole cycles
+            cs.update(1 / 60)
+            seen.add(("idle", "walk", "attack")[cs._phase_i])
+        self.assertEqual(seen, {"idle", "walk", "attack"})
+
+    def test_changing_hero_rebuilds_the_preview_and_resets_the_phase(self):
+        game, cs = _select()
+        for _ in range(90):
+            cs.update(1 / 60)                        # get off phase 0
+        first_rig = cs._preview.rig
+        _key(game, pygame.K_RIGHT)
+        cs.update(1 / 60)
+        self.assertNotEqual(cs._preview.rig, first_rig)
+        self.assertEqual(cs._phase_i, 0)
+
+    def test_draw_falls_back_to_a_disc_when_there_is_no_animator(self):
+        game, cs = _select()
+        cs._preview = None
+        cs.draw(game.screen)
+        cx = config.SCREEN_WIDTH // 2
+        box = pygame.Rect(cx - 60, 500, 120, 160)   # the preview slot
+        self.assertGreater(_bright_pixels(game.screen, box), 20,
+                           "no fallback disc drawn for a rig-less hero")
 
 
 class CharacterSelectDifficultyTests(unittest.TestCase):
@@ -208,11 +278,7 @@ class CharacterSelectDifficultyTests(unittest.TestCase):
     Up / Down cycles it; the choice is forwarded into PlayingState."""
 
     def _select(self):
-        game, menu = _menu()
-        _key(game, pygame.K_RETURN)                 # -> character select
-        cs = game.state_machine.current
-        assert isinstance(cs, CharacterSelectState)
-        return game, cs
+        return _select()
 
     def test_defaults_to_normal(self):
         _, cs = self._select()
