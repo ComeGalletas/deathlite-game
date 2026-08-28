@@ -163,7 +163,7 @@ class ObstacleDecorTests(unittest.TestCase):
     def test_every_obstacle_is_skinned_and_keys_are_obstacle_indices(self):
         gm = self._map()
         self.assertTrue(gm.obstacles)
-        # all four obstacle kinds are mapped -> every obstacle gets a sprite
+        # every obstacle kind is mapped -> every obstacle gets a sprite
         self.assertEqual(len(gm._decos), len(gm.obstacles))
         self.assertTrue(set(gm._decos).issubset(range(len(gm.obstacles))))
 
@@ -171,14 +171,17 @@ class ObstacleDecorTests(unittest.TestCase):
         gm = self._map()
         t = get_content().terrain
         boost = t["obstacle_decor"]["size_boost"]
+        render_radius = t["obstacle_decor"].get("render_radius", {})
         for i, (ax, ay, fps, frs) in gm._decos.items():
             o = gm.obstacles[i]
-            rig = t["obstacle_decor"]["rigs"][o.kind][(o.variant - 1) % 4]
+            choices = t["obstacle_decor"]["rigs"][o.kind]
+            rig = choices[(o.variant - 1) % len(choices)]
             meta = t["rigs"][rig]
             fw = meta["frame"][0]
-            expected = max(1, round(fw * (2.0 * o.radius * boost) / meta["footprint"]))
+            draw_r = render_radius.get(o.kind, o.radius)
+            expected = max(1, round(fw * (2.0 * draw_r * boost) / meta["footprint"]))
             self.assertAlmostEqual(frs[0].get_width(), expected, delta=1,
-                                   msg=f"{o.kind} r{o.radius} via {rig}")
+                                   msg=f"{o.kind} r{o.radius} draw_r{draw_r} via {rig}")
 
     def test_bigger_collider_yields_a_bigger_sprite_in_the_same_family(self):
         gm = self._map()
@@ -204,10 +207,14 @@ class ObstacleDecorTests(unittest.TestCase):
                          {i: e[3][0].get_size() for i, e in b._decos.items()})
 
     def test_obstacle_variants_in_range(self):
+        # Small obstacles carry a 1..4 cosmetic variant; a `house` encodes its
+        # colour band + type as 1..15 (see world/procedural._scatter_houses).
         from world.procedural import generate_world
         for seed in (1, 2, 3, 1234):
-            self.assertTrue(all(o.variant in (1, 2, 3, 4)
-                                for o in generate_world(seed).obstacles))
+            for o in generate_world(seed).obstacles:
+                hi = 15 if o.kind == "house" else 4
+                self.assertIn(o.variant, range(1, hi + 1),
+                              msg=f"{o.kind} variant {o.variant}")
 
     def test_skinning_adds_no_collider_and_leaves_walkability_intact(self):
         import pygame as pg
@@ -462,11 +469,14 @@ class DecorationScatterTests(unittest.TestCase):
         gm = self._map(1234)
         px = 64
         for rid, inst in gm._room_decor.items():
-            r = gm.layout.room(rid).rect
-            cx, cy = r.center
+            room = gm.layout.room(rid)
+            r = room.rect
+            cx, cy = room.center                          # centroid for shaped rooms
             clear = min(r.width, r.height) * 0.22
             for _frs, _ax, _ay, _fps, x, y in inst:
                 self.assertTrue(r.collidepoint(x, y), "clutter outside its room")
+                cell = (int((x - r.left) // px), int((y - r.top) // px))
+                self.assertIn(cell, room.cells, "clutter on a bitten-out cell")
                 self.assertGreaterEqual(x, r.x + px)      # not on the perimeter col
                 self.assertLess(x, r.right - px)
                 self.assertGreaterEqual(y, r.y + px)      # not on the perimeter row
@@ -517,6 +527,30 @@ class DecorationScatterTests(unittest.TestCase):
             self.assertTrue(frs and all(isinstance(f, pygame.Surface) for f in frs))
             self.assertGreaterEqual(fps, 0.0)
 
+    def test_min_gap_lets_small_flora_cluster_but_not_bushes(self):
+        # `min_gap` on an entry lowers the in-room separation (mushrooms/flowers
+        # form patches); an entry without it keeps the 40 px default (bushes).
+        import math
+        t = get_content().terrain
+        bush = t["rigs"]["deco_bush_1"]
+        bush_size = (round(bush["frame"][0] * 0.75), round(bush["frame"][1] * 0.75))
+        clustered = False
+        for seed in (1, 7, 42, 99, 1234):
+            gm = self._map(seed)
+            for inst in gm._room_decor.values():
+                pts = [(x, y) for *_r, x, y in inst]
+                for i in range(len(pts)):
+                    for j in range(i + 1, len(pts)):
+                        if math.dist(pts[i], pts[j]) < 38:
+                            clustered = True
+                bushes = [(x, y) for frs, _ax, _ay, _fps, x, y in inst
+                          if frs[0].get_size() == bush_size]
+                for i in range(len(bushes)):
+                    for j in range(i + 1, len(bushes)):
+                        self.assertGreaterEqual(math.dist(bushes[i], bushes[j]), 39,
+                                                f"bushes bunched (seed {seed})")
+        self.assertTrue(clustered, "no decoration cluster formed anywhere")
+
     def test_void_scenery_draws_before_the_foam(self):
         from systems.camera import Camera
         gm = self._map(1234)
@@ -561,7 +595,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         rigs = self.t["obstacle_decor"]["rigs"]
         self.assertEqual(rigs["tree"],
                          ["deco_tree_1", "deco_tree_2", "deco_tree_3", "deco_tree_4"])
-        self.assertEqual(rigs["shrub"][0], "deco_bush_1")     # shrubs keep bushes
+        self.assertNotIn("shrub", rigs)     # bushes are decoration now, not an obstacle
         for name in rigs["tree"]:
             rig = self.t["rigs"][name]
             self.assertTrue((ASSETS_DIR / rig["anims"]["loop"]["file"]).is_file())

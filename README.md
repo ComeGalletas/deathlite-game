@@ -63,7 +63,8 @@ the interactables.
 | 1 / 2 / 3 or ← → + ENTER | Choose a level-up upgrade / blessing |
 | M | Mute / unmute audio (persisted); also an **Options** toggle |
 | F1 | Toggle debug overlay (FPS, per-system counts, run seed, hero, timings) |
-| F2–F7 | Spawn enemy / grant XP / force level / spawn boss / invuln / collision vis |
+| F2–F6 | Spawn enemy / grant XP / force level / spawn boss / toggle invuln |
+| F7 | Toggle the **collision-shape overlay** — *developer runs only*; also a dev-menu row |
 
 Debug keys are never required for normal play.
 
@@ -83,6 +84,14 @@ the picture is "closer" but stays crisp — sprites scale *down* from their larg
 source frames, no upscale blur. The visible world extent is `SCREEN / CAMERA_ZOOM`.
 The HUD and damage feedback are drawn afterwards at full resolution, unscaled.
 `CAMERA_ZOOM = 1.0` disables the zoom entirely.
+
+A **sprited** enemy is just its sprite — the thin elite / shield / status rings
+that used to sit at the collider edge are off by default (`config.SHOW_ENEMY_STATE_RINGS`);
+primitive-fallback enemies (no tileset) always keep them. To see the real
+circular colliders, start a developer run and press **F7** (or toggle
+*Collision shapes* in the dev menu): hero / enemy / boss / obstacle bodies in
+green, pickup radius and projectile hitboxes dimmer. Attack telegraphs (the red
+slam ring) are always shown.
 
 ### Start screen
 

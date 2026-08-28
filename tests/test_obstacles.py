@@ -25,18 +25,17 @@ class ObstacleCollisionTests(unittest.TestCase):
         out = self.gm.resolve_movement(prev, pygame.Vector2(1600, 1585), 12)
         self.assertLessEqual(out.y, prev.y + 1)   # blocked on the Y axis
 
-    def test_solid_obstacles_block_projectiles_shrubs_do_not(self):
+    def test_every_obstacle_kind_blocks_projectiles(self):
         self.gm.obstacles = [Obstacle("rock", 1600, 1600),
                              Obstacle("tree", 1600, 1200),
-                             Obstacle("shrub", 1600, 800)]
-        # a solid trunk / mass stops a shot -- rock and (now) tree both do
-        self.assertIsNotNone(
-            self.gm.blocking_obstacle_hit(pygame.Vector2(1600, 1600), 4))
-        self.assertIsNotNone(
-            self.gm.blocking_obstacle_hit(pygame.Vector2(1600, 1200), 4))
-        # you fire over low foliage -- the shrub does not block
+                             Obstacle("pillar", 1600, 800)]
+        # a solid trunk / mass / column stops a shot -- all obstacle kinds do
+        for oy in (1600, 1200, 800):
+            self.assertIsNotNone(
+                self.gm.blocking_obstacle_hit(pygame.Vector2(1600, oy), 4))
+        # open ground does not
         self.assertIsNone(
-            self.gm.blocking_obstacle_hit(pygame.Vector2(1600, 800), 4))
+            self.gm.blocking_obstacle_hit(pygame.Vector2(1600, 400), 4))
 
 
 class ObstacleGenerationTests(unittest.TestCase):

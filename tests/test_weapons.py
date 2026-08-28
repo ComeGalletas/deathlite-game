@@ -78,6 +78,22 @@ class WeaponTests(unittest.TestCase):
                                      damage_multiplier=3.0))
         self.assertEqual(shots[0]["damage"], 30.0)
 
+    def test_update_reports_the_fire_beat(self):
+        shots = []
+        w = Weapon("bolt", dict(BOLT))
+        self.assertTrue(w.update(0.016, make_context([FakeEnemy(100, 0)], shots)))
+        self.assertFalse(w.update(0.5, make_context([FakeEnemy(100, 0)], shots)))   # cooling
+        self.assertTrue(w.update(0.6, make_context([FakeEnemy(100, 0)], shots)))    # ready again
+        # no target -> not a fire beat
+        self.assertFalse(w.update(0.016, make_context([], shots,
+                                                      fallback_dir=pygame.Vector2(0, 0))))
+
+    def test_orbit_and_summon_never_report_a_fire_beat(self):
+        for effect in ("orbit", "summon"):
+            w = Weapon("w", dict(BOLT, special_effect=effect))
+            for _ in range(5):
+                self.assertFalse(w.update(0.1, make_context([FakeEnemy(80, 0)], [])))
+
 
 if __name__ == "__main__":
     unittest.main()

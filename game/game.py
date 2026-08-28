@@ -54,9 +54,6 @@ class Game:
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
 
-        # Global debug flags the states read.
-        self.show_collision = False
-
         # A finished run banks its rewards into the save file.
         self.events.subscribe(Events.RUN_ENDED, self._on_run_ended)
 
@@ -129,9 +126,8 @@ class Game:
         if key == keys["toggle_overlay"]:
             self.debug.toggle()
             return True
-        if key == keys["toggle_collision_vis"]:
-            self.show_collision = not self.show_collision
-            return True
+        # toggle_collision_vis (F7) is now a dev-run overlay -- delegate it to the
+        # PlayingState hook below so it only fires inside a developer run.
 
         # The rest need an active run; delegate to it if present.
         state = self.state_machine.current

@@ -61,6 +61,7 @@ class GameMap:
         # is skinned with a decoration rig scaled to its collider; obstacles with
         # no entry (missing tileset / flag off) fall back to a drawn circle.
         self._decos: dict[int, tuple] = {}
+        self._sprite_drop: dict[str, float] = {}
         # (world_x, world_y, radius, surf) per tree -- a soft round canopy shadow
         # drawn *over* the characters (B3), so anyone under a tree is darkened.
         self._tree_shadows: list[tuple] = []
@@ -95,9 +96,23 @@ class GameMap:
         return None
 
     # --- walkability / movement -------------------------------
+    @staticmethod
+    def room_cell(room: Room, x: float, y: float) -> tuple[int, int]:
+        """The room-relative (col, row) tile a world point falls in."""
+        px = config.TILE_PX
+        return (int((x - room.rect.left) // px), int((y - room.rect.top) // px))
+
     def _point_ok(self, x: float, y: float) -> bool:
-        for rc in self._rects:
-            if rc.collidepoint(x, y):
+        if self.layout is None:
+            return self._rects[0].collidepoint(x, y)
+        for r in self.layout.rooms:
+            rr = r.rect
+            if (rr.left <= x < rr.right and rr.top <= y < rr.bottom
+                    and self.room_cell(r, x, y) in r.cells):
+                return True                # W5: grown-room bboxes can overlap in
+                                           # the void -> check every room, no break
+        for c in self.layout.corridors:
+            if c.rect.collidepoint(x, y):
                 return True
         return False
 
@@ -141,10 +156,17 @@ class GameMap:
 
     def random_point_in_room(self, room: Room, rng: random.Random,
                              margin: float = 24.0) -> pygame.Vector2:
-        r = room.rect
+        px = config.TILE_PX
+        if not room.cells:                          # plain rect (flag off)
+            r = room.rect
+            return pygame.Vector2(
+                rng.uniform(r.left + margin, r.right - margin),
+                rng.uniform(r.top + margin, r.bottom - margin))
+        col, row = rng.choice(sorted(room.cells))   # sorted -> deterministic
+        m = min(margin, px * 0.35)
         return pygame.Vector2(
-            rng.uniform(r.left + margin, r.right - margin),
-            rng.uniform(r.top + margin, r.bottom - margin))
+            room.rect.left + col * px + rng.uniform(m, px - m),
+            room.rect.top + row * px + rng.uniform(m, px - m))
 
     def offscreen_spawn_point(self, camera, rng: random.Random) -> pygame.Vector2:
         """A walkable point just outside the view: prefer the closest rooms that
@@ -195,6 +217,32 @@ class GameMap:
         return slots["interior"]
 
     @staticmethod
+    def _mask_slot(cells: frozenset, col: int, row: int, slots: dict) -> int:
+        """Autotile a floor cell by which of its 4 orthogonal neighbours are also
+        floor (a 4-bit mask). Concave (inner) corners and 1-wide spines fall back
+        to `interior` -- the sheet has only the 8 rectangle slots (W3)."""
+        gap_n = (col, row - 1) not in cells
+        gap_s = (col, row + 1) not in cells
+        gap_w = (col - 1, row) not in cells
+        gap_e = (col + 1, row) not in cells
+        gaps = gap_n + gap_s + gap_w + gap_e
+        if gaps == 0:
+            return slots["interior"]
+        if gaps == 1:
+            return slots["edge_n" if gap_n else "edge_s" if gap_s
+                         else "edge_w" if gap_w else "edge_e"]
+        if gaps == 2:
+            if gap_n and gap_w:
+                return slots["corner_nw"]
+            if gap_n and gap_e:
+                return slots["corner_ne"]
+            if gap_s and gap_w:
+                return slots["corner_sw"]
+            if gap_s and gap_e:
+                return slots["corner_se"]
+        return slots["interior"]           # opposite pair / nub -> best effort
+
+    @staticmethod
     def _bridge_slot(axis: str, index: int, ncells: int) -> str:
         """The bridge tile for cell `index` of an `ncells`-long run. The corridor
         `axis` ('h' | 'v') fixes the tile family; the two ends get the matching
@@ -243,18 +291,17 @@ class GameMap:
 
         def paint_room(r) -> pygame.Surface:
             sheet = palettes.get(r.kind, floor_sheet)
-            cols = max(1, -(-r.rect.width // px))     # ceil
-            rows = max(1, -(-r.rect.height // px))
-            # SRCALPHA: the autotile edge / corner tiles are transparent on their
-            # water-facing side -- keep that alpha so foam / water show through
-            # instead of the surface's black ground (see assets_journal.md T6).
+            mask = r.cells       # always populated by generate_world (W1)
+            # SRCALPHA: bitten-out cells stay transparent (foam / water show
+            # through), and the autotile edge tiles keep their water-facing alpha
+            # (see assets_journal.md T6).
             surf = pygame.Surface(r.rect.size, pygame.SRCALPHA)
-            for row in range(rows):
-                for col in range(cols):
-                    idx = self._slot_for(slots, row, col, rows, cols)
-                    surf.blit(cell(sheet, idx), (col * px, row * px))
-                    if row in (0, rows - 1) or col in (0, cols - 1):
-                        self._shore.append((r.rect.x + col * px, r.rect.y + row * px))
+            for col, row in mask:
+                idx = self._mask_slot(mask, col, row, slots)
+                surf.blit(cell(sheet, idx), (col * px, row * px))
+                if any((col + dc, row + dr) not in mask
+                       for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    self._shore.append((r.rect.x + col * px, r.rect.y + row * px))
             return surf
 
         def paint_corridor(c) -> tuple[pygame.Rect, pygame.Surface]:
@@ -347,12 +394,20 @@ class GameMap:
         rigs; `Obstacle.variant` (from the run seed) picks one. The rig's frame
         is scaled so its measured `footprint` (content width in source px) covers
         `2 * radius * size_boost` on screen, and its anchor scales to match.
+        `obstacle_decor.render_radius` may override the radius used *for drawing*
+        per kind, so a kind can keep its sprite size while its collider shrinks
+        (trees: small trunk ring, full-size canopy).
         """
         conf = a.terrain.get("obstacle_decor", {})
         rig_map = conf.get("rigs", {})
         if not rig_map:
             return
         boost = float(conf.get("size_boost", 1.25))
+        render_radius = conf.get("render_radius", {})
+        self._sprite_drop = {
+            kind: float(value)
+            for kind, value in conf.get("sprite_drop", {}).items()
+        }
         resolved: dict[tuple, tuple | None] = {}      # (rig, size) -> entry | None
 
         for i, o in enumerate(self.obstacles):
@@ -365,7 +420,8 @@ class GameMap:
                 continue
             fw, fh = meta["frame"]
             footprint = float(meta.get("footprint") or fw)
-            scale = (2.0 * o.radius * boost) / footprint
+            draw_r = float(render_radius.get(o.kind, o.radius))
+            scale = (2.0 * draw_r * boost) / footprint
             size = (max(1, round(fw * scale)), max(1, round(fh * scale)))
             key = (rig, size)
             if key not in resolved:
@@ -389,6 +445,7 @@ class GameMap:
         tree is slightly obscured -- the only obstacle that casts one."""
         spec = conf.get("tree_shadow", {})
         rs = float(spec.get("radius_scale", 1.9))
+        render_radius = conf.get("render_radius", {})
         color = tuple(spec.get("color", (12, 18, 22)))[:3]
         alpha = int(spec.get("alpha", 66))
         cache: dict[int, pygame.Surface] = {}
@@ -405,7 +462,8 @@ class GameMap:
 
         for i, o in enumerate(self.obstacles):
             if o.kind == "tree" and i in self._decos:
-                r = max(1, round(o.radius * rs))
+                draw_r = float(render_radius.get(o.kind, o.radius))
+                r = max(1, round(draw_r * rs))
                 self._tree_shadows.append((o.pos.x, o.pos.y, r, disc(r)))
 
     def _build_decor_scatter(self, a) -> None:
@@ -447,23 +505,39 @@ class GameMap:
         void_reg = [e for e in reg if e.get("placement") == "void"]
 
         # --- room interiors: clutter on interior cells, clear of the centre ---
+        _ORTHO = ((1, 0), (-1, 0), (0, 1), (0, -1))
         for room in self.layout.rooms:
             rng = random.Random(f"{seed}:{room.id}:decor")
             r = room.rect
             cols, rows = max(3, r.width // px), max(3, r.height // px)
-            cx, cy = r.center
+            # clutter only on fully-interior cells (all four neighbours floor),
+            # so a pebble never sits on a half-water shoreline / notch-edge tile
+            floor = ([c for c in sorted(room.cells)
+                      if all((c[0] + dc, c[1] + dr) in room.cells for dc, dr in _ORTHO)]
+                     if room.cells else None)
+            cx, cy = room.center
             clear_sq = (min(r.width, r.height) * 0.22) ** 2
             placed: list[tuple] = []
+            # per-prop minimum separation, kept parallel to `placed` (not stored
+            # in the instance tuple -- `_blit_one_decor` unpacks it as a 6-tuple).
+            # Between two props the larger of their two `min_gap`s wins, so a
+            # small `min_gap` lets flora (mushrooms, flowers) bunch into patches
+            # while a default-gap prop (bush, pebble) still holds everything off.
+            gaps: list[float] = []
             for e in room_reg:
                 lo, hi = e.get("per_room", [0, 2])
                 entry = load(e["rig"], float(e.get("scale", 1.0)))
                 if entry is None:
                     continue
                 frs, ax, ay, fps = entry
+                my_gap = float(e.get("min_gap", 40))
                 for _ in range(rng.randint(lo, hi)):
                     for _try in range(6):
-                        col = rng.randint(1, cols - 2)
-                        row = rng.randint(1, rows - 2)
+                        if floor:
+                            col, row = rng.choice(floor)
+                        else:
+                            col = rng.randint(1, cols - 2)
+                            row = rng.randint(1, rows - 2)
                         x = r.x + col * px + rng.uniform(6, px - 6)
                         y = r.y + row * px + rng.uniform(6, px - 6)
                         if (x - cx) ** 2 + (y - cy) ** 2 < clear_sq:
@@ -471,10 +545,12 @@ class GameMap:
                         if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
                                < (o.radius + 20) ** 2 for o in self.obstacles):
                             continue
-                        if any((x - p[4]) ** 2 + (y - p[5]) ** 2 < 40 * 40
-                               for p in placed):
+                        if any((x - p[4]) ** 2 + (y - p[5]) ** 2
+                               < max(my_gap, g) ** 2
+                               for p, g in zip(placed, gaps)):
                             continue
                         placed.append((frs, ax, ay, fps, x, y))
+                        gaps.append(my_gap)
                         break
             if placed:
                 self._room_decor[room.id] = placed
@@ -689,7 +765,8 @@ class GameMap:
             ax, ay, fps, frs = entry
             frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
                      if fps else frs[0])
-            drop = config.SPRITE_ANCHOR_DROP * o.radius * z
+            drop_scale = self._sprite_drop.get(o.kind, config.SPRITE_ANCHOR_DROP)
+            drop = drop_scale * o.radius * z
             surface.blit(self._z_surf(frame),
                          (round(sx - ax * z), round(sy - ay * z + drop)))
         else:

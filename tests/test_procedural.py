@@ -2,7 +2,7 @@
 "Procedural generation determinism")."""
 import unittest
 
-from world.procedural import SPECIAL_KINDS, generate_world
+from world.procedural import SPECIAL_KINDS, _four_connected, generate_world
 
 
 class DeterminismTests(unittest.TestCase):
@@ -87,6 +87,89 @@ class GridAlignmentTests(unittest.TestCase):
         for i, r in enumerate(w.rooms):
             for other in w.rooms[i + 1:]:
                 self.assertFalse(r.rect.colliderect(other.rect))
+
+
+class IrregularRoomTests(unittest.TestCase):
+    """W1: rooms carry a tile-cell mask (`Room.cells`); combat rooms get 2-3-cell
+    corner bites, `start` / `boss` stay rectangular. Renderer + walkability still
+    read the bounding rect at this milestone."""
+
+    SEEDS = (1, 7, 42, 99, 1234, 2024)
+
+    def _rooms(self, seed):
+        return generate_world(seed).rooms
+
+    def test_every_room_has_a_valid_cell_mask(self):
+        from game import config
+        for seed in self.SEEDS:
+            for r in self._rooms(seed):
+                w, h = r.tile_dims
+                self.assertTrue(r.cells, f"seed {seed} room {r.id} empty mask")
+                self.assertTrue(all(0 <= c[0] < w and 0 <= c[1] < h for c in r.cells))
+                self.assertTrue(_four_connected(set(r.cells)))
+                self.assertGreaterEqual(len(r.cells), 9)
+                self.assertLessEqual(len(r.cells), config.ROOM_SIZE_MAX_CELLS)
+
+    def test_bounding_box_matches_the_mask(self):
+        for seed in self.SEEDS:
+            for r in self._rooms(seed):
+                w, h = r.tile_dims
+                self.assertEqual(max(c[0] for c in r.cells), w - 1)
+                self.assertEqual(max(c[1] for c in r.cells), h - 1)
+                self.assertEqual(min(c[0] for c in r.cells), 0)
+                self.assertEqual(min(c[1] for c in r.cells), 0)
+
+    def test_start_and_boss_stay_rectangular(self):
+        for seed in self.SEEDS:
+            w = generate_world(seed)
+            for rid in (w.start_id, w.boss_id):
+                r = w.room(rid)
+                cw, ch = r.tile_dims
+                self.assertEqual(len(r.cells), cw * ch)
+
+    def test_room_centre_is_an_occupied_cell(self):
+        from game import config
+        px = config.TILE_PX
+        for seed in self.SEEDS:
+            for r in self._rooms(seed):
+                c = r.center
+                col = int((c.x - r.rect.left) // px)
+                row = int((c.y - r.rect.top) // px)
+                self.assertIn((col, row), r.cells,
+                              f"seed {seed} room {r.id} centre in the void")
+
+    def test_some_rooms_are_actually_shaped(self):
+        shaped = 0
+        for seed in self.SEEDS:
+            for r in self._rooms(seed):
+                w, h = r.tile_dims
+                if len(r.cells) < w * h:
+                    shaped += 1
+        self.assertGreater(shaped, 0, "no room ever got a corner bite")
+
+    def test_deterministic_masks(self):
+        a = [sorted(r.cells) for r in generate_world(555).rooms]
+        b = [sorted(r.cells) for r in generate_world(555).rooms]
+        self.assertEqual(a, b)
+
+    def test_flag_off_gives_plain_rectangles(self):
+        from game import config
+        old = config.IRREGULAR_ROOMS
+        config.IRREGULAR_ROOMS = False
+        try:
+            for r in generate_world(42).rooms:
+                w, h = r.tile_dims
+                self.assertEqual(len(r.cells), w * h)
+        finally:
+            config.IRREGULAR_ROOMS = old
+
+    def test_size_band_wider_than_the_legacy_range(self):
+        # irregular mode should reach both smaller and larger rooms than the old
+        # 0.55-0.86 band (chunk 720 -> ~396..619 px).
+        widths = [r.rect.width for seed in range(40)
+                  for r in generate_world(seed).rooms]
+        self.assertLess(min(widths), 396)
+        self.assertGreater(max(widths), 619)
 
 
 if __name__ == "__main__":

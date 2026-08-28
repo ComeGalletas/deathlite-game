@@ -116,7 +116,8 @@ class Player:
 
     def update(self, dt: float, world) -> None:
         target = self.pos + self._move_dir * self.move_speed * dt
-        self.pos = world.resolve_movement(self.pos, target, self.radius)
+        #self.pos = world.resolve_movement(self.pos, target, self.radius)
+        self.pos.update(world.resolve_movement(self.pos, target, self.radius)) # to fix the issue with static orbitals
 
         moving = self._move_dir.length_squared() > 0
         self.still_time = 0.0 if moving else self.still_time + dt

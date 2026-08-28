@@ -1,6 +1,11 @@
 """Milestone 4: the three special weapon effects -- cone, orbit, chain params."""
 import math
+import os
+import tempfile
 import unittest
+
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
@@ -82,6 +87,44 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(shots[0].chain_left,
                          get_content().weapon("thunder_orb")["chain_count"])
         self.assertGreater(shots[0].chain_range, 0)
+
+
+class MainWeaponAttackAnimTests(unittest.TestCase):
+    """The hero attack animation syncs to `weapons[0]` (the starting weapon)
+    only -- a picked-up second weapon firing must not drive it."""
+
+    def _playing(self):
+        from game.game import Game
+        from game.states.menu_state import MenuState
+        from game.states.playing_state import PlayingState
+        g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
+        g.state_machine.change(MenuState(g))
+        for _ in range(2):
+            g.state_machine.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        p = g.state_machine.current
+        assert isinstance(p, PlayingState)
+        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(60, 0))
+        return g, p
+
+    def test_main_weapon_fire_beat_triggers_the_anim(self):
+        g, p = self._playing()
+        p.player._attack_t = 0.0
+        p._phase_combat(0.5)                         # weapons[0] fires this frame
+        self.assertGreater(p.player._attack_t, 0.0)
+        pygame.quit()
+
+    def test_secondary_weapon_fire_beat_does_not_trigger_the_anim(self):
+        g, p = self._playing()
+        p.player.weapons[0]._cd = 999.0             # main weapon parked
+        p.player.weapons.append(
+            Weapon("arcane_bolt", get_content().weapon("arcane_bolt")))
+        p.player._attack_t = 0.0
+        before = len(p.projectiles)
+        p._phase_combat(0.5)
+        self.assertGreater(len(p.projectiles), before, "the secondary weapon never fired")
+        self.assertEqual(p.player._attack_t, 0.0, "secondary weapon drove the attack anim")
+        pygame.quit()
 
 
 if __name__ == "__main__":
