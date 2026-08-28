@@ -31,6 +31,13 @@ class EnemyContext:
         lambda prev, new, radius: new)   # wall sliding; identity by default
     spawn_hazard: Callable[..., None] = (
         lambda pos, radius, dps, duration, tick_interval=None: None)   # area-denial pools
+    nav_dir: Callable[..., pygame.Vector2] = (
+        lambda pos, radius: pygame.Vector2())   # flow-field steering; zero -> fall back
+    nav_enabled: bool = False                   # config.ENEMY_PATHFINDING
+    neighbors: Callable[..., list] = (
+        lambda pos, radius: [])                 # SpatialGrid.query_circle -- for separation
+    obstacles_near: Callable[..., list] = (
+        lambda pos, radius: [])                 # static obstacle grid -- for local avoidance
 
 
 def _toward(enemy, target: pygame.Vector2) -> pygame.Vector2:
@@ -38,8 +45,130 @@ def _toward(enemy, target: pygame.Vector2) -> pygame.Vector2:
     return d.normalize() if d.length_squared() > 1e-6 else pygame.Vector2()
 
 
+def _approach(enemy, ctx) -> pygame.Vector2:
+    """Unit direction for a *move toward the player* phase: the shared flow field
+    when navigation is on and has a route from here, else a straight line (M5).
+    Retreat / kite-back phases keep calling `_toward` -- the field only knows the
+    way *to* the player, not away from them."""
+    if ctx.nav_enabled:
+        d = ctx.nav_dir(enemy.pos, enemy.radius)
+        if d.length_squared() > 1e-6:
+            return d
+    return _toward(enemy, ctx.player_pos)
+
+
 def chase(enemy, ctx: EnemyContext) -> None:
     enemy.vel = _toward(enemy, ctx.player_pos) * enemy.speed
+
+
+# --- flow-field chaser (M4) ----------------------------------------
+_SLEW_RATE = 9.0            # ease the heading toward the field direction, per second
+_SEP_RADIUS_MULT = 1.6     # separation query radius = this * collider radius
+_SEP_MAX = 0.6             # cap on the separation push (the field heading is unit 1)
+_STUCK_SECONDS = 0.4      # below-par progress for this long -> perpendicular nudge
+_STUCK_PROGRESS_FRAC = 0.3  # "made progress" = moved >= this fraction of speed * window
+_NUDGE_SECONDS = 0.35
+_NUDGE_STRENGTH = 1.5     # perp push during the nudge -- dominates the heading to break free
+_OBSTACLE_MARGIN = 14.0  # start easing off a prop once within this of its edge
+_OBSTACLE_MAX = 0.7      # cap on the combined obstacle push (heading is unit 1)
+
+
+def _separation(enemy, ctx: EnemyContext) -> pygame.Vector2:
+    """A weak, capped push away from crowding neighbours -- prevents a swarm
+    collapsing onto one point on top of the player."""
+    r = enemy.radius * _SEP_RADIUS_MULT
+    acc = pygame.Vector2()
+    for other in ctx.neighbors(enemy.pos, r):
+        if other is enemy or not getattr(other, "alive", True):
+            continue
+        away = enemy.pos - other.pos
+        dsq = away.length_squared()
+        if dsq < 1e-6 or dsq >= r * r:
+            continue
+        away.scale_to_length((r - dsq ** 0.5) / r)      # 0..1, stronger up close
+        acc += away
+    if acc.length_squared() > _SEP_MAX * _SEP_MAX:
+        acc.scale_to_length(_SEP_MAX)
+    return acc
+
+
+def _obstacle_avoid(enemy, ctx: EnemyContext) -> pygame.Vector2:
+    """A capped push away from any obstacle the enemy has drifted within
+    `_OBSTACLE_MARGIN` of -- belt-and-braces on top of the flow field for the
+    wall-hug / clearance-slop cases. `resolve_movement` is still the hard stop."""
+    acc = pygame.Vector2()
+    reach = enemy.radius + _OBSTACLE_MARGIN
+    for o in ctx.obstacles_near(enemy.pos, reach + 40.0):    # +slack for big props
+        away = enemy.pos - o.pos
+        gap = away.length() - o.radius - enemy.radius
+        if gap >= _OBSTACLE_MARGIN or away.length_squared() < 1e-6:
+            continue
+        away.scale_to_length(min(1.0, (_OBSTACLE_MARGIN - gap) / _OBSTACLE_MARGIN))
+        acc += away
+    if acc.length_squared() > _OBSTACLE_MAX * _OBSTACLE_MAX:
+        acc.scale_to_length(_OBSTACLE_MAX)
+    return acc
+
+
+def _unstick(enemy, ctx: EnemyContext, heading: pygame.Vector2) -> pygame.Vector2:
+    """If the enemy has covered less than `_STUCK_PROGRESS_FRAC` of the distance
+    it should have for `_STUCK_SECONDS`, return a brief sideways nudge (random
+    side, seeded) to walk it off a corner. The progress bar scales with the
+    enemy's speed so a slow tank making real headway is not flagged."""
+    ai = enemy.ai
+    ai["nudge_t"] = ai.get("nudge_t", 0.0) - ctx.dt
+    if ai["nudge_t"] > 0.0:
+        return ai.get("nudge_v", pygame.Vector2())
+    reset_sq = (enemy.speed * _STUCK_SECONDS * _STUCK_PROGRESS_FRAC) ** 2
+    anchor = ai.get("stuck_at")
+    if anchor is None or enemy.pos.distance_squared_to(anchor) > reset_sq:
+        ai["stuck_at"] = pygame.Vector2(enemy.pos)
+        ai["stuck_t"] = 0.0
+        return pygame.Vector2()
+    ai["stuck_t"] = ai.get("stuck_t", 0.0) + ctx.dt
+    if ai["stuck_t"] < _STUCK_SECONDS:
+        return pygame.Vector2()
+    base = heading if heading.length_squared() > 1e-9 else _toward(enemy, ctx.player_pos)
+    perp = pygame.Vector2(-base.y, base.x)
+    if ctx.rng.random() < 0.5:
+        perp = -perp
+    ai["nudge_v"] = perp * _NUDGE_STRENGTH
+    ai["nudge_t"] = _NUDGE_SECONDS
+    ai["stuck_t"] = 0.0
+    ai["stuck_at"] = pygame.Vector2(enemy.pos)
+    return ai["nudge_v"]
+
+
+def path_chase(enemy, ctx: EnemyContext) -> None:
+    """Chase along the shared flow field: ease the heading toward `ctx.nav_dir`,
+    add a weak neighbour-separation push and an unstick nudge, and fall back to a
+    straight line whenever the field has nothing to say. With
+    `config.ENEMY_PATHFINDING` off this is exactly `chase`."""
+    if not ctx.nav_enabled:
+        chase(enemy, ctx)
+        return
+
+    want = ctx.nav_dir(enemy.pos, enemy.radius)
+    if want.length_squared() < 1e-6:
+        want = _toward(enemy, ctx.player_pos)
+
+    head = enemy.ai.get("nav_head")
+    if head is None or head.length_squared() < 1e-9:
+        head = pygame.Vector2(want)
+    elif want.length_squared() > 1e-9:
+        head = head.lerp(want, min(1.0, _SLEW_RATE * ctx.dt))
+        if head.length_squared() < 0.04:                # near-180deg flip: just take it
+            head = pygame.Vector2(want)
+        else:
+            head.normalize_ip()
+    enemy.ai["nav_head"] = pygame.Vector2(head)
+
+    steer = (head + _separation(enemy, ctx) + _obstacle_avoid(enemy, ctx)
+             + _unstick(enemy, ctx, head))
+    if steer.length_squared() < 1e-9:
+        steer = _toward(enemy, ctx.player_pos)
+    enemy.vel = (steer.normalize() * enemy.speed
+                 if steer.length_squared() > 1e-9 else pygame.Vector2())
 
 
 def kite_shoot(enemy, ctx: EnemyContext) -> None:
@@ -50,7 +179,7 @@ def kite_shoot(enemy, ctx: EnemyContext) -> None:
     if dist < pref - 30:
         enemy.vel = -_toward(enemy, ctx.player_pos) * enemy.speed      # back off
     elif dist > pref + 30:
-        enemy.vel = _toward(enemy, ctx.player_pos) * enemy.speed        # close in
+        enemy.vel = _approach(enemy, ctx) * enemy.speed                 # close in
     else:
         enemy.vel = pygame.Vector2()
 
@@ -65,7 +194,7 @@ def kite_shoot(enemy, ctx: EnemyContext) -> None:
 
 
 def exploder(enemy, ctx: EnemyContext) -> None:
-    chase(enemy, ctx)
+    enemy.vel = _approach(enemy, ctx) * enemy.speed
     fuse = enemy.cfg.get("fuse_range", 32)
     if (ctx.player_pos - enemy.pos).length() <= fuse:
         enemy.hp = 0.0
@@ -78,7 +207,7 @@ def summoner(enemy, ctx: EnemyContext) -> None:
     if dist < 200:
         enemy.vel = -_toward(enemy, ctx.player_pos) * enemy.speed
     else:
-        enemy.vel = _toward(enemy, ctx.player_pos) * enemy.speed * 0.4
+        enemy.vel = _approach(enemy, ctx) * enemy.speed * 0.4
 
     enemy.ai["summon_t"] = enemy.ai.get("summon_t", enemy.cfg.get("summon_interval", 4.0)) - ctx.dt
     if enemy.ai["summon_t"] <= 0.0:
@@ -107,7 +236,7 @@ def brute(enemy, ctx: EnemyContext) -> None:
             enemy.ai["slam_t"] = timer
         return
 
-    chase(enemy, ctx)
+    enemy.vel = _approach(enemy, ctx) * enemy.speed
     timer -= ctx.dt
     if timer <= 0.0 and dist <= enemy.cfg.get("slam_range", 120):
         enemy.ai["slam_state"] = "telegraph"
@@ -138,7 +267,7 @@ def _fsm_common(enemy, ctx, *, trigger_range: float, telegraph: float,
     dist = (ctx.player_pos - enemy.pos).length()
 
     if fs == "chase":
-        enemy.vel = _toward(enemy, ctx.player_pos) * enemy.speed
+        enemy.vel = _approach(enemy, ctx) * enemy.speed
         if dist <= trigger_range and enemy.ai["cd"] <= 0.0:
             _fsm_enter(enemy, "telegraph", telegraph)
     elif fs == "telegraph":
@@ -152,7 +281,7 @@ def _fsm_common(enemy, ctx, *, trigger_range: float, telegraph: float,
         if enemy.ai["ft"] <= 0.0:
             _fsm_enter(enemy, "recover", recover)
     elif fs == "recover":
-        enemy.vel = _toward(enemy, ctx.player_pos) * enemy.speed * 0.3
+        enemy.vel = _approach(enemy, ctx) * enemy.speed * 0.3
         if enemy.ai["ft"] <= 0.0:
             enemy.ai["cd"] = cooldown
             _fsm_enter(enemy, "chase", 0.0)
@@ -207,7 +336,7 @@ def fsm_warlock(enemy, ctx) -> None:
         if dist < pref - 40:
             enemy.vel = -_toward(enemy, ctx.player_pos) * enemy.speed
         elif dist > pref + 40:
-            enemy.vel = _toward(enemy, ctx.player_pos) * enemy.speed
+            enemy.vel = _approach(enemy, ctx) * enemy.speed
         else:
             enemy.vel = pygame.Vector2()
 
@@ -237,6 +366,7 @@ def fsm_warlock(enemy, ctx) -> None:
 BEHAVIORS = {
     "chase": chase,
     "chaser": chase,          # backwards-compatible alias
+    "path_chase": path_chase,
     "kite_shoot": kite_shoot,
     "exploder": exploder,
     "summoner": summoner,

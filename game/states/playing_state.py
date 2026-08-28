@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import math
 import random
+import time
 from types import SimpleNamespace
 
 import pygame
@@ -45,6 +46,7 @@ from systems.screen_shake import ScreenShake
 from ui.hud import HUD
 from ui.damage_numbers import DamageNumbers
 from world.map import GameMap
+from world.pathfinding import NavField
 from world.spawning import SpawnDirector
 
 log = logging.getLogger(__name__)
@@ -118,6 +120,25 @@ class PlayingState(State):
         self.damage_numbers = DamageNumbers()
         self.shake = ScreenShake()
         self.grid = SpatialGrid()
+
+        # Enemy flow-field navigation (config.ENEMY_PATHFINDING). Built once from
+        # the static layout; rebuilt toward the player on a timer in
+        # `_update_nav`. Inert until a behaviour reads `ctx.nav_dir` (M4).
+        self._nav: NavField | None = None
+        self._nav_t = 0.0
+        self._nav_rr = 0                  # round-robin index over the nav classes
+        self._nav_last_ms = 0.0          # last rebuild cost (debug overlay)
+        self._nav_rebuilds = 0
+        self._obstacle_grid: SpatialGrid | None = None
+        if config.ENEMY_PATHFINDING and self.game_map.layout is not None:
+            self._nav = NavField(self.game_map.layout, self.game_map.obstacles)
+            self._nav.rebuild(self.player.pos)
+            self._nav_t = config.ENEMY_NAV_REBUILD_INTERVAL
+            # Static -> built once; `path_chase` reads it for local obstacle
+            # avoidance (a push off the nearest prop, on top of the field).
+            self._obstacle_grid = SpatialGrid()
+            self._obstacle_grid.rebuild(self.game_map.obstacles)
+
         self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng,
                                       difficulty=self.difficulty)
         self.hud = HUD()
@@ -277,6 +298,7 @@ class PlayingState(State):
         self.player.update(dt, self.game_map)
         self._update_hero_anim(dt)
         self.camera.update(dt, self.player.pos)
+        self._update_nav(dt)
 
         elapsed = self.stats["time"]
         if self.director.should_spawn_boss(elapsed):
@@ -370,7 +392,56 @@ class PlayingState(State):
             fire_projectile=self._fire_hostile, summon=self._summon,
             explosion=self._explosion, report_damage=self._report_dot,
             resolve_movement=self.game_map.resolve_movement,
-            spawn_hazard=self._spawn_hazard)
+            spawn_hazard=self._spawn_hazard, nav_dir=self._nav_dir,
+            nav_enabled=self._nav is not None, neighbors=self._nav_neighbors,
+            obstacles_near=self._obstacles_near)
+
+    def _nav_neighbors(self, pos, radius) -> list:
+        return self.grid.query_circle(pos.x, pos.y, radius)
+
+    def _obstacles_near(self, pos, radius) -> list:
+        if self._obstacle_grid is None:
+            return []
+        return self._obstacle_grid.query_circle(pos.x, pos.y, radius)
+
+    # Repath early once the player is this many navigation cells from where the
+    # field was last aimed -- keeps the field fresh without an 8 ms rebuild every
+    # time the player nudges across a 32 px boundary (which happens ~8x/s).
+    _NAV_DRIFT_CELLS = 2
+
+    def _update_nav(self, dt: float) -> None:
+        """Refresh the flow field toward the player. A large player jump repaths
+        every grid at once (rare); the periodic refresh rebuilds one grid per
+        tick, round-robin, at `interval / n_grids` spacing -- so each grid still
+        refreshes every `ENEMY_NAV_REBUILD_INTERVAL` but only one ~4 ms rebuild
+        lands on any frame instead of the ~8 ms both-grids cost."""
+        if self._nav is None:
+            return
+        self._nav_t -= dt
+        jumped = (self._nav.target_cell_drift(self.player.pos)
+                  >= self._NAV_DRIFT_CELLS)
+        if not jumped and self._nav_t > 0.0:
+            return
+        t0 = time.perf_counter()
+        if jumped:
+            self._nav.rebuild(self.player.pos)
+            self._nav_t = config.ENEMY_NAV_REBUILD_INTERVAL
+        else:
+            classes = self._nav.classes
+            self._nav.rebuild(self.player.pos,
+                              only=classes[self._nav_rr % len(classes)])
+            self._nav_rr += 1
+            self._nav_t = config.ENEMY_NAV_REBUILD_INTERVAL / len(classes)
+        self._nav_last_ms = (time.perf_counter() - t0) * 1000.0
+        self._nav_rebuilds += 1
+
+    def _nav_dir(self, pos, radius) -> pygame.Vector2:
+        """Flow-field steering direction toward the player for an enemy of
+        `radius` at `pos`; a zero vector means "no route -- fall back to
+        straight chase" (`config.ENEMY_PATHFINDING` off, or an unreached cell)."""
+        if self._nav is None:
+            return pygame.Vector2()
+        return self._nav.direction(pos, radius)
 
     def _report_dot(self, amount: float) -> None:
         self.stats["damage_dealt"] += amount
@@ -901,6 +972,10 @@ class PlayingState(State):
         d.set_metric("particles", len(self.particles))
         d.set_metric("level", self.levels.level)
         d.set_metric("kills", self.stats["kills"])
+        if self._nav is not None:
+            d.set_metric("nav", f"on {self._nav_last_ms:4.1f}ms  x{self._nav_rebuilds}")
+        elif config.ENEMY_PATHFINDING:
+            d.set_metric("nav", "on (no layout)")
 
     # --- render ---------------------------------
     def draw(self, surface: pygame.Surface) -> None:

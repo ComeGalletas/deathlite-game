@@ -1,22 +1,22 @@
 {
   "chaser": {
     "name": "Husk", "hp": 12, "speed": 95, "contact_damage": 13, "radius": 14,
-    "experience_reward": 3, "behavior": "chase", "color": [200, 90, 90],
+    "experience_reward": 3, "behavior": "path_chase", "color": [200, 90, 90],
     "tags": ["basic"], "sprite": "skull"
   },
   "fast": {
     "name": "Skitter", "hp": 6, "speed": 190, "contact_damage": 11, "radius": 10,
-    "experience_reward": 3, "behavior": "chase", "color": [240, 150, 90],
+    "experience_reward": 3, "behavior": "path_chase", "color": [240, 150, 90],
     "tags": ["fast"], "sprite": "spider"
   },
   "tank": {
     "name": "Lumberer", "hp": 70, "speed": 45, "contact_damage": 21, "radius": 24,
-    "experience_reward": 9, "behavior": "chase", "color": [130, 90, 150],
+    "experience_reward": 9, "behavior": "path_chase", "color": [130, 90, 150],
     "tags": ["tank"], "sprite": "turtle"
   },
   "swarm": {
     "name": "Mite", "hp": 3, "speed": 130, "contact_damage": 9, "radius": 7,
-    "experience_reward": 1, "behavior": "chase", "color": [180, 200, 110],
+    "experience_reward": 1, "behavior": "path_chase", "color": [180, 200, 110],
     "tags": ["swarm"], "sprite": "bumblebee"
   },
   "ranged": {
@@ -34,13 +34,13 @@
   },
   "shielded": {
     "name": "Bulwark", "hp": 20, "speed": 80, "contact_damage": 15, "radius": 16,
-    "experience_reward": 8, "behavior": "chase", "color": [150, 170, 210],
+    "experience_reward": 8, "behavior": "path_chase", "color": [150, 170, 210],
     "tags": ["shielded"], "sprite": "panda",
     "shield_hp": 25
   },
   "elite": {
     "name": "Ravager", "hp": 120, "speed": 90, "contact_damage": 25, "radius": 22,
-    "experience_reward": 30, "behavior": "chase", "color": [255, 80, 120],
+    "experience_reward": 30, "behavior": "path_chase", "color": [255, 80, 120],
     "tags": ["elite"], "is_elite": true, "sprite": "bear"
   },
   "summoner": {

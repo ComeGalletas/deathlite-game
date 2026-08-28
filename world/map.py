@@ -32,6 +32,11 @@ _SPECIAL_FLOORS = {
     "merchant": (40, 36, 28), "elite_arena": (46, 26, 30),
 }
 
+# Compass directions for the last-resort unwedge hop in `resolve_movement`.
+_R2 = 2.0 ** -0.5
+_ESCAPE_DIRS = ((1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0),
+                (_R2, _R2), (_R2, -_R2), (-_R2, _R2), (-_R2, -_R2))
+
 
 class GameMap:
     def __init__(self, seed: int | None = None) -> None:
@@ -143,7 +148,9 @@ class GameMap:
 
     def resolve_movement(self, prev: pygame.Vector2, new: pygame.Vector2,
                          radius: float) -> pygame.Vector2:
-        """Move toward `new`; if it hits a wall, slide along one axis."""
+        """Move toward `new`; if it hits a wall, slide along one axis; if that
+        also fails, hop one short step to an open compass direction so a wedged
+        entity always has an out. Unchanged if every hop is blocked too."""
         if self.is_walkable(new, radius):
             return new
         slide_x = pygame.Vector2(new.x, prev.y)
@@ -152,6 +159,18 @@ class GameMap:
         slide_y = pygame.Vector2(prev.x, new.y)
         if self.is_walkable(slide_y, radius):
             return slide_y
+        # Fully wedged (move + both axis slides blocked). Try a `radius`-length
+        # hop in the eight compass directions, the one nearest the intended
+        # heading first, so enemies whose behaviour has no unstick of its own
+        # still recover. Purely a last resort -- normal movement never reaches
+        # here.
+        want = new - prev
+        step = max(radius, 12.0)
+        for dx, dy in sorted(_ESCAPE_DIRS,
+                             key=lambda d: -(d[0] * want.x + d[1] * want.y)):
+            hop = pygame.Vector2(prev.x + dx * step, prev.y + dy * step)
+            if self.is_walkable(hop, radius):
+                return hop
         return pygame.Vector2(prev)
 
     def random_point_in_room(self, room: Room, rng: random.Random,
@@ -262,10 +281,13 @@ class GameMap:
         self._tiles_ready = True
         if self.layout is None:
             return
+        layout = self.layout
         a = get_assets()
         t = a.terrain
         px = int(t.get("tile_px", 64))
         floor_sheet = t.get("floor_sheet")
+        if not isinstance(floor_sheet, str):
+            return
         slots = t.get("slots", {})
         interior = slots.get("interior", 10)
         palettes = t.get("room_palettes", {})
@@ -311,8 +333,8 @@ class GameMap:
             the shore, not falling short of it) -- not buried at the room centres
             the collision rect runs between. Returns the blit rect (differs from
             `c.rect`) and the surface."""
-            lo = self.layout.room(c.room_low).rect
-            hi = self.layout.room(c.room_high).rect
+            lo = layout.room(c.room_low).rect
+            hi = layout.room(c.room_high).rect
             if c.axis == "h":
                 span0, span1 = lo.right - px, hi.left + px   # 1 tile into each room
                 ncells = max(2, round((span1 - span0) / px))
@@ -329,7 +351,7 @@ class GameMap:
             for i in range(ncells):
                 if bridge_ok:
                     name = self._bridge_slot(c.axis, i, ncells)
-                    tile_surf = cell(b_sheet, b_slots.get(name, b_slots["h_mid"]),
+                    tile_surf = cell(str(b_sheet), b_slots.get(name, b_slots["h_mid"]),
                                      b_cols)
                 else:
                     tile_surf = cell(floor_sheet, interior)
@@ -340,9 +362,9 @@ class GameMap:
                 self._shore.append((blit.x + pos[0], blit.y + pos[1]))
             return blit, surf
 
-        for r in self.layout.rooms:
+        for r in layout.rooms:
             self._room_surfs[r.id] = paint_room(r)
-        for c in self.layout.corridors:
+        for c in layout.corridors:
             self._corr_surfs.append(paint_corridor(c))
 
         # Doorway seam (T9): where a bridge end meets a room edge the two shore
@@ -362,7 +384,9 @@ class GameMap:
                 kept.append((sx, sy))
             self._shore = kept
 
-        water = a.tile(t.get("water_tile"), 0)
+        if not isinstance(floor_sheet, str):
+            return
+        water = a.tile(str(t.get("water_tile")), 0)
         if water is not None:
             wt = water.get_width()
             # Big enough to cover the visible world extent (SCREEN / zoom) plus
@@ -498,7 +522,8 @@ class GameMap:
                     fps = a.fps(rig, "loop") if len(frs) > 1 else 0.0
                     resolved[key] = (frs, ax * scale, ay * scale, fps)
             return resolved[key]
-
+        if self.layout is None:
+            return
         seed = self.layout.seed
         room_reg = [e for e in reg if e.get("placement") == "room_interior"
                     and not e.get("collision")]
@@ -562,30 +587,31 @@ class GameMap:
         total = sum(weights)
         if total <= 0:
             return
-        b = self.layout.bounds
-        step = 160
-        inset = config.CHUNK_SIZE // 3
-        out: list[tuple] = []
-        gy = b.y + inset
-        while gy < b.bottom - inset and len(out) < 240:
-            gx = b.x + inset
-            while gx < b.right - inset and len(out) < 240:
-                rng = random.Random(f"{seed}:{gx}:{gy}:void")
-                if rng.random() < total:
-                    x = gx + rng.uniform(0, step)
-                    y = gy + rng.uniform(0, step)
-                    on_land = self._point_ok(x, y) or any(
-                        self._point_ok(x + dx, y + dy)
-                        for dx in (-36, 36) for dy in (-36, 36))
-                    if not on_land:
-                        e = rng.choices(void_reg, weights=weights, k=1)[0]
-                        entry = load(e["rig"], float(e.get("scale", 1.0)))
-                        if entry is not None:
-                            frs, ax, ay, fps = entry
-                            out.append((frs, ax, ay, fps, x, y))
-                gx += step
-            gy += step
-        self._void_decor = out
+        if self.layout is not None:
+            b = self.layout.bounds
+            step = 160
+            inset = config.CHUNK_SIZE // 3
+            out: list[tuple] = []
+            gy = b.y + inset
+            while gy < b.bottom - inset and len(out) < 240:
+                gx = b.x + inset
+                while gx < b.right - inset and len(out) < 240:
+                    rng = random.Random(f"{seed}:{gx}:{gy}:void")
+                    if rng.random() < total:
+                        x = gx + rng.uniform(0, step)
+                        y = gy + rng.uniform(0, step)
+                        on_land = self._point_ok(x, y) or any(
+                            self._point_ok(x + dx, y + dy)
+                            for dx in (-36, 36) for dy in (-36, 36))
+                        if not on_land:
+                            e = rng.choices(void_reg, weights=weights, k=1)[0]
+                            entry = load(e["rig"], float(e.get("scale", 1.0)))
+                            if entry is not None:
+                                frs, ax, ay, fps = entry
+                                out.append((frs, ax, ay, fps, x, y))
+                    gx += step
+                gy += step
+            self._void_decor = out
 
     # --- render -----------------------------------------------
     def draw(self, surface: pygame.Surface, camera) -> None:
@@ -700,15 +726,17 @@ class GameMap:
                 if fview.collidepoint(wx, wy):
                     surface.blit(zframe, ((wx - ox - half) * z, (wy - oy - half) * z))
         # ... then the baked room floors (autotile edges baked in) ...
-        for r in self.layout.rooms:
-            if r.rect.colliderect(view):
-                surface.blit(self._z_surf(self._room_surfs[r.id]),
-                             ((r.rect.x - ox) * z, (r.rect.y - oy) * z))
+        if self.layout is not None:
+            for r in self.layout.rooms:
+                if r.rect.colliderect(view):
+                    surface.blit(self._z_surf(self._room_surfs[r.id]),
+                                 ((r.rect.x - ox) * z, (r.rect.y - oy) * z))
         # ... corridors last, so their grass covers the foam at doorways.
-        for rect, surf in self._corr_surfs:
-            if rect.colliderect(view):
-                surface.blit(self._z_surf(surf),
-                             ((rect.x - ox) * z, (rect.y - oy) * z))
+        if self.layout is not None:
+            for rect, surf in self._corr_surfs:
+                if rect.colliderect(view):
+                    surface.blit(self._z_surf(surf),
+                                 ((rect.x - ox) * z, (rect.y - oy) * z))
         # Interior clutter is NOT drawn here -- it is depth-sorted with the
         # obstacles and the characters (see `scenery_drawables`).
 
@@ -716,11 +744,12 @@ class GameMap:
         """All interior clutter, unsorted -- only the whole-map `draw()` path.
             Public method so it can be called from outside the class to draw room clutter and don't belong in the depth culling / sorting of the main draw pass.
         """
-        view = camera.visible_rect()
-        for r in self.layout.rooms:
-            inst = self._room_decor.get(r.id)
-            if inst and r.rect.colliderect(view):
-                self._blit_decor(surface, camera, inst, view)
+        if self.layout is not None:
+            view = camera.visible_rect()
+            for r in self.layout.rooms:
+                inst = self._room_decor.get(r.id)
+                if inst and r.rect.colliderect(view):
+                    self._blit_decor(surface, camera, inst, view)
 
     def _blit_one_decor(self, surface, camera, inst) -> None:
         """Blit one `(frames, anchor_x, anchor_y, fps, wx, wy)` scenery instance:
@@ -745,11 +774,12 @@ class GameMap:
 
     def _draw_flat_layout(self, surface, camera) -> None:
         surface.fill(_VOID)
-        for c in self.layout.corridors:
-            pygame.draw.rect(surface, _FLOOR, self._screen_rect(c.rect, camera))
-        for r in self.layout.rooms:
-            pygame.draw.rect(surface, _SPECIAL_FLOORS.get(r.kind, _FLOOR),
-                             self._screen_rect(r.rect, camera))
+        if self.layout is not None:
+            for c in self.layout.corridors:
+                pygame.draw.rect(surface, _FLOOR, self._screen_rect(c.rect, camera))
+            for r in self.layout.rooms:
+                pygame.draw.rect(surface, _SPECIAL_FLOORS.get(r.kind, _FLOOR),
+                                 self._screen_rect(r.rect, camera))
 
     def _draw_one_obstacle(self, surface, camera, i, o) -> None:
         """One obstacle: the scaled decoration skin, seated below the collider
