@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.state import State
 
 _LABELS = {"volume": "Master volume", "mute": "Mute",
@@ -21,9 +21,9 @@ class OptionsState(State):
         self.audio = self.game.audio
         self._rows = ("volume", "mute", "sanctuary", "back")
         self.sel = 0
-        self._title = pygame.font.SysFont("georgia", 40, bold=True)
-        self._row = pygame.font.SysFont("georgia", 26)
-        self._hint = pygame.font.SysFont("georgia", 16)
+        self._title = fonts.heading(40)
+        self._row = fonts.body(26)
+        self._hint = fonts.body(16)
 
     # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:

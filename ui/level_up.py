@@ -7,15 +7,15 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 
 
 class LevelUpPanel:
     def __init__(self) -> None:
-        self._title = pygame.font.SysFont("georgia", 40, bold=True)
-        self._name = pygame.font.SysFont("georgia", 24, bold=True)
-        self._desc = pygame.font.SysFont("georgia", 18)
-        self._hint = pygame.font.SysFont("georgia", 16)
+        self._title = fonts.heading(40)
+        self._name = fonts.heading(24)
+        self._desc = fonts.body(18)
+        self._hint = fonts.body(16)
 
     def draw(self, surface: pygame.Surface, choices, selected: int) -> None:
         w, h = surface.get_size()

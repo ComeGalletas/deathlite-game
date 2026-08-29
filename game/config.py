@@ -6,8 +6,6 @@ from the project.
 """
 from __future__ import annotations
 
-import pygame
-
 # --- Display -----------------------------------------------------------------
 # The window / render target. The world is drawn straight to it at this
 # resolution (no intermediate buffer), so a larger screen = more pixels per
@@ -29,6 +27,15 @@ MAX_DT: float = 1.0 / 20.0
 # are drawn afterwards at full resolution and are unaffected. 1.0 == no zoom.
 # The visible world extent is therefore SCREEN_* / CAMERA_ZOOM.
 CAMERA_ZOOM: float = 1.5
+
+# --- Persistence -----------------------------------------------------------
+# When True the game reads `save.json` at boot and writes it back on every
+# persist() (settings, run rewards, records). When False it never touches the
+# disk: each launch starts from a fresh SaveData() and progression lasts only
+# for the session. The browser build (pygbag / emscripten) has no durable,
+# writable filesystem, so `main_web.py` -- and `main.py` when it detects an
+# emscripten runtime -- flips this to False. Desktop leaves it True.
+SAVE_ENABLED: bool = True
 
 # --- World -----------------------------------------------------------------
 # Fallback size used only before a procedural layout exists (menus / tests).
@@ -238,16 +245,45 @@ INCOMING_TICK_INTERVAL: float = 0.5
 GRID_CELL_SIZE: int = 96
 
 # --- Debug key bindings (see spec section 9) ---------------------------
+# Raw SDL2 keycodes (== pygame.K_F1 .. pygame.K_F7). Hardcoded rather than read
+# from `pygame` because this module is imported before `pygame.init()` and, in
+# the pygbag/browser build, `pygame.K_*` and the `pygame.constants` submodule
+# are not available that early. These SDLK values are fixed by SDL and never
+# change; `game/game.py` compares them against `event.key`.
 DEBUG_KEYS = {
-    "toggle_overlay": pygame.K_F1,
-    "spawn_enemy": pygame.K_F2,
-    "grant_xp": pygame.K_F3,
-    "force_level_up": pygame.K_F4,
-    "spawn_boss": pygame.K_F5,
-    "toggle_invuln": pygame.K_F6,
-    "toggle_collision_vis": pygame.K_F7,
+    "toggle_overlay": 1073741882,       # K_F1
+    "spawn_enemy": 1073741883,          # K_F2
+    "grant_xp": 1073741884,             # K_F3
+    "force_level_up": 1073741885,       # K_F4
+    "spawn_boss": 1073741886,           # K_F5
+    "toggle_invuln": 1073741887,        # K_F6
+    "toggle_collision_vis": 1073741888,  # K_F7
 }
 
 # Start with the debug overlay hidden; F1 toggles it. Debug tools are never
 # required for normal play.
 DEBUG_OVERLAY_DEFAULT: bool = False
+
+
+# --- Browser (pygbag) profile ---------------------------------------------
+def apply_web_profile() -> None:
+    """Mutate the module-level constants for the WebAssembly build. Call once at
+    startup, before `Game()` is constructed (see `main.py` / `main_web.py`).
+
+    * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
+    * `FPS = 60` -- the page composites at ~60 Hz; targeting 120 just spends
+      WASM budget on frames that are never presented.
+    * `1280x720` render target at `CAMERA_ZOOM = 1.2` -- that is the pygbag
+      canvas size, so there is no downscale, and `1280 / 1.2 == 1600 / 1.5`
+      keeps the visible world extent (and on-screen sprite size) identical to
+      the desktop build while cutting per-frame blit work by ~35%.
+
+    Everything reads these at call time (the one default-arg capture,
+    `systems.camera.Camera`, is overridden by an explicit argument in
+    `PlayingState`), so a plain reassignment here propagates.
+    """
+    global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM
+    SAVE_ENABLED = False
+    FPS = 60
+    SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
+    CAMERA_ZOOM = 1.2

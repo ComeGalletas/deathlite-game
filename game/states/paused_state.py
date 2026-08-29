@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.state import State
 
 
@@ -12,8 +12,8 @@ class PausedState(State):
     update_below = False   # ...but do not advance it
 
     def enter(self, **kwargs) -> None:
-        self._title_font = pygame.font.SysFont("georgia", 48, bold=True)
-        self._font = pygame.font.SysFont("georgia", 22)
+        self._title_font = fonts.heading(48)
+        self._font = fonts.body(22)
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYDOWN:

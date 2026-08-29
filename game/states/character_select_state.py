@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.content import get_content
 from game.state import State
 from systems.animation import Animator
@@ -32,11 +32,11 @@ class CharacterSelectState(State):
         self.index = 0
         # Per-run difficulty (never persisted). Up / Down cycles it.
         self.diff_index = config.DIFFICULTY_ORDER.index(config.DIFFICULTY_DEFAULT)
-        self._title = pygame.font.SysFont("georgia", 44, bold=True)
-        self._name = pygame.font.SysFont("georgia", 30, bold=True)
-        self._body = pygame.font.SysFont("georgia", 20)
-        self._instr = pygame.font.SysFont("georgia", 17)   # ~85% of the body font
-        self._hint = pygame.font.SysFont("georgia", 16)
+        self._title = fonts.heading(44)
+        self._name = fonts.heading(30)
+        self._body = fonts.body(20)
+        self._instr = fonts.body(17)   # ~85% of the body font
+        self._hint = fonts.body(16)
 
         # Hero animation preview -- one Animator, rebuilt when the pick changes.
         self._preview: Animator | None = None

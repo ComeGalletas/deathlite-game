@@ -19,7 +19,7 @@ import random
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.content import get_content
 from game.state import State
 
@@ -68,9 +68,9 @@ class DevMenuState(State):
         self._blessing_ids = sorted(
             lib.by_id, key=lambda b: (lib.by_id[b].source, lib.by_id[b].name)
         ) if lib is not None else []
-        self._title_font = pygame.font.SysFont("consolas", 28, bold=True)
-        self._row_font = pygame.font.SysFont("consolas", 22)
-        self._hint_font = pygame.font.SysFont("consolas", 15)
+        self._title_font = fonts.mono(28, bold=True)
+        self._row_font = fonts.mono(22)
+        self._hint_font = fonts.mono(15)
 
     def _rows(self) -> tuple | list:
         return {"root": _ROOT_ROWS, "enemies": self._enemy_ids,

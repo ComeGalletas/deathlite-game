@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 
 
 class HUD:
     def __init__(self) -> None:
-        self._font = pygame.font.SysFont("georgia", 18)
-        self._big = pygame.font.SysFont("georgia", 22, bold=True)
+        self._font = fonts.body(18)
+        self._big = fonts.heading(22)
 
     def draw(self, surface: pygame.Surface, player, stats: dict,
              xp_fraction: float | None = None, boss=None) -> None:

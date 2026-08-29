@@ -15,9 +15,26 @@ import time
 from types import SimpleNamespace
 
 import pygame
-import pygame.gfxdraw
 
-from game import config
+# `pygame.gfxdraw` is imported lazily in `_draw_cone` (via `_get_gfxdraw`): a
+# top-level `import pygame.gfxdraw` trips pygbag's import hook, which treats the
+# dotted name as a PyPI package. `None` -> fall back to `pygame.draw.polygon`.
+_gfxdraw = None
+_gfxdraw_tried = False
+
+
+def _get_gfxdraw():
+    global _gfxdraw, _gfxdraw_tried
+    if not _gfxdraw_tried:
+        _gfxdraw_tried = True
+        try:
+            import pygame.gfxdraw as _gd
+            _gfxdraw = _gd
+        except Exception:  # not built in this pygame (e.g. some pygbag builds)
+            _gfxdraw = None
+    return _gfxdraw
+
+from game import config, fonts
 from game.content import get_content
 from game.events import Events
 from game.state import State
@@ -153,8 +170,8 @@ class PlayingState(State):
         self._hurt_flash_t = 0.0
         self._boss_warning_t = 0.0
         self._boss_name = ""
-        self._banner_font = pygame.font.SysFont("georgia", 40, bold=True)
-        self._prompt_font = pygame.font.SysFont("georgia", 20, bold=True)
+        self._banner_font = fonts.heading(40)
+        self._prompt_font = fonts.heading(20)
 
         # `currency` = Salvage banked to the save at run end (boss + elite arena).
         # `gold` = spent in-run at the Merchant only, never banked.
@@ -1291,8 +1308,15 @@ class PlayingState(State):
             a = base - half + (2.0 * half) * i / steps
             pts.append((int(cx + math.cos(a) * r), int(cy + math.sin(a) * r)))
         col = tuple(p.color)
-        pygame.gfxdraw.filled_polygon(surface, pts, (*col, 70))
-        pygame.gfxdraw.aapolygon(surface, pts, (*col, 210))
+        gfx = _get_gfxdraw()
+        if gfx is not None:
+            gfx.filled_polygon(surface, pts, (*col, 70))
+            gfx.aapolygon(surface, pts, (*col, 210))
+        else:  # pygbag / no gfxdraw: a plain translucent sector, no AA edge
+            fill = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            pygame.draw.polygon(fill, (*col, 70), pts)
+            pygame.draw.polygon(fill, (*col, 210), pts, 2)
+            surface.blit(fill, (0, 0))
 
     def _draw_hostile_projectiles(self, surface) -> None:
         # Enemy / boss shots: a rotated arrow (falls back to a dot if the

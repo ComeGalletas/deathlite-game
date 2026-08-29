@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 
 
 class DebugOverlay:
@@ -22,7 +22,7 @@ class DebugOverlay:
 
     def _ensure_font(self) -> pygame.font.Font:
         if self._font is None:
-            self._font = pygame.font.SysFont("consolas", 16)
+            self._font = fonts.mono(16)
         return self._font
 
     def toggle(self) -> None:

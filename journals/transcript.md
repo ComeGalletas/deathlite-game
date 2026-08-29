@@ -774,3 +774,18 @@ collapsed into that column plus a single nav line.
 `assets/title screen.png` hook, refreshed counts); `journal.md` + this section.
 **Reason:** The menu flow, the new Options screen, and the optional title-image
 hook are things a reader / packager needs to know about.
+
+
+## Web build (pygbag)
+
+**What:** async loop (`run_async` + a shared `_start`/`_step`);
+`config.apply_web_profile()` (no `save.json`, 60 fps, 1280×720 @ `CAMERA_ZOOM
+1.2` — desktop field of view preserved); `systems/mixer_backend.py` (a
+`DesktopMixer` / `BrowserMixer` / `SilentMixer` adapter so the WebAudio context
+is not torn down and re-opened); `game/fonts.py` + a bundled Fredoka face
+replacing ~30 `SysFont` sites; `main.py` the sole entry (`--web` / emscripten
+applies the profile); all pygbag packaging in `web/`.
+**Reason:** the browser has no durable filesystem, a fragile audio context, no
+system fonts, and a 60 Hz compositor; each divergence from the desktop build is
+behind a flag or an adapter so the two share one code path, and the root stays
+uncluttered. Full plan + deploy steps live in `journals/pygbag.md`.

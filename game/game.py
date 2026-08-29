@@ -44,7 +44,8 @@ class Game:
         # and a missing file degrades to primitive drawing (never raises).
         self.assets = get_assets()
         self.save_path = save_path or save_mod.DEFAULT_PATH
-        self.save = save_mod.load(self.save_path)
+        self.save = (save_mod.load(self.save_path) if config.SAVE_ENABLED
+                     else save_mod.SaveData())
         self.meta_catalog = MetaCatalog(self.content.meta_upgrades)
 
         self.audio = AudioManager(self.events)
@@ -62,6 +63,8 @@ class Game:
         self.running = False
 
     def persist(self) -> None:
+        if not config.SAVE_ENABLED:
+            return  # session-only build (browser) -- nothing is written to disk
         self.save.settings["muted"] = self.audio.muted
         self.save.settings["volume"] = self.audio.volume
         try:
@@ -80,29 +83,51 @@ class Game:
             self.save.add_item(item)
         self.persist()
 
-    def run(self) -> None:
+    def _start(self) -> None:
+        """Push the opening state and arm the loop. Shared by `run` (desktop)
+        and `run_async` (browser)."""
         from game.states.menu_state import MenuState
         self.state_machine.change(MenuState(self))
-
         self.running = True
+
+    def _step(self) -> None:
+        """One iteration of the main loop: timing -> input -> update -> render.
+        Clears `self.running` when the state stack drains. Identical work for
+        both loop drivers so desktop and browser never diverge."""
+        dt = self.clock.tick(config.FPS) / 1000.0
+        dt = min(dt, config.MAX_DT)  # clamp -- see config.MAX_DT
+
+        self._process_input()
+        if self.state_machine.is_empty():
+            self.running = False
+            return
+
+        t0 = time.perf_counter()
+        self.state_machine.update(dt)
+        t1 = time.perf_counter()
+
+        self._render()
+        t2 = time.perf_counter()
+
+        self.debug.record_timing((t1 - t0) * 1000.0, (t2 - t1) * 1000.0)
+
+    def run(self) -> None:
+        """Desktop entry: a plain blocking loop."""
+        self._start()
         while self.running:
-            dt = self.clock.tick(config.FPS) / 1000.0
-            dt = min(dt, config.MAX_DT)  # clamp -- see config.MAX_DT
+            self._step()
+        pygame.quit()
 
-            self._process_input()
-            if self.state_machine.is_empty():
-                self.running = False
-                break
+    async def run_async(self) -> None:
+        """Browser (pygbag / emscripten) entry: the same loop, but it yields to
+        the host event loop once per frame with `await asyncio.sleep(0)` so the
+        page stays responsive. Works on desktop too (`asyncio.run`)."""
+        import asyncio
 
-            t0 = time.perf_counter()
-            self.state_machine.update(dt)
-            t1 = time.perf_counter()
-
-            self._render()
-            t2 = time.perf_counter()
-
-            self.debug.record_timing((t1 - t0) * 1000.0, (t2 - t1) * 1000.0)
-
+        self._start()
+        while self.running:
+            self._step()
+            await asyncio.sleep(0)
         pygame.quit()
 
     # --- loop phases ----------------------------------------------
