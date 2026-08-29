@@ -15,10 +15,14 @@ import pygame
 from game import config
 from progression.stats import Modifier, StatSet
 
-_LEFT_KEYS = (pygame.K_a, pygame.K_LEFT)
-_RIGHT_KEYS = (pygame.K_d, pygame.K_RIGHT)
-_UP_KEYS = (pygame.K_w, pygame.K_UP)
-_DOWN_KEYS = (pygame.K_s, pygame.K_DOWN)
+# Raw SDL2 keycodes (== pygame.K_a / K_LEFT / ...). Hardcoded because these are
+# read at import time, before `pygame.init()`; the pygbag/browser build does not
+# expose `pygame.K_*` (nor the `pygame.constants` submodule) that early. SDLK
+# values are fixed by SDL. `pressed` below is indexed by these ints.
+_LEFT_KEYS = (97, 1073741904)    # K_a, K_LEFT
+_RIGHT_KEYS = (100, 1073741903)  # K_d, K_RIGHT
+_UP_KEYS = (119, 1073741906)     # K_w, K_UP
+_DOWN_KEYS = (115, 1073741905)   # K_s, K_DOWN
 
 
 def input_vector(pressed) -> pygame.Vector2:

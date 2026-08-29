@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.state import State
 
 # (stat key in save.records, row label, formatter)
@@ -25,10 +25,10 @@ _ROWS = (
 class RankingsState(State):
     def enter(self, **kwargs) -> None:
         self.records = dict(self.game.save.records)
-        self._title = pygame.font.SysFont("georgia", 40, bold=True)
-        self._head = pygame.font.SysFont("georgia", 24, bold=True)
-        self._row = pygame.font.SysFont("georgia", 20)
-        self._hint = pygame.font.SysFont("georgia", 16)
+        self._title = fonts.heading(40)
+        self._head = fonts.heading(24)
+        self._row = fonts.body(20)
+        self._hint = fonts.body(16)
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.KEYDOWN:

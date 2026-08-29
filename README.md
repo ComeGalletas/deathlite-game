@@ -34,17 +34,44 @@ python main.py
 
 (or without activating: `.venv\Scripts\python.exe main.py`)
 
+## Play in the browser
+
+The game also builds to WebAssembly with [pygbag](https://pygame-web.github.io/).
+The loop is `asyncio`-driven (`Game.run_async`), so one code path serves the
+desktop and web builds. `main.py` is the only entry point; under the emscripten
+runtime (or with `--web` on the desktop) it calls `config.apply_web_profile()` —
+**session-only save** (never reads or writes `save.json`), **60 fps** to match
+the browser compositor, and a **1280×720** render target that keeps the desktop
+field of view while cutting per-frame work ~35%.
+
+Everything else pygbag needs lives in `web/` (`pygbag.ini`, `build.sh`,
+`serve.sh`, and `web/README.md` with the details):
+
+```bash
+bash web/serve.sh        # rebuild + serve at http://localhost:8000
+bash web/build.sh        # build only -> build/web/  (gitignored)
+```
+
+First run downloads a CPython-WASM runtime (cached after). Mixer bring-up is
+platform-specific behind `systems/mixer_backend.py` (desktop re-inits at
+22050 Hz; the browser keeps the WebAudio context it was given and resamples).
+Fonts are the bundled **Fredoka** face (`assets/fonts/`, via `game/fonts.py`).
+See `journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
+
 ## Run the tests
 
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -s tests -t . -v
 ```
 
-`tests/` is split into `ai/`, `rendering/` and `characters/` sub-packages (each
-an `__init__.py` package so `discover` walks it) plus the uncategorised suites at
-the root; `tests/aictx.py` is a shared fake-AI-context helper, not a test.
+`tests/` is split by subject into `__init__.py` sub-packages — `ai/`,
+`rendering/`, `characters/`, `combat/`, `progression/`, `world/`, `systems/`,
+`core/` — so only `__init__.py` and the shared `aictx.py` fake-AI-context helper
+sit at the root. `-t .` makes the modules import as `tests.<area>.<name>` so the
+`combat` / `world` / `systems` / `progression` folders don't shadow the
+same-named source packages. `pytest` works too and needs no extra flag.
 
-573 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+578 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
 terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
 depth-sorted rendering, the start menu + options + rankings screens, developer
@@ -132,16 +159,18 @@ or corrupt file is handled gracefully — the game never crashes over it).
 
 ```
 deathlite-game/
-├── main.py             thin entry point
+├── main.py             entry point (async loop); `--web` / emscripten applies
+│                       the browser profile
+├── web/                pygbag packaging: pygbag.ini, build.sh, serve.sh, README
 ├── game/               loop, state machine, config, event bus, content,
-│   │                   save, assets (sprite loader/cache)
+│   │                   save, assets (sprite loader/cache), fonts
 │   └── states/         one module per game state (menu, options, rankings,
 │                       char-select, playing, level-up, paused, game-over,
 │                       victory, sanctuary, dev menu)
 ├── entities/           player, enemy (+ ai), boss, projectile, pickup,
 │                       summon, hazard, obstacle, interactable
-├── systems/            camera, spatial grid, object pool, particles,
-│                       screen shake, audio, animation, debug overlay
+├── systems/            camera, spatial grid, object pool, particles, screen
+│                       shake, audio (+ mixer backend), animation, debug overlay
 ├── combat/             weapons, damage, targeting, status
 ├── progression/        experience, stats, upgrades, blessings, items, meta
 ├── world/              map, spawning (director), procedural (world gen)
@@ -152,11 +181,18 @@ deathlite-game/
 │                       projectiles/, terrain/{tiles,bridge,props,resources}/,
 │                       buildings/, effects/, ui/title.png, CREDITS.md
 │                       (PNG sprites only — see assets/CREDITS.md)
-└── tests/              573 tests: pure logic + headless integration
+└── tests/              578 tests: pure logic + headless integration
     ├── ai/             behaviours, FSM enemies, pathfinding, nav, boss
-    ├── rendering/      camera, animation, depth sort, terrain, sprites, screens
+    ├── rendering/      camera, animation, depth sort, terrain, sprites, assets,
+    │                   screens
     ├── characters/     hero definitions + movement
-    └── *.py            everything else + the aictx.py AI-context helper
+    ├── combat/         weapons, damage, status, summons
+    ├── progression/    xp, stats, upgrades, blessings, items, meta
+    ├── world/          procedural gen, rooms, obstacles, houses, spawning,
+    │                   pickups, interactables
+    ├── systems/        object pool, audio, collision
+    ├── core/           smoke boot, state machine, event bus, dev mode, save
+    └── aictx.py        shared fake-AI-context helper (not a test)
 ```
 
 ## Content

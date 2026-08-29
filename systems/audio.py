@@ -4,9 +4,11 @@ third-party assets).
 Every effect is built at startup from sine/square/noise primitives into a raw
 16-bit mono buffer and wrapped in a `pygame.mixer.Sound`. No files, no numpy.
 
-`AudioManager` subscribes to the event bus and plays the matching cue. If the
-mixer cannot initialise (e.g. the SDL dummy audio driver in tests) it degrades
-to a silent no-op -- audio is never load-bearing.
+Mixer bring-up is delegated to `systems/mixer_backend.py` so the same synth code
+runs on desktop SDL and in the browser (pygbag). `AudioManager` subscribes to
+the event bus and plays the matching cue. If no mixer backend is available
+(e.g. the SDL dummy audio driver in tests) it degrades to a silent no-op --
+audio is never load-bearing.
 """
 from __future__ import annotations
 
@@ -18,10 +20,11 @@ import random
 import pygame
 
 from game.events import Events
+from systems.mixer_backend import SYNTH_RATE, make_mixer_backend
 
 log = logging.getLogger(__name__)
 
-_RATE = 22050
+_RATE = SYNTH_RATE
 _AMP = 26000  # headroom below the int16 max so mixing does not clip
 
 
@@ -29,9 +32,9 @@ def _clamp16(v: float) -> int:
     return max(-32768, min(32767, int(v)))
 
 
-def _render(samples: list[float]) -> "pygame.mixer.Sound":
+def _render(samples: list[float], backend) -> "pygame.mixer.Sound | None":
     buf = array.array("h", (_clamp16(s) for s in samples))
-    return pygame.mixer.Sound(buffer=buf.tobytes())
+    return backend.make_sound(buf)
 
 
 def _osc(freq: float, t: float, shape: str) -> float:
@@ -70,22 +73,23 @@ def _mix(*layers: list[float]) -> list[float]:
     return out
 
 
-def _build_library() -> dict[str, "pygame.mixer.Sound"]:
+def _build_library(backend) -> dict[str, "pygame.mixer.Sound"]:
     rng = random.Random(1234)  # deterministic timbres
-    return {
-        "shoot":      _render(_tone(660, 0.09, 0.35, "square", f_end=880)),
-        "hit":        _render(_tone(200, 0.06, 0.4, "saw", f_end=120)),
+    cues = {
+        "shoot":      _render(_tone(660, 0.09, 0.35, "square", f_end=880), backend),
+        "hit":        _render(_tone(200, 0.06, 0.4, "saw", f_end=120), backend),
         "enemy_death": _render(_mix(_tone(150, 0.16, 0.4, "saw", f_end=60),
-                                    _noise(0.16, 0.25, rng))),
-        "xp":         _render(_tone(880, 0.07, 0.25, "sine", f_end=1320)),
+                                    _noise(0.16, 0.25, rng)), backend),
+        "xp":         _render(_tone(880, 0.07, 0.25, "sine", f_end=1320), backend),
         "level_up":   _render(_mix(_tone(523, 0.18, 0.4),
-                                   _tone(784, 0.18, 0.3, f_end=880))),
+                                   _tone(784, 0.18, 0.3, f_end=880)), backend),
         "player_hurt": _render(_mix(_tone(140, 0.22, 0.5, "square", f_end=90),
-                                    _noise(0.12, 0.3, rng))),
-        "boss_spawn": _render(_tone(70, 0.7, 0.6, "saw", f_end=45)),
+                                    _noise(0.12, 0.3, rng)), backend),
+        "boss_spawn": _render(_tone(70, 0.7, 0.6, "saw", f_end=45), backend),
         "boss_death": _render(_mix(_tone(110, 0.9, 0.5, "saw", f_end=40),
-                                   _noise(0.9, 0.35, rng))),
+                                   _noise(0.9, 0.35, rng)), backend),
     }
+    return {name: snd for name, snd in cues.items() if snd is not None}
 
 
 class AudioManager:
@@ -97,17 +101,16 @@ class AudioManager:
         self._last_play: dict[str, int] = {}
         self._min_gap_ms = {"shoot": 75, "hit": 50, "xp": 45}  # minimum gap between consecutive plays of each sound in milliseconds
 
-        try:
-            # Re-init to our exact format so buffers play at the right pitch
-            # (pygame.init() may have opened the mixer at a different rate).
-            if pygame.mixer.get_init() is not None:
-                pygame.mixer.quit()
-            pygame.mixer.init(frequency=_RATE, size=-16, channels=1)
-            pygame.mixer.set_num_channels(24)
-            self._sounds = _build_library()
-            self.enabled = True
-        except pygame.error as exc:  # dummy driver / no device
-            log.warning("audio disabled: %s", exc)
+        # Mixer bring-up is platform-specific (desktop vs browser vs headless);
+        # the backend owns that decision. A silent backend leaves us disabled.
+        self._backend = make_mixer_backend()
+        if not self._backend.ready:
+            log.warning("audio disabled: no mixer backend")
+            return
+        self._sounds = _build_library(self._backend)
+        self.enabled = bool(self._sounds)
+        if not self.enabled:
+            log.warning("audio disabled: mixer produced no buffers")
             return
 
         bus = event_bus

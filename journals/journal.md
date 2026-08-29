@@ -2449,3 +2449,16 @@ wrapped identity / trait / weapon text from y+66 down (~220 px used of 340).
 
 Screenshot verified per hero: the sprite animating in the preview slot, then
 Difficulty / instructions / hint, all within the 900 px height.
+
+
+## Web build (pygbag) — see `journals/pygbag.md`
+
+The game builds to WebAssembly with pygbag and runs in a browser. The main loop
+was made `asyncio`-driven (`Game.run`/`Game.run_async` share a `_start`/`_step`
+body); `config.apply_web_profile()` applies the browser variant (no save file,
+60 fps, a 1280×720 render target at `CAMERA_ZOOM 1.2` — same field of view as
+desktop); mixer bring-up moved behind `systems/mixer_backend.py` (desktop vs
+browser vs silent); and every `SysFont` call goes through `game/fonts.py` + a
+bundled Fredoka face. `main.py` is the sole entry (emscripten, or `--web` on the
+desktop, triggers the profile); all pygbag packaging lives in `web/`. Milestones
+W1–W8 done; only W9 (the GitHub Pages workflow) remains — see the dedicated log.

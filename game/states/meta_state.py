@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.state import State
 from progression.items import Item
 from progression.meta import buy
@@ -26,10 +26,10 @@ class MetaState(State):
         self.catalog = self.game.meta_catalog
         self.panel = 0                      # 0 = upgrades, 1 = stash
         self.sel = [0, 0]
-        self._title = pygame.font.SysFont("georgia", 40, bold=True)
-        self._h = pygame.font.SysFont("georgia", 22, bold=True)
-        self._f = pygame.font.SysFont("consolas", 18)
-        self._small = pygame.font.SysFont("georgia", 15)
+        self._title = fonts.heading(40)
+        self._h = fonts.heading(22)
+        self._f = fonts.mono(18)
+        self._small = fonts.body(15)
 
     # --- input ------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:

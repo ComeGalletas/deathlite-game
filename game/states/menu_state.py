@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.state import State
 from ui.panels import three_slice_h
 
@@ -25,9 +25,9 @@ from ui.panels import three_slice_h
 class MenuState(State):
     def enter(self, **kwargs) -> None:
         self._menu_font_px = 24
-        self._title_font = pygame.font.SysFont("georgia", 64, bold=True)
-        self._font = pygame.font.SysFont("georgia", self._menu_font_px)
-        self._small = pygame.font.SysFont("georgia", 16)
+        self._title_font = fonts.heading(64)
+        self._font = fonts.body(self._menu_font_px)
+        self._small = fonts.body(16)
 
         # (label, action). `action` is dispatched in _activate(); an entry whose
         # action is None is drawn but does nothing when selected.

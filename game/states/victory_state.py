@@ -7,15 +7,15 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from game.state import State
 
 
 class VictoryState(State):
     def enter(self, *, stats: dict | None = None, **kwargs) -> None:
         self.stats = stats or {}
-        self._title_font = pygame.font.SysFont("georgia", 56, bold=True)
-        self._font = pygame.font.SysFont("georgia", 24)
+        self._title_font = fonts.heading(56)
+        self._font = fonts.body(24)
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.KEYDOWN:

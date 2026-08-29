@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, fonts
 from systems.object_pool import Pool
 
 _BASE_PT = 16
@@ -50,8 +50,7 @@ class DamageNumbers:
         trio = self._font_cache.get(key)
         if trio is None:
             def f(pt):
-                return pygame.font.SysFont("arialrounded",
-                                           max(6, round(pt * zoom)), bold=True)
+                return fonts.body(max(6, round(pt * zoom)), bold=True)
             trio = (f(_BASE_PT), f(_CRIT_PT), f(_IN_PT))
             self._font_cache[key] = trio
         return trio
