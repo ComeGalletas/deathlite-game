@@ -109,12 +109,14 @@ def _round(op: str, value: float) -> float:
 
 
 def generate_item(content, *, seed: int, item_level: int = 1, luck: float = 0.0,
-                  slot: str | None = None) -> Item:
+                  slot: str | None = None, base_id: str | None = None) -> Item:
     rng = random.Random(seed)
     data = content.items
     bases = data["bases"]
     slot = slot or rng.choice(list(bases))
-    base = rng.choice(bases[slot])
+    base = rng.choice(bases[slot])           # drawn unconditionally -> stream stable
+    if base_id is not None:                  # dev menu: force a specific base
+        base = next((b for b in bases[slot] if b["id"] == base_id), base)
     rarity = roll_rarity(rng, luck)
 
     lvl_scale = 1.0 + 0.05 * (item_level - 1)

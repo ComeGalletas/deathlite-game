@@ -27,7 +27,7 @@ def make_context(enemies, sink, **over):
 BOLT = {
     "name": "Test Bolt", "damage": 10, "cooldown": 1.0, "projectile_count": 1,
     "projectile_speed": 400, "projectile_lifetime": 1.5, "area": 5,
-    "knockback": 0, "targeting_mode": "nearest", "pierce": 0, "tags": ["projectile"],
+    "targeting_mode": "nearest", "pierce": 0, "tags": ["projectile"],
 }
 
 

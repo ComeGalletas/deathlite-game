@@ -236,3 +236,520 @@ Example (k = 2 off the warlock pool): `dps 23 → 46`, `duration 3.5 → 1.75`,
   20; `warlock.hazard_dps` 23; boss `contact_damage` 31. `shoot_damage` /
   `explode_damage` / `slam_damage` untouched.
 - **Not committed.**
+---
+
+## CB-2 - Every weapon has a reach ring - weapon categories
+
+**Status:** in progress. All 6 decisions resolved with the user (2026-08-29).
+Checklist **A**-**F** done (data, `combat/weapons.py`, `entities/summon.py`,
+spawn plumbing, dev overlay, tests -- suite 597 -> 618, green). Only **G**
+(balance playtest, needs a human) is left. Design + checklist below.
+
+### Why
+
+Weapons fire on cooldown regardless of the battlefield -- `soul_scythe` swings
+its reaping *arc* into empty grass when the nearest foe is 400 px away; Kestrel
+plinks a lone straggler across the map. Every weapon should need a target
+**inside a reach ring** to trigger; with nothing in range the hero (and the
+summons) drop to idle. Formalising the rule needs a weapon **category** so it
+branches cleanly instead of abusing `tags`.
+
+### Weapon categories
+
+New required `category` field in `data/weapons.json`:
+
+| category | weapons | behaviour |
+|--|--|--|
+| `projectile` | arcane_bolt, frost_shards, thunder_orb | trigger on an enemy in reach; then fire toward the nearest enemy **within reach** and the shot flies on past the ring as today |
+| `melee` | soul_scythe | trigger on an enemy in reach; reach == the cone's own tip distance (below) |
+| `summon` | grave_totem, spirit_wolf | weapon still spawns on cooldown; the *summon* has its own reach ring and idles when it is empty (the wolf's `idle` strip -- WA3 -- exists for this) |
+| `orbit` | ember_ring | its own category (aura spells are separate); reach behaviour -- decision 6 |
+| `spell` | *(none yet)* | reserved for aura-type spells; unused by any current weapon |
+
+`Weapon.category` reads the field; a fallback infers it from `special_effect`
+(`cone`->melee, `summon`->summon, `orbit`->orbit, else projectile) for defs that
+omit it.
+
+### Reach
+
+`Weapon._reach(area_multiplier)`:
+
+* **melee** -> `self._area(area_multiplier)` exactly -- the distance from the
+  hero to the tip of the cone in the current functionality (decision 1). No
+  `reach` field on melee defs; it tracks the cone.
+* **everything else** -> `(float(def["reach"]) + self.bonus["area"]) *
+  area_multiplier` -- an explicit, required `reach` field.
+
+Reach scales with `area_multiplier` **and** `bonus["area"]` for every category
+(decision 2), so any blessing / affix that grows weapon area also widens the
+reach ring (and for melee the ring and the cone grow together).
+
+### Trigger + aim (projectile / melee)
+
+`_fire`: `reach_eff = self._reach(ctx.area_multiplier)`;
+`in_reach = [e for e in ctx.enemies if (e.pos - ctx.origin).length_squared()
+<= reach_eff ** 2]`. If `in_reach` is empty -> `return False` (no fire; the
+existing `self._cd = 0.1` path polls ~10x/s and swings the instant a foe steps
+in). Otherwise aim with `targeting.aim_direction(mode, origin, in_reach,
+fallback)` and fire unchanged. Decision 4: the trigger is a cheap "anything in
+the ring" test, not a global nearest search; the aim then picks the nearest
+*within* the ring. **Consequence:** gated weapons no longer fire into open space
+-- `aim_direction`'s `fallback_dir` branch is now effectively dead for them.
+
+### Summons (leash ring)
+
+The summon weapon passes its reach to `Summon.reset(reach=...)` -- new
+`summon_reach` field on the def, defaulting to `summon_attack_range` when omitted
+(so `grave_totem`'s 360 keeps working). In `entities/summon.py`:
+
+* Target selection filters to enemies within `reach` of **`ctx.player_pos`**
+  (the totem uses its own `pos`, which equals the anchor). No in-ring enemy ->
+  `vel = 0`, no bite, `_anim_name()` returns `idle` (the SLEEP strip).
+* Wolf leash: if `(self.pos - ctx.player_pos).length() > reach`, steer back
+  toward `player_pos` instead of the target, so a fleeing enemy cannot drag it
+  out of the ring.
+* `_BITE_ANIM_S` / `_side` logic unchanged; `idle` slots in ahead of
+  `run_{side}` when there is no leashed target.
+
+### Hero attack animation (decision 5)
+
+**No `_phase_combat` change.** The attack anim already keys on `fired and weapon
+is main`, and every hero's main weapon now gates on reach:
+
+* **Aegis** -- main `soul_scythe` (melee): `attack` plays only while an enemy is
+  in reach; otherwise `walk` / `idle`.
+* **Kestrel** -- main `frost_shards` (projectile): `attack` plays when the shards
+  fire, which now also needs a foe in reach.
+* **Nihil** -- main `arcane_bolt` (projectile): same.
+
+The idle<->attack switch is automatic for all three; the anim tracks the
+character's own main weapon by category, exactly as intended.
+
+### Decisions (resolved)
+
+1. **melee reach = cone tip distance** = `_area(area_mult)`. Confirmed.
+2. **reach scales with area** (`area_multiplier` + `bonus["area"]`), every
+   category, so weapon-area blessings extend it. Confirmed.
+3. **`orbit` is its own category** (ember_ring); aura spells will be a separate
+   `spell` category. Confirmed.
+4. **all weapons gate on reach**; the trigger is a proximity test (not a global
+   nearest search); projectiles then fire toward the nearest in-ring enemy and
+   the shot travels on; summons get a leash ring and idle when it is empty.
+   Confirmed.
+5. **attack anim stays main-weapon-linked**; no code change, it now idles
+   correctly per hero because every category gates on reach. Confirmed.
+6. **`orbit` gates too.** Confirmed. `_maintain_orbit` keeps the orbiters alive
+   only while an enemy is within `reach`; with the ring empty they fade (the
+   hero "lowers" the Ember Ring).
+
+### Checklist
+
+#### A - Data (`data/weapons.json`) -- DONE (2026-08-29)
+- [x] `category` on all 7 defs per the table (`projectile` x3, `melee` x1,
+      `summon` x2, `orbit` x1).
+- [x] `reach` (world px) on every non-melee def -- `arcane_bolt` / `frost_shards`
+      `400`, `thunder_orb` `440` (slow orb, longer lead), `ember_ring` `reach`
+      `140` (~1.5x its `orbit_radius 96`), `summon_reach` `360` on `grave_totem`
+      (== its `summon_attack_range`, so no behaviour change) and `280` on
+      `spirit_wolf`. `soul_scythe` gets **no** `reach` (tracks `area 74`).
+- JSON re-validates; full suite still green (597 tests). Nothing else reads
+  `category` / `reach` yet -- checklist B wires it in.
+
+#### B - `combat/weapons.py` -- DONE (2026-08-29)
+- [x] `Weapon.category` property -- reads the field, `_CATEGORY_BY_SPECIAL`
+      maps a legacy def (`cone`->melee, `summon`->summon, `orbit`->orbit, else
+      projectile).
+- [x] `Weapon._reach(area_multiplier)` -- `_area(mult)` for melee; else
+      `(def["reach"] + bonus["area"]) * mult`. A non-melee def with **no**
+      `reach` key returns `inf` (fires exactly as pre-CB-2) -- this is the case
+      for the two `summon` weapons, whose own `_fire` is never reached anyway.
+- [x] `_within_reach(enemies, origin, reach)` staticmethod -- squared scan,
+      returns the in-ring list.
+- [x] `_fire`: builds `in_reach`; empty -> `return False` (caller polls via
+      `_cd = 0.1`); else `aim_direction(mode, origin, in_reach, fallback)` so
+      the shot aims at the nearest foe *within* the ring and flies on past it.
+- [x] `_maintain_orbit` (decision 6): `desired = 0` when the ring is empty, so
+      the existing trim loop drops the orbiters; they re-form evenly spaced the
+      moment a target returns.
+- [x] `_maintain_summons`: computes
+      `reach = def.get("summon_reach", def.get("summon_attack_range", 320)) *
+      ctx.area_multiplier` and passes it to `ctx.spawn_summon(...)`.
+- Pulled forward from C (inseparable from passing `reach`): `Summon.__slots__`
+  gained `reach`, `Summon.reset(..., reach=float("inf"))` stores it. **No**
+  behaviour change on the summon side yet -- the wolf leash / `idle` / in-ring
+  target filter are still C.
+- Existing tests adjusted for the gate (not new F coverage): `test_weapons_special.py`
+  -- the 3 `OrbitTests` and the `ConeTests` scythe case now keep an enemy inside
+  the ring. Full suite green (597).
+
+#### C - `entities/summon.py` -- DONE (2026-08-29)
+- [x] `__slots__` += `reach`; `reset(..., reach=float("inf"))` stores it.
+      *(done with B -- inseparable from `_maintain_summons` passing it.)*
+- [x] `_acquire_target(ctx)`: nearest enemy that also sits inside the leash
+      ring. Ring centre is `ctx.player_pos` for the wolf, `self.pos` for the
+      planted totem (it defends its own spot even after the hero walks off).
+      `reach == inf` -> no ring, every enemy a candidate (pre-CB-2 behaviour).
+      No in-ring enemy -> `target is None` -> `vel = 0`.
+- [x] Wolf leash in `_chase`: `(self.pos - ctx.player_pos).length() > reach` ->
+      abandon the chase, `_steer` home, so a fleeing enemy can't drag the wolf
+      across the map. `_steer` factored out (shared by chase + leash-home).
+- [x] `_anim_name(target)`: returns `idle` (the SLEEP strip) only when
+      `target is None` **and** the wolf is standing still -- never between bites
+      (target still present there) and never while running home (`vel != 0`).
+
+#### D - Spawn plumbing -- DONE (2026-08-29, no code change needed)
+- [x] `PlayingState._spawn_summon` already forwards `**kw` -> `Summon.reset`, so
+      the `reach` from `_maintain_summons` flows through untouched.
+- [x] Direct `Summon.reset(...)` calls in `tests/combat/test_summons.py` omit
+      `reach` -> it defaults to `inf` (no leash), so the existing basic-fire /
+      basic-chase / expiry tests are unaffected. Dedicated leash + `idle`
+      coverage is checklist F.
+
+#### E - Dev overlay -- DONE (2026-08-29)
+- [x] `WorldRenderer.collider_overlay` (F7 / dev menu "Collision shapes") now
+      also draws the CB-2 reach rings in a new amber `config.COLOR_DEBUG_REACH`:
+      one ring per equipped weapon at `player.pos` (`w._reach(area_multiplier)`,
+      `inf` skipped -- so the two summon weapons draw nothing); one leash ring
+      per live summon -- hero-centred for the wolf, planted-spot-centred for the
+      totem, matching `Summon._acquire_target`. Rings honour camera zoom via the
+      existing `ring()` helper. Verified headless: hero moved away from a planted
+      totem keeps the weapon ring on the hero and the totem ring on the totem.
+
+#### F - Tests -- DONE (2026-08-29)
+New module **`tests/combat/test_weapons_reach.py`** (17 cases) + 4 cases added to
+**`tests/combat/test_summons.py::SummonBehaviourTests`**. Also (in B) the 4
+existing `test_weapons_special.py` cases were adjusted to keep an enemy in the
+ring. Full suite 597 -> 618, green.
+- [x] every `weapons.json` def has a `category` in the allowed set;
+      `Weapon.category` matches the expected value per weapon; the
+      `special_effect` fallback is correct once the field is removed.
+- [x] `_reach`: `soul_scythe` == `_area(mult)` and grows with `area_multiplier`
+      + `bonus["area"]`; a projectile == `(reach + bonus["area"]) * mult`; a
+      non-melee def with no `reach` field == `inf`; both `summon` weapons ==
+      `inf` (their `_fire` never gates).
+- [x] melee gate: `soul_scythe` fires at `reach - 1`, not at `reach + 1`;
+      `self._cd` stays <= 0.11 (polling) while gated.
+- [x] projectile gate: an out-of-ring foe never triggers `frost_shards`; with
+      `targeting_mode` forced to `random`, 50 fires only ever aim at the
+      in-ring foe (proves `_fire` filters the candidate list, not just the
+      trigger).
+- [x] area scaling: a foe just outside `reach` triggers once
+      `ctx.area_multiplier = 1.5`; and again via `bonus["area"]`.
+- [x] orbit gate (decision 6): no orbiters while the ring is empty; they form
+      when a foe enters the 140 ring and drop when it leaves.
+- [x] summon leash: wolf whose only foe is outside `reach` of `player_pos` ->
+      never moves, `vel == 0`, no bite, `_acquire_target` is `None`,
+      `_anim_name(None) == "idle"`; foe inside -> chases + bites; wolf dragged
+      past `reach` -> steers home (`vel.x < 0`, `run_left`, not `idle`); totem
+      keeps zapping a foe by its base even with the hero 5000 px away.
+- [x] regression: `arcane_bolt` cadence (fire / cool / fire ~1.1s) and dead-on
+      aim unchanged; `frost_shards` still fans 3, all toward the target.
+
+#### G - Balance / playtest
+- [ ] The whole game is now "no target -> no attack". Verify it still feels
+      active (swarms mean reach is hit almost always) and that a lone far enemy
+      correctly makes the hero idle.
+- [ ] Tune the projectile `reach` values -- too short = dead time between packs,
+      too long = never idles. Start ~400, adjust in a playtest.
+- [ ] Melee: `soul_scythe` reaches exactly its cone; confirm it does not feel
+      shorter than the visible arc. `cooldown 1.0` may want a small cut to offset
+      gated downtime.
+- [ ] Note whether a `+reach` blessing / affix is worth adding (area blessings
+      already do it indirectly via decision 2).
+
+### Touch list
+`data/weapons.json`, `combat/weapons.py` (`category`, `_reach`, `_within_reach`,
+`_fire` gate, `_maintain_summons` reach), `entities/summon.py` (`reach`, leash,
+`idle`), `game/states/playing/rendering.py` (`collider_overlay` rings),
+`tests/combat/test_weapons.py`, `tests/combat/test_summons.py`, this journal.
+**No** new deps. **Nothing** committed.
+
+---
+
+## CB-3 - Unit bumping + weight-based knockback
+
+**Status:** COMPLETE (2026-08-29). All of A-H done. Unit bumping + weight-based
+knockback are live: every mobile body carries a `weight`, overlapping bodies
+shove each other, and weapon hits push their target -- bumps and hits share the
+one `knock_split` formula. `_PEN_CAP_FRAC` tuned to 0.6 in the H pass; a hand
+playtest for feel is still worthwhile but nothing blocks. Suite 620 -> 647.
+**Nothing committed.**
+
+### Why
+
+Today enemies pass through each other and through the hero -- the only "contact"
+is `enemy_contact` dealing a bite. Crowds telescope into a single point; a tank
+and a swarm-bug feel identical to stand next to. Projectile knockback exists
+(`proj.knockback` -> `enemy.apply_knockback`) but it is a flat per-weapon scalar
+with no sense of the target's mass. We want the start of a physics layer:
+**weights** on every body + weapon, and a shared knockback function so a bump and
+a hit read the same way -- the bigger the weight gap, the bigger the shove. The
+per-weapon `knockback` field is **removed**; a weapon's `weight` is now the only
+knockback input (decision 4).
+
+### The model
+
+**Weight** (float, arbitrary units) on every mobile body and every weapon:
+
+| carrier | source | rough feel (tune later) |
+|--|--|--|
+| enemy | `weight` in `data/enemies.json`, fallback = `radius / 2` | swarm/fast light, chaser mid, tank/elite/brute heavy |
+| hero | `config.PLAYER_WEIGHT` (later: a `weight` stat so items can shift it) | heavy enough that a swarm barely moves them |
+| boss | `Boss.weight = inf` | already immovable (`apply_knockback` no-op); only shoves others |
+| weapon | `weight` in `data/weapons.json`, **separate from the wielder** | `soul_scythe` heavy; `arcane/frost/thunder/ember` light-plus ("spells weigh a bit more"); `grave_totem` bolt **very** small; `spirit_wolf` **0** (a spirit -> no knockback) |
+
+**Shared knockback split** -- new pure module `combat/knockback.py`:
+
+```
+knock_split(w_src, w_tgt, base) -> (push_src, push_tgt)
+    total    = base * (1 + DIFF_GAIN * |w_src - w_tgt| / (w_src + w_tgt))
+    push_tgt = total * w_src / (w_src + w_tgt)      # target moves per the SOURCE's share
+    push_src = total * w_tgt / (w_src + w_tgt)      # source recoils per the TARGET's share
+```
+
+* the `DIFF_GAIN` term is the "bigger difference -> bigger knockback" rule.
+* callers pick `base`: a **bump** uses `BUMP_GAIN * penetration_px`; a **hit**
+  uses `HIT_KNOCK_GAIN * w_src` (the weapon weight *is* the hit strength, then
+  the split + `DIFF_GAIN` shape it against the target's mass). So a spirit-wolf
+  hit (`w_src == 0`) has `base == 0` -> nothing happens.
+* a featherweight into a titan: `push_tgt` tiny, `push_src` ~= `total` (it
+  bounces itself); `w_tgt == inf` (boss) -> `push_tgt == 0`, `push_src == total`.
+  These `0` / `inf` cases are explicit branches, not IEEE arithmetic (see B).
+
+**Unit bump pass** -- new `game/states/playing/physics.py::BumpResolver`, called
+from `_phase_update` after the enemy / boss / summon updates:
+
+* grid of `_targetables()`; for each enemy, neighbours within `r_a + r_b`; for
+  each overlapping unordered pair `pen = (r_a + r_b) - dist`; if `pen > 0`,
+  `base = BUMP_GAIN * pen`, `knock_split(w_a, w_b, base)`, then
+  `a.apply_knockback(a.pos - b.pos, push_a)` / `b.apply_knockback(..., push_b)`.
+* hero vs each overlapping enemy: same split; the enemy takes `apply_knockback`,
+  the hero accumulates into a new `Player._knock`.
+* the soft `Separation` steering component stays -- it stops most overlaps ever
+  forming; the bump impulse is the harder kick when bodies do interpenetrate
+  (spawns, chargers, being herded into a wall).
+
+**Hero knockback plumbing** -- `Player._knock: Vector2`,
+`Player.apply_knockback(dir, strength)`, and in `Player.update`
+`target = pos + move*dt + _knock*dt` routed through `world.resolve_movement`
+(so shoves slide along walls), `_knock *= pow(BUMP_DECAY, dt)` then zeroed under
+a threshold -- mirrors `Enemy.update`.
+
+**Weapon-hit knockback** -- rework `combat.py::projectile_hits`:
+
+* `Projectile.knockback` slot / `reset` kwarg is **renamed** to
+  `src_weight: float = 0.0` (the wielder-independent weapon weight the hit
+  carries). Old callers passing `knockback=` move to `src_weight=`.
+* on hit: `_, push_tgt = knock_split(proj.src_weight, enemy.weight,
+  HIT_KNOCK_GAIN * proj.src_weight)`;
+  `enemy.apply_knockback(enemy.pos - proj.pos, push_tgt)`. Guarded by
+  `if proj.src_weight:` so a weight-0 hit does nothing. Hits push only the
+  target (no recoil onto the hero) for this first slice.
+* `Weapon` passes `src_weight = float(def.get("weight", 0.0))` when it spawns
+  projectiles / orbiters. **Start with `soul_scythe`**: wire its weight,
+  playtest the feel, then fan the field out to the other weapons.
+* `entities/summon.py`: the wolf bite spawns with `src_weight = 0`; the totem
+  bolt with a **very small** `src_weight` (~1).
+
+**Elite resist** -- fold the current `Enemy.apply_knockback` `is_elite *= 0.35`
+special-case into a simply-heavier `weight` and delete the branch (one rule, not
+two). Flagged as a deliberate behaviour change.
+
+### Decisions (locked 2026-08-29)
+
+1. **Bump = impulse into `_knock`** (bump with follow-through; keeps the soft
+   `Separation` steering) rather than a hard positional de-overlap. **Yes.**
+2. **The hero is shoved by enemy bumps**, with `PLAYER_WEIGHT` tuned so a swarm
+   barely registers and a brute / charger noticeably pushes. **Yes.**
+3. **Formula** as written above -- `total = base*(1 + k*|Dw|/Sw)`, split by the
+   *other* body's weight share, `w_src=0 -> 0`, boss `= inf`. **Yes.**
+4. **Remove the per-weapon `knockback` field entirely; `weight` replaces it.**
+   Hit strength is `HIT_KNOCK_GAIN * weapon.weight`, then `knock_split` shapes
+   it against the target. No separate scalar.
+5. **Enemy `weight`: explicit field, fallback `= radius / 2`** when a def omits
+   it.
+6. **Delete the elite `*0.35` knockback special-case**, express it as weight.
+   **Yes.**
+7. **Hits push only the target** this slice -- no recoil onto the hero or a
+   melee lunge-back. **Yes** (revisit later).
+8. **Totem bolt** gets a **very small** `src_weight` (~1) -- a barely-there
+   nudge, not zero. Wolf bite stays 0.
+
+### Checklist
+
+#### A - Data + constants -- DONE (2026-08-29)
+- [x] `weight` on every `data/enemies.json` def: swarm 3 / fast 5 / teleporter 6
+      / ranged 6 / chaser 7 / warlock 7 / exploder 8 / shielded 8 / charger 8 /
+      summoner 10 / tank 14 / elite 30 / brute 80. Light types sit at ~radius/2;
+      `elite` / `brute` carry the folded `*0.35` resist (decision 6) as extra
+      mass.
+- [x] **Removed** `knockback` from all 7 `data/weapons.json` defs; added
+      `weight`: `soul_scythe` 30, `arcane_bolt` 7, `frost_shards` / `thunder_orb`
+      6, `ember_ring` 8, `grave_totem` 1, `spirit_wolf` 0.
+- [x] `config.py` -- new "Physics: bumping & knockback (CB-3)" block:
+      `PLAYER_WEIGHT 40`, `BUMP_GAIN 12`, `BUMP_DIFF_GAIN 2.0`,
+      `BUMP_DECAY 0.001` (the curve enemies already used), `HIT_KNOCK_GAIN 2.5`
+      (calibrated so `soul_scythe` vs a `chaser` lands near the old `140`).
+- Nothing reads `weight` yet -- `Weapon` still does `def.get("knockback", 0.0)`
+      so projectile knockback is **inert** until E rewires it. Suite green (620).
+
+#### B - `combat/knockback.py` (new) -- DONE (2026-08-29)
+- [x] pure `knock_split(w_src, w_tgt, base, *, diff_gain=None) ->
+      (push_src, push_tgt)`. `diff_gain` defaults to `config.BUMP_DIFF_GAIN`
+      (kw-only override lets tests pin it). Imports only `math` + `game.config`;
+      no pygame.
+- [x] explicit edge branches (no IEEE `inf/inf`): `base <= 0` or `w_src <= 0`
+      -> `(0, 0)`; `w_src` & `w_tgt` both `inf` -> `(0, 0)`; `w_tgt == inf` ->
+      `(base*(1+diff_gain), 0)`; `w_src == inf` -> `(0, base*(1+diff_gain))`;
+      `w_src + w_tgt == 0` -> `(0, 0)`.
+- [x] `tests/combat/test_knockback.py` (13 cases): symmetry, `sum == total`,
+      gap raises the total, featherweight recoils more / heavyweight shoves
+      more, the `0` / `-ve` / `inf` guards, `diff_gain` default tracks config,
+      no nan/inf leak. Suite 620 -> 633, green.
+- Sanity (real weights): `soul_scythe` hit -> swarm 180 / chaser 136 / tank 88
+      / brute 39 px/s (was a flat 140); `arcane_bolt` / `ember_ring` ~9-12
+      ("very slightly"); `spirit_wolf` 0. Bump @ 12 px pen: swarm<->hero shoves
+      the hero only +27 px/s, brute<->hero +160.
+- **Tuning note for D/H:** the bump base is `BUMP_GAIN * pen` applied *every
+      frame the pair overlaps*; with `_knock` decay ~0.89/frame that reaches an
+      equilibrium ~6x the per-frame add if bodies stay interpenetrated. Rely on
+      `Separation` steering to keep overlaps shallow/brief; if crowds still
+      "boil", drop `BUMP_GAIN` (12 is a first guess) or make the bump a
+      one-shot on overlap onset in D.
+
+#### C - Bodies carry weight -- DONE (2026-08-29)
+- [x] `Enemy.weight = float(definition.get("weight", self.radius / 2.0))`.
+      `apply_knockback` lost the `if self.is_elite: strength *= 0.35` branch
+      (decision 6 -- resistance is now `weight` + `knock_split`). `Enemy.update`
+      decay switched from the literal `pow(0.001, dt)` to
+      `pow(config.BUMP_DECAY, dt)` (same value, one source of truth).
+- [x] `Boss.weight = float("inf")`; `apply_knockback` stays a no-op (double
+      guard -- `knock_split` already returns `0` for an `inf` target).
+- [x] `Player.weight = float(config.PLAYER_WEIGHT)`, `Player._knock`,
+      `Player.apply_knockback(dir, strength)`, and `Player.update` now
+      integrates `(_move_dir*move_speed + _knock)*dt` through
+      `world.resolve_movement` then decays `_knock` by `pow(config.BUMP_DECAY,
+      dt)` (zeroed under length 1) -- mirrors `Enemy`.
+- Sanity: chaser `weight 7` (data) / a def without the key -> `radius/2`; boss
+      `inf`, shrugs off `apply_knockback`; a 200 px/s impulse moves an enemy
+      ~30 px over 1 s then fades; a 160 px/s impulse shoves the hero ~24 px.
+      Suite still green (633) -- `_knock` is `(0,0)` in every existing path so
+      movement is byte-identical until D starts feeding it.
+
+#### D - `game/states/playing/physics.py` (new `BumpResolver`) -- DONE (2026-08-29)
+- [x] enemy<->enemy + enemy<->boss: a **private** `SpatialGrid` (not `ps.grid`
+      -- self-contained, no interaction with `_phase_combat`), rebuilt each
+      call from `enemies (+ boss)`; unordered-pair dedup by `id`; precise
+      overlap test -> `pen`; `knock_split(a.weight, b.weight, BUMP_GAIN * pen)`
+      -> `a.apply_knockback(a.pos - b.pos, push_a)` / `b` the mirror.
+- [x] hero<->enemy / hero<->boss: same `_bump`, so the hero's `_knock` and the
+      enemy's both take a share; the boss's `inf` weight zeroes its side.
+- [x] `pen` clamped to `rr * _PEN_CAP_FRAC` (0.75) so a charger tunnelling in
+      one frame can't generate an absurd impulse.
+- [x] wired into `PlayingState._phase_update` as `self.bump.resolve()`, right
+      after the enemy / boss `update` loop and before `fx.update_projectiles`.
+      `self.bump = BumpResolver(self)` built next to `self.combat`.
+- Sanity (dev `_dev_no_attack`, headless): 4 swarm + 1 brute stacked on a point
+      spread from ~10 px to ~160 px mean separation over 40 frames and settle;
+      a lone chaser pressing the hero nudges it ~9 px / s (gentle "leaning on
+      you"); a swarm bug spawned *exactly* on a brute peaks near ~900-1000 px/s
+      for ~2 frames before decaying -- worst case, tune in H (drop `BUMP_GAIN`
+      and/or tighten `_PEN_CAP_FRAC`, or make the bump one-shot). Suite green
+      (633).
+
+#### E - Weapon-hit knockback -- DONE (2026-08-29)
+- [x] `Projectile.knockback` -> `src_weight` (slot, `__init__`, `reset` kwarg,
+      default `0.0`).
+- [x] `combat.py::projectile_hits`: `if proj.src_weight:` ->
+      `_, push = knock_split(proj.src_weight, enemy.weight,
+      config.HIT_KNOCK_GAIN * proj.src_weight)` then
+      `enemy.apply_knockback(enemy.pos - proj.pos, push)` -- target only
+      (decision 7). Added `from combat.knockback import knock_split` +
+      `from game import config`.
+- [x] `combat/weapons.py`: one shared `src_weight = float(def.get("weight",
+      0.0))` read in `_fire`, passed by the cone branch, the fan branch, and
+      `_maintain_orbit`. Wired the **whole roster** in one pass -- the read is
+      shared, "soul_scythe first" only mattered for the playtest gate (H), and
+      the per-weapon `weight` values already landed in A.
+- [x] `entities/summon.py`: wolf bite `src_weight=0` (spirit -> nothing); totem
+      bolt `src_weight=1`.
+- [x] `tests/combat/test_weapons.py`: dropped the dead `"knockback"` key.
+- Isolated sanity (resolver expression, no bump contamination): `soul_scythe`
+      hit -> swarm 180 / chaser 136 / tank 88 / elite 38 / brute 39;
+      `arcane_bolt` / `frost_shards` / `thunder_orb` 3-22 ("very slightly");
+      `ember_ring` 5-28; `grave_totem` bolt 0.1-1.2; `spirit_wolf` bite **0.0**
+      everywhere. `elite` at 38 ~= the old `140 * 0.35 = 49`, so the folded
+      resist lands close. Suite green (633). NB: a *full-game* measurement mixes
+      this with D's bump-knock when the enemy also touches the hero -- clean
+      coverage lives in G at the resolver level.
+
+#### F - Dev overlay -- DONE (2026-08-29)
+- [x] `WorldRenderer.collider_overlay` (F7) gained a CB-3 block: a `wN` /
+      `wINF` tag (mono 10, amber) just right of every mobile body's collider --
+      hero, in-view enemies, boss -- and each body's live `_knock` drawn as a
+      short blue line (`config.COLOR_DEBUG_KNOCK`, length `_knock * 0.15 * zoom`)
+      whenever it is actually being shoved (`length_squared > 1`).
+- [x] `config.COLOR_DEBUG_KNOCK = (120, 200, 255)`.
+- Skipped the transient "bump flash" -- the persistent `_knock` line already
+      shows which bodies are being pushed and how hard, which is what the H
+      tuning pass needs. Verified headless: a stacked skirmish draws 5 knock
+      vectors (52-285 screen px) + a tag per body, no errors; suite green (633).
+
+#### G - Tests -- DONE (2026-08-29)
+- [x] `knock_split`: `tests/combat/test_knockback.py` (13 cases, step B).
+- [x] `tests/combat/test_bump.py` (14 cases) -- a `Body` stub with the
+      `apply_knockback` / `_knock` contract drives `BumpResolver` directly:
+  - enemy pair: equal weights -> symmetric opposite impulses; a swarm (w3)
+        into a tank (w14) -> bug's `_knock` > 3x the tank's; no touch -> no
+        impulse; coincident bodies skipped (no nan); a dead enemy neither
+        shoves nor is shoved; `pen` clamp verified (95% overlap == cap overlap).
+  - hero: a swarm bump barely nudges the hero while a brute bump shoves it >3x
+        harder; the enemy always out-travels the hero in a bump; the boss
+        (`weight inf`) shoves the hero and takes nothing back.
+  - hit knockback (mirrors `CombatResolver.projectile_hits`): a heavy weapon
+        shoves a light enemy more than a heavy one; a light projectile knocks
+        < 1/5 of the scythe; a `weight 0` spirit bite -> `0.0`; an `inf`
+        target -> `0.0`.
+- [x] regression: full suite green (647); CB-2 reach tests, projectile
+      cadence/aim tests, and the headless smoke all still pass unchanged.
+
+#### H - Balance playtest -- DONE (2026-08-29, headless analysis; a human pass is still worthwhile)
+- [x] **Normal fight** (director-driven, 40 s, weapons on, hero idle): 28
+      kills, fight resolves normally. Enemy `_knock` while active: median
+      **90**, p90 **139**, max **144** px/s (enemy speeds 45-190 -> a readable
+      nudge, not a launch). Hero `_knock`: median **6**, max **25** px/s vs a
+      260 move speed -- **the hero is barely shoved in real play**, which was
+      the bar for decision 2.
+- [x] **soul_scythe vs a tank stream**: tank `_knock` median **46** (== its
+      45 move speed, so it is held in place while scythed), transient spikes to
+      ~450 from hit+bump stacking on a frame, decays at once. Reads as a shove.
+- [x] **Pathological** (6 bodies spawned on one *exact* point): peaks ~1800-2000
+      px/s for a few frames. Tuned `_PEN_CAP_FRAC` 0.75 -> **0.6**: the pile now
+      settles (`_knock` < 60) in **~0.6 s** (was ~1.7 s) and ends ~200 px apart
+      (was ~500), with zero effect on shallow everyday overlaps. The spike
+      itself is accumulation across many pairs in one frame, not one deep bump;
+      it does not occur in director-driven play (spawns are spread).
+- `BUMP_GAIN 12`, `BUMP_DIFF_GAIN 2.0`, `HIT_KNOCK_GAIN 2.5`, `BUMP_DECAY
+      0.001` all validated by the normal-fight numbers -- **kept**.
+- **Left for a human:** does it *feel* right in the hand (juice vs. annoyance),
+      especially being pressed into a warlock hazard by a crowd. **Future
+      refinement if the frame-spike ever bites:** cap per-body `_knock`
+      magnitude per frame, or make the bump one-shot on overlap onset.
+
+### Touch list (as built)
+`data/enemies.json` (`weight` x13), `data/weapons.json` (`knockback` removed,
+`weight` added x7), `game/config.py` (physics block + `COLOR_DEBUG_KNOCK`),
+`combat/knockback.py` (**new**), `combat/weapons.py` (`_fire` / `_maintain_orbit`
+pass `src_weight`), `entities/enemy.py` (`weight`, drop elite damp,
+`BUMP_DECAY`), `entities/boss.py` (`weight = inf`), `entities/player.py`
+(`weight`, `_knock`, `apply_knockback`, `update` integration),
+`entities/projectile.py` (`knockback` -> `src_weight`), `entities/summon.py`
+(wolf bite 0 / totem bolt 1), `game/states/playing/physics.py` (**new**
+`BumpResolver`, `_PEN_CAP_FRAC` 0.6 after H), `game/states/playing/state.py`
+(build + call `self.bump` in `_phase_update`), `game/states/playing/combat.py`
+(`projectile_hits` -> `knock_split`), `game/states/playing/rendering.py`
+(`collider_overlay` weight tags + `_knock` vectors).
+Tests: `tests/combat/test_knockback.py` (**new**, 13),
+`tests/combat/test_bump.py` (**new**, 14), `tests/combat/test_weapons.py`
+(dead key dropped).
+**No** new deps. **Nothing** committed.

@@ -117,9 +117,9 @@ class MenuState(State):
                 mark = self._font.render(">", True, config.MENU_FG)
                 surface.blit(mark, mark.get_rect(midright=(rect.left - 16, rect.centery)))
 
-        nav = self._small.render("Up / Down    -    ENTER select    -    ESC quit",
-                                 True, config.MENU_FG_DIM)
-        surface.blit(nav, nav.get_rect(center=(cx, top + len(self._options) * step + 25)))
+        #nav = self._small.render("Up / Down    -    ENTER select    -    ESC quit",
+        #                         True, config.MENU_FG_DIM)
+        #surface.blit(nav, nav.get_rect(center=(cx, top + len(self._options) * step + 25)))
 
         # --- save summary, bottom centre ---
         save = self.game.save

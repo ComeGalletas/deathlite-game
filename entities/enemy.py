@@ -35,6 +35,9 @@ class Enemy:
             definition.get("contact_interval", config.INCOMING_TICK_INTERVAL))
         self.contact_cd = 0.0
         self.radius = float(definition["radius"])
+        # CB-3 bump/knockback mass. Fallback ~= radius/2; elites carry the
+        # folded "resist knockback" as extra weight (see data/enemies.json).
+        self.weight = float(definition.get("weight", self.radius / 2.0))
         self.xp_reward = int(definition.get("experience_reward", 1))
         self.behavior = definition.get("behavior", "chase")
         self.color = tuple(definition.get("color", (200, 90, 90)))
@@ -68,9 +71,8 @@ class Enemy:
 
     # --- combat -----------------------------------------------------
     def apply_knockback(self, direction: pygame.Vector2, strength: float) -> None:
-        # Elites and bosses resist being shoved around.
-        if self.is_elite:
-            strength *= 0.35
+        # CB-3: resistance is expressed as `weight` now (the caller runs
+        # `knock_split` against it), so there is no per-type damping here.
         if direction.length_squared() > 1e-6:
             self._knock += direction.normalize() * strength
 
@@ -103,7 +105,7 @@ class Enemy:
         # Chill scales movement; knockback is unaffected.
         step = (self.vel * self.status.speed_multiplier() + self._knock) * dt
         self.pos = ctx.resolve_movement(self.pos, self.pos + step, self.radius)
-        self._knock *= pow(0.001, dt)
+        self._knock *= pow(config.BUMP_DECAY, dt)
         if self._knock.length_squared() < 1.0:
             self._knock.update(0, 0)
         if self.hit_flash > 0.0:

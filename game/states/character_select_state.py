@@ -21,7 +21,7 @@ _PREVIEW_HOLD = 1.4          # seconds a looping phase (idle / walk) is shown
 _PREVIEW_PX = 130           # base preview box height
 _PREVIEW_W = _PREVIEW_PX + 30   # base preview box width (sprites read wider than tall)
 # Per-hero (dw, dh) tweak on the base box so each hero sits right.
-_PREVIEW_ADJUST = {"nihil": (24, 0), "kestrel": (0, -18)}
+_PREVIEW_ADJUST = {"nihil": (24, 0), "kestrel": (-18, 0)}
 
 
 class CharacterSelectState(State):

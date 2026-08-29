@@ -8,10 +8,13 @@ Pages:
   root       -- toggles + Reset / Exit / Close, and links into the sub-pages
   enemies    -- (D3) pick an enemy id; ENTER spawns one next to the hero
   blessings  -- (D4) pick a blessing; ENTER grants a stack to the hero
+  items      -- (D5) every weapon + every item base, straight off the loaded
+                content; ENTER gives the weapon or dev-equips a rolled item
 
 Any page longer than `MAX_VISIBLE` scrolls: the visible window follows the
 selection and "N more" markers show what's clipped, so the panel never outgrows
-the screen no matter how much content is added. Items are a placeholder (D5).
+the screen no matter how much content is added -- every list is built from the
+data files, so it grows / shrinks with the content.
 """
 from __future__ import annotations
 
@@ -25,12 +28,13 @@ from game.state import State
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
-_ROOT_ROWS = ("unlimited_hp", "no_attack", "colliders", "difficulty", "spawn",
-              "blessings", "items", "reset", "exit", "close")
+_ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "difficulty",
+              "spawn", "blessings", "items", "reset", "exit", "close")
 
 _LABELS = {
     "unlimited_hp": "Unlimited HP",
     "no_attack":    "Stop attacking",
+    "no_damage":    "Attacks deal 0 damage",
     "colliders":    "Collision shapes",
     "difficulty":   "Difficulty",
     "spawn":        "Spawn enemy...",
@@ -41,10 +45,11 @@ _LABELS = {
     "close":        "Close",
 }
 _HEADINGS = {"root": "DEV MENU", "enemies": "SPAWN ENEMY",
-             "blessings": "GRANT BLESSING"}
+             "blessings": "GRANT BLESSING", "items": "GRANT ITEM"}
 _NAV = {"root": "Up/Down move   ENTER select   ESC / ` close",
         "enemies": "Up/Down   ENTER spawn   ESC back",
-        "blessings": "Up/Down   ENTER grant   ESC back"}
+        "blessings": "Up/Down   ENTER grant   ESC back",
+        "items": "Up/Down   ENTER grant   ESC back"}
 
 _FG = (235, 240, 245)
 _DIM = (165, 172, 182)
@@ -62,19 +67,32 @@ class DevMenuState(State):
         self.sel = 0
         self.scroll = 0
         self._status = ""
-        self._enemy_ids = sorted(get_content().enemies)
+        c = get_content()
+        self._enemy_ids = sorted(c.enemies)
         self._spawn_counts: dict[str, int] = {}
         lib = getattr(playing, "blessing_lib", None)
         self._blessing_ids = sorted(
             lib.by_id, key=lambda b: (lib.by_id[b].source, lib.by_id[b].name)
         ) if lib is not None else []
+
+        # Items page: every weapon + every item base, straight off the data.
+        # `("weapon", id)` or `("item", slot, base_id)` rows.
+        self._weapon_ids = sorted(c.weapons)
+        bases = c.items.get("bases", {})
+        self._item_rows: list[tuple] = (
+            [("weapon", w) for w in self._weapon_ids]
+            + [("item", slot, b["id"]) for slot in sorted(bases) for b in bases[slot]]
+        )
+        self._base_by_id = {b["id"]: b for slot in bases for b in bases[slot]}
+        self._item_counts: dict[tuple, int] = {}
+        self._dev_item_seed = 0
         self._title_font = fonts.mono(28, bold=True)
         self._row_font = fonts.mono(22)
         self._hint_font = fonts.mono(15)
 
     def _rows(self) -> tuple | list:
         return {"root": _ROOT_ROWS, "enemies": self._enemy_ids,
-                "blessings": self._blessing_ids}[self.page]
+                "blessings": self._blessing_ids, "items": self._item_rows}[self.page]
 
     def _goto(self, page: str) -> None:
         self.page = page
@@ -118,6 +136,8 @@ class DevMenuState(State):
                 self._spawn(self._enemy_ids[self.sel])
             elif self.page == "blessings":
                 self._grant(self._blessing_ids[self.sel])
+            elif self.page == "items":
+                self._give_item(self._item_rows[self.sel])
 
     def _activate(self, rid: str) -> None:
         p = self._playing
@@ -134,6 +154,9 @@ class DevMenuState(State):
         elif rid == "no_attack":
             p._dev_no_attack = not p._dev_no_attack
             self._status = f"Stop attacking {'ON' if p._dev_no_attack else 'off'}"
+        elif rid == "no_damage":
+            p._dev_no_damage = not p._dev_no_damage
+            self._status = f"Attacks deal 0 damage {'ON' if p._dev_no_damage else 'off'}"
         elif rid == "colliders":
             p._dev_show_colliders = not p._dev_show_colliders
             self._status = f"Collision shapes {'ON' if p._dev_show_colliders else 'off'}"
@@ -146,6 +169,8 @@ class DevMenuState(State):
             self._goto("enemies")
         elif rid == "blessings":
             self._goto("blessings")
+        elif rid == "items":
+            self._goto("items")
         elif rid == "reset":
             p._restart_dev_run()               # replaces the whole stack
         elif rid == "exit":
@@ -153,8 +178,6 @@ class DevMenuState(State):
             self.game.state_machine.change(MenuState(self.game))
         elif rid == "close":
             self.game.state_machine.pop()
-        else:                                   # items -> D5
-            self._status = "(coming soon)"
 
     def _spawn(self, enemy_id: str) -> None:
         p = self._playing
@@ -173,6 +196,44 @@ class DevMenuState(State):
         b = p.blessing_lib.by_id[bid]
         apply_blessing(p.player, b)
         self._status = f"{b.name}  x{p.player.blessings.get(bid, 0)}"
+
+    def _give_item(self, row: tuple) -> None:
+        p = self._playing
+        if p is None:
+            return
+        if row[0] == "weapon":
+            from combat.weapons import Weapon
+            wid = row[1]
+            wdef = p.content.weapon(wid)
+            p.player.weapons.append(Weapon(wid, wdef))
+            key = ("weapon", wid)
+            label = wdef.get("name", wid)
+        else:
+            from progression.items import generate_item
+            _, slot, bid = row
+            self._dev_item_seed += 1
+            item = generate_item(
+                p.content, seed=p.run_seed * 1000 + self._dev_item_seed,
+                item_level=1, luck=p.player.stats["luck"], slot=slot, base_id=bid)
+            self._dev_equip(item)
+            key = ("item", bid)
+            label = item.short()
+        self._item_counts[key] = self._item_counts.get(key, 0) + 1
+        self._status = f"{label}  (x{self._item_counts[key]})"
+
+    def _dev_equip(self, item) -> None:
+        """Mirror `PlayingState._apply_persistent_bonuses`' item handling:
+        stat affixes -> layered Modifiers, tag affixes folded via
+        rebuild_blessings, HP topped to the new max."""
+        p = self._playing
+        from progression.stats import Modifier
+        from progression.blessings import rebuild as rebuild_blessings
+        p.player.equipment.append(item)
+        src = f"dev:item:{item.slot}#{len(p.player.equipment)}"
+        p.player.add_modifiers(*(Modifier(stat, p._OP_MAP[op], val, src)
+                                 for stat, op, val in item.stat_effects()))
+        rebuild_blessings(p.player, p.blessing_lib)
+        p.player.hp = p.player.max_hp
 
     # --- render ------------------------------------------------------
     def draw(self, surface: pygame.Surface) -> None:
@@ -217,7 +278,7 @@ class DevMenuState(State):
         y += 20
         surface.blit(self._hint_font.render(_NAV[self.page], True, _DIM), (x, y))
 
-    def _row_label(self, rid: str) -> str:
+    def _row_label(self, rid) -> str:
         p = self._playing
         if self.page == "enemies":
             n = self._spawn_counts.get(rid, 0)
@@ -227,11 +288,25 @@ class DevMenuState(State):
             owned = p.player.blessings.get(rid, 0)
             tag = f"   x{owned}" if owned else ""
             return f"{b.source[0].upper()}-{b.name}{tag}"
+        if self.page == "items":
+            # plain `weapon` = one of the auto-fire weapons (added to the hand);
+            # `[slot]` = an equipment base for that slot (rolled + dev-equipped).
+            if rid[0] == "weapon":
+                wid = rid[1]
+                name = p.content.weapon(wid).get("name", wid) if p else wid
+                n = self._item_counts.get(("weapon", wid), 0)
+                return f"weapon   {name}" + (f"   x{n}" if n else "")
+            _, slot, bid = rid
+            name = self._base_by_id.get(bid, {}).get("name", bid)
+            n = self._item_counts.get(("item", bid), 0)
+            return f"[{slot}]   {name}" + (f"   x{n}" if n else "")
         label = _LABELS[rid]
         if rid == "unlimited_hp" and p is not None:
             label += "   [ON]" if p._dev_unlimited_hp else "   [  ]"
         elif rid == "no_attack" and p is not None:
             label += "   [ON]" if p._dev_no_attack else "   [  ]"
+        elif rid == "no_damage" and p is not None:
+            label += "   [ON]" if p._dev_no_damage else "   [  ]"
         elif rid == "colliders" and p is not None:
             label += "   [ON]" if p._dev_show_colliders else "   [  ]"
         elif rid == "difficulty" and p is not None:

@@ -200,6 +200,30 @@ class DevMenuTests(unittest.TestCase):
             game.state_machine.update(1 / 60)
         self.assertGreater(playing.stats["damage_dealt"], d0)
 
+    def test_no_damage_keeps_the_hero_attacking_but_deals_zero(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate("no_damage")
+        self.assertTrue(playing._dev_no_damage)
+        self.assertFalse(playing._dev_no_attack)           # weapons still fire
+        _key(game, pygame.K_BACKQUOTE)
+        playing._spawn_enemy("tank", at=playing.player.pos + pygame.Vector2(30, 0))
+        e = playing.enemies[-1]
+        hp0 = e.hp
+        attacked = False
+        for _ in range(180):
+            game.state_machine.update(1 / 60)
+            attacked = attacked or playing.player._attack_t > 0.0
+        self.assertTrue(attacked, "the hero never played an attack beat")
+        self.assertEqual(playing.stats["damage_dealt"], 0.0)
+        self.assertEqual(e.hp, hp0)                        # enemy never chipped
+        self.assertTrue(e.alive)
+        # sanity: toggling it off lets damage land again
+        playing._dev_no_damage = False
+        for _ in range(180):
+            game.state_machine.update(1 / 60)
+        self.assertGreater(playing.stats["damage_dealt"], 0.0)
+
     def test_reset_row_restarts_the_dev_run_in_place(self):
         game = _game()
         playing, menu = _open_dev_menu(game)
@@ -229,13 +253,12 @@ class DevMenuTests(unittest.TestCase):
         menu._activate("close")
         self.assertIs(game.state_machine.current, playing)
 
-    def test_items_row_is_an_inert_placeholder(self):
+    def test_items_row_opens_the_items_page(self):
         game = _game()
         playing, menu = _open_dev_menu(game)
         menu._activate("items")
         self.assertIs(game.state_machine.current, menu)
-        self.assertEqual(menu.page, "root")
-        self.assertEqual(menu._status, "(coming soon)")
+        self.assertEqual(menu.page, "items")
 
     def test_difficulty_row_cycles_the_live_run_difficulty(self):
         from game.states.dev_menu_state import _ROOT_ROWS
@@ -370,6 +393,73 @@ class DevBlessingMenuTests(unittest.TestCase):
 
     def test_escape_returns_to_root_without_closing(self):
         game, playing, menu = self._bless_page()
+        _key(game, pygame.K_ESCAPE)
+        self.assertEqual(menu.page, "root")
+        self.assertIs(game.state_machine.current, menu)
+
+
+class DevItemMenuTests(unittest.TestCase):
+    def _item_page(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate("items")
+        return game, playing, menu
+
+    def test_page_lists_every_weapon_and_every_item_base_from_data(self):
+        game, playing, menu = self._item_page()
+        self.assertEqual(menu.page, "items")
+        c = playing.content
+        weapon_rows = [r for r in menu._item_rows if r[0] == "weapon"]
+        base_rows = [r for r in menu._item_rows if r[0] == "item"]
+        self.assertEqual({r[1] for r in weapon_rows}, set(c.weapons))
+        n_bases = sum(len(v) for v in c.items["bases"].values())
+        self.assertEqual(len(base_rows), n_bases)
+        self.assertEqual(len(menu._item_rows), len(c.weapons) + n_bases)
+
+    def test_enter_on_a_weapon_row_adds_that_weapon_to_the_hero(self):
+        game, playing, menu = self._item_page()
+        wid = next(r[1] for r in menu._item_rows if r[0] == "weapon")
+        menu.sel = menu._item_rows.index(("weapon", wid))
+        before = len(playing.player.weapons)
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(len(playing.player.weapons), before + 1)
+        self.assertEqual(playing.player.weapons[-1].weapon_id, wid)
+        self.assertEqual(menu.page, "items")                       # stays open
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(len(playing.player.weapons), before + 2)  # dev sandbox: stacks
+
+    def test_enter_on_an_item_row_dev_equips_a_rolled_item_and_moves_its_stat(self):
+        game, playing, menu = self._item_page()
+        # the weapon-slot 'sigil' base grants `damage_multiplier` -> readable
+        row = ("item", "weapon", "sigil")
+        self.assertIn(row, menu._item_rows)
+        menu.sel = menu._item_rows.index(row)
+        eq0 = len(playing.player.equipment)
+        dmg0 = playing.player.stats["damage_multiplier"]
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(len(playing.player.equipment), eq0 + 1)
+        it = playing.player.equipment[-1]
+        self.assertEqual(it.slot, "weapon")
+        self.assertEqual(it.base_stat, "damage_multiplier")
+        self.assertGreater(playing.player.stats["damage_multiplier"], dmg0)
+        self.assertEqual(menu.page, "items")                       # stays open
+
+    def test_base_id_is_forced_so_the_rolled_item_uses_the_selected_base(self):
+        from progression.items import generate_item
+        game, playing, menu = self._item_page()
+        c = playing.content
+        slot, bid = next((s, b["id"])
+                         for s in c.items["bases"] for b in c.items["bases"][s])
+        it = generate_item(c, seed=1, slot=slot, base_id=bid)
+        want = next(b for b in c.items["bases"][slot] if b["id"] == bid)
+        self.assertEqual(it.base_stat, want["stat"])
+        self.assertEqual(it.slot, slot)
+
+    def test_escape_returns_to_root_and_draw_is_headless(self):
+        game, playing, menu = self._item_page()
+        for i in range(len(menu._item_rows)):
+            menu.sel = i
+            menu.draw(game.screen)
         _key(game, pygame.K_ESCAPE)
         self.assertEqual(menu.page, "root")
         self.assertIs(game.state_machine.current, menu)

@@ -110,9 +110,12 @@ class Assets:
         # with -- same rect for every frame so the character does not jitter,
         # and much smaller surfaces to scale + blit.
         crop = r.get("content")
+        # `row` picks a strip out of a grid sheet (one directional / state anim
+        # per row). Omitted -> row 0, i.e. the plain horizontal strip.
+        row_y = int(spec.get("row", 0)) * fh
         out: list[pygame.Surface] = []
         for i in range(int(spec["frames"])):
-            rect = pygame.Rect(i * fw, 0, fw, fh)
+            rect = pygame.Rect(i * fw, row_y, fw, fh)
             if not sheet.get_rect().contains(rect):
                 break                                   # declared count overruns the sheet
             fr = sheet.subsurface(rect)
@@ -175,6 +178,29 @@ class Assets:
         if key not in self._rot:
             # pygame rotates counter-clockwise; screen-y is down, so negate.
             self._rot[key] = pygame.transform.rotate(base, -bucket)
+        return self._rot[key]
+
+    def frame_rotated(self, rig: str, anim: str, index: int, degrees: float,
+                      *, size=None, tint=None):
+        """One animation frame, bucket-rotated -- `rotated()` for a strip rig.
+        `degrees` is a screen-CW heading (0 = +x); it is snapped to
+        `ROTATION_BUCKET_DEG` and the rotated (and optionally tinted) surface is
+        cached. `index` should already be normalised (0..frames-1). Returns
+        `None` when the rig / sheet is absent (caller falls back to a shape)."""
+        bucket = round(degrees / ROTATION_BUCKET_DEG) * ROTATION_BUCKET_DEG
+        key = ("<frot>", rig, anim, index, size, tint, bucket)
+        hit = self._rot.get(key)
+        if hit is not None:
+            return hit
+        base = self.frame(rig, anim, index, size=size)
+        if base is None:
+            return None
+        if tint is not None:
+            base = base.copy()
+            # brighten toward `tint`, keeping the alpha silhouette.
+            base.fill((*tint, 0), special_flags=pygame.BLEND_RGBA_ADD)
+        # pygame rotates counter-clockwise; screen-y is down, so negate.
+        self._rot[key] = pygame.transform.rotate(base, -bucket)
         return self._rot[key]
 
     # --- standalone images (menu title, etc.) -----------------
