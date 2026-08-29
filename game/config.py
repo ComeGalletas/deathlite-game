@@ -112,6 +112,8 @@ COLOR_ACCENT = (255, 205, 90)
 COLOR_DEBUG = (120, 255, 140)         # solid bodies in the dev collider overlay
 COLOR_DEBUG_SOFT = (70, 150, 95)      # pickup / trigger radii in that overlay
 COLOR_DEBUG_HIT = (255, 120, 255)     # projectile hitboxes in that overlay
+COLOR_DEBUG_REACH = (255, 180, 90)    # weapon / summon reach rings (CB-2) in that overlay
+COLOR_DEBUG_KNOCK = (120, 200, 255)   # live `_knock` bump/hit impulse vectors (CB-3)
 COLOR_DAMAGE_IN = (235, 70, 70)      # damage the hero takes -- floating red numbers
 
 # --- Start menu ----------------------------------------------------------
@@ -243,6 +245,24 @@ INCOMING_TICK_INTERVAL: float = 0.5
 # --- Spatial grid -------------------------------------------------------
 # Broad-phase collision cell size. Roughly 2x the biggest common entity.
 GRID_CELL_SIZE: int = 96
+
+# --- Physics: bumping & knockback (CB-3) --------------------------------
+# Every mobile body carries a `weight` (enemies: data/enemies.json, fallback
+# radius/2; hero: PLAYER_WEIGHT; boss: inf). Bumps between overlapping bodies
+# and weapon hits both run through `combat.knockback.knock_split`, which shares
+# the impulse by the *other* body's weight fraction and amplifies it by the
+# weight gap:  total = base * (1 + BUMP_DIFF_GAIN * |dw| / sum_w).
+#   * a bump's base    = BUMP_GAIN * penetration_px
+#   * a hit's base      = HIT_KNOCK_GAIN * weapon_weight  (weight 0 -> no push)
+# The resulting push is added to the body's `_knock` accumulator, which decays
+# by pow(BUMP_DECAY, dt) each frame (same curve enemies already used for
+# projectile knockback) and is integrated into movement via resolve_movement.
+# All five are playtest knobs -- see journals/combat_balance_journal.md CB-3/H.
+PLAYER_WEIGHT: float = 40.0
+BUMP_GAIN: float = 12.0          # penetration px -> bump impulse
+BUMP_DIFF_GAIN: float = 2.0      # how hard a weight mismatch amplifies the shove
+BUMP_DECAY: float = 0.001        # `_knock *= pow(BUMP_DECAY, dt)` per frame (~0.7 s fade)
+HIT_KNOCK_GAIN: float = 2.5      # weapon weight -> hit impulse base
 
 # --- Debug key bindings (see spec section 9) ---------------------------
 # Raw SDL2 keycodes (== pygame.K_F1 .. pygame.K_F7). Hardcoded rather than read

@@ -45,6 +45,7 @@ class Boss:
         self.color = tuple(definition.get("color", (180, 40, 70)))
         self.tags = tuple(definition.get("tags", ("boss",)))
         self.is_elite = True
+        self.weight = float("inf")            # CB-3: immovable; only shoves others
 
         self.pos = pygame.Vector2(x, y)
         self.vel = pygame.Vector2()

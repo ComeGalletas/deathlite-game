@@ -40,14 +40,23 @@ class SpriteMetadataTests(unittest.TestCase):
                 self.assertTrue((ASSETS_DIR / f).is_file(), f"missing {f}")
 
     def test_strip_width_matches_declared_frame_count(self):
-        for rig in (r for r, m in self.meta.items() if "anims" in m):
-            fw, fh = self.meta[rig]["frame"]
-            for anim, spec in self.meta[rig]["anims"].items():
+        for rig, m in ((r, mm) for r, mm in self.meta.items() if "anims" in mm):
+            fw, fh = m["frame"]
+            gcols, grows = m.get("grid", (None, None))
+            for anim, spec in m["anims"].items():
                 surf = pygame.image.load(str(ASSETS_DIR / spec["file"]))
-                self.assertEqual(
-                    surf.get_width(), fw * spec["frames"],
-                    f"{rig}/{anim}: width {surf.get_width()} != {fw}*{spec['frames']}")
-                self.assertEqual(surf.get_height(), fh, f"{rig}/{anim}: height")
+                if gcols:                       # grid sheet: cols*fw x rows*fh
+                    self.assertEqual((surf.get_width(), surf.get_height()),
+                                     (fw * gcols, fh * grows), f"{rig}/{anim}: grid")
+                    self.assertLessEqual(spec["frames"], gcols,
+                                         f"{rig}/{anim}: frames > grid cols")
+                    self.assertLess(spec.get("row", 0), grows,
+                                    f"{rig}/{anim}: row out of range")
+                else:                           # plain horizontal strip
+                    self.assertEqual(
+                        surf.get_width(), fw * spec["frames"],
+                        f"{rig}/{anim}: width {surf.get_width()} != {fw}*{spec['frames']}")
+                    self.assertEqual(surf.get_height(), fh, f"{rig}/{anim}: height")
 
 
 class AssetsLoaderTests(unittest.TestCase):
@@ -92,6 +101,24 @@ class AssetsLoaderTests(unittest.TestCase):
         self.assertIsNot(normal, flipped)
         self.assertEqual(normal.get_size(), flipped.get_size())
 
+    def test_row_offset_slices_the_named_grid_strip(self):
+        # 3-col x 2-row sheet of 4px cells: row 0 red, row 1 green.
+        sheet = pygame.Surface((12, 8), pygame.SRCALPHA)
+        sheet.fill((200, 0, 0), pygame.Rect(0, 0, 12, 4))
+        sheet.fill((0, 200, 0), pygame.Rect(0, 4, 12, 4))
+        self.a._sheets["grid_test.png"] = sheet            # bypass disk
+        self.a._meta = {"grid": {
+            "frame": [4, 4], "grid": [3, 2],
+            "anims": {
+                "top":    {"file": "grid_test.png", "frames": 3, "loop": True},
+                "bottom": {"file": "grid_test.png", "frames": 3, "loop": True, "row": 1},
+            }}}
+        self.assertEqual(len(self.a.frames("grid", "bottom")), 3)
+        self.assertEqual(self.a.frame("grid", "top", 0).get_at((1, 1))[:3], (200, 0, 0))
+        self.assertEqual(self.a.frame("grid", "bottom", 0).get_at((1, 1))[:3], (0, 200, 0))
+        # row default (0) is unchanged behaviour
+        self.assertEqual(self.a.frame("grid", "top", 2).get_at((1, 1))[:3], (200, 0, 0))
+
     def test_missing_rig_or_anim_returns_none(self):
         self.assertIsNone(self.a.frame("ghost", "walk", 0))
         self.assertIsNone(self.a.frames("hero_aegis", "nope"))
@@ -110,11 +137,17 @@ class AssetsLoaderTests(unittest.TestCase):
 
     def test_arrow_image_uses_content_crop_when_unsized(self):
         crop = get_content().sprites["arrow"].get("content")
+        self.assertIsNotNone(crop)
+        assert crop is not None
         img = self.a.image("arrow")
+        self.assertIsNotNone(img)
+        assert img is not None
         self.assertEqual(img.get_size(), tuple(crop[2:]))
 
     def test_arrow_image_and_bucketed_rotation(self):
         img = self.a.image("arrow", size=(20, 20))
+        self.assertIsNotNone(img)
+        assert img is not None
         self.assertEqual(img.get_size(), (20, 20))
         r = self.a.rotated("arrow", 90, size=(20, 20))
         self.assertIsInstance(r, pygame.Surface)
@@ -127,10 +160,44 @@ class AssetsLoaderTests(unittest.TestCase):
         self.assertIsNot(plain, red)
         self.assertIs(red, self.a.rotated("arrow", 0, size=(20, 20), tint=(150, 20, 10)))
 
+    def test_frame_rotated_returns_a_surface_and_buckets(self):
+        r = self.a.frame_rotated("skull", "idle", 0, 90)
+        self.assertIsInstance(r, pygame.Surface)
+        # 1 deg and 3 deg both snap to the 0 bucket -> the same cached surface
+        self.assertIs(self.a.frame_rotated("skull", "idle", 0, 1),
+                      self.a.frame_rotated("skull", "idle", 0, 3))
+        # a different frame index is a different surface
+        self.assertIsNot(self.a.frame_rotated("skull", "idle", 0, 0),
+                         self.a.frame_rotated("skull", "idle", 1, 0))
+
+    def test_frame_rotated_zero_keeps_the_frame_size_a_turn_grows_it(self):
+        size = (40, 12)
+        flat = self.a.frame_rotated("skull", "idle", 0, 0, size=size)
+        self.assertIsNotNone(flat)
+        assert flat is not None
+        self.assertEqual(flat.get_size(), size)                 # 0-bucket: no growth
+        turned = self.a.frame_rotated("skull", "idle", 0, 40, size=size)
+        self.assertIsNotNone(turned)
+        assert turned is not None
+        self.assertGreater(turned.get_width() * turned.get_height(),
+                           flat.get_width() * flat.get_height())  # oblique -> bigger bbox
+
+    def test_frame_rotated_tint_is_distinct_and_cached(self):
+        plain = self.a.frame_rotated("skull", "idle", 0, 0)
+        red = self.a.frame_rotated("skull", "idle", 0, 0, tint=(150, 20, 10))
+        self.assertIsNot(plain, red)
+        self.assertIs(red, self.a.frame_rotated("skull", "idle", 0, 0, tint=(150, 20, 10)))
+
+    def test_frame_rotated_missing_rig_returns_none(self):
+        self.assertIsNone(self.a.frame_rotated("nope", "idle", 0, 45))
+        self.assertIsNone(self.a.frame_rotated("skull", "nope", 0, 45))
+
     def test_picture_loads_scales_and_caches(self):
         base = self.a.picture("projectiles/arrow.png")
         self.assertIsInstance(base, pygame.Surface)
         scaled = self.a.picture("projectiles/arrow.png", size=(40, 40))
+        self.assertIsNotNone(scaled)
+        assert scaled is not None
         self.assertEqual(scaled.get_size(), (40, 40))
         self.assertIs(scaled, self.a.picture("projectiles/arrow.png", size=(40, 40)))
 

@@ -21,11 +21,11 @@ import pygame
 class Projectile:
     __slots__ = (
         "active", "pos", "vel", "damage", "radius", "lifetime", "pierce_left",
-        "knockback", "color", "hit_ids", "source_tags", "is_crit", "hostile",
+        "src_weight", "color", "hit_ids", "source_tags", "is_crit", "hostile",
         "chain_left", "chain_range",
         "anchor", "orbit_angle", "orbit_radius", "orbit_speed",
         "rehit_interval", "rehit_timer",
-        "cone_dir", "cone_half_angle",
+        "cone_dir", "cone_half_angle", "style",
     )
 
     def __init__(self) -> None:
@@ -36,7 +36,7 @@ class Projectile:
         self.radius = 4.0
         self.lifetime = 0.0
         self.pierce_left = 0
-        self.knockback = 0.0
+        self.src_weight = 0.0          # CB-3: wielder-independent weapon weight for hit knockback
         self.color = (255, 255, 255)
         self.hit_ids: set[int] = set()
         self.source_tags: tuple[str, ...] = ()
@@ -52,21 +52,22 @@ class Projectile:
         self.rehit_timer = 0.0
         self.cone_dir = pygame.Vector2(1, 0)
         self.cone_half_angle = 0.0
+        self.style = ""          # render-only: forces a `projectiles/` draw family
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
-              pierce: int = 0, knockback: float = 0.0, color=(255, 255, 255),
+              pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
               source_tags: tuple[str, ...] = (), is_crit: bool = False,
               hostile: bool = False, chain_left: int = 0, chain_range: float = 0.0,
               anchor=None, orbit_angle: float = 0.0, orbit_radius: float = 0.0,
               orbit_speed: float = 0.0, rehit_interval: float = 0.0,
-              cone_dir=None, cone_half_angle: float = 0.0) -> None:
+              cone_dir=None, cone_half_angle: float = 0.0, style: str = "") -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
         self.radius = radius
         self.lifetime = lifetime
         self.pierce_left = pierce
-        self.knockback = knockback
+        self.src_weight = src_weight
         self.color = color
         self.hit_ids.clear()
         self.source_tags = source_tags
@@ -82,6 +83,7 @@ class Projectile:
         self.rehit_timer = rehit_interval
         self.cone_dir.update(cone_dir if cone_dir is not None else (1, 0))
         self.cone_half_angle = cone_half_angle
+        self.style = style
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:

@@ -9,6 +9,13 @@ cooldown (spec 3.2). Behavior differences come from data fields; three
   * "orbit" -- maintains N persistent projectiles circling the player.
 
 Everything else is a straight auto-aimed shot.
+
+CB-2: every weapon also has a `category` (`projectile` / `melee` / `summon` /
+`orbit` / `spell`) and a **reach ring**. A weapon only fires while an enemy is
+inside that ring; with the ring empty the hero drops to idle (the polling
+`self._cd = 0.1` path keeps checking). Melee sizes the ring from its own cone
+tip (`_area`); every other category reads an explicit `reach` field. The ring
+scales with `area_multiplier` and `bonus["area"]`, so area blessings widen it.
 """
 from __future__ import annotations
 
@@ -20,6 +27,10 @@ import pygame
 
 from combat import targeting
 from combat.damage import outgoing_damage
+
+# Weapon class. Data carries `category` explicitly now; this only maps the
+# legacy `special_effect` for a def that predates the field.
+_CATEGORY_BY_SPECIAL = {"cone": "melee", "summon": "summon", "orbit": "orbit"}
 
 
 @dataclass
@@ -66,6 +77,14 @@ class Weapon:
     def special(self) -> str | None:
         return self.definition.get("special_effect")
 
+    @property
+    def category(self) -> str:
+        """`projectile` | `melee` | `summon` | `orbit` | `spell` (CB-2). Reads
+        the data field; falls back to the `special_effect` for a def that omits
+        it. Decides how the reach ring is sized and what "no target" means."""
+        return (self.definition.get("category")
+                or _CATEGORY_BY_SPECIAL.get(self.special, "projectile"))
+
     def _damage(self) -> float:
         return float(self.definition["damage"]) + self.bonus["damage"]
 
@@ -82,6 +101,24 @@ class Weapon:
 
     def _area(self, area_multiplier: float) -> float:
         return (float(self.definition.get("area", 5)) + self.bonus["area"]) * area_multiplier
+
+    def _reach(self, area_multiplier: float) -> float:
+        """Radius of the reach ring (CB-2). Melee tracks the tip of its own cone
+        (`_area`); every other category uses an explicit `reach` field. Both
+        scale with `area_multiplier` and `bonus["area"]` (decision 2), so any
+        area-growing blessing widens the ring too. A non-melee def with no
+        `reach` is unbounded -- it fires exactly as it did before CB-2."""
+        if self.category == "melee":
+            return self._area(area_multiplier)
+        if "reach" not in self.definition:
+            return float("inf")
+        return (float(self.definition["reach"]) + self.bonus["area"]) * area_multiplier
+
+    @staticmethod
+    def _within_reach(enemies, origin, reach: float) -> list:
+        """Enemies whose centre lies within `reach` of `origin` (squared scan)."""
+        r2 = reach * reach
+        return [e for e in enemies if (e.pos - origin).length_squared() <= r2]
 
     # --- per-frame ---------------------------------------------
     def update(self, dt: float, ctx: FireContext) -> bool:
@@ -113,31 +150,49 @@ class Weapon:
         if self._cd > 0.0 or len(self._summons) >= max_count:
             return
         d = self.definition
+        # CB-2: the summon gets a leash ring centred on the hero -- it only
+        # targets enemies inside it and idles when it is empty. `summon_reach`
+        # defaults to `summon_attack_range` so a def without it is unchanged.
+        reach = float(d.get("summon_reach", d.get("summon_attack_range", 320.0)))
+        # A non-positive (or missing) `summon_lifetime` means "never expires" --
+        # the spirit wolf stays on field indefinitely; the totem keeps its 8 s.
+        raw_life = d.get("summon_lifetime", 8.0)
+        lifetime = (float("inf") if raw_life is None or float(raw_life) <= 0.0
+                    else float(raw_life))
         s = ctx.spawn_summon(
             kind=d.get("summon_kind", "totem"),
             pos=ctx.anchor if ctx.anchor is not None else ctx.origin,
             damage=self._damage(),
-            lifetime=float(d.get("summon_lifetime", 8.0)),
+            lifetime=lifetime,
             color=tuple(d.get("color", (150, 220, 190))),
             tags=self.tags,
             speed=float(d.get("summon_speed", 0.0)),
             attack_range=float(d.get("summon_attack_range", 320.0)),
-            attack_interval=float(d.get("summon_attack_interval", 0.7)))
+            attack_interval=float(d.get("summon_attack_interval", 0.7)),
+            reach=reach * ctx.area_multiplier)
         if s is not None:
             self._summons.append(s)
         self._cd = self._cooldown(ctx.attack_speed_multiplier)
 
     # --- straight / chain / cone ----------------------------
     def _fire(self, ctx: FireContext) -> bool:
+        # CB-2: gate on the reach ring. The trigger is a cheap "anything in the
+        # ring" test (decision 4); we then aim at the nearest enemy *within* it,
+        # and a projectile still flies on past the ring as before.
+        in_reach = self._within_reach(ctx.enemies, ctx.origin,
+                                      self._reach(ctx.area_multiplier))
+        if not in_reach:
+            return False           # ring empty -> hero idles; caller polls (_cd = 0.1)
+
         aim = targeting.aim_direction(
             self.definition.get("targeting_mode", "nearest"),
-            ctx.origin, ctx.enemies, ctx.fallback_dir)
+            ctx.origin, in_reach, ctx.fallback_dir)
         if aim is None:
             return False
 
         area = self._area(ctx.area_multiplier)
         color = tuple(self.definition.get("color", (255, 255, 255)))
-        knockback = float(self.definition.get("knockback", 0.0))
+        src_weight = float(self.definition.get("weight", 0.0))   # CB-3 hit knockback
 
         if self.special == "cone":
             dmg = outgoing_damage(self._damage(), ctx.damage_multiplier,
@@ -146,7 +201,7 @@ class Weapon:
                 pos=ctx.origin, vel=pygame.Vector2(),
                 damage=dmg.amount, radius=area,
                 lifetime=float(self.definition.get("projectile_lifetime", 0.14)),
-                pierce=self._pierce(), knockback=knockback, color=color,
+                pierce=self._pierce(), src_weight=src_weight, color=color,
                 source_tags=self.tags, is_crit=dmg.is_crit,
                 cone_dir=aim,
                 cone_half_angle=math.radians(self.definition.get("cone_half_angle", 45)))
@@ -169,13 +224,19 @@ class Weapon:
             ctx.spawn_projectile(
                 pos=ctx.origin, vel=direction * speed, damage=dmg.amount,
                 radius=area, lifetime=lifetime, pierce=self._pierce(),
-                knockback=knockback, color=color, source_tags=self.tags,
+                src_weight=src_weight, color=color, source_tags=self.tags,
                 is_crit=dmg.is_crit, chain_left=chain_left, chain_range=chain_range)
         return True
 
     # --- orbit ------------------------------------------
     def _maintain_orbit(self, ctx: FireContext) -> None:
         desired = self._projectile_count()
+        # CB-2 decision 6: the embers orbit only while a foe is inside `reach`.
+        # With the ring empty the hero lowers it -- the orbiters are dropped and
+        # re-form, evenly spaced, the moment a target returns.
+        if not self._within_reach(ctx.enemies, ctx.origin,
+                                  self._reach(ctx.area_multiplier)):
+            desired = 0
         radius = float(self.definition.get("orbit_radius", 90))
         orbit_speed = float(self.definition.get("orbit_speed", 3.0))
         rehit = float(self.definition.get("rehit_interval", 0.4))
@@ -189,7 +250,7 @@ class Weapon:
             o = ctx.spawn_projectile(
                 pos=ctx.origin, vel=pygame.Vector2(), damage=dmg, radius=area,
                 lifetime=1e9, pierce=999,
-                knockback=float(self.definition.get("knockback", 0.0)),
+                src_weight=float(self.definition.get("weight", 0.0)),
                 color=color, source_tags=self.tags, anchor=ctx.anchor,
                 orbit_angle=0.0, orbit_radius=radius, orbit_speed=orbit_speed,
                 rehit_interval=rehit)

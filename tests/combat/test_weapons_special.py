@@ -39,7 +39,9 @@ class ConeTests(unittest.TestCase):
     def test_scythe_spawns_a_cone_shaped_hit(self):
         w = Weapon("soul_scythe", get_content().weapon("soul_scythe"))
         shots = []
-        w.update(0.016, ctx([FakeEnemy(100, 0)], shots))
+        # CB-2: the scythe only swings at a foe inside its reach ring (== the
+        # cone tip, area 74), so the target has to sit within that.
+        w.update(0.016, ctx([FakeEnemy(50, 0)], shots))
         self.assertEqual(len(shots), 1)
         s = shots[0]
         self.assertGreater(s.cone_half_angle, 0.0)
@@ -50,11 +52,13 @@ class ConeTests(unittest.TestCase):
 
 
 class OrbitTests(unittest.TestCase):
+    # CB-2 decision 6: the embers only orbit while a foe is inside `reach`
+    # (ember_ring reach 140), so every case keeps an enemy in the ring.
     def test_maintains_projectile_count_orbiters(self):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         want = w._projectile_count()
         shots = []
-        w.update(0.016, ctx([], shots))
+        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
         self.assertEqual(len(shots), want)
         self.assertTrue(all(o.orbit_radius > 0 and o.orbit_speed != 0 for o in shots))
 
@@ -62,15 +66,15 @@ class OrbitTests(unittest.TestCase):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         shots = []
         for _ in range(10):
-            w.update(0.016, ctx([], shots))
+            w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
         self.assertEqual(len(shots), w._projectile_count())
 
     def test_extra_projectile_bonus_adds_an_orbiter_and_respaces(self):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         shots = []
-        w.update(0.016, ctx([], shots))
+        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
         w.bonus["projectile_count"] = 1
-        w.update(0.016, ctx([], shots))
+        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
         self.assertEqual(len(shots), w._projectile_count())
         angles = sorted(o.orbit_angle for o in shots)
         # evenly spaced around the circle

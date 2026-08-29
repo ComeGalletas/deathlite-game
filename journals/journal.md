@@ -2462,3 +2462,19 @@ browser vs silent); and every `SysFont` call goes through `game/fonts.py` + a
 bundled Fredoka face. `main.py` is the sole entry (emscripten, or `--web` on the
 desktop, triggers the profile); all pygbag packaging lives in `web/`. Milestones
 W1–W8 done; only W9 (the GitHub Pages workflow) remains — see the dedicated log.
+
+
+## PlayingState refactor — see `journals/playing_state_refactor.md`
+
+`game/states/playing_state.py` (1404 lines, one god class) became the
+`game/states/playing/` package: a ~735-line `PlayingState` coordinator (the
+`enter()` steps, the `update()` 4-phase pipeline, `draw()` layer order, event
+routing) plus six sub-systems it owns — `rendering.py` `WorldRenderer`,
+`combat.py` `CombatResolver`, `effects.py` `TransientFx`, `locations.py`
+`SpecialLocations`, `spawning.py` `EnemyControl`, `navigation.py`
+`NavCoordinator` — and a typed `perception.py` `PlayingPerception` dataclass for
+the `entities.ai` seam. Each sub-system takes the `PlayingState` and documents
+the attributes it touches. `game/states/playing_state.py` is now a re-export
+shim; both import paths work. No behaviour change — the 578-test suite stayed
+green at every step and fixed-seed A/B runs are byte-identical. The optional
+`RunContext` milestone (P7) was skipped as not worth the churn.

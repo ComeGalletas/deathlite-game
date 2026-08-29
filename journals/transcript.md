@@ -789,3 +789,18 @@ applies the profile); all pygbag packaging in `web/`.
 system fonts, and a 60 Hz compositor; each divergence from the desktop build is
 behind a flag or an adapter so the two share one code path, and the root stays
 uncluttered. Full plan + deploy steps live in `journals/pygbag.md`.
+
+
+## PlayingState refactor
+
+**What:** split `game/states/playing_state.py` (one 1404-line class) into the
+`game/states/playing/` package — a thin `PlayingState` coordinator plus
+`rendering` / `combat` / `effects` / `locations` / `spawning` / `navigation`
+sub-systems and a `PlayingPerception` dataclass. Milestones P0–P6 + P8 (P7's
+`RunContext` deliberately skipped). `game/states/playing_state.py` kept as a
+re-export shim.
+**Reason:** the file mixed every abstraction level and every feature edited it;
+rendering alone was ~30%. Each concern is now a small module that owns its slice
+of state and documents what it reads/writes on `PlayingState`. Zero behaviour
+change — suite green throughout, fixed-seed A/B identical at each milestone. Full
+plan + per-milestone notes in `journals/playing_state_refactor.md`.

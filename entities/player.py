@@ -43,6 +43,11 @@ class Player:
         self.character_id = character_id
         self.trait = trait
 
+        # CB-3 physics: the hero has mass and can be shoved. `_knock` is an
+        # extra velocity (px/s) that decays each frame, mirroring `Enemy`.
+        self.weight = float(config.PLAYER_WEIGHT)
+        self._knock = pygame.Vector2()
+
         merged = dict(config.PLAYER_DEFAULTS)
         merged.update(base_stats or {})
         self.statset = StatSet(merged)
@@ -118,10 +123,21 @@ class Player:
         animation. No gameplay effect."""
         self._attack_t = max(self._attack_t, duration)
 
+    def apply_knockback(self, direction: pygame.Vector2, strength: float) -> None:
+        """CB-3: add an outward impulse (px/s) that decays over ~0.7 s -- the
+        bump resolver calls this when an enemy overlaps the hero."""
+        if direction.length_squared() > 1e-6:
+            self._knock += direction.normalize() * strength
+
     def update(self, dt: float, world) -> None:
-        target = self.pos + self._move_dir * self.move_speed * dt
+        # Input velocity plus any bump impulse (`_knock`), integrated together
+        # so a shove slides along walls via `resolve_movement`.
+        target = self.pos + (self._move_dir * self.move_speed + self._knock) * dt
         #self.pos = world.resolve_movement(self.pos, target, self.radius)
         self.pos.update(world.resolve_movement(self.pos, target, self.radius)) # to fix the issue with static orbitals
+        self._knock *= pow(config.BUMP_DECAY, dt)
+        if self._knock.length_squared() < 1.0:
+            self._knock.update(0, 0)
 
         moving = self._move_dir.length_squared() > 0
         self.still_time = 0.0 if moving else self.still_time + dt

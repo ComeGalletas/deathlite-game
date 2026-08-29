@@ -1433,3 +1433,318 @@ Verified on seed 48 room 5: eight trees, the top-up packed into a tight grove
 with overlapping canopies while the trunk rings stay small; bushes / mushrooms /
 pumpkins scatter as non-colliding decor with mushrooms visibly bunching; rocks
 untouched; every obstacle base sits on a walkable floor cell.
+
+
+## Projectile FX — animated sprites, modular per-family draw (2026-08-28)
+
+**Goal.** Replace the flat-circle draw of the Ember Ring's orbiters with an
+animated, travel-facing flame sprite (`assets/effects/flame-loop/Spritesheet.png`,
+16 frames of 47x75, the flame points *south*). Do it inside a **modular
+projectile-rendering structure** so the next animated projectile (bolts, chain
+lightning, ...) is a new small file, not another branch piled into
+`rendering.py` — consistent with the `game/states/playing/` sub-system split
+(`journals/playing_state_refactor.md`).
+
+### Structure
+
+New `game/states/playing/projectiles/` package:
+
+| file | holds |
+|---|---|
+| `__init__.py` | `@style(name)` registry, `draw_projectile(surface, cam, proj, ctx, *, default)` dispatch, `classify(proj, default)` |
+| `simple.py` | `style("bolt")` — plain circle; `style("arrow")` — rotated hostile sprite. The current defaults, moved verbatim. |
+| `cone.py` | `style("cone")` — the reaping sector. `draw_cone` moves here; `rendering.py` re-imports it so `PlayingState._draw_cone` (a `test_depth_sort` entry point) still resolves. |
+| `orbit.py` | `style("orbit")` — the animated flame (this change). |
+
+`WorldRenderer.player_projectiles` / `hostile_projectiles` stay as the two
+ordered, test-patchable entry points, but their bodies collapse to
+`for p in pool: draw_projectile(surface, self.ps.camera, p, self._projctx,
+default="bolt" | "arrow")`. Each style fn is `draw(surface, cam, proj, ctx) ->
+None`; `ctx` is a tiny holder of `assets` + `now` (`ps.stats["time"]`).
+
+**Dispatch by the signals that already exist** — `classify` reads
+`cone_half_angle > 0` -> `"cone"`, `orbit_speed != 0 and anchor is not None` ->
+`"orbit"`, else `default`. No `entities/projectile.py` or `combat/weapons.py`
+change yet; an explicit `Projectile.style` field is parked for when a weapon
+needs a look unrelated to its mechanics.
+
+### Assets
+
+* **`Assets.frame_rotated(rig, anim, index, degrees, *, size=None, tint=None)`** —
+  animated sibling of `rotated()`: slice the strip frame, then bucket-rotate at
+  the existing 8-deg `ROTATION_BUCKET_DEG` with a new cache dict keyed
+  `(rig, anim, index, size, tint, bucket)`; `None` when the sheet is missing.
+* **`ember` rig in `data/sprites.json`** —
+  `{"frame":[47,75], "content":[4,2,34,73], "scale":[16,34], "anchor":[8,17],
+    "anims":{"loop":{"file":"effects/flame-loop/Spritesheet.png","frames":16,
+    "fps":18,"loop":true}}}`. `content` is the union of every frame's
+  non-transparent bbox (measured: x 5-37, y 3-74) — trims the wide side margins
+  so the rotation pivot sits near the flame. `scale`/`anchor`/`fps` are starting
+  values, tune by screenshot.
+
+### Rotation math
+
+Sprite default heading = south = screen 90 deg. An orbiter's travel (tangent)
+heading is `degrees(orbit_angle) + 90` for `orbit_speed > 0`. `rotated()`-style
+calls take a screen-CW heading, so the value passed to `frame_rotated` is
+`degrees(orbit_angle)` (`+ 180` if a blessing ever makes `orbit_speed < 0`).
+Frame index from the run clock: `int(now * 18) % 16` — a phase-locked ring reads
+as intentional; add `+ orbit_angle * k` later for per-ember shimmer (still no
+per-projectile state). Blit centred on `p.pos`; circle fallback preserved when
+`frame_rotated` returns `None` (sprites are an optional layer).
+
+### TODO (EP = ember / projectiles)
+
+- [x] **EP1 — modular scaffold.** `game/states/playing/projectiles/` package:
+  `__init__.py` (`@style` registry, `ProjCtx(assets, now, zoom)`,
+  `classify(proj, default)`, `draw_projectile()` — unknown style falls back to
+  `default`), `simple.py` (`bolt` disc / `arrow` rotated sprite, verbatim),
+  `cone.py` (`draw_cone` + the lazy `_get_gfxdraw`, moved verbatim; `rendering.py`
+  re-imports `draw_cone` so `PlayingState._draw_cone` still resolves).
+  `WorldRenderer.player_projectiles` / `hostile_projectiles` are now thin loops
+  over `draw_projectile(..., default="bolt"|"arrow")`. `classify` already routes
+  orbiters to `"orbit"`, which falls back to `bolt` until EP3. **Done 2026-08-28**
+  — suite **578 green** (`ConeWeaponVisualTests` + `test_render_pipeline_order`
+  pass); classify spy confirms Kestrel→`bolt`, Aegis→`cone`+`arrow`; fixed-seed
+  A/B identical. `rendering.py` 420→367.
+- [x] **EP2 — `assets.frame_rotated()`.** `Assets.frame_rotated(rig, anim,
+  index, degrees, *, size=None, tint=None)` — `rotated()` for a strip rig:
+  snaps `degrees` to `ROTATION_BUCKET_DEG` (8), optionally BLEND_RGBA_ADD-tints,
+  `pygame.transform.rotate(base, -bucket)`, caches in the shared `self._rot`
+  under a `("<frot>", rig, anim, index, size, tint, bucket)` key (no clash with
+  `rotated()`'s 4-tuple). `None` when the rig / anim / sheet is absent. `index`
+  is the caller's responsibility to normalise. **Done 2026-08-28** — `test_assets`
+  +4 (surface + bucket-share + per-frame distinct + tint distinct/cached +
+  missing rig/anim None + 0-bucket keeps size, oblique grows it). Suite **582
+  green**; pure addition — nothing calls it until EP3.
+- [x] **EP3 — the flame.** `ember` rig in `data/sprites.json`
+  (`effects/flame-loop/Spritesheet.png`, 16x47x75, `content [4,2,34,73]`,
+  `scale [16,34]`, `anims.loop fps 18`). New `game/states/playing/projectiles/
+  orbit.py` `@style("orbit")`: `size = scale_for*zoom`, `idx = int(now *
+  fps) % frames` (shared run clock -> phase-locked ring), `heading =
+  degrees(orbit_angle) + (0 if orbit_speed>0 else 180)`, then
+  `frame_rotated("ember","loop", idx, heading, size)` blitted centred on
+  `p.pos`; circle fallback when the rig is absent. Registered in
+  `projectiles/__init__` (`classify` already routed orbiters here).
+  **Done 2026-08-28** — suite **582 green**; cardinal-angle render (embers at
+  0/90/180/270 deg) confirms each flame's axis follows the travel tangent;
+  `scale`/`fps` looked right first try, no JSON tuning needed. Tip currently
+  *leads* travel (wisps forward); a `+180` flip makes the bright base lead if
+  wanted.
+- [x] **EP4 — tests + housekeeping.** New `tests/rendering/test_projectiles.py`
+  (5): the registry has `bolt`/`arrow`/`cone`/`orbit`; `classify` routes
+  cone-angle/orbit-speed/plain; the `orbit` style calls
+  `frame_rotated("ember","loop",...)`, falls back to `pygame.draw.circle`
+  when it returns `None`, and its frame index tracks `ctx.now * fps % frames`.
+  **Renamed the effect packs to the repo convention** (lowercase,
+  underscores): `assets/effects/flame-loop/` -> `flame_loop/`, and in all
+  four new dirs (`fire`, `fire_aura`, `flame`, `flame_loop`)
+  `Spritesheet.png` -> `spritesheet.png`, `Sprites/` -> `sprites/`,
+  `Preview.gif` -> `preview.gif`, `.DS_Store` deleted. `data/sprites.json`
+  `ember` file path updated. `.gitignore` — `assets/effects/*/preview.gif`
+  and `assets/effects/*/sprites/` (only the `spritesheet.png`s ship).
+  **Done 2026-08-28** — suite **587 green**; `git add -n` under `effects/`
+  lists only the four `spritesheet.png` files.
+
+**Parked:** ~~explicit `Projectile.style` field~~ (done at WA4 -- see below);
+animated `bolt` / `chain` styles; `explosion_*.png` for `TransientFx.explosion`;
+`fire_aura` sheet for the burn-status ring.
+
+
+## Weapon / summon animations -- Spirit Wolf, modular per-kind draw (2026-08-28)
+
+**Goal.** Animate the Spirit Wolf summon with the `spectral/wolf-spectral.png`
+sheet, and do it inside a modular summon-draw package (the `projectiles/`
+pattern), so the next animated summon / weapon effect is a new small file. Only
+the anims the wolf actually needs -- **run**, **bite**, plus **idle** in the rig
+now for a later "benched wolf" milestone.
+
+### The sheet (analysed, no split needed)
+
+`assets/characters/summons/spectral/wolf-spectral.png` -- **240 x 912**, a
+**5-col x 19-row grid of 48 x 48 frames** (not a strip). `wolf-guide.png` is the
+legend; rows are directional anims:
+
+| row | anim | f | row | anim | f |
+|--|--|--|--|--|--|
+| 0-3  | WALK d/l/r/u | 4 | 12-15 | BITE d/l/r/u | 5 |
+| 4-7  | RUN  d/l/r/u | 4 | 16-17 | HOWL l/r     | 5 |
+| 8-11 | EAT  d/l/r/u | 5 | 18    | SLEEP down   | 4 |
+
+The wolf blob sits ~x[11,38] y[11,36] inside each 48 cell. There is **no idle
+row** -- use SLEEP (row 18) as the resting/benched idle. 17 `wolf-colorways/`
+and 17 `wolfshadow-colorways/` recolours exist (same layout) -- parked.
+
+The loader is horizontal-strip only (`_build_frames` slices `rect = (i*fw, 0,
+fw, fh)`). Rather than split 240x912 into ~10 strips per colourway, add a
+one-line **`row`** offset -- see WA2. Splitting stays the fallback if that turns
+messy.
+
+### Structure
+
+New `game/states/playing/summons/` (mirrors `projectiles/`):
+
+| file | holds |
+|--|--|
+| `__init__.py` | `@summon_style(kind)` registry, `draw_summon(surface, sx, sy, s, ctx, *, default)` |
+| `totem.py` | `@summon_style("totem")` -- the current rounded rect, verbatim |
+| `wolf.py` | `@summon_style("wolf")` -- the wolf rig; circle+dot fallback (today's draw) |
+
+`WorldRenderer.one_summon` becomes a thin `draw_summon(...)` call.
+`ProjCtx(assets, now, zoom)` is hoisted to `game/states/playing/drawctx.py`
+`DrawCtx` and shared by both packages.
+
+### Wolf rig (`data/sprites.json`)
+
+```jsonc
+"spirit_wolf": {
+  "frame": [48, 48], "content": [10, 10, 28, 27],   // content measured, tune
+  "scale": [22, 20], "anchor": [11, 16], "grid": [5, 19],
+  "anims": {
+    "run_left":   {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 10, "loop": true,  "row": 5},
+    "run_right":  {"file": "...same...", "frames": 4, "fps": 10, "loop": true,  "row": 6},
+    "bite_left":  {"file": "...", "frames": 5, "fps": 16, "loop": false, "row": 13},
+    "bite_right": {"file": "...", "frames": 5, "fps": 16, "loop": false, "row": 14},
+    "idle":       {"file": "...", "frames": 4, "fps": 4,  "loop": true,  "row": 18}
+  }
+}
+```
+
+**Left/right only** -- matches every other entity in the game; the sheet's
+down/up rows (4-directional) are a parked upgrade. No `flip` -- the L/R rows are
+used directly.
+
+### Wolf animation state
+
+`entities/summon.py`: `__slots__` += `anim`, `_bite_t`, `_side`.
+* At spawn, if `kind == "wolf"`, build `Animator("spirit_wolf")` (assets reach it
+  via the summon ctx -- `_update_summons` gains `assets=self.game.assets`).
+* `update()` sets `self._bite_t = 0.25` on each bite and ticks it down; tracks
+  `_side` from `vel.x` (keeps the last non-zero).
+* `_anim_name()`: `bite_{side}` while `_bite_t > 0`, else `run_{side}` (moving or
+  poised in range), `idle` reserved for the future benched state.
+* `_update_summons` calls `s.anim.play(s._anim_name()); s.anim.update(dt)`.
+* `summons/wolf.py` blits `s.anim.frame(size=scale*zoom)` centred (+ the
+  `SPRITE_ANCHOR_DROP` seat), circle+dot fallback when the rig/sheet is absent.
+
+### TODO (WA = weapon / summon animation)
+
+- [x] **WA1 -- modular summon draw.** New `game/states/playing/summons/`
+  package: `__init__.py` (`@summon_style(kind)` registry, `draw_summon(
+  surface, sx, sy, s, ctx, *, default="disc")`, a `disc` fallback style),
+  `totem.py` (rounded rect + core, verbatim), `wolf.py` (colour disc + core --
+  today's `else` branch; WA4 swaps in the rig). `WorldRenderer.one_summon` is
+  now `draw_summon(surface, sx, sy, s, self._draw_ctx(), default="disc")`.
+  `ProjCtx` hoisted to `game/states/playing/drawctx.py` `DrawCtx(assets, now,
+  zoom)`; `projectiles/__init__` re-exports it (`ProjCtx = DrawCtx` alias kept)
+  and `rendering._proj_ctx` -> `_draw_ctx`, shared by both packages.
+  **Done 2026-08-28** -- suite **592 green**; `one_summon` over a totem + wolf
+  makes the same 1 rect / 3 circle calls as before; fixed-seed A/B identical.
+- [x] **WA2 -- grid rows in the loader.** `_build_frames` computes
+  `row_y = int(spec.get("row", 0)) * fh` and slices `rect = (i*fw, row_y, fw,
+  fh)` -- omit `row` -> row 0, the plain horizontal strip, byte-identical to
+  before. `test_assets`: `test_row_offset_slices_the_named_grid_strip` (a
+  synthetic 3x2 sheet seeded straight into `_sheets`, red row / green row --
+  `row: 1` picks the green strip, default picks red);
+  `test_strip_width_matches_declared_frame_count` gained a `grid: [cols, rows]`
+  branch (grid sheet is `cols*fw x rows*fh`, every anim's `frames <= cols` and
+  `row < rows`) so WA3's wolf rig won't trip it. **Done 2026-08-28** -- suite
+  **593 green**; every existing strip rig slices unchanged.
+- [x] **WA3 -- the wolf rig.** `spirit_wolf` in `data/sprites.json`:
+  `frame [48,48]`, `grid [5,19]`, `content [7,10,35,23]` (measured union of
+  every used frame's non-transparent bbox -- x[8,40] y[11,32]), `scale
+  [32,21]`, `anchor [16,16]` (placeholders, WA4 tunes). Anims: `run_left`
+  r5, `run_right` r6 (4f, fps 10, loop), `bite_left` r13, `bite_right` r14
+  (5f, fps 16, one-shot), `idle` r18 (SLEEP, 4f, fps 4 -- reserved for the
+  future benched state). All point at `characters/summons/spectral/
+  wolf-spectral.png` unchanged. **Done 2026-08-28** -- suite **593 green**
+  (`test_files_exist` + the WA2 grid branch of
+  `test_strip_width_matches_declared_frame_count` cover it); contact-sheet
+  render confirms all 5 anims slice with no clipping (run trot+leap, bite
+  lunge+snap, idle curl), L vs R rows distinct.
+- [x] **WA4 -- wolf animation state.** `entities/summon.py`: `__slots__` +=
+  `anim` / `_bite_t` / `_side`; `reset(kind="wolf")` builds
+  `Animator(get_assets(), "spirit_wolf", start="run_right")` (same
+  `get_assets()` singleton `Enemy` uses -- no ctx plumbing). `update()`
+  restructured so the movement (`_chase`) and attack (`_maybe_attack`) run,
+  then the animator always ticks (`play(self._anim_name()); update(dt)`).
+  `_anim_name()` -> `bite_{side}` while `_bite_t > 0` (set to `_BITE_ANIM_S =
+  0.32` on each bite), else `run_{side}`; `_side` tracks `vel.x` while
+  chasing and the bite direction at the snap. `idle` reserved. Chase math is
+  byte-identical to before (targetless wolf still holds position).
+  `summons/wolf.py` blits `s.anim.frame(size = scale_for*zoom)` at
+  `(sx - ax*z, sy - ay*z)`, circle+dot fallback when the rig is absent -- no
+  `_update_summons` change needed.
+  **Bite hitbox no longer renders as a big disc.** Retired the parked
+  "explicit `Projectile.style`" item: `Projectile` `__slots__` += `style`
+  (`reset(style="")`), `projectiles.classify` returns `proj.style` when set,
+  new `projectiles/melee.py` `@style("melee")` draws nothing; the wolf bite
+  `spawn_projectile(..., style="melee")`. **Done 2026-08-28** -- suite **593
+  green** (`test_projectiles` registry set += `melee`); controlled renders
+  confirm the wolf faces its target both ways, bites on contact, and the
+  bite-disc is gone. `scale [32,21]` / `anchor [16,16]` kept -- read fine,
+  nudge to ~`[36,24]` later if it wants more presence next to big enemies.
+- [ ] **WA5 -- tests + housekeeping.** `tests/rendering/test_summons.py`
+  (registry + classify + wolf sprite-vs-fallback + `bite_*` shows for ~0.25 s
+  after a bite + run direction follows `vel.x`). `.gitignore` `wolf-guide.png`
+  and the unused `*-colorways/` dirs (or keep -- decide at WA5). `README` Assets
+  note if warranted. Journal tick.
+
+**Parked:** 4-directional wolf (rows 4/7/12/15); EAT / HOWL anims; the 34
+colourway recolours (blessing-tinted / per-hero wolves); `wolfshadow` as a
+ground shadow; a totem sprite rig; other weapon FX (chain-lightning arc).
+
+
+## Soul Scythe -- reaping slash sprite over the (dimmed) cone (2026-08-28)
+
+**Goal.** Layer an animated purple slash on the Soul Scythe's reaping arc, **on
+top of** the existing translucent damage cone (kept, not replaced), with the
+cone ~35% more transparent so the sprite carries the read.
+
+### The sheet
+
+`assets/effects/weapons/circle_cuts.png` -- **640 x 576, a 10-col x 9-row grid
+of 64 x 64 frames**. Each **row is a colour** (row 0 gold, **row 1 purple**,
+2 cyan, 3 green, ...); each row is one left-to-right slash: cols 0-5 the crescent
+forms + swings, cols 6-9 it dissipates. Soul Scythe uses **row 1** (purple,
+matches its `color [200,120,255]`). Row-1 content union: x[6,57] y[10,56] ->
+`content [5, 9, 53, 48]`. The crescent is a "C" opening **right** -> default
+heading = +x, rotate to `atan2(cone_dir.y, cone_dir.x)`.
+
+### TODO (SS = Soul Scythe)
+
+- [x] **SS1 -- `soul_slash` rig.** `data/sprites.json`: `frame [64,64]`,
+  `grid [10,9]`, `content [5,9,53,48]` (row-1 union), `scale [72,64]`,
+  `anchor [36,32]` (placeholders -- SS2's cone fn blits by centre + a forward
+  offset, doesn't read anchor), one anim `loop` -> `{file:
+  "effects/weapons/circle_cuts.png", frames: 6, fps: 40, loop: true, row: 1}`
+  (cols 0-5, the forming crescent; ~0.15 s/cycle ~= `projectile_lifetime
+  0.14`). **Done 2026-08-28** -- suite **593 green** (`test_files_exist` + the
+  WA2 grid branch cover it); slices to 6 frames of `(53,48)`, avg opaque
+  colour `(215,110,235)` confirms row 1 is purple, crescent opens right.
+- [x] **SS2 -- draw both in `projectiles/cone.py`.** Cone alphas named
+  `_FILL_A = 46` / `_EDGE_A = 137` (was 70 / 210 -- x0.65, 35% more
+  transparent) and used in `draw_cone` (gfxdraw + the pygbag polygon
+  fallback). The `@style("cone")` fn now: `draw_cone(...)` for the dimmed
+  damage sector, then -- when the `soul_slash` rig is present --
+  `frame_rotated("soul_slash", "loop", int(now*fps)%frames,
+  degrees(atan2(cone_dir.y, cone_dir.x)), size=scale_for*zoom)` blitted
+  centred at `apex + heading_unit * (radius * _SLASH_FWD 0.40 * zoom)`;
+  rig absent -> sector only. Tuned by screenshot: `scale [72,64] -> [84,74]`,
+  `_SLASH_FWD 0.45 -> 0.40`. **Done 2026-08-28** -- suite **593 green**
+  (`ConeWeaponVisualTests` still fills inside the arc at the lower alpha);
+  Aegis render shows the purple crescent carving through the cone toward the
+  target, sector a faint footprint behind it.
+- [x] **SS3 -- tests + journal.** `tests/rendering/test_projectiles.py`
+  `ConeSlashTests` (4): `_FILL_A` / `_EDGE_A` == `round(70|210 * 0.65)` (46 /
+  136 -- pinned the 35%); `cone` calls `draw_cone` **and** requests
+  `frame_rotated("soul_slash", "loop", ...)` with a heading that follows
+  `cone_dir`; with `scale_for("soul_slash")` stubbed to `None` it draws the
+  sector only and never touches `frame_rotated`; the slash frame index tracks
+  `int(now*fps) % frames`. `ConeWeaponVisualTests` (in `test_depth_sort`)
+  still green at the lower alpha. `_EDGE_A` 137 -> 136 so it matches the
+  formula exactly. **Done 2026-08-28** -- suite **597 green**.
+
+**Parked:** the other 8 colour rows (per-hero / blessing-tinted slashes); a
+per-projectile animator so the slash always plays 0->5 in lifetime order rather
+than off the shared clock.

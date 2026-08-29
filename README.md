@@ -165,8 +165,10 @@ deathlite-game/
 ├── game/               loop, state machine, config, event bus, content,
 │   │                   save, assets (sprite loader/cache), fonts
 │   └── states/         one module per game state (menu, options, rankings,
-│                       char-select, playing, level-up, paused, game-over,
-│                       victory, sanctuary, dev menu)
+│                       char-select, level-up, paused, game-over, victory,
+│                       sanctuary, dev menu); `playing/` is a package — a thin
+│                       `PlayingState` coordinator plus rendering / combat /
+│                       effects / locations / spawning / navigation sub-systems
 ├── entities/           player, enemy (+ ai), boss, projectile, pickup,
 │                       summon, hazard, obstacle, interactable
 ├── systems/            camera, spatial grid, object pool, particles, screen
