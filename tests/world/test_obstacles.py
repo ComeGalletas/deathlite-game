@@ -4,9 +4,25 @@ import unittest
 
 import pygame
 
+from game import config
 from entities.obstacle import Obstacle
 from world.map import GameMap
 from world.procedural import SPECIAL_KINDS, generate_world
+
+# Pinned-seed obstacle-scatter assertions run against the flat base layout;
+# LD-1 verticality shifts the RNG stream. Verticality's own stair keep-clear is
+# checked in tests/world/test_verticality.py.
+_SAVED_VERT = None
+
+
+def setUpModule():
+    global _SAVED_VERT
+    _SAVED_VERT = config.WORLD_VERTICALITY
+    config.WORLD_VERTICALITY = False
+
+
+def tearDownModule():
+    config.WORLD_VERTICALITY = _SAVED_VERT
 
 
 class ObstacleCollisionTests(unittest.TestCase):

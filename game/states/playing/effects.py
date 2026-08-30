@@ -22,6 +22,7 @@ from __future__ import annotations
 import pygame
 
 from entities.hazard import Hazard
+from entities.melee_hitbox import MeleeHitbox
 from game.events import Events
 from systems.animation import Animator
 from game import config
@@ -82,6 +83,20 @@ class TransientFx:
             else:
                 hz.reset_ticks()               # partial exposure does not bank
         ps.hazards = [h for h in ps.hazards if h.alive]
+
+    # --- melee attack hitboxes (chaser-style front-facing swing) ---
+    def melee_hit(self, pos, radius, damage, duration) -> None:
+        self.ps.melee_hitboxes.append(MeleeHitbox(pos.x, pos.y, radius, damage, duration))
+
+    def update_melee_hitboxes(self, dt: float) -> None:
+        ps = self.ps
+        for hb in ps.melee_hitboxes:
+            hb.update(dt)
+            if hb.alive and hb.contains(ps.player.pos, ps.player.radius):
+                taken = ps.player.take_damage(hb.consume())
+                if taken > 0:
+                    ps.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
+        ps.melee_hitboxes = [h for h in ps.melee_hitboxes if h.alive]
 
     # --- blast visuals -------------------------------------
     def explosion(self, pos: pygame.Vector2, radius: float, damage: float) -> None:

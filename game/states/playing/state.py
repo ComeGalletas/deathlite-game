@@ -26,6 +26,7 @@ from entities.projectile import Projectile
 from entities.pickup import XPGem, XP_TIER_COLORS
 from entities.summon import Summon
 from entities.hazard import Hazard
+from entities.melee_hitbox import MeleeHitbox
 from combat.weapons import Weapon, FireContext
 from progression.experience import LevelTracker, xp_for_level
 from progression.upgrades import roll_choices
@@ -141,6 +142,7 @@ class PlayingState(State):
         self.gems: Pool[XPGem] = Pool(XPGem, config.MAX_PROJECTILES, prefill=64)
         self.summons: Pool[Summon] = Pool(Summon, 32, prefill=8)
         self.hazards: list[Hazard] = []
+        self.melee_hitboxes: list[MeleeHitbox] = []
         self.particles = ParticleSystem()
         self.damage_numbers = DamageNumbers()
         self.shake = ScreenShake()
@@ -349,6 +351,7 @@ class PlayingState(State):
 
         self._update_summons(dt)
         self.fx.update_hazards(dt)
+        self.fx.update_melee_hitboxes(dt)
         self.locations.update_elite_arenas()
         self.fx.update_death_fx(dt)
         self.particles.update(dt)
@@ -419,6 +422,7 @@ class PlayingState(State):
             resolve_movement=self.game_map.resolve_movement,
             fire_projectile=self.fx.fire_hostile, summon=self.spawn.summon,
             explosion=self.fx.explosion, spawn_hazard=self.fx.spawn_hazard,
+            melee_hit=self.fx.melee_hit,
             report_damage=self._report_dot)
 
     # Nav-field steering (see navigation.py); these two names are called by
@@ -649,6 +653,7 @@ class PlayingState(State):
         d.set_metric("hostiles", len(self.hostiles))
         d.set_metric("summons", len(self.summons))
         d.set_metric("hazards", len(self.hazards))
+        d.set_metric("melee hitboxes", len(self.melee_hitboxes))
         d.set_metric("gems", len(self.gems))
         d.set_metric("particles", len(self.particles))
         d.set_metric("level", self.levels.level)
@@ -673,7 +678,6 @@ class PlayingState(State):
             self.renderer.explosions(surface)
             self._draw_player_projectiles(surface)      # weapon effects sit behind the characters
             self._draw_depth_layer(surface)
-            self.game_map.draw_tree_shadows(surface, self.camera)
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
             self.particles.draw(surface, self.camera)
             self.damage_numbers.draw(surface, self.camera)

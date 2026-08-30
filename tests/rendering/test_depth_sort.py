@@ -56,6 +56,38 @@ class SceneryDrawablesTests(unittest.TestCase):
         for _y, fn in gm.scenery_drawables(cam):
             fn(surf)                                # must not raise
 
+    def test_tree_shade_is_sorted_by_tree_depth_before_its_owner(self):
+        from systems.camera import Camera
+        gm = GameMap(seed=7)
+        gm._build_tiles()
+        tree_idx = next(iter(gm._tree_shadows))
+        cam = Camera(gm.width, gm.height)
+        cam.snap_to(gm.obstacles[tree_idx].pos)
+
+        shadow_owner = {id(shadow): i for i, shadow in gm._tree_shadows.items()}
+        calls = []
+        gm._draw_one_tree_shadow = (
+            lambda _surface, _camera, shadow:
+            calls.append(("shadow", shadow_owner[id(shadow)])))
+        gm._draw_one_obstacle = (
+            lambda _surface, _camera, i, _obstacle: calls.append(("obstacle", i)))
+
+        drawables = sorted(gm.scenery_drawables(cam), key=lambda item: item[0])
+        for _depth, draw in drawables:
+            draw(None)
+
+        shadow_pos = calls.index(("shadow", tree_idx))
+        owner_pos = calls.index(("obstacle", tree_idx))
+        self.assertLess(shadow_pos, owner_pos)
+        tree_y = gm.obstacles[tree_idx].pos.y
+        for position, (kind, i) in enumerate(calls):
+            if kind != "obstacle" or i == tree_idx:
+                continue
+            if gm.obstacles[i].pos.y < tree_y - 0.01:
+                self.assertLess(position, shadow_pos)
+            elif gm.obstacles[i].pos.y > tree_y:
+                self.assertGreater(position, shadow_pos)
+
     def test_no_layout_returns_empty(self):
         from systems.camera import Camera
         gm = GameMap()                              # one big room, no procedural obstacles
@@ -115,13 +147,11 @@ class DepthOrderTests(unittest.TestCase):
             order = []
             p._draw_player_projectiles = lambda s: order.append("weapon_fx")
             p._draw_depth_layer = lambda s: order.append("depth")
-            p.game_map.draw_tree_shadows = lambda s, c: order.append("tree_shade")
             p._draw_hostile_projectiles = lambda s: order.append("hostile")
             p.draw(game.screen)
-            # weapon effects behind the characters; enemy shots on top
+            # Tree shades are now inside depth; enemy shots remain on top.
             self.assertLess(order.index("weapon_fx"), order.index("depth"))
-            self.assertLess(order.index("depth"), order.index("tree_shade"))
-            self.assertLess(order.index("tree_shade"), order.index("hostile"))
+            self.assertLess(order.index("depth"), order.index("hostile"))
         finally:
             pygame.quit()
 

@@ -81,6 +81,25 @@ class GridAlignmentTests(unittest.TestCase):
             for c in generate_world(seed).corridors:
                 self.assertEqual(min(c.rect.width, c.rect.height), config.TILE_PX)
 
+    def test_corridor_lanes_vary_and_fit_the_shared_room_edge(self):
+        from game import config
+        non_centre_lane = False
+        for seed in (1, 7, 42, 99, 1234):
+            world = generate_world(seed)
+            for c in world.corridors:
+                first, second = world.room(c.a).rect, world.room(c.b).rect
+                if c.axis == "h":
+                    lo, hi = max(first.top, second.top), min(first.bottom, second.bottom)
+                    self.assertTrue(lo <= c.lane - config.TILE_PX // 2)
+                    self.assertTrue(c.lane + config.TILE_PX // 2 <= hi)
+                    non_centre_lane |= c.lane != first.centery
+                else:
+                    lo, hi = max(first.left, second.left), min(first.right, second.right)
+                    self.assertTrue(lo <= c.lane - config.TILE_PX // 2)
+                    self.assertTrue(c.lane + config.TILE_PX // 2 <= hi)
+                    non_centre_lane |= c.lane != first.centerx
+        self.assertTrue(non_centre_lane, "all corridors still use room-centre lanes")
+
     def test_snapped_layout_still_connected_and_non_overlapping(self):
         w = generate_world(2024)
         self.assertTrue(w.is_connected())

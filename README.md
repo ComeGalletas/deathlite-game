@@ -175,7 +175,10 @@ deathlite-game/
 │                       shake, audio (+ mixer backend), animation, debug overlay
 ├── combat/             weapons, damage, targeting, status
 ├── progression/        experience, stats, upgrades, blessings, items, meta
-├── world/              map, spawning (director), procedural (world gen)
+├── world/              map (GameMap facade: walkability + terrain bake),
+│                       layout (WorldLayout data model), gen/ (world-gen
+│                       stages), terrain/ (TileSheets + painters + renderer),
+│                       pathfinding, spawning (director)
 ├── ui/                 hud, level-up panel, damage numbers
 ├── data/               JSON content (weapons, enemies, bosses, characters,
 │                       blessings, items, meta_upgrades, sprites, terrain)

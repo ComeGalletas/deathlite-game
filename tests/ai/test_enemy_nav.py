@@ -121,7 +121,7 @@ class PlayingStateNavWiringTests(unittest.TestCase):
         self.assertIsNotNone(spot, "no walkable spawn near the player")
         p._spawn_enemy("chaser", at=spot)
         e = p.enemies[-1]
-        self.assertEqual(e.behavior, "path_chase")
+        self.assertEqual(e.behavior, "path_chase_attack")
         ctx = p._enemy_context(1 / 60)
         start = e.pos.distance_to(p.player.pos)
         for _ in range(90):

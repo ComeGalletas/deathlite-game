@@ -60,6 +60,40 @@ IRREGULAR_ROOMS: bool = True
 # the cap for the deferred multi-chunk "large room" pass.
 ROOM_SIZE_MAX_CELLS: int = 160
 
+# --- Layered verticality (journals/level_design_journal.md LD-1) ---------
+# Rooms carry a `floor` (0 = ground, up to 3). A cross-floor room link is a
+# `Stair` (1-2 tiles wide) instead of a plank `Corridor`; the raised room's
+# south edge grows a stone cliff-face skirt. Off -> every room stays floor 0,
+# no stairs, and the generated `WorldLayout` is byte-identical to the
+# pre-verticality world (reproduces pinned-seed layouts).
+WORLD_VERTICALITY: bool = True
+CLIFF_TILES: int = 2
+# Whether generation insets a raised room's walkable cells to make room for an
+# inset cliff face (LD-1 V5, render). Off for now: the plateau rim already
+# borders void, so pathing is correct without it, and an aggressive inset can
+# choke the flow field through a raised room. Turn on with the render pass.
+CLIFF_CARVE: bool = False
+
+# LD-3: replace the cross-floor plank "stair" with a sideways **ramp run** cut
+# into the cliff band -- `face_h` ramp pieces stepping one column and one row
+# each (see the level-design journal). Needs the two rooms in contact, so
+# generation snaps the low room's top edge to the plateau's cliff base; a pair
+# is skipped (and stays a bridge) when that move exceeds `RAMP_SNAP_TILES` or
+# the run's footprint does not fit. Off -> layouts are byte-identical to LD-2.
+RAMP_STAIRS: bool = True
+# How far a room may be moved to bring it flush with a cliff base, in tiles.
+# Deliberately a constant, not a literal: longer approaches later just raise it.
+RAMP_SNAP_TILES: int = 2
+
+# LD-5: give every generation-placed tile that is in no room's cell mask (plank
+# planks, plank-stair strips, staircase-unit landings) an owning room, so it
+# draws in that room's palette and is folded into the room's autotiled shape.
+# Off -> `tile_meta` and the baked terrain are byte-identical to LD-4.
+STRUCT_ANNEX: bool = True
+# One plank stair in `STAIR_WIDE_EVERY` is 2 tiles wide (deterministic count,
+# no RNG). The rest are 1 wide. Both render as plank bridges.
+STAIR_WIDE_EVERY: int = 7
+
 # Animated shoreline foam where a room floor meets the water (terrain T3).
 # Off falls back to the baked autotile edge tiles alone.
 TERRAIN_FOAM: bool = True
@@ -70,8 +104,8 @@ TERRAIN_DECORATIONS: bool = True
 # water scenery (rocks / a duck) in the void. Purely cosmetic -- no effect on
 # walkability. Data-driven from data/terrain.json "decorations".
 TERRAIN_DECOR: bool = True
-# Soft round canopy shadow cast on the ground by each tree, drawn *over* the
-# characters so a hero / enemy standing under a tree is slightly darkened
+# Soft round canopy shadow cast on the ground by each tree, depth-sorted just
+# before its owner and alpha-masked over intersecting character sprites
 # (terrain B3). Needs TERRAIN_DECORATIONS on. Off -> no tree shade.
 TERRAIN_SHADOWS: bool = True
 # Buildings: a `house` obstacle (large circular collider, blocks shots) placed

@@ -1,8 +1,14 @@
 {
   "tile_px": 64,
   "floor_sheet": "terrain/tiles/tilemap_1.png",
+  "floor_sheets": { "1": "terrain/tiles/tilemap_2.png", "2": "terrain/tiles/tilemap_3.png", "3": "terrain/tiles/tilemap_5.png" },
   "grid": [9, 6],
   "water_tile": "terrain/tiles/water_background.png",
+  "foam_routines": [
+    {"fps": 9, "phase": 0},
+    {"fps": 12, "phase": 5},
+    {"fps": 15, "phase": 10}
+  ],
 
   "slots": {
     "interior": 10,
@@ -10,7 +16,23 @@
     "corner_nw": 0, "corner_ne": 2, "corner_sw": 18, "corner_se": 20,
     "strip_v": [3, 12, 21],
     "strip_h": [27, 28, 29],
-    "single": 30
+    "single": 30,
+    "cliff": {
+      "top":    { "left": 32, "mid": 33, "right": 34, "single": 35 },
+      "body":   { "left": 41, "mid": 42, "right": 43, "single": 44 },
+      "bottom": { "left": 50, "mid": 51, "right": 52, "single": 53 }
+    },
+    "ramp": {
+      "w": [36, 45],
+      "e": [39, 48]
+    },
+    "raised": {
+      "":   15,
+      "n":  6,  "s":  24, "w":  14, "e":  16,
+      "nw": 5,  "ne": 7,  "sw": 23, "se": 25, "ns": 33, "we": 17,
+      "nwe": 8, "swe": 26, "nsw": 32, "nse": 34,
+      "nswe": 35
+    }
   },
 
   "bridge": {
@@ -68,7 +90,7 @@
     "size_boost": 1.25,
     "render_radius": {"tree": 15},
     "sprite_drop": {"house": 1.35},
-    "tree_shadow": {"radius_scale": 1.9, "color": [12, 18, 22], "alpha": 66},
+    "tree_shadow": {"radius_scale": 1.9, "radius_padding": 5, "color": [12, 18, 22], "alpha": 66},
     "rigs": {
       "tree":   ["deco_tree_1", "deco_tree_2", "deco_tree_3", "deco_tree_4"],
       "rock":   ["deco_rock_1", "deco_rock_2", "deco_rock_3", "deco_rock_4"],
@@ -138,6 +160,7 @@
     "deco_cloud_8": {"frame": [576, 256], "anchor": [282, 136], "anims": {"loop": {"file": "terrain/props/cloud_8.png", "frames": 1, "fps": 0, "loop": false}}},
 
     "terrain_foam": {"frame": [192, 192], "anims": {"loop": {"file": "terrain/tiles/water_foam.png", "frames": 16, "fps": 12, "loop": true}}},
+    "terrain_shadow": {"frame": [192, 192], "anims": {"loop": {"file": "terrain/tiles/shadow.png", "frames": 1, "fps": 0, "loop": false}}},
 
     "house_blue_1":   {"frame": [128, 192], "anchor": [64, 173], "footprint": 112, "anims": {"loop": {"file": "buildings/blue/house_1.png",   "frames": 1, "fps": 0, "loop": false}}},
     "house_blue_2":   {"frame": [128, 192], "anchor": [64, 178], "footprint": 128, "anims": {"loop": {"file": "buildings/blue/house_2.png",   "frames": 1, "fps": 0, "loop": false}}},

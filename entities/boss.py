@@ -138,9 +138,7 @@ class Boss:
         chill = self.status.speed_multiplier()
 
         if not self._patterns:
-            self.vel = (ctx.player_pos - self.pos)
-            if self.vel.length_squared() > 1:
-                self.vel.scale_to_length(self.speed)
+            self.vel = self._seek(ctx) * self.speed
             self.pos = ctx.resolve_movement(self.pos, self.pos + self.vel * dt * chill,
                                             self.radius)
             return
@@ -165,10 +163,22 @@ class Boss:
             self.hp = 0.0
             self.alive = False
 
+    def _seek(self, ctx) -> pygame.Vector2:
+        """Unit heading toward the player: the shared flow field (so the boss
+        rounds walls and climbs stairs after the player -- LD-1 decision 2),
+        straight line when the field has no route from here. Committed dash
+        patterns bypass this and beeline."""
+        nav = getattr(ctx, "nav_dir", None)
+        if nav is not None:
+            d = nav(self.pos, self.radius)
+            if d.length_squared() > 1e-6:
+                return d.normalize()
+        d = ctx.player_pos - self.pos
+        return d.normalize() if d.length_squared() > 1 else pygame.Vector2()
+
     # drift slowly toward the player unless a pattern overrides velocity
     def _approach(self, ctx, factor: float = 0.5) -> None:
-        d = ctx.player_pos - self.pos
-        self.vel = d.normalize() * self.speed * factor if d.length_squared() > 1 else pygame.Vector2()
+        self.vel = self._seek(ctx) * self.speed * factor
 
     def _phase_intro(self, ctx) -> None:
         self._approach(ctx, 0.3)

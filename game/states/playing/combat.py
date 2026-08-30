@@ -161,6 +161,8 @@ class CombatResolver:
         for enemy in contacts:
             if not enemy.alive or enemy.contact_cd > 0.0:
                 continue
+            if not getattr(enemy, "contact_damage_enabled", True):
+                continue
             if circles_overlap(ps.player.pos.x, ps.player.pos.y, pr,
                                enemy.pos.x, enemy.pos.y, enemy.radius):
                 enemy.contact_cd = enemy.contact_interval

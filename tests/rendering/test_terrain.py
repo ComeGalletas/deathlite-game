@@ -13,8 +13,24 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from game import config
 from game.assets import ASSETS_DIR, Assets, reset_assets
 from game.content import get_content
+
+# The pinned-seed render checks here validate the terrain renderer against the
+# flat base layout; LD-2 verticality shifts the RNG stream and adds cliff /
+# stair passes, and has its own coverage in tests/world/test_verticality.py.
+_SAVED_VERT = None
+
+
+def setUpModule():
+    global _SAVED_VERT
+    _SAVED_VERT = config.WORLD_VERTICALITY
+    config.WORLD_VERTICALITY = False
+
+
+def tearDownModule():
+    config.WORLD_VERTICALITY = _SAVED_VERT
 
 
 def _display():
@@ -35,12 +51,37 @@ class TerrainMetadataTests(unittest.TestCase):
         for key in ("floor_sheet", "water_tile", "slots", "room_palettes", "rigs"):
             self.assertIn(key, self.t)
 
+    def test_foam_has_three_distinct_animation_routines(self):
+        routines = self.t["foam_routines"]
+        self.assertGreaterEqual(len(routines), 3)
+        self.assertGreaterEqual(len({float(r["fps"]) for r in routines}), 3)
+
     def test_slot_indices_are_inside_the_grid(self):
         cols, rows = self.t["grid"]
         limit = cols * rows
+
+        def _indices(v):
+            if isinstance(v, dict):                     # e.g. slots.cliff
+                for inner in v.values():
+                    yield from _indices(inner)
+            elif isinstance(v, list):
+                yield from v
+            else:
+                yield v
+
         for name, val in self.t["slots"].items():
-            for idx in (val if isinstance(val, list) else [val]):
+            for idx in _indices(val):
                 self.assertTrue(0 <= idx < limit, f"slot {name}={idx} out of 0..{limit - 1}")
+
+    def test_cliff_slots_are_a_full_left_mid_right_single_autotile(self):
+        cliff = self.t["slots"]["cliff"]
+        self.assertEqual(set(cliff), {"top", "body", "bottom"})
+        for row, edges in cliff.items():
+            self.assertEqual(set(edges), {"left", "mid", "right", "single"}, row)
+
+    def test_floor_sheets_are_real_files(self):
+        for path in self.t.get("floor_sheets", {}).values():
+            self.assertTrue((ASSETS_DIR / path).is_file(), f"missing {path}")
 
     def test_referenced_sheets_exist(self):
         sheets = {self.t["floor_sheet"], self.t["water_tile"],
@@ -159,6 +200,37 @@ class ObstacleDecorTests(unittest.TestCase):
         from world.procedural import WorldLayout, generate_world
         self.assertNotIn("decorations", WorldLayout.__dataclass_fields__)
         self.assertFalse(hasattr(generate_world(7), "decorations"))
+
+    def test_foam_anchors_stay_on_ground_edges_or_void_cliff_feet(self):
+        from game import config
+        gm = self._map()
+        px = config.TILE_PX
+        self.assertTrue(gm._shore)
+        for x, y in gm._shore:
+            cx, cy = x + px / 2, y + px / 2
+            self.assertTrue(gm._point_ok(cx, cy), "foam anchor is not under ground")
+            self.assertTrue(any(not gm._point_ok(cx + dx, cy + dy)
+                                for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px))),
+                            "foam ground tile no longer borders empty sea")
+        for x, y in gm._cliff_foam:
+            self.assertFalse(gm._point_ok(x + px / 2, y + px / 2),
+                             "void-facing cliff foam is on walkable ground")
+
+    def test_every_sea_facing_ground_room_tile_has_foam(self):
+        from game import config
+        gm = self._map()
+        px = config.TILE_PX
+        expected = set()
+        for room in gm.layout.rooms:
+            if room.floor != 0:
+                continue
+            for col, row in room.cells:
+                x, y = room.rect.x + col * px, room.rect.y + row * px
+                if any(not gm._point_ok(x + px / 2 + dx, y + px / 2 + dy)
+                       for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px))):
+                    expected.add((x, y))
+        self.assertTrue(expected)
+        self.assertTrue(expected.issubset(set(gm._shore)))
 
     def test_every_obstacle_is_skinned_and_keys_are_obstacle_indices(self):
         gm = self._map()
@@ -282,6 +354,21 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
             bled += sum(1 for x in range(0, w, 4) if surf.get_at((x, 0))[3] < 255)
         self.assertGreater(bled, 0, "top edge of every room baked fully opaque")
 
+    def test_zoom_does_not_invent_partial_alpha_at_tile_edges(self):
+        from world.map import GameMap
+
+        source = pygame.Surface((2, 2), pygame.SRCALPHA)
+        source.set_at((0, 0), (80, 120, 90, 255))
+        gm = GameMap.__new__(GameMap)
+        gm._render_zoom = 1.5
+        gm._blit_cache = {}
+
+        scaled = gm._z_surf(source)
+        alphas = {scaled.get_at((x, y)).a
+                  for y in range(scaled.get_height())
+                  for x in range(scaled.get_width())}
+        self.assertLessEqual(alphas, {0, 255})
+
     def test_draw_tiled_blits_foam_before_the_room_surfaces(self):
         from systems.camera import Camera
         gm = self._map()
@@ -304,6 +391,22 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
         self.assertIsNotNone(first_foam, "no foam blit")
         self.assertIsNotNone(first_room, "no room blit")
         self.assertLess(first_foam, first_room)
+
+    def test_foam_locations_use_three_desynchronized_routines(self):
+        gm = self._map()
+        anchors = gm._shore + gm._cliff_foam
+        buckets = {gm._foam_routine_index(x, y, len(gm._foam_routines))
+                   for x, y in anchors}
+        self.assertTrue({0, 1, 2}.issubset(buckets))
+
+        by_bucket = {
+            bucket: next(p for p in anchors
+                         if gm._foam_routine_index(*p, len(gm._foam_routines)) == bucket)
+            for bucket in (0, 1, 2)
+        }
+        frames = {id(gm._foam_frame_at(*by_bucket[bucket], seconds=0.0))
+                  for bucket in (0, 1, 2)}
+        self.assertEqual(len(frames), 3, "foam routines start on the same frame")
 
 
 class BridgeCorridorTests(unittest.TestCase):
@@ -351,19 +454,21 @@ class BridgeCorridorTests(unittest.TestCase):
         finally:
             logging.disable(logging.NOTSET)
 
-    def test_corridors_bake_srcalpha_and_seed_the_shore(self):
+    def test_corridors_bake_srcalpha_without_seeding_the_shore(self):
         from world.map import GameMap
         gm = GameMap(seed=1234)
         gm._build_tiles()
         self.assertTrue(gm._tiles_ok and gm._corr_surfs)
         for _, s in gm._corr_surfs:
             self.assertTrue(s.get_flags() & pygame.SRCALPHA)
-        # Some mid-bridge cell survives into the shore list (plank-gap foam);
-        # the T9 doorway-seam filter only strips the room/bridge junction.
-        in_a_corridor = [p for p in gm._shore
-                         if any(rect.collidepoint(p[0] + 1, p[1] + 1)
-                                for rect, _ in gm._corr_surfs)]
-        self.assertTrue(in_a_corridor, "no corridor cell seeded the shore")
+        px = get_content().terrain["tile_px"]
+        ground_cells = {
+            (room.rect.x + col * px, room.rect.y + row * px)
+            for room in gm.layout.rooms if room.floor == 0
+            for col, row in room.cells
+        }
+        self.assertTrue(set(gm._shore).issubset(ground_cells),
+                        "a corridor-only cell seeded shoreline foam")
 
     def test_corridor_carries_bridge_edge_properties(self):
         from world.procedural import generate_world
@@ -551,7 +656,7 @@ class DecorationScatterTests(unittest.TestCase):
                                                 f"bushes bunched (seed {seed})")
         self.assertTrue(clustered, "no decoration cluster formed anywhere")
 
-    def test_void_scenery_draws_before_the_foam(self):
+    def test_foam_draws_before_void_scenery(self):
         from systems.camera import Camera
         gm = self._map(1234)
         self.assertTrue(gm._void_decor and gm._foam)
@@ -571,13 +676,13 @@ class DecorationScatterTests(unittest.TestCase):
         first_foam = next((k for k, s in enumerate(rec.calls) if s in foam_ids), None)
         self.assertIsNotNone(first_void, "void scenery never blitted")
         self.assertIsNotNone(first_foam, "foam never blitted")
-        self.assertLess(first_void, first_foam)
+        self.assertLess(first_foam, first_void)
 
 
 class TreeSkinShadowSeamTests(unittest.TestCase):
     """T9 / B3: real animated tree sprites skin the `tree` obstacle; only trees
-    cast a shade (a round shadow drawn *over* the characters, no under-skin
-    contact shadow); foam is dropped at the bridge/room doorway seam."""
+    cast a depth-sorted round shade; foam is dropped at the bridge/room doorway
+    seam."""
 
     @classmethod
     def setUpClass(cls):
@@ -627,13 +732,16 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         self.assertTrue(gm._tree_shadows)
         tree_idx = {i for i, o in enumerate(gm.obstacles)
                     if o.kind == "tree" and i in gm._decos}
-        self.assertEqual(len(gm._tree_shadows), len(tree_idx))
-        for wx, wy, r, surf in gm._tree_shadows:
+        self.assertEqual(set(gm._tree_shadows), tree_idx)
+        padding = int(self.t["obstacle_decor"]["tree_shadow"]["radius_padding"])
+        radius_scale = float(self.t["obstacle_decor"]["tree_shadow"]["radius_scale"])
+        render_radius = self.t["obstacle_decor"].get("render_radius", {})
+        for i, (wx, wy, r, surf) in gm._tree_shadows.items():
             self.assertIsInstance(surf, pygame.Surface)
             self.assertTrue(surf.get_flags() & pygame.SRCALPHA)
             self.assertEqual(surf.get_size(), (2 * r, 2 * r))
-            # the shade is bigger than a trunk but stays translucent
-            self.assertGreater(r, 26)
+            draw_r = float(render_radius.get("tree", gm.obstacles[i].radius))
+            self.assertEqual(r, round(draw_r * radius_scale) + padding)
             self.assertLess(surf.get_at((r, r))[3], 200)
 
     def test_shade_flag_off_keeps_skins_but_drops_the_shade(self):
@@ -643,7 +751,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         try:
             gm = self._map()
             self.assertTrue(gm._decos)
-            self.assertEqual(gm._tree_shadows, [])
+            self.assertEqual(gm._tree_shadows, {})
         finally:
             config.TERRAIN_SHADOWS = old
 
@@ -695,11 +803,12 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         self.assertAlmostEqual(r1.calls[0] - r0.calls[0],
                                round(0.7 * o.radius * gm._render_zoom), delta=1)
 
-    def test_tree_shade_blits_after_the_characters(self):
+    def test_tree_shade_compatibility_painter_blits_visible_shades(self):
         from systems.camera import Camera
         gm = self._map()
+        first = next(iter(gm._tree_shadows.values()))
         cam = Camera(gm.width, gm.height)
-        cam.snap_to(pygame.Vector2(gm._tree_shadows[0][0], gm._tree_shadows[0][1]))
+        cam.snap_to(pygame.Vector2(first[0], first[1]))
 
         class _Recorder:
             def __init__(self): self.calls = []
@@ -708,24 +817,48 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
 
         rec = _Recorder()
         gm.draw_tree_shadows(rec, cam)
-        shade_ids = {id(s) for _x, _y, _r, s in gm._tree_shadows}
+        shade_ids = {id(s) for _x, _y, _r, s in gm._tree_shadows.values()}
         self.assertTrue(any(c in shade_ids for c in rec.calls),
                         "no tree shade blitted for an in-view tree")
 
-    def test_no_foam_cell_straddles_a_bridge_and_a_room(self):
+    def test_character_shade_is_masked_to_the_sprite_alpha(self):
+        from types import SimpleNamespace
+        from world.map import GameMap
+
+        shade = pygame.Surface((4, 4), pygame.SRCALPHA)
+        shade.fill((12, 18, 22, 128))
+        frame = pygame.Surface((4, 4), pygame.SRCALPHA)
+        frame.set_at((1, 1), (240, 240, 240, 255))
+
+        gm = GameMap.__new__(GameMap)
+        gm._tree_shadows = {0: (2, 2, 2, shade)}
+        gm._render_zoom = 1.0
+        gm._blit_cache = {}
+        camera = SimpleNamespace(pos=pygame.Vector2())
+
+        shaded = gm.shade_character_frame(frame, (0, 0), camera, character_y=2)
+        self.assertLess(shaded.get_at((1, 1)).r, frame.get_at((1, 1)).r)
+        self.assertEqual(shaded.get_at((0, 0)).a, 0,
+                         "shade leaked outside the character silhouette")
+
+        above_tree = gm.shade_character_frame(frame, (0, 0), camera, character_y=1)
+        self.assertIs(above_tree, frame,
+                  "character would be darkened twice by both shadow paths")
+
+    def test_foam_remains_on_ground_room_edges_next_to_corridors(self):
         gm = self._map(1234)
         px = self.t["tile_px"]
         corr = [rect for rect, _ in gm._corr_surfs]
         rooms = [r.rect for r in gm.layout.rooms]
+        seen = False
         for sx, sy in gm._shore:
             c = pygame.Rect(sx, sy, px, px)
             on_bridge = any(c.colliderect(h.inflate(px, px)) for h in corr)
             in_room = any(c.colliderect(h) for h in rooms)
-            self.assertFalse(on_bridge and in_room,
-                             f"doorway-seam foam left at ({sx}, {sy})")
+            seen |= on_bridge and in_room
+        self.assertTrue(seen, "no ground shoreline foam remains near a corridor")
 
-    def test_seam_filter_keeps_open_room_edges(self):
-        # A world still has plenty of shoreline after the seam trim.
+    def test_ground_only_shoreline_has_open_edges(self):
         gm = self._map(1234)
         self.assertGreater(len(gm._shore), 100)
 
