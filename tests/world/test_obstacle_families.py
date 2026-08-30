@@ -6,7 +6,9 @@ import unittest
 
 import pygame
 
-import world.procedural as P
+# W1 of journals/world_refactor.md moved the scatter stage (and the
+# `_TREE_DENSITY_BOOST` knob this test patches) into world/gen/scatter.py.
+import world.gen.scatter as P
 from entities.obstacle import KINDS
 from world.map import GameMap
 from world.procedural import generate_world

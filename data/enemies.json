@@ -2,8 +2,9 @@
   "chaser": {
     "name": "Husk", "hp": 12, "speed": 95, "contact_damage": 13, "radius": 14,
     "weight": 7,
-    "experience_reward": 3, "behavior": "path_chase", "color": [200, 90, 90],
-    "tags": ["basic"], "sprite": "skull"
+    "experience_reward": 3, "behavior": "path_chase_attack", "color": [200, 90, 90],
+    "tags": ["basic"], "sprite": "skull", "contact_damage_enabled": false,
+    "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
   "fast": {
     "name": "Skitter", "hp": 6, "speed": 190, "contact_damage": 11, "radius": 10,
@@ -15,7 +16,7 @@
     "name": "Lumberer", "hp": 70, "speed": 45, "contact_damage": 21, "radius": 24,
     "weight": 14,
     "experience_reward": 9, "behavior": "path_chase", "color": [130, 90, 150],
-    "tags": ["tank"], "sprite": "turtle"
+    "tags": ["tank"], "sprite": "turtle", "contact_damage_enabled": false
   },
   "swarm": {
     "name": "Mite", "hp": 3, "speed": 130, "contact_damage": 9, "radius": 7,
@@ -27,7 +28,7 @@
     "name": "Spitter", "hp": 14, "speed": 70, "contact_damage": 10, "radius": 13,
     "weight": 6,
     "experience_reward": 6, "behavior": "kite_shoot", "color": [110, 200, 170],
-    "tags": ["ranged"], "sprite": "slingshot_gnome",
+    "tags": ["ranged"], "sprite": "slingshot_gnome", "contact_damage_enabled": false,
     "prefer_distance": 260, "shoot_interval": 2.1, "shoot_damage": 7,
     "shot_speed": 230
   },
@@ -35,27 +36,27 @@
     "name": "Bloat", "hp": 18, "speed": 85, "contact_damage": 11, "radius": 16,
     "weight": 8,
     "experience_reward": 6, "behavior": "exploder", "color": [230, 120, 60],
-    "tags": ["exploder"], "sprite": "bomb_fish",
+    "tags": ["exploder"], "sprite": "bomb_fish", "contact_damage_enabled": false,
     "explode_radius": 90, "explode_damage": 24, "fuse_range": 34
   },
   "shielded": {
     "name": "Bulwark", "hp": 20, "speed": 80, "contact_damage": 15, "radius": 16,
     "weight": 8,
     "experience_reward": 8, "behavior": "path_chase", "color": [150, 170, 210],
-    "tags": ["shielded"], "sprite": "panda",
+    "tags": ["shielded"], "sprite": "panda", "contact_damage_enabled": false,
     "shield_hp": 25
   },
   "elite": {
     "name": "Ravager", "hp": 120, "speed": 90, "contact_damage": 25, "radius": 22,
     "weight": 30,
     "experience_reward": 30, "behavior": "path_chase", "color": [255, 80, 120],
-    "tags": ["elite"], "is_elite": true, "sprite": "bear"
+    "tags": ["elite"], "is_elite": true, "sprite": "bear", "contact_damage_enabled": false
   },
   "summoner": {
     "name": "Broodmother", "hp": 55, "speed": 55, "contact_damage": 13, "radius": 20,
     "weight": 10,
     "experience_reward": 18, "behavior": "summoner", "color": [90, 150, 120],
-    "tags": ["summoner"], "sprite": "gnome",
+    "tags": ["summoner"], "sprite": "gnome", "contact_damage_enabled": false,
     "summon_id": "swarm", "summon_interval": 4.0, "summon_count": 3
   },
   "brute": {
@@ -63,6 +64,7 @@
     "weight": 80,
     "experience_reward": 60, "behavior": "brute", "color": [200, 60, 60],
     "tags": ["miniboss", "elite"], "is_elite": true, "sprite": "troll",
+    "contact_damage_enabled": false,
     "slam_interval": 3.5, "slam_range": 120, "slam_radius": 130,
     "slam_damage": 30, "slam_telegraph": 0.9
   },
@@ -89,6 +91,7 @@
     "weight": 7,
     "experience_reward": 12, "behavior": "fsm_warlock", "color": [150, 90, 200],
     "tags": ["caster", "area-denial"], "sprite": "hex_shaman",
+    "contact_damage_enabled": false,
     "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8,
     "cast_duration": 0.2, "cast_recover": 1.8, "cast_interval": 3.2,
     "hazard_radius": 92, "hazard_dps": 23, "hazard_duration": 3.5

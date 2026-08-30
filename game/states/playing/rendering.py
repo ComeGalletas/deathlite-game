@@ -52,6 +52,11 @@ class WorldRenderer:
         below the collider centre -- see config.SPRITE_ANCHOR_DROP. Render-only."""
         return config.SPRITE_ANCHOR_DROP * radius * self.ps.camera.zoom
 
+    def _blit_character(self, surface, frame, dest, character_y: float) -> None:
+        frame = self.ps.game_map.shade_character_frame(
+            frame, dest, self.ps.camera, character_y)
+        surface.blit(frame, dest)
+
     # --- feedback / hud-adjacent overlays --------------------------
     def feedback_overlays(self, surface: pygame.Surface) -> None:
         ps = self.ps
@@ -191,8 +196,8 @@ class WorldRenderer:
                 pygame.draw.circle(surface, (150, 200, 255), (int(sx), int(sy)),
                                    round(er) + 5, 1)
 
-        if e.telegraphing:                        # attack telegraph -- always on
-            r = e.cfg.get("slam_radius", 120)
+        if e.telegraphing and "slam_radius" in e.cfg:  # AoE danger zone only
+            r = e.cfg["slam_radius"]
             pygame.draw.circle(surface, (255, 90, 90), (int(sx), int(sy)),
                                round(r * z), 2)
 
@@ -211,7 +216,8 @@ class WorldRenderer:
         ax, ay = assets.anchor("dead")
         sx, sy = ps.camera.world_to_screen(pos)
         drop = self.sprite_drop(radius)     # match the sprite this poof replaced
-        surface.blit(frame, (int(sx - ax * scale), int(sy - ay * scale + drop)))
+        self._blit_character(
+            surface, frame, (sx - ax * scale, sy - ay * scale + drop), pos.y)
 
     def enemy_sprite(self, surface, e) -> None:
         ps = self.ps
@@ -230,7 +236,9 @@ class WorldRenderer:
         if e._hurt_t > 0.0:
             frame = hit_tinted(frame)           # red flash, no pop to a circle
         ax, ay = assets.anchor(rig)
-        surface.blit(frame, (sx - ax * z, sy - ay * z + self.sprite_drop(e.radius)))
+        self._blit_character(
+            surface, frame,
+            (sx - ax * z, sy - ay * z + self.sprite_drop(e.radius)), e.pos.y)
 
     def boss(self, surface) -> None:
         ps = self.ps
@@ -251,8 +259,9 @@ class WorldRenderer:
             if b._hurt_t > 0.0:
                 frame = hit_tinted(frame)
             ax, ay = assets.anchor(rig)
-            surface.blit(frame, (int(sx - ax * z),
-                                 int(sy - ay * z + self.sprite_drop(b.radius))))
+            self._blit_character(
+                surface, frame,
+                (sx - ax * z, sy - ay * z + self.sprite_drop(b.radius)), b.pos.y)
         else:
             colour = (255, 255, 255) if b.hit_flash > 0 else b.color
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
@@ -290,8 +299,10 @@ class WorldRenderer:
             ax, ay = ps.game.assets.anchor(ps._hero_anim.rig)
             if ps.player._hurt_t > 0.0:
                 frame = hit_tinted(frame)
-            surface.blit(frame, (sx - ax * z,
-                                 sy - ay * z + self.sprite_drop(ps.player.radius)))
+            self._blit_character(
+                surface, frame,
+                (sx - ax * z, sy - ay * z + self.sprite_drop(ps.player.radius)),
+                ps.player.pos.y)
             if ps.player.invulnerable:
                 pygame.draw.circle(surface, (255, 120, 120), (sx, sy),
                                    round(pr + 4 * z), width=2)
@@ -361,6 +372,11 @@ class WorldRenderer:
             ring(p.pos, p.radius, config.COLOR_DEBUG_HIT, 1)
         for p in ps.hostiles:
             ring(p.pos, p.radius, config.COLOR_DEBUG_HIT, 1)
+        # Melee swing rings -- one-shot contact volumes, same style as the
+        # projectile hitboxes above (they used to draw unconditionally).
+        for hb in ps.melee_hitboxes:
+            if view.collidepoint(hb.pos.x, hb.pos.y):
+                ring(hb.pos, hb.radius, config.COLOR_DEBUG_HIT, 1)
 
         # CB-2 reach rings: the gate that decides fire-vs-idle. One ring per
         # equipped weapon at the hero (summon weapons have no ring -- `_reach`

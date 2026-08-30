@@ -1748,3 +1748,81 @@ heading = +x, rotate to `atan2(cone_dir.y, cone_dir.x)`.
 **Parked:** the other 8 colour rows (per-hero / blessing-tinted slashes); a
 per-projectile animator so the slash always plays 0->5 in lifetime order rather
 than off the shared clock.
+
+---
+
+## Cliff foot sits on grass, not sea — LD-7a (2026-08-30)
+
+Cross-ref: `level_design_journal.md` LD-7 (cliffs = lowest terrain layer).
+
+**Goal.** Where a raised room's south cliff drops onto a lower room, the bottom
+row of cliff-face tiles must read as sitting *on the ground*: no sea / foam
+showing through the cliff foot's transparent scallops, and the lower room's own
+north-edge tile directly under the cliff must not autotile as a white foam
+shoreline ("the directly south tile looks like a north shore tile"). A cliff
+genuinely over open water is unchanged — scalloped foot + lapping `terrain_foam`.
+
+**Water foam is not touched.** The animated shoreline system (`_shore` +
+`_cliff_foam` anchor lists, `foam_routines`, the `terrain_foam` sheet, the foam
+draw pass) is unchanged. What changes is which cliff *feet* are classified as
+"over sea": a foot with lower-room floor directly beneath it stops drawing the
+scalloped `bottom` tile and stops seeding a `_cliff_foam` point — it draws the
+plain `body` tile like any grounded foot. Feet over actual open water keep
+everything.
+
+### What changed — `world/map.py`, render + bake only
+
+1. **`_cliff_underlay`** — a new list of `(rect, tile)`, one lower-room
+   `interior` grass tile at each cliff-face **foot cell** that has a room floor
+   **directly south of it** (`south_room()` centre-probes the cell one row
+   below the drawn foot). "Below" here means *same x/y, painted first*: the
+   underlay is drawn before the cliff faces, so the cliff sits on top of it and
+   its transparent foot shows grass. It never fills a cell that has nothing
+   else drawn on it — no gap filling (a real void gap between the cliff and the
+   room keeps its shoreline).
+
+2. **`_cliff_capped`** — a set of `(room_id, col, row)` ground-room edge cells
+   with a cliff band **flush overhead** (a `px`-tall strip at the cell's north
+   edge intersects the raised room's `face_h`-tall band rect for that column).
+   `paint_room` paints those cells with the north side forced closed
+   (`_mask_slot(shape | {(col, row-1)}, ...)` → `interior`, not an `edge_n` /
+   `corner` shoreline tile) and seeds **no** `_shore` anchor for them. Together
+   with the underlay this reads as the lower room extending one tile up under
+   the cliff.
+
+3. **`paint_cliff`** — the `near_ground_k` / `_cliff_fill` gap-fill from the
+   first LD-7 pass (which poured grass into a 1–2 tile void gap) is **removed**.
+   The per-column branch now computes `lower = south_room(col, row + draw_h)`;
+   `landed = grounded or lower is not None`. `landed` → plain `body` foot, no
+   `_cliff_foam`. `lower is not None` → append the `_cliff_underlay` tile and a
+   `_cliff_shadow` anchor at the foot cell (LD-6's shadow anchor moved up one
+   row, from the room tile to the cliff-foot cell).
+
+4. **Draw order (`_draw_tiled`)** — the LD-7a exception to "cliffs first":
+   `water → foam → void decor → _cliff_underlay → _cliff_shadow → _cliff_surfs
+   → room floors (bottom floor up) → _stair_surfs → _ramp_surfs → corridors`.
+   The underlay and the shadow are the only terrain drawn before the cliff
+   faces; the shadow, sitting between the underlay and the cliffs, reads as a
+   tight contact shadow at the cliff base rather than a blob on the open field.
+
+### Verified
+
+- `tests/world/test_verticality.py`: `test_cliff_foot_underlay_sits_at_the_cliff_cell_over_lower_ground`
+  (underlay tile is opaque grass, a lower room is directly south of it, the
+  cell carries a shadow anchor); `test_cliff_foot_foams_over_void_and_grounds_over_a_tile`
+  reworked around the `lower` / `grounded` split; `test_cliff_foot_shadow_does_not_suppress_ground_shoreline_foam`
+  skips `_cliff_capped` cells; `test_shadow_only_where_a_cliff_foot_lands_on_a_lower_room`
+  probes one tile south of the anchor; `test_cliff_faces_paint_below_rooms_and_ramp_units_above`
+  now also asserts the underlay blits before the first cliff face.
+- Full suite **714 green**. Generation / `WorldLayout` untouched (pure render +
+  bake); flat-world baseline unaffected (`_cliff_underlay` / `_cliff_capped`
+  stay empty with no raised rooms).
+- Screenshots: seeds 2 / 10 (flush cliff-on-room) show the cliff foot on a thin
+  grass strip with the lower room's grass continuous under it, no foam band;
+  the water-facing columns of the same wall keep their scalloped foot + foam.
+
+### Known gap
+
+Where the cliff band ends a full tile *above* the lower room (a real void gap,
+e.g. seed 5), the gap is left as open water per the "do not fill empty spaces"
+rule — only a flush cliff is capped.

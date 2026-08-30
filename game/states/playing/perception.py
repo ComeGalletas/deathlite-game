@@ -33,4 +33,5 @@ class PlayingPerception:
     summon: Callable             # (enemy_id, pos, count) -> None
     explosion: Callable          # (pos, radius, damage) -> None
     spawn_hazard: Callable       # (pos, radius, dps, duration, tick_interval=None)
+    melee_hit: Callable          # (pos, radius, damage, duration) -> None
     report_damage: Callable      # (amount) -> None

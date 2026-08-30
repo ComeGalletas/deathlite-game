@@ -29,6 +29,11 @@ class Enemy:
         self.speed = float(definition["speed"])
         self.contact_damage = float(definition["contact_damage"])
         self._base_contact = self.contact_damage  # FSM attacks bump this transiently
+        # Per-type toggle: some enemies (chargers, teleporters, ...) deal their
+        # real damage through the contact check on a dash/blink; others just
+        # bump the player harmlessly, so this can be turned off in enemies.json.
+        self.contact_damage_enabled = bool(
+            definition.get("contact_damage_enabled", True))
         # Contact damage lands as a bite every `contact_interval` s (armor is a
         # flat per-hit subtraction). `contact_cd` counts down to the next bite.
         self.contact_interval = float(

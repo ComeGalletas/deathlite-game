@@ -57,8 +57,8 @@ renderer's 64 px cell grid covers a room exactly.
   stepped floors; `start` / `boss` and rooms smaller than 6×6 stay full
   rectangles; special rooms get 0–1 bites. Every bite is validated: the mask
   stays 4-connected, ≥ 9 cells, ≤ `ROOM_SIZE_MAX_CELLS`, and every border
-  row/column keeps a cell (so `rect` never shrinks and corridors — which attach
-  at edge midpoints, never corners — are never blocked).
+  row/column keeps a cell (so `rect` never shrinks and corridor mouths remain
+  valid).
 
 Flag off → every room is the full `W × H` rectangle on the old `55–86 %` band.
 
@@ -70,15 +70,25 @@ tree edges; the corridor axis keys off the two rooms' **chunk cells**, not their
 ### 1.3 Corridors
 
 One `Corridor` per tree edge — a straight axis-aligned rectangle, **one tile
-wide** (`config.TILE_PX`, 64 px; T7), spanning **centre-to-centre** of the two
-rooms (that overlap into both rooms is what keeps walkability seamless at the
-mouths). Each corridor also records its **bridge edge identity**:
+wide** (`config.TILE_PX`, 64 px; T7), spanning from the interior of one room to
+the interior of its neighbor. Same-floor corridors choose a deterministic,
+tile-aligned **lane** from the shared edge's interior span, so bridges enter at
+varied positions instead of every room center. Two tiles are reserved at each
+shared-edge end to keep the connection clear of irregular corner bites and
+navigation bottlenecks; narrow overlaps fall back to their middle lane.
+
+Cross-floor links retain the shared-span center before becoming plank stairs or
+ramp units, preserving their two-tile navigation approaches. If a room grows,
+`_relink_corridors` keeps its lane when valid or moves it to the nearest valid
+shared lane. Each corridor records this geometry plus its **bridge edge
+identity**:
 
 ```python
 axis: str          # "h"  -> west/east ends | "v" -> north/south ends
 end_low:  str      # "west"  (h) | "north" (v)  — the edge at the smaller x / y
 end_high: str      # "east"  (h) | "south" (v)  — the edge at the larger  x / y
 room_low, room_high: int   # the room ids those two edges butt against
+lane: int                  # cross-axis tile-centre coordinate of the mouth
 ```
 
 The tiled renderer uses `axis` + `room_low` / `room_high` to draw a directional
@@ -238,32 +248,34 @@ circles. Fully playable.
   of it or being buried at the room centres. `_bridge_slot(c.axis, i, ncells)` gives the
   low cap (`h_left` / `v_top`) at cell 0, the high cap (`h_right` / `v_bot`) at
   the last cell, `h_mid` / `v_mid` between — matching `Corridor.end_low` /
-  `end_high`. SRCALPHA (the plank gaps are transparent); every plank cell is
-  added to `self._shore` so foam shows through the gaps over open water. No
+  `end_high`. SRCALPHA (the plank gaps are transparent); bridges render above
+  nearby ground-shore foam but never add `_shore` anchors of their own. No
   bridge sheet → the plain `interior` grass tile. `_corr_surfs` holds
   `(blit_rect, surface)` — the blit rect is this tight mouth-to-mouth span.
-- **Doorway seam** (T9) — after both rings are collected, any `self._shore` cell
-  whose 64 px tile touches *both* a room rect and a corridor rect (inflated by
-  `tile_px`) is dropped: the bridge/room junction then reads as solid ground,
-  while mid-bridge cells (corridor only) keep their gap foam and open room edges
-  (room only) keep their shoreline.
+- **Final shoreline filter** — after rooms, corridors, cliffs, and stairs are
+  built, every `_shore` anchor comes from a ground-room cell and must still
+  have at least one non-walkable cardinal neighbor. Every qualifying ground
+  edge retains foam, regardless of corridors or other surfaces drawn above it.
+  `_cliff_foam` is the explicit non-walkable, void-facing exception.
 - Also baked: `self._water_buf` (the `water_tile` tiled into a `SCREEN + 1 tile`
   scroll buffer, opaque `.convert()` — bottom layer, biggest blit); if enabled,
-  `self._foam` (`Water_Foam.png`, 16 frames); `self._decos` (one scaled rig per
-  obstacle) + `self._tree_shadows` (a round shade per tree — §3.4); and the seeded
-  non-colliding scatter `self._room_decor` / `self._void_decor` (§3.6).
+  `self._foam` (`Water_Foam.png`, 16 frames) with three spatially assigned
+  `{fps, phase}` routines from `terrain.json`; `self._decos` (one scaled rig per
+  obstacle) + `self._tree_shadows` (a round shade per tree — §3.4); and the
+  seeded non-colliding scatter `self._room_decor` / `self._void_decor` (§3.6).
 
 **Ground pass (per frame), `GameMap.draw_ground` → `_draw_tiled`** — bottom to top:
 
 1. `self._water_buf` blitted at `(-(ox % wt), -(oy % wt))` — the scrolling water
    void (one blit). `water_tile` missing → `surface.fill(_VOID)` instead; the
    baked rooms still draw.
-2. **void scenery** (`self._void_decor`) — water rocks / a duck on the open
-   water, animated, view-culled (§3.6).
-3. `config.TERRAIN_FOAM` → the current `Water_Foam` frame, centred on every
-   in-view `self._shore` cell. Drawn **behind** the terrain (T6): it only shows
-   through the transparent water-side of the `edge_*` / `corner_*` tiles and the
-   bridge plank gaps, plus on the open water just outside a room.
+2. `config.TERRAIN_FOAM` → a `Water_Foam` frame centred under every in-view
+  `_shore` tile or void-facing `_cliff_foam` foot. It is the first layer above
+  water, behind void props and all terrain. A stable coordinate bucket assigns
+  each anchor to one of three routines (9 / 12 / 15 fps with distinct phase
+  offsets), preventing the whole coastline from advancing in lockstep.
+3. **void scenery** (`self._void_decor`) — water rocks / a duck on the open
+  water, animated, view-culled and always above foam (§3.6).
 4. each in-view room's baked surface at `room.rect - camera`.
 5. each in-view corridor's baked bridge surface.
 
@@ -400,9 +412,9 @@ bridge sheet. Returns `None` for a missing sheet or an out-of-range index.
 | floor | tinted `pygame.draw.rect` per room / corridor | baked grass `tilemap_N` surface, autotiled edges |
 | room-kind cue | `_SPECIAL_FLOORS` colour | `room_palettes` tileset (boss = color4, …) |
 | void | `_VOID` fill | scrolling `Water_Background` buffer + water scenery scatter (§3.6) |
-| corridors | plain `_FLOOR` strip, 64 px wide | directional plank **bridge** (`Bridge_All.png`), foam through the gaps |
-| room boundary | 3 px grey `_WALL` rect border | autotile `edge_*` / `corner_*` tiles (+ optional foam), doorway seam trimmed |
-| shoreline foam | — | `Water_Foam` 16-frame animation *behind* the perimeter tiles |
+| corridors | plain `_FLOOR` strip, 64 px wide | directional plank **bridge** (`Bridge_All.png`), drawn above nearby shoreline foam |
+| room boundary | 3 px grey `_WALL` rect border | autotile `edge_*` / `corner_*` tiles (+ foam at every sea-facing ground edge) |
+| shoreline foam | — | `Water_Foam` 16-frame animation above water but behind every prop/tile; three desynchronized spatial routines |
 | obstacles | filled + outlined circle (`Obstacle.color`, `.radius`) | scaled decoration rig (`deco_tree_*` / `deco_bush_*` / `deco_rock_*`); circle if a rig is missing. Trees also cast a round shade patch over the characters |
 | interior detail | — | seeded non-colliding clutter on room interiors (§3.6) |
 | obstacle / character order | fixed: map first, then all entities | **depth-sorted by feet Y** (§3.7) — a hero above a tree is drawn behind it |
@@ -430,21 +442,20 @@ indices.
 
 The baked room/corridor surfaces are `pygame.Surface(size, pygame.SRCALPHA)`
 (T6): the autotile `edge_*` / `corner_*` tiles keep their transparent
-water-facing side instead of baking it to black, so anything drawn *under* the
-terrain (foam, water, void scenery) shows through the fringe with no black gaps.
+water-facing side instead of baking it to black, so lower layers (water, foam,
+void scenery) show through the fringe with no black gaps.
 The water buffer stays opaque `.convert()` (bottom layer, biggest blit). On top
 of that:
 
 - **T7** — rooms snap to a 64 px grid so the autotile ring always completes;
-  corridors are directional plank **bridges** (`bridge` block), SRCALPHA, foam
-  through the plank gaps.
+  corridors are directional plank **bridges** (`bridge` block), SRCALPHA, drawn
+  over the ground shoreline foam without producing plank-gap foam themselves.
 - **T8** — a data-driven `decorations` registry feeds a seeded non-colliding
   scatter (interior clutter + void water scenery), drawn per frame between the
   water and the terrain / above the terrain (§3.6).
-- **T9 / B3** — real animated tree skins for `tree` obstacles; a doorway-seam
-  trim so bridge/room junctions read as solid ground; a soft round **tree
-  shade** cast over the characters (B3 replaced the T9 per-obstacle contact
-  shadow).
+- **T9 / B3** — real animated tree skins for `tree` obstacles and a soft round
+  **tree shade** cast over the characters (B3 replaced the T9 per-obstacle
+  contact shadow).
 
 Blending two room palettes into one surface is now straightforward (the bake
 carries alpha) but not yet done — it would be another `decorations`-style slot

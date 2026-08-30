@@ -2478,3 +2478,172 @@ the attributes it touches. `game/states/playing_state.py` is now a re-export
 shim; both import paths work. No behaviour change — the 578-test suite stayed
 green at every step and fixed-seed A/B runs are byte-identical. The optional
 `RunContext` milestone (P7) was skipped as not worth the churn.
+
+
+## Terrain transparency outline fix (2026-08-29)
+
+**What was done:** Traced terrain cells from `Assets.tile()` through the
+`SRCALPHA` room/corridor bake and into `GameMap._z_surf()`. The source corner
+tile contains only alpha 0/255, but the terrain-only `smoothscale` at the
+default 1.5 camera zoom generated 277 partially transparent edge pixels. Those
+interpolated pixels blend against the water as an unwanted outline. Replaced
+that cached transform with nearest-neighbor `pygame.transform.scale`, matching
+the pixel-art asset pipeline and preserving the authored transparency mask.
+Added a focused regression test proving terrain zoom cannot invent partial
+alpha values from a binary-alpha source.
+
+**Verified:** `TerrainSurfaceAlphaTests` (5 tests) and the complete
+`tests.rendering.test_terrain` module (56 tests) pass; no editor diagnostics in
+the touched renderer or test file.
+
+**Expected next phase:** Windowed playtest at camera zoom 1.5 around room
+shorelines, irregular corners, cliffs, and bridges. Confirm the interpolation
+halo is gone while the tileset's intentional opaque dark-green grass edging
+remains crisp; only asset cleanup should follow if that authored edging itself
+is unwanted.
+
+
+## Depth-sorted tree shades (2026-08-29)
+
+**What was done:** Tree shade surfaces are now keyed by their owning obstacle
+and emitted through `GameMap.scenery_drawables()` at `tree_y - 0.01`, directly
+before the tree skin at `tree_y`. They therefore shade obstacles and characters
+above the tree while obstacles and characters lower on screen paint over the
+shade. Removed the old `PlayingState.draw()` late shade pass; the standalone
+`GameMap.draw()` path now sorts the same combined shade/obstacle drawables.
+Added data-driven `tree_shadow.radius_padding: 5`, increasing every shade radius
+by five world pixels without changing its color or alpha.
+
+**Verified:** Focused tree/depth tests (18) and the complete terrain plus depth
+rendering modules (66 tests) pass. New coverage executes the sorted drawables
+and checks upper obstacles paint before a shade while its owner and lower
+obstacles paint after it.
+
+**Expected next phase:** Windowed overlap check with trees clustered above and
+below the hero and nearby obstacles. Tune `radius_padding`, `radius_scale`, or
+`alpha` in `data/terrain.json` only if the larger projected shade needs visual
+adjustment.
+
+
+## Tree shades always cover character sprites (2026-08-29)
+
+**What was done:** Preserved the depth-sorted tree-shade behavior against all
+scenery and obstacles, then added a character-only compositing path. A hero,
+enemy, boss, or death-character that sorts below a tree receives intersecting
+shade discs through a frame-sized overlay multiplied by the character frame's
+RGBA mask. A character above the tree is already shaded by the normal depth
+pass and skips this overlay, preventing double darkening. The result darkens
+only opaque sprite pixels at every character depth; transparent frame pixels
+stay fully transparent, so nearby terrain and obstacles cannot be touched.
+Existing fractional sprite anchor destinations remain unchanged. Summon
+effects retain their separate renderer and are not included in the character
+pass.
+
+**Verified:** The complete terrain, depth-sort, and enemy-sprite rendering
+modules pass (86 tests). A focused regression proves the shade darkens an
+opaque character pixel while leaving a transparent pixel at alpha zero; the
+existing test still proves obstacle-vs-shadow ordering follows tree depth.
+
+**Expected next phase:** Windowed check with the hero and enemies on both sides
+of a tree's depth line, especially where another obstacle overlaps the same
+shade. Tune only shade color/alpha if character darkening reads too strongly.
+
+
+## Bottom-layer desynchronized shoreline foam (2026-08-29)
+
+**What was done:** Moved the foam pass to the first layer above the scrolling
+water buffer, before void decorations, terrain, scenery, characters, and FX.
+After all terrain geometry is built, `_shore` is now deduplicated and filtered
+to anchors whose center is walkable ground/bridge and which still have at least
+one non-walkable cardinal sea neighbor; `_cliff_foam` remains the explicit
+non-walkable void-facing cliff-foot path. Added three data-driven animation
+routines in `terrain.json` (9, 12, and 15 fps with phase offsets 0, 5, and 10).
+Each foam anchor uses a stable coordinate hash to select a routine, keeping
+animation deterministic while preventing coastlines from advancing in sync.
+
+**Verified:** Focused foam metadata, placement, animation, and layer tests pass
+(17). Complete terrain plus verticality suites complete without failures (102
+tests by progress count). Representative seeds 1, 7, 42, and 1234 use all three
+routine buckets; every `_shore` anchor is on ground and stale fully-surrounded
+anchors are removed, while all sampled `_cliff_foam` anchors remain off ground.
+
+**Expected next phase:** Windowed shoreline check around irregular rooms,
+bridges, water props, and cliff feet. Tune the three `foam_routines` rates or
+phase offsets in `data/terrain.json` if the cadence differences read too fast
+or too repetitive.
+
+
+## Universal ground-edge shoreline foam (2026-08-30)
+
+**What was done:** Made ground rooms the sole producer of normal `_shore` foam
+anchors. Every floor-0 room cell on its local perimeter is now a candidate,
+without depending on `TileMeta.foam`. After all rooms, corridors, stairs, and
+cliffs are built, one unconditional final filter retains every candidate whose
+center is walkable and whose north, south, east, or west neighbor is empty.
+Corridors and non-ramp stairs still render above foam but no longer add anchors;
+the doorway-seam deletion and cliff-shadow foam suppression were removed. The
+separate `_cliff_foam` list remains for void-facing cliff feet.
+
+**Verified:** Focused terrain bridge/shore tests pass (29). The complete
+terrain plus verticality suites complete without failure output. New coverage
+requires every sea-facing ground-room tile to be in `_shore`; bridge coverage
+requires every `_shore` anchor to belong to a ground-room cell, not a
+corridor-only cell.
+
+**Expected next phase:** Windowed check at room-to-bridge junctions and beneath
+cliff-foot shadows. Foam should trace every exposed ground edge, while bridge
+plank gaps no longer create their own mid-span foam.
+
+
+## Variable same-floor corridor entrances (2026-08-30)
+
+**What was done:** Replaced fixed center-lane placement for same-floor
+corridors with a deterministic tile-aligned `Corridor.lane`. A per-connection
+local RNG selects from the two-tile-inset shared room-edge span, so bridge
+mouths vary without consuming the main world-generation RNG or changing seed
+reproducibility. Narrow overlaps use their nearest centered lane. Room growth
+preserves the stored lane where possible and clamps it to the nearest valid lane
+on relink. Cross-floor connections are re-centered before they become stairs or
+ramp units, retaining the existing clearance and flow-field contract.
+
+**Verified:** Procedural and irregular-room geometry tests pass (39). Full
+procedural, verticality, and pathfinding regression tests complete without
+failure output. New coverage proves lanes fit the complete shared edge width,
+at least some connections differ from a room center, and flat worlds remain
+deterministic with verticality disabled.
+
+**Expected next phase:** Windowed playtest across several seeds to tune the
+two-tile lane margin. Reduce it only if entrances still look too repetitive;
+keep cross-floor stair and ramp approach lanes centered unless their navigation
+coverage is deliberately redesigned.
+
+
+## World refactor — GameMap / procedural split (2026-08-30)
+
+**What was done:** Split the two 1.4k-line world files into focused
+sub-packages, mirroring the earlier `PlayingState` split. `world/procedural.py`
+(1360 lines) became a 22-line re-export shim over `world/layout.py` (the
+`TileMeta` / `Room` / `Corridor` / `Stair` / `WorldLayout` data model) and
+`world/gen/` (six stage modules — `tuning`, `rooms`, `graph`, `links`,
+`verticality`, `scatter` — plus `__init__` holding only the `generate_world`
+orchestrator). `world/map.py` (1414 → 418) kept the `GameMap` collision / spawn
+API and the terrain **bake sequence** (`_build_tiles`); the tileset-metadata
+adapter is now `world/terrain/sheets.py` `TileSheets`, the autotile maths
+`world/terrain/autotile.py`, the room / corridor / cliff / stair painters
+`world/terrain/{rooms,cliffs}.py`, the decor bakes `world/terrain/decor.py`,
+and the whole draw path `world/terrain/render.py` `TerrainRenderer` (behind
+thin `GameMap` delegators + a lazy `renderer` property). Full log:
+`journals/world_refactor.md`.
+
+**Verified:** Suite 714 green at every milestone (W0–W6). Determinism
+A/B-checked with scratch harnesses each step — generation byte-identical
+(`WorldLayout` serialised over 41 seeds × 3 config profiles), the terrain bake
+byte-identical (every baked `Surface`'s raw RGBA + every anchor + decor list),
+and the composited draw output byte-identical (frozen animation clock, 2 vert
+modes × 12 seeds × 3 camera/zoom setups). One-line test edit total
+(`test_obstacle_families` re-points a monkey-patch at `world.gen.scatter`).
+
+**Expected next phase:** Optional cleanups noted in the log — drop the unused
+`_slot_for` and the retired `_STAIR_WIDE_*` constants; consider a real
+`TerrainStore` so the painters take a narrow object instead of the whole
+`GameMap`.

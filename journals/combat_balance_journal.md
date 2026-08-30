@@ -753,3 +753,71 @@ Tests: `tests/combat/test_knockback.py` (**new**, 13),
 `tests/combat/test_bump.py` (**new**, 14), `tests/combat/test_weapons.py`
 (dead key dropped).
 **No** new deps. **Nothing** committed.
+
+---
+
+## CB-4 · Melee-swing hitbox: dev-only render + a readable telegraph
+
+**Status:** **DONE** 2026-08-30 (Part 1 shipped; Part 2 code + chaser metadata
+shipped, sprite-fps trim still open — see follow-ups). Not committed.
+
+### Why
+
+`entities/melee_hitbox.py` `MeleeHitbox` — the small front-facing circle a
+`path_chase_attack` enemy drops on its `telegraph -> attack` transition, which
+deals `contact_damage` once on first overlap — was:
+
+1. **drawn every frame** as a solid red ring (`WorldRenderer.melee_hitboxes`,
+   called from `PlayingState.draw`), unlike every other collider, which only
+   shows in the F7 / dev-menu "Collision shapes" overlay; and
+2. landing after only **0.15 s** of wind-up (`attack_telegraph` default), too
+   fast to read and step out of.
+
+### What changed
+
+**Part 1 — render like every other collider.**
+- Removed `self.renderer.melee_hitboxes(surface)` from `PlayingState.draw`.
+- Deleted `WorldRenderer.melee_hitboxes`.
+- `WorldRenderer.collider_overlay` now draws each live `ps.melee_hitboxes`
+  entry with the shared `ring()` helper, view-culled, in
+  `config.COLOR_DEBUG_HIT` at width 1 — the same style as projectile hitboxes
+  (a one-shot contact volume). Gated behind `ps.dev_mode and
+  ps._dev_show_colliders` like the rest of that pass.
+
+**Part 2 — a ~25 % longer, readable swing.**
+- Module-level tuning constants at the top of
+  `entities/ai/behaviors/simple.py` (globals, **not** `game/config` yet):
+  `MELEE_REACT_SCALE = 1.25`, `MELEE_ATTACK_TELEGRAPH = 0.15 * scale`
+  (0.1875 s), `MELEE_ATTACK_ACTIVE = 0.35 * scale` (0.4375 s),
+  `MELEE_ATTACK_RECOVER = 0.15`, `MELEE_ATTACK_COOLDOWN = 0.6`. `recover` /
+  `cooldown` are unchanged, so attack *cadence* barely shifts — only the
+  readable wind-up and the hitbox lifetime grow.
+- `build_path_chase_attack` reads each value as
+  `cfg.get("attack_<key>", MELEE_ATTACK_<KEY>)` — a per-enemy
+  `data/enemies.json` key wins, a missing key **falls back to the module
+  constant**.
+- The chaser ("Husk", the only `path_chase_attack` enemy) carries the explicit
+  metadata `"attack_telegraph": 0.1875, "attack_active": 0.4375` so its tuning
+  is visible in data; any future melee enemy without the keys inherits the
+  slowed defaults.
+
+Because `telegraph_cycle`'s transitions are `after(seconds)`, the timing change
+is exact and deterministic.
+
+### Verification
+
+- Full suite **714 green**. `tests/ai/test_ai_behaviors_fsm.py` asserts state
+  names / rooted-ness with its own explicit cfg, not the `path_chase_attack`
+  defaults; `tests/core/test_dev_mode.py` (F7 toggle) and
+  `tests/rendering/test_depth_sort.py::test_render_pipeline_order` unaffected.
+- `python -c "from entities.ai.behaviors import simple"` →
+  `MELEE_ATTACK_TELEGRAPH 0.1875`, `MELEE_ATTACK_ACTIVE 0.4375`.
+
+### Follow-ups (not blocking)
+
+- **Sprite sync:** the `skull` `attack` strip (7 frames @ 14 fps = 0.5 s) now
+  finishes ~0.19 s before the swing ends and holds its last frame. Cut its
+  `attack.fps` in `data/sprites.json` to ~11 so one swing spans the stretched
+  `telegraph + active` (~0.625 s). Same for any future `path_chase_attack` rig.
+- If more systems need it, promote `MELEE_REACT_SCALE` to `game/config.py` and
+  fold it into the difficulty multipliers.

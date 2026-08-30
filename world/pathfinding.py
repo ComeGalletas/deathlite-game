@@ -46,8 +46,8 @@ _CLEARANCE_CAP = 96.0
 
 def _point_on_floor(layout, x: float, y: float) -> bool:
     """Mirror of `GameMap._point_ok` for a finished (non-None) layout: a room
-    floor cell or a corridor rect. `test_pathfinding` samples this against
-    `GameMap.is_walkable` so the two cannot drift."""
+    floor cell, a corridor rect, or a stair rect (LD-1). `test_pathfinding`
+    samples this against `GameMap.is_walkable` so the two cannot drift."""
     px = config.TILE_PX
     for r in layout.rooms:
         rr = r.rect
@@ -57,11 +57,18 @@ def _point_on_floor(layout, x: float, y: float) -> bool:
     for c in layout.corridors:
         if c.rect.collidepoint(x, y):
             return True
+    for s in layout.stairs:
+        if s.rect.collidepoint(x, y):
+            return True
     return False
 
 
 def _point_in_corridor(layout, x: float, y: float) -> bool:
-    return any(c.rect.collidepoint(x, y) for c in layout.corridors)
+    """A narrow inter-region link that gets M3 clearance leniency: a plank
+    corridor or (LD-1) a stair -- both are the only ways between room groups, so
+    the big rare enemies must be able to thread them."""
+    return (any(c.rect.collidepoint(x, y) for c in layout.corridors)
+            or any(s.rect.collidepoint(x, y) for s in layout.stairs))
 
 
 class NavGrid:
