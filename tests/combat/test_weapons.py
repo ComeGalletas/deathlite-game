@@ -26,8 +26,9 @@ def make_context(enemies, sink, **over):
 
 BOLT = {
     "name": "Test Bolt", "damage": 10, "cooldown": 1.0, "projectile_count": 1,
-    "projectile_speed": 400, "projectile_lifetime": 1.5, "area": 5,
-    "targeting_mode": "nearest", "pierce": 0, "tags": ["projectile"],
+    "projectile_speed": 400, "projectile_lifetime": 1.5, "spread_deg": 12,
+    "area": 5, "weight": 0, "targeting_mode": "nearest", "pierce": 0,
+    "special_effect": None, "category": "projectile", "tags": ["projectile"],
 }
 
 
@@ -89,10 +90,13 @@ class WeaponTests(unittest.TestCase):
                                                       fallback_dir=pygame.Vector2(0, 0))))
 
     def test_orbit_and_summon_never_report_a_fire_beat(self):
-        for effect in ("orbit", "summon"):
-            w = Weapon("w", dict(BOLT, special_effect=effect))
+        from game.content import get_content
+        for wid in ("ember_ring", "grave_totem"):
+            w = Weapon(wid, get_content().weapon(wid))
             for _ in range(5):
-                self.assertFalse(w.update(0.1, make_context([FakeEnemy(80, 0)], [])))
+                self.assertFalse(w.update(
+                    0.1, make_context([FakeEnemy(80, 0)], [],
+                                      spawn_summon=lambda **kw: None)))
 
 
 if __name__ == "__main__":

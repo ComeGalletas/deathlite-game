@@ -172,6 +172,74 @@ class DeathPoofTests(unittest.TestCase):
         pygame.quit()
 
 
+class ProjectileTrailTests(unittest.TestCase):
+    """A player projectile carrying `fx.trail` sheds a fading one-shot dust
+    puff every `spacing` px; a plain projectile sheds nothing."""
+
+    def _playing(self):
+        from game.game import Game
+        from game.states.menu_state import MenuState
+        g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
+        g.state_machine.change(MenuState(g))
+        for _ in range(2):
+            g.state_machine.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        return g, g.state_machine.current
+
+    def _shoot(self, p, **kw):
+        base = dict(pos=pygame.Vector2(p.player.pos), vel=pygame.Vector2(300, 0),
+                    damage=1, radius=4, lifetime=9.0)
+        base.update(kw)
+        return p._spawn_projectile(**base)
+
+    def test_trail_projectile_sheds_puffs_plain_one_does_not(self):
+        g, p = self._playing()
+        p._trail_fx.clear()
+        self._shoot(p)                                   # no fx -> no trail
+        for _ in range(30):
+            p.fx.update_projectiles(1 / 60)
+        self.assertEqual(p._trail_fx, [])
+
+        for pr in list(p.projectiles):
+            pr.active = False
+        p.projectiles.sweep()
+        p._trail_fx.clear()
+        self._shoot(p, fx={"trail": {"rig": "dust_puff", "spacing": 30,
+                                     "tint": [90, 140, 255], "fade": True}})
+        for _ in range(60):                              # ~300 px travelled
+            p.fx.update_projectiles(1 / 60)
+        self.assertGreaterEqual(len(p._trail_fx), 3)
+        anim, pos, size, tint, fade = p._trail_fx[0]
+        self.assertEqual((anim.rig, anim.anim), ("dust_puff", "burst"))
+        self.assertEqual(tint, (90, 140, 255))
+        self.assertTrue(fade)
+        pygame.quit()
+
+    def test_puffs_cull_when_the_one_shot_burst_finishes(self):
+        g, p = self._playing()
+        p._trail_fx.clear()
+        self._shoot(p, fx={"trail": {"rig": "dust_puff", "spacing": 20}})
+        for _ in range(20):
+            p.fx.update_projectiles(1 / 60)
+        self.assertTrue(p._trail_fx)
+        for _ in range(120):                             # 2 s -- well past the burst
+            p.fx.update_trail_fx(1 / 60)
+        self.assertEqual(p._trail_fx, [])
+        pygame.quit()
+
+    def test_spacing_sets_the_puff_count(self):
+        g, p = self._playing()
+        p._trail_fx.clear()
+        pr = self._shoot(p, vel=pygame.Vector2(600, 0),
+                         fx={"trail": {"rig": "dust_puff", "spacing": 60}})
+        for _ in range(30):                              # 600 px/s * 0.5 s = 300 px
+            p.fx.update_projectiles(1 / 60)
+        pr.active = False
+        # 300 px / 60 spacing ~= 5 puffs (allow the boundary +-1)
+        self.assertIn(len(p._trail_fx), (4, 5, 6))
+        pygame.quit()
+
+
 class _BlitRecorder:
     """A stand-in surface that logs (src, x, y) for every blit."""
     def __init__(self, size=(1600, 900)):

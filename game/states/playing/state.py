@@ -155,6 +155,10 @@ class PlayingState(State):
         # (hero or enemy) that dies pushes one; drawn in the depth layer, dropped
         # when the animation finishes.
         self._death_fx: list = []
+        # Projectile dust trails: [Animator("dust burst"), world_pos, size, tint,
+        # fade]. A `fx.trail` projectile sheds one per `spacing` px; each plays
+        # its one-shot burst where it was dropped, then is culled.
+        self._trail_fx: list = []
         self._last_move_dir = pygame.Vector2(1, 0)
         self._awaiting_level_up = False
         self._hurt_flash_t = 0.0
@@ -296,6 +300,7 @@ class PlayingState(State):
             # Unlimited HP switched on mid-death-animation: cancel the end.
             self._death_seq_t = None
             self._death_fx.clear()
+            self._trail_fx.clear()
             self.player.alive = True
             self.player.hp = max(self.player.hp, self._dev_hp_floor,
                                  self.player.max_hp * 0.5)
@@ -303,6 +308,7 @@ class PlayingState(State):
         self._death_seq_t -= dt
         self._update_hero_anim(dt)
         self.fx.update_death_fx(dt)
+        self.fx.update_trail_fx(dt)
         self.camera.update(dt, self.player.pos)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
@@ -354,6 +360,7 @@ class PlayingState(State):
         self.fx.update_melee_hitboxes(dt)
         self.locations.update_elite_arenas()
         self.fx.update_death_fx(dt)
+        self.fx.update_trail_fx(dt)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
         self.shake.update(dt)
@@ -477,10 +484,23 @@ class PlayingState(State):
     def _update_elite_arenas(self) -> None:
         self.locations.update_elite_arenas()
 
+    def _resolve_visual(self, kw: dict) -> None:
+        """Fill `color` / `style` / `fx` from `data/weapon_visuals.json` for a
+        spawn that named its `weapon_id`. An explicit value in `kw` (e.g. the
+        wolf's bite) wins; a spawn with no `weapon_id` keeps the pool default."""
+        wid = kw.pop("weapon_id", "")
+        if not wid:
+            return
+        vis = self.content.weapon_visual(wid)
+        kw.setdefault("color", vis.color)
+        kw.setdefault("style", vis.style)
+        kw.setdefault("fx", vis.fx)
+
     def _spawn_projectile(self, **kw):
         proj = self.projectiles.acquire()
         if proj is None:
             return None
+        self._resolve_visual(kw)
         proj.reset(**kw)
         self.game.audio.play_shoot()
         return proj
@@ -490,6 +510,8 @@ class PlayingState(State):
         s = self.summons.acquire()
         if s is None:
             return None
+        self._resolve_visual(kw)
+        kw.pop("style", None)                 # summons dispatch their draw on `kind`
         s.reset(**kw)
         return s
 
@@ -676,6 +698,7 @@ class PlayingState(State):
             self.renderer.hazards(surface)
             self.renderer.gems(surface)
             self.renderer.explosions(surface)
+            self.renderer.trail_fx(surface)             # projectile dust trails, under the bolts
             self._draw_player_projectiles(surface)      # weapon effects sit behind the characters
             self._draw_depth_layer(surface)
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)

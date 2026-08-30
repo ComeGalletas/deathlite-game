@@ -3,7 +3,7 @@
 This utility is intentionally separate from the game runtime. It scans the
 project assets and sprite metadata, lets a user preview horizontal animation
 strips, adjust the shared content crop, and copy/save a JSON snippet compatible
-with data/sprites.json.
+with the split rig files (data/{character,enemy,weapon,prop}_sprites.json).
 """
 from __future__ import annotations
 
@@ -22,7 +22,10 @@ from pygame._sdl2 import Renderer, Texture, Window
 ROOT_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = ROOT_DIR / "assets"
 DATA_DIR = ROOT_DIR / "data"
-SPRITES_JSON = DATA_DIR / "sprites.json"
+SPRITES_JSON_FILES = [
+    DATA_DIR / f for f in ("character_sprites.json", "enemy_sprites.json",
+                           "weapon_sprites.json", "prop_sprites.json")
+]
 TERRAIN_JSON = DATA_DIR / "terrain.json"
 OUTPUT_DIR = ROOT_DIR / "utilities" / "sprite_metadata_exports"
 
@@ -86,7 +89,9 @@ def load_json(path: Path) -> dict:
 
 def load_animation_refs() -> list[AnimationRef]:
     refs: list[AnimationRef] = []
-    sprite_meta = load_json(SPRITES_JSON)
+    sprite_meta: dict = {}
+    for f in SPRITES_JSON_FILES:
+        sprite_meta.update(load_json(f))
     terrain_meta = load_json(TERRAIN_JSON).get("rigs", {})
     all_meta = {**sprite_meta, **terrain_meta}
     for rig, rig_meta in sorted(all_meta.items()):

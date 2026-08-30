@@ -1826,3 +1826,252 @@ everything.
 Where the cliff band ends a full tile *above* the lower room (a real void gap,
 e.g. seed 5), the gap is left as open water per the "do not fill empty spaces"
 rule — only a flush cliff is capped.
+
+---
+
+## Thunder Orb -- layered lightning FX on the orb projectile -- ✅ DONE (2026-08-30)
+
+**Goal.** Give the Thunder Orb projectile a real look: two stacked, looping
+animations centred on the orb -- an amber energy **aura** ring behind and a grey
+**lightning ball** in front -- over (not replacing) the existing orb disc.
+User request: "for the first sheet [`thunder_ball`] use row 5 (0-indexed), for
+the aura sheet [`thunder_aura`] use row 4; align both on top of the orb entity
+for now."
+
+### The sheets (measured)
+
+`assets/effects/weapons/` -- both **576 px tall, a 64 x 64 grid**, row = colour
+variant, column = animation frame (bolt strikes in -> ring forms + crackles ->
+breaks apart + fades):
+
+| sheet | size | grid | row used | frames in that row |
+|---|---|---|---|---|
+| `thunder_ball.png` | 1472 x 576 | **23 col x 9 row** | **row 5** (grey/white) | 23 -- a full strike->ball->dissipate cycle, ends near-empty |
+| `thunder_aura.png` | 768 x 576 | **12 col x 9 row** | **row 4** (amber) | 12 -- a spiky ring swells from a dot then expands + fades |
+
+Frames are roughly centred in their 64 px cells, so "align on top of the orb" =
+blit the scaled frame `get_rect(center=(sx, sy))`, no `content` crop and no
+rotation (unlike `ember` / `soul_slash`, these don't face travel).
+
+### What the engine already gives us (no new `assets.py` code)
+
+* Grid-row slicing: `_build_frames` already reads `frame:[fw,fh]` from the rig
+  and `row` from the anim spec (`assets.py:113-118`), same path `soul_slash`
+  uses.
+* `Assets.frame() / frame_count() / fps() / scale_for()` -- the `orbit` style's
+  toolkit.
+* `Projectile.style` field + `classify()` honours an explicit `proj.style`
+  (`projectiles/__init__.py`); `_spawn_projectile(**kw)` forwards everything to
+  `proj.reset()`.
+* `DrawCtx(assets, now, zoom)` passed to every style fn.
+
+### Changes
+
+1. **`data/sprites.json`** -- two rigs:
+
+   ```json
+   "thunder_ball": {
+     "frame": [64, 64], "grid": [23, 9], "anchor": [32, 32], "scale": [40, 40],
+     "anims": { "loop": { "file": "effects/weapons/thunder_ball.png",
+                          "row": 5, "frames": 23, "fps": 24, "loop": true } }
+   },
+   "thunder_aura": {
+     "frame": [64, 64], "grid": [12, 9], "anchor": [32, 32], "scale": [48, 48],
+     "anims": { "loop": { "file": "effects/weapons/thunder_aura.png",
+                          "row": 4, "frames": 12, "fps": 14, "loop": true } }
+   }
+   ```
+   `scale` (world px) and `fps` are starting values -- tune by screenshot. The
+   orb's `area` is 9 (~9 px disc), so `40` / `48` make the ball a chunky halo
+   around a small bright core. `anchor` unused by the draw (blits by centre);
+   kept for consistency.
+
+2. **`game/states/playing/projectiles/thunder.py`** (new) -- `@style("thunder")`:
+
+   ```python
+   _ANIM = "loop"
+   @style("thunder")
+   def thunder(surface, sx, sy, p, ctx) -> None:
+       z, a = ctx.zoom, ctx.assets
+       pygame.draw.circle(surface, p.color, (int(sx), int(sy)),
+                          max(2, round(p.radius * z)))          # orb still shows
+       for rig in ("thunder_aura", "thunder_ball"):             # aura under, ball over
+           n = max(1, a.frame_count(rig, _ANIM))
+           idx = int(ctx.now * a.fps(rig, _ANIM)) % n
+           sc = a.scale_for(rig) or (48, 48)
+           size = (max(1, round(sc[0] * z)), max(1, round(sc[1] * z)))
+           spr = a.frame(rig, _ANIM, idx, size=size)
+           if spr is not None:
+               surface.blit(spr, spr.get_rect(center=(int(sx), int(sy))))
+   ```
+   Both anims run off the shared run clock (`ctx.now`), exactly like `orbit` --
+   phase-locked, no per-projectile state. `frame()` -> `None` on a missing
+   sheet, so the style degrades to just the disc (sprites stay optional).
+   Register with `from ... import thunder as _thunder` in
+   `projectiles/__init__.py`.
+
+3. **`combat/weapons.py`** `_fire` -- plumb a def-declared render family into the
+   straight/chain spawn (general hook, not thunder-specific):
+
+   ```python
+   style = str(self.definition.get("style", ""))
+   ...
+   ctx.spawn_projectile(..., chain_left=chain_left, chain_range=chain_range,
+                        style=style)
+   ```
+
+4. **`data/weapons.json`** -- `thunder_orb` gains `"style": "thunder"`.
+
+### How it's verified
+
+* `tests/rendering/test_projectiles.py`: `registered()` contains `"thunder"`;
+  `classify(FakeProj(style="thunder"), "bolt") == "thunder"`; the style blits
+  `frame("thunder_aura","loop",...)` then `frame("thunder_ball","loop",...)`,
+  each index `int(now*fps)%frames`, and with both stubbed to `None` it draws
+  only `pygame.draw.circle`.
+* `tests/rendering/test_terrain.py`-style asset check (or `test_assets`): the
+  two rigs slice a non-empty frame 0 and a non-empty last frame at their
+  declared `row`; sheet files exist.
+* `tests/combat/test_weapons_special.py`: a `thunder_orb` fire sets
+  `proj.style == "thunder"` on every spawned projectile; other weapons stay
+  `style == ""`.
+* Full suite green; A/B fixed-seed identical (render-only + one inert data key).
+* Screenshot: Thunder Orb in flight -- amber ring pulsing behind a grey
+  crackling ball, small yellow core visible through it.
+
+> **Superseded 2026-08-30 (see `journal.md` "Weapon logic / presentation
+> split"):** `color` + `style` moved from `data/weapons.json` to
+> `data/weapon_visuals.json`; `_fire` now passes `weapon_id` and the spawn shim
+> resolves `color` / `style` / `fx`. The Thunder Orb's per-weapon effect
+> tuning (`aura_scale` / `ball_scale`) lives in `weapon_visuals.json` `fx` and
+> overrides the rig `scale` below.
+
+### TODO (TO = Thunder Orb)
+
+- [x] **TO1 -- rigs.** `thunder_ball` (`row 5`, 23 frames, `grid [23,9]`,
+  `scale [40,40]`, `fps 24`) and `thunder_aura` (`row 4`, 12 frames,
+  `grid [12,9]`, `scale [48,48]`, `fps 14`) in `data/sprites.json`, both
+  `frame [64,64]`. No `content` crop -- frames are already centred and there is
+  no rotation. Covered by `test_assets.test_strip_width_matches_declared_frame_count`
+  (the grid branch: sheet == `fw*gcols x fh*grows`, `frames <= gcols`,
+  `row < grows`) and `test_files_exist`. **Done** -- API slice check: both rigs
+  return all frames from the right row, scaled.
+- [x] **TO2 -- `style` hook.** `_fire` reads `style =
+  str(self.definition.get("style", ""))` once and passes it to every
+  straight/chain `spawn_projectile`; `thunder_orb` def gets
+  `"style": "thunder"`. `Projectile.style` / `_spawn_projectile(**kw)` /
+  `classify()` already carry it. `tests/combat/test_weapons_special.py`
+  `ChainTests`: `+test_thunder_orb_requests_the_thunder_render_style`,
+  `+test_a_def_without_a_style_leaves_the_projectile_unstyled`. **Done.**
+- [x] **TO3 -- `projectiles/thunder.py`.** `@style("thunder")`: orb disc
+  (`pygame.draw.circle`, still reads through), then `thunder_aura` frame, then
+  `thunder_ball` frame, each `frame(rig, "loop", int(now*fps)%n, size=scale*zoom)`
+  blitted `get_rect(center=(sx,sy))`. Shared run clock, no per-projectile
+  state. Missing sheet -> that layer skipped, disc still drawn. Registered in
+  `projectiles/__init__`. `tests/rendering/test_projectiles.py`:
+  `RegistryTests` gains `"thunder"` + `test_an_explicit_style_wins_over_field_inference`;
+  new `ThunderOrbTests` (3): asks for both layers aura-before-ball; both frame
+  indices follow `now*fps`; disc still drawn when both sheets are `None`.
+  **Done.**
+- [x] **TO4 -- tune + screenshot.** `scale` / `fps` / order / keep-the-disc all
+  looked right on the first in-game shot (same as `ember` / `soul_slash`) -- no
+  JSON tuning. In-game filmstrip (Thunder Orb fired at a dummy across its
+  flight): spark -> forming ring -> amber aura burst + grey crackling ball ->
+  scatter -> fade, reads clearly against grass. Kept the disc (near-invisible
+  under the ball, and it is the fallback). Full suite **714 -> 720** green.
+
+**Parked:** per-projectile spawn-time phase offset (needs a `Projectile` field
+so each orb's loop starts at 0); the other 8 colour rows; a travel-facing
+variant; tinting the disc out entirely once the ball reads on its own; the same
+`style` hook for the `cone` / `orbit` / `summon` spawn paths when something
+needs it.
+
+---
+
+## Arcane Bolt -- blue dust trail + spinning arcane ring (2026-08-30)
+
+**Goal.** Two looping effects centred on the `arcane_bolt` projectile, over its
+disc: `arcane_circle.png` **row 2** (blue, 10 frames) as a spinning ring, and
+`dust_2.png` (white, 10 frames) recoloured blue as a trailing puff. Same
+mechanism as the Thunder Orb -- `@style` module + rigs + per-weapon `fx`
+tuning; **no `combat/weapons.py` change** (`classify()` + `_resolve_visual()`
+route `style` / `fx` from `data/weapon_visuals.json`).
+
+### The sheets (measured, 64x64 grid)
+
+| sheet | size | grid | use |
+|---|---|---|---|
+| `effects/weapons/arcane_circle.png` | 640x576 | 10 col x 9 row | **row 2** (blue) -- spark -> 6-point star -> spinning atom-ring -> fragments -> fade |
+| `effects/dust_2.png` | 640x64 | 10 col x 1 row | white puff blooms + scatters + fades; tinted blue per weapon |
+
+### TODO (AB = Arcane Bolt)
+
+- [x] **AB1 -- `tint` on animated frames (`game/assets.py`).** `frames()` /
+  `frame()` / `_build_frames()` take `tint=(r,g,b)|None`; applied per frame
+  after the `content` crop with `BLEND_RGBA_MULT` (a white pack takes the
+  colour -- `frame_rotated`'s additive tint can't). Frame cache key
+  `(rig, anim, size, flip)` -> `+ tint`. `test_assets`: a white frame x
+  `tint=(0,0,255)` comes back blue, cached, `None` unchanged.
+- [x] **AB2 -- rigs in `data/weapon_sprites.json`.** `arcane_circle`
+  (`grid [10,9]`, `scale [40,40]`, `anims.loop {row:2, frames:10, fps:18}`) and
+  `dust_puff` (`grid [10,1]`, `scale [44,44]`, `anims.loop {frames:10, fps:22}`,
+  white). Both `frame [64,64]`, `anchor [32,32]`, no `content`. Covered by the
+  `test_assets` grid check + `test_files_exist`.
+- [x] **AB3 -- `data/weapon_visuals.json` `arcane_bolt`.** `+ "style": "arcane"`
+  and `fx: { circle_scale:[40,40], circle_spin_dps:90, dust_scale:[44,44],
+  dust_tint:[90,140,255] }`. `test_weapons_special`:
+  `weapon_visual("arcane_bolt").style == "arcane"`.
+- [x] **AB4 -- `game/states/playing/projectiles/arcane.py` (new).**
+  `@style("arcane")`, pattern of `thunder.py`: base disc; `dust_puff` frame
+  centred, `size` from `fx.dust_scale`, `tint=fx.dust_tint`; `arcane_circle`
+  frame centred, spun via `frame_rotated(..., now*fx.circle_spin_dps, ...)`
+  when set else plain `frame(...)`. Shared `ctx.now` clock; each layer skipped
+  if its sheet is missing (disc still drawn). Register in
+  `projectiles/__init__`. `test_projectiles`: registry has `"arcane"`;
+  `classify(style="arcane")`; both layers requested (dust with `tint`); indices
+  track `now*fps`; disc-only fallback.
+- [x] **AB5 -- verify + screenshot.** Full suite green; fixed-seed A/B
+  identical (render-only + inert data). In-game filmstrip of `arcane_bolt` at a
+  dummy. If the burst sheets pop on loop-wrap, fall back to a one-shot muzzle
+  puff via the transient-FX system (same data, adds a fire hook, still no
+  `weapons.py` change) -- decide from the shot.
+
+**As built (2026-08-30):** all five landed first pass, full suite **720 -> 726** green. `Assets.frames/frame` `tint` = per-frame `BLEND_RGBA_MULT` (cache key `+tint`, JSON list coerced to a tuple). Rigs in `data/weapon_sprites.json`; `arcane_bolt` visual =
+`{style:"arcane", fx:{circle_scale:[40,40], circle_spin_dps:90, dust_scale:[44,44], dust_tint:[90,140,255]}}`. `projectiles/arcane.py` = disc + tinted `dust_puff` + spun `arcane_circle` (row 2), shared clock, per-layer missing-sheet fallback. In-game shot: purple dart in a blue dust puff + spinning blue rune ring, no tuning needed. No `combat/weapons.py` change.
+
+### AB6 -- dust trail (transient puffs) -- ✅ DONE (2026-08-30)
+
+The on-bolt dust rides with the projectile; a *trail* means puffs left **at past
+positions** that finish their own bloom -> scatter -> fade while the bolt flies
+on. A draw-only `@style` can't spawn persistent things, so this is an emitter
+driven from `TransientFx.update_projectiles`, mirroring `_death_fx`.
+
+**Structure**
+- `data/weapon_sprites.json` -- `dust_puff` gains a `burst` anim (same sheet,
+  `loop: false`) so a trail Animator can `finished`.
+- `data/weapon_visuals.json` -- `arcane_bolt.fx.trail =
+  { rig, tint, scale, spacing, fade }`; on-bolt `dust_scale` dropped 44 -> 30
+  (the trail carries the volume now). Rides onto `p.fx` via the existing spawn
+  shim -- no new plumbing.
+- `entities/projectile.py` -- `trail_shed: float` slot (px since the last puff).
+- `game/states/playing/effects.py` -- `update_projectiles` measures per-frame
+  travel; `_shed_trail(p, moved)` drops
+  `[Animator("burst"), Vector2(pos), size, tint, fade]` into `ps._trail_fx`
+  every `spacing` px (soft cap 400); `update_trail_fx(dt)` ticks + culls on
+  `Animator.finished`.
+- `game/states/playing/state.py` -- `_trail_fx` list (init + cleared with
+  `_death_fx`); `update_trail_fx` in both per-frame passes; drawn by
+  `renderer.trail_fx` **before** the player projectiles so the bolt sits over
+  its own trail.
+- `game/states/playing/rendering.py` -- `trail_fx(surface)`: blit each puff's
+  `assets.frame(rig, "burst", anim.index, size=size*zoom, tint=tint)`; when
+  `fade`, a `.copy()` + `set_alpha(255*(1 - t/total))` (never touches the
+  shared frame cache).
+
+**Verified.** `tests/rendering/test_enemy_sprite.py::ProjectileTrailTests` (3):
+a `fx.trail` projectile sheds `("dust_puff","burst")` puffs and a plain one
+sheds none; puffs cull once the burst finishes; `spacing` sets the count. Full
+suite **726 -> 729** green. In-game: a blue dust ribbon lingers behind the bolt
+across the field, denser at the head, dissipating toward the hero. No
+`combat/weapons.py` change. Tune via `fx.trail` (`spacing` up / `scale` down for
+wispier).

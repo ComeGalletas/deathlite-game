@@ -5,8 +5,9 @@ and `.convert_alpha()` need an initialised display. A missing or unreadable file
 yields `None`, logged once -- callers fall back to primitive drawing, the same
 degrade contract as `game/save.py`.
 
-Sheet metadata (frame size, frame counts, fps, loop, anchor) lives in
-`data/sprites.json`; this module only slices, transforms and memoises. Every
+Sheet metadata (frame size, frame counts, fps, loop, anchor) lives in the split
+rig files (`data/{character,enemy,weapon,prop}_sprites.json`, merged by
+`Content`); this module only slices, transforms and memoises. Every
 transform (slice, scale, flip, rotate) is cached -- nothing transforms per
 frame.
 """
@@ -97,7 +98,7 @@ class Assets:
         return self._sheets[rel_path]
 
     # --- animation strips -----------------------------------
-    def _build_frames(self, rig: str, anim: str, size, flip: bool):
+    def _build_frames(self, rig: str, anim: str, size, flip: bool, tint=None):
         r = self.meta.get(rig)
         spec = self._anim(rig, anim)
         if not r or spec is None:
@@ -122,6 +123,11 @@ class Assets:
             if crop:
                 fr = fr.subsurface(pygame.Rect(*crop))
             fr = fr.copy()
+            if tint is not None:
+                # multiply -- a white / grey effect pack takes the colour
+                # (BLEND_RGBA_ADD, used by `rotated()` / `frame_rotated()`,
+                # only brightens and can't recolour white).
+                fr.fill((*tint, 255), special_flags=pygame.BLEND_RGBA_MULT)
             if flip:
                 fr = pygame.transform.flip(fr, True, False)
             if size is not None:
@@ -129,15 +135,19 @@ class Assets:
             out.append(fr)
         return out or None
 
-    def frames(self, rig: str, anim: str, *, size=None, flip: bool = False):
-        key = (rig, anim, size, flip)
+    def frames(self, rig: str, anim: str, *, size=None, flip: bool = False, tint=None):
+        if tint is not None:
+            tint = tuple(int(c) for c in tint)          # JSON list -> hashable key
+        key = (rig, anim, size, flip, tint)
         if key not in self._frames:
-            self._frames[key] = self._build_frames(rig, anim, size, flip)
+            self._frames[key] = self._build_frames(rig, anim, size, flip, tint)
         return self._frames[key]
 
-    def frame(self, rig: str, anim: str, index: int, *, size=None, flip: bool = False):
-        """One frame. `index` is clamped for one-shot anims, wrapped for loops."""
-        frs = self.frames(rig, anim, size=size, flip=flip)
+    def frame(self, rig: str, anim: str, index: int, *, size=None, flip: bool = False,
+              tint=None):
+        """One frame. `index` is clamped for one-shot anims, wrapped for loops.
+        `tint` (r,g,b) multiplies every frame -- recolours a white effect pack."""
+        frs = self.frames(rig, anim, size=size, flip=flip, tint=tint)
         if not frs:
             return None
         n = len(frs)

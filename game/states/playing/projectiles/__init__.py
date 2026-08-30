@@ -56,7 +56,9 @@ def registered() -> tuple[str, ...]:
 
 
 # Import the family modules so their @style decorators run.
-from game.states.playing.projectiles import simple as _simple  # noqa: E402,F401
-from game.states.playing.projectiles import cone as _cone      # noqa: E402,F401
-from game.states.playing.projectiles import orbit as _orbit    # noqa: E402,F401
-from game.states.playing.projectiles import melee as _melee    # noqa: E402,F401
+from game.states.playing.projectiles import simple as _simple    # noqa: E402,F401
+from game.states.playing.projectiles import cone as _cone        # noqa: E402,F401
+from game.states.playing.projectiles import orbit as _orbit      # noqa: E402,F401
+from game.states.playing.projectiles import melee as _melee      # noqa: E402,F401
+from game.states.playing.projectiles import thunder as _thunder  # noqa: E402,F401
+from game.states.playing.projectiles import arcane as _arcane    # noqa: E402,F401

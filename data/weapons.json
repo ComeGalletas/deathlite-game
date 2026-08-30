@@ -5,7 +5,7 @@
     "damage": 9,
     "cooldown": 0.9,
     "projectile_count": 1,
-    "projectile_speed": 460,
+    "projectile_speed": 350,
     "projectile_lifetime": 1.6,
     "area": 6,
     "weight": 7,
@@ -14,7 +14,6 @@
     "special_effect": null,
     "category": "projectile",
     "reach": 400,
-    "color": [150, 130, 255],
     "tags": ["projectile", "arcane"]
   },
   "frost_shards": {
@@ -25,6 +24,7 @@
     "projectile_count": 3,
     "projectile_speed": 400,
     "projectile_lifetime": 1.1,
+    "spread_deg": 12,
     "area": 5,
     "weight": 6,
     "targeting_mode": "nearest",
@@ -32,7 +32,6 @@
     "special_effect": null,
     "category": "projectile",
     "reach": 400,
-    "color": [140, 220, 255],
     "tags": ["projectile", "frost"]
   },
   "thunder_orb": {
@@ -52,7 +51,6 @@
     "chain_range": 220,
     "category": "projectile",
     "reach": 440,
-    "color": [255, 230, 120],
     "tags": ["projectile", "lightning"]
   },
   "ember_ring": {
@@ -73,7 +71,6 @@
     "rehit_interval": 0.4,
     "category": "orbit",
     "reach": 140,
-    "color": [255, 150, 70],
     "tags": ["area", "fire", "orbit"]
   },
   "soul_scythe": {
@@ -91,7 +88,6 @@
     "special_effect": "cone",
     "cone_half_angle": 55,
     "category": "melee",
-    "color": [200, 120, 255],
     "tags": ["melee", "area", "arcane"]
   },
   "grave_totem": {
@@ -109,11 +105,11 @@
     "special_effect": "summon",
     "summon_kind": "totem",
     "summon_lifetime": 8.0,
+    "summon_speed": 0,
     "summon_attack_interval": 0.7,
     "summon_attack_range": 360,
-    "category": "summon",
     "summon_reach": 360,
-    "color": [150, 220, 190],
+    "category": "summon",
     "tags": ["summon", "projectile"]
   },
   "spirit_wolf": {
@@ -134,9 +130,8 @@
     "summon_speed": 240,
     "summon_attack_interval": 0.6,
     "summon_attack_range": 70,
+    "summon_reach": 180,
     "category": "summon",
-    "summon_reach": 280,
-    "color": [180, 210, 255],
     "tags": ["summon", "melee"]
   }
 }

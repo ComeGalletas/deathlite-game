@@ -51,11 +51,14 @@ class TransientFx:
 
     def update_projectiles(self, dt: float) -> None:
         """Advance both projectile pools, block them on obstacles, and drop
-        hostile shots that leave the world margin."""
+        hostile shots that leave the world margin. A player projectile carrying
+        a `fx.trail` spec sheds a fading dust puff every `spacing` world px."""
         ps = self.ps
         for p in ps.projectiles:
+            before = pygame.Vector2(p.pos)
             p.update(dt)
             self.block_on_obstacle(p)
+            self._shed_trail(p, (p.pos - before).length())
         ps.projectiles.sweep()
         for p in ps.hostiles:
             p.update(dt)
@@ -140,3 +143,32 @@ class TransientFx:
         for fx in ps._death_fx:
             fx[0].update(dt)
         ps._death_fx = [fx for fx in ps._death_fx if not fx[0].finished]
+
+    # --- projectile dust trail ---------------------------------
+    _TRAIL_CAP = 400
+
+    def _shed_trail(self, p, moved: float) -> None:
+        """Drop `[Animator("burst"), pos, size, tint, fade]` entries behind a
+        moving projectile, one per `spacing` px. Each plays the one-shot dust
+        `burst` once (bloom -> scatter -> fade) anchored where it was shed."""
+        ps = self.ps
+        tr = p.fx.get("trail") if p.fx else None
+        if not tr or not p.active or len(ps._trail_fx) >= self._TRAIL_CAP:
+            return
+        p.trail_shed += moved
+        spacing = max(1.0, float(tr.get("spacing", 24)))
+        while p.trail_shed >= spacing and len(ps._trail_fx) < self._TRAIL_CAP:
+            p.trail_shed -= spacing
+            ps._trail_fx.append([
+                Animator(ps.game.assets, tr.get("rig", "dust_puff"), start="burst"),
+                pygame.Vector2(p.pos),
+                tuple(tr.get("scale", (28, 28))),
+                tuple(tr["tint"]) if "tint" in tr else None,
+                bool(tr.get("fade", False)),
+            ])
+
+    def update_trail_fx(self, dt: float) -> None:
+        ps = self.ps
+        for tr in ps._trail_fx:
+            tr[0].update(dt)
+        ps._trail_fx = [tr for tr in ps._trail_fx if not tr[0].finished]

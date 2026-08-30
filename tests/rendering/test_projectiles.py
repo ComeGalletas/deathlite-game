@@ -17,6 +17,8 @@ from game.states.playing.projectiles import (
     DrawCtx, classify, draw_projectile, registered)
 from game.states.playing.projectiles import cone as cone_mod
 from game.states.playing.projectiles.orbit import orbit
+from game.states.playing.projectiles.thunder import thunder
+from game.states.playing.projectiles.arcane import arcane
 
 
 def _display():
@@ -27,16 +29,115 @@ def _display():
 
 class RegistryTests(unittest.TestCase):
     def test_every_family_is_registered(self):
-        self.assertEqual(set(registered()), {"bolt", "arrow", "cone", "orbit", "melee"})
+        self.assertEqual(set(registered()),
+                         {"bolt", "arrow", "cone", "orbit", "melee", "thunder",
+                          "arcane"})
 
     def test_classify_routes_by_the_projectile_fields(self):
-        cone = SimpleNamespace(cone_half_angle=0.5, orbit_speed=0.0, anchor=None)
-        orb = SimpleNamespace(cone_half_angle=0.0, orbit_speed=3.2, anchor=object())
-        plain = SimpleNamespace(cone_half_angle=0.0, orbit_speed=0.0, anchor=None)
+        cone = SimpleNamespace(style="", cone_half_angle=0.5, orbit_speed=0.0, anchor=None)
+        orb = SimpleNamespace(style="", cone_half_angle=0.0, orbit_speed=3.2, anchor=object())
+        plain = SimpleNamespace(style="", cone_half_angle=0.0, orbit_speed=0.0, anchor=None)
         self.assertEqual(classify(cone, "bolt"), "cone")
         self.assertEqual(classify(orb, "bolt"), "orbit")
         self.assertEqual(classify(plain, "bolt"), "bolt")
         self.assertEqual(classify(plain, "arrow"), "arrow")   # hostile default
+
+    def test_an_explicit_style_wins_over_field_inference(self):
+        p = SimpleNamespace(style="thunder", cone_half_angle=0.0,
+                            orbit_speed=0.0, anchor=None)
+        self.assertEqual(classify(p, "bolt"), "thunder")
+
+
+class ThunderOrbTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _display()
+
+    def setUp(self):
+        reset_assets()
+        self.a = Assets()
+        self.surf = pygame.Surface((200, 200), pygame.SRCALPHA)
+        self.p = SimpleNamespace(color=(255, 230, 120), radius=9)
+        self.ctx = DrawCtx(self.a, now=0.4, zoom=1.0)
+
+    def test_asks_for_both_layers_aura_before_ball(self):
+        got = []
+        real = self.a.frame
+        self.a.frame = lambda rig, an, idx, **kw: (got.append((rig, an)),
+                                                   real(rig, an, idx, **kw))[1]
+        thunder(self.surf, 100, 100, self.p, self.ctx)
+        self.assertEqual(got, [("thunder_aura", "loop"), ("thunder_ball", "loop")])
+
+    def test_frame_indices_follow_the_run_clock(self):
+        want = {rig: int(0.4 * self.a.fps(rig, "loop")) % self.a.frame_count(rig, "loop")
+                for rig in ("thunder_aura", "thunder_ball")}
+        got = {}
+        self.a.frame = lambda rig, an, idx, **kw: got.__setitem__(rig, idx)
+        thunder(self.surf, 100, 100, self.p, self.ctx)
+        self.assertEqual(got, want)
+
+    def test_still_draws_the_orb_disc_and_survives_missing_sheets(self):
+        self.a.frame = lambda *a, **k: None            # both sheets absent
+        circles = []
+        real = pygame.draw.circle
+        pygame.draw.circle = lambda *a, **k: circles.append(a[:3])
+        try:
+            thunder(self.surf, 100, 100, self.p, self.ctx)
+        finally:
+            pygame.draw.circle = real
+        self.assertTrue(circles, "orb disc not drawn")
+
+
+class ArcaneBoltTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _display()
+
+    def setUp(self):
+        reset_assets()
+        self.a = Assets()
+        self.surf = pygame.Surface((200, 200), pygame.SRCALPHA)
+        self.p = SimpleNamespace(color=(150, 130, 255), radius=6,
+                                 fx={"dust_tint": [90, 140, 255], "circle_spin_dps": 90})
+        self.ctx = DrawCtx(self.a, now=0.3, zoom=1.0)
+
+    def test_dust_is_tinted_and_circle_is_spun(self):
+        frame_calls, rot_calls = [], []
+        self.a.frame = lambda rig, an, idx, **kw: frame_calls.append((rig, kw.get("tint")))
+        self.a.frame_rotated = lambda rig, an, idx, deg, **kw: rot_calls.append((rig, deg))
+        arcane(self.surf, 100, 100, self.p, self.ctx)
+        self.assertIn(("dust_puff", [90, 140, 255]), frame_calls)
+        self.assertEqual(rot_calls[0][0], "arcane_circle")
+        self.assertAlmostEqual(rot_calls[0][1], 0.3 * 90)      # now * spin_dps
+
+    def test_frame_indices_follow_the_run_clock(self):
+        want = {r: int(0.3 * self.a.fps(r, "loop")) % self.a.frame_count(r, "loop")
+                for r in ("dust_puff", "arcane_circle")}
+        got = {}
+        self.a.frame = lambda rig, an, idx, **kw: got.__setitem__(rig, idx)
+        self.a.frame_rotated = lambda rig, an, idx, deg, **kw: got.__setitem__(rig, idx)
+        arcane(self.surf, 100, 100, self.p, self.ctx)
+        self.assertEqual(got, want)
+
+    def test_no_spin_key_uses_a_plain_circle_frame(self):
+        self.p.fx = {}
+        seen = []
+        self.a.frame = lambda rig, an, idx, **kw: seen.append(rig)
+        self.a.frame_rotated = lambda *a, **k: (_ for _ in ()).throw(AssertionError("spun"))
+        arcane(self.surf, 100, 100, self.p, self.ctx)
+        self.assertIn("arcane_circle", seen)
+
+    def test_draws_the_disc_and_survives_missing_sheets(self):
+        self.a.frame = lambda *a, **k: None
+        self.a.frame_rotated = lambda *a, **k: None
+        circles = []
+        real = pygame.draw.circle
+        pygame.draw.circle = lambda *a, **k: circles.append(a[:3])
+        try:
+            arcane(self.surf, 100, 100, self.p, self.ctx)
+        finally:
+            pygame.draw.circle = real
+        self.assertTrue(circles, "bolt disc not drawn")
 
 
 class OrbitFlameTests(unittest.TestCase):

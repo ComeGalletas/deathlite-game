@@ -32,7 +32,7 @@ def _nearest(pos, enemies):
 class Summon:
     __slots__ = ("active", "kind", "pos", "vel", "life", "attack_cd", "radius",
                  "color", "damage", "speed", "attack_range", "attack_interval",
-                 "tags", "_t", "anim", "_bite_t", "_side", "reach")
+                 "tags", "_t", "anim", "_bite_t", "_side", "reach", "fx")
 
     def __init__(self) -> None:
         self.active = False
@@ -53,10 +53,11 @@ class Summon:
         self.anim: Animator | None = None   # wolf only
         self._bite_t = 0.0                   # seconds left showing `bite_*`
         self._side = "right"                 # last-known facing: "left" | "right"
+        self.fx: dict = {}                   # render-only: per-weapon effect tuning
 
     def reset(self, *, kind, pos, damage, lifetime, color, tags,
               speed=0.0, attack_range=320.0, attack_interval=0.7,
-              radius=12.0, reach=float("inf")) -> None:
+              radius=12.0, reach=float("inf"), fx: dict | None = None) -> None:
         self.kind = kind
         self.pos.update(pos)
         self.vel.update(0, 0)
@@ -69,6 +70,7 @@ class Summon:
         self.attack_interval = attack_interval
         self.radius = radius
         self.reach = reach                   # CB-2 leash ring; wired up in step C
+        self.fx = fx if fx is not None else {}
         self.attack_cd = 0.3
         self._t = 0.0
         self._bite_t = 0.0
