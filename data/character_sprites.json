@@ -1,0 +1,45 @@
+{
+  "hero_aegis": {
+    "frame": [192, 192],
+    "content": [43, 44, 120, 112],
+    "scale": [46, 43],
+    "anchor": [22, 35],
+    "face": "right",
+    "anims": {
+      "idle":   {"file": "characters/blue/warrior/idle.png",    "frames": 8, "fps": 8,  "loop": true},
+      "walk":   {"file": "characters/blue/warrior/run.png",     "frames": 6, "fps": 12, "loop": true},
+      "attack": {"file": "characters/blue/warrior/attack1.png", "frames": 4, "fps": 16, "loop": false}
+    }
+  },
+  "hero_kestrel": {
+    "frame": [192, 192],
+    "content": [53, 46, 87, 90],
+    "scale": [37, 38],
+    "anchor": [16, 38],
+    "face": "right",
+    "anims": {
+      "idle":   {"file": "characters/yellow/archer/idle.png",  "frames": 6, "fps": 8,  "loop": true},
+      "walk":   {"file": "characters/yellow/archer/run.png",   "frames": 4, "fps": 12, "loop": true},
+      "attack": {"file": "characters/yellow/archer/shoot.png", "frames": 8, "fps": 16, "loop": false}
+    }
+  },
+  "hero_nihil": {
+    "frame": [192, 192],
+    "content": [35, 63, 121, 71],
+    "scale": [56, 33],
+    "anchor": [28, 33],
+    "face": "right",
+    "anims": {
+      "idle":   {"file": "characters/purple/monk/idle.png", "frames": 6,  "fps": 8,  "loop": true},
+      "walk":   {"file": "characters/purple/monk/run.png",  "frames": 4,  "fps": 12, "loop": true},
+      "attack": {"file": "characters/purple/monk/heal.png", "frames": 11, "fps": 18, "loop": false}
+    }
+  },
+  "dead": {
+    "frame": [128, 128], "content": [35, 32, 60, 67], "scale": [39, 44], "anchor": [19, 41], "face": "right",
+    "_note": "shared one-shot death poof for every entity (hero + enemy) -- copied verbatim in character_sprites.json and enemy_sprites.json. dead.png repacked from a 7x2 grid to a 14x1 strip so the loader (horizontal-strip only) slices it right.",
+    "anims": {
+      "loop": {"file": "characters/dead/dead.png", "frames": 14, "fps": 15, "loop": false}
+    }
+  }
+}

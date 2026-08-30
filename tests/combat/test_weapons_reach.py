@@ -15,10 +15,10 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-from combat.weapons import Weapon, FireContext, _CATEGORY_BY_SPECIAL
+from combat.weapons import Weapon, FireContext, CATEGORIES
 from game.content import get_content
 
-_ALLOWED = {"projectile", "melee", "summon", "orbit", "spell"}
+_ALLOWED = set(CATEGORIES)
 
 
 class FakeEnemy:
@@ -63,14 +63,14 @@ class CategoryTests(unittest.TestCase):
         for wid, cat in want.items():
             self.assertEqual(w(wid).category, cat, wid)
 
-    def test_special_effect_fallback_when_the_field_is_absent(self):
-        for wid, expect in (("soul_scythe", "melee"), ("ember_ring", "orbit"),
-                            ("grave_totem", "summon"), ("arcane_bolt", "projectile")):
-            d = dict(get_content().weapon(wid))
-            d.pop("category", None)
-            self.assertEqual(Weapon(wid, d).category, expect, wid)
-        self.assertEqual(_CATEGORY_BY_SPECIAL,
-                         {"cone": "melee", "summon": "summon", "orbit": "orbit"})
+    def test_category_is_required_metadata(self):
+        # weapons.json carries every field now -- a def with no `category`
+        # (validated against the CATEGORIES constant) is bad data, not a
+        # fall-through.
+        d = dict(get_content().weapon("arcane_bolt"))
+        d.pop("category", None)
+        with self.assertRaises(ValueError):
+            Weapon("arcane_bolt", d)
 
 
 class ReachTests(unittest.TestCase):

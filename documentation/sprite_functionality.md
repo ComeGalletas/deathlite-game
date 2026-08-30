@@ -16,14 +16,17 @@ The main implementation files are:
 - `game/content.py`: loads JSON data from `data/`.
 - `game/assets.py`: loads, slices, transforms, and caches PNG surfaces.
 - `systems/animation.py`: advances animation time and selects frame indexes.
-- `data/sprites.json`: character, enemy, and projectile sprite metadata.
+- `data/character_sprites.json`, `data/enemy_sprites.json`,
+  `data/weapon_sprites.json`, `data/prop_sprites.json`: sprite rig metadata,
+  split by domain and merged into one namespace by `game/content.py`. A rig
+  shared by two domains (e.g. `dead`) is copied verbatim into both files.
 - `data/terrain.json`: terrain and decoration rig metadata.
 - `game/states/playing_state.py`: creates animators and draws gameplay sprites.
 - `entities/enemy.py`: creates enemy animators and changes enemy animation states.
 
 ## Metadata and Sprite Rigs
 
-A rig is a named metadata entry. For example, `hero_aegis` in `data/sprites.json` contains:
+A rig is a named metadata entry. For example, `hero_aegis` in `data/character_sprites.json` contains:
 
 ```json
 "hero_aegis": {
@@ -209,7 +212,7 @@ Enemies without a usable rig fall back to a primitive colored circle. Sprited en
 
 ## Terrain and Obstacle Decoration Sprites
 
-Terrain decoration rigs are declared in `data/terrain.json` rather than `data/sprites.json`. They still use `Assets.frames()` and the same rig concepts.
+Terrain decoration rigs are declared in `data/terrain.json` rather than the `*_sprites.json` files. They still use `Assets.frames()` and the same rig concepts.
 
 Examples include:
 
@@ -231,7 +234,7 @@ Obstacle decoration is separate from obstacle gameplay collision:
 
 ## Projectiles and Rotated Images
 
-Animated strips are not used for the arrow projectile. The arrow is a single-image rig in `data/sprites.json`:
+Animated strips are not used for the arrow projectile. The arrow is a single-image rig in `data/weapon_sprites.json`:
 
 ```json
 "arrow": {
@@ -337,7 +340,7 @@ The most important content authoring invariant is that every animated PNG must b
 When adding a new animated sprite:
 
 1. Place the PNG under `assets/`.
-2. Add a rig entry to `data/sprites.json` or `data/terrain.json`.
+2. Add a rig entry to the matching `data/*_sprites.json` file (or `data/terrain.json`).
 3. Set the correct source `frame` dimensions.
 4. Set the exact horizontal `frames` count.
 5. Set `fps` and `loop` behavior.

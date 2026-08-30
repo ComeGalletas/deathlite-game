@@ -2647,3 +2647,34 @@ modes × 12 seeds × 3 camera/zoom setups). One-line test edit total
 `_slot_for` and the retired `_STAIR_WIDE_*` constants; consider a real
 `TerrainStore` so the painters take a narrow object instead of the whole
 `GameMap`.
+
+## Weapon logic / presentation split (2026-08-30)
+
+**What was done:** `data/weapons.json` now carries *all* weapon mechanics and
+identity (name, description, category, special_effect, and every gameplay number
+— no code-side value defaults). Every look moved to a new
+`data/weapon_visuals.json`: `{ weapon_id: { color, style, fx } }`, where `fx` is
+free-form per-weapon effect tuning (e.g. `thunder_orb.fx.aura_scale` overrides
+the `sprites.json` rig scale). `combat/weapon_visuals.py` holds the frozen
+`WeaponVisual` dataclass + the one default colour; `Content.weapon_visual(id)`
+resolves it.
+
+**Structure:**
+- `combat/weapons.py` — keeps only the taxonomy constants `CATEGORIES` /
+  `SPECIAL_EFFECTS` at the top (a `__post_init__` validates each def's
+  `category` against them). All `self.definition.get(key, <value>)` fallbacks
+  removed — fields are read straight. `_fire` / `_maintain_orbit` /
+  `_maintain_summons` pass `weapon_id=self.weapon_id` instead of `color=` /
+  `style=`. Dropped `_CATEGORY_BY_SPECIAL`.
+- `PlayingState._resolve_visual(kw)` — the spawn shim pops `weapon_id`, fills
+  `color` / `style` / `fx` from `weapon_visuals.json` (an explicit value, e.g.
+  the wolf's bite, still wins). `Projectile` / `Summon` gain an `fx` dict field.
+- `projectiles/thunder.py` reads `p.fx.get("aura_scale" / "ball_scale")` before
+  falling back to the rig scale.
+- `data/weapons.json` additions to complete the data: `spread_deg` on
+  `frost_shards`, `summon_speed` on `grave_totem`.
+
+**Verified:** full suite **720 green**; Thunder Orb renders identically in-game
+(colour + fx resolved from the new file). Weapon tests reworked: `.style`
+asserts → `.weapon_id` + a `weapon_visual()` check; `BOLT` fixture completed;
+the category-fallback test → a category-is-required test.

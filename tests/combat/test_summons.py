@@ -20,6 +20,10 @@ class SummonPool:
         self.made = []
 
     def spawn(self, **kw):
+        # mirror PlayingState._resolve_visual: the weapon names a weapon_id, the
+        # spawn side turns it into a colour.
+        kw.pop("weapon_id", None)
+        kw.setdefault("color", (200, 200, 200))
         s = Summon()
         s.active = True
         s.reset(**kw)

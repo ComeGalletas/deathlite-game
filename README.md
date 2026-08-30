@@ -257,7 +257,9 @@ Not done: balance is a first tuning pass (needs human playtesting); one boss
 
 Sprites are an optional cosmetic layer over the primitive renderer. Metadata
 (sheet paths, frame size, per-animation fps/loop, a `content` crop, `scale`,
-`anchor`) lives in `data/sprites.json`; `game/assets.py` loads and caches
+`anchor`) lives in the domain-split rig files
+(`data/{character,enemy,weapon,prop}_sprites.json`, merged by `game/content.py`);
+`game/assets.py` loads and caches
 frames (sliced, scaled, flipped, rotated — all memoised), and returns `None`
 for a missing file so the caller falls back to a shape. A character opts in via
 a `"sprite"` key in its data.
@@ -269,8 +271,8 @@ frame is **red-tinted** in place (no pop to a circle) and on death *any* entity
 plays one shared one-shot **skull poof** (`characters/dead/dead.png`; enemy poof
 at 55 %, hero at full size). Each hero's `color` in `data/characters.json` is its
 primitive-fallback tint. Only XP gems and the HUD still draw as shapes.
-**Obstacles** are skinned by the terrain decoration rigs (below), not
-`sprites.json`. See `assets/CREDITS.md` for the pack layout.
+**Obstacles** are skinned by the terrain decoration rigs (below), not the
+`*_sprites.json` files. See `assets/CREDITS.md` for the pack layout.
 
 The **world** is tiled from `data/terrain.json` — a slot table (which sheet
 index is the interior / edge / corner tile), a `bridge` block (the corridor

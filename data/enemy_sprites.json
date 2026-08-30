@@ -1,40 +1,4 @@
 {
-  "hero_aegis": {
-    "frame": [192, 192],
-    "content": [43, 44, 120, 112],
-    "scale": [46, 43],
-    "anchor": [22, 35],
-    "face": "right",
-    "anims": {
-      "idle":   {"file": "characters/blue/warrior/idle.png",    "frames": 8, "fps": 8,  "loop": true},
-      "walk":   {"file": "characters/blue/warrior/run.png",     "frames": 6, "fps": 12, "loop": true},
-      "attack": {"file": "characters/blue/warrior/attack1.png", "frames": 4, "fps": 16, "loop": false}
-    }
-  },
-  "hero_kestrel": {
-    "frame": [192, 192],
-    "content": [53, 46, 87, 90],
-    "scale": [37, 38],
-    "anchor": [16, 38],
-    "face": "right",
-    "anims": {
-      "idle":   {"file": "characters/yellow/archer/idle.png",  "frames": 6, "fps": 8,  "loop": true},
-      "walk":   {"file": "characters/yellow/archer/run.png",   "frames": 4, "fps": 12, "loop": true},
-      "attack": {"file": "characters/yellow/archer/shoot.png", "frames": 8, "fps": 16, "loop": false}
-    }
-  },
-  "hero_nihil": {
-    "frame": [192, 192],
-    "content": [35, 63, 121, 71],
-    "scale": [56, 33],
-    "anchor": [28, 33],
-    "face": "right",
-    "anims": {
-      "idle":   {"file": "characters/purple/monk/idle.png", "frames": 6,  "fps": 8,  "loop": true},
-      "walk":   {"file": "characters/purple/monk/run.png",  "frames": 4,  "fps": 12, "loop": true},
-      "attack": {"file": "characters/purple/monk/heal.png", "frames": 11, "fps": 18, "loop": false}
-    }
-  },
   "skull": {
     "frame": [192, 192], "content": [52, 52, 121, 78], "scale": [56, 36], "anchor": [20, 36], "face": "right",
     "anims": {
@@ -147,64 +111,11 @@
       "attack": {"file": "enemies/giant_bat/attack.png", "frames": 7, "fps": 12, "loop": false}
     }
   },
-
   "dead": {
     "frame": [128, 128], "content": [35, 32, 60, 67], "scale": [39, 44], "anchor": [19, 41], "face": "right",
-    "_note": "shared one-shot death poof for every entity (hero + enemy) -- the packs have no per-creature death strip. dead.png repacked from a 7x2 grid to a 14x1 strip so the loader (horizontal-strip only) slices it right.",
+    "_note": "shared one-shot death poof for every entity (hero + enemy) -- copied verbatim in character_sprites.json and enemy_sprites.json. dead.png repacked from a 7x2 grid to a 14x1 strip so the loader (horizontal-strip only) slices it right.",
     "anims": {
       "loop": {"file": "characters/dead/dead.png", "frames": 14, "fps": 15, "loop": false}
     }
-  },
-  "arrow": {
-    "file": "projectiles/arrow.png",
-    "frame": [64, 64],
-    "content": [10, 26, 43, 12],
-    "scale": [26, 7],
-    "anchor": [13, 3]
-  },
-  "ember": {
-    "frame": [47, 75],
-    "content": [4, 2, 34, 73],
-    "scale": [16, 34],
-    "anims": {
-      "loop": {"file": "effects/flame_loop/spritesheet.png", "frames": 16, "fps": 18, "loop": true}
-    }
-  },
-  "spirit_wolf": {
-    "frame": [48, 48],
-    "content": [7, 10, 35, 23],
-    "scale": [32, 21],
-    "anchor": [16, 16],
-    "grid": [5, 19],
-    "anims": {
-      "run_left":   {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 10, "loop": true,  "row": 5},
-      "run_right":  {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 10, "loop": true,  "row": 6},
-      "bite_left":  {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 5, "fps": 16, "loop": false, "row": 13},
-      "bite_right": {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 5, "fps": 16, "loop": false, "row": 14},
-      "idle":       {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 4,  "loop": true,  "row": 18}
-    }
-  },
-  "soul_slash": {
-    "frame": [64, 64],
-    "content": [5, 9, 53, 48],
-    "scale": [84, 74],
-    "anchor": [36, 32],
-    "grid": [10, 9],
-    "anims": {
-      "loop": {"file": "effects/weapons/circle_cuts.png", "frames": 6, "fps": 40, "loop": true, "row": 1}
-    }
-  },
-    "xp_orb_small": {
-      "file": "orbs/orb_green.png",
-      "scale": [8, 8]
-    },
-    "xp_orb_medium": {
-      "file": "orbs/orb_blue.png",
-      "scale": [10, 10]
-    },
-    "xp_orb_large": {
-      "file": "orbs/orb_purple.png",
-      "scale": [12, 12]
-    }
-
+  }
 }

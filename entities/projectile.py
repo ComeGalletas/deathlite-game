@@ -25,7 +25,7 @@ class Projectile:
         "chain_left", "chain_range",
         "anchor", "orbit_angle", "orbit_radius", "orbit_speed",
         "rehit_interval", "rehit_timer",
-        "cone_dir", "cone_half_angle", "style",
+        "cone_dir", "cone_half_angle", "style", "fx", "trail_shed",
     )
 
     def __init__(self) -> None:
@@ -53,6 +53,8 @@ class Projectile:
         self.cone_dir = pygame.Vector2(1, 0)
         self.cone_half_angle = 0.0
         self.style = ""          # render-only: forces a `projectiles/` draw family
+        self.fx: dict = {}       # render-only: per-weapon effect tuning
+        self.trail_shed = 0.0    # render-only: world px travelled since the last trail puff
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
               pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
@@ -60,7 +62,8 @@ class Projectile:
               hostile: bool = False, chain_left: int = 0, chain_range: float = 0.0,
               anchor=None, orbit_angle: float = 0.0, orbit_radius: float = 0.0,
               orbit_speed: float = 0.0, rehit_interval: float = 0.0,
-              cone_dir=None, cone_half_angle: float = 0.0, style: str = "") -> None:
+              cone_dir=None, cone_half_angle: float = 0.0, style: str = "",
+              fx: dict | None = None) -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
@@ -84,6 +87,8 @@ class Projectile:
         self.cone_dir.update(cone_dir if cone_dir is not None else (1, 0))
         self.cone_half_angle = cone_half_angle
         self.style = style
+        self.fx = fx if fx is not None else {}
+        self.trail_shed = 0.0
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:

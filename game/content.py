@@ -34,18 +34,38 @@ def _load(name: str) -> dict[str, Any]:
     return data
 
 
+def _merge_sprites(*names: str) -> dict[str, Any]:
+    """Load several sprite-rig files into one flat namespace. A rig may appear
+    in more than one file (a shared rig, copied on purpose) as long as the
+    copies are identical."""
+    merged: dict[str, Any] = {}
+    for name in names:
+        for rig, spec in _load(name).items():
+            if rig in merged and merged[rig] != spec:
+                raise ContentError(
+                    f"sprite rig {rig!r} differs between files (last: {name})")
+            merged[rig] = spec
+    return merged
+
+
 class Content:
     """Immutable-ish container for all loaded definitions."""
 
     def __init__(self) -> None:
         self.weapons: dict[str, dict] = _load("weapons.json")
+        self.weapon_visuals: dict[str, dict] = _load("weapon_visuals.json")
         self.enemies: dict[str, dict] = _load("enemies.json")
         self.bosses: dict[str, dict] = _load("bosses.json")
         self.characters: dict[str, dict] = _load("characters.json")
         self.blessings: dict[str, dict] = _load("blessings.json")
         self.items: dict = _load("items.json")
         self.meta_upgrades: dict[str, dict] = _load("meta_upgrades.json")
-        self.sprites: dict[str, dict] = _load("sprites.json")
+        # Sprite rigs are split by domain; a rig shared by two domains (e.g.
+        # `dead`, used by heroes and enemies) is copied into both files. They
+        # merge back into one flat `sprites` namespace here.
+        self.sprites: dict[str, dict] = _merge_sprites(
+            "character_sprites.json", "enemy_sprites.json",
+            "weapon_sprites.json", "prop_sprites.json")
         self.terrain: dict = _load("terrain.json")
         self.ui_sprites: dict[str, dict] = _load("ui_sprites.json")
         log.info("content loaded: %d weapons, %d enemies, %d bosses, "
@@ -62,6 +82,12 @@ class Content:
             return self.weapons[weapon_id]
         except KeyError as exc:
             raise ContentError(f"unknown weapon id: {weapon_id!r}") from exc
+
+    def weapon_visual(self, weapon_id: str):
+        """Presentation for a weapon (`combat.weapon_visuals.WeaponVisual`).
+        A missing entry -> the neutral default (white, no style)."""
+        from combat.weapon_visuals import WeaponVisual
+        return WeaponVisual.from_dict(self.weapon_visuals.get(weapon_id))
 
     def enemy(self, enemy_id: str) -> dict:
         try:

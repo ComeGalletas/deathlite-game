@@ -1,0 +1,29 @@
+{
+  "arcane_bolt": {
+    "color": [150, 130, 255],
+    "style": "arcane",
+    "fx": {
+      "circle_scale": [40, 40],
+      "circle_spin_dps": 90,
+      "dust_scale": [30, 30],
+      "dust_tint": [90, 140, 255],
+      "trail": {
+        "rig": "dust_puff",
+        "tint": [90, 140, 255],
+        "scale": [30, 30],
+        "spacing": 30,
+        "fade": true
+      }
+    }
+  },
+  "frost_shards": { "color": [140, 220, 255] },
+  "thunder_orb": {
+    "color": [255, 230, 120],
+    "style": "thunder",
+    "fx": { "aura_scale": [48, 48], "ball_scale": [40, 40] }
+  },
+  "ember_ring": { "color": [255, 150, 70] },
+  "soul_scythe": { "color": [200, 120, 255] },
+  "grave_totem": { "color": [150, 220, 190] },
+  "spirit_wolf": { "color": [180, 210, 255] }
+}

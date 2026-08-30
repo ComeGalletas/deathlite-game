@@ -28,9 +28,13 @@ import pygame
 from combat import targeting
 from combat.damage import outgoing_damage
 
-# Weapon class. Data carries `category` explicitly now; this only maps the
-# legacy `special_effect` for a def that predates the field.
-_CATEGORY_BY_SPECIAL = {"cone": "melee", "summon": "summon", "orbit": "orbit"}
+# --- weapon taxonomy (the only fixed weapon data that stays in code) ---------
+# Every `data/weapons.json` entry names one `category` and one `special_effect`
+# from these sets; the values decide how the reach ring is sized, what "no
+# target" means, and which extra fire path runs. All per-weapon numbers live in
+# the JSON -- nothing here has a value default.
+CATEGORIES = ("projectile", "melee", "summon", "orbit", "spell")
+SPECIAL_EFFECTS = (None, "chain", "cone", "orbit", "summon")
 
 
 @dataclass
@@ -64,6 +68,12 @@ class Weapon:
     _orbit_count: int = field(default=0, init=False)
     _summons: list = field(default_factory=list, init=False)
 
+    def __post_init__(self) -> None:
+        if self.definition.get("category") not in CATEGORIES:
+            raise ValueError(
+                f"{self.weapon_id}: category "
+                f"{self.definition.get('category')!r} not in {CATEGORIES}")
+
     # --- derived stats -------------------------------------------
     @property
     def name(self) -> str:
@@ -79,11 +89,9 @@ class Weapon:
 
     @property
     def category(self) -> str:
-        """`projectile` | `melee` | `summon` | `orbit` | `spell` (CB-2). Reads
-        the data field; falls back to the `special_effect` for a def that omits
-        it. Decides how the reach ring is sized and what "no target" means."""
-        return (self.definition.get("category")
-                or _CATEGORY_BY_SPECIAL.get(self.special, "projectile"))
+        """One of `CATEGORIES` -- decides the reach ring and what "no target"
+        means. Always present in the data (validated in `__post_init__`)."""
+        return self.definition["category"]
 
     def _damage(self) -> float:
         return float(self.definition["damage"]) + self.bonus["damage"]
@@ -93,14 +101,14 @@ class Weapon:
         return max(0.05, base / max(0.05, attack_speed_multiplier))
 
     def _projectile_count(self) -> int:
-        return max(1, int(self.definition.get("projectile_count", 1))
+        return max(1, int(self.definition["projectile_count"])
                    + self.bonus["projectile_count"])
 
     def _pierce(self) -> int:
-        return int(self.definition.get("pierce", 0)) + self.bonus["pierce"]
+        return int(self.definition["pierce"]) + self.bonus["pierce"]
 
     def _area(self, area_multiplier: float) -> float:
-        return (float(self.definition.get("area", 5)) + self.bonus["area"]) * area_multiplier
+        return (float(self.definition["area"]) + self.bonus["area"]) * area_multiplier
 
     def _reach(self, area_multiplier: float) -> float:
         """Radius of the reach ring (CB-2). Melee tracks the tip of its own cone
@@ -151,24 +159,22 @@ class Weapon:
             return
         d = self.definition
         # CB-2: the summon gets a leash ring centred on the hero -- it only
-        # targets enemies inside it and idles when it is empty. `summon_reach`
-        # defaults to `summon_attack_range` so a def without it is unchanged.
-        reach = float(d.get("summon_reach", d.get("summon_attack_range", 320.0)))
-        # A non-positive (or missing) `summon_lifetime` means "never expires" --
-        # the spirit wolf stays on field indefinitely; the totem keeps its 8 s.
-        raw_life = d.get("summon_lifetime", 8.0)
-        lifetime = (float("inf") if raw_life is None or float(raw_life) <= 0.0
-                    else float(raw_life))
+        # targets enemies inside it and idles when it is empty.
+        reach = float(d["summon_reach"])
+        # A non-positive `summon_lifetime` means "never expires" -- the spirit
+        # wolf stays on field indefinitely; the totem keeps its 8 s.
+        raw_life = float(d["summon_lifetime"])
+        lifetime = float("inf") if raw_life <= 0.0 else raw_life
         s = ctx.spawn_summon(
-            kind=d.get("summon_kind", "totem"),
+            kind=d["summon_kind"],
             pos=ctx.anchor if ctx.anchor is not None else ctx.origin,
             damage=self._damage(),
             lifetime=lifetime,
-            color=tuple(d.get("color", (150, 220, 190))),
+            weapon_id=self.weapon_id,
             tags=self.tags,
-            speed=float(d.get("summon_speed", 0.0)),
-            attack_range=float(d.get("summon_attack_range", 320.0)),
-            attack_interval=float(d.get("summon_attack_interval", 0.7)),
+            speed=float(d["summon_speed"]),
+            attack_range=float(d["summon_attack_range"]),
+            attack_interval=float(d["summon_attack_interval"]),
             reach=reach * ctx.area_multiplier)
         if s is not None:
             self._summons.append(s)
@@ -185,14 +191,13 @@ class Weapon:
             return False           # ring empty -> hero idles; caller polls (_cd = 0.1)
 
         aim = targeting.aim_direction(
-            self.definition.get("targeting_mode", "nearest"),
+            self.definition["targeting_mode"],
             ctx.origin, in_reach, ctx.fallback_dir)
         if aim is None:
             return False
 
         area = self._area(ctx.area_multiplier)
-        color = tuple(self.definition.get("color", (255, 255, 255)))
-        src_weight = float(self.definition.get("weight", 0.0))   # CB-3 hit knockback
+        src_weight = float(self.definition["weight"])   # CB-3 hit knockback
 
         if self.special == "cone":
             dmg = outgoing_damage(self._damage(), ctx.damage_multiplier,
@@ -200,32 +205,38 @@ class Weapon:
             ctx.spawn_projectile(
                 pos=ctx.origin, vel=pygame.Vector2(),
                 damage=dmg.amount, radius=area,
-                lifetime=float(self.definition.get("projectile_lifetime", 0.14)),
-                pierce=self._pierce(), src_weight=src_weight, color=color,
-                source_tags=self.tags, is_crit=dmg.is_crit,
-                cone_dir=aim,
-                cone_half_angle=math.radians(self.definition.get("cone_half_angle", 45)))
+                lifetime=float(self.definition["projectile_lifetime"]),
+                pierce=self._pierce(), src_weight=src_weight,
+                weapon_id=self.weapon_id, source_tags=self.tags,
+                is_crit=dmg.is_crit, cone_dir=aim,
+                cone_half_angle=math.radians(self.definition["cone_half_angle"]))
             return True
 
         count = self._projectile_count()
         speed = float(self.definition["projectile_speed"]) * ctx.projectile_speed_multiplier
-        lifetime = float(self.definition.get("projectile_lifetime", 1.5))
+        lifetime = float(self.definition["projectile_lifetime"])
         is_chain = self.special == "chain"
-        chain_left = int(self.definition.get("chain_count", 0)) if is_chain else 0
-        chain_range = float(self.definition.get("chain_range", 0.0)) if is_chain else 0.0
+        chain_left = int(self.definition["chain_count"]) if is_chain else 0
+        chain_range = float(self.definition["chain_range"]) if is_chain else 0.0
 
-        spread = math.radians(12) * (count - 1)
-        base_angle = math.atan2(aim.y, aim.x) - spread / 2
+        if count > 1:
+            spread = math.radians(float(self.definition["spread_deg"])) * (count - 1)
+            base_angle = math.atan2(aim.y, aim.x) - spread / 2
+            step = spread / (count - 1)
+        else:
+            base_angle = math.atan2(aim.y, aim.x)
+            step = 0.0
         for i in range(count):
-            angle = base_angle + (spread / (count - 1)) * i if count > 1 else base_angle
-            direction = pygame.Vector2(math.cos(angle), math.sin(angle))
+            direction = pygame.Vector2(math.cos(base_angle + step * i),
+                                       math.sin(base_angle + step * i))
             dmg = outgoing_damage(self._damage(), ctx.damage_multiplier,
                                   ctx.crit_chance, ctx.crit_multiplier, ctx.rng)
             ctx.spawn_projectile(
                 pos=ctx.origin, vel=direction * speed, damage=dmg.amount,
                 radius=area, lifetime=lifetime, pierce=self._pierce(),
-                src_weight=src_weight, color=color, source_tags=self.tags,
-                is_crit=dmg.is_crit, chain_left=chain_left, chain_range=chain_range)
+                src_weight=src_weight, weapon_id=self.weapon_id,
+                source_tags=self.tags, is_crit=dmg.is_crit,
+                chain_left=chain_left, chain_range=chain_range)
         return True
 
     # --- orbit ------------------------------------------
@@ -237,11 +248,10 @@ class Weapon:
         if not self._within_reach(ctx.enemies, ctx.origin,
                                   self._reach(ctx.area_multiplier)):
             desired = 0
-        radius = float(self.definition.get("orbit_radius", 90))
-        orbit_speed = float(self.definition.get("orbit_speed", 3.0))
-        rehit = float(self.definition.get("rehit_interval", 0.4))
+        radius = float(self.definition["orbit_radius"])
+        orbit_speed = float(self.definition["orbit_speed"])
+        rehit = float(self.definition["rehit_interval"])
         area = self._area(ctx.area_multiplier)
-        color = tuple(self.definition.get("color", (255, 180, 90)))
         dmg = outgoing_damage(self._damage(), ctx.damage_multiplier).amount
 
         self._orbiters = [o for o in self._orbiters if getattr(o, "active", False)]
@@ -249,9 +259,10 @@ class Weapon:
         while len(self._orbiters) < desired:
             o = ctx.spawn_projectile(
                 pos=ctx.origin, vel=pygame.Vector2(), damage=dmg, radius=area,
-                lifetime=1e9, pierce=999,
-                src_weight=float(self.definition.get("weight", 0.0)),
-                color=color, source_tags=self.tags, anchor=ctx.anchor,
+                lifetime=float(self.definition["projectile_lifetime"]),
+                pierce=self._pierce(),
+                src_weight=float(self.definition["weight"]),
+                weapon_id=self.weapon_id, source_tags=self.tags, anchor=ctx.anchor,
                 orbit_angle=0.0, orbit_radius=radius, orbit_speed=orbit_speed,
                 rehit_interval=rehit)
             if o is None:

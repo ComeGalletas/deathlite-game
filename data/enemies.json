@@ -60,12 +60,12 @@
     "summon_id": "swarm", "summon_interval": 4.0, "summon_count": 3
   },
   "brute": {
-    "name": "Warden", "hp": 260, "speed": 60, "contact_damage": 29, "radius": 30,
+    "name": "Warden", "hp": 260, "speed": 60, "contact_damage": 29, "radius": 26,
     "weight": 80,
     "experience_reward": 60, "behavior": "brute", "color": [200, 60, 60],
     "tags": ["miniboss", "elite"], "is_elite": true, "sprite": "troll",
     "contact_damage_enabled": false,
-    "slam_interval": 3.5, "slam_range": 120, "slam_radius": 130,
+    "slam_interval": 3.5, "slam_range": 60, "slam_radius": 130,
     "slam_damage": 30, "slam_telegraph": 0.9
   },
   "charger": {

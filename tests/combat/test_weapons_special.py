@@ -92,6 +92,25 @@ class ChainTests(unittest.TestCase):
                          get_content().weapon("thunder_orb")["chain_count"])
         self.assertGreater(shots[0].chain_range, 0)
 
+    def test_fire_tags_the_projectile_with_its_weapon_id_not_a_look(self):
+        # the logic layer forwards identity only; colour / style are resolved
+        # from data/weapon_visuals.json on the spawn side.
+        w = Weapon("thunder_orb", get_content().weapon("thunder_orb"))
+        shots = []
+        w.update(0.016, ctx([FakeEnemy(200, 0)], shots))
+        self.assertEqual(shots[0].weapon_id, "thunder_orb")
+        self.assertNotIn("color", shots[0].__dict__)
+        self.assertNotIn("style", shots[0].__dict__)
+
+    def test_weapon_visuals_carry_the_look(self):
+        c = get_content()
+        self.assertEqual(c.weapon_visual("thunder_orb").style, "thunder")
+        self.assertEqual(tuple(c.weapon_visual("thunder_orb").color), (255, 230, 120))
+        self.assertEqual(c.weapon_visual("frost_shards").style, "")
+        av = c.weapon_visual("arcane_bolt")
+        self.assertEqual(av.style, "arcane")
+        self.assertEqual(av.fx["dust_tint"], [90, 140, 255])
+
 
 class MainWeaponAttackAnimTests(unittest.TestCase):
     """The hero attack animation syncs to `weapons[0]` (the starting weapon)

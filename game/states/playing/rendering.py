@@ -162,6 +162,26 @@ class WorldRenderer:
             pygame.draw.circle(surface, (255, 180, 90),
                                (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
 
+    def trail_fx(self, surface) -> None:
+        """Projectile dust trails -- each `[Animator, pos, size, tint, fade]`
+        entry blits the current burst frame (tinted), optionally alpha-ramped
+        over its life. Anchored in world space; the bolt draws over it."""
+        ps = self.ps
+        z = ps.camera.zoom
+        a = ps.game.assets
+        for anim, pos, (w, h), tint, fade in ps._trail_fx:
+            size = (max(1, round(w * z)), max(1, round(h * z)))
+            fr = a.frame(anim.rig, anim.anim, anim.index, size=size, tint=tint)
+            if fr is None:
+                continue
+            if fade:
+                fps = max(1e-3, a.fps(anim.rig, anim.anim))
+                total = max(1, a.frame_count(anim.rig, anim.anim)) / fps
+                fr = fr.copy()                       # don't touch the shared cache
+                fr.set_alpha(max(0, int(255 * (1.0 - anim.t / total))))
+            sx, sy = ps.camera.world_to_screen(pos)
+            surface.blit(fr, fr.get_rect(center=(int(sx), int(sy))))
+
     # --- characters (depth layer) --------------------------------
     def one_enemy(self, surface, e) -> None:
         ps = self.ps

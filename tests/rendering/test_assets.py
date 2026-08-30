@@ -32,6 +32,22 @@ class SpriteMetadataTests(unittest.TestCase):
                     "skull", "arrow"):
             self.assertIn(rig, self.meta)
 
+    def test_rigs_are_merged_from_the_split_files_with_shared_dead(self):
+        import json
+        from game.content import DATA_DIR
+        files = {f: json.loads((DATA_DIR / f).read_text("utf-8")) for f in (
+            "character_sprites.json", "enemy_sprites.json",
+            "weapon_sprites.json", "prop_sprites.json")}
+        # every split-file rig ended up in the merged namespace
+        for name, rigs in files.items():
+            for rig in rigs:
+                self.assertIn(rig, self.meta, f"{rig} from {name} not merged")
+        # `dead` is copied into both character + enemy files, identical content
+        self.assertIn("dead", files["character_sprites.json"])
+        self.assertIn("dead", files["enemy_sprites.json"])
+        self.assertEqual(files["character_sprites.json"]["dead"],
+                         files["enemy_sprites.json"]["dead"])
+
     def test_files_exist(self):
         for rig, r in self.meta.items():
             files = ([r["file"]] if "file" in r
@@ -118,6 +134,20 @@ class AssetsLoaderTests(unittest.TestCase):
         self.assertEqual(self.a.frame("grid", "bottom", 0).get_at((1, 1))[:3], (0, 200, 0))
         # row default (0) is unchanged behaviour
         self.assertEqual(self.a.frame("grid", "top", 2).get_at((1, 1))[:3], (200, 0, 0))
+
+    def test_tint_multiplies_frames_and_caches_per_colour(self):
+        sheet = pygame.Surface((8, 4), pygame.SRCALPHA)
+        sheet.fill((255, 255, 255))
+        self.a._sheets["white.png"] = sheet
+        self.a._meta = {"w": {"frame": [4, 4], "anims": {
+            "loop": {"file": "white.png", "frames": 2, "loop": True}}}}
+        plain = self.a.frame("w", "loop", 0)
+        blue = self.a.frame("w", "loop", 0, tint=(0, 0, 255))
+        self.assertEqual(plain.get_at((1, 1))[:3], (255, 255, 255))
+        self.assertEqual(blue.get_at((1, 1))[:3], (0, 0, 255))
+        # cached per colour; a list tint hits the same cache entry as its tuple
+        self.assertIs(blue, self.a.frame("w", "loop", 0, tint=[0, 0, 255]))
+        self.assertIsNot(blue, plain)
 
     def test_missing_rig_or_anim_returns_none(self):
         self.assertIsNone(self.a.frame("ghost", "walk", 0))

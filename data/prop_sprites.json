@@ -1,0 +1,14 @@
+{
+  "xp_orb_small": {
+    "file": "orbs/orb_green.png",
+    "scale": [8, 8]
+  },
+  "xp_orb_medium": {
+    "file": "orbs/orb_blue.png",
+    "scale": [10, 10]
+  },
+  "xp_orb_large": {
+    "file": "orbs/orb_purple.png",
+    "scale": [12, 12]
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "arrow": {
+    "file": "projectiles/arrow.png",
+    "frame": [64, 64],
+    "content": [10, 26, 43, 12],
+    "scale": [26, 7],
+    "anchor": [13, 3]
+  },
+  "ember": {
+    "frame": [47, 75],
+    "content": [4, 2, 34, 73],
+    "scale": [16, 34],
+    "anims": {
+      "loop": {"file": "effects/flame_loop/spritesheet.png", "frames": 16, "fps": 18, "loop": true}
+    }
+  },
+  "arcane_circle": {
+    "frame": [64, 64],
+    "scale": [40, 40],
+    "anchor": [32, 32],
+    "grid": [10, 9],
+    "anims": {
+      "loop": {"file": "effects/weapons/arcane_circle.png", "frames": 10, "fps": 18, "loop": true, "row": 2}
+    }
+  },
+  "dust_puff": {
+    "frame": [64, 64],
+    "scale": [44, 44],
+    "anchor": [32, 32],
+    "grid": [10, 1],
+    "anims": {
+      "loop":  {"file": "effects/dust_2.png", "frames": 10, "fps": 22, "loop": true},
+      "burst": {"file": "effects/dust_2.png", "frames": 10, "fps": 22, "loop": false}
+    }
+  },
+  "spirit_wolf": {
+    "frame": [48, 48],
+    "content": [7, 10, 35, 23],
+    "scale": [32, 21],
+    "anchor": [16, 16],
+    "grid": [5, 19],
+    "anims": {
+      "run_left":   {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 10, "loop": true,  "row": 5},
+      "run_right":  {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 10, "loop": true,  "row": 6},
+      "bite_left":  {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 5, "fps": 16, "loop": false, "row": 13},
+      "bite_right": {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 5, "fps": 16, "loop": false, "row": 14},
+      "idle":       {"file": "characters/summons/spectral/wolf-spectral.png", "frames": 4, "fps": 4,  "loop": true,  "row": 18}
+    }
+  },
+  "soul_slash": {
+    "frame": [64, 64],
+    "content": [5, 9, 53, 48],
+    "scale": [84, 74],
+    "anchor": [36, 32],
+    "grid": [10, 9],
+    "anims": {
+      "loop": {"file": "effects/weapons/circle_cuts.png", "frames": 6, "fps": 40, "loop": true, "row": 1}
+    }
+  },
+  "thunder_ball": {
+    "frame": [64, 64],
+    "scale": [40, 40],
+    "anchor": [32, 32],
+    "grid": [23, 9],
+    "anims": {
+      "loop": {"file": "effects/weapons/thunder_ball.png", "frames": 23, "fps": 24, "loop": true, "row": 5}
+    }
+  },
+  "thunder_aura": {
+    "frame": [64, 64],
+    "scale": [48, 48],
+    "anchor": [32, 32],
+    "grid": [12, 9],
+    "anims": {
+      "loop": {"file": "effects/weapons/thunder_aura.png", "frames": 12, "fps": 14, "loop": true, "row": 4}
+    }
+  }
+}
