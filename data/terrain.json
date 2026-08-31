@@ -24,7 +24,8 @@
     },
     "ramp": {
       "w": [36, 45],
-      "e": [39, 48]
+      "e": [39, 48],
+      "s": [17, 17]
     },
     "raised": {
       "":   15,
@@ -41,6 +42,15 @@
     "slots": {
       "h_left": 0, "h_mid": 1, "h_right": 2,
       "v_top": 3, "v_mid": 6, "v_bot": 9
+    }
+  },
+
+  "vstair": {
+    "sheet": "terrain/tiles/vstairs.png",
+    "core_cols": 1,
+    "sheets": {
+      "1": "terrain/tiles/vstairs_1.png",
+      "2": "terrain/tiles/vstairs_2.png"
     }
   },
 

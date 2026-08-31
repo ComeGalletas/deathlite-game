@@ -37,6 +37,11 @@ class TileSheets:
         self.raised_slots = {k: int(v) for k, v in self.slots.get("raised", {}).items()}
         self.ramp_slots = {k: [int(i) for i in v]
                            for k, v in self.slots.get("ramp", {}).items()}
+        # LD-8a: the rock north/south staircase overlay (`vstairs.png`, one
+        # 192x128 SRCALPHA sprite -- ~1-tile stone core + a foliage wing each
+        # side). Drawn on top of all terrain for a `Stair.style == "rock"` unit;
+        # a `"grass"` unit renders the biome `ramp` tiles instead.
+        self.vstair = t.get("vstair", {})
 
         # Bridge tiles for corridors / plank stairs (own sheet + grid).
         bridge = t.get("bridge", {})
@@ -86,6 +91,55 @@ class TileSheets:
         sides = "".join(d for d in "nswe"
                         if (d == "s" and south) or (d != "s" and d in m.lip))
         return self.raised_slots.get(sides, self.raised_slots.get("", self.interior))
+
+    @property
+    def cliff_shadow(self) -> pygame.Surface | None:
+        """The soft drop shadow a cliff casts on whatever it stands on.
+
+        One 192x192 sprite (the `terrain_shadow` rig -- a ~1-tile blob with a
+        feathered bleed into the ring of cells around it), shared with the LD-8
+        band renderer. `None` when the rig is missing; callers just skip the
+        pass."""
+        key = ("cliff-shadow",)
+        if key not in self._cell_cache:
+            frs = self._a.frames("terrain_shadow", "loop")
+            if not frs:
+                return None
+            self._cell_cache[key] = frs[0]
+        return self._cell_cache[key]
+
+    def vstair_sprite(self, drop: int) -> pygame.Surface | None:
+        """LD-9: the stone flight for a `drop`-level descent -- one tile wide,
+        `drop` tiles tall. Two sprites are authored (`vstairs_1` / `vstairs_2`)
+        rather than one rescaled, so the steps stay square at either depth.
+        `None` when the art is missing; the caller keeps the grass channel."""
+        key = ("vstair-sprite", drop)
+        if key not in self._cell_cache:
+            rel = self.vstair.get("sheets", {}).get(str(drop))
+            img = self._a._load_image(rel) if rel else None
+            if img is None:
+                return None
+            want = (self.px, max(1, drop) * self.px)
+            self._cell_cache[key] = (img if img.get_size() == want
+                                     else pygame.transform.smoothscale(img, want))
+        return self._cell_cache[key]
+
+    def vstair_overlay(self, band_tiles: int) -> pygame.Surface | None:
+        """LD-8a: the rock N/S stair as one overlay sprite, scaled to
+        `band_tiles` tiles tall (its aspect kept). Cached. `None` when the sheet
+        is missing -> the caller renders the biome grass ramp instead."""
+        sheet = self.vstair.get("sheet")
+        if not sheet:
+            return None
+        img = self._a._load_image(sheet)
+        if img is None:
+            return None
+        h = max(1, int(band_tiles)) * self.px
+        w = max(1, round(img.get_width() * h / img.get_height()))
+        key = ("vstair", w, h)
+        if key not in self._cell_cache:
+            self._cell_cache[key] = pygame.transform.smoothscale(img, (w, h))
+        return self._cell_cache[key]
 
     def three_sided(self, sheet: str, open_sides: str, band: int = 15
                     ) -> pygame.Surface:

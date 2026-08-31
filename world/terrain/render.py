@@ -133,85 +133,106 @@ class TerrainRenderer:
             surface.fill(_VOID)
 
         view = camera.visible_rect()
-        # Foam is the first layer above water. Ground shoreline cells, bridge
-        # planks, cliffs, props, and every entity therefore cover it.
-        if self.gm._foam:
-            seconds = pygame.time.get_ticks() * 0.001
-            frame_size = self.gm._foam[0].get_width()
-            half = frame_size // 2 - config.TILE_PX // 2
-            fview = view.inflate(frame_size, frame_size)
-            # `_shore` = ocean shoreline; `_cliff_foam` = E8 cliff feet over
-            # open water. Coordinates choose one of three independent routines.
-            for wx, wy in self.gm._shore + self.gm._cliff_foam:
-                if fview.collidepoint(wx, wy):
-                    frame = self.gm._foam_frame_at(wx, wy, seconds)
-                    zframe = self._z_surf(frame)
-                    surface.blit(zframe, ((wx - ox - half) * z, (wy - oy - half) * z))
-        # Void props are above foam so rocks, ducks, and other water scenery are
-        # never washed over by a shoreline animation.
-        if self.gm._void_decor:
-            self._blit_decor(surface, camera, self.gm._void_decor, view)
-        # ... then the terrain surfaces (LD-7 order): the LD-7a cliff-foot
-        # underlay + drop shadow, the cliff faces, the baked room floors
-        # (bottom floor up), then stairs / ramp units / corridors. Flat worlds
-        # have no cliffs, so this is just the room + corridor pass.
+        gm = self.gm
+
         def _blit(rect, surf):
             if rect.colliderect(view):
                 surface.blit(self._z_surf(surf),
                              ((rect.x - ox) * z, (rect.y - oy) * z))
 
-        if self.gm.layout is not None:
-            # LD-7a: the one exception to "cliffs paint before everything" --
-            # one tile of the lower room's grass at each cliff-foot cell that
-            # has a room directly south of it, painted first so the cliff sits
-            # on grass instead of showing the sea through its foot. Never fills
-            # a cell nothing else is drawn on.
-            for rect, tile in self.gm._cliff_underlay:
-                _blit(rect, tile)
-            # LD-6/LD-7a: the static drop shadow, immediately above the underlay
-            # tiles and below the cliff faces -- a tight contact shadow at the
-            # cliff base rather than a blob on the open field.
-            if self.gm._shadow is not None and self.gm._cliff_shadow:
-                sh_half = self.gm._shadow.get_width() // 2 - config.TILE_PX // 2
-                sview = view.inflate(self.gm._shadow.get_width(),
-                                     self.gm._shadow.get_height())
-                zsh = self._z_surf(self.gm._shadow)
-                vis = [(wx, wy) for wx, wy in self.gm._cliff_shadow
-                       if sview.collidepoint(wx, wy)]
+        seconds = pygame.time.get_ticks() * 0.001
+        foam_ready = bool(gm._foam)
+        if foam_ready:
+            fsz = gm._foam[0].get_width()
+            fhalf = fsz // 2 - config.TILE_PX // 2
+            fview = view.inflate(fsz, fsz)
+
+        def _foam_at(points):
+            if not foam_ready:
+                return
+            for wx, wy in points:
+                if fview.collidepoint(wx, wy):
+                    frame = gm._foam_frame_at(wx, wy, seconds)
+                    surface.blit(self._z_surf(frame),
+                                 ((wx - ox - fhalf) * z, (wy - oy - fhalf) * z))
+
+        # Base water layer: the sea shoreline foam that every floor sits on,
+        # then the open-water scenery (rocks, ducks) so a shoreline animation
+        # never washes over it.
+        _foam_at(gm._shore)
+        if gm._void_decor:
+            self._blit_decor(surface, camera, gm._void_decor, view)
+
+        if gm.layout is None:
+            # Interior clutter is NOT drawn here -- it is depth-sorted with the
+            # obstacles and the characters (see `scenery_drawables`).
+            return
+
+        if gm._grid_surfs:
+            # LD-9: each room is one baked surface holding its own terraces,
+            # walls and flights, so the only ordering left is between rooms.
+            # South-first, then a room lower down the map overlaps the one
+            # above it, the same way its own terraces do.
+            for blit, surf, _lvl in sorted(gm._grid_surfs,
+                                           key=lambda t: t[0].y):
+                _blit(blit, surf)
+            for rect, surf, _lvl in gm._corr_surfs:
+                _blit(rect, surf)
+            return
+
+        # LD-8b: composite the map one elevation at a time, bottom up. For each
+        # floor -- the cliff wall dropping onto the level below it (its foot
+        # foam over open water, the LD-7a underlay grass + contact shadow, then
+        # the stone faces), this level's baked room grass, then its walkable
+        # connectors (plank stairs, LD-4 ramp units, corridors) and finally the
+        # LD-8a rock stair overlay. A higher floor's wall is therefore painted
+        # over the finished lower floor, never the reverse. Flat worlds have a
+        # single floor 0 with no cliffs, so this is just the room + corridor pass.
+        for f in sorted({r.floor for r in gm.layout.rooms}):
+            _foam_at([(x, y) for x, y, ff in gm._cliff_foam if ff == f])
+
+            for rect, tile, uf in gm._cliff_underlay:
+                if uf == f:
+                    _blit(rect, tile)
+
+            if gm._shadow is not None:
+                pts = [(wx, wy) for wx, wy, sf in gm._cliff_shadow if sf == f]
+                sh_half = gm._shadow.get_width() // 2 - config.TILE_PX // 2
+                sview = view.inflate(gm._shadow.get_width(),
+                                     gm._shadow.get_height())
+                vis = [p for p in pts if sview.collidepoint(*p)]
                 if vis:
                     # Accumulate on a scratch layer with MAX so overlapping
                     # blobs of a continuous run merge into one soft strip
                     # instead of stacking their alpha and over-darkening.
+                    zsh = self._z_surf(gm._shadow)
                     scratch = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
                     for wx, wy in vis:
                         scratch.blit(zsh, ((wx - ox - sh_half) * z,
                                            (wy - oy - sh_half) * z),
                                      special_flags=pygame.BLEND_RGBA_MAX)
                     surface.blit(scratch, (0, 0))
-            # LD-7: cliff faces are the lowest terrain layer proper -- they
-            # paint before every room floor, corridor, plank bridge, stair and
-            # ramp unit, regardless of the owning room's elevation, so a
-            # walkable surface always covers the stone where the two meet and
-            # the face shows only over the void or over lower ground. (The
-            # LD-7a underlay + shadow above are the sole thing drawn earlier.)
-            for blit, surf, _fl in self.gm._cliff_surfs:
-                _blit(blit, surf)
-            # ... then the baked room floors, bottom floor up so a higher
-            # plateau's grass overlaps the one below it.
-            floors = sorted({r.floor for r in self.gm.layout.rooms})
-            for f in floors:
-                for r in self.gm.layout.rooms:
-                    if r.floor == f:
-                        _blit(r.rect, self.gm._room_surfs[r.id])
-            # ... walkable structures over the room floors: plank stairs, the
-            # LD-4 staircase units (lifted out of the cliff surface), then
-            # corridors last so their grass renders over nearby shoreline foam.
-            for blit, surf, _fl in self.gm._stair_surfs:
-                _blit(blit, surf)
-            for blit, surf, _fl in self.gm._ramp_surfs:
-                _blit(blit, surf)
-            for rect, surf in self.gm._corr_surfs:
-                _blit(rect, surf)
+
+            for blit, surf, cfl in gm._cliff_surfs:
+                if cfl == f:
+                    _blit(blit, surf)
+
+            for r in gm.layout.rooms:
+                if r.floor == f:
+                    _blit(r.rect, gm._room_surfs[r.id])
+
+            for blit, surf, sfl in gm._stair_surfs:
+                if sfl == f:
+                    _blit(blit, surf)
+            for blit, surf, rfl in gm._ramp_surfs:
+                if rfl == f:
+                    _blit(blit, surf)
+            for rect, surf, cfl in gm._corr_surfs:
+                if cfl == f:
+                    _blit(rect, surf)
+            for rect, surf, ofl in gm._stair_overlays:
+                if ofl == f:
+                    _blit(rect, surf)
         # Interior clutter is NOT drawn here -- it is depth-sorted with the
         # obstacles and the characters (see `scenery_drawables`).
 

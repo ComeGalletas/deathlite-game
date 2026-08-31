@@ -70,7 +70,10 @@ def paint_cliff(store, sheets, layout, r):
 
     if not cliff_slots or not r.tile_meta:
         return None
-    face_h = max(1, min(r.floor, 2) * int(config.CLIFF_TILES))
+    # LD-8 #2: one cliff tile per floor, uncapped -- a floor-3 plateau has a
+    # 3-tile face. `paint_cliff` still shortens it per column where something
+    # sits below (LD-2 E8).
+    face_h = max(1, r.floor * int(config.CLIFF_TILES))
     rim = [(c, ro, m.cliff_var) for (c, ro), m in r.tile_meta.items()
            if m.cliff == "top"]
     if not rim:
@@ -114,35 +117,41 @@ def paint_cliff(store, sheets, layout, r):
                 return k
         return None
 
-    # LD-4: a **staircase unit** cut into this band -- 3 columns wide,
-    # 2 band rows deep. `meta.ramp` tags the stair's own column and the
-    # descent direction; the two landings sit one column out at the top
-    # and one column in at the bottom:
-    #
-    #   band row 0:  # # # > = # #     stair top + top landing (c+d)
-    #   band row 1:  # # = > # # #     bottom landing (c-d) + stair
-    #
-    # `unit[col] = (part, direction, low_room)`.
-    unit: dict[int, tuple[str, str, int]] = {}
+    # LD-8a: a **staircase unit** cut into this band. A "v" unit is one column
+    # -- a straight N->S flight; an "h" unit (the LD-4 shape) is 3 columns wide
+    # with the stair at `c0` and a grass landing one column out at the top
+    # (`c0+d`) and one column in at the bottom (`c0-d`). The flight spans
+    # `band` band rows -- 1 for a one-floor drop, 2 for a two-floor one.
+    # `meta.ramp` tags the stair column ("s" for "v", "w"/"e" for "h").
+    # `unit[col] = (part, direction, low_room, band)`.
+    unit: dict[int, tuple] = {}
+    unit_style = "grass"       # LD-8a: this room's ramp unit -- "grass" | "rock"
+    unit_orient = "v"          # "v" straight flight | "h" LD-4 side-landing unit
     if ramp_slots:
         have = {c for c, _r, _v in rim}
         for (c0, ro0), m0 in r.tile_meta.items():
             if not m0.ramp:
                 continue
-            d = 1 if m0.ramp == "w" else -1
-            lo_id = next((st.low_room for st in layout.stairs
-                          if st.ramp and st.high_room == r.id), -1)
-            unit[c0] = ("stair", m0.ramp, lo_id)
-            unit[c0 + d] = ("top", m0.ramp, lo_id)
-            unit[c0 - d] = ("bot", m0.ramp, lo_id)
-            # LD-5: STRUCT_ANNEX can strip `cliff="top"` from the
-            # top-landing column (a landing counts as floor below it),
-            # so it may be missing from `rim`. The unit still needs it
-            # painted -- add it at the stair's row, plain `mid` face.
-            for uc in (c0 + d, c0 - d):
-                if uc not in have:
-                    rim.append((uc, ro0, "mid"))
-                    have.add(uc)
+            _s = next((st for st in layout.stairs
+                       if st.ramp and st.high_room == r.id), None)
+            lo_id = _s.low_room if _s is not None else -1
+            unit_style = getattr(_s, "style", "grass") if _s is not None else "grass"
+            unit_orient = getattr(_s, "orient", "v") if _s is not None else "v"
+            _df = _s.d_floor if _s is not None else 1
+            band = max(1, _df * int(config.CLIFF_TILES))
+            unit[c0] = ("stair", m0.ramp, lo_id, band)
+            if unit_orient == "h":
+                d = 1 if m0.ramp == "w" else -1
+                unit[c0 + d] = ("top", m0.ramp, lo_id, band)
+                unit[c0 - d] = ("bot", m0.ramp, lo_id, band)
+                # LD-5: STRUCT_ANNEX can strip `cliff="top"` from the
+                # top-landing column (a landing counts as floor below it),
+                # so it may be missing from `rim`. The unit still needs it
+                # painted -- add it at the stair's row, plain `mid` face.
+                for uc in (c0 + d, c0 - d):
+                    if uc not in have:
+                        rim.append((uc, ro0, "mid"))
+                        have.add(uc)
     # bridge / stair spans below the plateau are "sky", not sea -- a
     # cliff foot over one of them gets the foamy tile art but no lapping
     # foam effect (matches E3's foam-free sky bridges).
@@ -178,36 +187,64 @@ def paint_cliff(store, sheets, layout, r):
         landed = grounded or lower is not None
 
         if col in unit:
-            part, direction, lo_id = unit[col]
-            band0, band1 = (row + 1) * px, (row + 2) * px
+            part, direction, lo_id, band = unit[col]
+            brows = [(row + 1 + k) * px for k in range(band)]   # band-row y (tile)
+            top_y, bot_y = brows[0], brows[-1]
             lo_room = layout.room(lo_id) if lo_id >= 0 else None
-            # LD-7: the cliff-behind (`mid`, opaque both sides so the
-            # crevasse never shows the sea) stays in the cliff surface
-            # -- the lowest layer -- but the unit's own walkable tiles
-            # (landings + the 1x2 stair piece) are collected into
-            # `unit_paint` and lifted into `_ramp_surfs`, so they paint
-            # above the room floors and the drop shadow, not under them.
-            surf.blit(body_mid, (x, band0))
-            surf.blit(bot_mid, (x, band1))
-            if part == "stair":
+            lsheet = (sheet_for(lo_room.floor, lo_room.kind)
+                      if lo_room is not None else sheet)
+            # LD-7: the cliff-behind (`body` mid, opaque both sides so the
+            # crevasse never shows the sea) stays in the cliff surface -- the
+            # lowest layer -- while the unit's own walkable tiles are lifted
+            # into `_ramp_surfs`, above the room floors and the drop shadow.
+            # Every band row gets the solid `body` mid tile stamped twice at a
+            # half-tile stagger so no soft edge leaks the void at a row seam.
+            for yy in brows:
+                surf.blit(body_mid, (x, yy))
+                surf.blit(body_mid, (x, yy + px // 2))
+            vov = sheets.vstair_overlay(band)
+            rock = unit_style == "rock" and vov is not None
+            if part == "stair" and (unit_orient == "v" or rock):
+                # A vertical flight fills the stair column with the biome grass.
+                #   * rock  -> plain `interior` grass, then the `vstairs.png`
+                #              sprite scaled to the band on top.
+                #   * grass -> the authored N/S grass channel `slots.ramp["s"]`
+                #              (the bordered `strip_v` tiles) so the flight
+                #              reads as a bush-lined path down through the cliff.
+                if rock:
+                    idxs = [interior] * band
+                else:
+                    s_piece = ramp_slots.get("s", (interior, interior))
+                    idxs = ([s_piece[-1]] if band == 1
+                            else [s_piece[0]] + [s_piece[-1]] * (band - 1))
+                for k, yy in enumerate(brows):
+                    sh = lsheet if k == band - 1 else sheet
+                    unit_paint.append((x, yy, cell(sh, idxs[k])))
+                if rock:
+                    sx0 = (r.rect.x + col * px + px // 2 - vov.get_width() // 2)
+                    store._stair_overlays.append(
+                        (pygame.Rect(sx0, r.rect.y + top_y,
+                                     vov.get_width(), vov.get_height()),
+                         vov, r.floor))
+            elif part == "stair":
+                # "h" + grass: the biome `slots.ramp` sideways wedge, one tile
+                # per band row (the wedge top for a 1-tile drop).
                 piece = ramp_slots.get(direction)
                 if piece:
-                    unit_paint.append((x, band0, cell(sheet, piece[0])))
-                    unit_paint.append((x, band0 + px, cell(sheet, piece[1])))
+                    idxs = ([piece[0]] if band == 1
+                            else [piece[0]] + [piece[1]] * (band - 1))
+                    for yy, pi in zip(brows, idxs):
+                        unit_paint.append((x, yy, cell(sheet, pi)))
             elif part == "top":
-                # top landing -- plateau's own grass, 3-sided: strands
-                # face the cut (the +d side) and the band below (s),
-                # flat toward the stair and the plateau above.
+                # top landing ("h" only) -- plateau's own grass, 3-sided:
+                # strands face the cut (the +d side) and the band below (s).
                 opp = "e" if direction == "w" else "w"
-                unit_paint.append((x, band0, three_sided(sheet, opp + "s")))
+                unit_paint.append((x, top_y, three_sided(sheet, opp + "s")))
             else:
-                # bottom landing -- the low room's grass, 3-sided:
-                # strands face the cut (the -d side) and the band above
-                # (n), flat toward the stair and the low room below.
-                lsheet = (sheet_for(lo_room.floor, lo_room.kind)
-                          if lo_room is not None else sheet)
+                # bottom landing ("h" only) -- the low room's grass, 3-sided:
+                # strands face the cut (the -d side) and the band above (n).
                 cut = "w" if direction == "w" else "e"
-                unit_paint.append((x, band1, three_sided(lsheet, cut + "n")))
+                unit_paint.append((x, bot_y, three_sided(lsheet, cut + "n")))
             continue
 
         if draw_h >= 1:
@@ -239,7 +276,7 @@ def paint_cliff(store, sheets, layout, r):
                 fy = r.rect.y + fy_row
                 if not any(d.collidepoint(fx + px // 2, fy + px // 2)
                            for d in dry):
-                    store._cliff_foam.append((fx, fy))
+                    store._cliff_foam.append((fx, fy, r.floor))
             else:
                 # LD-6/7a: the foot lands on something -- the plain
                 # `body` foot is already drawn (`last == draw_h`), and
@@ -255,19 +292,20 @@ def paint_cliff(store, sheets, layout, r):
                     store._cliff_underlay.append(
                         (pygame.Rect(fx, fy, px, px),
                          cell(sheet_for(lower.floor, lower.kind),
-                              interior)))
-                    store._cliff_shadow.append((fx, fy))
+                              interior), r.floor))
+                    store._cliff_shadow.append((fx, fy, r.floor))
     # LD-7: lift the staircase unit's own tiles into a small surface
     # drawn in the walkable-structure layer (above the drop shadow)
     # rather than baked into the cliff surface. The cliff-behind `mid`
     # fill was already blitted into `surf` above, so the crevasse never
     # shows the sea.
     if unit_paint:
-        minc = min(unit)
-        ux0 = minc * px
+        # tight bbox from the actual tile sizes / positions -- the LD-8a rock
+        # strip is one wide surface, not a run of 64 px tiles.
+        ux0 = min(ux for ux, _uy, _t in unit_paint)
         uy0 = min(uy for _ux, uy, _t in unit_paint)
-        uw = (max(unit) - minc + 1) * px
-        uh = max(uy for _ux, uy, _t in unit_paint) + px - uy0
+        uw = max(ux + t.get_width() for ux, _uy, t in unit_paint) - ux0
+        uh = max(uy + t.get_height() for _ux, uy, t in unit_paint) - uy0
         usurf = pygame.Surface((uw, uh), pygame.SRCALPHA)
         for ux, uy, tile in unit_paint:
             usurf.blit(tile, (ux - ux0, uy - uy0))

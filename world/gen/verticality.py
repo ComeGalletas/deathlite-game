@@ -2,6 +2,8 @@
 and the per-tile metadata pass (W1 split of world/procedural.py)."""
 from __future__ import annotations
 
+import random
+
 import pygame
 
 from game import config
@@ -10,29 +12,45 @@ from world.gen.rooms import _four_connected
 from world.gen.links import _relink_corridors
 
 
+def _ramp_style(seed: int, hi_id: int, lo_id: int, hi_floor: int) -> str:
+    """LD-8a: "rock" (the `vstairs.png` overlay) or "grass" (biome grass
+    channel / wedge) for one cross-floor unit -- a seeded per-link roll biased
+    by the plateau's floor. Pure render tag; consumes no world RNG state."""
+    bias = config.RAMP_ROCK_BIAS.get(hi_floor, config.RAMP_ROCK_BIAS_DEFAULT)
+    roll = random.Random(f"{seed}:ramp-style:{hi_id}:{lo_id}").random()
+    return "rock" if roll < bias else "grass"
+
+
+def _ramp_layout(seed: int, hi_id: int, lo_id: int) -> str:
+    """LD-8 #1: "h" (the LD-4 side-landing unit -- stair column with a grass
+    landing jogged one tile to each side) or "v" (a straight one-column flight)
+    for one cross-floor link. Seeded per link; consumes no world RNG state."""
+    roll = random.Random(f"{seed}:ramp-layout:{hi_id}:{lo_id}").random()
+    return "h" if roll < config.RAMP_LANDING_BIAS else "v"
+
+
 def _face_h(room) -> int:
     """Depth of the cliff band under a raised room's south rim, in tiles, when
-    it drops all the way to the sea. `paint_cliff` shortens it per column where
-    something is actually below (LD-2 E8)."""
-    return max(1, min(room.floor, 2) * int(config.CLIFF_TILES))
+    it drops all the way to the sea -- LD-8 #2: one tile per floor, uncapped
+    (floor 3 is 3 tiles). `paint_cliff` shortens it per column where something
+    is actually below (LD-2 E8)."""
+    return max(1, room.floor * int(config.CLIFF_TILES))
 
 
 def _drop_h(high, low) -> int:
     """LD-3 R8: the band depth between two *specific* rooms, in tiles -- the
-    real floor difference, not the high room's drop to the sea.
-
-    `_face_h` answers "how deep is this plateau's face over water", which is
-    what the renderer needs where the rim overhangs nothing. Between a floor-2
-    plateau and a floor-1 room the actual step is one floor, so a run there is
-    2 tiles, not 4. Using `_face_h` for the snap put the low room twice as far
-    down as the elevation says and made the run twice as long."""
-    return max(1, min(high.floor - low.floor, 2) * int(config.CLIFF_TILES))
+    real floor difference (1 or 2, capped by the 2-floor connectivity rule),
+    not the high room's drop to the sea."""
+    return max(1, (high.floor - low.floor) * int(config.CLIFF_TILES))
 
 
 def _ramp_candidates(rooms, edges):
-    """Cross-floor tree edges that could carry a sideways ramp run: the two
-    cells vertically adjacent, and the **high room to the north** so its south
-    cliff band faces the low room. Yields `(high, low)`."""
+    """Cross-floor tree edges that can carry a staircase unit: the two rooms
+    share a chunk column and sit one chunk row apart, high room to the north, so
+    the descent runs N->S down the plateau's south cliff band. The drop is 1 or
+    2 floors (the 2-floor connectivity rule caps it). `_plan_ramps` picks the
+    per-link layout (straight flight vs LD-4 side-landing unit). Yields
+    `(high, low)`."""
     for a, b in edges:
         ra, rb = rooms[a], rooms[b]
         if ra.floor == rb.floor or ra.cell[0] != rb.cell[0]:
@@ -42,37 +60,33 @@ def _ramp_candidates(rooms, edges):
             yield hi, lo
 
 
-def _plan_ramps(rooms, edges, corridors) -> list:
+def _plan_ramps(rooms, edges, corridors, seed: int = 0) -> list:
     """LD-4 S1: place a **staircase unit** on every cross-floor pair that can
     take one. Mutates `rooms` (snaps a low room up against the plateau's cliff
     base) and re-seats every corridor; returns
-    `[(high_id, low_id, col, direction), ...]` with `col` in the **plateau's**
-    tile grid.
+    `[(high_id, low_id, col, orient, direction, style), ...]` with `col` in the
+    **plateau's** tile grid, `orient` "v" (straight one-column flight) / "h"
+    (LD-4 side-landing unit) from `_ramp_layout`, and `style` "grass" / "rock"
+    from `_ramp_style`.
 
-    A unit is 3 tiles wide and 2 tall, cut into the band (`#` cliff, `=` ground,
-    `>` the 1x2 stair piece)::
+    The drop spans `(hi.floor - lo.floor) * CLIFF_TILES` band rows -- 1 tile for
+    a one-floor link, 2 for a two-floor one (the 2-floor connectivity rule caps
+    it). The footprint is probed 3 columns wide (`col-1..col+1`) so the cut
+    reads as a clean channel; a "v" unit then walks only the centre column, an
+    "h" unit jogs one column out to a landing at each end.
 
         row rim   :  = = = = = = = =      plateau surface
-        band row 0:  # # # # > = # #      stair top    + top landing at c+d
-        band row 1:  # # # = > # # #      bottom landing at c-d + stair bottom
+        band      :  # # # > # # #        "v": centre column only
         row below :  = = = = = = = =      low room surface
 
-    `d` is +1 descending west (the high side is east), -1 descending east.
-
-    **One-floor changes only** (decision 2, option c): the drop is exactly
-    `CLIFF_TILES` band rows, so one piece spans it. Deeper links keep their
-    plank bridge -- stacking units is understood but needs the band depth
-    reworked first.
-
-    A pair is skipped when the snap exceeds `config.RAMP_SNAP_TILES`, the moved
-    rect would overlap another room, or no column offers the full footprint:
-    three consecutive columns inside the x-overlap, plateau floor above the top
-    landing, and low-room floor below the bottom landing. Deterministic -- no
-    RNG draw, and the edge order is the tree's own.
+    A pair is skipped when the snap exceeds `RAMP_SNAP_TILES` per floor of drop,
+    the moved rect would overlap another room, or no column offers the
+    footprint. Deterministic -- the seeded rolls draw no world RNG and the edge
+    order is the tree's own.
     """
     px = config.TILE_PX
-    cap = int(config.RAMP_SNAP_TILES) * px
-    drop = max(1, int(config.CLIFF_TILES))
+    ct = max(1, int(config.CLIFF_TILES))
+    snap = int(config.RAMP_SNAP_TILES) * px
     planned: list = []
     moved_any = False
     # A room may take part in at most one unit: snapping it a second time would
@@ -81,10 +95,12 @@ def _plan_ramps(rooms, edges, corridors) -> list:
     for hi, lo in _ramp_candidates(rooms, edges):
         if hi.id in locked or lo.id in locked:
             continue
-        if hi.floor - lo.floor != 1:        # option (c): one floor at a time
+        df = hi.floor - lo.floor
+        if df not in (1, 2):               # 2-floor connectivity rule caps it
             continue
+        drop = df * ct
         delta = (hi.rect.bottom + drop * px) - lo.rect.top
-        if abs(delta) > cap:
+        if abs(delta) > snap * df:         # allow a deeper snap for a deeper drop
             continue
         seat = lo.rect.move(0, delta)
         if any(seat.colliderect(o.rect) for o in rooms
@@ -94,6 +110,8 @@ def _plan_ramps(rooms, edges, corridors) -> list:
         cols_n, rows_n = hi.rect.width // px, hi.rect.height // px
         if rows_n < 2:
             continue
+
+        orient = _ramp_layout(seed, hi.id, lo.id)
 
         def spans(col: int) -> bool:
             """That plateau column's whole tile sits inside the low room's
@@ -112,17 +130,17 @@ def _plan_ramps(rooms, edges, corridors) -> list:
         def fits(col: int, d: int) -> bool:
             if not all(spans(col + o) for o in (-1, 0, 1)):
                 return False
-            # You step onto the top landing from the plateau directly above it
-            # and off the bottom landing into the low room directly below --
-            # and the unit's *approach* reaches two tiles into each room, so
-            # both of those rows have to be real floor. Two rows, not one,
-            # because of clearance: a room-edge cell is within 22 px of the
-            # boundary and so fails the large nav class, which would leave the
-            # unit reachable only by the small one.
-            if any((col + d, rows_n - 1 - k) not in hi.cells for k in (0, 1)):
+            # The approaches reach two tiles into each room, so those rows must
+            # be real floor (two rows, not one -- a room-edge cell is within
+            # 22 px of the boundary and fails the large nav class). A "v" unit
+            # approaches down the centre column; an "h" unit's approaches sit
+            # one column out (`col+d` on top, `col-d` at the bottom).
+            hc = col if orient == "v" else col + d
+            lc = col if orient == "v" else col - d
+            if any((hc, rows_n - 1 - k) not in hi.cells for k in (0, 1)):
                 return False
             return all((c, r) in lo.cells
-                       for c in low_col(col - d) for r in (0, 1))
+                       for c in low_col(lc) for r in (0, 1))
 
         unit = None
         for direction, d in (("w", 1), ("e", -1)):
@@ -139,7 +157,11 @@ def _plan_ramps(rooms, edges, corridors) -> list:
         lo.rect = seat
         moved_any = True
         locked.update((hi.id, lo.id))
-        planned.append((hi.id, lo.id, unit[0], unit[1]))
+        # rock is the straight `vstairs.png` sprite -- the side-landing unit
+        # always renders as the biome grass wedge.
+        style = ("grass" if orient == "h"
+                 else _ramp_style(seed, hi.id, lo.id, hi.floor))
+        planned.append((hi.id, lo.id, unit[0], orient, unit[1], style))
     if moved_any:
         _relink_corridors(rooms, corridors)
     return planned
@@ -149,35 +171,43 @@ def _ramp_steps(rooms, plan) -> list:
     """The walkable tiles of every staircase unit, as one-tile `Stair`s so
     collision, `walkable_rects` and the nav grid pick them up unchanged.
 
-    Five rects: an approach reaching two tiles into the plateau, the top
-    landing, the 1x2 stair piece, the bottom landing, and an approach two tiles
-    into the low room. The approaches exist for **clearance**, not looks --
-    without them the lenient cells stop at the room edge, where clearance is
-    under the large nav class's 22 px, so only the small class could reach the
-    unit. LD-1 solved the same problem by spanning plank stairs centre-to-centre.
-    Consecutive tiles touch **orthogonally** (landing beside stair, stair beside
-    landing, and each landing directly under / over its room), so none of this
-    depends on diagonal movement -- the flow field refuses a diagonal step
-    unless both orthogonal neighbours are open, which is what broke LD-3's
-    diagonal chain."""
+    A **vertical** unit is a straight chain of three rects in the stair column
+    `col`: an approach two tiles into the plateau, the flight spanning the cliff
+    band, and an approach two tiles into the low room. A **horizontal** unit
+    keeps the LD-4 five-rect chain (approach / top landing at `col+d` / the 1x2
+    stair / bottom landing at `col-d` / approach). The approaches exist for
+    **clearance**, not looks -- without them the lenient cells stop at the room
+    edge, where clearance is under the large nav class's 22 px. Consecutive
+    tiles touch **orthogonally**, so nothing depends on diagonal movement -- the
+    flow field refuses a diagonal step unless both orthogonal neighbours are
+    open, which is what broke LD-3's diagonal chain."""
     px = config.TILE_PX
+    ct = max(1, int(config.CLIFF_TILES))
     out: list = []
-    for hi_id, lo_id, col, direction in plan:
+    for hi_id, lo_id, col, orient, direction, style in plan:
         hi = rooms[hi_id]
-        d = 1 if direction == "w" else -1
         y0 = hi.rect.bottom
         df = abs(hi.floor - rooms[lo_id].floor)
+        band = df * ct                        # band rows the flight spans (1 or 2)
 
-        def add(c, y, h):
+        def add(c, y, h, ax):
             out.append(Stair(lo_id, hi_id,
                              pygame.Rect(hi.rect.left + c * px, y, px, h),
-                             "h", 1, df, ramp=direction))
+                             ax, 1, df,
+                             ramp=("s" if orient == "v" else direction),
+                             orient=orient, style=style))
 
-        add(col + d, y0 - 2 * px, 2 * px)     # approach, into the plateau
-        add(col + d, y0, px)                  # top landing
-        add(col, y0, 2 * px)                  # the stair piece
-        add(col - d, y0 + px, px)             # bottom landing
-        add(col - d, y0 + 2 * px, 2 * px)     # approach, into the low room
+        if orient == "v":
+            add(col, y0 - 2 * px, 2 * px, "v")        # approach, into the plateau
+            add(col, y0, band * px, "v")              # the straight flight
+            add(col, y0 + band * px, 2 * px, "v")     # approach, into the low room
+        else:
+            d = 1 if direction == "w" else -1
+            add(col + d, y0 - 2 * px, 2 * px, "h")            # approach (plateau)
+            add(col + d, y0, px, "h")                         # top landing
+            add(col, y0, band * px, "h")                      # the stair piece
+            add(col - d, y0 + (band - 1) * px, px, "h")       # bottom landing
+            add(col - d, y0 + band * px, 2 * px, "h")         # approach (low room)
     return out
 
 
@@ -193,10 +223,17 @@ def _collect_annex(rooms, plan) -> None:
     px = config.TILE_PX
     hi_ann: dict = {}
     lo_ann: dict = {}
-    for hi_id, lo_id, col, direction in plan:
+    for hi_id, lo_id, col, orient, direction, _style in plan:
         hi, lo = rooms[hi_id], rooms[lo_id]
-        d = 1 if direction == "w" else -1
         rows_hi = hi.rect.height // px
+        if orient == "v":
+            # The flight's own column must stay a south rim so
+            # `_build_tile_meta` still tags it; the tag alone drops the rim
+            # fringe there. Only the low room's landing cell is annexed.
+            lc = (hi.rect.left + col * px - lo.rect.left) // px
+            lo_ann.setdefault(lo_id, set()).add((lc, -1))
+            continue
+        d = 1 if direction == "w" else -1
         # top landing: high room's grid, band row 0 == room-relative row `rows`
         hi_ann.setdefault(hi_id, set()).add((col + d, rows_hi))
         # bottom landing: low room's grid, band row 1 == room-relative row -1
@@ -293,8 +330,8 @@ def _build_tile_meta(rooms, plan=()) -> None:
     Pure, deterministic, no RNG. A flat room -> `floor 0 / foam True / cliff ""`
     for every cell. `plan` is the LD-3 ramp plan, whose entries tag the one rim
     cell each run starts at."""
-    starts = {(hi_id, col): direction
-              for hi_id, _lo_id, col, direction in plan}
+    starts = {(hi_id, col): ("s" if orient == "v" else direction)
+              for hi_id, _lo_id, col, orient, direction, _style in plan}
     for room in rooms:
         cells = room.cells
         # LD-5: a landing in the cliff band counts as floor for edge

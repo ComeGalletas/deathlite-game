@@ -16,6 +16,35 @@ import pygame
 from game import config
 
 
+class Cell(NamedTuple):
+    """LD-9: one tile of a room's **height map**. Generation emits a grid of
+    these -- the machine-readable form of the ASCII layouts in the level-design
+    journal -- and rendering is a pure function of the grid.
+
+        `=` ground   walkable surface at `level`
+        `#` cliff    the wall holding up `level`; not walkable
+        `0` vstair   straight N/S flight, `level` down to `level - drop`
+        `>` ewstair  east/west flight, same span, `tag` is the descent side
+        `~` lake     inland water inside a terrace; not walkable
+        ` ` void     open sea / nothing
+
+    `level` is always the **upper** surface a cell belongs to: for a cliff or a
+    stair that is the terrace it hangs from. `row` indexes a cliff / stair cell
+    within its own vertical stack (0 = the topmost), so the renderer can pick
+    the top / body / bottom art without re-deriving the stack.
+    """
+    kind: str
+    level: int = 0
+    drop: int = 0          # cliff / stair: levels spanned (1 or 2)
+    row: int = 0           # cliff / stair: index down the stack, 0 = top
+    tag: str = ""          # stair: "grass" / "rock", or the "w" / "e" descent
+
+
+GROUND, CLIFF, VSTAIR, EWSTAIR, LAKE, VOID = (
+    "ground", "cliff", "vstair", "ewstair", "lake", "void")
+WALKABLE_KINDS = frozenset({GROUND, VSTAIR, EWSTAIR})
+
+
 class TileMeta(NamedTuple):
     """LD-2 E0: per-tile classification produced at world generation so the
     renderer -- and any later system (per-floor decor, elevation tint, footstep
@@ -54,6 +83,11 @@ class Room:
     # into the room's autotiled shape so its edges connect flat. Empty unless
     # config.STRUCT_ANNEX.
     annex: frozenset = field(default_factory=frozenset)
+    # LD-9: the room's height map, `(col, row) -> Cell`, room-relative. Empty
+    # unless `config.HEIGHTMAP_ROOMS`. When set it is the source of truth for
+    # the room's shape, elevation and stairs -- `cells` is derived from it (the
+    # walkable subset) and `floor` is just its base level.
+    grid: dict = field(default_factory=dict)
 
     @property
     def tile_dims(self) -> tuple[int, int]:
@@ -109,11 +143,21 @@ class Stair:
     axis: str = "h"
     width_tiles: int = 1
     d_floor: int = 1
-    # LD-3: set on the `face_h` one-tile steps of a ramp run, so a system can
-    # tell a diagonal ramp step from a plank stair. Every step of one run
-    # shares its `low_room` / `high_room`, and `ramp` is the descent direction
-    # ("w" or "e"). "" for an ordinary stair.
+    # LD-3: set on the steps of a ramp run so a system can tell a staircase
+    # unit from a plank stair. Every step of one run shares its `low_room` /
+    # `high_room`. The value is the descent direction -- "s" for a vertical
+    # (N/S) unit, "w"/"e" for a horizontal (E/W) one. "" for an ordinary stair.
     ramp: str = ""
+    # LD-8a-Phase1: the unit's orientation, decided at generation. "v" -- the
+    # rooms are stacked and the flight runs straight north->south; "h" -- the
+    # rooms sit side by side and the flight runs east<->west (the LD-4 unit with
+    # sideways landings). The renderer picks the tile layout / asset from this.
+    orient: str = "v"
+    # LD-8a: which staircase look this ramp unit renders with -- "rock" (the
+    # `vstairs.png` overlay, the N/S asset we have) or "grass" (a plain grass
+    # flight for "v"; the biome `slots.ramp` sideways ramp for "h"). Seeded per
+    # link in `_plan_ramps`; only meaningful when `ramp`.
+    style: str = "grass"
 
 
 @dataclass
