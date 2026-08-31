@@ -2075,3 +2075,135 @@ suite **726 -> 729** green. In-game: a blue dust ribbon lingers behind the bolt
 across the field, denser at the head, dissipating toward the hero. No
 `combat/weapons.py` change. Tune via `fx.trail` (`spacing` up / `scale` down for
 wispier).
+
+---
+
+## Terrain: a cliff face always stands behind a sideways stair
+
+**Rule.** An east/west grass flight (`slots.ramp` `w` / `e`, the wedge tiles) is
+a notch cut **into** a cliff, not a hole through it. The stone therefore has to
+be drawn behind the flight, and that stone is an ordinary cliff face in every
+respect: it takes its `left` / `mid` / `right` / `single` variant from its
+neighbours exactly as any other cliff cell does, so a rim reads as one
+continuous run straight past the flight instead of stopping either side of it.
+This holds whichever way the flight faces.
+
+The wedge art's own corners are transparent -- that is by design, and it is how
+the stone behind shows through. Before this, `grid_paint.paint_room_grid` laid
+plain grass under the wedge, so those corners showed grass floating in the
+middle of a rock wall and the wall appeared to break at every crossing.
+
+**Where it lives.** `world/terrain/grid_paint.py`, the `EWSTAIR` branch: the
+terrace the flight drops onto, then `cliff_idx("body", var)` with `var` from
+`_run_var`, then the wedge on top.
+
+**The neighbour rule that goes with it.** Which variant a face takes is
+decided by the rule below, and a flight counts as *closing* the side it sits
+against -- it is a gap cut through the wall, not the end of it -- which is what
+lets the run carry through.
+
+---
+
+## Terrain: when a cliff face is `mid`, capped, or a pillar
+
+**Rule.** A cliff face is square-shouldered (`mid`) by default. It only takes a
+rounded, part-transparent cap on a side where that side is genuinely **open**,
+and it is only the free-standing `single` pillar when it is open on three
+sides at once.
+
+A side counts as open when the space beside the face holds nothing at the
+wall's own height: the sea, a lake, or a *lower* terrace looking up at it.
+Everything at the wall's own level closes the side -- more cliff, a flight cut
+through the wall, and (this is the part that used to be missing) **the terrace
+grass itself**, where the rim jogs a row so the face's neighbour is plateau top
+rather than stone.
+
+    open  -> lower ground, lake, void
+    closed -> cliff, flight, ground at this wall's level or above
+
+    both sides closed          -> mid
+    open to the west           -> left
+    open to the east           -> right
+    west + east + the foot     -> single
+
+`single` is tested against the **foot of the wall**, not the face's own south
+neighbour: a wall is one to `drop` cells deep, so for a two-deep wall that
+neighbour is the wall's own second row and the test would never pass on the
+upper cell -- rendering a one-wide two-tall pillar as a cap stacked on a
+pillar. `_wall_foot` walks the stack down first, so the whole column reads as
+one pillar.
+
+**The tile above a pillar.** A `single` carries exactly one ground cell, and
+the way terraces are grown that cell always continues north into the plateau.
+Its cap is therefore the three-sided `raised["swe"]` piece (slot 26), never the
+fully islanded `nswe` one. Measured across twelve worlds this was already what
+the corner rules produced on their own for every pillar that had ground above
+it, so forcing it changes nothing today and pins the invariant for later.
+
+**Why it matters.** The previous rule asked only "is the neighbour part of this
+same wall", which made same-level grass alongside a face read as the end of the
+run. Across twelve worlds that inverted the whole distribution: 613 pillars
+against 328 `mid`. Under this rule it is 25 pillars against 774 `mid`, with the
+remaining 1,145 caps sitting where a lower terrace really is visible past the
+stone.
+
+**Where it lives.** `world/terrain/grid_paint.py` -- `_open_side`,
+`_wall_foot`, `_run_var`, and the `_is_pillar` short-circuit at the top of
+`_open_sides`.
+
+---
+
+## Terrain: the shadow under a cliff
+
+**Rule.** Every cliff cell casts the `terrain_shadow` blob (`shadow.png`, one
+192x192 sprite: a ~1-tile core with a feathered bleed into the ring of cells
+around it) centred on itself, drawn **after the ground / lower-floor tile and
+before the cliff face** -- ground, shadow, stone. Only the feather shows past
+the face, which is what makes the wall read as standing above the terrace it
+fronts instead of being painted onto it.
+
+An east/west flight casts one too, because a cliff face stands behind it. A
+vertical flight does not -- it is a channel cut through the wall that you walk
+down, not stone.
+
+**Compositing.** The blobs are three cells wide but sit one cell apart, so six
+of them overlap on every tile of a continuous run. Blitted straight down with
+normal alpha they stack into lumpy over-darkened patches; accumulate them on a
+scratch `SRCALPHA` surface with `pygame.BLEND_RGBA_MAX` instead and the run
+merges into one even strip.
+
+**Where it lives.** `data/terrain.json` `rigs.terrain_shadow`;
+`TileSheets.cliff_shadow`; `grid_paint._shade`, called between pass 1 (ground)
+and pass 3 (stone) of `paint_room_grid`. The LD-8 band renderer does the same
+thing in `world/terrain/render.py` from `GameMap._cliff_shadow`.
+
+---
+
+## Terrain: the two ground fringe blocks, and when each applies
+
+**The sheet has two complete autotile blocks**, same sixteen combinations in
+both, different art:
+
+* the **shoreline** block -- white surf. `slots.interior` / `edge_*` /
+  `corner_*` (the eight rectangle slots) plus `strip_v` `[3, 12, 21]`,
+  `strip_h` `[27, 28, 29]` and `single` `30` for the opposite pairs and the
+  3- and 4-sided nubs. All sixteen are authored; earlier code used only the
+  eight and fell back to `interior` for the rest, which is why a one-wide spine
+  of ground, or a cell pinched between a lake and a cliff, painted as a flat
+  square with no fringe.
+* the **raised** block -- `slots.raised`, keyed directly by the open sides
+  (`""`, `"n"`, ... `"nswe"`). A dark navy rim, no surf.
+
+**Rule.** Which *sides* get a fringe is decided by the tile's own floor alone:
+own-floor ground continues, or it does not. Which *block* draws it is decided
+by what lies beyond the edge -- **shoreline when any side fronts open sea or a
+lake, raised otherwise**. They are not interchangeable: drawing every sea-level
+tile from the shoreline block traces white surf along the inland foot of every
+cliff, which reads as a beach in the middle of the island.
+
+This holds at every level, so an inland lake on a plateau gets surf and the
+plateau's own rim against stone does not.
+
+**Where it lives.** `world/terrain/autotile.py` (`_GROUND_SLOT`, `mask_slot`),
+`world/terrain/grid_paint.py` (`_floor_sides`, `_at_water`, the `GROUND` branch
+of `paint_room_grid`).

@@ -1976,3 +1976,958 @@ found 134 cliff-skirt-vs-geometry overlaps. Root causes:
   `BLEND_RGBA_MAX` accumulation.
 * N/E/W plateau rims still have no hanging face (only the south rim is skirted) —
   unchanged from LD-1.
+
+---
+
+## LD-8 — "Tiny Swords" world redesign (in progress)
+
+**Goal.** Make generated levels read like the Tiny Swords overworld: large
+irregular grass plateaus in a water moat, joined by narrow necks with **wide
+water gaps**, cliff walls marking elevation, **grass / rock staircases** the only
+way up or down, per-floor biomes, seeded houses and structures. Hard rule: **no
+more than a 2-floor difference** between any two connected areas or a bridge.
+
+### Plan (workstreams, each flag-gated so flag-off stays byte-identical)
+
+| | scope | key touch points |
+|--|--|--|
+| **L8-1** | Bigger world, fewer + larger rooms, organic edge erosion (not just corner notches) | `config` (`CHUNK_SIZE`, `WORLD_ROOM_COUNT`, world size), `world/gen/rooms.py` (`_room_frac`, `_grow_rooms` default-on, a perimeter-inset pass), `tuning.py` |
+| **L8-2** | Wider connections (`CORRIDOR_WIDTH_TILES` 2–3), bigger gaps; optional same-floor **grass causeway** instead of a plank bridge | `world/gen/__init__.py` (`width = px`), `links.py`, a `paint_causeway` |
+| **L8-3** | Cap floors at 2; every cross-floor link is a **grass/rock staircase** (2-tall for a Δ2 drop), no plank stairs for elevation | `world/gen/graph.py` (`_assign_floors`), `verticality.py` (`_plan_ramps` Δ2, `_ramp_steps`), `links.py` (`_split_links`) |
+| **L8-4** | Orientation-aware stairs: **N/S = rock stairs**, E/W = biome grass (future) | `world/layout.py` (`Stair.orient`), `verticality.py`, `world/terrain/cliffs.py`, `data/terrain.json` |
+| **L8-5** | Per-floor **biomes** — grass sheet + tree/prop sets by floor | `data/terrain.json` (`biomes` block, `decorations.floors`), `world/gen/scatter.py`, `world/terrain/sheets.py` |
+| **L8-6** | Biome-matched houses + kind-keyed **structures** (castle / tower / tents) | `world/gen/scatter.py` (`_scatter_houses`), `data/terrain.json` (`structures`) |
+
+Decisions (resolved with the user, 2026-08-30):
+
+1. **World size** — go with the suggested value for now, big enough to hold
+   large multi-floor rooms.
+2. **Plank bridges** — kept: used when two rooms are far apart, and as the
+   fallback placeholder wherever a grassy staircase cannot be used.
+3. **Floor 3** — kept, as a capped pocket. The verticality rule still holds:
+   no jump greater than 2 floors between connected areas (no ground → floor 3).
+4. **Biome trees** — reuse the tinted trees; match each tree's tint to its
+   biome's palette and group the tree sets by biome.
+5. **Structures** — placed as blocking `Obstacle`s, only in sufficiently large
+   open spaces, following the existing placement rules; multiple buildings are
+   clustered into a small village-like layout rather than scattered.
+
+---
+
+### LD-8a — rock N/S stair overlay + per-link style pick — ✅ DONE (2026-08-30)
+
+First L8-4 slice. A cross-floor staircase unit now renders in **one of two
+styles**, chosen per link:
+
+- **grass** — the biome `slots.ramp` sideways tiles + 3-sided grass landings,
+  exactly as LD-4 built them.
+- **rock** — a single `vstairs.png` **overlay sprite** (1 walkable tile wide,
+  2 tiles tall, with foliage wings) drawn on top of *all* terrain so its
+  foliage feathers over the plateau grass, the cliff face and the low-room
+  grass, hiding the unit's seams while the grass textures show through
+  underneath.
+
+**Part A — per-link style (seeded, render-only)**
+- `world/layout.py` — `Stair.style` field (`"grass"` | `"rock"`, default grass).
+- `game/config.py` — `RAMP_ROCK_BIAS` `{1:.35, 2:.8, 3:1.0}` + `..._DEFAULT .5`:
+  the rock probability, keyed by the plateau's floor (higher floors lean rock).
+- `world/gen/verticality.py` — `_ramp_style(seed, hi, lo, hi_floor)` rolls a
+  private `random.Random(f"{seed}:ramp-style:{hi}:{lo}")` against the bias.
+  `_plan_ramps` takes `seed`, its plan tuples grow a 5th `style` field, threaded
+  through `_ramp_steps` (into the `Stair`), `_collect_annex`, `_build_tile_meta`
+  and `world/gen/__init__.py`. No world-RNG draw → per-seed geometry byte-identical.
+
+**Part B — the rock overlay sprite**
+- `utilities/prep_vstairs.py` — one-shot: colour-keys the opaque backdrop of the
+  user's re-crop (`vertical_stairs.png`, 582×595), crops the lower flight + both
+  foliage wings, `smoothscale` → `assets/terrain/tiles/vstairs.png` (**192×128**,
+  ~1-tile stone core + a foliage wing each side, SRCALPHA).
+- `data/terrain.json` — `"vstair"` block simplified to `{ sheet, core_cols 1 }`.
+- `world/terrain/sheets.py` — `vstair_overlay(band_tiles)`: the sheet scaled to
+  `band_tiles` tiles tall (aspect kept), cached; `None` → caller renders grass.
+- `world/map.py` — `GameMap._stair_overlays: list[(blit_rect, surf)]`.
+- `world/terrain/cliffs.py` `paint_cliff` — a `rock` unit appends its sprite to
+  `_stair_overlays` centred on the stair column; under it the stair column is
+  filled with plain grass (plateau tone on the upper band cell, low-room tone on
+  the lower) so the sprite's feathered edges reveal grass, never void. All three
+  unit columns stamp the solid `body` mid tile at a half-tile stagger across both
+  band rows (was `body_mid` + scalloped `bot_mid`) so no row seam leaks the void.
+- `world/terrain/render.py` — `_draw_tiled` blits `_stair_overlays` last, after
+  the corridors.
+- Render-only, no flag: `Stair.style` + `vstairs.png` presence are the switch.
+- Tests: `test_ramp_units_render_as_rock_overlay_or_grass_by_style` (rock → a
+  `_stair_overlays` sprite, stone centre; grass → a `_ramp_surfs` entry, no
+  overlay; both styles seen across 40 seeds), `test_vstair_overlay_sprite_is_a_
+  real_srcalpha_file`. Full suite **730** green.
+
+**Deferred**
+- E/W (side-by-side) cross-floor links are not produced yet, so a `grass` unit is
+  still the LD-4 N/S sideways ramp; the true E/W biome set is L8-4's other half.
+- Δ2 links still fall through to a plank `Stair` (`_split_links`) — L8-3's job.
+
+---
+
+### LD-8b — per-level terrain compositing — ✅ DONE (2026-08-30)
+
+`world/terrain/render.py` `_draw_tiled` used to paint globally by *type*: all
+cliff underlay, then all cliff faces, then room floors bottom-up, then all
+stairs / ramps / corridors / overlays. It now paints one **elevation at a
+time**, bottom up:
+
+    water + sea shoreline foam + open-water scenery      (base, once)
+    for f in sorted(floors):
+        cliff-foot foam over open water  (floor f)
+        LD-7a cliff-foot underlay grass  (floor f)
+        LD-6 contact drop shadow         (floor f)
+        cliff faces                      (floor f)
+        room grass                       (floor f)
+        plank stairs / ramp units / corridors / rock stair overlay  (floor f)
+
+So a higher floor's cliff wall is always painted onto the *finished* floor
+below it. Every per-floor container gained a floor tag: `_corr_surfs` and
+`_stair_overlays` grew a 3rd element in `world/map.py` / `world/terrain/cliffs.py`;
+`_cliff_underlay` / `_cliff_foam` / `_cliff_shadow` grew one in `paint_cliff`
+(the raised room's own floor). `_cliff_surfs` / `_stair_surfs` / `_ramp_surfs`
+already carried it.
+
+Test `test_cliff_faces_paint_below_rooms_and_ramp_units_above` →
+`test_map_composites_one_floor_at_a_time`: within a floor `underlay < faces <
+grass < ramp`, and a lower floor's grass paints before the wall above it.
+
+---
+
+### LD-8a Phase 1 — stair orientation is a generation property — ✅ DONE (2026-08-30)
+
+Per the "generate the stair as vertical / horizontal, *then* pick the asset"
+decision. Every cross-floor link the generator makes today is N/S-stacked, but
+the LD-4 unit modelled it as a **sideways** E/W ramp (`slots.ramp` tiles,
+landings at `c0±d`), whose start/end tiles leaked around the rock overlay.
+
+- `world/layout.py` — `Stair.orient` (`"v"` | `"h"`, default `"v"`); `ramp`
+  value is now `"s"` for a vertical unit, `"w"`/`"e"` for a horizontal one.
+- `world/gen/verticality.py`
+  - `_ramp_candidates` yields `(hi, lo, "v")` — still only stacked pairs; the
+    `"h"` classification is reserved for L8-4's E/W half.
+  - `_plan_ramps` plan tuple → `(hi, lo, col, orient, direction, style)`. The
+    footprint is still probed 3 columns wide, so **per-seed `col` is unchanged**.
+  - `_ramp_steps` — a `"v"` unit is a straight 3-rect chain in column `col`
+    (approach 2 into the plateau / the flight spanning the band / approach 2
+    into the low room), `axis="v"`; `"h"` keeps the LD-4 5-rect chain.
+  - `_collect_annex` — `"v"` annexes only the low room's landing cell; the
+    flight's own rim cell stays a south rim so `_build_tile_meta` can tag it
+    (the tag alone suppresses the cliff fringe there).
+- `world/terrain/cliffs.py` `paint_cliff` — reads `Stair.orient`. A `"v"` unit
+  builds `unit = {c0: stair}` only; the flight column is filled with the biome
+  grass (plateau tone above, low-room tone below), plus the `vstairs.png`
+  overlay when `style == "rock"`. No sideways landings. The `"h"` branch (dead
+  until E/W links exist) still holds the LD-4 landing code.
+
+Determinism: flag-off worlds byte-identical; per-seed vertical layout changes
+once (3 straight rects replace the 5-rect ±d chain). ~6 `RampTests` /
+`StructAnnexTests` rewritten for the straight chain. Full suite **730** green.
+
+---
+
+### LD8-0 — vertical grass flight tile — ✅ DONE (2026-08-30)
+
+Phase 1 left a `"grass"` `"v"` flight as a flat `interior` fill, so it read as
+invisible grass through a gap in the cliff. The tilesheet has no authored N/S
+ramp (slots 37/38/40/46/47/49 are blank; the only slope art, 36/45 + 39/48, is
+diagonal E/W), but `strip_v` — idx **3 / 12 / 21** — is an authored **vertical
+grass channel**: grass with a dark bush fringe down the left and right edges.
+
+- `data/terrain.json` — `slots.ramp` gains `"s"`. First `[12, 12]` (the plain
+  `strip_v` mid tile); LD-8 #1/#2 changed it to `[3, 21]` -- the top and bottom
+  `strip_v` caps, which carry the dark navy + white-foam **cliff-outline
+  border** so the channel merges into the flanking stone.
+- `world/terrain/cliffs.py` — a `"grass"` `"v"` flight now paints
+  `ramp_slots["s"]` (plateau sheet on the upper band cell, low-room sheet on
+  the lower) instead of `interior`. `"rock"` flights keep the plain `interior`
+  fill under the `vstairs.png` sprite.
+
+Data-only + one render branch; no layout / RNG change, no new test churn. Full
+suite **730** green. Result: the grass flight reads as a bush-lined grassy path
+cut straight down through the rock wall, flanked by the stone cliff faces.
+
+---
+
+### LD-8 #1/#2 — flatter elevation + two-floor links + layout choice — ✅ DONE (2026-08-30)
+
+**#2 elevation model.** `config.CLIFF_TILES` 2 → **1**: one cliff tile per
+floor, and the plateau face height is now the floor number **uncapped** --
+`_face_h` / `paint_cliff` / `map.py` drop the `min(floor, 2)` cap, so a floor-3
+plateau has a 3-tile face and floor 3 sits one tile above floor 2. A cross-floor
+link drops 1 tile (Δ1) or 2 (Δ2). Every `min(floor,2)*CLIFF_TILES` in the tests
+became `floor*CLIFF_TILES`.
+
+**#1 two-floor links + per-link layout.**
+- `world/gen/verticality.py` `_plan_ramps` — accepts `hi.floor - lo.floor` in
+  `(1, 2)` (was `== 1`); `drop = df * CLIFF_TILES`; the snap allowance scales
+  with the drop (`RAMP_SNAP_TILES` per floor). `_ramp_candidates` yields
+  `(hi, lo)` and the layout is a seeded roll: `_ramp_layout` → `"h"`
+  (`config.RAMP_LANDING_BIAS`, 0.4) or `"v"`. The `fits` probe checks the
+  approaches at the centre column for `"v"`, one column out for `"h"`.
+- `_ramp_steps` / `_collect_annex` / `paint_cliff` — a `band` of 1 or 2 rows
+  everywhere the unit was hard-coded to 2. `"v"` grass uses `ramp_slots["s"]`
+  (`[21]` for a 1-tile drop, `[3, 21]` for 2); `"v"` rock uses
+  `sheets.vstair_overlay(band)` (the sprite scaled to 1 or 2 tiles); `"h"` is
+  the LD-4 wedge (`ramp_slots[direction]`) + 3-sided landings, band-scaled.
+- rock is the straight-`"v"` sprite only -- an `"h"` unit is always
+  `style = "grass"`.
+- Determinism: flag-off byte-identical; per-seed vertical layout changes
+  (shorter bands, the layout roll). ~8 `RampTests` / `StructAnnexTests`
+  rewritten to be layout- and band-aware. Full suite **730** green.
+
+Provisional: `CLIFF_TILES = 1` is flagged in `config.py` -- raise back toward 2
+if a 1-tile ledge clips character sprites.
+
+---
+
+## LD-9 — rooms are height maps (in progress)
+
+**The reframe.** Stop modelling the map as separate floors and model it as
+*levels within one continuous map*, where cliffs are natural barriers that sell
+verticality as y grows. A room stops being "one `floor` int + a cliff band
+hanging off its south rim" and becomes a **per-cell height map**: generation
+emits a grid, rendering is a pure function of it. This is the machine form of
+the ASCII layouts the user writes.
+
+### Phase A — the grid + generator — ✅ DONE (2026-08-30)
+
+- `world/layout.py` — `Cell(kind, level, drop, row, tag)` plus the `GROUND` /
+  `CLIFF` / `VSTAIR` / `EWSTAIR` / `LAKE` / `VOID` names and `WALKABLE_KINDS`.
+  `level` is always the *upper* surface a cell belongs to; `row` indexes a
+  cliff / stair cell down its own stack so the renderer never re-derives it.
+- `world/gen/heightmap.py` — new. `build_grid(mask, cols, rows, rng, base)`:
+  1. `_plan_levels` picks terraces bottom-up, stepping 1 or 2 levels while
+     there is level headroom (0..3) and row budget.
+  2. `_wander` gives each wall a clamped random walk so it reads as a ridge.
+  3. `_settle_walls` alternates a smoothing pass (a wall never steps further
+     between columns than it is deep — otherwise upper ground would touch
+     lower ground with no stone between) with an ordering clamp (walls cannot
+     cross and squeeze a terrace out of existence).
+  4. `_plan_stairs` *finds* crossings that already fit the settled wall rather
+     than forcing the wall to fit them — flat across three columns for a
+     straight flight, a one-row jog for an east/west one (`# > =` over
+     `= > #`, exactly the journal's diagram, generalised to a Δ2 wall as a
+     three-row flight).
+  5. `_face_the_sea` — no floating ground: a terrace cell with open sea south
+     grows a wall under it, capped at two tiles.
+  6. `_repair_links` cuts extra straight flights until the room is one
+     connected piece; `_prune_unreachable` voids anything still stranded.
+- `walk_links` is the single source of truth for connectivity: ground joins
+  same-level ground; a flight joins the terrace at its head and the one at its
+  foot; an east/west flight additionally opens sideways at each end (its entry
+  and exit tiles) as well as along its column.
+- `check_grid` asserts every invariant — no floating ground, no two levels
+  touching without a wall, no flight open sideways onto the wrong level, drops
+  never over two, everything reachable. **0 violations over 60 plain rooms and
+  60 eroded ones.** `to_ascii` dumps a grid in the journal's own notation.
+
+### Still to do
+
+- **B** wire `build_grid` into `generate_world`; fewer, bigger rooms
+  (~14-22 tiles a side, ~6-9 per world); inland lakes; between-room links.
+- **C** render from the grid; retire `paint_cliff`'s rim-band machinery
+  (`_cliff_underlay` / `_ramp_surfs` / `_stair_overlays` collapse into one pass).
+- **D** nav + collision read the grid (`WALKABLE_KINDS`, `walk_links`).
+
+### Phase B1 — wired into generation — ✅ DONE (2026-08-30)
+
+Behind `config.HEIGHTMAP_ROOMS` (default **off**), so the LD-8 renderer keeps
+working and flag-off layouts stay byte-identical until Phase C lands.
+
+- `game/config.py` — the flag plus its sizing: `HEIGHTMAP_CHUNK_SIZE` 1280,
+  `HEIGHTMAP_ROOM_COUNT` 8, `HEIGHTMAP_ROOM_TILES` (14, 22),
+  `HEIGHTMAP_STAIRS_PER_WALL` 2, `HEIGHTMAP_LAKES` 1. Fewer, far larger rooms:
+  a room now has to hold several terraces *and* the walls between them.
+- `world/layout.py` — `Room.grid`.
+- `world/gen/__init__.py` — `_build_room_grids` calls `build_grid` per room,
+  then re-derives what the rest of the engine reads: `cells` becomes the
+  walkable subset (so collision and the nav grid need no changes at all) and
+  `floor` collapses to the room's base level, which is all the palette lookup
+  still wants. `_grid_tile_meta` projects `TileMeta` straight off the grid --
+  no rim/lip derivation, which is the point of LD-9.
+- `world/gen/heightmap.py` — `_carve_lakes`: floods blobs of a terrace, and
+  backs a lake out again if it touches anything but its own terrace's ground or
+  would cut the room in two.
+
+Measured over 20 generated worlds: 8 rooms each, 15-22 tiles a side, 3-4 levels
+per room, **0 grid violations**, and generation is deterministic per seed. Full
+suite **730** green (flag off).
+
+**Known gap, B2.** Cross-room corridors do not yet match levels: of 140 corridor
+ends, 37 land on equal levels and 103 do not (65 of them level 0 against level
+3 -- a room's north edge is its *highest* terrace while its south edge is its
+base, so a vertically stacked pair meets 0 against 3). Cliffs in this tileset
+only face south, so a room's levels must descend northward; the fix is to cap a
+room's top terrace where a north link attaches and carry the remaining
+difference on a cross-room stair, the way LD-8's `_plan_ramps` did.
+
+### Phase B2 — cross-room links — ✅ DONE (2026-08-30)
+
+Rooms are islands in open sea, so the cliff rules govern *contiguous land*; a
+bridge between two islands may span levels the way a real bridge does. What
+must hold is the standing two-level cap and that both mouths land on ground.
+
+- `world/gen/heightmap.py` — `build_grid(..., top=)` caps the highest terrace.
+- `world/gen/__init__.py` `_build_room_grids` — cliffs only face south, so a
+  room's terraces descend northward: its south edge is the base level and its
+  north edge its summit. A bridge dropping onto a room's north edge therefore
+  meets that room at its summit, so any room entered from the north has its
+  summit capped at two.
+- `_seat_corridors` — slides each bridge along the rooms' shared edge until
+  both mouths land on walkable ground, preferring a lane where the two ends are
+  at the same level. A height-map room's edge is no longer uniform floor (it may
+  be cliff, or lake, or a terrace met side-on), so the lane the tree picked
+  before the grids existed has to be re-seated against them.
+
+Measured over 20 worlds: **0 mouths on non-walkable ground** (before: several),
+73 of 140 same-level (before: 37), and every remaining span is 1 or 2 — the
+Δ3 mouths, 65 of them, are gone.
+
+### Phase C — rendering from the grid — ✅ DONE (2026-08-30)
+
+- `world/terrain/grid_paint.py` — new, and it is now the whole terrain painter
+  for a room: one pass over `Room.grid`, one tile per cell. It replaces the LD-8
+  arrangement where the floor, the cliff band, the band's underlay, the drop
+  shadow and the ramp units were five collections stitched together in a fixed
+  order by `_draw_tiled`. Generation already decided every cell's kind and
+  level, so rendering derives nothing.
+  - a side counts as **open** (grass fringe / shoreline edge) only where the
+    neighbour is water or void, or where it is the *south* side looking over
+    this terrace's own drop. A cell at the foot of a wall keeps its north side
+    flat -- the stone stands on it, and a fringe there would read as a beach
+    running under the cliff;
+  - a cliff cell is underlaid with the terrace it drops onto, because the
+    run-end face variants keep their outer edge transparent and would otherwise
+    show the sea straight through a wall standing on land;
+  - `vstair` paints the grass channel and, when "rock", the stone sprite over
+    it; `ewstair` paints the biome wedge; `lake` paints nothing at all, so the
+    world's water buffer shows through as real water.
+- `world/terrain/sheets.py` — `vstair_sprite(drop)` picks `vstairs_1` /
+  `vstairs_2` (authored per depth rather than one rescaled, so the steps stay
+  square); `data/terrain.json` `vstair.sheets` maps them.
+- `world/map.py` — `_grid_surfs`, and `_finish_tiles` factored out so the water
+  buffer, drop shadow, foam frames and scenery scatter are shared by both
+  painters, which differ only in how the land is baked.
+- `world/terrain/render.py` — with `_grid_surfs` set, the only ordering left is
+  between rooms: south-first, so a room lower down the map overlaps the one
+  above it, the same way its own terraces do.
+- `config.HEIGHTMAP_CHUNK_SIZE` 1280 -> 1984: the largest room (22 tiles =
+  1408 px) was wider than its chunk, so neighbours fused instead of staying
+  islands.
+
+Full suite **730** green with the flag off.
+
+### Still to do
+
+- **D** nav + collision from the grid. `Room.cells` is already the walkable
+  subset so both work, but neither yet knows a flight is the *only* way
+  between two terraces -- they treat the whole room as one connected floor.
+- Obstacle scatter is unaware of terraces and can drop trees onto a flight.
+- Level 3 uses the teal sheet, which reads oddly as the highest ground.
+- Walls wander only one row (`JITTER`); the terraces still read as bands.
+
+### Phase C1 — tile corrections + wider rooms — ✅ DONE (2026-08-30)
+
+Three corrections from a screenshot review.
+
+- **The vertical pathway used the wrong tile.** `slots.ramp.s` was `[3, 21]`,
+  the `strip_v` pair -- white shoreline outline, and capped top and bottom so a
+  one-tile flight rendered as a lone "bottom" tile. It is now `[17, 17]`:
+  `slots.raised.we`, the grey cliff-fringed vertical channel, continuous at any
+  depth. A Δ1 flight is one of them, a Δ2 flight two.
+- **A lip run needs corners where it ends.** `_edges` now states the rule
+  plainly: water and void are edges anywhere; a cliff *at this cell's own
+  level* is this terrace's wall, so the terrace stops against it; a cliff at a
+  higher level is standing on this cell, so the ground runs flat beneath it;
+  a flight is never an edge. `_open_sides` then adds the corner: where a
+  neighbour along the run has no lip -- at a flight cut through the wall, or
+  where the wall jogs -- the facing side opens too, picking the `sw` / `se`
+  tile so the fringe turns rather than stopping in mid-air.
+- **Rooms read as one long staircase.** They are now markedly **wider than
+  tall** (`HEIGHTMAP_ROOM_COLS` 24-34 against `HEIGHTMAP_ROOM_ROWS` 14-20):
+  height only buys more of the same climb, width buys room for several separate
+  ways up on the same wall. `HEIGHTMAP_STAIRS_PER_WALL` 2 -> 4, and the chunk
+  grew to 2560 so the widest room still leaves a water gap.
+
+Over 20 worlds: 0 grid violations, 3.1 terraces per room, and both flight kinds
+common (1221 straight cells, 758 east/west). Full suite **730** green.
+
+**Not done: the coastline.** A level-0 shore ring right around a room is not
+compatible with this tileset, and the reason is worth recording. The cliff art
+is south-facing only (`slots.cliff` is a horizontal run with left/mid/right
+ends), so a room's levels must decrease northward -- which makes its north edge
+the summit and its south edge the base. A ring would put level 0 north of a
+raised terrace, and the boundary there faces *north*, which there is no tile
+for. Either the terraces stay banded, or the sheet needs north/east/west facing
+cliff faces.
+
+### Phase C2 — coastline — ✅ DONE (2026-08-30)
+
+The earlier note said a shore ring was impossible without north-facing cliff
+art. That was answering the wrong question. What the coastline needs is not a
+level-0 ring but an **irregular outer margin**: every terrace simply reaches a
+different distance out on every row, so the island's silhouette wanders. No new
+art at all, because a terrace's east and west edges are grass meeting open
+water -- which `slots.raised` already draws. Only a *southward* drop needs a
+cliff face, and the bands still run that way.
+
+- `world/gen/heightmap.py` `coast_mask(cols, rows, rng, margin)` -- one clamped
+  random walk of inset per side. `_walk` holds each value for a run of 2-4
+  instead of stepping every column: stepping every column gave a comb of
+  one-tile spikes, holding gives headlands and bays. `_despike` then trims
+  until no tile clings on by a single side, since a one-tile peninsula reads as
+  a rendering fault and is too narrow to walk anyway.
+- `world/gen/__init__.py` -- replaces the tree's corner-bite shape with the
+  coast mask. `config.HEIGHTMAP_COAST_MARGIN` 4.
+
+Terraces no longer all begin and end in the same column, which is what made the
+rooms read as a fixed staircase. 0 grid violations over 20 worlds; suite green.
+
+### Phase C3 — bays, wandering coast, bridges that reach — ✅ DONE (2026-08-30)
+
+**Why a bridge could end in open water.** `paint_corridor` derived the plank
+span from the two rooms' *rects*. Once the coastline started wandering inside
+the rect, the land it was supposed to land on had receded two to four rows, so
+the bridge stopped short and hung over the sea. `_seat_corridors` now scans
+inward from each rect edge for the first walkable cell (`reach`) and stretches
+the corridor rect coast to coast, overlapping one tile into the land at each
+end; `grid_paint.paint_bridge` tiles the planks along that rect, so the rect
+*is* the bridge. This also fixes collision, which reads the same rect. 138 of
+140 bridges re-seat; the two that cannot are pairs whose shared span has no
+column with land on both sides.
+
+**The west coast was a straight line** because `_walk` was a free random walk:
+it drifts to one end of its range and then hugs it. The step is now pulled back
+toward mid-range, so the inset oscillates instead of drifting.
+
+**`_carve_bays`** bites a few bays into the coast so the *terraces* come out
+ragged, not just the island's outline. Each bay starts on the shore and eats
+inward, so it opens onto the sea rather than leaving a landlocked hole -- that
+is what a lake is for -- and is rolled back unless the island stays one piece.
+A bay reaching across a terrace narrows it to a neck, which is where a wide
+lower floor with a slim path above it comes from.
+
+0 grid violations over 20 worlds; suite **730** green.
+
+### Next
+
+- A bridge *inside* a room, spanning a bay between two stretches of the same
+  terrace -- the gap at the top of the reviewed screenshot.
+- **D**: nav and collision still treat a room as one flat floor, so enemies
+  path through cliffs instead of using the flights. This is the real blocker
+  on turning the flag on.
+
+### Phase C4 — the shore ring — ✅ DONE (2026-08-30)
+
+The earlier entry claimed a shore ring needed north-facing cliff art. That was
+wrong, and the mistake is worth keeping: **only the *southern* face of a rise
+is ever seen.** Looking from the south you see the wall there; on the other
+three sides you are looking at the plateau's grassy back or flank, which the
+`slots.raised` edge tile already draws. So the island can be ringed in
+sea-level ground and rise inward with no new art at all.
+
+- `build_grid(..., shore=n)` erodes the mask by `n` to get a core, terraces the
+  core, and fills the ring with sea-level ground.
+- **Order matters**: the wall goes in before the beach. A terrace reaching the
+  core's southern edge needs its face built into the ring first; the sand then
+  fills only what is left. Filling the beach first put sea-level ground
+  directly below raised ground and the drop lost the very wall that sells it
+  (1649 violations).
+- `_wall_flight_sides` puts stone back beside any flight the beach opened up --
+  eroding the core can take away the wall a flight was cut into, leaving a
+  staircase you could step onto sideways, halfway down (127 violations).
+- `check_grid` now only requires a wall on a **southward** drop; a rise to the
+  north, east or west is legal and unwalled.
+- `MAX_LEVEL` 3 -> 2: sea level plus two floors, as the ASCII diagrams show.
+- `reach` (bridge seating) now demands plain **ground**, not merely a walkable
+  cell -- a bridge was landing on a flight, its planks meeting the middle of a
+  staircase.
+- Erosion is now guarded twice: `coast_mask` retries with a smaller margin, and
+  `_build_room_grids` judges the *finished* grid and backs the coast off until
+  the island is worth calling one. Before, the four insets plus bays plus
+  de-spiking could compound down to a dozen tiles, leaving bridges running to
+  almost nothing (min fill was 2%; now 51%).
+- Rooms grew a long way and the count fell to pay for it (36-50 x 22-30 tiles,
+  6 per world, 3712 px chunks): a room has to hold a shore ring, several
+  terraces and the walls between them, and the coast erodes it further.
+
+0 grid violations over 20 worlds, no room under 150 ground cells, average fill
+64%. Suite **730** green.
+
+### Phase C5 — granularity + crevasses, both tunable — ✅ DONE (2026-08-30)
+
+Upper terraces read as slabs of grass because the wall between two of them
+barely moved. Two knobs now shape that, both in `game/config.py`:
+
+- `HEIGHTMAP_WALL_WANDER` / `HEIGHTMAP_WALL_STEP` -- how far the wall strays
+  from its nominal row and how fast it may move between neighbouring columns.
+  Together they set how granular a terrace edge is: 1/1 gives smooth bands,
+  higher values a broken ridge.
+- `HEIGHTMAP_CREVASSES` (+ `_DEPTH`, `_WIDTH`) -- fingers of the *lower*
+  terrace driven up into the one above. Wandering alone only ripples the
+  boundary; a crevasse is a deliberate incursion, a bay of the lower floor
+  biting into the higher one, tapered at the ends so it reads as an inlet
+  rather than a slot.
+
+The unlock was retiring the old `|Δ| <= depth` limit on how far a wall could
+move between columns. That existed because a big sideways step left upper
+ground touching lower ground with no stone between -- which, since Phase C4,
+only matters on a *southward* drop. East and west the plateau shows its flank,
+drawn by its own edge tile. Lifting the limit is what lets a crevasse cut in
+sharply instead of as a shallow V. `_settle_walls` keeps only the ordering
+clamp, which stops a crevasse swallowing the terrace above.
+
+Defaults settled at wander 2 / step 1 / 4 crevasses of 1-3 rows: depth 5 ate
+whole terraces. 0 grid violations over 20 worlds; suite **730** green.
+
+### Phase C6 — bridges, properly — ✅ DONE (2026-08-30)
+
+Three rules, and one real bug behind most of the mess.
+
+**The bug: `reach` was reading a transposed cell.** Grid keys are `(col, row)`,
+but the scan built its key as `(fixed, idx)` regardless of axis. A *vertical*
+bridge holds the column and scans rows, so that was right by luck; a
+*horizontal* one holds the row and scans columns, so every lookup landed on a
+completely different cell. Horizontal bridges were therefore seated against
+cells chosen at random -- which is why they started in open water. `reach` now
+takes the axis and keys `(idx, fixed)` for "h", `(fixed, idx)` for "v".
+
+**Rule 2, end caps square on the ground tile.** Room rects were centred in
+their chunk, so a room of odd tile-width sat half a tile off the world grid and
+no two rooms shared one -- a bridge could not land square at both ends. Rooms
+are now snapped to the global grid, and `_grow_rooms` / `_carve_room_shapes`
+are skipped entirely in the height-map path: the coastline overwrites `cells`
+anyway, and the growth pass was moving rects back off the grid.
+
+**Rule 3, bridges belong on the shore.** `reach` takes the *first* land the
+scan meets, so it can never strike inland, and it now requires plain ground at
+**sea level** -- it will not run up onto a terrace or stop on a cliff top. If
+no lane at all offers a beach on both sides it retries without the sea-level
+demand, since a bridge onto raised ground still beats one hanging over water.
+
+**Rule 1, any island will do.** The lane search covers the whole span either
+room reaches rather than only where the two rects overlap, and prefers the
+shortest crossing among the lanes that work.
+
+Over 20 worlds, 100 bridges: **100/100 tile-aligned to both rooms, 100/100 with
+both mouths on ground** (was 55), 75/100 with both on the shore. 0 grid
+violations; suite **730** green.
+
+### Phase C7 — volcano islands: concentric plateaus — ✅ DONE (2026-08-30)
+
+Terraces as north-to-south **bands** made every island read as one long
+staircase, however irregular the boundary got. Replaced with concentric caps:
+the island is sea-level ground all over, a smaller irregular plateau sits on
+top of it, and a smaller one again on that -- a mountain.
+
+- `_cap(below, rng)` erodes the plateau below it, **harder from the south than
+  the north** (`CAP_INSET_S` 5 against `CAP_INSET_N` 1), then roughens the rim.
+  The asymmetry is the whole trick: each cap hugs the island's back, so the
+  rims stack into a slope facing the camera instead of a dome.
+- `_raise_walls` gives every southward drop its cliff, consuming cells from the
+  terrace below exactly as the band walls did. East, west and north faces get
+  no cliff -- they are the plateau's flank and back, which `slots.raised` draws.
+- The sea-level ring is never built on, so a walkable shore runs right round
+  every island. That is what lets **bridges meet sea level only**: a mouth is
+  always there to be found and no bridge ever reconciles a height difference.
+  100/100 bridges now land on shore at both ends.
+- `_cut_flights` **finds** stair sites by scanning the finished grid instead of
+  planning against a row of wall, since concentric caps have no such row. All
+  four of the tileset's stairs are placed: straight in stone, straight in
+  grass, and the east/west grass flight either way. `_link_levels` then cuts
+  more until every plateau is reachable.
+- Not every island is a mountain: `HEIGHTMAP_VOLCANO_CHANCE` (0.65) leaves the
+  rest plain one-level ground, so the world mixes silhouettes.
+
+Retired with the band model: `_plan_levels`, `_split_rows`, `_wander`,
+`_crevasses`, `_settle_walls`, `_plan_stairs`, `_stamp_stairs`, `_repair_links`
+and their config. Kept and unchanged: `check_grid`, `walk_links`, `coast_mask`,
+`_carve_bays`, `_despike`, `_carve_lakes`, `_face_the_sea`, `_prune_unreachable`
+and all of `grid_paint` -- which is why this was a contained rewrite.
+
+One bug worth recording: `_face_the_sea` has to run **again at the very end**.
+Carving lakes and pruning stranded pockets both take cells away, and any of
+them may have been the ground a plateau stood on; without the second pass 36
+cells of floating ground survived into the shipped grid.
+
+Over 20 worlds: 0 grid violations, 72 volcano / 48 flat islands, all four stair
+types in use (117 stone, 120 grass straight; 608 east/west). Suite **730** green.
+
+### Phase C8 — the cap knobs live in config — ✅ DONE (2026-08-30)
+
+The band model's tuning (`HEIGHTMAP_WALL_WANDER` / `_STEP`, `HEIGHTMAP_CREVASSE*`)
+described a wall row wandering across columns and has no meaning for concentric
+caps, so it went with the bands. Its replacements were left as module constants
+in `heightmap.py`, which is not where anyone would look for them. They are now
+in `game/config.py` alongside the rest:
+
+- `HEIGHTMAP_CAP_INSET_S` / `_N` / `_W` / `_E` -- how far each plateau steps in
+  from the one below, per side. **South is the one that matters**: it is the
+  only face the camera sees, so raising it lengthens the visible climb, while
+  raising north flattens the mountain toward a dome.
+- `HEIGHTMAP_CAP_ROUGHNESS` -- chance a rim cell is nibbled away. 0 gives smooth
+  contour lines, higher values a broken rocky edge. This is the granularity
+  dial the wall wander used to be.
+- `HEIGHTMAP_CAP_MIN_CELLS` -- below this a plateau is not worth having and the
+  stack stops, which is what decides how often an island gets a summit at all.
+
+Threaded through `build_grid(cap_inset=, cap_roughness=, cap_min_cells=)` and
+`_cap`. Swept over 12 worlds each, 0 grid violations at every setting.
+
+### Phase C9 — crossings placed per region — ✅ DONE (2026-08-30)
+
+Whole stretches of rim -- the north-east and north-west especially -- came out
+with no way up. Not a geometry problem: `_cut_flights` spent a flat island-wide
+quota drawn from one shuffled pile, so on a large island the crossings clustered
+wherever the shuffle fell and the rest of the coast simply lost the draw.
+
+Sites are now bucketed into a coarse grid of **regions** and each region gets
+its own quota, which guarantees every part of the coast has crossings of its
+own. `HEIGHTMAP_STAIRS_PER_REGION` (2), `HEIGHTMAP_STAIR_REGION` (8 tiles) and
+`HEIGHTMAP_STAIR_SPACING` (4) replace `HEIGHTMAP_STAIRS_PER_WALL`.
+
+Also: where a cell offered both a straight and an east/west flight, the
+straight one always won, because the scan `continue`d on the first match. Both
+are collected now and one is chosen at random, so the mix is honest.
+
+Over 20 worlds: 773 flights -- 250 east/west descending west, 244 east, 153
+straight grass, 126 straight stone -- and 182 of them in the northern half
+(previously the north was routinely empty). 0 grid violations; suite **730**
+green.
+
+A structural note for later: the north can never be as dense as the south,
+because a cap's north edge is its *back* and gets no cliff, so there is nothing
+to cut through. The flights that do appear up there sit on the zigzag
+south-facing segments of the cap's east and west flanks.
+
+### Phase C10 — side stairs in the north — ✅ DONE (2026-08-30)
+
+Split an island in half horizontally and the north had almost no **side**
+stairs, specifically on the ground-to-first-floor boundary. Counted over 16
+worlds, the gap was stark and specific:
+
+    north side 1->0    21        south side 1->0   201
+    north side 2->1    54        south side 2->1    25
+
+So it was not "the north has fewer stairs" in general -- 2->1 is actually
+*better* up there, because a level-2 cap's southern arc sits in the middle of
+the island. It was the **0->1 boundary** that was missing, and only in the
+north, because a cap's north edge is its back and grows no cliff. The one
+south-facing 0->1 wall the north can have is a canyon head.
+
+Two fixes, and the first was a mistake worth recording:
+
+1. **Step the canyon head.** A flat run of wall only ever fits a *straight*
+   flight; an east/west one needs the wall a row lower on one side than the
+   other. Pushing one column of the head a row further north creates that jog.
+   On its own this made things **worse** -- straight flights at heads collapsed
+   from 17 to 1 and side stairs did not appear -- because the jog needs three
+   columns and canyons were 1-3 wide, so most heads had no room for it.
+2. **`HEIGHTMAP_CANYON_WIDTH` (1, 3) -> (3, 5)**, so a head is wide enough to
+   carry the jog. That is what actually paid: north side 1->0 went 21 -> 51,
+   and straight flights recovered to 16. Raising `HEIGHTMAP_CANYONS` to 5 took
+   it to **63**, three times the original.
+
+Final: north side 1->0 **63** (was 21), north straight 1->0 29 (was 17), with
+the south unchanged. 0 grid violations; suite **730** green.
+
+### Phase C11 — tile selection corrections — ✅ DONE (2026-08-31)
+
+Three changes to `world/terrain/grid_paint.py`, and one of them I got wrong
+first and had to back out -- worth recording, because the reasoning that led me
+there was plausible and false.
+
+1. **A cliff run is per wall, not per stone.** `_run_var` asked only whether the
+   neighbour was stone. Concentric plateaus put one terrace's wall right
+   alongside another's, and a two-level wall beside a one-level one, so two
+   separate rims merged into a single run and the face where a rim genuinely
+   ended was drawn as a squared-off `mid`. `_same_wall` now matches the level
+   *and* the drop. Measured: 7 cliff cells across 12 worlds change variant --
+   real, but rarer than I expected.
+
+2. **A cliff face stands behind every sideways stair** -- see the assets
+   journal for the rule. Plain grass used to sit under the wedge, so the
+   wedge's transparent corners showed grass in the middle of a rock wall and
+   the rim appeared to break at every crossing.
+
+3. **Reverted: using `slots.raised` for sea level.** I argued that
+   `autotile.mask_slot` falls back to `interior` on concave corners, that a
+   wandering coastline hits those constantly, and that `slots.raised`'s sixteen
+   combinations would fix it. Two of those are true and the conclusion is
+   still wrong: `raised` is the *cliff-fringe* block, not the *shoreline*
+   block. Applying it to sea level drew a grey fringe round every tile on the
+   island -- and `raised[""]` is not a plain tile either. The shoreline block
+   genuinely has only eight slots, so `mask_slot` is as far as the art goes;
+   representing a concave shore corner needs new art, not new code.
+
+   I should have looked at the rendered result before asserting the diagnosis.
+   The visible shoreline had never actually been wrong.
+
+Suite **730** green.
+
+### C13 -- cliff faces default to `mid`
+
+Three rules from the brief, replacing `_same_wall`:
+
+1. A face is `mid` unless a side is **open**, where open means lower ground,
+   lake or void. Same-level terrace grass alongside a face closes it -- that
+   was the miss, and it was 1,027 of the 3,888 sides sampled.
+2. An open west takes `left`, an open east takes `right`.
+3. `single` needs west, east *and* the ground under the wall's **foot** open,
+   so it is a genuine free-standing pillar. Foot rather than the face's own
+   south neighbour, because a two-deep wall's upper cell sits on its own second
+   row; walking to the foot keeps a one-wide column reading as one pillar.
+
+Plus: the ground cell above a `single` is pinned to `raised["swe"]`, the
+three-sided cap -- a pillar's terrace tile always continues north.
+
+Measured over twelve worlds, variants go
+`single 613 / mid 328 / left 502 / right 501` ->
+`single 25 / mid 774 / left 561 / right 584`, and all 23 pillars that had
+ground above them already resolved to `swe` unaided.
+
+Full rule text in the assets journal. Suite **730** green (221 in the terrain
+and world subsets re-run for this change).
+
+### C14 -- cliffs cast a shadow on the terrace they stand on
+
+The band renderer has had this since LD-5 (`_cliff_shadow` / `_shadow` in
+`world/map.py`, drawn in `terrain/render.py`); the height-map painter never
+did, so plateaus read as painted flat onto the ground rather than standing
+above it. Same asset -- the `terrain_shadow` rig, one 192x192 blob with a
+feathered bleed a cell wide on each side.
+
+Ordering is the whole point: **ground, shadow, stone**. That forced
+`paint_room_grid` out of its single row-sorted loop into four passes:
+
+1. ground cells, plus the terrace tile each wall stands on
+2. `_shade` -- the shadow layer
+3. the stone: cliff faces, e/w wedges, vertical-flight channels
+4. sprites taller than one cell
+
+Pass 4 is new and currently latent: a drop-2 stone flight is 64x128 and hangs
+into the row below, so under the old row-sorted single loop the grass of that
+row painted over its bottom half. Every flight generated today is drop 1
+(72 rock + 64 grass across twelve worlds, zero drop 2), so nothing visibly
+changes -- but the ordering is now correct for when drop-2 flights appear.
+
+Shadows accumulate on a scratch layer with `BLEND_RGBA_MAX`, not straight
+alpha: the blobs are three cells wide and sit one cell apart, so six overlap on
+every tile of a continuous run and normal compositing stacks into lumpy
+over-darkened patches. Same fix the band renderer arrived at.
+
+Vertical flights are excluded -- a channel you walk down is not a wall.
+
+### C15 -- ground tiles are floor-relative
+
+The rule, from the brief: a ground tile autotiles **against its own floor and
+nothing else**, and is drawn underneath everything. Own-floor ground continues
+on a side or it does not; cliff, flight, another terrace, lake and open sea are
+all equally "not my floor". Where that puts a fringe somewhere it should not
+be, the stone on top covers it.
+
+`_edges` + `_open_sides` + `_is_pillar` collapse into one `_floor_sides`. What
+went, and what each was papering over:
+
+* cliffs at a *higher* level not counting as an edge (ground "runs flat under
+  the wall standing on it") -- this is what left sea-level tiles tucked against
+  a plateau as flat squares with no fringe at all;
+* flights never breaking a fringe;
+* the corner-closure pass, which added `w` + `e` wherever the neighbouring
+  cell's south run stopped. Combined with the cliff rule it produced tiles like
+  `raised[26]` (`swe`, fringed on three sides) sitting in the middle of a flat
+  plateau -- the blocky outline in the report;
+* the explicit `swe` cap above a `single` pillar from C13. Measured: all 23
+  pillar caps across twelve worlds still resolve to `swe` on the plain mask, so
+  the special case was doing nothing. Cliff variants are unchanged
+  (`mid` 774 / `left` 561 / `right` 584 / `single` 25).
+
+**Two corrections to earlier entries.**
+
+1. C-series claimed "the shoreline block genuinely has only eight slots, so
+   `mask_slot` is as far as the art goes". Wrong -- `slots` also holds
+   `strip_v` `[3, 12, 21]`, `strip_h` `[27, 28, 29]` and `single` `30`, which
+   are exactly the missing eight combinations (opposite pairs and 3-gap nubs).
+   `autotile.mask_slot` fell back to `interior` for all of them; it now maps all
+   sixteen via `_GROUND_SLOT`. That is the second half of the flat-square fix --
+   a cell pinched between a lake and a cliff is an opposite pair.
+2. The same entry concluded the visible shoreline "had never actually been
+   wrong". It was: `solid` counted **every non-lake cell** as ground, cliffs and
+   higher terraces included, so a sea-level tile against stone saw four solid
+   neighbours and painted plain interior.
+
+**Block choice is a separate axis from the mask.** Keying sea level off its own
+floor made white surf trace the inland foot of every cliff. The mask stays
+purely floor-relative; `_at_water` picks which of the sheet's two fringe blocks
+draws it -- shoreline (white surf) when any side fronts sea or lake, raised
+(dark rim) otherwise. Applies at every level, so a lake on a plateau gets surf
+too.
+
+Suite **730** green.
+
+### C16 -- a higher floor is not the end of the floor beneath it
+
+C15 fringed a ground tile wherever its own floor's ground stopped. That drew
+*both* sides of every level boundary: the upper terrace's rim, and a second rim
+on the lower floor tracing the upper floor's outline back at it. The brief:
+plain mid tiles under every cliff and staircase, no strands, with the floor's
+own topography still respected.
+
+One clause does it -- **anything at a higher level is not an edge**; the floor
+runs on underneath, and since ground is painted below everything, the structure
+on top covers it. That covers both halves of the doubled rim: a higher terrace
+butting against the cell with no wall between (4,903 sides across twelve
+worlds) and a cliff or flight standing on it (3,540).
+
+Still fringed, unchanged: void 13,216, ground at a *lower* level 4,903 (the
+floor really does end and overlook a drop), stone at the cell's own level 3,735
+-- its terrace's rim -- and lake 395. Flights at the cell's own level keep the
+lip too, so a rim carries straight past a crossing; that was the one point the
+brief left open and it was settled that way for consistency with the cliff
+standing behind those flights.
+
+Result: 30,692 fringed sides -> 22,249, and ground tiles with no fringe at all
+go 37,426 -> 43,608. One rim per boundary, on the upper side.
+
+`autotile.mask_slot` splits into `ground_slot(slots, sides)` (name-keyed, what
+the grid painter wants) and the old cell-set wrapper (what `rooms.py` wants),
+because both fringe blocks are now keyed off the same `_floor_sides` string --
+the sea-level path was still deriving its own mask from the per-level cell set
+and would have kept the doubled rim.
+
+Suite **730** green.
+
+### C17 -- stairs continue the outline; depth at the water's edge
+
+Three fixes from one report.
+
+**1. A flight is part of its floor's outline, not a break in it.** C16 kept a
+flight as rim on every side, so the terrace tile beside one turned a corner
+into the gap -- seed 1 `(13,20)` came out `raised[25]` (`se`) where the wall
+either side of the crossing wants a plain bottom line. A flight at the cell's
+own level is now rim to the **south only** (the lip still carries over it),
+never west or east. `(13,20)` -> `raised[24]` (`s`); `(8,18)` -> `sw` instead
+of `swe`, keeping only the west edge it genuinely has against lower ground.
+
+**2. The shoreline block was painting surf against stone.** 40 tiles across
+twelve worlds fringed against stone or a lower terrace while drawn from the
+shoreline block, because block choice asked only "does any side touch water".
+White surf wrapping a cliff foot reads as the water sitting up on the plateau.
+The block is now chosen by whether **every** fringed side fronts water; a mixed
+tile takes the dark rim, which is the lesser error. Now zero.
+
+**3. A wall standing at the water's edge showed plain grass under it.** The
+underlay beneath a cliff was a flat `interior` tile, and the run-end face
+variants are transparent down one side, so 48 stone cells adjacent to sea or
+lake exposed a sliver of plain grass floating on the water. The underlay is now
+the same `_ground_tile` call as real ground, at the floor below -- the floor
+genuinely does run on under the stone. Inland it still comes out plain (2,502
+of 2,554), which is what the C15 brief asked for; the 48 at the water's edge
+come out as proper shore tiles.
+
+`_at_water` splits into `_wet_sides` (which sides front water) and
+`_ground_tile` (sides -> block -> slot), the latter shared by ground and
+underlay.
+
+Suite **730** green.
+
+### C18 -- a land-facing fringe needs the floor below behind it
+
+Reported as "cliff tiles appearing with a blueish square outline as if they
+didn't have transparency" on an upper terrace. The transparency is real and
+intended, and that is the whole problem.
+
+Every fringe tile is authored with a ragged, part-transparent outer margin --
+grass strands and surf are meant to composite over whatever lies beyond them.
+For a shoreline tile that beyond is the sea, and the world's water buffer
+showing between the strands is exactly right. For a **raised** tile the fringe
+faces land, but the room surface starts empty and nothing had been drawn in
+that cell, so the same water buffer showed through: a blue hairline round every
+cell of every upper rim.
+
+`_ground_tile` now returns `(slot, over_water)`, and where it is false the
+painter lays `sheet_for(level - 1)`'s interior behind the tile first -- the
+floor that genuinely runs on underneath it, so the strands sit against grass.
+Same for the underlay beneath a wall.
+
+Measured on the baked room surfaces (alpha < 200, sampled every 2px) over seeds
+1/3/5/7: ground tiles with see-through pixels whose fringe faces **land** go
+1,088 -> **0** in seed 7 alone; across all four seeds 2,622 remain and every one
+fronts water. Stone cells: 23 with see-through pixels, every one transparent
+only on a side that fronts water -- a wall hanging over the sea, where the
+`bottom` variant is meant to show it.
+
+Suite **730** green.
+
+### C19 -- a grass vertical pathway is not capped
+
+C17 made a flight rim to the south only. That still drew a grass lip straight
+across the head of every vertical pathway -- fencing off the opening the
+pathway is meant to be, since you walk into one from the north rather than
+from the side.
+
+`_open_channel`: a **grass** vertical flight at this cell's level is not a
+south rim either, so the tile above it is flat and the channel reads as
+continuous from the terrace down through the wall. Only the grass ones -- a
+stone-cut staircase keeps its rim, because the stair sprite drawn on top is
+what fills that channel. East/west flights keep theirs too; they are notches
+entered from the side, where the rim above is the wall's own.
+
+Only the south side goes, on the brief's instruction ("maybe in the future it
+can connect in other ways") -- a pathway lying *north* of a ground cell still
+reads as the floor ending.
+
+Measured over twelve worlds, the tile north of a flight:
+
+| flight | before | after |
+|---|---|---|
+| grass (62) | `s` | `-` |
+| grass (1) | `se` | `e` |
+| grass (1) | `ns` | `n` |
+| rock (72) | `s` / `ns` / `sw` | unchanged |
+
+**Also fixed here:** `_floor_sides`' docstring still described the pre-C17 rule
+("a flight counts as rim too"). The C17 patch had used a string replace with no
+assertion and it silently failed to match, so the code changed and the prose
+did not. Every edit in this file now asserts its match first.
+
+Suite **730** green.
+
+### C20 -- stone stairs cast, and so do plateau flanks
+
+Two additions to the caster set, `_casts` becoming `_shadow_clips`:
+
+* **Stone-cut vertical staircases cast** (+72 cells over twelve worlds). They
+  are structures standing on the floor like any wall. Grass pathways still cast
+  nothing -- a channel you walk down (64 cells).
+* **Plain ground casts sideways** where a ground tile at a *lower* level lies
+  directly east or west and this is the higher of the two (2,866 cells). That
+  is the plateau's flank: a north-south level change is where cliff faces live
+  and those already cast, but an east-west one is often bare, the wall having
+  jogged away, so the shadow band hugging the side of a plateau stopped and
+  restarted wherever the flank had no stone in it.
+
+Total casters 2,418 -> 5,356.
+
+**The clip is the whole trick, and the first attempt got it wrong.** The
+shadow sprite is flat alpha-80 with a core a shade wider than one cell, so an
+unclipped blob spills a few pixels past the caster onto every neighbour. Under
+stone that is invisible and on the terrace below it reads as the soft edge we
+want. Cast unclipped from open ground it traced a hard rectangle **outline**
+around each tile -- over the plateau top and to north and south as well.
+
+I first tried re-laying the caster's own ground tile over its shadow, on the
+brief's "under the ground tile". That covers the core but not the spill, which
+lands *outside* the tile, so the outlines stayed -- an A/B difference image
+(max channel delta 39/255) showed them as clean rectangles, which is what
+finally identified the mechanism. Clipping a ground caster's blob to the lower
+neighbour cell removes the outline entirely and leaves exactly the soft line
+hugging the flank that a cliff draws at the foot of a wall. The re-lay pass is
+gone with it.
+
+Suite **730** green. (One run failed on the known intermittent `spread_deg`
+`KeyError` in `combat/weapons.py`; it passes in isolation and is unrelated to
+terrain.)

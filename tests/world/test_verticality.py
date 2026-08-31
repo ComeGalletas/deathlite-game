@@ -463,7 +463,7 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
                              if b.x == r.rect.x and b.y == r.rect.y), None)
                 if surf is None:
                     continue
-                face_h = max(1, min(r.floor, 2) * int(config.CLIFF_TILES))
+                face_h = max(1, r.floor * int(config.CLIFF_TILES))
                 rim = {(c, ro): m.cliff_var
                        for (c, ro), m in r.tile_meta.items() if m.cliff == "top"}
 
@@ -502,7 +502,7 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
                              if b.x == r.rect.x and b.y == r.rect.y), None)
                 if surf is None:
                     continue
-                face_h = max(1, min(r.floor, 2) * int(config.CLIFF_TILES))
+                face_h = max(1, r.floor * int(config.CLIFF_TILES))
                 for (c, ro), m in r.tile_meta.items():
                     if m.cliff != "top":
                         continue
@@ -535,13 +535,13 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
         for s in _SEEDS:
             gm = self._built_map(s)
             lay = gm.layout
-            foam = {(int(x), int(y)) for x, y in gm._cliff_foam}
+            foam = {(int(x), int(y)) for x, y, _f in gm._cliff_foam}
             dry = [c.rect.inflate(px, px) for c in lay.corridors] \
                 + [st.rect.inflate(px, px) for st in lay.stairs]
             for r in lay.rooms:
                 if r.floor <= 0:
                     continue
-                face_h = max(1, min(r.floor, 2) * int(config.CLIFF_TILES))
+                face_h = max(1, r.floor * int(config.CLIFF_TILES))
                 for (c, ro), m in r.tile_meta.items():
                     if m.cliff != "top":
                         continue
@@ -590,8 +590,8 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
         seen = 0
         for s in _SEEDS:
             gm = self._built_map(s)
-            shadow = {(int(x), int(y)) for x, y in gm._cliff_shadow}
-            for rect, tile in gm._cliff_underlay:
+            shadow = {(int(x), int(y)) for x, y, _f in gm._cliff_shadow}
+            for rect, tile, _uf in gm._cliff_underlay:
                 p = tile.get_at((px // 2, px // 2))
                 self.assertGreater(p[3], 200, f"seed {s}: underlay tile transparent")
                 self.assertGreaterEqual(p[1], p[0], f"seed {s}: underlay not grass")
@@ -605,11 +605,11 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
                 seen += 1
         self.assertGreater(seen, 0, "no cliff-foot underlay across the seeds")
 
-    def test_cliff_faces_paint_below_rooms_and_ramp_units_above(self):
-        # LD-7 order: LD-7a cliff-foot underlay tiles -> cliff faces -> room
-        # floors -> lifted staircase units. The underlay is the only terrain
-        # drawn before the cliff faces; the cliff faces are before every room
-        # floor; the ramp units are after the room floors.
+    def test_map_composites_one_floor_at_a_time(self):
+        # LD-8b per-level order. Within a floor: LD-7a cliff-foot underlay ->
+        # cliff faces -> room grass -> ramp units. Across floors: a lower
+        # floor's room grass is painted *before* the next floor's cliff wall
+        # drops onto it (the reverse of the old global "all cliffs first").
         gm = next((g for g in (self._built_map(s) for s in _SEEDS)
                    if g._cliff_surfs and g._ramp_surfs and g._cliff_underlay),
                   None)
@@ -635,14 +635,29 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
         pos = {}
         for i, sid in enumerate(rec.ids):
             pos.setdefault(sid, i)                # first blit of each surface
-        first_under = min(pos[id(t)] for _r, t in gm._cliff_underlay if id(t) in pos)
-        first_cliff = min(pos[id(s)] for _b, s, _f in gm._cliff_surfs if id(s) in pos)
-        last_cliff = max(pos[id(s)] for _b, s, _f in gm._cliff_surfs if id(s) in pos)
-        first_room = min(pos[id(s)] for s in gm._room_surfs.values() if id(s) in pos)
-        first_ramp = min(pos[id(s)] for _b, s, _f in gm._ramp_surfs if id(s) in pos)
-        self.assertLess(first_under, first_cliff, "underlay painted after a cliff face")
-        self.assertLess(last_cliff, first_room, "a cliff painted after a room floor")
-        self.assertLess(first_room, first_ramp, "a ramp unit painted under a room floor")
+
+        # the floor a ramp unit belongs to (its high room); it always has a
+        # cliff face and, since it drops onto a room, an underlay tile.
+        rf = min(f for _b, _s, f in gm._ramp_surfs)
+        under_f = [pos[id(t)] for _r, t, uf in gm._cliff_underlay
+                   if uf == rf and id(t) in pos]
+        cliff_f = [pos[id(s)] for _b, s, cf in gm._cliff_surfs
+                   if cf == rf and id(s) in pos]
+        room_f = [pos[id(gm._room_surfs[r.id])] for r in gm.layout.rooms
+                  if r.floor == rf and id(gm._room_surfs[r.id]) in pos]
+        ramp_f = [pos[id(s)] for _b, s, rrf in gm._ramp_surfs
+                  if rrf == rf and id(s) in pos]
+        self.assertTrue(under_f and cliff_f and room_f and ramp_f)
+        self.assertLess(max(under_f), min(cliff_f), "underlay after a cliff face")
+        self.assertLess(max(cliff_f), min(room_f), "cliff after its own floor's grass")
+        self.assertLess(max(room_f), min(ramp_f), "ramp unit under its floor's grass")
+
+        # a room a full floor below the ramp is painted before that cliff wall.
+        low_room = [pos[id(gm._room_surfs[r.id])] for r in gm.layout.rooms
+                    if r.floor == rf - 1 and id(gm._room_surfs[r.id]) in pos]
+        self.assertTrue(low_room, "no lower-floor room to compare against")
+        self.assertLess(min(low_room), min(cliff_f),
+                        "a lower floor's grass painted after the wall above it")
 
     def test_a_partly_covered_rim_column_keeps_its_full_face(self):
         # E8a: corridor / stair rects are tile-sized but not aligned to a
@@ -662,7 +677,7 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
                              if b.x == r.rect.x and b.y == r.rect.y), None)
                 if surf is None:
                     continue
-                face_h = max(1, min(r.floor, 2) * int(config.CLIFF_TILES))
+                face_h = max(1, r.floor * int(config.CLIFF_TILES))
                 for (c, ro), m in r.tile_meta.items():
                     if m.cliff != "top":
                         continue
@@ -770,16 +785,15 @@ if __name__ == "__main__":
 
 
 class RampTests(_Vertical, unittest.TestCase):
-    """LD-4: a cross-floor link is a **staircase unit** -- 3 tiles wide, 2 band
-    rows deep -- cut into the cliff band, instead of LD-3's diagonal run of
-    one-tile-per-descent pieces::
+    """LD-8a: a cross-floor link is a **staircase unit** cut into the cliff
+    band, spanning `d_floor * CLIFF_TILES` band rows (1 for a one-floor drop,
+    2 for two). Per link the generator picks a layout:
 
-        row rim   :  = = = = = = = =     plateau surface
-        band row 0:  # # # # > = # #     stair top    + top landing at c+d
-        band row 1:  # # # = > # # #     bottom landing at c-d + stair bottom
-        row below :  = = = = = = = =     low room surface
+      * "v" -- a straight N->S flight one column wide (ramp tag "s"), and
+      * "h" -- the LD-4 side-landing unit: stair column plus a grass landing
+        jogged one tile out at the top and in at the bottom (ramp tag "w"/"e").
 
-    Gated on `config.RAMP_STAIRS`. One-floor changes only (decision 2, option c).
+    Gated on `config.RAMP_STAIRS`.
     """
 
     def setUp(self):
@@ -793,29 +807,35 @@ class RampTests(_Vertical, unittest.TestCase):
 
     @staticmethod
     def _units(w):
-        """`{(high, low, direction): {part: rect}}`, parts named
-        `top_approach` / `top` / `stair` / `bot` / `bot_approach`."""
+        """`{(high, low, ramp): {part: rect, "band": int}}`. Parts:
+        `approach_hi` / `approach_lo` always; `span` (the flight for "v", the
+        stair column for "h"); "h" also has `top` / `bot` landings."""
         px = config.TILE_PX
+        ct = int(config.CLIFF_TILES)
         grouped = {}
         for st in w.stairs:
             if st.ramp:
-                grouped.setdefault((st.high_room, st.low_room, st.ramp), []).append(st)
+                grouped.setdefault((st.high_room, st.low_room, st.ramp),
+                                   []).append(st)
         named = {}
         for key, parts in grouped.items():
             y0 = w.room(key[0]).rect.bottom
-            m = {}
-            for st in parts:
-                r = st.rect
-                if r.height == 2 * px and r.top == y0:
-                    m["stair"] = r
-                elif r.top == y0 - 2 * px:
-                    m["top_approach"] = r
-                elif r.top == y0 and r.height == px:
-                    m["top"] = r
-                elif r.top == y0 + px and r.height == px:
-                    m["bot"] = r
-                elif r.top == y0 + 2 * px:
-                    m["bot_approach"] = r
+            band = parts[0].d_floor * ct
+            rects = [st.rect for st in parts]
+            m = {"band": band}
+            m["approach_hi"] = next(r for r in rects if r.top == y0 - 2 * px)
+            m["approach_lo"] = next(r for r in rects if r.top == y0 + band * px)
+            mids = [r for r in rects
+                    if r.top not in (y0 - 2 * px, y0 + band * px)]
+            if key[2] == "s":
+                m["span"] = next(r for r in mids if r.height == band * px)
+            else:
+                m["top"] = next(r for r in mids if r.x == m["approach_hi"].x
+                                and r.top == y0 and r.height == px)
+                m["bot"] = next(r for r in mids if r.x == m["approach_lo"].x
+                                and r.height == px)
+                m["span"] = next(r for r in mids
+                                 if r is not m["top"] and r is not m["bot"])
             named[key] = m
         return named
 
@@ -833,52 +853,46 @@ class RampTests(_Vertical, unittest.TestCase):
         n = sum(1 for s in _SEEDS if self._units(generate_world(s)))
         self.assertGreater(n, 3, f"only {n}/{len(_SEEDS)} seeds got a staircase")
 
-    def test_a_unit_has_all_five_tiles_in_the_right_places(self):
-        px = config.TILE_PX
-        checked = 0
+    def test_both_layouts_and_both_drops_occur_across_seeds(self):
+        ramps = seen = set()
+        drops = set()
         for s in _SEEDS:
-            w = generate_world(s)
-            for (hi_id, lo_id, d), m in self._units(w).items():
-                self.assertEqual(set(m), {"top_approach", "top", "stair",
-                                          "bot", "bot_approach"},
-                                 f"seed {s}: unit is missing tiles")
-                dd = 1 if d == "w" else -1
-                stair = m["stair"]
-                self.assertEqual(stair.height, 2 * px,
-                                 f"seed {s}: the stair is not 2 tiles tall")
-                self.assertEqual(m["top"].x, stair.x + dd * px,
-                                 f"seed {s}: top landing on the wrong side")
-                self.assertEqual(m["bot"].x, stair.x - dd * px,
-                                 f"seed {s}: bottom landing on the wrong side")
-                self.assertEqual(m["top_approach"].x, m["top"].x)
-                self.assertEqual(m["bot_approach"].x, m["bot"].x)
-                checked += 1
-        self.assertGreater(checked, 0, "no staircase sampled")
+            for st in generate_world(s).stairs:
+                if st.ramp:
+                    seen = seen | {st.ramp}
+                    drops.add(st.d_floor)
+        self.assertIn("s", seen, "no straight vertical flight across the seeds")
+        self.assertTrue({"w", "e"} & seen, "no side-landing unit across the seeds")
+        self.assertEqual(drops, {1, 2}, f"drops seen: {sorted(drops)}")
 
-    def test_a_unit_is_flush_between_its_rooms_and_spans_one_floor(self):
+    def test_a_unit_is_flush_between_its_rooms_and_spans_its_drop(self):
         px = config.TILE_PX
         for s in _SEEDS:
             w = generate_world(s)
             for (hi_id, lo_id, _d), m in self._units(w).items():
                 hi, lo = w.room(hi_id), w.room(lo_id)
-                self.assertEqual(hi.floor - lo.floor, 1,
-                                 f"seed {s}: unit spans more than one floor")
+                df = hi.floor - lo.floor
+                self.assertIn(df, (1, 2), f"seed {s}: drop is not 1 or 2 floors")
+                self.assertEqual(m["band"], df * int(config.CLIFF_TILES))
                 self.assertEqual(lo.rect.top,
-                                 hi.rect.bottom + int(config.CLIFF_TILES) * px,
+                                 hi.rect.bottom + m["band"] * px,
                                  f"seed {s}: rooms not snapped flush")
-                self.assertEqual(m["stair"].top, hi.rect.bottom)
-                self.assertEqual(m["stair"].bottom, lo.rect.top)
+                self.assertEqual(m["span"].top, hi.rect.bottom)
+                self.assertEqual(m["span"].bottom, lo.rect.top)
+                self.assertEqual(m["span"].height, m["band"] * px)
 
     def test_the_unit_chain_is_orthogonal_end_to_end(self):
-        """Plateau -> top approach -> top landing -> stair -> bottom landing ->
-        bottom approach -> low room, every link sharing a full edge. The flow
-        field refuses a diagonal step unless both orthogonal neighbours are
+        """Every consecutive pair of the unit's rects shares a full edge -- the
+        flow field refuses a diagonal step unless both orthogonal neighbours are
         open, which is what broke LD-3's diagonal run."""
         for s in _SEEDS:
             w = generate_world(s)
             for key, m in self._units(w).items():
-                chain = [m["top_approach"], m["top"], m["stair"],
-                         m["bot"], m["bot_approach"]]
+                if key[2] == "s":
+                    chain = [m["approach_hi"], m["span"], m["approach_lo"]]
+                else:
+                    chain = [m["approach_hi"], m["top"], m["span"],
+                             m["bot"], m["approach_lo"]]
                 for a, b in zip(chain, chain[1:]):
                     sx = min(a.right, b.right) - max(a.left, b.left)
                     sy = min(a.bottom, b.bottom) - max(a.top, b.top)
@@ -897,18 +911,18 @@ class RampTests(_Vertical, unittest.TestCase):
             w = generate_world(s)
             for (hi_id, lo_id, _d), m in self._units(w).items():
                 hi, lo = w.room(hi_id), w.room(lo_id)
-                self.assertEqual(m["top_approach"].height, 2 * px)
-                self.assertEqual(m["top_approach"].bottom, hi.rect.bottom)
-                self.assertEqual(m["bot_approach"].height, 2 * px)
-                self.assertEqual(m["bot_approach"].top, lo.rect.top)
+                self.assertEqual(m["approach_hi"].height, 2 * px)
+                self.assertEqual(m["approach_hi"].bottom, hi.rect.bottom)
+                self.assertEqual(m["approach_lo"].height, 2 * px)
+                self.assertEqual(m["approach_lo"].top, lo.rect.top)
                 rows_n = hi.rect.height // px
-                for c in range((m["top_approach"].x - hi.rect.left) // px,
-                               (m["top_approach"].right - 1 - hi.rect.left) // px + 1):
+                for c in range((m["approach_hi"].x - hi.rect.left) // px,
+                               (m["approach_hi"].right - 1 - hi.rect.left) // px + 1):
                     for row in (rows_n - 1, rows_n - 2):
                         self.assertIn((c, row), hi.cells,
                                       f"seed {s}: top approach is off the plateau")
-                for c in range((m["bot_approach"].x - lo.rect.left) // px,
-                               (m["bot_approach"].right - 1 - lo.rect.left) // px + 1):
+                for c in range((m["approach_lo"].x - lo.rect.left) // px,
+                               (m["approach_lo"].right - 1 - lo.rect.left) // px + 1):
                     for row in (0, 1):
                         self.assertIn((c, row), lo.cells,
                                       f"seed {s}: bottom approach is off the low room")
@@ -952,10 +966,11 @@ class RampTests(_Vertical, unittest.TestCase):
                              f"seed {s}: {len(tags)} tags for {len(units)} units")
             for rid, c, ro, d in tags:
                 hi = w.room(rid)
+                self.assertIn(d, ("s", "w", "e"), f"seed {s}: odd ramp tag {d!r}")
                 self.assertEqual(hi.tile_meta[(c, ro)].cliff, "top",
                                  f"seed {s}: tag is not on a south-rim cell")
                 m = next(v for k, v in units.items() if k[0] == rid and k[2] == d)
-                self.assertEqual(m["stair"].x, hi.rect.left + c * px,
+                self.assertEqual(m["span"].x, hi.rect.left + c * px,
                                  f"seed {s}: tag column is not the stair column")
 
     def test_layout_stays_connected_and_deterministic(self):
@@ -967,13 +982,13 @@ class RampTests(_Vertical, unittest.TestCase):
                 [(st.ramp, tuple(st.rect), st.high_room, st.low_room) for st in b.stairs],
                 f"seed {s}: staircase planning is not deterministic")
 
-    def test_the_unit_renders_its_three_parts(self):
-        """Cliff-behind (`mid`, opaque) across both band rows of all three unit
-        columns stays baked in the cliff surface so no part of the cut shows the
-        sea; LD-7: the walkable landings + stair piece are lifted into
-        `_ramp_surfs` and each landing samples as grass there."""
+    def test_ramp_units_render_by_style(self):
+        """The stair column stays opaque in the cliff surface across the whole
+        band; every unit lifts a grass fill into `_ramp_surfs` over that column;
+        a `rock` unit also lays a `_stair_overlays` sprite there, `band` tiles
+        tall. Both styles and both drops occur across the seed range."""
         px = config.TILE_PX
-        checked = 0
+        seen_rock = seen_grass = seen_deep = 0
         for s in _SEEDS:
             gm = GameMap(seed=s)
             gm._render_zoom = 1.0
@@ -981,38 +996,52 @@ class RampTests(_Vertical, unittest.TestCase):
             if not gm._tiles_ok:
                 continue
             for r in gm.layout.rooms:
-                tag = [(c, ro, m.ramp) for (c, ro), m in r.tile_meta.items() if m.ramp]
+                tag = [(c, ro) for (c, ro), m in r.tile_meta.items() if m.ramp]
                 if not tag:
                     continue
+                st = next((x for x in gm.layout.stairs
+                           if x.ramp and x.high_room == r.id), None)
+                self.assertIsNotNone(st)
+                band = st.d_floor * int(config.CLIFF_TILES)
+                if band == 2:
+                    seen_deep += 1
                 surf = next((sf for b, sf, _fl in gm._cliff_surfs
                              if b.x == r.rect.x and b.y == r.rect.y), None)
                 if surf is None:
                     continue
-                c0, ro0, d = tag[0]
-                dd = 1 if d == "w" else -1
-                # cliff-behind: opaque across every unit tile in the cliff surface
-                for col, band in ((c0, 0), (c0, 1), (c0 + dd, 0), (c0 + dd, 1),
-                                  (c0 - dd, 0), (c0 - dd, 1)):
-                    y = (ro0 + 1 + band) * px + px // 2
+                c0, ro0 = tag[0]
+                for k in range(band):
+                    y = (ro0 + 1 + k) * px + px // 2
                     self.assertGreater(
-                        surf.get_at((col * px + px // 2, y))[3], 200,
-                        f"seed {s}: unit tile ({col},{band}) shows the void")
-                # LD-7: landings live in the lifted ramp surface, not the cliff
-                rblit, rsurf = next(
-                    ((b, sf) for b, sf, _fl in gm._ramp_surfs
-                     if b.x == r.rect.x + (c0 - 1) * px
-                     and b.y == r.rect.y + (ro0 + 1) * px), (None, None))
-                self.assertIsNotNone(rsurf, f"seed {s}: unit not lifted to _ramp_surfs")
-                land_hi = rsurf.get_at((r.rect.x + (c0 + dd) * px + px // 2 - rblit.x,
-                                        r.rect.y + (ro0 + 1) * px + px // 2 - rblit.y))
-                land_lo = rsurf.get_at((r.rect.x + (c0 - dd) * px + px // 2 - rblit.x,
-                                        r.rect.y + (ro0 + 2) * px + px // 2 - rblit.y))
-                for p in (land_hi, land_lo):
-                    self.assertGreater(p[3], 200, f"seed {s}: landing is transparent")
-                    self.assertGreater(p[1], p[2] + 15,
-                                       f"seed {s}: landing is not grass")
-                checked += 1
-        self.assertGreater(checked, 0, "no unit rendered")
+                        surf.get_at((c0 * px + px // 2, y))[3], 200,
+                        f"seed {s}: stair column band row {k} shows the void")
+
+                stair_cx = r.rect.x + c0 * px + px // 2
+                band_y = r.rect.y + (ro0 + 1) * px
+                rs = next((sf for b, sf, _fl in gm._ramp_surfs
+                           if abs(b.centerx - stair_cx) < 2 * px and b.y == band_y),
+                          None)
+                self.assertIsNotNone(rs, f"seed {s}: no grass fill in _ramp_surfs")
+
+                ov = [(b, sf) for b, sf, _f in gm._stair_overlays
+                      if abs(b.centerx - stair_cx) < px and b.y == band_y]
+                if st.style == "rock":
+                    self.assertTrue(ov, f"seed {s}: rock unit has no overlay sprite")
+                    b, sf = ov[0]
+                    self.assertEqual(sf.get_size(), (b.w, b.h))
+                    self.assertEqual(b.h, band * px,
+                                     f"seed {s}: overlay not {band} tiles tall")
+                    p = sf.get_at((sf.get_width() // 2, sf.get_height() // 2))
+                    self.assertGreater(p[3], 150, f"seed {s}: overlay centre clear")
+                    self.assertGreaterEqual(p[2], p[1] - 25,
+                                            f"seed {s}: overlay centre not stone")
+                    seen_rock += 1
+                else:
+                    self.assertFalse(ov, f"seed {s}: grass unit got a rock overlay")
+                    seen_grass += 1
+        self.assertGreater(seen_rock, 0, "no rock ramp units across the seeds")
+        self.assertGreater(seen_grass, 0, "no grass ramp units across the seeds")
+        self.assertGreater(seen_deep, 0, "no two-floor ramp units across the seeds")
 
 
 class StructAnnexTests(_Vertical, unittest.TestCase):
@@ -1037,34 +1066,45 @@ class StructAnnexTests(_Vertical, unittest.TestCase):
                 self.assertEqual(r.annex, frozenset(),
                                  f"seed {s} room {r.id}: annex set with flag off")
 
-    def test_flag_on_folds_the_top_landing_into_the_plateau(self):
-        """The rim cell directly above a staircase unit's top landing stops
-        being a south rim -- so the plateau's grass runs flat down to the
-        landing instead of a cliff fringe cutting across."""
+    def test_flag_on_folds_the_unit_landing_into_a_room(self):
+        """Every unit annexes the low room's landing cell (so its foam / north
+        lip drop where the flight lands). A "v" flight keeps its own plateau rim
+        cell a south rim so `_build_tile_meta` can tag it -- the tag then
+        suppresses the cliff fringe there; an "h" unit annexes the plateau's
+        top-landing cell instead."""
         config.STRUCT_ANNEX = True
         px = config.TILE_PX
-        checked = 0
+        checked_v = checked_h = 0
         for s in _SEEDS:
             w = generate_world(s)
             for st in w.stairs:
-                hi = w.room(st.high_room)
-                if (not st.ramp or st.rect.height != 2 * px
-                        or st.rect.top != hi.rect.bottom):
-                    continue                      # only the 1x2 stair piece
-                                                  # (approaches are 2-tall too)
-                d = 1 if st.ramp == "w" else -1
+                hi, lo = w.room(st.high_room), w.room(st.low_room)
+                band = st.d_floor * int(config.CLIFF_TILES)
+                if (not st.ramp or st.rect.top != hi.rect.bottom
+                        or st.rect.height != band * px):
+                    continue                      # the stair-span rect only
                 col = (st.rect.x - hi.rect.left) // px
-                top_col = col + d
                 rows_n = hi.rect.height // px
-                self.assertIn((top_col, rows_n), hi.annex,
-                              f"seed {s}: top landing not annexed to the plateau")
-                rim = hi.tile_meta.get((top_col, rows_n - 1))
-                if rim is not None:
-                    self.assertEqual(rim.cliff, "",
-                                     f"seed {s}: rim cell above the landing is "
-                                     f"still a cliff top")
-                checked += 1
-        self.assertGreater(checked, 0, "no staircase unit sampled")
+                if st.ramp == "s":
+                    lo_col = col                             # flight's own column
+                    rim = hi.tile_meta.get((col, rows_n - 1))
+                    self.assertIsNotNone(rim, f"seed {s}: no rim above the flight")
+                    self.assertEqual(rim.cliff, "top",
+                                     f"seed {s}: flight rim lost its south rim")
+                    self.assertEqual(rim.ramp, "s",
+                                     f"seed {s}: flight rim not tagged")
+                    checked_v += 1
+                else:
+                    d = 1 if st.ramp == "w" else -1
+                    lo_col = col - d                         # bottom landing column
+                    self.assertIn((col + d, rows_n), hi.annex,
+                                  f"seed {s}: top landing not annexed")
+                    checked_h += 1
+                lc = (hi.rect.left + lo_col * px - lo.rect.left) // px
+                self.assertIn((lc, -1), lo.annex,
+                              f"seed {s}: low room landing not annexed")
+        self.assertGreater(checked_v, 0, "no vertical unit sampled")
+        self.assertGreater(checked_h, 0, "no side-landing unit sampled")
 
     def test_flag_on_is_deterministic(self):
         config.STRUCT_ANNEX = True
@@ -1150,7 +1190,7 @@ class CliffFootAndSeamTests(_Vertical, unittest.TestCase):
             gm = self._built(s)
             if not gm._tiles_ok:
                 continue
-            for wx, wy in gm._cliff_shadow:
+            for wx, wy, _f in gm._cliff_shadow:
                 # LD-7a: the shadow anchor is the cliff *foot* cell (in the
                 # band); the lower room it belongs to is one tile south of it.
                 m = gm.layout.tile_at(wx + px // 2, wy + px + px // 2)
@@ -1160,8 +1200,8 @@ class CliffFootAndSeamTests(_Vertical, unittest.TestCase):
                 checked_on += 1
             # a cliff foot over open sea contributes foam, never a shadow, at
             # the same spot
-            foam = {(x, y) for x, y in gm._cliff_foam}
-            shadow = {(x, y) for x, y in gm._cliff_shadow}
+            foam = {(x, y) for x, y, _f in gm._cliff_foam}
+            shadow = {(x, y) for x, y, _f in gm._cliff_shadow}
             self.assertEqual(foam & shadow, set(),
                              f"seed {s}: a foot is both foam and shadow")
             checked_sea += len(foam)
@@ -1210,7 +1250,7 @@ class CliffFootAndSeamTests(_Vertical, unittest.TestCase):
                 unit_c = set()
                 for cc in ramp_c:
                     unit_c |= {cc - 1, cc, cc + 1}
-                face_h = max(1, min(r.floor, 2) * int(config.CLIFF_TILES))
+                face_h = max(1, r.floor * int(config.CLIFF_TILES))
 
                 def full_void(cc, ro):
                     cx = r.rect.x + cc * px + px // 2

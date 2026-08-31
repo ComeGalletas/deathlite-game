@@ -32,30 +32,52 @@ def slot_for(slots: dict, row: int, col: int, rows: int, cols: int) -> int:
     return slots["interior"]
 
 
+# The ground block's twelve slot names, keyed by which sides are open. The
+# eight rectangle slots cover a cell with 0-2 *adjacent* open sides; the strips
+# and the single cover the rest -- `strip_v` is a north-south channel (open west
+# and east) as [top, mid, bottom], `strip_h` an east-west one as [west, mid,
+# east], and `single` is open on all four. Together they are a complete
+# sixteen-combination autotile, which earlier code did not use: it fell back to
+# `interior` for opposite pairs and 3-gap nubs, so a one-wide spine of ground,
+# or a cell pinched between a lake and a cliff, painted as a flat square with no
+# fringe at all.
+_GROUND_SLOT = {
+    "":     ("interior", 0),
+    "n":    ("edge_n", 0),   "s":  ("edge_s", 0),
+    "w":    ("edge_w", 0),   "e":  ("edge_e", 0),
+    "nw":   ("corner_nw", 0), "ne": ("corner_ne", 0),
+    "sw":   ("corner_sw", 0), "se": ("corner_se", 0),
+    "we":   ("strip_v", 1),  "ns":  ("strip_h", 1),
+    "nwe":  ("strip_v", 0),  "swe": ("strip_v", 2),
+    "nsw":  ("strip_h", 0),  "nse": ("strip_h", 2),
+    "nswe": ("single", 0),
+}
+
+
+def _slot(slots: dict, name: str, index: int) -> int:
+    """One slot by name. A strip is authored as a [start, mid, end] list; the
+    rectangle slots are bare ints. Missing art falls back to `interior`."""
+    v = slots.get(name)
+    if isinstance(v, (list, tuple)):
+        return int(v[index]) if index < len(v) else int(v[-1])
+    if v is None:
+        return int(slots.get("interior", 0))
+    return int(v)
+
+
+def ground_slot(slots: dict, sides: str) -> int:
+    """The ground tile fringed on exactly `sides` (a subset of "nswe", in that
+    order). Every one of the sixteen combinations has authored art."""
+    return _slot(slots, *_GROUND_SLOT[sides])
+
+
 def mask_slot(cells: frozenset, col: int, row: int, slots: dict) -> int:
-    """Autotile a floor cell by which of its 4 orthogonal neighbours are also
-    floor (a 4-bit mask). Concave (inner) corners and 1-wide spines fall back
-    to `interior` -- the sheet has only the 8 rectangle slots (W3)."""
-    gap_n = (col, row - 1) not in cells
-    gap_s = (col, row + 1) not in cells
-    gap_w = (col - 1, row) not in cells
-    gap_e = (col + 1, row) not in cells
-    gaps = gap_n + gap_s + gap_w + gap_e
-    if gaps == 0:
-        return slots["interior"]
-    if gaps == 1:
-        return slots["edge_n" if gap_n else "edge_s" if gap_s
-                     else "edge_w" if gap_w else "edge_e"]
-    if gaps == 2:
-        if gap_n and gap_w:
-            return slots["corner_nw"]
-        if gap_n and gap_e:
-            return slots["corner_ne"]
-        if gap_s and gap_w:
-            return slots["corner_sw"]
-        if gap_s and gap_e:
-            return slots["corner_se"]
-    return slots["interior"]           # opposite pair / nub -> best effort
+    """`ground_slot` for callers whose floor is just a set of cells -- a side is
+    open where the neighbour is not in it."""
+    return ground_slot(slots, "".join(
+        d for d, dx, dy in (("n", 0, -1), ("s", 0, 1),
+                            ("w", -1, 0), ("e", 1, 0))
+        if (col + dx, row + dy) not in cells))
 
 
 def bridge_slot(axis: str, index: int, ncells: int) -> str:

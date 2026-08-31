@@ -83,6 +83,17 @@ class TerrainMetadataTests(unittest.TestCase):
         for path in self.t.get("floor_sheets", {}).values():
             self.assertTrue((ASSETS_DIR / path).is_file(), f"missing {path}")
 
+    def test_vstair_overlay_sprite_is_a_real_srcalpha_file(self):
+        vs = self.t.get("vstair", {})
+        self.assertIn("sheet", vs)
+        p = ASSETS_DIR / vs["sheet"]
+        self.assertTrue(p.is_file(), f"missing {vs['sheet']}")
+        surf = pygame.image.load(str(p))
+        w, h = surf.get_size()
+        self.assertTrue(64 <= w <= 512 and 64 <= h <= 512, (w, h))
+        # the prep script keys the backdrop out -> real transparency
+        self.assertLess(surf.convert_alpha().get_at((0, 0))[3], 40)
+
     def test_referenced_sheets_exist(self):
         sheets = {self.t["floor_sheet"], self.t["water_tile"],
                   *self.t["room_palettes"].values()}
@@ -212,7 +223,7 @@ class ObstacleDecorTests(unittest.TestCase):
             self.assertTrue(any(not gm._point_ok(cx + dx, cy + dy)
                                 for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px))),
                             "foam ground tile no longer borders empty sea")
-        for x, y in gm._cliff_foam:
+        for x, y, _f in gm._cliff_foam:
             self.assertFalse(gm._point_ok(x + px / 2, y + px / 2),
                              "void-facing cliff foam is on walkable ground")
 
@@ -332,7 +343,7 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
 
     def test_room_and_corridor_bakes_are_srcalpha_32bit(self):
         gm = self._map()
-        surfs = list(gm._room_surfs.values()) + [s for _, s in gm._corr_surfs]
+        surfs = list(gm._room_surfs.values()) + [s for _r, s, _f in gm._corr_surfs]
         self.assertTrue(surfs)
         for s in surfs:
             self.assertTrue(s.get_flags() & pygame.SRCALPHA, "not SRCALPHA")
@@ -394,7 +405,7 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
 
     def test_foam_locations_use_three_desynchronized_routines(self):
         gm = self._map()
-        anchors = gm._shore + gm._cliff_foam
+        anchors = gm._shore + [(x, y) for x, y, _f in gm._cliff_foam]
         buckets = {gm._foam_routine_index(x, y, len(gm._foam_routines))
                    for x, y in anchors}
         self.assertTrue({0, 1, 2}.issubset(buckets))
@@ -459,7 +470,7 @@ class BridgeCorridorTests(unittest.TestCase):
         gm = GameMap(seed=1234)
         gm._build_tiles()
         self.assertTrue(gm._tiles_ok and gm._corr_surfs)
-        for _, s in gm._corr_surfs:
+        for _r, s, _f in gm._corr_surfs:
             self.assertTrue(s.get_flags() & pygame.SRCALPHA)
         px = get_content().terrain["tile_px"]
         ground_cells = {
@@ -501,7 +512,7 @@ class BridgeCorridorTests(unittest.TestCase):
         gm._build_tiles()
         self.assertTrue(gm._corr_surfs)
         checked_h = checked_v = 0
-        for c, (rect, surf) in zip(gm.layout.corridors, gm._corr_surfs):
+        for c, (rect, surf, _f) in zip(gm.layout.corridors, gm._corr_surfs):
             if c.axis == "h":
                 first = surf.subsurface((0, 0, px, px))
                 last = surf.subsurface((surf.get_width() - px, 0, px, px))
@@ -523,7 +534,7 @@ class BridgeCorridorTests(unittest.TestCase):
         px = self.t["tile_px"]
         gm = GameMap(seed=1234)
         gm._build_tiles()
-        for c, (rect, _surf) in zip(gm.layout.corridors, gm._corr_surfs):
+        for c, (rect, _surf, _f) in zip(gm.layout.corridors, gm._corr_surfs):
             lo = gm.layout.room(c.room_low).rect
             hi = gm.layout.room(c.room_high).rect
             if c.axis == "h":
@@ -848,7 +859,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
     def test_foam_remains_on_ground_room_edges_next_to_corridors(self):
         gm = self._map(1234)
         px = self.t["tile_px"]
-        corr = [rect for rect, _ in gm._corr_surfs]
+        corr = [rect for rect, _s, _f in gm._corr_surfs]
         rooms = [r.rect for r in gm.layout.rooms]
         seen = False
         for sx, sy in gm._shore:

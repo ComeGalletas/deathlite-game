@@ -21,6 +21,7 @@ from world.procedural import Room, WorldLayout, generate_world
 from world.terrain import autotile
 from world.terrain import cliffs as terrain_cliffs
 from world.terrain import decor as terrain_decor
+from world.terrain import grid_paint
 from world.terrain import rooms as terrain_rooms
 from world.terrain.sheets import TileSheets
 from world.terrain.render import TerrainRenderer
@@ -52,32 +53,47 @@ class GameMap:
         self._water_buf: pygame.Surface | None = None
         self._water_tile = 0            # water tile size in world px (scroll stride)
         self._room_surfs: dict[int, pygame.Surface] = {}
-        self._corr_surfs: list[tuple[pygame.Rect, pygame.Surface]] = []
+        # `(blit_rect, surf, floor)` -- LD-8b: every terrain container below
+        # carries the floor it belongs to so `_draw_tiled` can composite the
+        # map one elevation at a time (a floor's grass, then the next floor's
+        # cliff wall dropping onto it, then that floor's grass, ...).
+        self._corr_surfs: list[tuple] = []
         # LD-1 verticality: one baked south-facing cliff-face skirt per raised
         # room, and one baked strip per stair. `(blit_rect, surf, floor)`.
         self._cliff_surfs: list[tuple] = []
         self._stair_surfs: list[tuple] = []
+        # LD-9: `(blit_rect, surf, base_level)` -- one baked surface per
+        # height-map room, covering its terraces, walls and flights together.
+        # Used instead of every other terrain collection when
+        # `config.HEIGHTMAP_ROOMS` is on.
+        self._grid_surfs: list[tuple] = []
         # LD-7: the LD-4 staircase-unit tiles (landings + the 1x2 stair piece),
         # lifted out of the cliff surface so they paint in the walkable-structure
         # layer, above the drop shadow, not under the room floors. Same
         # `(blit_rect, surf, high_floor)` shape as `_stair_surfs`.
         self._ramp_surfs: list[tuple] = []
-        # LD-7a: `(blit_rect, tile)` -- one lower-room grass tile drawn at a
-        # cliff-face foot cell that has a room floor directly south of it, in a
-        # pass *before* the cliff faces so the stone sits on grass, not sea.
+        # LD-8a: `(blit_rect, surf, high_floor)` -- the rock stair overlay
+        # sprite for a "rock"-style ramp unit, drawn on top of its own floor's
+        # terrain so its foliage feathers over the neighbouring grass/cliff.
+        self._stair_overlays: list[tuple] = []
+        # LD-7a: `(blit_rect, tile, floor)` -- one lower-room grass tile drawn
+        # at a cliff-face foot cell that has a room floor directly south of it,
+        # in a pass *before* that floor's cliff faces so the stone sits on
+        # grass, not sea. `floor` is the raised room whose face it carries.
         self._cliff_underlay: list[tuple] = []
         # LD-7a: `(room_id, col, row)` ground-room edge cells with a cliff band
         # flush overhead -- painted with the north side closed (no shoreline
         # autotile) and seeded with no foam.
         self._cliff_capped: set = set()
         self._shore: list[tuple[int, int]] = []       # top-left world px of shoreline tiles
-        # LD-2 E8: top-left world px of a cliff foot that drops into open water
-        # (its own foam pass -- kept out of `_shore`, whose anchors belong only
-        # to sea-facing ground-room tiles).
-        self._cliff_foam: list[tuple[int, int]] = []
-        # LD-6: top-left world px of a cliff foot that lands on a lower room's
-        # floor -- a static drop shadow, no animation, drawn in the foam pass.
-        self._cliff_shadow: list[tuple[int, int]] = []
+        # LD-2 E8: `(x, y, floor)` -- top-left world px of a cliff foot that
+        # drops into open water, plus the raised room's floor so it laps in
+        # that level's pass. Kept out of `_shore` (sea-facing ground tiles only).
+        self._cliff_foam: list[tuple] = []
+        # LD-6: `(x, y, floor)` -- top-left world px of a cliff foot that lands
+        # on a lower room's floor -- a static drop shadow, no animation, drawn
+        # just under that level's cliff faces. `floor` is the raised room's.
+        self._cliff_shadow: list[tuple] = []
         self._shadow: pygame.Surface | None = None
         self._foam: list[pygame.Surface] | None = None
         self._foam_routines: tuple[tuple[float, int], ...] = (
@@ -298,7 +314,7 @@ class GameMap:
         for R in layout.rooms:
             if R.floor <= 0:
                 continue
-            fh = max(1, min(R.floor, 2) * int(config.CLIFF_TILES))
+            fh = max(1, R.floor * int(config.CLIFF_TILES))
             for (bc, bro), bm in R.tile_meta.items():
                 if bm.cliff == "top":
                     band_rects.append(pygame.Rect(
@@ -319,12 +335,30 @@ class GameMap:
                         cliff_capped.add((r.id, col, row))
         self._cliff_capped = cliff_capped
 
+        if config.HEIGHTMAP_ROOMS:
+            # LD-9 Phase C: one pass per room, straight off its height map.
+            # Nothing else to stitch -- no separate cliff band, underlay,
+            # drop shadow or ramp collection, because the grid already says
+            # what every cell is. Falls through to the shared water / foam /
+            # scenery setup below.
+            self._shore = []
+            for r in layout.rooms:
+                got = grid_paint.paint_room_grid(self, sheets, layout, r)
+                if got is not None:
+                    self._grid_surfs.append((got[0], got[1], r.floor))
+                self._shore.extend(grid_paint.grid_shore(r))
+            for c in layout.corridors:
+                rc = grid_paint.paint_bridge(sheets, c)
+                self._corr_surfs.append((rc[0], rc[1], layout.room(c.a).floor))
+            self._finish_tiles(a, sheets)
+            return
+
         for r in layout.rooms:
             self._room_surfs[r.id] = terrain_rooms.paint_room(
                 self, sheets, layout, r)
         for c in layout.corridors:
-            self._corr_surfs.append(
-                terrain_rooms.paint_corridor(sheets, layout, c))
+            rc = terrain_rooms.paint_corridor(sheets, layout, c)
+            self._corr_surfs.append((rc[0], rc[1], layout.room(c.a).floor))
         for r in layout.rooms:
             if r.floor > 0:
                 cl = terrain_cliffs.paint_cliff(self, sheets, layout, r)
@@ -349,6 +383,13 @@ class GameMap:
                     for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px)))
         ))
 
+        self._finish_tiles(a, sheets)
+
+    def _finish_tiles(self, a, sheets) -> None:
+        """The water buffer, drop shadow, foam frames and scenery scatter --
+        shared by the LD-8 painter and the LD-9 height-map one, which differ
+        only in how the land itself is baked."""
+        t = a.terrain
         water = a.tile(str(t.get("water_tile")), 0)
         if water is not None:
             wt = water.get_width()

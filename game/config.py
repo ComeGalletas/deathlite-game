@@ -60,6 +60,75 @@ IRREGULAR_ROOMS: bool = True
 # the cap for the deferred multi-chunk "large room" pass.
 ROOM_SIZE_MAX_CELLS: int = 160
 
+# --- LD-9: rooms are height maps ----------------------------------------
+# Each room gets a per-cell grid (`world/gen/heightmap.py`) with its own
+# terraces, cliffs and stairs, instead of one `floor` integer plus a cliff band
+# hanging off its south rim. Off -> the LD-8 model, byte-identical layouts.
+HEIGHTMAP_ROOMS: bool = False
+# With the flag on: fewer, larger rooms, because a room now has to hold several
+# terraces and the walls between them. A terrace needs 3 walkable rows plus its
+# wall, so a room wants ~14 rows to carry three of them.
+# Big enough that the widest room still leaves a water gap to its neighbours --
+# rooms are islands, and overlapping ones would fuse into one landmass.
+HEIGHTMAP_CHUNK_SIZE: int = 3712
+# Fewer, much larger islands. A room has to hold a shore ring, several terraces
+# and the walls between them, and the coastline erodes it further -- so size it
+# generously and cut the count to pay for it, rather than ending up with a
+# scatter of islets too small to carry any of that.
+HEIGHTMAP_ROOM_COUNT: int = 6
+# Rooms are markedly **wider than they are tall**: terraces stack northward, so
+# height buys more of the same climb while width buys room for several separate
+# ways up on the same wall, which is what stops a room reading as one long
+# staircase.
+HEIGHTMAP_ROOM_COLS: tuple = (36, 50)
+HEIGHTMAP_ROOM_ROWS: tuple = (22, 30)
+# Ways up are placed per **region** of the island rather than per island, so
+# every stretch of rim gets its own crossings -- an island-wide quota gets spent
+# wherever the shuffle falls and reliably leaves the north rim with no way up.
+# REGION is the region's side in tiles, SPACING how far apart two may sit.
+HEIGHTMAP_STAIRS_PER_REGION: int = 2
+HEIGHTMAP_STAIR_REGION: int = 8
+HEIGHTMAP_STAIR_SPACING: int = 4
+# How far the coastline may wander in from each side of a room's bounding box.
+# Rooms are sized to include this margin, so it eats into them rather than
+# growing them.
+HEIGHTMAP_COAST_MARGIN: int = 4
+# Rings of sea-level ground around the island before the terraces start, so it
+# reads as land rising out of the water instead of a slab floating in it.
+HEIGHTMAP_SHORE_RING: int = 1
+HEIGHTMAP_LAKES: int = 1
+# A volcano island is a mountain: sea-level ground all over, with concentric
+# plateaus stacked on top of it. `TIERS` is how many it may stack. The rest of
+# the islands are plain one-level ground, so the world mixes shapes rather than
+# repeating the same silhouette -- and a flat island connects to its
+# neighbours without any elevation to reconcile.
+HEIGHTMAP_VOLCANO_CHANCE: float = 0.65
+HEIGHTMAP_TIERS: int = 2
+# The shape of the mountain. Each plateau is the one below it eroded inward by
+# these amounts, per side. **South is the one that matters**: it is the only
+# face the camera sees, so pulling each cap back from the south rim is what
+# gives the island a visible slope, while barely insetting the north keeps the
+# caps hugging its back. Raise SOUTH for a longer, gentler climb; even them all
+# out for a dome rather than a mountain.
+HEIGHTMAP_CAP_INSET_S: int = 5
+HEIGHTMAP_CAP_INSET_N: int = 1
+HEIGHTMAP_CAP_INSET_W: int = 3
+HEIGHTMAP_CAP_INSET_E: int = 3
+# How granular a plateau's rim is: the chance a rim cell is nibbled away.
+# 0 gives smooth contour lines, higher values a broken, rocky edge.
+HEIGHTMAP_CAP_ROUGHNESS: float = 0.35
+# Below this many cells a plateau is not worth having, and the stack stops.
+HEIGHTMAP_CAP_MIN_CELLS: int = 24
+# Canyons cut up into each plateau from its southern rim. A south-facing wall
+# only exists where the level drops going south, which around a concentric cap
+# is the southern arc alone -- so a canyon's **head** is the only south-facing
+# wall the northern half of an island can have, and these are what put ways up
+# there. They also break a big plateau into lobes. Raise the count or the depth
+# for a more densely broken, more climbable north side.
+HEIGHTMAP_CANYONS: int = 5
+HEIGHTMAP_CANYON_DEPTH: tuple = (4, 10)
+HEIGHTMAP_CANYON_WIDTH: tuple = (3, 5)
+
 # --- Layered verticality (journals/level_design_journal.md LD-1) ---------
 # Rooms carry a `floor` (0 = ground, up to 3). A cross-floor room link is a
 # `Stair` (1-2 tiles wide) instead of a plank `Corridor`; the raised room's
@@ -67,7 +136,12 @@ ROOM_SIZE_MAX_CELLS: int = 160
 # no stairs, and the generated `WorldLayout` is byte-identical to the
 # pre-verticality world (reproduces pinned-seed layouts).
 WORLD_VERTICALITY: bool = True
-CLIFF_TILES: int = 2
+# LD-8 #2: one cliff-face tile per floor of elevation. Plateau face height is
+# the floor number, uncapped (floor 3 sits one tile above floor 2). A
+# cross-floor link therefore drops 1 tile (Delta 1) or 2 tiles (Delta 2); the
+# 2-floor-max connectivity rule keeps it from ever being deeper. Provisional --
+# raise back toward 2 if a 1-tile ledge clips character sprites too much.
+CLIFF_TILES: int = 1
 # Whether generation insets a raised room's walkable cells to make room for an
 # inset cliff face (LD-1 V5, render). Off for now: the plateau rim already
 # borders void, so pathing is correct without it, and an aggressive inset can
@@ -81,9 +155,20 @@ CLIFF_CARVE: bool = False
 # is skipped (and stays a bridge) when that move exceeds `RAMP_SNAP_TILES` or
 # the run's footprint does not fit. Off -> layouts are byte-identical to LD-2.
 RAMP_STAIRS: bool = True
-# How far a room may be moved to bring it flush with a cliff base, in tiles.
-# Deliberately a constant, not a literal: longer approaches later just raise it.
+# How far a room may be moved to bring it flush with a cliff base, in tiles,
+# per floor of drop (a Delta 2 link is allowed twice this). Deliberately a
+# constant, not a literal: longer approaches later just raise it.
 RAMP_SNAP_TILES: int = 2
+# LD-8a: chance a cross-floor ramp unit renders as the rock `vstairs.png`
+# overlay instead of the biome grass sideways ramp, keyed by the plateau's
+# floor. A seeded per-link roll -- higher / rockier floors lean rock. Missing
+# floor -> the fallback below. Pure render tag; draws no world RNG.
+RAMP_ROCK_BIAS: dict = {1: 0.35, 2: 0.8, 3: 1.0}
+RAMP_ROCK_BIAS_DEFAULT: float = 0.5
+# LD-8 #1: chance a cross-floor link renders as the LD-4 **side-landing** unit
+# (stair column with a grass landing jogged one tile to each side) instead of a
+# straight one-column flight. Seeded per link; consumes no world RNG.
+RAMP_LANDING_BIAS: float = 0.4
 
 # LD-5: give every generation-placed tile that is in no room's cell mask (plank
 # planks, plank-stair strips, staircase-unit landings) an owning room, so it
