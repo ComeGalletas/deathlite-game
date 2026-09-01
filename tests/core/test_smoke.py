@@ -1,6 +1,16 @@
 """Headless boot smoke test: the game must initialise, walk MENU -> PLAYING ->
 PAUSED -> PLAYING and run frames without raising. Uses SDL's dummy drivers so
-it works in CI with no display or audio device."""
+it works in CI with no display or audio device.
+
+The run seed is left random on purpose -- booting a different world every time
+is most of this test's value -- so nothing here may depend on what the world
+looks like. Getting that wrong is what made it flaky: it used to drop its
+enemies at five fixed offsets south of the player, and on a height-map world
+the player often starts on a summit whose southern rim is a cliff, so four of
+the five landed over the drop and never came back to be killed. Measured, that
+was four seeds in twenty. `_spots_near_player` asks the map where a body can
+actually stand instead.
+"""
 import os
 import tempfile
 import unittest
@@ -16,6 +26,7 @@ from game.states.playing_state import PlayingState
 from game.states.paused_state import PausedState
 from game.states.level_up_state import LevelUpState
 from game.states.victory_state import VictoryState
+from tests.nearby import spots_near
 
 
 class SmokeTest(unittest.TestCase):
@@ -35,22 +46,35 @@ class SmokeTest(unittest.TestCase):
         self.assertIsInstance(playing, PlayingState)
 
         # Seed a few enemies right next to the player so the check does not
-        # depend on the director's opening cadence or the hero's weapon range.
-        import pygame as _pg
-        for dx in (-60, 60, -40, 40, 0):
-            playing._spawn_enemy("chaser", at=playing.player.pos + _pg.Vector2(dx, 70))
+        # depend on the director's opening cadence or the hero's weapon range --
+        # on ground the map agrees they can stand on and reach the player from,
+        # so it does not depend on the shape of the world either.
+        spots = spots_near(playing, want=5)
+        self.assertEqual(len(spots), 5,
+                         "no room to stand five enemies next to the player")
+        for at in spots:
+            playing._spawn_enemy("chaser", at=at)
 
-        # advance ~15s: the starting weapon auto-fires, projectiles hit, enemies die.
+        # advance ~15s: the starting weapon auto-fires, projectiles hit, enemies
+        # die. The third kill is usually enough XP to level up, which pushes an
+        # overlay that stops the world until it is answered -- so this loop has
+        # to dismiss them exactly as the boss loop below does. Not doing so was
+        # the other half of the flake: whether the level-up landed before or
+        # after the fifth kill was a race, and when it landed first the state
+        # machine sat in `LevelUpState` for the remaining fourteen seconds and
+        # the count stopped where it was.
         for _ in range(900):
             game.state_machine.update(1 / 60)
             game._render()
+            while isinstance(game.state_machine.current, LevelUpState):
+                key(pygame.K_1)
 
         # (enemies may all be dead again -- a strong starting weapon keeps the
         # field clear; kills / damage are the meaningful signals.)
         self.assertGreater(playing.stats["damage_dealt"], 0, "weapon dealt no damage")
         self.assertGreaterEqual(playing.stats["kills"], 5, "nothing was killed")
 
-        # PROGRESSION: force a level-up, confirm the choice overlay appears,
+        # PROGRESSION: force another level-up, confirm the choice overlay appears,
         # pick option 1, confirm it applies and control returns to PLAYING.
         weapons_before = len(playing.player.weapons)
         stacks_before = sum(playing.player.upgrade_stacks.values())

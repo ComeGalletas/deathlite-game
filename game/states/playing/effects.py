@@ -1,7 +1,8 @@
 """Transient effects for PLAYING: hostile projectiles, ground hazards, blast
 visuals, and the shared one-shot death poof.
 
-`TransientFx` owns the spawn / per-frame update / cull logic for these. The
+`TransientFx` owns the spawn / per-frame update / cull logic for these, and
+the LD-9 D10 elevation rule for shots (`stamp_fire_level` / `block_on_terrain`). The
 containers themselves stay on `PlayingState` (`_explosions`, `_death_fx`,
 `hazards`, and the `projectiles` / `hostiles` pools) because `WorldRenderer` and
 the tests read them directly; this class only mutates them.
@@ -26,6 +27,7 @@ from entities.melee_hitbox import MeleeHitbox
 from game.events import Events
 from systems.animation import Animator
 from game import config
+from world.elevation import NONE as _NO_LEVEL
 
 
 class TransientFx:
@@ -39,6 +41,51 @@ class TransientFx:
             return
         proj.reset(pos=pos, vel=vel, damage=damage, radius=radius,
                    lifetime=6.0, color=(255, 110, 90), hostile=True)
+        self.stamp_fire_level(proj)
+
+    def stamp_fire_level(self, proj) -> None:
+        """Record the elevation a shot leaves from, for `block_on_terrain`.
+
+        Sampled at the muzzle rather than on the projectile's first update: a
+        fast shot has already travelled several pixels by then, which at a
+        terrace rim is enough to sample the tile beyond the edge and give the
+        shot the wrong floor to be judged against."""
+        levels = getattr(self.ps.game_map, "_levels", None)
+        if levels is not None:
+            proj.fire_level = levels.top_at_point(proj.pos.x, proj.pos.y)
+
+    def block_on_terrain(self, proj) -> None:
+        """LD-9 D10: a shot dies against terrain that stands above the floor it
+        was fired from.
+
+        The rule, as set with the rest of the phase: a projectile travels over
+        its own floor and over anything lower, so shooting *down* off a terrace
+        works. Shooting *up* does not -- it hits the cliffside. Together with
+        elevation-blind aggro that makes high ground asymmetrically strong,
+        which is deliberate: a ranged enemy above can fire down while the
+        player's answer hits the wall. It is the first balance lever to reach
+        for if plateaus feel unfair.
+
+        `top_at_point` is what makes this land on the *face* rather than on the
+        rim above it. A cliff face has no walkable level, so a test against
+        `level_at_point` would let the shot through the wall and only kill it
+        on the plateau beyond -- reading as if it had passed through the rock.
+        The void reports `NONE` and blocks nothing, so a shot still crosses open
+        sea between islands.
+
+        Orbiters are exempt for the same reason they skip the obstacle test:
+        they are anchored to the player and are not travelling anywhere.
+        """
+        if not proj.active or proj.fire_level == _NO_LEVEL or proj.orbit_speed:
+            return
+        levels = getattr(self.ps.game_map, "_levels", None)
+        if levels is None:
+            return
+        here = levels.top_at_point(proj.pos.x, proj.pos.y)
+        if here != _NO_LEVEL and here > proj.fire_level:
+            self.ps.particles.burst(proj.pos, proj.color, count=3, speed=70,
+                                    life=0.2, radius=2)
+            proj.active = False
 
     def block_on_obstacle(self, proj) -> None:
         ps = self.ps
@@ -58,6 +105,7 @@ class TransientFx:
             before = pygame.Vector2(p.pos)
             p.update(dt)
             self.block_on_obstacle(p)
+            self.block_on_terrain(p)
             self._shed_trail(p, (p.pos - before).length())
         ps.projectiles.sweep()
         for p in ps.hostiles:
@@ -66,6 +114,7 @@ class TransientFx:
                 p.active = False
             else:
                 self.block_on_obstacle(p)
+                self.block_on_terrain(p)
         ps.hostiles.sweep()
 
     # --- ground hazards (spec 5.6) --------------------------

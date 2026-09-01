@@ -12,6 +12,7 @@ import pygame
 from combat.damage import apply_armor
 from combat.status import StatusState
 from entities.ai import Blackboard, build_behavior
+from entities.ai.components.aggro import provoke
 from game import config
 from game.assets import get_assets
 from systems.animation import Animator
@@ -83,6 +84,10 @@ class Enemy:
 
     def take_damage(self, amount: float, armor: float = 0.0) -> float:
         dealt = apply_armor(amount, armor)
+        # LD-9 D7: a hit provokes, whatever the range. Recorded as a flag rather
+        # than a timestamp because nothing here has the clock; `AggroSense`
+        # consumes it on its next tick.
+        provoke(self)
         self.hit_flash = 0.08
         if self.anim is not None:
             self._hurt_t = 0.26                     # hit-tint window

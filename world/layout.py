@@ -88,6 +88,12 @@ class Room:
     # the room's shape, elevation and stairs -- `cells` is derived from it (the
     # walkable subset) and `floor` is just its base level.
     grid: dict = field(default_factory=dict)
+    # LD-10: the island's *shape* type -- "volcanic", "small", "boss". Separate
+    # from `kind`, which says what happens on it: a shrine can stand on a small
+    # island. Chosen once in `_assign_topography` and read by the room sizing,
+    # the coastline and the terrace count, so all three agree. Empty unless
+    # `config.HEIGHTMAP_ROOMS`.
+    topography: str = ""
 
     @property
     def tile_dims(self) -> tuple[int, int]:

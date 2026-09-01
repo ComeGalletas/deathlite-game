@@ -21,7 +21,7 @@ _NEIGHBOURS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 def paint_room(store, sheets, layout, r) -> pygame.Surface:
     px = sheets.px
-    sheet = sheets.sheet_for(r.floor, r.kind)
+    sheet = sheets.sheet_for(r.floor, r.kind, r)
     raised = r.floor > 0
     mask = r.cells       # always populated by generate_world (W1)
     # LD-5: a ground room autotiles against its cells *plus* any annex
@@ -80,7 +80,8 @@ def paint_corridor(sheets, layout, c) -> tuple[pygame.Rect, pygame.Surface]:
         w, h = px, ncells * px
         by = span0 - (h - (span1 - span0)) // 2
         blit = pygame.Rect(c.rect.x, by, w, h)
-    fallback_sheet = sheets.sheet_for(layout.room(c.a).floor)
+    a_room = layout.room(c.a)
+    fallback_sheet = sheets.sheet_for(a_room.floor, room=a_room)
     surf = pygame.Surface((w, h), pygame.SRCALPHA)
     for i in range(ncells):
         if sheets.bridge_ok:

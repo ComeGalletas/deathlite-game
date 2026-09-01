@@ -15,6 +15,8 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from tests.nearby import spots_near
+
 from game import save as save_mod
 from game.game import Game
 from game.states.character_select_state import CharacterSelectState
@@ -188,7 +190,11 @@ class DevMenuTests(unittest.TestCase):
         menu._activate("no_attack")
         self.assertTrue(playing._dev_no_attack)
         _key(game, pygame.K_BACKQUOTE)
-        playing._spawn_enemy("tank", at=playing.player.pos + pygame.Vector2(24, 0))
+        # Not a fixed offset: the run seed is random, and a spot 24 px east can
+        # be over a drop. See `tests/nearby.py`.
+        spot = spots_near(playing, want=1, radius=22.0)
+        self.assertTrue(spot, "nowhere beside the hero to stand a tank")
+        playing._spawn_enemy("tank", at=spot[0])
         d0 = playing.stats["damage_dealt"]
         for _ in range(90):
             game.state_machine.update(1 / 60)

@@ -391,3 +391,94 @@ lists which `store` fields it reads and appends to.
 - The bake sequence in `_build_tiles` could itself move to
   `world/terrain/bake.py` as a `build(store, layout, assets)` function, leaving
   `GameMap` purely collision + facade.
+
+---
+
+# W7 (LD-10) — splitting generation and rendering
+
+A check-only survey first, then four steps, each verified by a **fingerprint of
+every generated world** -- rooms, grids, tile metadata, corridors, stairs,
+obstacles and bounds, over twelve seeds with the height-map flag both on and
+off. Every step below ends with that hash unchanged, so "pure move" is a
+measurement rather than a claim.
+
+## 1. 230 lines of `heightmap.py` were unreachable
+
+An entire earlier generator was still in the file, superseded by the cap-based
+one and called by nothing -- not even tests. `_plan_levels` and `_split_rows`
+(band planning), `_plan_stairs`, `_settle_walls`, `_stamp_stairs` and
+`_repair_links` (band-era stair placement), `_crevasses` and `_wander` (band-era
+wall wobble). `_settle_walls` had exactly one reference in the whole tree: a
+mention inside a comment.
+
+`to_ascii` was the one dead function kept, deliberately, and now says why: the
+level-design journal writes every layout in that notation, so it is the bridge
+between the grid the code builds and the diagrams that explain it.
+
+## 2. Eleven forwarders, and a round trip
+
+`GameMap` carried eleven methods whose entire body was
+`return self.renderer.<same name>(...)`. Two of them were worse than
+redundant: `TerrainRenderer` called *back* through `GameMap` to reach its own
+`_draw_one_obstacle` and `_draw_one_tree_shadow`. A depth-sort test patched
+those on the map and worked only because of the round trip; it patches the
+renderer now, which is where the drawing was all along.
+
+The neighbour tuple was written eight times under five names. Only the four
+literals **inside** `heightmap.py` were consolidated: `tuning._DIRS` and
+`pathfinding._ORTH` are written in a different order and feed a seeded shuffle
+and a two-pass mask, where the order is part of the result. That is now a
+comment on the constant rather than a trap.
+
+The survey had also claimed six duplicate flood fills. On inspection that was
+an overcount -- `_components` is three lines built on `reachable`, and the two
+in `repair.py` are hand-inlined for speed on purpose. Only `_water_blobs`
+stands alone, and it walks a different set. No helper was forced.
+
+## 3. `heightmap.py` -> `world/gen/height/`
+
+1,180 lines and six concerns became seven modules, none over 213 lines:
+`const`, `coast`, `terraces`, `walls`, `flights`, `water`, `graph`, with
+`build_grid` as the pipeline in `__init__`. `world/gen/heightmap.py` stays as a
+24-line shim, because `world.gen`, the painters and a dozen test modules import
+it by name.
+
+Two hazards in a mechanical slice, both caught by the fingerprint rather than by
+reading: a constant defined *above* a function (`_LAKE_MIN`) travels with the
+**previous** function's span and landed in `flights`; and cross-module calls
+that were free inside one file (`terraces._cap` needs `coast._despike`,
+`walls` needs `graph.walk_links`) have to become imports. A small AST pass that
+lists names used but never defined or imported found every one at once.
+
+## 4. `gen/__init__.py` and `map.py`
+
+`generate_world` was 222 lines and `_seat_corridors` 184 -- 66% of the package
+`__init__` was two stages that belonged beside the others. They are
+`gen/placement.py`, `gen/bridges.py` and `gen/islands.py` now, and `__init__` is
+the pipeline it always claimed to be.
+
+`world/map.py` was three unrelated jobs. The bake (`_build_tiles` +
+`_finish_tiles`, 139 lines) is `world/terrain/bake.py`, taking the map as `gm`
+-- the same shape the painters already use. `GameMap` keeps a one-line
+`_build_tiles` entry point, because it is called lazily from `draw` and by ten
+test modules, and is now 352 lines of what everything actually uses it for: the
+collision surface.
+
+## The LD-8 path is frozen, not deleted
+
+`world/legacy/` holds `verticality.py`, `terrain_rooms.py` and
+`terrain_cliffs.py` -- 829 lines reached only through
+`config.HEIGHTMAP_ROOMS = False`. Its `__init__` says what it is and that
+nothing new should import from it. The reason it was interleaved matters: every
+generation change this session needed a gate (`scatter._radius`,
+`repair.unseal`, `tuning.special_kinds`) *because* the two models shared files.
+
+## A third test caught assuming a fixed offset is walkable
+
+`test_dev_mode` spawned a tank 24 px east of the hero, in a world built from an
+unpinned run seed. It passed alone and failed in the suite, exactly as the smoke
+test and the projectile-trail tests had. `tests/nearby.py` now holds the one
+helper all three use -- `is_walkable(p, r, frm=origin)`, the map's own question
+with the elevation rule included, so a spot across a drop is refused.
+
+Suite **817** green; world fingerprint unchanged from first step to last.

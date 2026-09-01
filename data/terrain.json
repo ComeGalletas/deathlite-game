@@ -96,9 +96,39 @@
     {"id": "cloud_d",       "rig": "deco_cloud_7", "placement": "void", "scale": 0.32, "chance": 0.006}
   ],
 
+  "sheet_biomes": {
+    "terrain/tiles/tilemap_1.png": "grass",
+    "terrain/tiles/tilemap_2.png": "grass",
+    "terrain/tiles/tilemap_3.png": "grass",
+    "terrain/tiles/tilemap_4.png": "grass",
+    "terrain/tiles/tilemap_5.png": "grass",
+    "terrain/tiles/tilemap_6.png": "rock",
+    "terrain/tiles/tilemap_7.png": "grass",
+    "terrain/tiles/tilemap_8.png": "sand"
+  },
+
+  "heightmap_biome_pool": [
+    "terrain/tiles/tilemap_6.png",
+    "terrain/tiles/tilemap_7.png",
+    "terrain/tiles/tilemap_8.png"
+  ],
+
+  "sheet_flags": {
+    "terrain/tiles/tilemap_6.png": {"shoreline": false},
+    "terrain/tiles/tilemap_7.png": {"shoreline": false},
+    "terrain/tiles/tilemap_8.png": {"shoreline": false}
+  },
+
+  "obstacles": {
+    "tree":   {"radius": 15, "blocks_projectiles": true, "color": [54, 82, 54]},
+    "rock":   {"radius": 30, "blocks_projectiles": true, "color": [92, 92, 100]},
+    "pillar": {"radius": 21, "blocks_projectiles": true, "color": [120, 118, 130]},
+    "house":  {"radius": 34, "blocks_projectiles": true, "color": [150, 120, 90]}
+  },
+
   "obstacle_decor": {
     "size_boost": 1.25,
-    "render_radius": {"tree": 15},
+    "render_radius": {"tree": 22},
     "sprite_drop": {"house": 1.35},
     "tree_shadow": {"radius_scale": 1.9, "radius_padding": 5, "color": [12, 18, 22], "alpha": 66},
     "rigs": {

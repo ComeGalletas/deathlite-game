@@ -14,6 +14,27 @@ from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.playing_state import PlayingState
 from world.map import GameMap
+from game import config
+
+
+
+# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
+# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
+# defaults on now and selects a different generator entirely, whose rooms are
+# height maps with overlapping bounding rects and no cliff band. Pin the flag
+# off here so this coverage keeps testing the path it was written for; the
+# height-map path has its own in `tests/world/test_elevation.py`.
+_SAVED_HEIGHTMAP = None
+
+
+def _pin_heightmap_off():
+    global _SAVED_HEIGHTMAP
+    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
+    config.HEIGHTMAP_ROOMS = False
+
+
+def _restore_heightmap():
+    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
 
 
 def fresh_playing():
@@ -42,7 +63,7 @@ class SceneryDrawablesTests(unittest.TestCase):
         view = cam.visible_rect().inflate(320, 320)
         want = {round(o.pos.y) for o in gm.obstacles
                 if view.collidepoint(o.pos.x, o.pos.y)}
-        got = {round(y) for y, fn in gm.scenery_drawables(cam)}
+        got = {round(y) for y, fn in gm.renderer.scenery_drawables(cam)}
         self.assertTrue(want)
         self.assertTrue(want.issubset(got), "an in-view obstacle is missing a drawable")
 
@@ -53,7 +74,7 @@ class SceneryDrawablesTests(unittest.TestCase):
         cam = Camera(gm.width, gm.height)
         cam.snap_to(gm.center)
         surf = pygame.Surface((320, 240))
-        for _y, fn in gm.scenery_drawables(cam):
+        for _y, fn in gm.renderer.scenery_drawables(cam):
             fn(surf)                                # must not raise
 
     def test_tree_shade_is_sorted_by_tree_depth_before_its_owner(self):
@@ -66,13 +87,17 @@ class SceneryDrawablesTests(unittest.TestCase):
 
         shadow_owner = {id(shadow): i for i, shadow in gm._tree_shadows.items()}
         calls = []
-        gm._draw_one_tree_shadow = (
+        # Patched on the renderer, which is where the drawing lives.
+        # `GameMap` used to carry a forwarder for each of these and
+        # `TerrainRenderer` called back through it to reach its own methods, so
+        # patching the map worked by accident; the round trip is gone.
+        gm.renderer._draw_one_tree_shadow = (
             lambda _surface, _camera, shadow:
             calls.append(("shadow", shadow_owner[id(shadow)])))
-        gm._draw_one_obstacle = (
+        gm.renderer._draw_one_obstacle = (
             lambda _surface, _camera, i, _obstacle: calls.append(("obstacle", i)))
 
-        drawables = sorted(gm.scenery_drawables(cam), key=lambda item: item[0])
+        drawables = sorted(gm.renderer.scenery_drawables(cam), key=lambda item: item[0])
         for _depth, draw in drawables:
             draw(None)
 
@@ -92,7 +117,7 @@ class SceneryDrawablesTests(unittest.TestCase):
         from systems.camera import Camera
         gm = GameMap()                              # one big room, no procedural obstacles
         cam = Camera(gm.width, gm.height)
-        self.assertEqual(gm.scenery_drawables(cam), [])
+        self.assertEqual(gm.renderer.scenery_drawables(cam), [])
 
 
 class DepthOrderTests(unittest.TestCase):
@@ -208,3 +233,11 @@ class ConeWeaponVisualTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def setUpModule():
+    _pin_heightmap_off()
+
+
+def tearDownModule():
+    _restore_heightmap()

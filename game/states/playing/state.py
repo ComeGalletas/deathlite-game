@@ -502,6 +502,9 @@ class PlayingState(State):
             return None
         self._resolve_visual(kw)
         proj.reset(**kw)
+        # LD-9 D10: stamp the floor it leaves from, at the muzzle. See
+        # `TransientFx.block_on_terrain`.
+        self.fx.stamp_fire_level(proj)
         self.game.audio.play_shoot()
         return proj
 
@@ -692,8 +695,8 @@ class PlayingState(State):
         offset = self.shake.offset / self.camera.zoom
         self.camera.pos -= offset
         try:
-            self.game_map.draw_ground(surface, self.camera)
-            self.game_map.draw_room_clutter(surface, self.camera)
+            self.game_map.renderer.draw_ground(surface, self.camera)
+            self.game_map.renderer.draw_room_clutter(surface, self.camera)
             self.renderer.interactables(surface)
             self.renderer.hazards(surface)
             self.renderer.gems(surface)
@@ -716,7 +719,7 @@ class PlayingState(State):
         """`(depth_y, draw_fn)` for the whole depth-sorted layer -- map scenery
         (obstacles + interior decorations) plus the characters (hero, enemies,
         boss, summons) -- sorted back-to-front by ground-contact Y."""
-        items = self.game_map.scenery_drawables(self.camera)
+        items = self.game_map.renderer.scenery_drawables(self.camera)
         for e in self.enemies:
             items.append((e.pos.y, lambda s, e=e: self._draw_one_enemy(s, e)))
         for fx in self._death_fx:                  # one-shot death poofs

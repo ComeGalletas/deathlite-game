@@ -16,11 +16,31 @@ from world.procedural import Stair, WorldLayout, generate_world
 from world.pathfinding import NavField, _point_in_corridor, _point_on_floor
 from world.map import GameMap
 
+
 _SEEDS = tuple(range(40))
 
 # interior grass tone per elevation sheet (data/terrain.json floor_sheets)
 _SHEET_TONE = {0: (151, 181, 83), 1: (131, 173, 87),
                2: (96, 169, 99), 3: (86, 152, 139)}
+
+
+# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
+# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
+# defaults on now and selects a different generator entirely, whose rooms are
+# height maps with overlapping bounding rects and no cliff band. Pin the flag
+# off here so this coverage keeps testing the path it was written for; the
+# height-map path has its own in `tests/world/test_elevation.py`.
+_SAVED_HEIGHTMAP = None
+
+
+def _pin_heightmap_off():
+    global _SAVED_HEIGHTMAP
+    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
+    config.HEIGHTMAP_ROOMS = False
+
+
+def _restore_heightmap():
+    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
 
 
 def _display():
@@ -204,15 +224,28 @@ class NavTests(_Vertical, unittest.TestCase):
         self.assertTrue(_point_in_corridor(w, st.rect.centerx, st.rect.centery))
 
     def test_flow_field_routes_across_floors_to_every_raised_room(self):
+        """LD-9 D9: the field is filled to `config.NAV_FILL_MAX_COST`, not to
+        the edge of the world, so seeding once at the start room no longer
+        reaches a raised room on the far side of the map. The intent here is
+        cross-*floor* routing, not world span, so each raised room is tested
+        from the nearest *other* room's centre -- still a different room, still
+        a climb, and independent of how far the fill runs."""
         px = config.TILE_PX
         for s in _SEEDS:
             w = generate_world(s)
             nf = NavField(w)
-            sc = w.room(w.start_id).center
-            nf.rebuild((sc.x, sc.y))
             for r in w.rooms:
                 if r.floor == 0:
                     continue
+                # A *connected* neighbour from the layout graph, not merely
+                # the nearest by distance: the closest room by centre can sit
+                # across a gap with no link to this one, and seeding there
+                # reaches nothing at all.
+                nb = ([w.room(i) for i in r.neighbors] or
+                      [o for o in w.rooms if o.id != r.id])
+                near = min(nb, key=lambda o:
+                           (o.center - r.center).length_squared())
+                nf.rebuild((near.center.x, near.center.y))
                 cells = sorted(r.cells)
                 reached = sum(
                     1 for (cc, rr) in cells
@@ -631,7 +664,7 @@ class ElevationSheetTests(_Vertical, unittest.TestCase):
 
         rec = _Rec()
         gm._render_zoom = 1.0
-        gm._draw_tiled(rec, _FullView(gm.width, gm.height))
+        gm.renderer._draw_tiled(rec, _FullView(gm.width, gm.height))
         pos = {}
         for i, sid in enumerate(rec.ids):
             pos.setdefault(sid, i)                # first blit of each surface
@@ -935,10 +968,14 @@ class RampTests(_Vertical, unittest.TestCase):
             if not tiles:
                 continue
             nf = NavField(w, w.obstacles)
-            sc = w.room(w.start_id).center
-            nf.rebuild((sc.x, sc.y))
             for st in tiles:
                 c = pygame.Vector2(st.rect.centerx, st.rect.centery)
+                # Seeded at the unit itself: the field is bounded by
+                # `config.NAV_FILL_MAX_COST` now, so a single fill from the
+                # start room no longer covers every ramp in the world. What
+                # this asserts is that both classes can stand on the unit and
+                # be routed, which is what the clearance leniency is for.
+                nf.rebuild((c.x, c.y))
                 for radius in (14.0, 30.0):
                     self.assertLess(nf.cost(c, radius), 1e9,
                                     f"seed {s}: unit tile unreachable at r={radius}")
@@ -1274,3 +1311,11 @@ class CliffFootAndSeamTests(_Vertical, unittest.TestCase):
                                        f"seed {s}: void hairline at a cliff seam")
                     checked += 1
         self.assertGreater(checked, 0, "no interior cliff seam sampled")
+
+
+def setUpModule():
+    _pin_heightmap_off()
+
+
+def tearDownModule():
+    _restore_heightmap()

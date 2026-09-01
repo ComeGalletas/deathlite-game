@@ -78,7 +78,7 @@ def paint_cliff(store, sheets, layout, r):
            if m.cliff == "top"]
     if not rim:
         return None
-    sheet = sheet_for(r.floor)
+    sheet = sheet_for(r.floor, room=r)
     lap = px // 2
     surf = pygame.Surface((r.rect.width, r.rect.height + face_h * px),
                           pygame.SRCALPHA)
@@ -191,7 +191,7 @@ def paint_cliff(store, sheets, layout, r):
             brows = [(row + 1 + k) * px for k in range(band)]   # band-row y (tile)
             top_y, bot_y = brows[0], brows[-1]
             lo_room = layout.room(lo_id) if lo_id >= 0 else None
-            lsheet = (sheet_for(lo_room.floor, lo_room.kind)
+            lsheet = (sheet_for(lo_room.floor, lo_room.kind, lo_room)
                       if lo_room is not None else sheet)
             # LD-7: the cliff-behind (`body` mid, opaque both sides so the
             # crevasse never shows the sea) stays in the cliff surface -- the
@@ -291,7 +291,7 @@ def paint_cliff(store, sheets, layout, r):
                 if lower is not None:
                     store._cliff_underlay.append(
                         (pygame.Rect(fx, fy, px, px),
-                         cell(sheet_for(lower.floor, lower.kind),
+                         cell(sheet_for(lower.floor, lower.kind, lower),
                               interior), r.floor))
                     store._cliff_shadow.append((fx, fy, r.floor))
     # LD-7: lift the staircase unit's own tiles into a small surface
@@ -351,7 +351,8 @@ def paint_stair(sheets, layout, st):
         bx = st.rect.centerx - w // 2
         by = span0 - (h - (span1 - span0)) // 2
     blit = pygame.Rect(bx, by, w, h)
-    fallback = sheet_for(layout.room(st.high_room).floor)
+    hi_room = layout.room(st.high_room)
+    fallback = sheet_for(hi_room.floor, room=hi_room)
     surf = pygame.Surface((w, h), pygame.SRCALPHA)
     for i in range(ncells):
         if bridge_ok:

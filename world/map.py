@@ -17,12 +17,14 @@ import pygame
 
 from game import config
 from game.assets import get_assets
+from world.elevation import LevelIndex, can_step
 from world.procedural import Room, WorldLayout, generate_world
 from world.terrain import autotile
-from world.terrain import cliffs as terrain_cliffs
+from world.terrain import bake as terrain_bake
+from world.legacy import terrain_cliffs
 from world.terrain import decor as terrain_decor
 from world.terrain import grid_paint
-from world.terrain import rooms as terrain_rooms
+from world.legacy import terrain_rooms
 from world.terrain.sheets import TileSheets
 from world.terrain.render import TerrainRenderer
 
@@ -36,6 +38,7 @@ class GameMap:
     def __init__(self, seed: int | None = None) -> None:
         if seed is None:
             self.layout: WorldLayout | None = None
+            self._levels = None
             self.width = config.WORLD_WIDTH
             self.height = config.WORLD_HEIGHT
             self._rects = [pygame.Rect(0, 0, self.width, self.height)]
@@ -46,6 +49,10 @@ class GameMap:
             self.width, self.height = b.width, b.height
             self._rects = self.layout.walkable_rects()
             self.obstacles = self.layout.obstacles
+            # LD-9 D0/D2: elevation lookup for the movement rule. Flat
+            # (all level 0) with the height-map flag off, so it refuses
+            # nothing there.
+            self._levels = LevelIndex(self.layout)
 
         # Tiled-terrain state, built lazily on the first draw() (needs a display).
         self._tiles_ready = False
@@ -170,8 +177,56 @@ class GameMap:
                 return True
         return False
 
-    def is_walkable(self, pos: pygame.Vector2, radius: float = 0.0) -> bool:
+    def path_ok(self, prev: pygame.Vector2, new: pygame.Vector2) -> bool:
+        """May a body travel from `prev` to `new` given the terrain's elevation?
+
+        Both points can be on floor and the move still be illegal: a plateau's
+        flank and its back edge are level changes with no stone in them, so
+        `_point_ok` sees floor either side. Only a flight crosses them.
+
+        The segment is walked rather than end-checked. Ordinary movement is a
+        few pixels a frame and never leaves the tile it started in, but a
+        charger's lunge (`ai/behaviors/melee.py`, `ai/components/attacks.py`)
+        resolves straight to the player's position and can span many tiles; a
+        bare endpoint test would let it vault a cliff. Sampling every half tile
+        cannot skip one.
+
+        No index (the flag off, or no layout) means no elevation to respect."""
+        ix = self._levels
+        if ix is None:
+            return True
+        a = ix.tile_of(prev.x, prev.y)
+        b = ix.tile_of(new.x, new.y)
+        if a == b:
+            return True
+        step = ix.px * 0.5
+        d = new - prev
+        n = max(1, int(d.length() / step) + 1)
+        cur = a
+        for i in range(1, n + 1):
+            t = i / n
+            nxt = ix.tile_of(prev.x + d.x * t, prev.y + d.y * t)
+            if nxt != cur:
+                if not can_step(ix, cur, nxt):
+                    return False
+                cur = nxt
+        return cur == b or can_step(ix, cur, b)
+
+    def is_walkable(self, pos: pygame.Vector2, radius: float = 0.0,
+                    frm: pygame.Vector2 | None = None) -> bool:
+        """`frm` opts into the elevation rule: the move from there to here must
+        be one the terrain allows. Callers that are only asking "is this spot
+        free" -- the AI's `is_walkable` probe, spawn placement -- leave it None
+        and get the pure floor test, unchanged.
+
+        The rule is applied to the body's **centre only**. The radius probes
+        below stay a plain floor test, as they always were: a terrace is a few
+        tiles wide, so demanding that every probe sit on the centre's level
+        would stop a large enemy standing anywhere near a rim, and overhanging
+        a drop is exactly what those probes already tolerate against a wall."""
         if not self._point_ok(pos.x, pos.y):
+            return False
+        if frm is not None and not self.path_ok(frm, pos):
             return False
         if radius > 0 and not (
                 self._point_ok(pos.x + radius, pos.y)
@@ -200,13 +255,13 @@ class GameMap:
         """Move toward `new`; if it hits a wall, slide along one axis; if that
         also fails, hop one short step to an open compass direction so a wedged
         entity always has an out. Unchanged if every hop is blocked too."""
-        if self.is_walkable(new, radius):
+        if self.is_walkable(new, radius, frm=prev):
             return new
         slide_x = pygame.Vector2(new.x, prev.y)
-        if self.is_walkable(slide_x, radius):
+        if self.is_walkable(slide_x, radius, frm=prev):
             return slide_x
         slide_y = pygame.Vector2(prev.x, new.y)
-        if self.is_walkable(slide_y, radius):
+        if self.is_walkable(slide_y, radius, frm=prev):
             return slide_y
         # Fully wedged (move + both axis slides blocked). Try a `radius`-length
         # hop in the eight compass directions, the one nearest the intended
@@ -218,7 +273,7 @@ class GameMap:
         for dx, dy in sorted(_ESCAPE_DIRS,
                              key=lambda d: -(d[0] * want.x + d[1] * want.y)):
             hop = pygame.Vector2(prev.x + dx * step, prev.y + dy * step)
-            if self.is_walkable(hop, radius):
+            if self.is_walkable(hop, radius, frm=prev):
                 return hop
         return pygame.Vector2(prev)
 
@@ -285,175 +340,13 @@ class GameMap:
         return self._foam[(int(seconds * fps) + phase) % len(self._foam)]
 
     def _build_tiles(self) -> None:
-        self._tiles_ready = True
-        if self.layout is None:
-            return
-        layout = self.layout
-        a = get_assets()
-        t = a.terrain
-        sheets = TileSheets(a)
-        if not sheets.ok:
-            return                                   # tileset missing -> flat fallback
-        self._sheets = sheets
-
-        # W2/W4 (journals/world_refactor.md): the tileset adapter + tile cache
-        # are `sheets` now; the room / corridor / cliff / stair painters live in
-        # world/terrain/. `_build_tiles` only sequences them and still owns the
-        # LD-7a cliff-cap pass, the shore filter, and the water / foam / decor
-        # buffers below.
-        px = sheets.px
-
-        # LD-7a: ground-room edge cells that sit directly under a raised room's
-        # cliff band. Their north side is stone, not open sea -- so `paint_room`
-        # closes that side (interior tile, no shoreline autotile) and seeds no
-        # foam there. Paired with the `_cliff_underlay` tile at the cliff foot
-        # cell itself, this reads as the lower room extending one tile up under
-        # the cliff. Only a cliff *flush* above the cell counts; a real gap
-        # keeps its shoreline.
-        band_rects = []
-        for R in layout.rooms:
-            if R.floor <= 0:
-                continue
-            fh = max(1, R.floor * int(config.CLIFF_TILES))
-            for (bc, bro), bm in R.tile_meta.items():
-                if bm.cliff == "top":
-                    band_rects.append(pygame.Rect(
-                        R.rect.x + bc * px, R.rect.y + (bro + 1) * px,
-                        px, fh * px))
-        cliff_capped: set = set()
-        if band_rects:
-            for r in layout.rooms:
-                if r.floor != 0:
-                    continue
-                for (col, row) in r.cells:
-                    if (col, row - 1) in r.cells:
-                        continue
-                    strip = pygame.Rect(r.rect.x + col * px + 4,
-                                        r.rect.y + row * px - px // 2,
-                                        px - 8, px)
-                    if any(strip.colliderect(b) for b in band_rects):
-                        cliff_capped.add((r.id, col, row))
-        self._cliff_capped = cliff_capped
-
-        if config.HEIGHTMAP_ROOMS:
-            # LD-9 Phase C: one pass per room, straight off its height map.
-            # Nothing else to stitch -- no separate cliff band, underlay,
-            # drop shadow or ramp collection, because the grid already says
-            # what every cell is. Falls through to the shared water / foam /
-            # scenery setup below.
-            self._shore = []
-            for r in layout.rooms:
-                got = grid_paint.paint_room_grid(self, sheets, layout, r)
-                if got is not None:
-                    self._grid_surfs.append((got[0], got[1], r.floor))
-                self._shore.extend(grid_paint.grid_shore(r))
-            for c in layout.corridors:
-                rc = grid_paint.paint_bridge(sheets, c)
-                self._corr_surfs.append((rc[0], rc[1], layout.room(c.a).floor))
-            self._finish_tiles(a, sheets)
-            return
-
-        for r in layout.rooms:
-            self._room_surfs[r.id] = terrain_rooms.paint_room(
-                self, sheets, layout, r)
-        for c in layout.corridors:
-            rc = terrain_rooms.paint_corridor(sheets, layout, c)
-            self._corr_surfs.append((rc[0], rc[1], layout.room(c.a).floor))
-        for r in layout.rooms:
-            if r.floor > 0:
-                cl = terrain_cliffs.paint_cliff(self, sheets, layout, r)
-                if cl is not None:
-                    self._cliff_surfs.append(cl)
-        for st in layout.stairs:
-            # LD-3: a ramp step is drawn by `paint_cliff` as part of the run.
-            # It is a `Stair` only so collision and nav pick it up for free --
-            # baking a plain grass strip here would cover the slope.
-            if st.ramp:
-                continue
-            sc = terrain_cliffs.paint_stair(sheets, layout, st)
-            self._stair_surfs.append((sc[0], sc[1], layout.room(st.high_room).floor))
-
-        # Keep every ground-room edge which still faces sea after all corridors,
-        # stairs, and cliff geometry are known. Corridors render over this foam
-        # but never create or suppress anchors of their own.
-        self._shore = list(dict.fromkeys(
-            (sx, sy) for sx, sy in self._shore
-            if self._point_ok(sx + px / 2, sy + px / 2)
-            and any(not self._point_ok(sx + px / 2 + dx, sy + px / 2 + dy)
-                    for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px)))
-        ))
-
-        self._finish_tiles(a, sheets)
-
-    def _finish_tiles(self, a, sheets) -> None:
-        """The water buffer, drop shadow, foam frames and scenery scatter --
-        shared by the LD-8 painter and the LD-9 height-map one, which differ
-        only in how the land itself is baked."""
-        t = a.terrain
-        water = a.tile(str(t.get("water_tile")), 0)
-        if water is not None:
-            wt = water.get_width()
-            # Big enough to cover the visible world extent (SCREEN / zoom) plus
-            # one tile of scroll slack; `_z_surf` blows it up to the screen.
-            span_w = round(config.SCREEN_WIDTH / config.CAMERA_ZOOM) + wt
-            span_h = round(config.SCREEN_HEIGHT / config.CAMERA_ZOOM) + wt
-            buf = pygame.Surface((span_w, span_h)).convert()
-            for y in range(0, span_h, wt):
-                for x in range(0, span_w, wt):
-                    buf.blit(water, (x, y))
-            self._water_buf = buf
-            self._water_tile = wt
-
-        _shdw = a.frames("terrain_shadow", "loop")
-        self._shadow = _shdw[0] if _shdw else None
-
-        if config.TERRAIN_FOAM:
-            self._foam = a.frames("terrain_foam", "loop")
-            routines = t.get("foam_routines", [])
-            parsed = tuple((max(0.1, float(r["fps"])), int(r.get("phase", 0)))
-                           for r in routines if float(r.get("fps", 0)) > 0)
-            if parsed:
-                self._foam_routines = parsed
-
-        if config.TERRAIN_DECORATIONS:
-            terrain_decor.build_obstacle_decor(self, a)
-
-        if config.TERRAIN_DECOR:
-            terrain_decor.build_decor_scatter(self, a)
-
-        self._tiles_ok = True
+        """Bake the layout into surfaces. Body in `world/terrain/bake.py`."""
+        terrain_bake.bake(self)
 
     # --- render -----------------------------------------------
-    # --- render: bodies in world/terrain/render.py TerrainRenderer (W6) ---
-    def draw(self, surface, camera):
-        return self.renderer.draw(surface, camera)
-
-    def draw_ground(self, surface, camera):
-        return self.renderer.draw_ground(surface, camera)
-
-    def draw_room_clutter(self, surface, camera):
-        return self.renderer.draw_room_clutter(surface, camera)
-
-    def scenery_drawables(self, camera):
-        return self.renderer.scenery_drawables(camera)
-
-    def shade_character_frame(self, frame, dest, camera, character_y):
-        return self.renderer.shade_character_frame(frame, dest, camera, character_y)
-
-    def draw_tree_shadows(self, surface, camera):
-        return self.renderer.draw_tree_shadows(surface, camera)
-
-    def _draw_obstacles(self, surface, camera):
-        return self.renderer._draw_obstacles(surface, camera)
-
-    def _draw_tiled(self, surface, camera):
-        return self.renderer._draw_tiled(surface, camera)
-
-    def _z_surf(self, surf):
-        return self.renderer._z_surf(surf)
-
-    def _draw_one_obstacle(self, surface, camera, i, o):
-        return self.renderer._draw_one_obstacle(surface, camera, i, o)
-
-    def _draw_one_tree_shadow(self, surface, camera, shadow):
-        return self.renderer._draw_one_tree_shadow(surface, camera, shadow)
+    # Bodies live in `world/terrain/render.py` (`TerrainRenderer`, W6) and
+    # callers reach them through the `renderer` property above. There used to be
+    # eleven forwarders here doing nothing but `return self.renderer.<same
+    # name>(...)`, and two of them were round trips: `TerrainRenderer` called
+    # back through `GameMap` to reach its *own* methods. Naming the object that
+    # owns the drawing is both shorter and truthful about where it happens.

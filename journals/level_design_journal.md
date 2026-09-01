@@ -2931,3 +2931,1388 @@ gone with it.
 Suite **730** green. (One run failed on the known intermittent `spread_deg`
 `KeyError` in `combat/weapons.py`; it passes in isolation and is unrelated to
 terrain.)
+
+### C21 -- water at a cliff foot, and bigger pools
+
+A one-tile pool ringed by a level-1 terrace showed three faults at once. It was
+not a lake, incidentally, but an **enclosed void** -- a hole the coast mask
+punched that the terracing then built around.
+
+**1. A wall's foot is not a beach.** The cliff west of the water had a shoreline
+underlay (`edge_e`, white surf), and a cliff face's outer margin is transparent,
+so the surf leaked out around the stone and put the waterline at the wall's own
+height. `_ground_tile` takes `under=True` for the floor behind a wall and never
+picks the shoreline block there. 37 underlays at a water edge, all now on the
+raised block. This was mine from C17, which had swung too far the other way
+from walls showing plain grass.
+
+**2. Water outvotes a drop.** Block choice required *every* fringed side to
+front water, so a tile with water north and a drop west fell to the raised
+block and got no foam at all. It now takes the shoreline block whenever **any**
+side fronts water, with one exception kept from C17: stone at the cell's own
+level still wins, since surf wrapping a cliff foot reads as water on the
+plateau. 25 tiles flip, 11 stay raised.
+
+*Known cost, flagged at the time:* one tile, one block. Those 25 now draw surf
+along their dry side too -- visible as a short white line running down a terrace
+flank away from the pool.
+
+**3. Foam anchors at any level.** `grid_shore` was restricted to level 0, so a
+pool in a hollow ringed by a raised terrace had no moving water at its edge.
+Any floor now anchors; 127 of the anchors are above sea level. This matters
+more than it looks: foam is drawn *beneath* the room surfaces and shows through
+the shoreline tiles' transparent margin, so it only reaches the water where fix
+2 put a shoreline tile.
+
+**Bigger pools.** `_carve_lakes` gains a `size` range (accretion steps, so more
+steps means both bigger and raggeder); `HEIGHTMAP_LAKES` 1 -> 2 and
+`HEIGHTMAP_LAKE_SIZE` (4,14) -> (10,34). Over twelve worlds: rooms with water
+33 -> 37, cells 211 -> 645, median 6 -> 16, largest 11 -> 34. Note this shifts
+the shared RNG, so every seed's layout changes.
+
+Suite **730** green.
+
+### C22 -- the floor order is what makes a shadow read as cast
+
+C20's ground-flank shadows were clipped to the lower neighbour cell. Rendering
+the shadow layer alone at 8x shows why that was wrong: the clip admits the
+sprite's sparse fringe and its few-pixel core spill, never the core itself, so
+what landed was a ragged hairline a couple of pixels off the tile edge,
+attached to nothing.
+
+The brief's fix, and it is the right one: the shadow is a **whole tile square
+at the caster's own cell**, laid *after the floor below and before the tile
+that casts it*. That means painting terrain **floor by floor in ascending
+level order**, each level's shadows going down between the floor beneath and
+that level's own tiles -- not "all ground, then all shadows".
+
+The ordering does all the hiding that the clip was attempting:
+
+| the core's spill lands on | painted | result |
+|---|---|---|
+| the caster's own cell | after | covered |
+| same-level neighbours | after | covered |
+| the floor below | before | **visible -- the cast shadow** |
+
+So `_shadow_clips` collapses back to a `_casts` predicate and `_shade` takes
+plain positions again. `paint_room_grid`'s passes go from
+`ground -> shadow -> stone -> tall` to: sort every cell into the floor it
+paints on; then per level ascending, that level's shadows followed by its
+ground and wall underlays; then stone; then tall sprites.
+
+Measured over seeds 35/7/2, cells whose pixels change when shadows are turned
+off: 2,049 ground cells receive an edge band (the floor below, as intended),
+584 cliffs and 158 e/w flights receive one through their faces' transparent
+margins, and only **5** caster cells are touched at all -- level-2 casters
+spilling onto level-1 casters painted a step earlier, which is a higher floor
+casting onto a lower one and so correct. Under C20's first attempt every one of
+the 2,866 casters carried a rectangle outline.
+
+Suite **730** green.
+
+### C23 -- a north edge is a level change too
+
+C20 let ground cast only where the lower neighbour lay east or west, reasoning
+that north-south changes are where the cliff faces live. That holds on a
+terrace's **south** rim and nowhere else: a plateau's north edge is its back
+and never grows a face, so those tiles cast nothing. The only shadow along a
+north edge was the sideways spill from the corner tile at each end -- two short
+horizontal stubs with a gap between them, which is what the report described as
+"a straight line ... attached to nothing".
+
+`_casts` now returns true for ground with a lower orthogonal neighbour on
+**any** side. Over twelve worlds: ground casters 2,409 -> 3,271, the 862 new
+ones being exactly the north-edge runs the old rule skipped. Rendering the
+shadow layer alone at 8x, the two stubs become one band running the length of
+the edge and turning the corner into the flank.
+
+South rims are unaffected -- their south neighbour is a cliff, and a cliff is
+not ground, so they still cast from the stone.
+
+Suite **730** green (one run tripped the known intermittent `spread_deg`
+`KeyError` in `combat/weapons.py`; it passes in isolation and on re-run).
+
+### C24 -- the shadow sprite has no corners
+
+Reported: north-east and north-west corner tiles still shadowed wrongly.
+Confirmed, and it is the art, not the ordering. `shadow.png` is a plus, not a
+square -- opaque pixels per cell of its 3x3 layout run
+
+    0   200    7
+  184  4028  181
+    0   170    8
+
+so the four **diagonal** cells are empty while the orthogonal ones carry
+~180-200. A caster lays its band along both edges of a corner and leaves a bite
+out of the outside corner; no draw order can fix that, because one caster
+physically cannot wrap its own corner. Measured over seeds 0-5, the two edge
+cells came out at a 7-9% median coverage and the diagonal at **0.0%** (NW) and
+**0.2%** (NE) -- the NE figure being the 7 stray pixels, which is also what had
+made an earlier boolean check report the corner as "covered".
+
+Only north corners exist to be wrong: the convex-corner census is 482 NE, 480
+NW and **zero** SW/SE, because a terrace's south rim has a cliff at the corner
+and a cliff is not ground.
+
+`_corner_fills` adds two more blits of the same sprite per corner, centred on
+each orthogonal neighbour so their *side* fringes fall on the diagonal cell.
+**Clipped to a `px // 8` square at the inner corner**, not to the whole cell:
+each of those blits lays a full-length strip down one side of the diagonal, and
+unclipped they read as whiskers poking a whole tile past the corner into open
+ground -- tried, rendered, and visibly worse than the notch. All that is wanted
+is the joint.
+
+Density in that joint square, against 46.9% for the band itself:
+NW **0.0% -> 45.3%**, NE **10.9% -> 73.4%**. The NE corner comes out heavier
+than the band; it is 8x8 pixels and reads fine, but it is not symmetric.
+
+These are the only clipped entries in the shadow pass -- a caster's own blob
+still goes down whole (C22).
+
+Suite **730** green.
+
+### C25 -- no shadow ever falls north
+
+The brief, after seeing C23/C24 in place: a shadow only ever falls **south or
+sideways**, and a sideways caster casts only on the side facing the drop. A
+tile whose only drop is northward casts nothing -- a north-cast shadow reads as
+inconsistent with the rest of the lighting, and is better absent than present.
+
+`_casts` + `_corner_fills` become one `_shadow_casts` returning the blits a
+cell contributes. Stone is unchanged: one unclipped blob. Ground emits one blit
+per lower side **except north**, each clipped to that side's cell -- and the
+clip is what suppresses the north half on a corner tile, which drops both ways.
+
+Census over twelve worlds of ground with a drop beside it:
+
+| lower ground on | count | now |
+|---|---|---|
+| north only | 862 | silent |
+| west only / east only | 718 / 715 | that side only |
+| north+west / north+east | 480 / 482 | sideways only |
+| west+east / north+west+east | 10 / 4 | both sides |
+
+**No ground tile anywhere drops to the south** -- zero cases, because a south
+rim always has a cliff on it. South is entirely the stone's job.
+
+C23 and C24 are both undone by this: with no north band there is no corner to
+join, so `_corner_fills` is deleted rather than adjusted.
+
+**A prediction of mine that was wrong.** I said the lateral bands would be
+unchanged to the pixel, since the core is covered by the caster's own tile
+either way. 735 of 1,165 lateral cells did change: a north-edge caster used to
+spill sideways onto its neighbours too, and those casters are now silent.
+Median coverage 5.27% -> 5.08%, so the effect is slight, but "unchanged" was
+not right and the code comment saying so has been corrected.
+
+*(A blank first diagnostic was my scratch script, not the code -- a `sed`
+pattern missed, so both halves of the A/B rendered identically.)*
+
+Suite **730** green.
+
+### C26 -- a north corner casts nothing either
+
+C25 suppressed the northward half of a corner tile's shadow and let it keep its
+sideways one. Still wrong to the eye. The rule is simpler than that: a ground
+tile with **any** drop to the north casts nothing at all.
+
+`_shadow_casts` gains one early return. Ground casters over twelve worlds:
+
+| lower ground on | count | now |
+|---|---|---|
+| north only | 862 | silent (as C25) |
+| north + west / north + east / all three | 480 / 482 / 4 | **silent (new)** |
+| west / east / west+east | 718 / 715 / 10 | unchanged |
+
+1,828 tiles emit no blit; 1,443 remain, 1,433 of them one-sided and 10 casting
+both ways. That is the same caster population C20 had, now with C22's
+floor-by-floor ordering and per-side clipping instead of C20's single clipped
+blob.
+
+The accepted cost: a flank's band starts one tile below the top of the flank,
+since that top tile is a corner. Visible in the diagnostic as the vertical band
+beginning a cell lower than the terrace does.
+
+`_corner_fills` (C24) and the north-edge casters (C23) are both gone; the rule
+has ended up narrower than either.
+
+Suite **730** green.
+
+## Phase D — nav and collision read the grid
+
+Settled first, from the brief:
+
+* **Nothing falls off a ledge.** Movement between elevations is by flight only,
+  both directions, player and enemies alike, so links stay undirected. Extra
+  mobility may come later; nothing today assumes one-way edges.
+* **Projectiles respect elevation upward only.** A shot crosses its own floor
+  and higher ground freely; one entering a *lower* tile than it was fired from
+  dies at that boundary.
+* **Enemies get an aggro range and a pursuit timer.** Once aggroed they take
+  the whole route however long -- no path-cost cap -- but the timer ends it.
+  The timer refreshes while the player is in range and counts down from the
+  moment they leave; being attacked also triggers it. On giving up they idle in
+  place with a light wander. Aggro range is straight-line and elevation-blind.
+
+A consequence of the last two, accepted deliberately: **high ground is
+asymmetrically strong.** A ranged enemy on a terrace can shoot down at the
+player while the player's return fire hits the cliffside.
+
+### D0 — one elevation index — ✅ DONE
+
+`world/elevation.py`: `LevelIndex` rasterises the whole world once into flat
+per-tile arrays (`level`, `kind`) keyed by absolute tile, plus a small dict
+holding the flight `Cell` records verbatim -- a flight's `drop` / `row` / `tag`
+are what tell one end of a staircase from the other, and D1 needs them to mirror
+`walk_links` exactly rather than approximate it. 1.1 ms for a 279x145 world.
+
+Round-tripped across 8 seeds: **40,128 walkable cells (367 of them flight
+cells), zero mismatches** in level, kind or flight identity.
+
+**It answers elevation, not walkability, and that distinction is load-bearing.**
+A room rect is tile-*sized* but only tile-*aligned* under the height-map
+generator: with the flag off, rooms sit at offsets like (8, 40) / (24, 56) /
+(40, 8), so one absolute tile straddles two room cells and no absolute raster
+can reproduce `_point_ok`. Sampled over 4,000 random points with the flag off,
+using this as a floor test disagreed with `_point_ok` **219 times**. It costs
+nothing -- with the flag off every surface is ground at level 0, so every
+elevation query says "same floor" -- but the method is named `has_surface`, not
+`walkable_at`, so it cannot be mistaken for the floor test.
+
+`_add_grid` checks alignment and falls back to flat rather than placing cells
+at the wrong tiles. Every room rect is aligned today (offset (0, 0)); the
+fallback exists so a future change to room placement fails safe.
+
+Suite **730** green.
+
+### D1 — `can_cross`, one adjacency rule — ✅ DONE
+
+`world/elevation.py` gains `can_cross(index, a, b)` and its helper
+`_flight_opens`: `heightmap.walk_links` mirrored against the `LevelIndex`, in
+world tiles, without allocating. `walk_links` stays the authority -- it is what
+`check_grid` validates every generated room against -- but it reads a
+room-relative grid and builds the whole neighbour list per call, which the
+collider and the flow field cannot afford thousands of times a frame.
+
+Faithful down to the asymmetry between the two flight kinds: a straight
+flight's foot is row `drop - 1`, an east/west flight's is row `drop`, because
+the jogged unit spans one row more than it descends.
+
+**Parity, 12 seeds, 60,028 walkable cells: 60,028 agree, zero missing links.**
+The comparison is against `walk_links` restricted to the room's own tiles,
+because `can_cross` legitimately finds 122 links that `walk_links` structurally
+cannot see -- every one of them a **bridge tile**, since `walk_links` only ever
+knows one room's grid and a bridge belongs to none. Verified by classifying
+each extra against the corridor rects rather than assuming.
+
+Flag off: 1,779 adjacent surface pairs across a world, **zero refused** -- every
+surface is ground at level 0, so nothing changes until the flag is on.
+
+Cost: **298 ns/call**. Fine for the collider (a few hundred calls a frame) but
+*not* for the flow field, which would spend ~24 ms per rebuild asking it per
+edge. Level geometry is static, so **D4 must bake a per-edge passability mask
+once at `NavGrid` build time** rather than calling `can_cross` during
+`rebuild`. Noting it here because it shapes D3/D4's design.
+
+Diagonals return False by construction: a diagonal step is the caller's to
+compose from its two orthogonal parts, which is also what stops a body cutting
+the corner of a drop.
+
+Suite **730** green.
+
+### D2 — collision obeys elevation — ✅ DONE
+
+`GameMap.path_ok(prev, new)` + `is_walkable(pos, radius, frm=)`, threaded
+through the three `is_walkable` calls in `resolve_movement` -- the single choke
+point every mover already goes through (player, enemy, boss). `frm=None` is
+the pure floor test, unchanged, which is what the AI's "is this spot free"
+probe and spawn placement keep getting.
+
+**The rule applies to the body's centre only.** The radius probes stay a plain
+floor test. Demanding that every probe sit on the centre's level would stop a
+large enemy standing anywhere near a rim -- terraces are only a few tiles wide
+-- and overhanging a drop is exactly what those probes already tolerate against
+a wall. This was the wrinkle flagged when the phase was planned; the fix turned
+out to be *not* extending the rule to them.
+
+**The segment is walked, not end-checked.** Ordinary movement is a few pixels a
+frame and never leaves its tile, but a charger's lunge
+(`ai/behaviors/melee.py:79`, `ai/components/attacks.py:44`) resolves straight to
+the player's position and spans many tiles; a bare endpoint test would let it
+vault a cliff. Sampling every half tile cannot skip one.
+`elevation.can_step` handles the diagonal case by composing its two orthogonal
+parts, which is what stops a body slipping across the corner of a drop.
+
+Verified over 6 seeds:
+
+* **55,570 adjacent tile pairs**: the collider's verdict matches `can_cross`
+  everywhere. 76 pairs are refused for a reason that is not elevation -- all 76
+  have an obstacle sitting on the destination, confirmed by testing rather than
+  assumed. **Zero** cases where the elevation rule disagrees.
+* **2,336 level-change pairs**: 2,073 blocked, 263 open -- and the 263 are
+  flights. Enemies can no longer walk up a drop.
+* **52,868 same-level ground pairs** still open.
+* **9,185 / 9,185** multi-tile lunges across a level change refused.
+* **160 / 160** flights walkable head to foot through `resolve_movement` in
+  realistic 8 px steps.
+
+Cost, A/B on one world (the two flags generate *different* worlds, so comparing
+across them measures the world, not the rule): **+0.58 us/call, +15%**, on a
+call that was 3.93 us. Negligible beside the room and obstacle loops
+`_point_ok` already runs.
+
+Suite **730** green with the flag off.
+
+### D3 — `NavGrid` learns elevation — ✅ DONE
+
+Three new per-cell arrays beside `walkable` / `corridor` / `clearance`:
+`level`, `flight`, and `step_mask` -- bit *i* set when the move in
+`NAV_DIRS[i]` is one the terrain allows. `NAV_DIRS` is now the single source of
+the neighbour order, with `FlowField._NEI` built from it, so a mask bit and a
+neighbour can never drift apart.
+
+**Baked, not asked.** D1 measured `can_cross` at ~300 ns; consulting it inside
+`rebuild` would cost ~24 ms a repath. The geometry is static, so the answer is
+computed once here and the rebuild loop (D4) reads one byte and ANDs it.
+
+**Flight cells are also marked `corridor`**, which hands them the M3 clearance
+leniency. A flight is one tile wide with stone either side; without it the
+48 px nav class cannot thread one -- the exact case that leniency was added for
+in LD-3.
+
+Nav cells are 32 px (48 for the large class) and tiles are 64, so the work is
+done per *tile* and projected onto cells; two cells inside one tile are always
+connected, a tile having a single elevation.
+
+**Cost, and two attempts at it.** The first version cost +86 ms per grid, ×2
+classes. I assumed tuple building and dict lookups in the projection and
+rewrote it around integer tile indices — **no change at all**, +86 ms still.
+Profiling instead of guessing showed the real cost: 42,504 `can_step` calls,
+106 ms of a 200 ms pass. A diagonal is *defined* as its two right-angle
+detours, so asking `can_step` for one re-derives orthogonal answers already
+computed. Doing the four orthogonals first and reading the diagonals off those
+bits gives **+58 ms** per grid, NavField 384 → 322 ms. Anything further would
+mean duplicating the rule out of `elevation.py`, which is what D1 exists to
+prevent.
+
+Verified: the baked mask agrees with `can_step` on **157,328 / 157,328** edges,
+re-checked after each rewrite. 404 flight cells, all marked corridor; 3 levels
+present.
+
+Suite **730** green.
+
+### D4 — the flow field obeys elevation — ✅ DONE
+
+`FlowField._NEI` carries its `NAV_DIRS` bit alongside the weight, and both
+`rebuild` and `direction_at` reject a neighbour whose bit is clear in
+`NavGrid.step_mask`.
+
+**The gradient had to be gated as well as the fill**, which was not in the
+plan. A cell across a drop can be genuinely downhill -- the fill reached it the
+long way round, so its cost really is lower -- and an ungated `direction_at`
+would steer straight at it, walking an enemy into the cliff it just spent a
+detour avoiding.
+
+That in turn changed a test rather than breaking one:
+`test_every_cell_has_a_strictly_downhill_neighbour` asserts the invariant M4
+relies on, and the invariant is only the one M4 needs if the downhill
+neighbour is also one the terrain allows. It now gates on the same mask. (With
+the flag off the mask is all-open, so the test is unchanged there.) A second
+test failure was mine: `direction_at` still unpacked `_NEI` as 3-tuples.
+
+Verified with the flag on:
+
+* **The field's reach is exactly a BFS over the mask.** Cell-for-cell identical
+  on seeds 35 / 7 / 2 -- 21,252 / 20,560 / 20,716 cells.
+* **20 / 20 gradient walks** from sea level to a top terrace reached it,
+  **every one through a flight, none over a cliff**. This is the phase's actual
+  goal, tested end to end rather than inferred from the mask.
+
+Cost: **+0%**. A/B on one world, mask all-open against mask gating, 48 repaths:
+33.8 → 33.9 ms each. Exactly what baking it in D3 was for -- calling
+`can_cross` here would have added ~24 ms a repath.
+
+**Flagged for D7, not introduced here:** 33.9 ms *is* a lot for one repath, and
+height-map worlds are far bigger than the LD-8 ones the field was tuned on.
+Pre-existing and unchanged by this phase, but it wants looking at before the
+flag goes on for real.
+
+Suite **730** green.
+
+### D5 — scatter keeps flights clear — ✅ DONE
+
+`_flight_keepouts(rooms)` in `world/gen/scatter.py`, appended to the existing
+`all_doors` list so it protects the top-up tree pass as well. The tiles come
+straight from `heightmap.walk_links` rather than being re-derived -- it already
+knows a straight flight opens north at its head and south at its foot, and that
+an east/west flight also reaches sideways because the wall jogs a row across
+it. Empty for a room with no height map, so the legacy world is byte-identical.
+
+Verified over 6 seeds: **160 / 160 flights** have their foot reachable from
+their head for **both** nav classes, small and large, with obstacles in place.
+
+**But the fix is nearly a no-op today, and the reason matters more than the
+fix.** A/B over 8 seeds: without the keep-out, exactly **1 obstacle in 73**
+landed on a flight. Chasing that number found the real problem --
+
+| | rooms | floor cells | obstacles | per 1000 cells |
+|---|---|---|---|---|
+| flag off | 128 | 7,476 | 420 | **56.2** |
+| flag on | 48 | 40,128 | 73 | **1.8** |
+
+**A 31x drop in obstacle density.** Two compounding causes. Every height-map
+room is a *special* kind -- there are no `combat` rooms at all in a height-map
+world -- and a special room gets `base = 2` with `bonus = 0`, so it attempts two
+placements no matter how large it is. On top of that the room count fell 16 → 6
+per world (fewer, bigger rooms, as asked), spreading that fixed budget over five
+times the floor.
+
+So the islands are bare, which is exactly what every screenshot in the C-series
+shows. This is out of D5's scope -- D5 is "do not block a flight", and that is
+done and verified -- but it is a blocker for D7, and the density rule needs
+rewriting for rooms of this size before the flag goes on.
+
+Suite **730** green.
+
+### D6 — the verification pass — ✅ DONE
+
+`tests/world/test_elevation.py`, 16 tests over two seeds. Every ad-hoc check
+run during D0–D5 is now a standing one, so the phase cannot silently rot.
+
+`heightmap.walk_links` / `heightmap.reachable` are the authority throughout --
+they are what `check_grid` validates every generated room against -- so the
+suite is really one chain: generator → `can_cross` → `step_mask` → the field,
+each link checked against the one before it.
+
+| what | covers |
+|---|---|
+| index round-trip, cliffs carry no surface, rects tile-aligned | D0, including the alignment guard that would otherwise fail silently |
+| `can_cross` vs `walk_links` within every room | D1 |
+| a level change needs a flight; a diagonal cannot cut a drop's corner | D1 |
+| collider vs the rule on every adjacent pair; a lunge cannot vault a cliff; every flight walkable head to foot | D2 |
+| `step_mask` vs the rule; flights get corridor leniency | D3 |
+| the field reaches exactly a BFS over the mask | D4 |
+| **the field reaches every cell `heightmap.reachable` says is connected** | end to end |
+| a chase from sea level to a plateau goes through a flight | the phase's actual goal |
+| no obstacle on a flight or its landings; both nav classes can use every flight | D5 |
+
+The end-to-end one is the strongest: **10,233 generator-connected cells, zero
+unreached**. Cells blocked for a reason that is not elevation (nav centre off
+floor, clearance, an obstacle) are excluded so the assertion is about the level
+rule alone -- and in the event none of them occurred either.
+
+**One test failure was the test's own fault, and worth recording** because the
+same wrong assumption is easy to make again: `test_every_flight_is_walkable_head_to_foot`
+first entered each flight from the tile *north of its head*. That is right for
+a straight flight and wrong for an east/west one, which is entered from the
+**side** -- the wall jogs a row across it. It walked a body into a cliff face
+and reported the collider as broken. The entry and exit tiles now come from
+`walk_links`, which already knows the difference.
+
+Two seeds rather than forty: each costs a world plus a nav build, and every
+case is structural -- the sweeps cover tens of thousands of tiles apiece.
+Module adds ~6 s.
+
+Suite **746** green (730 + 16).
+
+### D7 — aggro range and the pursuit timer — ✅ DONE
+
+`entities/ai/components/aggro.py`, wired in at `registry.build_behavior` so all
+twelve enemy types and the boss are covered from one place rather than in
+twelve builders. `aggro_range` / `pursuit_seconds` are per-type values in
+`data/enemies.json`; a type carrying **neither** comes back untouched, so the
+module's existence retunes nothing by itself and a missing key never gets a
+number chosen in code.
+
+* `AggroSense` runs in `Behavior.always`, so the countdown continues through an
+  attack cycle and a hit landed mid-swing still refreshes it. It **refreshes**
+  rather than extends -- while the player is in range the deadline is always
+  `pursuit_seconds` away, so it starts counting from the moment they leave.
+* `Enemy.take_damage` calls `provoke()`. A flag, not a timestamp, because
+  nothing there has the clock; `AggroSense` consumes it next tick.
+* `Wander` gives the idle state a slow drift with occasional standstills, so a
+  bored enemy is not a statue.
+
+**The machine only drops back to idle from the behaviour's *initial* state.**
+Letting the timer yank an enemy out of a telegraph or an active swing would cut
+that attack's timing short and strand the melee hitbox it had committed to.
+The attack finishes, the machine returns to chase as it always does, and gives
+up from there.
+
+Measured on the chaser (range 420, pursuit 6 s, speed 95):
+
+| | result |
+|---|---|
+| 2,000 px away, 4 s | 106 px travelled -- the wander only |
+| 294 px away | closes to x=2 and attacks |
+| 2,000 px away, hit once | 379 px travelled: full pursuit |
+| in range 2 s, then gone | aggro held to **t=8.02 s**, i.e. **6.02 s** after leaving |
+| after giving up | 95 → 26.6 px/s, which is the 0.28 wander |
+
+**One real behaviour change, and it cost a test.** Every behaviour now starts
+in the aggro machine's idle state and reaches its own initial state through a
+transition, which `Behavior.tick` evaluates *after* the frame's components have
+run. So an enemy spends its first tick idle even with the player on top of it,
+and acts from the second -- one frame at 60 fps.
+`test_exploder_dies_when_it_reaches_player` asserted a detonation in a single
+update and now ticks twice. The alternative, checking transitions before
+components, would have cut every attack's own timing short.
+
+`tests/ai/test_aggro.py`, 7 tests: every type declares both values (a new type
+that forgets them silently reverts to chasing for ever), a type with neither is
+untouched, and the five behaviours above.
+
+Suite **753** green.
+
+### D8 — obstacle size and density — ✅ DONE
+
+**Size was in two places, one of them code.** `entities/obstacle.py` held the
+collider radii as literals while the *drawn* size lived in `terrain.json`
+`obstacle_decor` -- two files to resize one prop, and against the standing rule
+that entity tuning belongs in the data. `KINDS` is now a lazy mapping over a
+new `terrain.json` `obstacles` block, keeping `from entities.obstacle import
+KINDS` working.
+
+Sizes were chosen by sweeping against the legacy world rather than picked:
+
+| | old | tried | **kept** |
+|---|---|---|---|
+| tree | 11 | 16 | **15** (+36%) |
+| rock | 25 | 34 | **30** (+20%) |
+| pillar | 15 | 24 | **21** (+40%) |
+| house | 31 | 36 | **34** (+10%) |
+
+The first set broke `test_flow_field_routes_across_floors_to_every_raised_room`
+-- an LD-8 raised room is ~60 cells and a rock of radius 34 is more than a tile
+across. `15 / 30 / 21 / 34` is the largest set that world still tolerates. The
+tree's canopy (`render_radius`) went 15 → 22 to match.
+
+**Density.** The legacy rule is `base + cells // 48` capped at 14, with `base`
+= 2 and no area bonus for a "special" room. Every height-map room is a special
+kind, so each island got two obstacles. Now area-proportional for grid rooms
+only, so the legacy path stays byte-identical:
+
+| | rooms | cells | obstacles | per 1000 | floor covered |
+|---|---|---|---|---|---|
+| flag off | 128 | 7,476 | 418 | 55.9 | 2.2% |
+| flag on, before | 48 | 40,128 | 73 | **1.8** | 0.1% |
+| flag on, after | 48 | 40,128 | **1,907** | **47.5** | 1.7% |
+
+Placement lands on level 0 / 1 / 2 in 82 / 16 / 2 %, against a cell split of
+79 / 17 / 4 % -- proportional, no bias toward the shore.
+
+Also: the special-room "keep the interaction space clear" disc is a fraction of
+the room's own size, which works out at ~460 px on an island -- and the middle
+of a concentric island *is* its upper plateau, so it blanked the whole thing.
+Grid rooms use a fixed 176 px instead.
+
+**Two corrections to earlier reporting.**
+
+1. **The screenshots were never drawing obstacles.** `_draw_tiled` is terrain
+   only; obstacles come from `TerrainRenderer.scenery_drawables`, which the
+   scratch render scripts never called. So every island shot in the C-series
+   would have looked bare whatever the density was. The density really was
+   1.8/1000, but "the islands are bare" was being read off images that could
+   not have shown otherwise.
+2. Two edits to the render script silently did nothing -- they matched a
+   variable name from a different script -- and I reported "still nothing
+   drawn" twice before checking. String edits in the scratch scripts now assert
+   their anchor, the same rule already applied to the source files after C19.
+
+**A test fixture pinned to the old radii.**
+`test_resolve_movement_hops_a_fully_wedged_entity_free` placed its three trees
+at hardcoded offsets sized for radius 11; at 15 they also blocked the escape
+hop and it fled backwards. It now derives the offsets from the tree's own
+radius, so it tests the behaviour rather than one obstacle size.
+
+Suite **753** green.
+
+### D9 — the bounded repath — ✅ DONE
+
+`FlowField.rebuild` takes `max_cost` and stops once the frontier passes it;
+`NavField` passes `config.NAV_FILL_MAX_COST`. Left `None` in `FlowField`'s own
+signature, so anything constructing one directly is unchanged.
+
+Safe only because of D7: an enemy that is not pursuing needs no route, and one
+that is has an aggro range in the hundreds of pixels plus a timer.
+
+**Bounding the fill was only half of it.** The first cut gave 43.5 → 12.4 ms, a
+3.5x win against the 6-7x the cell counts predicted. Profiling the gap found
+`rebuild` clearing 160k longs one at a time in a Python loop -- with the search
+now bounded, *resetting* the cost array had become more expensive than the
+search it was preparing for. Slice-assigning a prebuilt blank took it to
+**6.3 ms**, and improved the unbounded case too (43.5 → 37.9).
+
+**The cap is measured, not guessed, and my first value was wrong.** At 3000, a
+spot check said 89.8% of cells within 600 px of the target had a route -- and
+every one of the misses was on the *same island*. That is the exact failure
+this phase exists to remove: an enemy 300 px away with no path, beelining into
+a cliff. The reason is that the bound is on **path** cost, and on a terraced
+island a cell 300 px away can be a long walk to a staircase and back.
+
+Sampled over three worlds, path cost for cells within 600 px straight-line:
+p50 513, p90 1858, p95 2590, p99 3655, max 6058.
+
+| cap | routed | ms/repath |
+|---|---|---|
+| 3000 | 97.5% | 6.3 |
+| **4500** | **99.7%** | **9.4** |
+| 6000 | 99.8% | 14.1 |
+| unbounded | 100% | 37.9 |
+
+**4500**: 4x faster than unbounded for 0.3% of nearby cells, which keep
+`steer_at`'s bearing fallback and whose pursuit timer ends the attempt anyway.
+
+**Three tests asserted a contract this removes** -- all three seeded at the
+start room and checked something on the far side of the world, using world span
+as a vehicle for testing connectivity rather than as the thing under test. Two
+now seed next to the feature (a raised room's *connected* neighbour from the
+layout graph, not merely the nearest by centre distance -- the closest room can
+sit across a gap and reach nothing) and test exactly what they meant. The third
+was genuinely about world span; it now asserts everything *inside* the bound is
+routed for both classes, and a new `test_the_fill_bound_actually_bounds` checks
+the bound holds -- with slack for one final step, since the loop stops when the
+frontier passes the cap and the last bucket can still hand a neighbour a
+diagonal.
+
+Suite **754** green.
+
+### D10 — projectiles respect elevation — ✅ DONE
+
+**The rule as written here was inverted, and the brief is what settled it.** The
+paragraph below used to read "travels onto higher ground; dies on entering a
+lower tile" -- which is backwards, and contradicted this same entry's own
+consequence paragraph two paragraphs further down. The brief: *"projectiles only
+work on the same floor or above floors, if a projectile is shot from a lower
+floor, it will collide with the closest cliffside."*
+
+**The rule**: a projectile travels over its own floor and over anything
+**lower** -- so firing *down* off a terrace works, and a shot still crosses the
+open sea between islands. Terrain standing **above** the floor it was fired from
+stops it, against the cliffside.
+
+**It is cheap, and that was checked rather than assumed.** `block_on_obstacle`
+in `game/states/playing/effects.py` already runs a circle test against every
+blocking obstacle for every projectile every frame. The elevation test is one
+array read on `LevelIndex` (D0) -- strictly less work than what sits beside it.
+The brief allowed dropping the rule if it proved expensive; it does not.
+
+**Where it went.** `effects.py`, alongside `block_on_obstacle`:
+`stamp_fire_level` records the floor at the muzzle and `block_on_terrain` kills
+the shot with the existing particle burst.
+
+**`level_at_point` was the wrong reading, and this is the part worth keeping.**
+A cliff face is not walkable, so it has no `level` at all -- testing that would
+let an upward shot pass *through* the wall and only stop it on the plateau
+beyond, which reads as the shot going through solid rock and dying in mid-air.
+`LevelIndex` gained a second array, `top`: the elevation of whatever terrain
+stands on a tile, walkable or not. `Cell.level` is already documented as "the
+upper surface a cell belongs to -- for a cliff or a stair, the terrace it hangs
+from", so a face reports the height a shot has to clear and nothing had to be
+derived. Verified against the grid: `top_at` matches `Cell.level` on all 5,964
+cells of a sample world, across ground, cliff, lake and both stair kinds, while
+`level_at` still reports `NONE` on every face. The void keeps no top, which is
+what lets a shot cross between islands.
+
+The level is stamped **at the muzzle**, not on the projectile's first update: a
+400 px/s shot has already moved ~7 px by then, which at a rim is enough to
+sample the tile past the edge and judge the shot against the wrong floor.
+
+Measured end to end on seed 21, at a column with three tiles of level 1 below
+three of level 2: fired **up** from the low terrace the shot dies after 100 px,
+about a tile and a half, at the wall; fired **down** from the high terrace it
+flies the full 450 px. Orbiters are exempt, for the same reason they skip the
+obstacle test -- they are anchored to the player and are not travelling.
+
+`fire_level` defaults to `NONE`, which disables the rule, so a flat world and
+every unit test that builds a projectile by hand are untouched. `reset` clears
+it, because the pool recycles and a stale level would judge the next shot
+against the last one's ground.
+
+**The consequence to keep in view.** Together with elevation-blind aggro, this
+makes **high ground asymmetrically strong**: a ranged enemy on a terrace can
+shoot down at the player while the player's return fire hits the cliff face.
+That is deliberate and was confirmed as wanted, but it is a balance lever, and
+the first place to look if ranged enemies on plateaus feel unfair.
+
+Nothing else in the phase depended on this, which is why the flag went on
+without it.
+
+Suite **793** green, nine new tests.
+
+### D11 — shorter bridges, tighter islands — ✅ DONE
+
+**The lattice cell was square.** One 58-tile chunk per room, while a height-map
+room is 36-50 tiles wide and only 22-30 tall -- so every island carried a
+chunk-height of empty sea above and below it and the vertical bridges ran at a
+median of **34 tiles against 17** for the horizontal ones. `_cell_rect` now
+takes a per-axis cell.
+
+**Packing them closer needed two changes together, and neither works alone.**
+
+1. `coast_mask` gains `keep`: a hard band of void inside the rect that the walk
+   cannot eat into. Without it a rect is not a safe proxy for where its island
+   is -- measured over 14 seeds, land reached the rect edge on *all four sides*,
+   because the erosion fallback returns the whole rect. That is what made rect
+   overlap unsafe.
+2. The room size **range** narrows, 44-50 x 26-30 rather than 36-50 x 22-30.
+   This mattered more than expected: a 36-wide island in a 50-wide cell leaves
+   14 tiles of pointless sea, so the *variance* was as much of the gap as the
+   spacing.
+
+Measured over 14 seeds, zero land-cell collisions in every row:
+
+| | bridges h (med/max) | bridges v | island |
+|---|---|---|---|
+| square 58, rooms 36-50 | 18 / 25 | 34 / 37 | -- |
+| 50x30, rooms 36-50 | 10 / 15 | 7 / 10 | 43 x 26 |
+| 46x26, rooms 36-50 | 9 / 15 | 6 / 9 | 39 x 22 |
+| **46x26 + keep 2, rooms 44-50** | **5 / 8** | **4 / 6** | **43 x 24** |
+
+Half the bridge length for two tiles of island height. Tighter merges islands:
+46x26 with the old wide range gave 92 shared land cells.
+
+**A test asserts the opposite invariant, correctly.**
+`test_procedural.test_all_geometry_within_bounds_and_nonoverlapping` requires
+room *rects* never to collide -- true under LD-8, where a rect *is* the floor.
+Height-map rects overlap by design. The equivalent that matters is now asserted
+in `test_elevation.PackingTests`: no world tile is land in two rooms at once,
+and the void band is really there.
+
+**Also: the world renders never drew obstacles.** `world.py` had the same bug
+the island shots did -- `_draw_tiled` is terrain only, and the scenery pass
+lives in `TerrainRenderer.scenery_drawables`.
+
+### Turning the flag on — the fallout
+
+`HEIGHTMAP_ROOMS = True` left **53 failures across 8 modules**, not the one I
+first guessed from a truncated log (`test_verticality` is 29 of them). Read
+rather than assumed: every failure is an LD-8 geometry assumption -- room
+counts, chunk-derived sizes, room-local void, foam on cliff bands, rect
+non-overlap. None indicates a height-map bug.
+
+Those eight modules exist to cover the LD-8 world, which the flag still
+selects, so each now pins `HEIGHTMAP_ROOMS = False` for its own run -- the
+convention `test_pathfinding` already used for `WORLD_VERTICALITY`. The
+height-map path keeps its own coverage in `test_elevation.py`, now 18 tests.
+
+*(Two self-inflicted detours worth recording: a background suite run that
+reported 293 failures in 15 s was measuring a half-edited tree -- it was in
+flight while `HEIGHTMAP_CHUNK_SIZE` was being removed from config, and the
+number is meaningless. And the first attempt at adding these fixtures inserted
+them **inside** parenthesised import statements, because the regex matched the
+opening line; eight files had to be repaired in place rather than reverted,
+since they carried uncommitted work from D6 and D9.)*
+
+**The last failure was mine, and it was an assertion, not a bug.**
+`test_rebuild_routes_both_classes_within_the_fill_bound` (D9) counted how many
+*room centres* the bounded fill reached and required more than one. On an LD-8
+world rooms are small and close, so that held. On a height-map world the room
+centres are **3,500-13,000 of path cost apart** -- seed 3 measures
+`[0, 4585, 8344, 3829, 8602, 12939]` -- so most sit outside the 4,500 bound and
+the count says nothing.
+
+Checked before rewriting it, because "one room reachable" would also be the
+symptom of bridges failing under the tighter packing: with the cap lifted, **all
+six rooms route on every seed tried**. The islands are connected; the centres
+are simply far apart in walking terms. The test now samples reached *cells* and
+asserts each has a gradient, which is the contract it meant.
+
+Worth stating plainly, since it follows from D9 + D11 together: a cross-island
+chase is impossible under the bound. That is by design -- aggro range is at most
+600 px straight-line and a neighbouring island is thousands of pixels of path
+away, so no enemy would be pursuing across one anyway.
+
+### D12 — several bridges per link, placed at random — ✅ DONE
+
+Two config values:
+
+* `HEIGHTMAP_BRIDGES_PER_LINK` (default 1) -- how many plank bridges each link
+  between two islands carries.
+* `HEIGHTMAP_BRIDGE_MIN_GAP` (default 6 tiles) -- the closest two bridges on the
+  same link may sit.
+
+`_seat_corridors` is restructured from a per-corridor loop into a per-*link*
+one. It has to be: seating picks the lane with the shortest crossing, which is
+deterministic, so every bridge on a link would have landed on the same lane.
+The viable lanes -- those where both islands offer a sea-level beach -- are now
+computed once per link, shuffled with a per-pair seeded RNG (the trick
+`_connection_lane` already uses, so no world RNG is consumed), and taken
+greedily subject to the gap.
+
+A link's *first* bridge always survives, falling back to the shortest crossing
+when the gap leaves no room, since dropping it would disconnect the world; the
+extras are discarded. `_seat_corridors` returns the survivors rather than
+mutating in place.
+
+Verified over 14 seeds: at 1/2/3 per link every link gets its full count, and
+the **minimum observed gap is exactly 6 tiles**, matching the config.
+
+### A connectivity regression, found while testing the above
+
+Checking that extra bridges did not break routing turned up something worse
+that was already there:
+
+| bridges per link | seeds (of 16) with an unroutable room |
+|---|---|
+| 1 | **3** |
+| 2 | 1 |
+| 3 | 0 |
+
+**Obstacles are sealing islands.** Rebuilding the same worlds with the obstacle
+list emptied: **0 cells unreachable** on all three bad seeds, against 1,036 /
+1,194 / 2,216 with them. It is not the bridges -- both ends land on plain
+ground, confirmed by testing each end against whichever room contains it.
+
+Density is clearly implicated: at `_GRID_OBSTACLES_PER_1000` 85 the three seeds
+lose **4,446** cells between them, at 44 they lose **406**. So D8's density
+bump made a pre-existing problem an order of magnitude worse rather than
+creating it.
+
+*I could not separate size from density.* The A/B reported identical numbers
+for old and new radii, which is not credible -- `entities.obstacle._Kinds`
+caches the radii on first use and the module reload in that harness did not
+clear it, so both runs almost certainly used the same values. The density
+figures come from a path that does not have that problem and are the ones to
+trust.
+
+More bridges only **mask** this: a second crossing gives the fill another way
+in when one mouth is walled off. The root cause is that `_flight_keepouts`
+(D5) protects flights and nothing protects a one-tile shore neck or a terrace's
+narrow waist, where a radius-30 rock closes the gap outright.
+
+**Proposed fix**, mirroring a pattern already in the generator -- `_carve_lakes`
+undoes a lake that cuts a room in two: after scattering, flood each room over
+`walk_links` treating a cell as blocked when an obstacle covers its centre, and
+drop the obstacles that strand anything. Prevention is the cheaper alternative:
+refuse a placement on a cell with too few walkable neighbours, which is where a
+neck is.
+
+Not implemented -- it is a generation change and wants deciding, not guessing.
+
+---
+
+## LD-9: the per-island biome pool
+
+`tilemap_7` was the last of the three ground sheets with nowhere to go. The
+height-map worlds read a fixed `heightmap_floor_sheets` map --- floor 1 sand,
+floor 2 rock, on every island of every seed --- which had only ever been
+labelled a stand-in. That key is gone. The tilesets are now listed in
+`data/terrain.json` as `heightmap_biome_pool` **with no floor attached**, and
+each island draws its own terraces from the list.
+
+The rule was *at least three tilemaps per island, and no two adjacent floors
+share one*. It lands in two halves.
+
+**Level 0 is never drawn from the pool**, and that is a constraint rather than
+taste: it is the only terrace that meets the sea, so it is the only one that
+needs a shoreline block with real surf in it, and all three pool sheets are
+flagged `shoreline: false`. Level 0 keeps the room-kind palette and thereby
+supplies the island's first tileset for free; the pool only has to cover the
+raised terraces. A test asserts the pool offers at least one material the kind
+palettes do not, since otherwise level 1 would have no legal choice.
+
+**Each raised level differs from the one below**, level 1 included.
+
+### The rule compares materials, not filenames
+
+The first cut compared sheet paths, passed its tests, and rendered islands whose
+shore and first terrace were one continuous green with a cliff line drawn
+through it. `tilemap_7` is a different *file* from `tilemap_1` but its ground was
+built from `tilemap_1`'s grass: measured on the interior tile it sits **6.4 RGB
+units** away, against 104 for the rock sheet and 110 for the sand. Two files,
+one material.
+
+So `data/terrain.json` now names each sheet's material in `sheet_biomes`
+(`tilemap_1`--`5` and `tilemap_7` grass, `tilemap_6` rock, `tilemap_8` sand) and
+the adjacency rule compares those. An unlisted sheet is its own family, so a new
+tileset defaults to "unlike everything" rather than silently pairing itself with
+something it happens to resemble.
+
+The effect is visible immediately: with every level 0 grass, level 1 can only be
+rock or sand, while level 2 is free to be grass again --- which is how
+`tilemap_7` finally gets used, as a grassy summit above a rock or sand terrace.
+
+### Mechanics
+
+`world/terrain/biome.py` holds the picking rule and nothing else.
+`floor_palette(seed, room_id, levels, pool, base, family)` shuffles the pool
+under a `random.Random(f"{seed}:biome:{room_id}")` --- constructed there, so it
+consumes nothing from the world's own stream and the same seed still generates
+the same world whether or not anything asks for a palette --- then walks the
+levels upward taking the next sheet whose material is not the one below. A
+shuffle over a pool at least as large as the terrace count cannot repeat at all,
+so the walk only does real work when the pool is smaller; with a pool of one it
+returns that sheet throughout rather than raising.
+
+`TileSheets.sheet_for` grew a third parameter, `room`, which is what makes the
+answer per-island; palettes are computed once per room and cached, because the
+painters ask for the same room's sheet dozens of times a bake and every answer
+has to agree. Every call site already had a room in hand.
+
+Three of those sites originally passed no `kind` at all, and adding one would
+have changed what an LD-8 floor-0 room renders (kind palette instead of the
+plain ground sheet). They pass `room=` by keyword and leave `kind` alone.
+
+---
+
+## LD-9: obstacles no longer seal the world, and lakes read as lakes
+
+### The seal
+
+D8 raised obstacle density from 1.8 to 47.5 per thousand cells and their radii
+with it, and something went quiet rather than loud: enemies that could not route
+simply stood still. Measured on the **large** navigation class -- 48 px lattice,
+22 px body -- four of ten sample seeds lost between 1,300 and 6,300 reachable
+cells, one of them **69% of the world**, while the same worlds with every
+obstacle removed lost **none**. The small class was barely affected (1--86 cells,
+nooks behind a rock), which is why nothing had shown it: the common enemies fit.
+
+Two things were wrong.
+
+**The keep-clear test used the obstacle's centre.** `rect.collidepoint(x, y)`
+let a rock sit one pixel outside a bridge mouth and still put thirty pixels of
+itself across the only way in. It now tests the circle. On its own this fixed
+some seeds outright -- one went from 6,315 unreachable cells to 20 -- and left
+others exactly as they were.
+
+**Which is the second thing: the pinch is not always at a mouth.** Two obstacles
+can close a neck of ordinary ground that no keep-clear rule knew to protect. Any
+geometry rule is a guess about where the choke will be, and this one guessed
+wrong often enough to matter.
+
+So `world/gen/repair.py` does not guess. It asks the question that actually
+matters -- can the widest body still reach everywhere bare terrain allows -- and
+removes the specific obstacles standing in the way. Same shape as
+`_carve_lakes`, which cuts a lake and puts it back if the room came apart, but
+checked against the **navigation lattice the game steers on** rather than the
+generator's own adjacency, because it is the lattice that decides whether a body
+fits.
+
+Each round is a Dijkstra whose edge weight is *the number of obstacles that
+would have to go*, so a region is reopened through its cheapest pinch rather
+than by clearing the first path found. Result: **0 sealed cells on 20/20 seeds**
+at the large class, for an average of **4 obstacles removed out of ~261**. On
+the small class the residue is 2--6 cells per world of ~21,000 -- single 32 px
+nooks, not regions -- and repairing the coarse class is what repairs both, since
+a route the 22 px body walks the 16 px one walks too.
+
+The radius-aware mouth test now earns much less than it did alone: with the
+repair in place it saves 47 removals against 52 over fifteen worlds. It is kept
+because preventing a seal beats repairing one, and because testing an obstacle's
+body rather than its centre is simply the correct question.
+
+**Both are height-map only**, and `config.HEIGHTMAP_UNSEAL` can switch the
+repair off. The seals were measured on the height-map worlds; the LD-8
+generator is pinned seed by seed in the tests that describe it, and widening a
+rule there would rewrite those worlds for no benefit. The off switch is not
+decoration -- `test_the_repair_has_teeth` uses it to prove the seals are still
+there without it, so the passing case cannot pass trivially.
+
+**Cost, honestly:** one coarse navigation grid per world. Generation goes from
+0.18 s to 0.35 s, and the suite from 110 s to 199 s. Profiling puts 0.19 s of
+the 0.23 s in `NavGrid.__init__` (`_point_on_floor` and `_elevation`), not in
+the repair's own code, so cutting it further means optimising shared navigation
+code rather than this stage.
+
+### One-tile lakes
+
+The brief: a lake is at least three contiguous tiles on one terrace, line or L,
+no single-tile ponds.
+
+Measured first, and the floor was already met -- the smallest lake across twenty
+seeds was **five** cells and every one sat on a single level, because accretion
+only ever steps onto ground of the seed cell's own level. There were no
+landlocked void pockets either.
+
+What the eye was actually catching was a **one-tile arm hanging off a bigger
+blob**. Rendered, a spur is worse than a lone pond: the surrounding ground's
+shore fringe overdraws most of it and what survives is a speck stuck to the
+shoreline. Forty-three of them across twenty seeds.
+
+`_trim_lake_stubs` peels leaves -- cells with fewer than two water neighbours --
+**repeatedly**, because taking a two-tile arm off exposes its base as a new leaf
+and one pass leaves that behind. The loop stops the moment another peel would
+drop the lake under three, which is exactly what lets a bare line or L of three
+through: every cell of those is a leaf, so a flat "no leaves" rule would forbid
+the shapes the brief allows. A long thin snake therefore erodes to three tiles
+rather than being kept at length -- the right trade, since a one-tile-wide
+channel is a ditch and suffers the same fringe overdraw.
+
+After: sizes 3--22, **zero** lakes under three, **zero** multi-level lakes,
+**zero** spurs on any lake bigger than three.
+
+---
+
+## The `test_smoke` flake was two bugs, one of them the game's
+
+The smoke test drew a fresh `run_seed` every run and failed about one run in
+three on `kills >= 5`. It seeds five chasers next to the player and asserts the
+starting weapon kills them. Two independent causes, found by pinning the seed
+and sweeping twenty of them.
+
+**Four seeds in twenty had nowhere to put the enemies.** The five went to fixed
+offsets 70 px *south* of the player. On a height-map world the player often
+starts on a summit whose southern rim is a cliff, so four of the five landed
+over the drop -- `level_at_point` returned the no-surface sentinel -- and never
+came back to be killed. The test now asks the map where a body can stand:
+`is_walkable(p, radius, frm=origin)`, which is the map's own question with the
+elevation rule included, so a spot across a drop is rejected rather than
+merely being off the floor.
+
+**Then it failed twenty in twenty**, which is how the second cause surfaced. The
+third kill is usually enough XP to level up, and a level-up pushes an overlay
+that stops the world until it is answered. The first loop never answered it, so
+the state machine sat in `LevelUpState` for the remaining fourteen seconds and
+the count froze wherever it was. Whether that landed before or after the fifth
+kill was the race. The boss loop further down had always dismissed level-ups;
+the first one now does too.
+
+Both fixed: 20/20 pinned seeds kill five, and 40 consecutive runs of the real
+test with its random seed all pass. The seed stays random deliberately --
+booting a different world every run is most of this test's value -- so the fix
+had to be making the assertions independent of the world, not pinning it.
+
+### And a real crash found on the way
+
+The intermittent `KeyError: 'spread_deg'` seen alongside the flake is not a test
+problem. `Weapon._fire_projectiles` reads `spread_deg` with a hard subscript
+once a weapon fires more than one shot, and a `<weapon>:projectiles` Multishot
+upgrade is generated for **every owned weapon**. `arcane_bolt` and `thunder_orb`
+are both `category: projectile` and both shipped without the field, so taking
+their Multishot crashed the run outright.
+
+Fixed in `data/weapons.json` -- 10 degrees for the homing bolt, 14 for the slow
+orb -- and not with a default in code: a fallback there would be per-weapon
+tuning living outside the data, against the standing rule. Two tests now cover
+it, one asserting every projectile weapon declares a spread and one actually
+pushing each weapon past one shot, since the failure is a KeyError deep in a
+firing path rather than something the data check alone would catch.
+
+---
+
+# LD-10 — room generation tweaks
+
+Four things the ten full-world screenshots exposed that room-level crops never
+did. Recorded as a plan before any of it was written, with the measurement that
+motivates each, so the intent survives if the work is picked up cold.
+
+## The brief
+
+1. **Single inland water tiles.** The minimum-three rule the lakes got must
+   cover these too -- either grow the hole to three tiles without breaking the
+   floor's connections, or fill it with an adjacent floor tile that does not
+   interrupt pathing.
+2. **Shores are too straight.** A run of 4-5 tiles at the same coordinate should
+   force the next one to step in or out.
+3. **Three topographies.** Boss islands: big and relatively flat, revisited
+   later. Volcanic: what we have been building, up to three floors -- *and it
+   must also be able to be only two*, which today it cannot. Small: at most two
+   floors, about half the area. Elite rooms are gone.
+4. **More rooms**, with more variety in where they sit.
+
+## What the measurements said
+
+**The single water tiles are not lakes.** 43 one-tile and 156 two-tile
+near-enclosed holes across seeds 1-10, and **199 of 205 are cells absent from
+the grid entirely** -- open sea bitten into the coastline, not `LAKE` cells. The
+lake minimum re-verified clean over 30 seeds: zero components under three. So
+the rule added in LD-9 works and simply guards the wrong stage. These come from
+`_carve_bays` and the coast walk, and from `_prune_unreachable` /
+`_face_the_sea` taking cells away afterwards.
+
+Of those holes, **147 of 156 have uniform neighbour levels**, so a safe fill
+covers 94% and the grow fallback has to handle nine. **73 of 156 (47%) have
+their south side open**, which is what justifies a third `_face_the_sea` call:
+nearly half the fills would otherwise leave ground with open sea below it and no
+face under it.
+
+**The straight shores are an amplitude problem, not a hold-length one.**
+`_walk` already holds each inset only 2-3 columns. The coast margin is 4 (and
+the north wall uses `margin - 1` = 3), so a walk stepping +/-1 or +/-2 hits 0 or
+`hi` constantly and *sticks there*. The north shore has the smaller amplitude
+and the worse histogram, exactly as that predicts: 24% of west-shore runs are 5
+tiles or longer, with a hard spike at 12+ (23 runs west, 50 north). Islands fill
+**90% of their own bounding box**; 8 of 120 are perfect rectangles, which is the
+margin-0 fallback firing and returning a ruled line.
+
+**"Up to 3 floors" and `HEIGHTMAP_TIERS = 2` mean the same thing** --- the code
+counts tiers above the base, so `tiers 2` is levels 0/1/2. The brief's *"it can
+also be of only 2 floors"* is `tiers 1`, and that case **does not exist today**:
+generation is a coin flip, 65% get all three floors and 35% get one, nothing
+between.
+
+**Land is 24% of the world bounds** (min 20.1%, max 32.6%) and every world has
+exactly two undecorated islands -- start gets 0-2 obstacles, boss always 0.
+
+## Design notes settled before starting
+
+**Topography is not a room kind.** Kind (start / boss / shrine) and topography
+(volcanic / small / castle) are orthogonal -- a shrine can sit on a small
+island. Topography gets its own declared table, following the shape of
+`SPECIAL_KINDS` rather than joining it.
+
+**The coast parameters belong in that table.** A future `castle` type is
+described as "more squared", which is a coast setting, not a new algorithm: it
+declares a low margin and gets squared shores. That also gives the coastline
+work its off switch for free -- reverting is selecting the `classic` preset
+rather than a special-cased flag.
+
+**The bridge count is decided in the wrong place.**
+`HEIGHTMAP_BRIDGES_PER_LINK` duplicates corridors at link-creation time, before
+kinds are assigned and before any grid exists. Per-topography allowances need
+that decision moved into `_seat_corridors`, which already runs after the grids
+are built, already groups per link, and is the only place that knows where each
+island's beaches are. Where two endpoints disagree the lower wins, and a small
+island's cap is written **per side** rather than per link -- the two coincide
+today, since the lattice gives at most one neighbour per side, but they will not
+if a chunk ever hosts two islands.
+
+## A — inland holes — ✅ DONE
+
+`_fill_holes` runs last in `build_grid`, after `_prune_unreachable`, because
+every stage above it can leave a hole behind: a bay bitten in by the coast walk,
+a pocket the prune emptied. `_face_the_sea` then runs once more, and that is not
+a formality -- 73 of the 156 measured holes have their south side open, so
+nearly half the fills put new ground over open sea with nothing under it.
+
+**Filling won outright; widening is not implemented.** The brief offered either,
+and building both made the choice obvious. A hole with mixed neighbour levels
+sits at a **cliff foot**, and widening it there produces exactly the shape
+`_carve_lakes` already refuses -- water lapping a wall, which the terrace
+boundary has no shoreline art for. It also *removes* walkable ground, so it has
+to be guarded against cutting the room in two, while filling only ever adds. The
+first cut did implement widening, and it showed: 25 lake components of one and
+two tiles appeared, because a widened hole is part absent cell and part `LAKE`
+and only the taken half is a lake.
+
+So every hole is closed with terrain, and which terrain turns on one question:
+**is the ground directly north of it higher?**
+
+* **Higher to the north** -- the hole is under a terrace, so it becomes part of
+  that terrace's wall: a `CLIFF` at the north neighbour's level.
+* **Otherwise** -- ground at the *lowest* neighbouring level. A lateral step up
+  to a taller terrace east or west needs no face at all; that edge is drawn from
+  the raised block, and only a southward drop needs stone.
+
+Neither branch consumes walkable ground, so no connectivity check is needed and
+none is done -- which is what makes this pass cheap and unable to strand
+anything.
+
+Measured after, over the same ten worlds: **0 one-tile and 0 two-tile** enclosed
+holes, against 43 and 156 before; 0 lake components under three; 0 `check_grid`
+failures. Suite **796** green, four new tests -- including one asserting no
+raised ground anywhere has open sea directly beneath it, which is the invariant
+the extra `_face_the_sea` call exists to keep.
+
+## B — the coastline — ✅ DONE
+
+`rugged` is now the active preset; `classic` restores the old shore, and a test
+pins it. Measured over ten worlds:
+
+| | runs of 5+ | runs of 12+ | box fill | rectangles | mean land |
+|---|---|---|---|---|---|
+| classic | 38.1% | 89 | 0.92 | 2 | 952 tiles |
+| **rugged** | **11.2%** | **33** | **0.84** | **0** | **976 tiles** |
+
+### The brief's rule, on its own, does almost nothing
+
+Forcing a step after four held positions at the *old* amplitude moved runs-of-5
+from 37.9% only to 29.9%, left the 12+ spike at 84, and produced **more**
+perfect rectangles than before -- five against two. That is worth stating
+plainly because it was the obvious fix and it is not the fix.
+
+The cause was never the hold length. It was **clamping at a small amplitude**:
+with the margin at 4 and steps of one or two, the walk reaches 0 or the margin
+constantly and the clamp pins it there for hold after hold. The north wall used
+`margin - 1`, a smaller amplitude still, and had the worse histogram -- exactly
+as that predicts. Raising the amplitude alone got to 13.1%; the two together to
+11.2%. So the run cap does earn its place, but only once there is room to
+wander, and it also needs a second half nobody would guess at: when the clamp
+hands back the same value the cap is silently defeated, so `_walk` forces a move
+in the only direction there is room for.
+
+### Two things that fight the ragged coast
+
+**`keep` clips it straight again.** Raising `HEIGHTMAP_COAST_KEEP` to 3 or 4 --
+the obvious way to let rooms grow without growing the chunks -- undid most of
+the work: runs-of-5 back to 18.5% and 20.0%, the 12+ spike back to 74 and 82,
+and rectangles reappearing. `coast_mask` intersects the walk with a rectangle
+inset by `keep`, so a bigger band chops the wander back to a ruled edge wherever
+it strays. `keep` stays at 2.
+
+**A bigger margin eats the top terrace.** At the old room size a margin of 6-8
+cost the islands their level-2 cap outright -- the count fell to 25 of 60 at
+margin 7, and to 18 at margin 8. That is *topography deciding itself by
+erosion*, which is precisely what C exists to choose deliberately, so it cannot
+be left to the coast. The room grows in step to pay for it: 46-52 x 28-32
+against 44-50 x 26-30, and the chunk with it. Land per island came out slightly
+**up**, 976 tiles against 952, and the bridges no worse -- the horizontal
+maximum actually improved, 41 tiles to 29.
+
+### Two bugs found on the way
+
+**`_fill_holes` was eating lakes.** `_water_blobs` took its bounding box over
+*non-lake* cells, so a lake straddling that box had its outside half invisible
+to the walk and its inside half swallowed as a two-tile hole. On seed 0 a
+four-cell lake came out of the pass as two. A `LAKE` now counts as present, not
+as water to be closed -- lakes have their own minimum and their own stub trim --
+and a gap entirely surrounded by pond becomes more pond rather than a one-tile
+island in the water.
+
+**A chunk must be an even number of tiles.** Setting 29 rows put every room half
+a tile off the world grid and `LevelIndex` could no longer place a room's cells
+at all -- eleven tests in `test_elevation` and three in
+`test_projectile_elevation` went red at once. The world's bounds are inflated by
+one whole chunk before everything is shifted to the origin, and `Rect.inflate`
+moves the top-left by *half* of that. Now commented at the constant.
+
+### One test was asserting the wrong thing
+
+`test_no_seed_is_sealed_by_its_obstacles` compared against **zero**, and the
+ragged coast broke it -- 279 unreachable nav cells on seed 0. Measured, that is
+terrain, not obstacles: bare terrain leaves 293. A 22 px body cannot stand on a
+one-tile spit, and the ragged coast makes many more of them. The regions are
+fringe rather than territory -- on seed 0, thirty single cells, twenty pairs,
+nineteen triples, largest anything 29 cells, about four tiles.
+
+So the test now asserts what the repair actually promises: **obstacles never cut
+off more than bare terrain does**. The teeth test compares the same difference,
+so it still cannot pass trivially.
+
+Suite **800** green, five new tests.
+
+## C — topography — ✅ DONE
+
+`classic` is gone; `rugged` is the only coast preset. The table stays a table
+because a topography **names** the preset it wants, which is how a future
+"castle" island gets squared shores without new code.
+
+### The table
+
+`config.HEIGHTMAP_TOPOGRAPHIES`, declared in the spirit of `SPECIAL_KINDS` --
+adding a type is an entry, not a branch. Topography is deliberately **not** a
+room kind and does not join `SPECIAL_KINDS`: kind says what happens on an
+island, topography says what shape it is, and a shrine can stand on a small one.
+A test asserts the two vary independently, because if they did not this would
+just be `SPECIAL_KINDS` again.
+
+Measured over fourteen worlds:
+
+| | islands | mean walkable | floors above sea |
+|---|---|---|---|
+| `volcanic` | 42 | 923 tiles | 15 two-floor, 27 three-floor |
+| `small` | 28 | 449 tiles | 15 flat, 13 two-floor |
+| `boss` | 14 | 1,334 tiles | always flat |
+
+**The two-floor volcanic island now exists.** The old generator could not
+express it at all -- a coin flip between all three floors and one, nothing
+between. `tiers` is an inclusive range drawn per island instead.
+
+**`size` is a linear scale on the rect, not an area ratio**, and the difference
+matters: the coast margin is an absolute number of tiles, so it eats
+proportionally more of a smaller island. 0.7 linear measured out at 0.38 of a
+volcanic island's walkable area; **0.76 gives 0.49**, the "about half" the brief
+asked for. Boss lands at 1.44x.
+
+Rooms are **resized after** the tree is grown rather than drawn at a different
+size, because the topography cannot be known until the boss island is
+identified, and that happens after the rooms are built. The rect keeps its
+centre, every dimension stays even in tiles, and it is re-snapped to the world
+grid -- the same guarantee the original placement makes.
+
+### Elite rooms: gone from the height-map worlds only
+
+Dropping `elite_arena` outright re-labels rooms in the **legacy** generator too,
+and a re-labelled room is shaped and scattered differently: four pinned-seed
+LD-8 tests moved, none of which have anything to do with elite arenas. So
+`special_kinds(heightmap)` retires it for the height-map worlds and leaves the
+legacy pool alone -- the same gate `_blocks` and `unseal` already use. The
+feature's own code stays in place and dormant.
+
+### Two tests were measuring the world instead of themselves
+
+**`test_the_repair_has_teeth` needed a wider seed range.** Since the islands were
+reshaped, a bad obstacle seal is rare but severe rather than common and small:
+across twenty seeds the deltas run 0, 0, 1, 2 ... 10, 14, 80, 567, **2319**. The
+first eight top out at 14, so the range the rest of the module uses would have
+let it pass while proving nothing.
+
+**`ProjectileTrailTests` was firing into a random world.** It builds a game with
+an unpinned run seed and shoots 300 px east to count trail puffs; with D10 live,
+the shot dies the moment it crosses onto higher ground, so on the seeds where the
+hero starts below a terrace the count collapsed to 0 or 1 against the expected
+4-6. It failed in the suite and passed alone -- a different random world each
+time. `_shoot` now sets `fire_level = NONE`, the documented opt-out, with the
+reason written down; the elevation rule has its own module.
+
+Suite **807** green, eight new tests.
+
+## D — more islands, off-centre, with per-island bridges — ✅ DONE
+
+Nine islands a world, drawn off the centre of their lattice cells, and how many
+bridges a link carries is now a property of the two islands. Suite **817** green,
+nine new tests.
+
+### Bridges are decided where the beaches are
+
+`HEIGHTMAP_BRIDGES_PER_LINK` is gone. Links are laid one apiece and cloned in
+`_seat_corridors`, which is the only place that runs after the grids exist. The
+allowance is `min` of the two ends -- both have to accept a crossing -- and it
+is counted **per side of each island**, not per link. Those are the same thing
+today, since the lattice gives a room at most one neighbour per direction;
+writing it per side is what keeps it correct if a cell ever hosts two. Volcanic
+islands take two, small and boss one, so a world runs 8 to 15 bridges against
+the tree's minimum of 8.
+
+### The offset, and the bound that makes it safe
+
+Bounding the *rect against its chunk* -- at most one tile of overhang per side --
+rather than deriving a slack from the nominal sizes. The first cut used
+`(chunk - room) // 2`, which is wrong for an odd-width room: centring one leaves
+it half a tile off the lattice, the snap moves it, and the offset stacks on top.
+That produced **two shared land cells** between neighbouring islands, the exact
+failure the guarantee exists to prevent.
+
+**And it caught a second one that centring had been hiding.** The boss island
+was declared at `size: 1.15`, which puts a 52-tile room at 60 in a 50-tile cell
+-- five tiles of overhang against everyone else's one. Centred, coast erosion
+and luck had covered it; offset, it shared land cells reliably. `size` may not
+take a room past the chunk plus two tiles, and a test now asserts that of the
+table itself.
+
+**Boss islands are flat but not big.** 1.0 is the cap, and at 1.0 a boss island
+measures about the same as a volcanic one, so the "pretty big" half of the brief
+is *not* delivered. It needs either a bigger lattice cell or a per-topography
+`HEIGHTMAP_COAST_KEEP` -- a boss island could overhang five tiles safely if its
+own land were held five tiles inside its rect, at the cost of a straighter shore
+on that island. Boss islands are a deferred conversation, so the test asserts
+only flatness and says why.
+
+The offset costs nothing measurable in bridge length: median 12 tiles with it
+against 13 without, and the long tail (max 53 against 47) is the nine-room tree,
+not the offsets.
+
+### Two bugs the room count exposed
+
+**`unseal`'s round cap was silently too few.** It was 8, which was enough for six
+islands; at nine, seeds finished with a handful of cells still walled off and the
+"obstacles never cut off more than bare terrain" test went red on five. The cap
+is a safety valve, not a budget -- the loop already stops when nothing is sealed
+-- so it is 40 now.
+
+**Which made the repair the largest cost in generation.** At 60% of a 713 ms
+world, profiled to `_cheapest_seal` and `_reachable`. Two changes: inlining
+`in_bounds` and `idx` in the inner loops (three and a half million calls apiece,
+and the arithmetic is cheaper than the call) took it to 651 ms; then labelling
+the sealed regions and reopening **all of them in one Dijkstra sweep** instead of
+one per round took it to **511 ms**, with sweeps per world dropping from about
+six to **one**. Popping in cost order means the first cell of a region off the
+queue is that region's cheapest entry, so nothing is given up in exchange.
+
+### Land is still 19% of the bounds
+
+Down from 22.8% at six islands -- more rooms means a longer tree and more sea
+between the branches. The offsets help how the world *reads* rather than how
+densely it packs; genuinely tighter packing is the lattice change that was
+scoped out of this item.
