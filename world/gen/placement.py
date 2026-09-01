@@ -87,13 +87,40 @@ def _offset_in_chunk(rooms, chunk, rng) -> None:
     px = config.TILE_PX
     for room in rooms:
         cell = _cell_rect(room.cell, chunk)
-        lo_x = (cell.left - px) - room.rect.left
-        hi_x = (cell.right + px) - room.rect.right
-        lo_y = (cell.top - px) - room.rect.top
-        hi_y = (cell.bottom + px) - room.rect.bottom
+        lo_x = ((cell.left - px) - room.rect.left) // px
+        hi_x = ((cell.right + px) - room.rect.right) // px
+        lo_y = ((cell.top - px) - room.rect.top) // px
+        hi_y = ((cell.bottom + px) - room.rect.bottom) // px
+        lo_x, hi_x = _toward_neighbours(room, rooms, 0, lo_x, hi_x)
+        lo_y, hi_y = _toward_neighbours(room, rooms, 1, lo_y, hi_y)
         if lo_x <= hi_x:
-            room.rect.x += rng.randint(lo_x // px, hi_x // px) * px
+            room.rect.x += rng.randint(lo_x, hi_x) * px
         if lo_y <= hi_y:
-            room.rect.y += rng.randint(lo_y // px, hi_y // px) * px
+            room.rect.y += rng.randint(lo_y, hi_y) * px
+
+
+def _toward_neighbours(room, rooms, axis, lo, hi):
+    """Narrow an offset range so an island never drifts *away* from the
+    islands it is linked to.
+
+    The offset is what gives the world its variety, and it is also what
+    lengthened the bridges: two neighbours are free to move apart inside their
+    own cells, and a crossing that started at the lattice spacing ends up ten
+    tiles longer. A cap on bridge length cannot fix that -- the long ones are
+    already taking the shortest lane they have, measured -- so it has to be
+    fixed where the distance is created.
+
+    The rule is deliberately weak: it removes the half of the range that opens
+    the gap, and only when every linked neighbour is on the same side of this
+    axis. A room with neighbours both east and west keeps its full range,
+    because moving either way shortens one crossing and lengthens the other.
+    """
+    sides = {(rooms[n].cell[axis] > room.cell[axis])
+             - (rooms[n].cell[axis] < room.cell[axis])
+             for n in room.neighbors}
+    sides.discard(0)
+    if len(sides) != 1:
+        return lo, hi                   # pulled both ways, or not linked here
+    return (0, hi) if sides.pop() > 0 else (lo, 0)
 
 
