@@ -64,7 +64,8 @@ KINDS = _Kinds()
 
 
 class Obstacle:
-    __slots__ = ("pos", "radius", "kind", "blocks_projectiles", "color", "variant")
+    __slots__ = ("pos", "radius", "kind", "blocks_projectiles", "color",
+                 "variant", "biome")
 
     def __init__(self, kind: str, x: float, y: float, variant: int = 1) -> None:
         radius, blocks_proj, color = KINDS.get(kind, KINDS["rock"])
@@ -76,3 +77,8 @@ class Obstacle:
         # Cosmetic only: which decoration variant skins this obstacle (1..4).
         # Chosen from the run seed; never affects collision.
         self.variant = int(variant)
+        # LD-10: the terrace's biome, stamped by the scatter. Cosmetic too --
+        # it picks which *set* of rigs the variant indexes into, so a pine
+        # stands on the wetland and an autumn crown on the sand. Empty on the
+        # legacy worlds, which have no biomes and keep the one global set.
+        self.biome = ""
