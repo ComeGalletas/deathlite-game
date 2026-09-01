@@ -3,6 +3,27 @@
 import unittest
 
 from world.procedural import SPECIAL_KINDS, _four_connected, generate_world
+from game import config
+
+
+
+# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
+# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
+# defaults on now and selects a different generator entirely, whose rooms are
+# height maps with overlapping bounding rects and no cliff band. Pin the flag
+# off here so this coverage keeps testing the path it was written for; the
+# height-map path has its own in `tests/world/test_elevation.py`.
+_SAVED_HEIGHTMAP = None
+
+
+def _pin_heightmap_off():
+    global _SAVED_HEIGHTMAP
+    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
+    config.HEIGHTMAP_ROOMS = False
+
+
+def _restore_heightmap():
+    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
 
 
 class DeterminismTests(unittest.TestCase):
@@ -193,3 +214,11 @@ class IrregularRoomTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def setUpModule():
+    _pin_heightmap_off()
+
+
+def tearDownModule():
+    _restore_heightmap()

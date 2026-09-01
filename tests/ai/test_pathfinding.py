@@ -17,6 +17,7 @@ from world.map import GameMap
 from world.pathfinding import NavGrid, FlowField, _CLEARANCE_CAP, _INF
 from world.procedural import generate_world
 
+
 SEEDS = (1, 3, 7, 42, 99)
 
 # These validate the nav algorithm against the flat base layout on pinned seeds;
@@ -25,13 +26,34 @@ SEEDS = (1, 3, 7, 42, 99)
 _SAVED_VERT = None
 
 
+# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
+# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
+# defaults on now and selects a different generator entirely, whose rooms are
+# height maps with overlapping bounding rects and no cliff band. Pin the flag
+# off here so this coverage keeps testing the path it was written for; the
+# height-map path has its own in `tests/world/test_elevation.py`.
+_SAVED_HEIGHTMAP = None
+
+
+def _pin_heightmap_off():
+    global _SAVED_HEIGHTMAP
+    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
+    config.HEIGHTMAP_ROOMS = False
+
+
+def _restore_heightmap():
+    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
+
+
 def setUpModule():
+    _pin_heightmap_off()
     global _SAVED_VERT
     _SAVED_VERT = config.WORLD_VERTICALITY
     config.WORLD_VERTICALITY = False
 
 
 def tearDownModule():
+    _restore_heightmap()
     config.WORLD_VERTICALITY = _SAVED_VERT
 
 
@@ -203,6 +225,10 @@ class FlowFieldTests(unittest.TestCase):
     def test_every_cell_has_a_strictly_downhill_neighbour(self):
         # the field-level invariant M4 relies on: from any reachable non-target
         # cell at least one traversable neighbour has strictly lower cost.
+        # LD-9 D4: the neighbour must also be one the terrain allows -- a cell
+        # across a drop can be downhill and still be no way out, because the
+        # fill reached it the long way round. `direction_at` gates on the same
+        # mask, so an ungated invariant would no longer be the one M4 needs.
         for seed in SEEDS:
             _w, ng, ff, _t = self._field(seed)
             cols, rows = ng.cols, ng.rows
@@ -211,9 +237,10 @@ class FlowFieldTests(unittest.TestCase):
                 if ci >= _INF or ci == 0:
                     continue
                 col, row = i % cols, i // cols
+                mask = ng.step_mask[i]
                 best = min((ff.cost[ng.idx(col + dc, row + dr)]
-                            for dc, dr, _w in ff._NEI
-                            if ng.in_bounds(col + dc, row + dr)),
+                            for dc, dr, _w, bit in ff._NEI
+                            if (mask & bit) and ng.in_bounds(col + dc, row + dr)),
                            default=_INF)
                 self.assertLess(best, ci, f"seed {seed}: local min at {(col, row)}")
 
