@@ -162,6 +162,7 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
     kept = []
     used: dict = {}
     gap = max(1, config.HEIGHTMAP_BRIDGE_MIN_GAP) * px
+    cap = config.HEIGHTMAP_BRIDGE_MAX * px
     for (a_id, b_id, _axis), group in sorted(links.items()):
         # LD-10: the group arrives with exactly one corridor. Clone it up to the
         # allowance before seating, so every copy is seated as a peer.
@@ -180,7 +181,13 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
                 used[key] = used.get(key, 0) + 1
             continue
         pick = random.Random(f"{seed}:bridges:{a_id}:{b_id}")
-        order = list(opts)
+        # LD-10: a crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a
+        # causeway rather than a bridge. Lanes inside the cap are the pool; if
+        # a link has none, its *first* bridge still has to exist, so it falls
+        # back to the shortest lane there is -- refusing it would cut the world
+        # in two -- and its extras are simply not built.
+        short = [o for o in opts if o[1] <= cap]
+        order = list(short)
         pick.shuffle(order)
         chosen: list = []
         for o in order:
@@ -188,7 +195,7 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
                 chosen.append(o)
                 if len(chosen) == len(group):
                     break
-        if not chosen:                        # gap too wide for this span
+        if not chosen:                        # gap too wide, or nothing short
             chosen = [min(opts, key=lambda o: o[1])]
         for c, o in zip(group, chosen):
             apply(c, o)
@@ -196,6 +203,112 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
         for room, other in ((rooms[a_id], rooms[b_id]), (rooms[b_id], rooms[a_id])):
             key = (room.id, side_of(room, other, group[0].axis))
             used[key] = used.get(key, 0) + min(len(group), len(chosen))
+    _add_shortcuts(rooms, kept, used, options, apply, seed)
     return kept
 
 
+def _side_of(room, other, axis):
+    """Which edge of `room` a link to `other` leaves from."""
+    if axis == "h":
+        return "e" if other.rect.centerx > room.rect.centerx else "w"
+    return "s" if other.rect.centery > room.rect.centery else "n"
+
+
+def _shortcut_axis(a, b):
+    """`("h" | "v", gap in tiles)` for two islands that could be bridged, or
+    `None` when no axis-aligned crossing exists between them.
+
+    A `Corridor` is an axis, a rect and a lane, and the plank art is drawn from
+    horizontal and vertical end caps -- so a pair with no shared row *or* column
+    span cannot be joined at all without new art and a new corridor model.
+    Measured over twenty worlds, that is 313 of the 560 unlinked pairs, and it
+    is why this pass reaches for the other 247 only.
+    """
+    px = config.TILE_PX
+    if min(a.rect.bottom, b.rect.bottom) - max(a.rect.top, b.rect.top) > 0:
+        return "h", (max(a.rect.left, b.rect.left)
+                     - min(a.rect.right, b.rect.right)) // px
+    if min(a.rect.right, b.rect.right) - max(a.rect.left, b.rect.left) > 0:
+        return "v", (max(a.rect.top, b.rect.top)
+                     - min(a.rect.bottom, b.rect.bottom)) // px
+    return None
+
+
+def _add_shortcuts(rooms, kept, used, options, apply, seed) -> list:
+    """Join islands that ended up close together but were never linked.
+
+    The lattice grows a **tree**, so every route between two islands is unique
+    and a run backtracks over the bridge it arrived by. Placement then moves
+    islands off the centre of their cells, which regularly leaves two of them
+    within a few tiles of each other with no crossing -- including orthogonal
+    neighbours the tree simply never joined, and diagonal ones whose rects
+    overlap on one axis after the offset.
+
+    This runs last, once the grids exist and the tree's own bridges are seated,
+    so it can see where the beaches are and how much of each island's bridge
+    allowance is already spent. Nothing downstream assumes a tree: the flow
+    field is geometric and just gains routes, and `boss_id` was fixed from the
+    tree long before this, which keeps "farthest from the start" meaning what it
+    always did.
+
+    The yield is modest and that is the honest number: measured before building
+    it, 44 candidates over twelve worlds and **16 that actually seat**, because
+    `options` wants a *beach* on the same lane on both sides and ragged coasts
+    rarely line up. About one extra crossing a world.
+    """
+    if not config.HEIGHTMAP_SHORTCUTS:
+        return kept
+    px = config.TILE_PX
+    max_gap = config.HEIGHTMAP_SHORTCUT_GAP
+    linked = {(min(c.a, c.b), max(c.a, c.b)) for c in kept}
+
+    cand = []
+    for i, a in enumerate(rooms):
+        for b in rooms[i + 1:]:
+            if (min(a.id, b.id), max(a.id, b.id)) in linked:
+                continue
+            got = _shortcut_axis(a, b)
+            if got is None:
+                continue
+            axis, gap = got
+            if not 0 <= gap <= max_gap:
+                continue
+            cand.append((gap, a.id, b.id, axis))
+    # Shortest first, and deterministic: the gap breaks most ties and the ids
+    # break the rest, so no RNG is drawn and the same seed still builds the
+    # same world.
+    cand.sort()
+
+    for gap, a_id, b_id, axis in cand:
+        a, b = rooms[a_id], rooms[b_id]
+        room_low, room_high = ((a_id, b_id)
+                               if (a.rect.centerx < b.rect.centerx if axis == "h"
+                                   else a.rect.centery < b.rect.centery)
+                               else (b_id, a_id))
+        # The per-side allowance is the same rule the tree's own bridges obey:
+        # a small island takes one crossing a side, and both ends have to have
+        # room for it.
+        if any(used.get((room.id, _side_of(room, other, axis)), 0)
+               >= topography_of(room).get("bridges", 1)
+               for room, other in ((a, b), (b, a))):
+            continue
+        c = Corridor(a_id, b_id, pygame.Rect(0, 0, px, px), axis,
+                     "west" if axis == "h" else "north",
+                     "east" if axis == "h" else "south",
+                     room_low, room_high, 0)
+        opts = [o for o in options(c)
+                if o[1] <= config.HEIGHTMAP_BRIDGE_MAX * px]
+        if not opts:
+            continue        # no lane with a beach on both sides, or all too long
+        apply(c, min(opts, key=lambda o: o[1]))
+        kept.append(c)
+        # Keep the layout graph and the corridor list agreeing -- several
+        # callers read `Room.neighbors` rather than the corridors.
+        if b_id not in a.neighbors:
+            a.neighbors.append(b_id)
+        if a_id not in b.neighbors:
+            b.neighbors.append(a_id)
+        for room, other in ((a, b), (b, a)):
+            key = (room.id, _side_of(room, other, axis))
+            used[key] = used.get(key, 0) + 1
+    return kept

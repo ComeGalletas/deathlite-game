@@ -182,6 +182,28 @@ HEIGHTMAP_SHORE_RING: int = 1
 # per world. Off is only for isolating placement from repair -- with it off,
 # roughly one seed in three walls an island away from the large enemies.
 HEIGHTMAP_UNSEAL: bool = True
+# LD-10: after the tree's own bridges are seated, join islands that ended up
+# close together but were never linked. The lattice grows a tree, so without
+# this every route between two islands is unique and a run backtracks over the
+# bridge it arrived by. Gap is measured between the two rects, in tiles.
+# Longest bridge worth building, in tiles. A link the tree *needs* is never
+# refused for being long -- dropping it would cut the world in two -- but it
+# always takes the shortest lane it has when every lane is over the cap, and an
+# **optional** crossing (a second bridge on a link, or a shortcut) is simply not
+# built. See `_offset_in_chunk` for the other half: an island is nudged toward
+# the neighbours it is linked to, not away from them, which is what actually
+# shortens the long tail.
+# 16 rather than 20: swept over five seeds at 8 / 12 / 16 / 20 / 24, the two
+# middle values build the *same* graph -- same bridge count, same links, same
+# 1.6 loops a world, same 38% of links being the only way somewhere -- and 16
+# is simply shorter, max 18 tiles against 20 and p90 16 against 17. Below that
+# it stops being free: at 8 the loops collapse to 0.2 a world and 90% of links
+# go back to being the only way anywhere, while the longest crossing stays 18,
+# because half of them are tree links already on their shortest lane. Above it
+# the cap stops filtering and the maximum runs away again -- 25 tiles at 24.
+HEIGHTMAP_BRIDGE_MAX: int = 16
+HEIGHTMAP_SHORTCUTS: bool = True
+HEIGHTMAP_SHORTCUT_GAP: int = 12
 HEIGHTMAP_LAKES: int = 2
 # Accretion steps per lake blob. Wider and larger -> bigger, raggeder pools;
 # fewer cells than steps survive, since a step onto another terrace does
@@ -212,6 +234,20 @@ HEIGHTMAP_LAKE_SIZE: tuple = (10, 34)
 #            at 0.49 of a volcanic island's walkable area, which is the "about
 #            half" the brief asked for; 0.7 gives 0.38.
 #   coast    which `HEIGHTMAP_COAST_PRESETS` entry shapes its shoreline
+#   sheets   the tilesets this topography may wear, level 0 included. Level 0
+#            is chosen from here now rather than from `room_palettes`, which
+#            keyed it on room *kind* -- and kind is orthogonal to shape, so a
+#            shrine on a small island was picking its ground from the wrong
+#            axis entirely. `room_palettes` stays for the LD-8 generator, which
+#            has no topographies.
+#   allow_beachless_shore
+#            let a sheet with `shoreline: false` sit at level 0. Off by
+#            default, and it is not a taste setting: level 0 is the only
+#            terrace that meets the sea, and a sheet without a surf block draws
+#            that meeting from its raised block instead -- a hard rim rather
+#            than foam. The rule is derived from `sheet_flags` rather than
+#            listed per topography, so a ninth tileset cannot silently end up
+#            on a shoreline it has no art for.
 #   bridges  how many bridges may land on any one **side** of the island. Where
 #            two islands disagree the lower wins, since both have to accept it.
 #            Small islands are held to one; there is not enough beach on a
@@ -221,13 +257,33 @@ HEIGHTMAP_LAKE_SIZE: tuple = (10, 34)
 #            only assigned by role
 HEIGHTMAP_TOPOGRAPHIES: dict = {
     "volcanic": {"tiers": (1, 2), "size": 1.0,  "coast": "rugged",
-                 "bridges": 2, "weight": 3},
+                 "bridges": 2, "weight": 3,
+                 "sheets": ["terrain/tiles/tilemap_1.png",
+                            "terrain/tiles/tilemap_2.png",
+                            "terrain/tiles/tilemap_3.png",
+                            "terrain/tiles/tilemap_4.png",
+                            "terrain/tiles/tilemap_5.png",
+                            "terrain/tiles/tilemap_6.png",
+                            "terrain/tiles/tilemap_7.png",
+                            "terrain/tiles/tilemap_8.png"]},
     "small":    {"tiers": (0, 1), "size": 0.76, "coast": "rugged",
-                 "bridges": 1, "weight": 2},
+                 "bridges": 1, "weight": 2,
+                 "sheets": ["terrain/tiles/tilemap_1.png",
+                            "terrain/tiles/tilemap_2.png",
+                            "terrain/tiles/tilemap_3.png",
+                            "terrain/tiles/tilemap_4.png",
+                            "terrain/tiles/tilemap_5.png"]},
     "boss":     {"tiers": (0, 0), "size": 1.0,  "coast": "rugged",
-                 "bridges": 1, "weight": 0},
+                 "bridges": 1, "weight": 0,
+                 # Deliberately includes a sheet with no surf block, to see
+                 # what a beachless coastline looks like. A boss island is
+                 # flat, so its *whole* shore is drawn that way -- an
+                 # all-or-nothing look rather than a subtle one.
+                 "allow_beachless_shore": True,
+                 "sheets": ["terrain/tiles/tilemap_4.png",
+                            "terrain/tiles/tilemap_5.png",
+                            "terrain/tiles/tilemap_6.png"]},
 }
-# Which topography the boss island always gets. Big and relatively flat.
 HEIGHTMAP_BOSS_TOPOGRAPHY: str = "boss"
 # The shape of the mountain. Each plateau is the one below it eroded inward by
 # these amounts, per side. **South is the one that matters**: it is the only

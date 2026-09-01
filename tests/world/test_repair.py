@@ -16,12 +16,18 @@ one-tile arm hanging off a bigger blob.
 """
 import unittest
 
+import pygame
+
 from game import config
 from world.gen import generate_world
+from world.gen.bridges import _seat_corridors
+from world.gen.placement import _toward_neighbours
 from world.gen.rooms import _cell_rect
+from world.gen.tuning import (_GRID_BOSS_CLEAR_RADIUS,
+                             _GRID_SPAWN_CLEAR)
 from world.gen.repair import _killers, _reachable, _start_cell, _widest_class
 from world.gen.heightmap import _trim_lake_stubs, _walk, check_grid
-from world.layout import GROUND, LAKE
+from world.layout import Corridor, GROUND, LAKE
 from world.pathfinding import NavGrid
 
 _SEEDS = range(8)
@@ -540,6 +546,214 @@ class PlacementTests(_Heightmap):
             self.assertEqual(len(seen), len(layout.rooms), f"seed {seed}")
 
 
+class ShortcutTests(_Heightmap):
+    """LD-10: extra bridges between islands that ended up close together.
+
+    The lattice grows a **tree**, so without this every route between two
+    islands is unique and a run backtracks over the bridge it arrived by. The
+    pass runs last, once the grids exist and the tree's own bridges are seated,
+    so it can see where the beaches are and what each island's allowance has
+    already been spent on.
+    """
+
+    def _graph(self, layout):
+        adj = {r.id: set() for r in layout.rooms}
+        for c in layout.corridors:
+            adj[c.a].add(c.b)
+            adj[c.b].add(c.a)
+        return adj
+
+    def _cut_edges(self, adj):
+        """Links that are the *only* way to somewhere -- remove one and the
+        world comes apart. On a tree that is every link."""
+        edges = {(min(a, b), max(a, b)) for a in adj for b in adj[a]}
+        cut = 0
+        for x, y in edges:
+            trimmed = {k: set(v) for k, v in adj.items()}
+            trimmed[x].discard(y)
+            trimmed[y].discard(x)
+            seen, stack = {x}, [x]
+            while stack:
+                for v in trimmed[stack.pop()]:
+                    if v not in seen:
+                        seen.add(v)
+                        stack.append(v)
+            cut += len(seen) != len(adj)
+        return cut, len(edges)
+
+    def test_most_worlds_get_at_least_one_loop(self):
+        looped = 0
+        for seed in range(1, 13):
+            adj = self._graph(generate_world(seed))
+            edges = {(min(a, b), max(a, b)) for a in adj for b in adj[a]}
+            if len(edges) > len(adj) - 1:
+                looped += 1
+        self.assertGreater(looped, 6, f"only {looped}/12 worlds have a loop")
+
+    def test_it_halves_the_links_that_are_the_only_way_somewhere(self):
+        """The measurement that matters. One extra bridge does more than its
+        share: a single cycle in a nine-island tree takes a whole chain of
+        links off the critical path at once -- 100% down to about 47%."""
+        cut, total = 0, 0
+        for seed in range(1, 13):
+            c, t = self._cut_edges(self._graph(generate_world(seed)))
+            cut += c
+            total += t
+        self.assertLess(cut / total, 0.75, f"{cut}/{total} links still the only way")
+
+    def test_without_it_every_link_is_the_only_way(self):
+        """Proves the number above is the pass working, not the lattice."""
+        saved = config.HEIGHTMAP_SHORTCUTS
+        try:
+            config.HEIGHTMAP_SHORTCUTS = False
+            cut, total = 0, 0
+            for seed in range(1, 7):
+                c, t = self._cut_edges(self._graph(generate_world(seed)))
+                cut += c
+                total += t
+        finally:
+            config.HEIGHTMAP_SHORTCUTS = saved
+        self.assertEqual(cut, total, "the lattice is not a tree any more")
+
+    def test_a_shortcut_still_obeys_the_per_side_allowance(self):
+        """It reuses the same `used` counter the tree's own bridges fill, so a
+        small island cannot be given a second crossing on one side."""
+        for seed in range(1, 13):
+            layout = generate_world(seed)
+            per_side = {}
+            for c in layout.corridors:
+                a, b = layout.room(c.a), layout.room(c.b)
+                for room, other in ((a, b), (b, a)):
+                    if c.axis == "h":
+                        side = "e" if other.rect.centerx > room.rect.centerx else "w"
+                    else:
+                        side = "s" if other.rect.centery > room.rect.centery else "n"
+                    key = (room.id, side)
+                    per_side[key] = per_side.get(key, 0) + 1
+            for (rid, side), n in per_side.items():
+                cap = config.HEIGHTMAP_TOPOGRAPHIES[
+                    layout.room(rid).topography]["bridges"]
+                self.assertLessEqual(n, cap, f"seed {seed}: room {rid} side {side}")
+
+    def test_the_layout_graph_agrees_with_the_bridges(self):
+        """`Room.neighbors` is read by callers that never look at the corridor
+        list, so a shortcut has to appear in both."""
+        for seed in range(1, 13):
+            layout = generate_world(seed)
+            for c in layout.corridors:
+                self.assertIn(c.b, layout.room(c.a).neighbors, f"seed {seed}")
+                self.assertIn(c.a, layout.room(c.b).neighbors, f"seed {seed}")
+
+    def test_it_is_deterministic(self):
+        """No RNG is drawn: candidates are sorted by gap and then by id."""
+        a = [(c.a, c.b, tuple(c.rect)) for c in generate_world(4).corridors]
+        b = [(c.a, c.b, tuple(c.rect)) for c in generate_world(4).corridors]
+        self.assertEqual(a, b)
+
+
+class BridgeLengthTests(_Heightmap):
+    """LD-10: a crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a causeway.
+
+    The cap alone could not have delivered this. Measured before the change, the
+    long bridges were **already taking the shortest lane their link had** -- only
+    8 of 238 were more than two tiles longer than the best available -- so
+    refusing them would have meant refusing the link, and a link the tree needs
+    cannot be refused without cutting the world in two. The distance was created
+    in *placement*, where two linked neighbours were free to drift apart inside
+    their own cells, so that is where most of it is taken back.
+    """
+
+    def _lengths(self, seeds=range(1, 13)):
+        px = config.TILE_PX
+        out = []
+        for seed in seeds:
+            for c in generate_world(seed).corridors:
+                out.append(max(c.rect.width, c.rect.height) // px)
+        return sorted(out)
+
+    def test_no_optional_crossing_exceeds_the_cap(self):
+        """What the cap can actually promise.
+
+        A percentage threshold was the first attempt and it is the wrong shape:
+        lowering the cap mechanically raises the count of bridges "over" it,
+        because the ones over are tree links the cap was never able to refuse.
+        The guarantee is about the crossings that *are* refusable -- a link's
+        second bridge, and a shortcut -- so at most one bridge on any link may
+        exceed the cap.
+        """
+        px = config.TILE_PX
+        cap = config.HEIGHTMAP_BRIDGE_MAX
+        for seed in range(1, 13):
+            per = {}
+            for c in generate_world(seed).corridors:
+                key = (min(c.a, c.b), max(c.a, c.b))
+                per.setdefault(key, []).append(
+                    max(c.rect.width, c.rect.height) // px)
+            for key, lens in per.items():
+                over = [n for n in lens if n > cap]
+                self.assertLessEqual(
+                    len(over), 1,
+                    f"seed {seed} link {key}: {len(over)} of {len(lens)} bridges "
+                    f"over the cap ({lens})")
+
+    def test_a_bridge_over_the_cap_had_no_shorter_lane(self):
+        """And the one that may exceed it has to be unavoidable.
+
+        Re-seats each offending link on its own and compares: if a shorter lane
+        existed, the pick was bad rather than the geography. Measured before the
+        cap went in, only 8 of 238 bridges were more than two tiles longer than
+        their link's best lane, and none of those was in the long tail.
+        """
+        px = config.TILE_PX
+        cap = config.HEIGHTMAP_BRIDGE_MAX
+        checked = 0
+        for seed in range(1, 13):
+            layout = generate_world(seed)
+            for c in layout.corridors:
+                span = max(c.rect.width, c.rect.height) // px
+                if span <= cap:
+                    continue
+                probe = Corridor(c.a, c.b, pygame.Rect(0, 0, px, px), c.axis,
+                                 c.end_low, c.end_high, c.room_low, c.room_high, 0)
+                got = _seat_corridors(layout.rooms, [probe], seed)
+                best = max(got[0].rect.width, got[0].rect.height) // px
+                self.assertLessEqual(
+                    span, best + 2,
+                    f"seed {seed} link {c.a}-{c.b}: {span} tiles when {best} "
+                    f"was available")
+                checked += 1
+        self.assertGreater(checked, 0, "no bridge exceeds the cap at all -- "
+                                       "this test is proving nothing")
+
+
+    def test_the_offset_range_is_narrowed_toward_linked_neighbours(self):
+        """The placement half, tested where it lives.
+
+        Reconstructing this from a finished layout does not work and the attempt
+        is instructive: the world is shifted to the origin at the end of
+        generation, so a room's rect no longer relates to its cell, and
+        `Room.neighbors` has by then gained the shortcut links, which are added
+        *after* placement and were never part of the bias. The rule is a pure
+        function of the tree, so it is tested as one.
+        """
+        class _R:
+            def __init__(self, cell, neighbors=()):
+                self.cell = cell
+                self.neighbors = list(neighbors)
+
+        rooms = {0: _R((0, 0), [1]), 1: _R((1, 0), [0, 2]),
+                 2: _R((2, 0), [1]), 3: _R((1, 1), [])}
+        # pulled east only -- may move east or stay, never west
+        self.assertEqual(_toward_neighbours(rooms[0], rooms, 0, -4, 4), (0, 4))
+        # pulled west only
+        self.assertEqual(_toward_neighbours(rooms[2], rooms, 0, -4, 4), (-4, 0))
+        # pulled both ways -- full range, since either move lengthens the other
+        self.assertEqual(_toward_neighbours(rooms[1], rooms, 0, -4, 4), (-4, 4))
+        # nothing on this axis -- untouched
+        self.assertEqual(_toward_neighbours(rooms[0], rooms, 1, -4, 4), (-4, 4))
+        self.assertEqual(_toward_neighbours(rooms[3], rooms, 0, -4, 4), (-4, 4))
+
+
 class LakeShapeTests(_Heightmap):
     def _lakes(self):
         for seed in _SEEDS:
@@ -579,6 +793,86 @@ class LakeShapeTests(_Heightmap):
             self.assertEqual(_trim_lake_stubs(set(comp)), comp,
                              f"seed {seed} room {room.id}: {sorted(comp)} still "
                              f"has an arm the trim would take")
+
+
+class EveryIslandIsScatteredTests(_Heightmap):
+    """LD-10: the start and boss islands are no longer skipped.
+
+    The LD-8 scatter skipped both by id -- a safe spawn and a clear fight arena
+    -- and that rule was written when a room was ~60 cells. On the height-map
+    worlds it left two of the nine islands as bare 1,000-cell slabs, about a
+    fifth of all the land in the game, with nothing on them but flat ground
+    litter. Each keeps a clear disc now instead of being skipped whole.
+    """
+
+    SEEDS = (41, 42, 43)
+
+    def _on(self, layout, room):
+        return [o for o in layout.obstacles
+                if room.rect.collidepoint(o.pos.x, o.pos.y)]
+
+    def test_no_island_is_left_bare(self):
+        for seed in self.SEEDS:
+            layout = generate_world(seed)
+            for room in layout.rooms:
+                if not room.grid:
+                    continue
+                got = self._on(layout, room)
+                self.assertGreater(
+                    len(got) * 1000 / len(room.cells), 20,
+                    f"seed {seed} island {room.id} ({room.topography}, "
+                    f"{room.kind}) has {len(got)} obstacles on "
+                    f"{len(room.cells)} cells")
+
+    def test_the_boss_keeps_an_arena(self):
+        """Scattered like any other island *less a disc in the middle* -- the
+        brief was "keep a basic radius in the center free from obstacles and
+        spread other obstacles on the outside"."""
+        for seed in self.SEEDS:
+            layout = generate_world(seed)
+            room = layout.room(layout.boss_id)
+            if not room.grid:
+                continue
+            for o in self._on(layout, room):
+                for cx, cy in ((room.center.x, room.center.y),
+                               (room.rect.centerx, room.rect.centery)):
+                    d = ((o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2) ** 0.5
+                    self.assertGreaterEqual(
+                        d, _GRID_BOSS_CLEAR_RADIUS,
+                        f"seed {seed}: a {o.kind} stands in the boss arena")
+
+    def test_nothing_stands_where_the_hero_appears(self):
+        """`GameMap.center` is the start room's centroid and the hero spawns on
+        that exact pixel, so this is spawn safety rather than special treatment
+        of the island -- everything outside the bubble scatters normally."""
+        for seed in self.SEEDS:
+            layout = generate_world(seed)
+            room = layout.room(layout.start_id)
+            if not room.grid:
+                continue
+            for o in self._on(layout, room):
+                d = ((o.pos.x - room.center.x) ** 2
+                     + (o.pos.y - room.center.y) ** 2) ** 0.5
+                self.assertGreaterEqual(d, _GRID_SPAWN_CLEAR - o.radius,
+                                        f"seed {seed}: a {o.kind} overlaps the "
+                                        f"spawn point")
+
+    def test_the_legacy_world_still_skips_them(self):
+        """Dropping the skip there would re-scatter two rooms of every pinned
+        LD-8 seed, which those tests exist to describe."""
+        saved = config.HEIGHTMAP_ROOMS
+        config.HEIGHTMAP_ROOMS = False
+        try:
+            layout = generate_world(7)
+        finally:
+            config.HEIGHTMAP_ROOMS = saved
+        for rid in (layout.start_id, layout.boss_id):
+            room = layout.room(rid)
+            # Houses were never part of that skip -- `_scatter_houses` has
+            # always been allowed to build in the start room, and only ever
+            # excluded the boss.
+            got = [o for o in self._on(layout, room) if o.kind != "house"]
+            self.assertEqual(got, [], f"legacy room {rid} was scattered")
 
 
 if __name__ == "__main__":

@@ -78,6 +78,14 @@ class TerrainMetadataTests(unittest.TestCase):
         self.assertGreaterEqual(len(routines), 3)
         self.assertGreaterEqual(len({float(r["fps"]) for r in routines}), 3)
 
+    def test_trees_have_three_distinct_animation_routines(self):
+        """Same reason as the foam: one clock for every instance makes a whole
+        forest breathe in step, which reads as one object rather than many."""
+        routines = self.t["tree_routines"]
+        self.assertGreaterEqual(len(routines), 3)
+        self.assertGreaterEqual(len({float(r["fps"]) for r in routines}), 3)
+        self.assertGreaterEqual(len({int(r["phase"]) for r in routines}), 3)
+
     def test_slot_indices_are_inside_the_grid(self):
         cols, rows = self.t["grid"]
         limit = cols * rows
@@ -277,7 +285,7 @@ class ObstacleDecorTests(unittest.TestCase):
         t = get_content().terrain
         boost = t["obstacle_decor"]["size_boost"]
         render_radius = t["obstacle_decor"].get("render_radius", {})
-        for i, (ax, ay, fps, frs) in gm._decos.items():
+        for i, (ax, ay, fps, frs, phase) in gm._decos.items():
             o = gm.obstacles[i]
             choices = t["obstacle_decor"]["rigs"][o.kind]
             rig = choices[(o.variant - 1) % len(choices)]
@@ -343,7 +351,7 @@ class ObstacleDecorTests(unittest.TestCase):
     def test_build_headless(self):
         gm = self._map(42)
         self.assertGreater(len(gm._decos), 0)
-        for ax, ay, fps, frs in gm._decos.values():
+        for ax, ay, fps, frs, phase in gm._decos.values():
             self.assertGreater(len(frs), 0)
 
 
@@ -730,20 +738,66 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         return gm
 
     def test_tree_kind_maps_to_tree_rigs(self):
+        """Every rig the `tree` obstacle draws from has to exist, animate, and
+        be laid out as a **horizontal strip**.
+
+        This used to pin the exact four names and demand exactly eight frames
+        each, which said nothing about whether they were usable and refused a
+        fifth tree for having six frames. The strip geometry is the real
+        constraint: `Assets.frames` slices `frames` cells of `frame[0]` px
+        across, so a sheet whose width is not that product silently yields
+        blank or clipped frames. `tree_sheet.png` arrived as a 4x3 *grid* and
+        would have done exactly that.
+        """
         rigs = self.t["obstacle_decor"]["rigs"]
-        self.assertEqual(rigs["tree"],
-                         ["deco_tree_1", "deco_tree_2", "deco_tree_3", "deco_tree_4"])
+        self.assertGreaterEqual(len(rigs["tree"]), 4)
         self.assertNotIn("shrub", rigs)     # bushes are decoration now, not an obstacle
         for name in rigs["tree"]:
             rig = self.t["rigs"][name]
-            self.assertTrue((ASSETS_DIR / rig["anims"]["loop"]["file"]).is_file())
-            self.assertEqual(rig["anims"]["loop"]["frames"], 8)
+            loop = rig["anims"]["loop"]
+            path = ASSETS_DIR / loop["file"]
+            self.assertTrue(path.is_file(), name)
+            self.assertGreater(loop["frames"], 1, f"{name} does not animate")
+            sheet = pygame.image.load(str(path))
+            self.assertEqual(sheet.get_width(), rig["frame"][0] * loop["frames"],
+                             f"{name}: sheet is not a strip of "
+                             f"{loop['frames']} x {rig['frame'][0]} px")
+            self.assertEqual(sheet.get_height(), rig["frame"][1], name)
             self.assertGreater(int(rig["footprint"]), 0)
+
+    def test_a_grove_does_not_sway_in_lock_step(self):
+        """The trees of one world have to be spread over the declared routines
+        -- if they all landed on one, the whole forest would still animate as a
+        single object, which is what this exists to prevent."""
+        gm = self._map(7)
+        declared = {(float(r["fps"]), int(r["phase"]))
+                    for r in get_content().terrain["tree_routines"]}
+        got = {(e[2], e[4]) for i, e in gm._decos.items()
+               if gm.obstacles[i].kind == "tree" and len(e[3]) > 1}
+        self.assertTrue(got <= declared,
+                        f"a tree is swaying on an undeclared routine: "
+                        f"{got - declared}")
+        self.assertEqual(got, declared, "some routine went unused")
+
+    def test_a_tree_keeps_its_routine_across_a_rebake(self):
+        """It is bucketed on where the tree stands, not on anything the bake
+        makes up, so the same seed animates identically twice running."""
+        a, b = self._map(7), self._map(7)
+        self.assertEqual({i: (e[2], e[4]) for i, e in a._decos.items()},
+                         {i: (e[2], e[4]) for i, e in b._decos.items()})
+
+    def test_only_trees_take_a_routine(self):
+        """A rock has one frame and nothing to offset; giving it a phase would
+        index off the end of its own list."""
+        gm = self._map(7)
+        for i, e in gm._decos.items():
+            if gm.obstacles[i].kind != "tree" or len(e[3]) <= 1:
+                self.assertEqual(e[4], 0, gm.obstacles[i].kind)
 
     def test_tree_skin_is_animated_and_scaled_to_the_collider(self):
         gm = self._map(7)
         seen = 0
-        for i, (ax, ay, fps, frs) in gm._decos.items():
+        for i, (ax, ay, fps, frs, phase) in gm._decos.items():
             if gm.obstacles[i].kind != "tree":
                 continue
             seen += 1
@@ -816,7 +870,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         # (houses pin their own value, so toggling the config would do nothing).
         i, o = next((i, o) for i, o in enumerate(gm.obstacles)
                     if i in gm._decos and o.kind not in gm._sprite_drop)
-        ax, ay, _fps, _frs = gm._decos[i]
+        ax, ay, _fps, _frs, _phase = gm._decos[i]
         cam = Camera(gm.width, gm.height)
         cam.snap_to(o.pos)
 

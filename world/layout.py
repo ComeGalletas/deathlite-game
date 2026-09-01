@@ -94,6 +94,12 @@ class Room:
     # the coastline and the terrace count, so all three agree. Empty unless
     # `config.HEIGHTMAP_ROOMS`.
     topography: str = ""
+    # LD-10: `{level: sheet}` -- which ground tileset each terrace of this
+    # island wears. Decided at generation (`world/gen/biomes.py`) rather than
+    # at bake, because the obstacle scatter reads the biome as well as the tile
+    # painter does, and one authority is the point. Empty unless
+    # `config.HEIGHTMAP_ROOMS`.
+    palette: dict = field(default_factory=dict)
 
     @property
     def tile_dims(self) -> tuple[int, int]:

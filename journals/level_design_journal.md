@@ -4316,3 +4316,485 @@ Down from 22.8% at six islands -- more rooms means a longer tree and more sea
 between the branches. The offsets help how the world *reads* rather than how
 densely it packs; genuinely tighter packing is the lattice change that was
 scoped out of this item.
+
+## E — shortcut bridges: the world stops being a tree — ✅ DONE
+
+The lattice grows a **spanning tree**, so every route between two islands was
+unique and a run backtracked over the bridge it arrived by. `_add_shortcuts`
+runs last, once the grids exist and the tree's own bridges are seated, and joins
+islands that ended up close together but were never linked -- orthogonal
+neighbours the tree simply skipped, and diagonal ones whose rects overlap on one
+axis after the placement offset.
+
+### It was surveyed before it was built, and the survey was right
+
+Over twenty worlds there are 560 unlinked pairs, but they thin out fast: **313
+(56%) share no row *or* column span at all**. A `Corridor` is an axis, a rect
+and a lane, and the plank art comes from horizontal and vertical end caps, so
+those cannot be joined without new art and a new corridor model -- left alone.
+Of the 247 that do have a lane, only 71 are within fifteen tiles, and running
+the real seating machinery on them beforehand said **16 of 44 candidates would
+actually seat**, about 1.3 a world. That is what it delivers: 10.6 bridges a
+world becomes 11.9.
+
+The limit is not distance. `options` wants a *beach* -- plain sea-level ground,
+the first land the scan reaches -- on the same lane on **both** islands, and
+ragged coasts rarely line up. `reach` still carries a `strict` flag its own
+docstring says the caller drops "when no lane at all offers a beach on both
+sides", and nothing has ever passed `strict=False`. That is where the remaining
+yield is, at the cost of planks running up onto a terrace.
+
+### One bridge does far more than its share
+
+| | links/world | of them the only way there | worlds with a loop |
+|---|---|---|---|
+| tree only | 8.00 | **8.00 (100%)** | 0/20 |
+| with shortcuts | 9.30 | **4.35 (47%)** | 18/20 |
+
+A single cycle in a nine-island tree takes a whole *chain* of links off the
+critical path at once, which is why +1.3 links halves the count of crossings
+that are the only way to somewhere. The softer measures move as expected but far
+less: mean hops from the start 2.19 -> 2.06, mean pairwise 2.78 -> 2.49.
+
+### What it has to respect, and what it deliberately does not touch
+
+* **The per-side allowance**, via the same `used` counter the tree's own bridges
+  fill -- a small island still takes one crossing a side.
+* **`Room.neighbors` and the corridor list**, together: several callers read the
+  graph and never look at the corridors.
+* **`boss_id` is not recomputed.** It was fixed from the tree long before this,
+  so "farthest from the start" keeps meaning what it always did rather than
+  quietly moving when a shortcut lands.
+
+No RNG is drawn -- candidates are sorted by gap and then by room id -- so a seed
+still builds the same world. Nothing downstream assumed a tree: the flow field
+is geometric and simply gains routes.
+
+Suite **817** green, six new tests, one of which turns the pass off and asserts
+every link *is* a cut edge without it, so the 47% cannot be read as a property
+of the lattice.
+
+## F — bridges that are not causeways — ✅ DONE
+
+A crossing of thirty-odd tiles reads as a causeway, not a bridge. Before:
+median 12, p90 21, p95 24, p99 30, **max 38**.
+
+### The obvious fix would not have worked, and measuring said so first
+
+A length cap can only *refuse* a bridge, and a link the tree needs cannot be
+refused -- dropping it cuts the world in two. So the question was whether the
+long ones were long by choice. They were not: of 238 bridges, only **8 were more
+than two tiles longer than the shortest lane their link had**, and none of those
+eight was in the long tail. Every genuinely long bridge was already taking the
+best lane available.
+
+The distance is created in **placement**. The offset that gives the world its
+variety also lets two linked neighbours drift apart inside their own cells, and
+a crossing that started at the lattice spacing ends up ten tiles longer.
+
+### So the fix is in two halves
+
+**`_toward_neighbours`** narrows an offset range so an island never drifts
+*away* from what it is linked to. Deliberately weak: it removes the half of the
+range that opens the gap, and only when every linked neighbour sits on the same
+side of that axis. A room pulled both east and west keeps its full range,
+because moving either way shortens one crossing and lengthens the other.
+
+**`HEIGHTMAP_BRIDGE_MAX`** (20 tiles) then handles what placement cannot. Lanes
+inside the cap are the pool a link draws from; an **optional** crossing -- a
+second bridge on a link, or a shortcut -- is simply not built when none
+qualifies, while a link's *first* bridge falls back to the shortest lane there
+is. That also fixes the eight sub-optimal picks, since a short lane is now
+preferred rather than drawn at random from all of them.
+
+| | median | p90 | p95 | p99 | max | over 24 |
+|---|---|---|---|---|---|---|
+| before | 12 | 21 | 24 | 30 | 38 | 12 of 238 |
+| after | **11** | **18** | **19** | **23** | **25** | **2 of 236** |
+
+Loops fall slightly, 1.30 a world to 1.20, because the cap refuses the longest
+shortcuts -- which is the trade being asked for. No island collisions; land fill
+unchanged at 19.5%.
+
+### A test that could not be written the obvious way
+
+Asserting the placement rule from a finished layout does not work, and the
+failed attempt is worth recording: the world is shifted to the origin at the end
+of generation so a room's rect no longer relates to its cell, **and**
+`Room.neighbors` has by then gained the shortcut links, which are added after
+placement and were never part of the bias. The rule is a pure function of the
+tree, so it is tested as one.
+
+Suite **826** green.
+
+### The cap swept, and settled at 16
+
+Five seeds each at 8 / 12 / 16 / 20 / 24:
+
+| cap | bridges | links | loops | links that are the only way | median / p90 / max |
+|---|---|---|---|---|---|
+| 8 | 10.4 | 8.2 | 0.20 | **90%** | 9 / 12 / 18 |
+| 12 | 11.2 | 9.0 | 1.00 | 56% | 10 / 13 / 18 |
+| **16** | 11.8 | 9.6 | 1.60 | 38% | 10 / 16 / **18** |
+| 20 | 11.8 | 9.6 | 1.60 | 38% | 10 / 17 / 20 |
+| 24 | 11.8 | 9.6 | 1.60 | 38% | 11 / 17 / **25** |
+
+**16 and 20 build the same graph** -- same bridges, links, loops and cut-edge
+share -- and 16 is simply shorter, so it is strictly better and is the default
+now. **8 is too tight and costs the feature**: loops collapse to 0.2 a world
+and 90% of links go back to being the only way somewhere, and it does not even
+buy short bridges, because half the crossings are tree links already on their
+shortest lane. **24 is where the cap stops filtering** and the maximum runs away
+again.
+
+A first pass at 1--4 was run before this and is worth recording as a null
+result: the shortest bridge any world can build is about four tiles, so a cap
+below that refuses every *optional* crossing and nothing else. Loops went to
+zero in all twenty worlds, and caps 1 and 2 produced byte-identical worlds.
+
+### The test that came with it was the wrong shape
+
+`test_almost_no_bridge_exceeds_the_cap` asserted a percentage, and tightening
+the cap broke it -- from 0% over at 20 to 7.9% over at 16. That is not a
+regression: the bridges "over" are tree links the cap was never able to refuse,
+so lowering it mechanically raises the count. The tests now assert what the
+code actually guarantees -- **at most one bridge on any link may exceed the
+cap** (a second bridge or a shortcut is always refusable) and **that one had no
+shorter lane**, checked by re-seating the link on its own.
+
+## G — topography chooses the tilesets, level 0 included — ✅ DONE
+
+Which tilesets an island may wear is a property of its **topography** now, and
+that covers level 0. `boss` owns 4, 5 and 6; `small` owns 1--5; `volcanic` owns
+all eight.
+
+**`room_palettes` was choosing level 0 by room *kind***, which is orthogonal to
+shape -- a shrine on a small island was picking its ground from the wrong axis
+entirely. It stays in the data for the LD-8 generator, which has no
+topographies, and the height-map path no longer reads it.
+
+**The "no beachless sheet at the waterline" rule is derived, not listed.** Level
+0 is the only terrace that meets the sea, so a sheet flagged `shoreline: false`
+has no surf block for it. The filter is that flag, which means a ninth tileset
+cannot silently end up on a shoreline it has no art for; a topography opts out
+with `allow_beachless_shore`, and `boss` does, on purpose.
+
+Measured over eight worlds: boss islands wear only 4/5/6, small only 1--5, and
+volcanic take 1--5 at level 0 with 6 and 8 above -- 6, 7 and 8 never reach the
+waterline without being asked to.
+
+### What the boss island on `tilemap_6` actually looks like
+
+Three of twelve seeds drew it. It reads as a large flat slab of pale blue-grey
+stone, and **the missing surf block is much less visible than expected**: the
+animated foam is a separate layer keyed off `grid_shore`, not off the tileset,
+so the island still gets a white outline where it meets the water. Verified
+rather than assumed -- `has_shoreline` is `False` for that sheet and the world
+still carries its full set of foam anchors.
+
+Whether it is *wanted* is a taste call, but nothing about it is broken, and a
+bare stone arena arguably reads more deliberate than the bare green one it
+replaces. Boss islands carry no obstacles at all (the scatter skips them by id),
+so every one of them is a big empty slab whatever tileset it wears -- which is
+the thing worth fixing before the tileset choice matters much.
+
+### A consequence of the rules meeting each other
+
+**A `small` island cannot satisfy the adjacency rule.** Its five tilesets are
+all filed as one material, so every terrace boundary on a small island is
+green-on-green with only a cliff line between. That is rule 3 ("small islands
+use 1--5") meeting the material table, and the fix is the finer material split
+that step 2 of the proposal was already going to make -- `tilemap_4` is olive
+and `tilemap_5` teal, both currently called "grass". The test now asserts the
+adjacency rule only where an island owns more than one material, and says why.
+
+## H — six biomes instead of three materials — ✅ DONE
+
+The old split was `grass / rock / sand`, and G showed it was too coarse the
+moment a topography owned a fixed set of sheets: a `small` island owns tilemaps
+1--5 and **all five were "grass"**, so every terrace boundary on one was
+green-on-green with only a cliff line between, and the adjacency rule had
+nothing to reach for.
+
+Regrouped on the **measured** mean ground colour of each sheet's interior tile,
+which is the honest basis for saying two tilesets read alike:
+
+| biome | sheets | interior RGB |
+|---|---|---|
+| `meadow` | 1, 7 | 152,182,83 / 152,179,88 |
+| `forest` | 2, 3 | 132,174,87 / 97,169,99 |
+| `drab` | 4 | 130,152,94 |
+| `wetland` | 5 | 87,153,139 |
+| `rock` | 6 | 137,185,186 |
+| `sand` | 8 | 244,224,125 |
+
+`tilemap_1` and `tilemap_7` are **6.4 RGB units apart** -- one biome by
+measurement, not by taste. `tilemap_4` and `tilemap_5` were 40 and 60 units from
+the greens they had been filed with, which is the error the coarse table was
+making.
+
+**The coarse `family` layer is gone rather than kept underneath.** It existed
+only to feed the adjacency rule, and the fine biome now does that directly --
+one lookup instead of two, and one fewer place for the two to disagree.
+
+Result over twelve worlds: **108 terrace boundaries, zero with the same biome on
+both sides**, where before every small island had one. `small` islands now stack
+things like `drab -> forest` and `meadow -> wetland`; `volcanic` reaches
+`wetland -> forest -> rock`.
+
+Two data guards came with it, both of which the old table would have failed:
+every sheet a topography can wear must name a **declared** biome -- an unlisted
+sheet falls back to being its own, which quietly exempts it from the rule -- and
+every topography must own **at least two** biomes, which is the precondition for
+the rule to be satisfiable at all.
+
+The `biomes` table carries each biome's measured tint and a one-word note for
+now; the obstacle and decoration weights land in it next.
+
+
+## I — a scatter mix per biome — ✅ DONE
+
+*"A rocky layout for tilemap_6 needs a lot more rocks than trees."* Every island
+in the world drew from one weighted bag -- `tree 4 / rock 3 / pillar 2 / shrub 3`
+at 85 attempts per thousand floor cells -- so a rock summit and a forest shore
+scattered identically and only the tiles under them differed.
+
+### The mix belongs to the terrace, not to the island
+
+A volcanic island can wear `wetland -> forest -> rock` up its three levels, so
+"this island is rocky" is not a thing that can be said. The floor is split by
+**level** first and each terrace scattered on its own terms: its own weights and
+its own density, read from its biome's `scatter` block in `data/terrain.json`.
+
+| biome | tree / rock / pillar / shrub | attempts /1000 | achieved /1000 | stone share |
+|---|---|---|---|---|
+| `meadow` | 5 / 2 / 1 / 4 | 85 | 52.8 | 28% |
+| `forest` | 7 / 1 / 1 / 4 | 100 | 74.5 | 19% |
+| `drab` | 4 / 3 / 2 / 3 | 80 | 53.0 | 46% |
+| `wetland` | 3 / 4 / 2 / 3 | 75 | 38.2 | 56% |
+| `rock` | 1 / 6 / 4 / 1 | 140 | 44.3 | 88% |
+| `sand` | 1 / 3 / 1 / 1 | 25 | 18.8 | 84% |
+
+Measured over twelve worlds. A forest terrace comes out **80% trees**, a rock
+terrace **88% stone** -- the two ends of the same knob.
+
+### Attempts are not obstacles, and rock is where that bites
+
+`per_1000` has always counted *attempts*: placement rejects whatever will not
+clear the doorways, the flights and the other obstacles' spacing. That rejection
+rate is not the same for every kind -- a rock is radius 30 and keeps a 46 px gap,
+so it needs 76 px of clear ground, where a tree is radius 15 and keeps only 22
+off another tree. A rock-weighted bag therefore *lands* about a third of what it
+draws, against four fifths for a tree-weighted one.
+
+First pass at the numbers gave `rock` 95 attempts and it rendered at 31 per
+thousand, sparser than the meadow beside it -- the opposite of a boulder field.
+Raised to 140 it lands at 44. `sand` went the other way, 40 down to 25, because
+open sand is meant to read as open.
+
+### The palette had to move into generation first
+
+The island's `{level: sheet}` was worked out at **bake** time, from the seed and
+the room id. That was a fine place for it while the tile painter was the only
+consumer. The scatter is a second consumer, and it runs in a different layer at
+a different time -- so either it re-derives the same answer from the same seed,
+or the answer moves somewhere both can read.
+
+Two derivations of one answer is exactly how this feature broke once already
+(the adjacency rule comparing filenames while the eye compared colours), so the
+palette is generation output now: `world/gen/biomes.py` decides it, `Room.palette`
+carries it, and `TileSheets.biome_palette` returns it rather than computing
+anything. Same shape as the stair rule -- generation classifies, rendering picks
+the art. `world/terrain/biome.py` is a re-export shim.
+
+### What was deliberately left alone
+
+The **legacy** mix stays a literal in `world/gen/scatter.py`, frozen. The flat
+generator is pinned seed by seed in a dozen tests that exist to describe how it
+behaved, and re-weighting it would rewrite those worlds for no gain.
+
+The **tree top-up** (+25%, clumped next to existing trees) still runs world-wide
+and unweighted, and it does not need to be biome-aware: it picks its anchors
+uniformly from the trees that exist, so a terrace that grew five trees gets five
+trees' worth of thickening and a forest gets a forest's worth. It is
+proportional by construction.
+
+The fallback for a biome that declares no `scatter` block is the LD-8 mix. That
+is a floor, not a per-biome default -- a test asserts every declared biome
+carries its own block, so the fallback stays unreachable.
+
+
+## J — decorations belong to a biome too — ✅ DONE
+
+Same rule as I, one layer down: an entry in `decorations` may name the `biomes`
+it belongs to and is then only placed on terraces wearing one of them. An entry
+that names none is universal -- the default a new prop gets, and what stops a
+terrace being able to come out with nothing on it.
+
+### The registry was lying about what the art is
+
+Half the ids described something the rig does not show. `sprout_a` is a red
+mushroom, `sprout_b` a flat grey stone, `twig` a boulder cluster, `flower_a` a
+green shrub, and both `mushroom` entries are pumpkins. Tagging them by name
+would have put stones in the meadow and shrubs on the summit, so they were
+renamed to the art first -- nothing but the registry referenced the ids.
+
+Twelve rigs were sitting unused. They are exactly what the stony biomes needed:
+`deco_ground_14/15` are **bones**, `deco_rock_2/4` are big boulders, and
+`deco_ground_7/8` are mossy stone. Room props went 19 -> 31.
+
+| biome | what it draws |
+|---|---|
+| `meadow` | grass, pumpkins, stumps, bushes |
+| `forest` | fungi (three), moss, grass, stumps, bushes |
+| `drab` | stone, grass, pumpkins, stumps |
+| `wetland` | mossy stone, fungi, grass, boulder piles |
+| `rock` | stone, boulders, moss, bones |
+| `sand` | stone, boulders, bones |
+
+Measured over eight worlds, with no prop found standing outside its tags.
+
+### And a density bug the split uncovered
+
+`per_room` counts were authored against LD-8 rooms of ~60 cells and were being
+applied whole to islands of 700-1000 -- the same mismatch the obstacle scatter
+had before D8 gave it a per-thousand rate, and nobody had noticed because decor
+is small. A sand terrace of 484 cells was drawing about six props.
+
+So each biome carries a `decor.per_1000` alongside its `scatter` block. It sets
+the terrace's whole budget and the authored counts become the **weights** by
+which its legal props share it, which keeps the hand-tuned ratios (four pebbles
+to one stump) while the total follows the ground. Rates: forest 75, meadow and
+drab 60, wetland 55, rock 45, sand 40. Achieved, over eight worlds:
+
+| biome | props /1000 before | after |
+|---|---|---|
+| `meadow` | 23.1 | 45.2 |
+| `forest` | 34.3 | 50.1 |
+| `drab` | 30.9 | 43.2 |
+| `wetland` | 30.9 | 38.8 |
+| `rock` | 25.0 | 35.2 |
+| `sand` | 24.7 | 41.8 |
+
+Achieved lands under the rate because placement still refuses a spot that is
+too near an obstacle, another prop, or the island's centre disc.
+
+A biome that declares no rate scales by 1.0 and uses the counts as written --
+a floor, not a default, and the only thing the legacy world ever sees, since a
+room with no height map has no palette and stays one unsplit group.
+
+### An hour lost to a screenshot script
+
+The A/B renders showed decor markers with nothing drawn under them, which
+looked like the scatter placing invisible props. It was the *script*: room
+clutter is not part of `scenery_drawables` -- that block is commented out --
+and is drawn by its own `draw_room_clutter` pass, which `PlayingState.draw`
+calls and my harness did not. The game was right the whole time. Worth
+remembering that clutter is deliberately **not** depth-sorted: it renders under
+every obstacle and character, which is why it is all flat ground litter.
+
+
+## K — the bare islands, and two groups of tree — ✅ DONE
+
+An audit of five worlds said every terrace of 40+ cells carried something --
+except that two of the nine islands in **every** world carried no obstacles at
+all.
+
+### start and boss were still on an LD-8 rule
+
+`_scatter_obstacles` skipped both by id. The reasons were good when a room was
+~60 cells: a safe spawn and a clear fight arena. On a 1,000-cell island it left
+about a fifth of all the land as bare slabs with nothing but flat ground litter
+on them.
+
+Both scatter like any other island now, each keeping a disc instead of being
+skipped whole:
+
+* **boss** -- `_GRID_BOSS_CLEAR_RADIUS`, 8 tiles, about a fifth of the island.
+  Enough to fight in; the rim is a boulder field.
+* **start** -- `_GRID_SPAWN_CLEAR`, 1.5 tiles. Not special treatment of the
+  island, just not dropping a boulder on the pixel the hero materialises at:
+  `GameMap.center` is the start room's centroid and the hero spawns exactly
+  there. Everything outside it scatters normally.
+
+The **legacy** generator keeps the skip, being pinned seed by seed in tests
+that exist to describe it. (Houses were never in that skip: `_scatter_houses`
+has always been allowed to build in the start room and only ever excluded the
+boss. The test that says the legacy skip still holds had to be written to
+allow for that.)
+
+**A bug the arena test caught.** The tree top-up decided its own keep-clear
+disc and kept the LD-8 fraction-of-the-room rule even on a height-map island,
+so a thicket could grow into the arena the scatter had just held open. Both now
+call one `_clear_radius`.
+
+### Two groups of tree, named by the biome
+
+The five tree rigs fall into two groups the eye reads immediately -- pines
+(`deco_tree_1/2/5`) and autumn crowns (`deco_tree_3/4`) -- and mixing them
+across a terrace was the last thing keeping an island from looking like one
+place. Each biome names its group in the `biomes` table: no new file and no new
+metadata layer, per the brief.
+
+| group | biomes |
+|---|---|
+| pine | `forest`, `wetland`, `rock` |
+| autumn | `meadow`, `drab`, `sand` |
+
+Assigned the same way the biomes themselves were: by what the ground colour
+does with the crown. The pines carry a teal shadow that reads with the deep
+green, the damp teal and the blue-grey stone; the yellow crowns belong on the
+warm greens and the sand.
+
+The obstacle carries the biome the scatter stamped on it -- generation
+classifies, rendering picks the art, the same rule as the palette and the
+stairs -- so the bake looks nothing up twice.
+
+**This also un-hid `deco_tree_5`.** The global list holds five rigs and the
+variant is a `randint(1, 4)`, so `(variant - 1) % 5` could never reach the last
+one: the tree sheet built two sessions ago had never once appeared in a world.
+Groups of three and two are both shorter than the draw, so every rig comes up.
+
+### Fewer trees on stone and sand, more dead ones
+
+`rock` and `sand` drop their tree weight from 1 to **0.3** -- reduced, not
+banned, because a lone pine on a boulder field is worth having -- and all five
+stump props are tagged into both biomes to stand in for what no longer grows
+there.
+
+
+## L — stumps at trunk size, and a forest that does not breathe in step — ✅ DONE
+
+Two small passes over the props, both about the field reading as many things
+rather than one.
+
+**Stumps +40%.** Every stump prop's `scale` went up by 1.4 (`stump_a` 0.55 to
+0.77, `stump_b` 0.5 to 0.7, `stump_c` 0.7 to 0.98, `stump_d` and `stump_e` 0.55
+to 0.77), which puts them at 17-37 px of visible width against a tree's ~115.
+A stump should read as the trunk that is left, and at 12-26 px they read as
+specks -- which mattered more once the stony biomes started using them in place
+of the trees they no longer grow.
+
+**Three tree routines.** Every tree in the world took its frame from one
+`pygame.time.get_ticks()` at one fps, so an entire forest swayed as a single
+object. This is the same problem the shoreline had, and it takes the same fix:
+`tree_routines` in `data/terrain.json`, shaped exactly like `foam_routines` --
+
+| fps | phase |
+|---|---|
+| 4 | 0 |
+| 5 | 2 |
+| 6 | 4 |
+
+-- picked per tree by a stable spatial bucket, so a rebake never reshuffles
+them and the same seed animates identically twice running. Bucketed at **half**
+a tile rather than the foam's full tile: `_TREE_TREE_GAP` is 22 px, so trees
+stand closer together than shore patches do and a whole-tile bucket would hand
+a pair in the same tile the same clock. Measured on seed 45: 66 / 65 / 86 trees
+on the three routines, and 34% of tree pairs within two tiles share one --
+which is the floor for three buckets.
+
+The skin entry grew a fifth field: `(anchor_x, anchor_y, fps, frames, phase)`.
+Only an animated tree takes a routine; everything else keeps its rig's fps and
+a phase of 0, since a one-frame rock has nothing to offset.
+
