@@ -29,7 +29,12 @@ def build_behavior(name: str, cfg: dict | None = None) -> Behavior:
     except KeyError:
         raise KeyError(f"unknown ai behavior {name!r}; "
                        f"registered: {sorted(_BUILDERS)}") from None
-    return builder(cfg or {})
+    cfg = cfg or {}
+    # LD-9 D7: every behaviour is gated behind the aggro check from one place
+    # rather than in twelve builders. A type with no `aggro_range` /
+    # `pursuit_seconds` in its JSON block comes back untouched.
+    from entities.ai.components.aggro import with_aggro
+    return with_aggro(builder(cfg), cfg)
 
 
 def registered() -> list[str]:

@@ -64,24 +64,90 @@ ROOM_SIZE_MAX_CELLS: int = 160
 # Each room gets a per-cell grid (`world/gen/heightmap.py`) with its own
 # terraces, cliffs and stairs, instead of one `floor` integer plus a cliff band
 # hanging off its south rim. Off -> the LD-8 model, byte-identical layouts.
-HEIGHTMAP_ROOMS: bool = False
+#
+# On by default since phase D. What had to land first: nav and collision read
+# the grid (D0-D4), so a flank or a terrace's back edge is a wall and only a
+# flight crosses it; obstacle scatter keeps flights clear (D5); enemies have an
+# aggro range and give up (D7), without which a flow field routes one the length
+# of an island to reach a player across a drop; and the field is bounded (D9),
+# without which a repath on these much larger worlds cost 37.9 ms.
+HEIGHTMAP_ROOMS: bool = True
 # With the flag on: fewer, larger rooms, because a room now has to hold several
 # terraces and the walls between them. A terrace needs 3 walkable rows plus its
 # wall, so a room wants ~14 rows to carry three of them.
 # Big enough that the widest room still leaves a water gap to its neighbours --
 # rooms are islands, and overlapping ones would fuse into one landmass.
-HEIGHTMAP_CHUNK_SIZE: int = 3712
+# Lattice cell for a height-map room, per axis, in tiles.
+#
+# Was one square 58-tile cell, which is why vertical bridges ran at a median of
+# 34 tiles against 17 for the horizontal ones: a room is 36-50 tiles wide but
+# only 22-30 tall, so a square cell left a chunk-height of empty sea above and
+# below every island. Sized per axis to the largest room instead, bridges come
+# out at a median of 10 / 6.
+#
+# Packed closer than the rects alone would allow, which needs two things
+# together: `HEIGHTMAP_COAST_KEEP` guarantees a void band inside every rect so
+# the rects may overlap without the islands meeting, and the room size *range*
+# is narrow (44-50 x 26-30 rather than 36-50 x 22-30) so a small island no
+# longer leaves a cell's worth of extra sea around it. Measured over 14 seeds:
+#
+#     50x30, rooms 36-50   bridges h 10/15  v  7/10
+#     46x26, rooms 36-50   bridges h  9/15  v  6/9
+#     46x26, rooms 44-50   bridges h  5/8   v  4/6   rect overlap 2/4
+#     48x28, rooms 44-50   bridges h  7/10  v  6/8   rect overlap 0/2  <- chosen
+#     50x30, rooms 44-50   bridges h  9/12  v  8/10  rect overlap 0/0
+#
+# 48x28 backs the islands apart again after 46x26 read as too tight: the median
+# rect overlap goes to zero and the worst case halves, for two tiles of extra
+# sea. 50x30 removes overlap entirely if the islands still crowd.
+#
+# Zero land-cell collisions between rooms in every row above; tighter than this
+# and islands start to merge.
+# Tiles of void guaranteed inside a room rect on every side. The coast walk
+# alone leaves none (measured minimum inset: 0), so without this a rect is not a
+# safe proxy for where its island is and neighbouring rects cannot overlap.
+HEIGHTMAP_COAST_KEEP: int = 2
+
+# How many plank bridges each link between two islands carries, and how far
+# apart two bridges on the same link must be, in tiles. `_seat_corridors` places
+# them at random among the lanes where both islands offer a beach -- all of them
+# would otherwise take the shortest crossing and land on top of each other,
+# since they are seated by the same deterministic rule. A link's first bridge
+# always survives even if the gap leaves no room; the extras are dropped.
+# LD-10: how many bridges a link carries is a property of the two **islands**
+# now, not one global number -- see `bridges` in `HEIGHTMAP_TOPOGRAPHIES`.
+HEIGHTMAP_BRIDGE_MIN_GAP: int = 6
+
+# Deliberately **two tiles smaller than the largest room** on each axis, which
+# is the relationship D11 arrived at: rects overlap by that much and the islands
+# still cannot meet, because `HEIGHTMAP_COAST_KEEP` guarantees a band of void
+# inside every rect. Setting the chunk to the full room size instead spreads the
+# world out -- measured, land fell from 24% of the bounds to 20% and the median
+# bridge went from 5 tiles to 13.
+# Both must be an **even** number of tiles. The world's bounds are inflated by
+# one whole chunk before everything is shifted to the origin, and `Rect.inflate`
+# moves the top-left by half of that -- so an odd chunk dimension shifts every
+# room half a tile off the world grid, and `LevelIndex` can then no longer place
+# a room's cells at all. Found the hard way with 29 rows.
+HEIGHTMAP_CHUNK_COLS: int = 50
+HEIGHTMAP_CHUNK_ROWS: int = 30
 # Fewer, much larger islands. A room has to hold a shore ring, several terraces
 # and the walls between them, and the coastline erodes it further -- so size it
 # generously and cut the count to pay for it, rather than ending up with a
 # scatter of islets too small to carry any of that.
-HEIGHTMAP_ROOM_COUNT: int = 6
+HEIGHTMAP_ROOM_COUNT: int = 9
 # Rooms are markedly **wider than they are tall**: terraces stack northward, so
 # height buys more of the same climb while width buys room for several separate
 # ways up on the same wall, which is what stops a room reading as one long
 # staircase.
-HEIGHTMAP_ROOM_COLS: tuple = (36, 50)
-HEIGHTMAP_ROOM_ROWS: tuple = (22, 30)
+# LD-10: widened to pay for the coast margin's growth. A margin of 6 eats 6
+# tiles off each side instead of 4, and at the old size that cost the islands
+# their top terrace -- the level-2 count fell from 54 of 84 to 25 of 60 purely
+# by erosion, which is topography deciding itself instead of being chosen.
+# Growing the room in step restores it (49 of 84) at almost the same mean land
+# area, 928 tiles against 952.
+HEIGHTMAP_ROOM_COLS: tuple = (46, 52)
+HEIGHTMAP_ROOM_ROWS: tuple = (28, 32)
 # Ways up are placed per **region** of the island rather than per island, so
 # every stretch of rim gets its own crossings -- an island-wide quota gets spent
 # wherever the shuffle falls and reliably leaves the north rim with no way up.
@@ -89,21 +155,80 @@ HEIGHTMAP_ROOM_ROWS: tuple = (22, 30)
 HEIGHTMAP_STAIRS_PER_REGION: int = 2
 HEIGHTMAP_STAIR_REGION: int = 8
 HEIGHTMAP_STAIR_SPACING: int = 4
-# How far the coastline may wander in from each side of a room's bounding box.
-# Rooms are sized to include this margin, so it eats into them rather than
-# growing them.
-HEIGHTMAP_COAST_MARGIN: int = 4
+# LD-10: how ragged a shoreline is, as one named set of parameters.
+#
+#   margin       how far the walk may come in from the rect edge -- the
+#                *amplitude*, which is what actually controlled straightness
+#   north_delta  added to `margin` for the north wall alone
+#   hold         how many positions one inset value is held for
+#   run_cap      never hold a value longer than this; 0 disables the cap
+#   mask_keep    fraction of the rect a mask must keep to be accepted
+#   grid_keep    the same test applied to the finished grid, in world/gen
+#
+# One preset for now. It stays a *table* because a topography names the preset
+# it wants: a "castle" island is described as more squared, which is this table
+# with a low margin and a long hold, not a new algorithm.
+HEIGHTMAP_COAST_PRESET: str = "rugged"
+HEIGHTMAP_COAST_PRESETS: dict = {
+    "rugged": {"margin": 6, "north_delta": 0, "hold": (2, 3), "run_cap": 4,
+               "mask_keep": 0.34, "grid_keep": 0.26},
+}
 # Rings of sea-level ground around the island before the terraces start, so it
 # reads as land rising out of the water instead of a slab floating in it.
 HEIGHTMAP_SHORE_RING: int = 1
-HEIGHTMAP_LAKES: int = 1
-# A volcano island is a mountain: sea-level ground all over, with concentric
-# plateaus stacked on top of it. `TIERS` is how many it may stack. The rest of
-# the islands are plain one-level ground, so the world mixes shapes rather than
-# repeating the same silhouette -- and a flat island connects to its
-# neighbours without any elevation to reconcile.
-HEIGHTMAP_VOLCANO_CHANCE: float = 0.65
-HEIGHTMAP_TIERS: int = 2
+# LD-9: after the scatter, check that the widest navigating body can still
+# reach everywhere bare terrain allows, and take back the handful of obstacles
+# that say otherwise (`world/gen/repair.py`). Costs one coarse navigation grid
+# per world. Off is only for isolating placement from repair -- with it off,
+# roughly one seed in three walls an island away from the large enemies.
+HEIGHTMAP_UNSEAL: bool = True
+HEIGHTMAP_LAKES: int = 2
+# Accretion steps per lake blob. Wider and larger -> bigger, raggeder pools;
+# fewer cells than steps survive, since a step onto another terrace does
+# nothing. A blob touching anything but its own terrace's ground is discarded,
+# so pushing this much higher mostly costs rejections rather than size.
+HEIGHTMAP_LAKE_SIZE: tuple = (10, 34)
+# LD-10: island topography, which is **not** a room kind -- a shrine can sit on
+# a small island. Kind says what happens on an island; topography says what
+# shape it is. Declared as a table so a new type is data, in the same spirit as
+# `SPECIAL_KINDS`: "castle" islands are already asked for, and want nothing more
+# than a squarer `coast` preset and a flat `tiers`.
+#
+#   tiers    inclusive range of floors *above* sea level, drawn per island.
+#            (1, 2) is the one the old generator could not express: it was a
+#            coin flip between all three floors and one, with nothing between.
+#   size     linear scale on the room rect. **It may not take a room past
+#            `HEIGHTMAP_CHUNK_* + 2` tiles**: the packing guarantee is that a
+#            rect overhangs its cell by at most one tile, so two neighbours
+#            overlap by at most two and `HEIGHTMAP_COAST_KEEP` holds each
+#            island's land that far inside its own rect. The boss island tried
+#            1.15 and broke exactly that -- it overhung by five tiles and shared
+#            land cells with the island beside it. It is 1.0 and still far the
+#            biggest, because a flat island spends none of its area on cliff
+#            faces: 1,150 walkable tiles against a volcanic island's 923.
+#            Note this is *not* the area ratio:
+#            the coast margin is an absolute number of tiles, so it eats
+#            proportionally more of a smaller island. 0.76 linear measures out
+#            at 0.49 of a volcanic island's walkable area, which is the "about
+#            half" the brief asked for; 0.7 gives 0.38.
+#   coast    which `HEIGHTMAP_COAST_PRESETS` entry shapes its shoreline
+#   bridges  how many bridges may land on any one **side** of the island. Where
+#            two islands disagree the lower wins, since both have to accept it.
+#            Small islands are held to one; there is not enough beach on a
+#            37-tile shore for two crossings to sit apart without one of them
+#            landing somewhere silly.
+#   weight   relative chance of being drawn; 0 means never drawn at random,
+#            only assigned by role
+HEIGHTMAP_TOPOGRAPHIES: dict = {
+    "volcanic": {"tiers": (1, 2), "size": 1.0,  "coast": "rugged",
+                 "bridges": 2, "weight": 3},
+    "small":    {"tiers": (0, 1), "size": 0.76, "coast": "rugged",
+                 "bridges": 1, "weight": 2},
+    "boss":     {"tiers": (0, 0), "size": 1.0,  "coast": "rugged",
+                 "bridges": 1, "weight": 0},
+}
+# Which topography the boss island always gets. Big and relatively flat.
+HEIGHTMAP_BOSS_TOPOGRAPHY: str = "boss"
 # The shape of the mountain. Each plateau is the one below it eroded inward by
 # these amounts, per side. **South is the one that matters**: it is the only
 # face the camera sees, so pulling each cap back from the south rim is what
@@ -210,6 +335,32 @@ SHOW_ENEMY_STATE_RINGS: bool = False
 # On since M6 profiling (journals/journal.md "Planned Phase -- Enemy navigation").
 # PlayingState owns a dual-resolution `NavField` toward the player: chasers and
 # the FSM movers sample its gradient instead of steering straight, so they route
+# LD-9 D9: how far the shared flow field is filled, as **path** cost in world
+# pixels (an orthogonal nav step costs one cell, 32 or 48 px, for either class).
+# A full-world fill was 37.9 ms a repath on a height-map world -- the islands are
+# five times the floor of an LD-8 world -- and nearly all of it went on cells no
+# enemy would ever walk from.
+#
+# Safe only because enemies now give up (see the aggro rules): one that is not
+# pursuing needs no route, and one that is has an aggro range in the hundreds of
+# pixels plus a timer.
+#
+# The value is measured, not guessed. This bounds the **path**, not the straight
+# line, and on a terraced island a cell 300 px away can be a long walk to a
+# staircase and back. Sampled over three worlds, for cells within 600 px
+# straight-line of the target (the widest aggro range) the path cost runs
+# p50 513, p90 1858, p95 2590, p99 3655, max 6058 -- so:
+#
+#     cap 3000 -> 97.5% of them routed,  6.3 ms
+#     cap 4500 -> 99.7%,                 9.4 ms      <- chosen
+#     cap 6000 -> 99.8%,                14.1 ms
+#     unbounded -> 100%,                37.9 ms
+#
+# An enemy outside the bound keeps `steer_at`'s bearing fallback, so it still
+# moves; it just has no routed path, and its pursuit timer ends the attempt.
+# `None` restores the unbounded fill.
+NAV_FILL_MAX_COST: int | None = 4500
+
 # through doorways and around obstacle clusters. `resolve_movement` stays the
 # final per-step guard. Crowded-scene cost (~220 enemies): steady p90 ~5 ms/frame
 # for the whole update, with one staggered ~4 ms field rebuild every 0.2 s.

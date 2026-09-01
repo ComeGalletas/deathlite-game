@@ -10,6 +10,8 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from world.elevation import NONE as NO_LEVEL
+
 from entities.enemy import Enemy
 from game.content import get_content
 from systems.animation import Animator
@@ -187,10 +189,24 @@ class ProjectileTrailTests(unittest.TestCase):
         return g, g.state_machine.current
 
     def _shoot(self, p, **kw):
+        """Fire east from the hero, with the LD-9 D10 elevation rule switched
+        off for the shot.
+
+        These tests are about how often a trail sheds a puff, and the world they
+        run in is built from a **random** run seed. Left on, the rule kills the
+        shot the moment it crosses onto higher ground, so on the seeds where the
+        hero happens to start below a terrace the puff count collapses -- 0 or 1
+        against the 4-6 the spacing predicts. `fire_level = NONE` is the
+        documented way to opt a projectile out; the rule has its own coverage in
+        `tests/combat/test_projectile_elevation.py`.
+        """
         base = dict(pos=pygame.Vector2(p.player.pos), vel=pygame.Vector2(300, 0),
                     damage=1, radius=4, lifetime=9.0)
         base.update(kw)
-        return p._spawn_projectile(**base)
+        pr = p._spawn_projectile(**base)
+        if pr is not None:
+            pr.fire_level = NO_LEVEL
+        return pr
 
     def test_trail_projectile_sheds_puffs_plain_one_does_not(self):
         g, p = self._playing()

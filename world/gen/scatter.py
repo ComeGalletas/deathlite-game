@@ -3,14 +3,84 @@ from __future__ import annotations
 
 import pygame
 
-from entities.obstacle import Obstacle
+from entities.obstacle import KINDS, Obstacle
 from game import config
+from world.gen.heightmap import walk_links
+from world.layout import VSTAIR, EWSTAIR
 from world.gen.tuning import (
     SPECIAL_KINDS, _OBSTACLE_GAP, _TREE_TREE_GAP, _TREE_DENSITY_BOOST,
     _TREE_THICKET_MIN, _TREE_THICKET_MAX, _HOUSE_RADIUS, _HOUSE_ROOM_CHANCE,
     _HOUSE_MIN_ROOM_CELLS, _HOUSE_GLOBAL_CAP, _VILLAGE_MIN_ROOM_CELLS,
     _VILLAGE_EXTRA, _VILLAGE_RADIUS,
+    _GRID_OBSTACLES_PER_1000, _GRID_PLACE_TRIES, _GRID_CLEAR_RADIUS,
 )
+
+
+def _blocks(doors, x: float, y: float, radius: float) -> bool:
+    """Does an obstacle of `radius` centred at (x, y) intrude on a keep-clear
+    rectangle?
+
+    The test used to be `rect.collidepoint(x, y)` -- the obstacle's *centre*
+    against the rect -- which let a rock sit one pixel outside a bridge mouth
+    and still put thirty pixels of itself across the only way in. Measured at
+    the large navigation class (radius 22, 48 px lattice), between two and six
+    obstacles per world did exactly that, and removing just those took one
+    sample seed from 6,315 unreachable cells to zero. Testing the circle is the
+    whole fix for that class of seal."""
+    for d in doors:
+        if d.collidepoint(x, y):
+            return True
+        cx = min(max(x, d.left), d.right)
+        cy = min(max(y, d.top), d.bottom)
+        if (x - cx) ** 2 + (y - cy) ** 2 < radius * radius:
+            return True
+    return False
+
+
+def _radius(kind: str) -> float:
+    """The radius `_blocks` should test this obstacle with.
+
+    Zero for two cases, both of which make `_blocks` fall back to the centre
+    test it always did. `shrub` rides the weighted pick so the spacing draws
+    stay where they were, but it is decoration, dropped before the list is
+    returned, with no entry in `KINDS` and nothing to intrude with. And the
+    LD-8 world keeps the old test entirely: the seals this fixes were measured
+    on the height-map worlds, the legacy generator is what a dozen pinned-seed
+    tests describe, and widening a keep-clear rule there would rewrite those
+    worlds for no benefit."""
+    if not config.HEIGHTMAP_ROOMS:
+        return 0.0
+    entry = KINDS.get(kind)
+    return float(entry[0]) if entry else 0.0
+
+
+def _flight_keepouts(rooms) -> list:
+    """Tiles no obstacle may sit on: every height-map flight, and the ground it
+    joins at each end.
+
+    A flight is one tile wide and is the *only* route between two terraces, so
+    one tree on it or on its landing seals a whole plateau off -- a much worse
+    failure than a blocked corner of a room, and one nothing else would catch.
+
+    The tiles are taken straight from `heightmap.walk_links` rather than
+    re-derived: it already knows that a straight flight opens north at its head
+    and south at its foot, and that an east/west flight also reaches sideways
+    because the wall jogs a row across it. Empty for a room with no height map,
+    so the legacy world is untouched.
+    """
+    px = config.TILE_PX
+    out = []
+    for room in rooms:
+        grid = room.grid
+        if not grid:
+            continue
+        for pos, cell in grid.items():
+            if cell.kind not in (VSTAIR, EWSTAIR):
+                continue
+            for col, row in (pos, *walk_links(grid, pos)):
+                out.append(pygame.Rect(room.rect.left + col * px,
+                                       room.rect.top + row * px, px, px))
+    return out
 
 
 def _corridor_doorways(rooms, corridors) -> dict:
@@ -57,6 +127,8 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
         if s.ramp:
             pad.height += px
         all_doors.append(pad)
+    # LD-9 D5: the same protection for a height-map flight and its landings.
+    all_doors.extend(_flight_keepouts(rooms))
     out = []
 
     # Houses first, so the small obstacles below space themselves off a house
@@ -68,9 +140,18 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
         if room.id in (start_id, boss_id):
             continue
         special = room.kind in SPECIAL_KINDS
-        base = 4 if room.kind == "elite_arena" else 2 if special else rng.randint(3, 7)
-        bonus = 0 if special else len(room.cells) // 48
-        density = min(base + bonus, 14)
+        if room.grid:
+            # A height-map room is 700-1000 cells and is always a "special"
+            # kind, so the legacy rule below would give it two obstacles. Scale
+            # with floor area instead; see `_GRID_OBSTACLES_PER_1000`.
+            density = int(len(room.cells) * _GRID_OBSTACLES_PER_1000 / 1000.0)
+            tries = _GRID_PLACE_TRIES
+        else:
+            base = (4 if room.kind == "elite_arena"
+                    else 2 if special else rng.randint(3, 7))
+            bonus = 0 if special else len(room.cells) // 48
+            density = min(base + bonus, 14)
+            tries = 12
         r = room.rect
         floor = sorted(room.cells) if room.cells else None
         # Keep the interaction / fight space clear around *both* the shaped-room
@@ -78,9 +159,17 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
         # sit a cell or two apart, and a shot-blocker near either reads as
         # "middle of the room".
         centres = ((room.center.x, room.center.y), (r.centerx, r.centery))
-        clear = min(r.width, r.height) * 0.24 if special else 0.0
+        if room.grid:
+            # The special-room "keep the interaction space clear" disc is a
+            # fraction of the room's own size, which on a height-map island
+            # works out at ~460 px -- it blanks the entire upper plateau, since
+            # that is what sits in the middle of a concentric island. A fixed
+            # few tiles around the centre is all the altar / shrine needs.
+            clear = _GRID_CLEAR_RADIUS if special else 0.0
+        else:
+            clear = min(r.width, r.height) * 0.24 if special else 0.0
         for _ in range(density):
-            for _try in range(12):
+            for _try in range(tries):
                 # Kind is drawn first so the placement gap can depend on it:
                 # tree-next-to-tree keeps only `_TREE_TREE_GAP` (groves), every
                 # other pairing keeps the full `_OBSTACLE_GAP`.
@@ -96,7 +185,7 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
                 if clear and any((x - mx) ** 2 + (y - my) ** 2 < clear ** 2
                                  for mx, my in centres):
                     continue
-                if any(d.collidepoint(x, y) for d in all_doors):
+                if _blocks(all_doors, x, y, _radius(kind)):
                     continue
                 if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
                        < (o.radius + (_TREE_TREE_GAP
@@ -181,7 +270,7 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
         if clear and any((x - mx) ** 2 + (y - my) ** 2 < clear ** 2
                          for mx, my in centres):
             continue
-        if any(d.collidepoint(x, y) for d in all_doors):
+        if _blocks(all_doors, x, y, _radius("tree")):
             continue
         gap_hit = False
         for o in out:
@@ -241,7 +330,7 @@ def _scatter_houses(rooms, all_doors, rng, boss_id, out) -> None:
                 if any((x - mx) ** 2 + (y - my) ** 2 < keep ** 2
                        for mx, my in centres):
                     continue
-                if any(d.collidepoint(x, y) for d in fat_doors):
+                if _blocks(fat_doors, x, y, _radius("house")):
                     continue
                 if near is not None:
                     lo, hi = _VILLAGE_RADIUS

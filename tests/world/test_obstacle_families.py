@@ -10,6 +10,7 @@ import pygame
 # `_TREE_DENSITY_BOOST` knob this test patches) into world/gen/scatter.py.
 import world.gen.scatter as P
 from entities.obstacle import KINDS
+from game import config
 from world.map import GameMap
 from world.procedural import generate_world
 
@@ -63,8 +64,19 @@ class TreeDensityBoostTests(unittest.TestCase):
         self.assertAlmostEqual(boosted / base, 1.25, delta=0.06)
 
     def test_boost_leaves_minerals_byte_identical(self):
+        """The top-up runs after the main scatter and only adds trees, so no
+        mineral may move when it is switched on.
+
+        The connectivity repair is switched off for the comparison, and has to
+        be: it is a decision about the *whole* obstacle set, so an added tree
+        can legitimately change which obstacle is cheapest to take back --
+        including a rock. That is the repair working, not the top-up leaking
+        into the placement RNG, which is what this test is about."""
         old = P._TREE_DENSITY_BOOST
+        unseal = config.HEIGHTMAP_UNSEAL
         try:
+            config.HEIGHTMAP_UNSEAL = False
+
             def minerals(boost):
                 P._TREE_DENSITY_BOOST = boost
                 return [(o.kind, round(o.pos.x, 3), round(o.pos.y, 3))
@@ -73,6 +85,7 @@ class TreeDensityBoostTests(unittest.TestCase):
             self.assertEqual(minerals(0.0), minerals(0.25))
         finally:
             P._TREE_DENSITY_BOOST = old
+            config.HEIGHTMAP_UNSEAL = unseal
 
     def test_top_up_trees_are_deterministic(self):
         a = [(o.kind, tuple(o.pos)) for o in generate_world(11).obstacles]

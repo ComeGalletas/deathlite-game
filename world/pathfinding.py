@@ -36,6 +36,15 @@ from array import array
 import pygame
 
 from game import config
+from world.elevation import LevelIndex, NONE, can_cross
+
+# The canonical neighbour order. `FlowField._NEI` and `NavGrid.step_mask` are
+# both built from it, so bit *i* of a cell's mask is always the move in
+# `NAV_DIRS[i]` and the two cannot drift apart.
+NAV_DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1),
+            (1, 1), (1, -1), (-1, 1), (-1, -1))
+_TILE_BIT = {d: 1 << i for i, d in enumerate(NAV_DIRS)}
+_ORTH = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 _SQRT2 = 2.0 ** 0.5
 # Clearance is only ever compared against an enemy radius (<= 30 px today) and
@@ -110,6 +119,125 @@ class NavGrid:
         self.walkable = walkable
         self.corridor = corridor
         self.clearance = self._clearance_transform(blocked, obstacles)
+        self.levels = LevelIndex(layout)
+        self.level, self.flight, self.step_mask = self._elevation(walkable,
+                                                                  corridor)
+
+    def _elevation(self, walkable: bytearray, corridor: bytearray):
+        """Per-cell elevation, and the baked mask of which neighbour moves the
+        terrain allows.
+
+        Asking `can_step` inside `FlowField.rebuild` was measured at ~300 ns a
+        call, which is ~24 ms of rebuild on a full world -- far too much for a
+        field that repaths as the player moves. The geometry is static, so the
+        answer is baked here once instead: bit *i* of `step_mask[cell]` is set
+        when moving in `NAV_DIRS[i]` is legal, and the rebuild loop reads one
+        byte and ANDs it.
+
+        Two lattices are in play -- nav cells are 32 px, terrain tiles 64 px --
+        so the work is done per *tile* first (a quarter as many, and only those
+        with a surface) and projected onto the cells. Two nav cells inside one
+        tile are always connected: a tile has a single elevation.
+
+        Flight cells are also marked `corridor`, which is what gives them the
+        M3 clearance leniency. A flight is one tile wide with stone either
+        side; without it the 48 px nav class cannot thread one, exactly the
+        case that leniency was added for in LD-3."""
+        ix = self.levels
+        n = self.cols * self.rows
+        level = array("b", [NONE]) * n
+        flight = bytearray(n)
+        mask = bytearray(n)
+        ox, oy = self.origin
+        half = self.cell * 0.5
+        tcols = ix.cols
+
+        # Per cell: the *linear* index of the tile it sits in, -1 where the cell
+        # is not floor. Linear rather than (col, row) so the neighbour test below
+        # is integer arithmetic instead of tuple building.
+        tile = array("i", [-1]) * n
+        live = []
+        for row in range(self.rows):
+            base = row * self.cols
+            cy = oy + row * self.cell + half
+            for col in range(self.cols):
+                i = base + col
+                if not walkable[i]:
+                    continue
+                tc, tr = ix.tile_of(ox + col * self.cell + half, cy)
+                tile[i] = tr * tcols + tc
+                live.append(i)
+                level[i] = ix.level_at(tc, tr)
+                if ix.flight_at(tc, tr) is not None:
+                    flight[i] = 1
+                    corridor[i] = 1
+
+        # Per tile, once: which of the eight moves the terrain allows.
+        #
+        # In two passes, because a diagonal is defined as its two right-angle
+        # detours and asking `can_step` for it re-derives orthogonal answers we
+        # already have. Doing the four orthogonals first and reading the
+        # diagonals off those bits cuts the rule evaluations by half and the
+        # diagonal ones to pure bit tests -- measured at a third of the build
+        # time this pass used to take.
+        seen = set(tile[i] for i in live)
+        orth: dict = {}
+        for tl in seen:
+            tc, tr = tl % tcols, tl // tcols
+            m = 0
+            for k, (dc, dr) in enumerate(_ORTH):
+                if can_cross(ix, (tc, tr), (tc + dc, tr + dr)):
+                    m |= 1 << k
+            orth[tl] = m
+
+        tmask: dict = {}
+        for tl in seen:
+            om = orth[tl]
+            m = 0
+            for d, bit in _TILE_BIT.items():
+                dc, dr = d
+                if not (dc and dr):
+                    if om & (1 << _ORTH.index(d)):
+                        m |= bit
+                    continue
+                h = tl + dc                       # step east/west first, ...
+                v = tl + dr * tcols               # ... or north/south first
+                if ((om & (1 << _ORTH.index((dc, 0)))
+                     and orth.get(h, 0) & (1 << _ORTH.index((0, dr))))
+                        or (om & (1 << _ORTH.index((0, dr)))
+                            and orth.get(v, 0) & (1 << _ORTH.index((dc, 0))))):
+                    m |= bit
+            tmask[tl] = m
+
+        # Project onto cells. Two cells inside one tile are always connected --
+        # a tile has a single elevation -- so only a tile *change* consults the
+        # mask, keyed by the linear delta between the two tiles.
+        by_delta = {0: -1}                       # -1 marks "same tile, always ok"
+        for (dc, dr), bit in _TILE_BIT.items():
+            by_delta[dr * tcols + dc] = bit
+        cols = self.cols
+        rows = self.rows
+        for i in live:
+            tl = tile[i]
+            tm = tmask[tl]
+            col = i % cols
+            row = i // cols
+            m = 0
+            for k, (dc, dr) in enumerate(NAV_DIRS):
+                ncol = col + dc
+                if ncol < 0 or ncol >= cols:
+                    continue
+                nrow = row + dr
+                if nrow < 0 or nrow >= rows:
+                    continue
+                ntl = tile[nrow * cols + ncol]
+                if ntl < 0:
+                    continue
+                bit = by_delta.get(ntl - tl)
+                if bit == -1 or (bit is not None and (tm & bit)):
+                    m |= 1 << k
+            mask[i] = m
+        return level, flight, mask
 
     # --- build helpers -------------------------------------------------
     def _clearance_transform(self, blocked: bytearray, obstacles) -> array:
@@ -257,7 +385,7 @@ class FlowField:
     Pure and deterministic: same grid + args -> identical `cost`.
     """
 
-    _NEI: tuple = ()   # filled per-instance with (dcol, drow, weight)
+    _NEI: tuple = ()   # per-instance (dcol, drow, weight, mask bit)
 
     def __init__(self, navgrid: NavGrid) -> None:
         self.navgrid = navgrid
@@ -265,12 +393,16 @@ class FlowField:
         # costs are sums of two small step weights; the max over any world is
         # well under 2**31, so a signed `long` array is plenty.
         self.cost = array("l", bytes(array("l").itemsize)) * n
+        self._blank = array("l", [_INF]) * n
         w_o = navgrid.cell
         w_d = int(round(navgrid.cell * _SQRT2))
         self._w_orth = w_o
         self._w_diag = w_d
-        self._NEI = ((1, 0, w_o), (-1, 0, w_o), (0, 1, w_o), (0, -1, w_o),
-                     (1, 1, w_d), (1, -1, w_d), (-1, 1, w_d), (-1, -1, w_d))
+        # (dcol, drow, weight, mask bit). The bit is the neighbour's position
+        # in `NAV_DIRS`, which is also how `NavGrid.step_mask` was baked, so the
+        # rebuild loop can reject an illegal move with one AND.
+        self._NEI = tuple((dc, dr, w_d if dc and dr else w_o, 1 << i)
+                          for i, (dc, dr) in enumerate(NAV_DIRS))
         # runaway guard only -- a full-world fill visits every reachable cell once
         self.relax_cap = 8 * n
         self.relaxations = 0
@@ -313,13 +445,26 @@ class FlowField:
         return None
 
     def rebuild(self, target_world, min_clearance: float = 0.0,
-                corridor_lenient: bool = True) -> None:
+                corridor_lenient: bool = True, max_cost: int | None = None) -> None:
+        """Fill the field outward from `target_world`.
+
+        `max_cost` stops the fill once the frontier passes that path cost --
+        **path**, not straight line, so a cell a few hundred pixels away across
+        a drop can sit well beyond it. Costs are in world pixels for both nav
+        classes (an orthogonal step costs `navgrid.cell`), so the bound reads
+        directly as "how far will an enemy be asked to walk".
+
+        Left `None` here and set by `NavField`, so the field's own contract is
+        unchanged for anything constructing it directly."""
         ng = self.navgrid
         cols, rows = ng.cols, ng.rows
         n = cols * rows
         cost = self.cost
-        for i in range(n):
-            cost[i] = _INF
+        # Slice-assign a prebuilt blank rather than looping. The fill itself is
+        # bounded now (`max_cost`), so clearing 160k longs one at a time in
+        # Python had become the single biggest cost in a repath -- more than the
+        # search it was preparing for.
+        cost[:] = self._blank
         self.relaxations = 0
 
         trav = self._traversable(min_clearance, corridor_lenient)
@@ -332,6 +477,7 @@ class FlowField:
             return
 
         nei = self._NEI
+        smask = ng.step_mask
         si = seed[1] * cols + seed[0]
         cost[si] = 0
         buckets: dict[int, list] = {0: [si]}
@@ -339,7 +485,8 @@ class FlowField:
         max_bucket = 0
         cap = self.relax_cap
         relax = 0
-        while cur <= max_bucket:
+        limit = _INF if max_cost is None else int(max_cost)
+        while cur <= max_bucket and cur <= limit:
             bucket = buckets.get(cur)
             if not bucket:
                 cur += 1
@@ -353,7 +500,11 @@ class FlowField:
             relax += 1
             if relax > cap:
                 break
-            for dcol, drow, w in nei:
+            umask = smask[u]
+            for dcol, drow, w, bit in nei:
+                if not (umask & bit):
+                    continue          # the terrain forbids it: a flank, a back
+                                      # edge, or the side of a staircase
                 ncol = ucol + dcol
                 if ncol < 0 or ncol >= cols:
                     continue
@@ -398,7 +549,13 @@ class FlowField:
         trav = self._trav
         base = row * cols
         acc = pygame.Vector2()
-        for dcol, drow, _w in self._NEI:
+        # The gradient is gated on the same mask the fill was: a downhill
+        # neighbour across a drop is not a direction to steer in, even though
+        # its cost is genuinely lower -- it was reached the long way round.
+        umask = ng.step_mask[i]
+        for dcol, drow, _w, bit in self._NEI:
+            if not (umask & bit):
+                continue
             ncol, nrow = col + dcol, row + drow
             if ncol < 0 or ncol >= cols or nrow < 0 or nrow >= rows:
                 continue
@@ -505,7 +662,8 @@ class NavField:
         names = [only] if only is not None else self.classes
         for name in names:
             self.fields[name].rebuild((tx, ty), self._min_clear[name],
-                                      corridor_lenient=True)
+                                      corridor_lenient=True,
+                                      max_cost=config.NAV_FILL_MAX_COST)
         self._target_cell = self._ref_grid.cell_of(tx, ty)
         self.reachable = any(f.reachable for f in self.fields.values())
 

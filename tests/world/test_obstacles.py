@@ -9,19 +9,41 @@ from entities.obstacle import Obstacle
 from world.map import GameMap
 from world.procedural import SPECIAL_KINDS, generate_world
 
+
 # Pinned-seed obstacle-scatter assertions run against the flat base layout;
 # LD-1 verticality shifts the RNG stream. Verticality's own stair keep-clear is
 # checked in tests/world/test_verticality.py.
 _SAVED_VERT = None
 
 
+# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
+# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
+# defaults on now and selects a different generator entirely, whose rooms are
+# height maps with overlapping bounding rects and no cliff band. Pin the flag
+# off here so this coverage keeps testing the path it was written for; the
+# height-map path has its own in `tests/world/test_elevation.py`.
+_SAVED_HEIGHTMAP = None
+
+
+def _pin_heightmap_off():
+    global _SAVED_HEIGHTMAP
+    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
+    config.HEIGHTMAP_ROOMS = False
+
+
+def _restore_heightmap():
+    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
+
+
 def setUpModule():
+    _pin_heightmap_off()
     global _SAVED_VERT
     _SAVED_VERT = config.WORLD_VERTICALITY
     config.WORLD_VERTICALITY = False
 
 
 def tearDownModule():
+    _restore_heightmap()
     config.WORLD_VERTICALITY = _SAVED_VERT
 
 
@@ -45,9 +67,16 @@ class ObstacleCollisionTests(unittest.TestCase):
         gm = GameMap()
         prev = pygame.Vector2(1000, 1000)
         new = pygame.Vector2(1020, 1020)                 # a diagonal move
-        gm.obstacles = [Obstacle("tree", 1030, 1030),    # blocks the full move
-                        Obstacle("tree", 1030, 1000),    # blocks the x-slide
-                        Obstacle("tree", 1000, 1030)]    # blocks the y-slide
+        # Placed relative to the tree's own radius, not at pinned coordinates:
+        # close enough that the move and both slides are blocked, far enough
+        # that a short hop toward the goal is still free. Hardcoding the offsets
+        # tied this test to one obstacle size, and it broke the moment those
+        # moved into data/terrain.json and were retuned.
+        r = Obstacle("tree", 0, 0).radius
+        d = 20.0 + (r + 10.0) * 0.6
+        gm.obstacles = [Obstacle("tree", 1000 + d, 1000 + d),  # blocks the move
+                        Obstacle("tree", 1000 + d, 1000),      # blocks the x-slide
+                        Obstacle("tree", 1000, 1000 + d)]      # blocks the y-slide
         self.assertFalse(gm.is_walkable(new, 10))
         self.assertFalse(gm.is_walkable(pygame.Vector2(new.x, prev.y), 10))
         self.assertFalse(gm.is_walkable(pygame.Vector2(prev.x, new.y), 10))

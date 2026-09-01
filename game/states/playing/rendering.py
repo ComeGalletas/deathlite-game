@@ -53,7 +53,7 @@ class WorldRenderer:
         return config.SPRITE_ANCHOR_DROP * radius * self.ps.camera.zoom
 
     def _blit_character(self, surface, frame, dest, character_y: float) -> None:
-        frame = self.ps.game_map.shade_character_frame(
+        frame = self.ps.game_map.renderer.shade_character_frame(
             frame, dest, self.ps.camera, character_y)
         surface.blit(frame, dest)
 

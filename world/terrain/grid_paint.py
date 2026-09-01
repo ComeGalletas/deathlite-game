@@ -105,17 +105,43 @@ def _wet_sides(grid, col, row) -> set:
     return out
 
 
-def _ground_tile(grid, sheets, slots, col, row, level):
+def _stone_edge(grid, col, row, level, sides) -> bool:
+    """Does any fringed side of this cell butt against stone at its own level?
+
+    That is this terrace's own rim -- the wall it stands on the top of -- and it
+    is the one thing that outvotes water when picking a fringe block."""
+    for side, dx, dy in _SIDES:
+        if side not in sides:
+            continue
+        nb = grid.get((col + dx, row + dy))
+        if nb is not None and nb.kind in _WALL_KINDS and nb.level == level:
+            return True
+    return False
+
+
+def _ground_tile(grid, sheets, slots, col, row, level, under=False,
+                 beachless=False):
     """The tile for ground of `level` at this position.
 
     Which *sides* are fringed is `_floor_sides`; this picks which of the
     sheet's two fringe blocks draws them. They are different art for different
     situations -- the shoreline block has white surf and belongs against water,
     the raised block a dark rim and belongs against stone -- and a tile can only
-    be drawn from one of them. So the shoreline block is used only when *every*
-    fringed side fronts water; a tile that also fringes against stone or a lower
-    terrace takes the dark rim, which is the lesser error: white surf wrapping
-    around a cliff foot reads as the water being up on the plateau.
+    be drawn from one of them, so the shoreline block wins wherever **any**
+    fringed side fronts water -- foam is the stronger cue and a bank should read
+    as a bank whatever else the tile happens to border. The exception is stone
+    at the cell's own level: white surf wrapping around a cliff foot reads as
+    the water being up on the plateau, so the rim wins there.
+
+    `beachless=True` for a tileset whose shoreline block is not real surf
+    (`TileSheets.has_shoreline`); it takes the raised block everywhere, which
+    says "this biome has no beaches" rather than drawing a sand bank where a
+    lapping shore belongs.
+
+    `under=True` for the floor laid behind a wall, which never takes the
+    shoreline block whatever it borders. A wall's foot is not a beach: the
+    face's outer margin is transparent, so surf painted behind it leaks out
+    around the stone and puts the waterline at the wall's own height.
 
     Returns `(slot, over_water)`. Every fringe tile is drawn with a ragged,
     partly transparent outer margin -- that is how surf and grass strands
@@ -123,11 +149,15 @@ def _ground_tile(grid, sheets, slots, col, row, level):
     whether there *is* meant to be water behind it. `over_water` false means the
     fringe faces land and needs the floor below laid behind it first."""
     sides = _floor_sides(grid, col, row, level)
-    if sides and _wet_sides(grid, col, row).issuperset(sides):
-        return autotile.ground_slot(slots, sides), True
+    wet = _wet_sides(grid, col, row)
+    # backing is needed wherever a fringed side faces land, whichever block draws it
+    over_water = not sides or wet.issuperset(sides)
+    if (sides and wet and not under and not beachless
+            and not _stone_edge(grid, col, row, level, sides)):
+        return autotile.ground_slot(slots, sides), over_water
     return (sheets.raised_slots.get(sides,
                                     sheets.raised_slots.get("", sheets.interior)),
-            not sides)
+            over_water)
 
 
 _WALL_KINDS = (CLIFF, VSTAIR, EWSTAIR)
@@ -198,57 +228,68 @@ class _Missing:
 _NONE = _Missing()
 
 
-def _shadow_clips(grid, col, row, c, x, y, px) -> list:
-    """Where this cell's shadow may land: a list of rects, or `[None]` for
-    "anywhere". An empty list means it casts nothing.
+def _shadow_casts(grid, col, row, c, x, y, px) -> list:
+    """The shadow blits this cell contributes: `(bx, by, clip)` entries.
 
-    Stone casts everywhere, as it always has: cliff faces, east/west flights (a
-    cliff stands behind those) and the stone-cut vertical staircases, which are
-    structures standing on the floor like any wall. A **grass** vertical
-    pathway casts nothing -- it is a channel cut through the wall that you walk
-    down.
+    Stone drops one, unclipped: cliff faces, east/west flights (a cliff stands
+    behind those) and the stone-cut vertical staircases, which are structures
+    standing on the floor like any wall. A **grass** vertical pathway drops
+    none -- it is a channel cut through the wall that you walk down.
 
-    Plain ground casts too, but only sideways and only onto the cell below it:
-    where a ground tile at a *lower* level lies directly east or west, that
-    neighbour gets the shadow. This is the plateau's flank. A north-south level
-    change is where cliff faces live and those already cast, but an east-west
-    one is often bare -- the wall having jogged away -- so the shadow band
-    hugging the side of a plateau used to stop and restart wherever the flank
-    had no stone in it.
+    Plain ground drops one per side where a ground tile at a *lower* level lies
+    beside it, clipped to that side's cell -- a bare level change with no stone
+    in it, which happens wherever a wall jogs away and leaves a flank exposed.
+    **Unless anything drops away to the north, in which case it casts nothing
+    at all.** A shadow falling north is inconsistent with the rest of the
+    lighting, so a plateau's north edge, which is its back, is left clean --
+    and so are the corner tiles where such an edge meets a flank. Suppressing
+    only the northward half of a corner's shadow and letting it keep its
+    sideways one was tried, and still read wrong; the whole tile goes quiet.
 
-    The clip matters, and is not just an optimisation. The shadow sprite's core
-    is a shade wider than one cell, so an unclipped blob spills a few pixels
-    past the caster onto every neighbour. Under stone that is invisible (the
-    face covers its own cell) and on the terrace below it reads as the soft
-    edge you want. Cast unclipped from open ground it traces a hard rectangle
-    outline around the tile -- over the plateau top and to north and south as
-    well -- which reads as a box, not a shadow. Clipping to the lower
-    neighbour leaves exactly the soft line hugging the flank, the same thing a
-    cliff draws at the foot of a wall."""
+    The cost, accepted with the rule: a flank's band starts one tile below the
+    top of the flank, that top tile being a corner.
+
+    Clipping a ground caster is cheap here in a way it was not when this pass
+    ran after all the ground was painted: the blob's core lands on the caster's
+    own cell and is covered by that tile either way, so clipping costs only the
+    spill. Lateral bands do thin very slightly -- median coverage 5.27% ->
+    5.08% -- because a north-edge caster used to spill sideways onto them as
+    well, and those casters are now silent."""
     if c.kind == VSTAIR:
-        return [None] if c.tag == "rock" else []
+        return [(x, y, None)] if c.tag == "rock" else []
     if c.kind != GROUND:
-        return [None]
-    out = []
-    for dx in (-1, 1):
-        nb = grid.get((col + dx, row))
-        if nb is not None and nb.kind == GROUND and nb.level < c.level:
-            out.append(pygame.Rect(x + dx * px, y, px, px))
-    return out
+        return [(x, y, None)]
+
+    def drops(dx, dy):
+        nb = grid.get((col + dx, row + dy))
+        return nb is not None and nb.kind == GROUND and nb.level < c.level
+
+    if drops(0, -1):
+        return []
+    return [(x, y, pygame.Rect(x + dx * px, y + dy * px, px, px))
+            for side, dx, dy in _SIDES if side != "n" and drops(dx, dy)]
 
 
 def _shade(surf, sheets, casters, px) -> None:
     """Lay the drop shadow between the ground and whatever stands on it.
 
-    Every caster (see `_casts`) drops the same soft 192px blob, centred on
+    Every caster (see `_shadow_casts`) drops the same soft 192px blob, centred on
     itself, so a wall or a plateau flank reads as standing *above* what it
     fronts rather than being painted flat onto it. It goes on after the terrace
     tiles of pass 1 and before the faces of pass 3 -- ground, shadow, stone.
 
-    A stone caster's own cell is covered by the face painted over it, so only
-    the feather spilling onto its neighbours shows. A ground caster has nothing
-    painted over it, so its blob is clipped to the one cell it is meant to fall
-    on; see `_shadow_clips`.
+    The blob is a whole tile square and is laid at the caster's *own* cell, not
+    beside it. What makes that read as a cast shadow is the order the painter
+    works in -- floor by floor, ascending, each level's shadows going down
+    between the floor beneath and that level's own tiles. The sprite's core is a
+    shade wider than a cell, so it spills a few pixels onto every neighbour;
+    the caster's own tile and its same-level neighbours are painted afterwards
+    and cover their share, and only the spill onto the floor below -- already
+    painted -- survives.
+
+    Stone carries `clip = None` and drops its blob whole. Ground is clipped to
+    the side it falls on, which is how the northward half is kept off the
+    board; see `_shadow_casts`.
 
     Accumulated on a scratch layer with `BLEND_RGBA_MAX` rather than blitted
     straight down: the blobs are three cells wide but sit one cell apart, so
@@ -295,12 +336,15 @@ def paint_room_grid(store, sheets, layout, room):
 
     order = sorted(grid.items(), key=lambda kv: kv[0][1])
     walls = []                       # (col, row, cell, x, y) -- stone to come
-    casters = []                     # (x, y, clip) -- cells that drop a shadow
+    floors: dict = {}                # level -> the ground tiles painted at it
+    shadows: dict = {}               # level -> the casters standing at it
 
-    def ground(col, row, level, x, y):
-        """Paint ground of `level` at this cell. Called twice for a caster --
-        once in pass 1, once over its own shadow."""
-        idx, wet = _ground_tile(grid, sheets, slots, col, row, level)
+    def ground(col, row, level, x, y, under=False):
+        """Paint ground of `level` at this cell -- `under` for the floor that
+        runs on beneath a wall."""
+        face = sheet_for(level, room.kind, room)
+        idx, wet = _ground_tile(grid, sheets, slots, col, row, level, under,
+                                beachless=not sheets.has_shoreline(face))
         if not wet:
             # This tile's fringe faces land, and the fringe art is ragged and
             # part-transparent at that margin. With an empty room surface
@@ -309,25 +353,26 @@ def paint_room_grid(store, sheets, layout, room):
             # upper terrace, where every cell of a rim had one. Lay the floor
             # below behind it: it is what genuinely runs on under the fringe,
             # so the strands sit against grass, not sea.
-            surf.blit(cell(sheet_for(max(0, level - 1), room.kind), interior),
+            surf.blit(cell(sheet_for(max(0, level - 1), room.kind, room),
+                           interior),
                       (x, y))
-        surf.blit(cell(sheet_for(level, room.kind), idx), (x, y))
+        surf.blit(cell(face, idx), (x, y))
 
-    # --- pass 1: ground, and the terrace each wall stands on ---------------
+    # --- pass 1: sort every cell into the floor it paints on ---------------
     for (col, row), c in order:
         x, y = (col - c0) * px, (row - r0) * px
         if c.kind == LAKE:
             continue                       # the water buffer shows through
 
+        shadows.setdefault(c.level, []).extend(
+            _shadow_casts(grid, col, row, c, x, y, px))
+
         if c.kind == GROUND:
-            ground(col, row, c.level, x, y)
-            casters += [(x, y, clip) for clip in
-                        _shadow_clips(grid, col, row, c, x, y, px)]
+            floors.setdefault(c.level, []).append((col, row, c.level, x, y,
+                                                   False))
             continue
 
         walls.append((col, row, c, x, y))
-        casters += [(x, y, clip) for clip in
-                    _shadow_clips(grid, col, row, c, x, y, px)]
         if c.kind == VSTAIR:
             continue                       # a channel you walk down, not stone
         if (c.kind == CLIFF and c.row == c.drop - 1
@@ -341,16 +386,26 @@ def paint_room_grid(store, sheets, layout, room):
         # water's edge the exposed sliver has to be a shore tile or it reads as
         # grass floating on the sea. Inland it comes out plain anyway, since a
         # floor running under a wall has nothing to fringe against.
-        ground(col, row, max(0, c.level - c.drop), x, y)
+        low = max(0, c.level - c.drop)
+        floors.setdefault(low, []).append((col, row, low, x, y, True))
 
-    # --- pass 2: the shadow each caster drops on what lies beside it -------
-    _shade(surf, sheets, casters, px)
+    # --- pass 2: floor by floor, each level's shadows under its own tiles ---
+    # The order is the whole trick. A shadow square sits at its caster's own
+    # cell; laying it after the floor below and before that level's tiles means
+    # the caster and its same-level neighbours paint over their share of it and
+    # only what falls on the floor beneath is left. Painting all the ground
+    # first and all the shadows afterwards cannot do this -- there is nothing
+    # left to cover the parts that should not show.
+    for lvl in sorted(set(floors) | set(shadows)):
+        _shade(surf, sheets, shadows.get(lvl, ()), px)
+        for col, row, level, x, y, under in floors.get(lvl, ()):
+            ground(col, row, level, x, y, under)
 
     # --- pass 3: the stone itself -----------------------------------------
     tall = []
     for col, row, c, x, y in walls:
-        sheet = sheet_for(c.level, room.kind)
-        low = sheet_for(max(0, c.level - c.drop), room.kind)
+        sheet = sheet_for(c.level, room.kind, room)
+        low = sheet_for(max(0, c.level - c.drop), room.kind, room)
 
         if c.kind == CLIFF:
             var = _run_var(grid, col, row)
@@ -414,14 +469,17 @@ def paint_bridge(sheets, corridor):
 
 
 def grid_shore(room) -> list:
-    """Top-left world pixels of this room's sea-level cells that face open
-    water or a lake -- the anchors the animated foam laps against. A terrace
-    edge is a cliff, not a beach, so only level 0 ever contributes."""
+    """Top-left world pixels of this room's cells that face open water or a
+    lake -- the anchors the animated foam laps against.
+
+    Any floor counts, not only sea level. An inland pool can sit in a hollow
+    ringed entirely by a raised terrace, and restricting this to level 0 left
+    exactly those with no moving water at their edge at all."""
     from game import config
     px = config.TILE_PX
     out = []
     for (col, row), c in room.grid.items():
-        if c.kind != GROUND or c.level != 0:
+        if c.kind != GROUND:
             continue
         if any((room.grid.get((col + dx, row + dy)) or _NONE).kind in ("", LAKE)
                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))):

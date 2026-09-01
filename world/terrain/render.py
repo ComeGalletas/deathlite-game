@@ -116,10 +116,10 @@ class TerrainRenderer:
                 if shadow is not None:
                     out.append((o.pos.y - 0.01,
                                 lambda s, c=camera, sh=shadow:
-                                self.gm._draw_one_tree_shadow(s, c, sh)))
+                                self._draw_one_tree_shadow(s, c, sh)))
                 out.append((o.pos.y,
                             lambda s, c=camera, idx=i, ob=o:
-                            self.gm._draw_one_obstacle(s, c, idx, ob)))
+                            self._draw_one_obstacle(s, c, idx, ob)))
         return out
 
     def _draw_tiled(self, surface, camera) -> None:
@@ -351,14 +351,14 @@ class TerrainRenderer:
         view = camera.visible_rect().inflate(200, 200)
         for shadow in self.gm._tree_shadows.values():
             if view.collidepoint(shadow[0], shadow[1]):
-                self.gm._draw_one_tree_shadow(surface, camera, shadow)
+                self._draw_one_tree_shadow(surface, camera, shadow)
 
     def _draw_obstacles(self, surface, camera) -> None:
         """Every visible obstacle, unsorted -- only the whole-map `draw()` path."""
         view = camera.visible_rect().inflate(260, 260)
         for i, o in enumerate(self.gm.obstacles):
             if view.collidepoint(o.pos.x, o.pos.y):
-                self.gm._draw_one_obstacle(surface, camera, i, o)
+                self._draw_one_obstacle(surface, camera, i, o)
 
     def _draw_grid(self, surface, camera, floor_rect) -> None:
         z = self.gm._render_zoom

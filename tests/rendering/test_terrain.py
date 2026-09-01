@@ -17,19 +17,41 @@ from game import config
 from game.assets import ASSETS_DIR, Assets, reset_assets
 from game.content import get_content
 
+
 # The pinned-seed render checks here validate the terrain renderer against the
 # flat base layout; LD-2 verticality shifts the RNG stream and adds cliff /
 # stair passes, and has its own coverage in tests/world/test_verticality.py.
 _SAVED_VERT = None
 
 
+# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
+# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
+# defaults on now and selects a different generator entirely, whose rooms are
+# height maps with overlapping bounding rects and no cliff band. Pin the flag
+# off here so this coverage keeps testing the path it was written for; the
+# height-map path has its own in `tests/world/test_elevation.py`.
+_SAVED_HEIGHTMAP = None
+
+
+def _pin_heightmap_off():
+    global _SAVED_HEIGHTMAP
+    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
+    config.HEIGHTMAP_ROOMS = False
+
+
+def _restore_heightmap():
+    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
+
+
 def setUpModule():
+    _pin_heightmap_off()
     global _SAVED_VERT
     _SAVED_VERT = config.WORLD_VERTICALITY
     config.WORLD_VERTICALITY = False
 
 
 def tearDownModule():
+    _restore_heightmap()
     config.WORLD_VERTICALITY = _SAVED_VERT
 
 
@@ -374,7 +396,7 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
         gm._render_zoom = 1.5
         gm._blit_cache = {}
 
-        scaled = gm._z_surf(source)
+        scaled = gm.renderer._z_surf(source)
         alphas = {scaled.get_at((x, y)).a
                   for y in range(scaled.get_height())
                   for x in range(scaled.get_width())}
@@ -393,7 +415,7 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
             def fill(self, *a, **k): pass
 
         rec = _Recorder()
-        gm._draw_tiled(rec, cam)
+        gm.renderer._draw_tiled(rec, cam)
 
         foam_set = set(map(id, gm._foam))
         room_set = set(map(id, gm._room_surfs.values()))
@@ -680,7 +702,7 @@ class DecorationScatterTests(unittest.TestCase):
             def fill(self, *a, **k): pass
 
         rec = _Recorder()
-        gm._draw_tiled(rec, cam)
+        gm.renderer._draw_tiled(rec, cam)
         void_ids = {id(f) for _f in gm._void_decor for f in _f[0]}
         foam_ids = set(map(id, gm._foam))
         first_void = next((k for k, s in enumerate(rec.calls) if s in void_ids), None)
@@ -780,7 +802,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
             def fill(self, *a, **k): pass
 
         rec = _Recorder()
-        gm._draw_obstacles(rec, cam)
+        gm.renderer._draw_obstacles(rec, cam)
         skin_ids = {id(f) for e in gm._decos.values() for f in e[3]}
         self.assertTrue(rec.calls)
         self.assertTrue(all(c in skin_ids for c in rec.calls),
@@ -806,9 +828,9 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         old = config.SPRITE_ANCHOR_DROP
         try:
             config.SPRITE_ANCHOR_DROP = 0.0
-            r0 = _Rec(); gm._draw_one_obstacle(r0, cam, i, o)
+            r0 = _Rec(); gm.renderer._draw_one_obstacle(r0, cam, i, o)
             config.SPRITE_ANCHOR_DROP = 0.7
-            r1 = _Rec(); gm._draw_one_obstacle(r1, cam, i, o)
+            r1 = _Rec(); gm.renderer._draw_one_obstacle(r1, cam, i, o)
         finally:
             config.SPRITE_ANCHOR_DROP = old
         self.assertAlmostEqual(r1.calls[0] - r0.calls[0],
@@ -827,7 +849,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
             def fill(self, *a, **k): pass
 
         rec = _Recorder()
-        gm.draw_tree_shadows(rec, cam)
+        gm.renderer.draw_tree_shadows(rec, cam)
         shade_ids = {id(s) for _x, _y, _r, s in gm._tree_shadows.values()}
         self.assertTrue(any(c in shade_ids for c in rec.calls),
                         "no tree shade blitted for an in-view tree")
@@ -847,12 +869,12 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         gm._blit_cache = {}
         camera = SimpleNamespace(pos=pygame.Vector2())
 
-        shaded = gm.shade_character_frame(frame, (0, 0), camera, character_y=2)
+        shaded = gm.renderer.shade_character_frame(frame, (0, 0), camera, character_y=2)
         self.assertLess(shaded.get_at((1, 1)).r, frame.get_at((1, 1)).r)
         self.assertEqual(shaded.get_at((0, 0)).a, 0,
                          "shade leaked outside the character silhouette")
 
-        above_tree = gm.shade_character_frame(frame, (0, 0), camera, character_y=1)
+        above_tree = gm.renderer.shade_character_frame(frame, (0, 0), camera, character_y=1)
         self.assertIs(above_tree, frame,
                   "character would be darkened twice by both shadow paths")
 
