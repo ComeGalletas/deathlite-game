@@ -4,7 +4,22 @@ journals/world_refactor.md).
 """
 # Room kinds. `combat` is the filler; the rest are special locations whose
 # interactions arrive in Milestone 10 -- Milestone 8 only places and labels them.
-SPECIAL_KINDS = ("shrine", "treasure", "fountain", "altar", "merchant", "elite_arena")
+SPECIAL_KINDS = ("shrine", "treasure", "fountain", "altar", "merchant",
+                 "elite_arena")
+# LD-10: "elite rooms are gone" -- from the **height-map** worlds, which is
+# where the brief was talking about. The legacy generator keeps them: dropping a
+# kind there re-labels its rooms, and a re-labelled room is shaped and scattered
+# differently, which moved four pinned-seed LD-8 tests that have nothing to do
+# with elite arenas. The feature's own code -- the interactable kind,
+# `locations.update_elite_arenas`, its render branch, its room palette -- stays
+# in place and dormant rather than being ripped out in the same change.
+_RETIRED_KINDS = ("elite_arena",)
+
+
+def special_kinds(heightmap: bool) -> tuple:
+    if not heightmap:
+        return SPECIAL_KINDS
+    return tuple(k for k in SPECIAL_KINDS if k not in _RETIRED_KINDS)
 
 _DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
@@ -63,3 +78,21 @@ _VERT_F3_CHANCE = 0.40          # a floor-2 area sprouts a 1-room floor-3 pocket
 # 1 tile. So width tracks how the rooms came out, not a coin flip.
 _STAIR_WIDE_OVERLAP_TILES = 6
 _STAIR_WIDE_ROOM_TILES = 7
+
+
+# LD-9 D8: obstacle density for height-map rooms.
+#
+# The legacy rule is `base + len(cells) // 48`, capped at 14, where `base` is 2
+# for a "special" room and its area bonus is skipped entirely. That was written
+# for LD-8 rooms of ~60 cells. A height-map room is 700-1000 cells, and *every*
+# room in a height-map world is a special kind -- there are no `combat` rooms at
+# all -- so every island got two obstacles. Measured: 1.8 obstacles per 1000
+# floor cells against the flat world's 56.2, a 31x drop, which is why the
+# islands render bare.
+#
+# Attempts scale with floor area instead. Placement still has to clear the
+# doorways, the flights (D5) and the other obstacles' spacing, so the count
+# achieved is lower than the count attempted.
+_GRID_OBSTACLES_PER_1000 = 85.0
+_GRID_PLACE_TRIES = 20
+_GRID_CLEAR_RADIUS = 176.0             # ~2.75 tiles kept clear round an island's centre

@@ -14,8 +14,14 @@ from world.gen.tuning import (
 )
 
 
-def _cell_rect(cell: tuple[int, int], chunk: int) -> pygame.Rect:
-    return pygame.Rect(cell[0] * chunk, cell[1] * chunk, chunk, chunk)
+def _cell_rect(cell: tuple[int, int], chunk) -> pygame.Rect:
+    """The lattice cell a room is placed in. `chunk` is a scalar for a square
+    cell, or `(w, h)` -- height-map rooms are much wider than they are tall, so
+    a square cell leaves a chunk-height of empty sea above and below every
+    island and the bridges spanning it come out twice as long as the
+    side-to-side ones."""
+    cw, ch = chunk if isinstance(chunk, tuple) else (chunk, chunk)
+    return pygame.Rect(cell[0] * cw, cell[1] * ch, cw, ch)
 
 
 def _room_frac(rng: random.Random, irregular: bool) -> float:

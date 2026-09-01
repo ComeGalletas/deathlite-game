@@ -1,10 +1,16 @@
 """Milestone 2: weapon cooldown gating, auto-fire, projectile count / spread,
 and the no-target fallback."""
+import math
+import os
 import unittest
+
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
 from combat.weapons import Weapon, FireContext
+from game.content import get_content
 
 
 class FakeEnemy:
@@ -97,6 +103,36 @@ class WeaponTests(unittest.TestCase):
                 self.assertFalse(w.update(
                     0.1, make_context([FakeEnemy(80, 0)], [],
                                       spawn_summon=lambda **kw: None)))
+
+
+class ProjectileSpreadDataTests(unittest.TestCase):
+    """Every weapon that fans its shots must say how wide the fan is.
+
+    A `<weapon>:projectiles` upgrade is generated for *every* owned weapon
+    (`progression/upgrades._weapon_upgrades`), so any projectile weapon can be
+    pushed past one shot in a real run. `Weapon._fire_projectiles` reads
+    `spread_deg` with a hard subscript at that point -- deliberately, since a
+    default in code would be per-weapon tuning living outside the data -- so a
+    weapon missing the field crashes the run the moment the player takes its
+    Multishot. `arcane_bolt` and `thunder_orb` both shipped without it.
+    """
+
+    def test_every_projectile_weapon_declares_a_spread(self):
+        for wid, cfg in get_content().weapons.items():
+            if cfg.get("category") != "projectile":
+                continue
+            self.assertIn("spread_deg", cfg, wid)
+            self.assertGreater(float(cfg["spread_deg"]), 0.0, wid)
+
+    def test_one_multishot_upgrade_does_not_crash_any_weapon(self):
+        """The failure this guards is a KeyError deep in a firing path, so it is
+        worth exercising rather than only asserting the data."""
+        for wid, cfg in get_content().weapons.items():
+            w = Weapon(wid, cfg)
+            w.bonus["projectile_count"] += 1
+            count = w._projectile_count()
+            if count > 1 and cfg.get("category") == "projectile":
+                math.radians(float(cfg["spread_deg"])) * (count - 1)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,10 @@
 Steering (R2): SeekTarget, Flee, MaintainRange, Separation, AvoidObstacles, Unstick
 Timing / machine (R4): Cooldown, OnEnter + the transition predicates
 Actions (R4): FireProjectile, SummonBrood, CastHazard, Charge, Blink, Explosion, Explode
+Aggro (LD-9 D7): AggroSense, Wander + `with_aggro`, the gate every behaviour is wrapped in
 """
+from entities.ai.components.aggro import (AggroSense, Wander, is_aggroed,
+                                          provoke, with_aggro)
 from entities.ai.components.attacks import Blink, Charge, Explode, Explosion
 from entities.ai.components.crowd import AvoidObstacles, Separation
 from entities.ai.components.ranged import CastHazard, FireProjectile, SummonBrood
@@ -18,4 +21,5 @@ __all__ = [
     "after", "in_range", "out_of_range", "ready", "all_of", "any_of",
     "FireProjectile", "SummonBrood", "CastHazard",
     "Charge", "Blink", "Explosion", "Explode",
+    "AggroSense", "Wander", "with_aggro", "is_aggroed", "provoke",
 ]

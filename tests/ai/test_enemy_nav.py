@@ -36,14 +36,48 @@ class NavFieldTests(unittest.TestCase):
         self.assertEqual(nf._class_for(16.1), "large")
         self.assertEqual(nf._class_for(30), "large")
 
-    def test_rebuild_reaches_across_the_world_for_both_classes(self):
+    def test_rebuild_routes_both_classes_within_the_fill_bound(self):
+        """LD-9 D9: the fill stops at `config.NAV_FILL_MAX_COST` of **path**
+        cost, so "reaches across the world" is no longer the contract -- it was
+        31.8 ms a repath on a height-map world, nearly all of it spent on cells
+        no enemy would ever walk from, and enemies give up beyond their aggro
+        range anyway. What must still hold: everything inside the bound is
+        routed, for both classes."""
+        w, nf = self._nf()
+        start = pygame.Vector2(w.room(w.start_id).center)
+        nf.rebuild(start)
+        self.assertTrue(nf.reachable)
+        # Sampled over cells, not room centres. Counting rooms was a proxy that
+        # only held while rooms were small and close: on a height-map world the
+        # centres are 3,500-13,000 of path cost apart, so most of them sit
+        # outside the bound by design and the count says nothing about whether
+        # the fill works.
+        ng = nf.grids["small"]
+        ff = nf.fields["small"]
+        reached = [i for i in range(ng.cols * ng.rows) if 0 < ff.cost[i] < _INF]
+        self.assertGreater(len(reached), 200, "the fill covered nothing but its seed")
+        for i in reached[::max(1, len(reached) // 40)]:
+            c = ng.world_of(i % ng.cols, i // ng.cols)
+            for radius in (12, 24):
+                if nf.cost(c, radius) >= _INF:
+                    continue                     # too tight for the big class
+                self.assertGreater(nf.direction(c, radius).length(), 0.5,
+                                   f"reached cell with no gradient at {c}")
+
+    def test_the_fill_bound_actually_bounds(self):
         w, nf = self._nf()
         nf.rebuild(w.room(w.start_id).center)
-        self.assertTrue(nf.reachable)
-        far = pygame.Vector2(w.room(w.boss_id).center)
-        for radius in (12, 24):
-            self.assertLess(nf.cost(far, radius), _INF)
-            self.assertGreater(nf.direction(far, radius).length(), 0.5)
+        cap = config.NAV_FILL_MAX_COST
+        self.assertIsNotNone(cap, "unbounded fill: nothing to assert")
+        worst = max((f.cost[i] for f in nf.fields.values()
+                     for i in range(len(f.cost)) if f.cost[i] < _INF),
+                    default=0)
+        # The loop stops once the *frontier* passes the cap, so the last bucket
+        # it processes can still hand a neighbour one more step -- a diagonal,
+        # `cell * sqrt(2)`. The bound is on how far the fill runs, not an exact
+        # ceiling on every cost it writes.
+        slack = max(g.cell for g in nf.grids.values()) * 1.5
+        self.assertLessEqual(worst, cap + slack)
 
     def test_target_cell_change_detection(self):
         w, nf = self._nf()

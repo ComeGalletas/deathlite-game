@@ -7,7 +7,8 @@ stair painters could not move out of `world/map.py`. One `TileSheets` instance
 is built per bake and handed to every painter.
 
 Reads (through the assets handle): `terrain["tile_px"]`, `["floor_sheet"]`,
-`["floor_sheets"]`, `["room_palettes"]`, `["slots"]` (incl. `["cliff"]`,
+`["floor_sheets"]`, `["room_palettes"]`, `["heightmap_biome_pool"]`,
+`["slots"]` (incl. `["cliff"]`,
 `["raised"]`, `["ramp"]`), `["bridge"]`. Owns the tile-surface cache and the
 synthesised 3-sided-grass cache. Writes nothing back.
 """
@@ -15,9 +16,12 @@ from __future__ import annotations
 
 import pygame
 
+from game import config
+from world.terrain import biome
+
 
 class TileSheets:
-    def __init__(self, assets) -> None:
+    def __init__(self, assets, seed=0) -> None:
         t = assets.terrain
         self._a = assets
 
@@ -28,6 +32,28 @@ class TileSheets:
         self.palettes = t.get("room_palettes", {})
         # LD-2 E1: elevation grass sheets (same slot layout). JSON keys -> int.
         self.floor_sheets = {int(k): v for k, v in t.get("floor_sheets", {}).items()}
+        # LD-9: the height-map worlds draw their raised terraces from a *pool*
+        # rather than a fixed floor -> sheet map, so two islands on the same
+        # seed wear different tilesets. `world/terrain/biome.py` holds the
+        # picking rule; the seed and the room id are what make it stable across
+        # bakes. Level 0 is never drawn from the pool -- see that module.
+        self.biome_pool = list(t.get("heightmap_biome_pool", []))
+        # Which material each tileset draws. The adjacency rule compares these
+        # rather than filenames: `tilemap_7`'s ground came from `tilemap_1`'s
+        # grass and is 6.4 RGB units from it, so treating them as different
+        # would put a green terrace on a green shore and call it varied. An
+        # unlisted sheet is its own family.
+        self.sheet_biomes = dict(t.get("sheet_biomes", {}))
+        self._seed = seed
+        self._palettes: dict[int, dict[int, str]] = {}
+        # Per-sheet properties. `shoreline: false` marks a tileset whose
+        # shoreline block is not a true surf block -- `tilemap_7`'s is a sand
+        # bank lifted from `tilemap_flat`, with 15% edge transparency against a
+        # real shoreline's 55%, so the animated foam beneath barely shows. Such
+        # a sheet uses its raised block for *every* fringe instead: the biome
+        # simply has no beaches, which is the honest reading for a rocky
+        # highland and needs no new art.
+        self._sheet_flags = t.get("sheet_flags", {})
 
         # LD-2 E2: cliff autotile slots (left / mid / right / single x top /
         # body / bottom). LD-2 E10: `slots.raised` -- the sheet's second 16-tile
@@ -70,12 +96,48 @@ class TileSheets:
             self._cell_cache[key] = self._a.tile(sheet, idx, cols=cols) or self.probe
         return self._cell_cache[key]
 
-    def sheet_for(self, floor: int, kind: str = "") -> str:
-        """Grass sheet for a room / stair: an elevation sheet for a raised
-        floor, otherwise the kind palette (or the ground sheet)."""
-        if floor > 0 and floor in self.floor_sheets:
-            return self.floor_sheets[floor]
+    def biome_of(self, sheet: str) -> str:
+        """This tileset's material. Unlisted sheets are their own family."""
+        return self.sheet_biomes.get(sheet, sheet)
+
+    def biome_palette(self, room) -> dict[int, str]:
+        """This island's `{level: sheet}` for its raised terraces. Computed
+        once per room and cached: the painters ask for the same room's sheet
+        dozens of times a bake, and every answer has to agree."""
+        pal = self._palettes.get(room.id)
+        if pal is None:
+            if room.grid:
+                levels = {c.level for c in room.grid.values() if c.level > 0}
+            else:
+                levels = {room.floor} if room.floor > 0 else set()
+            pal = biome.floor_palette(
+                self._seed, room.id, levels, self.biome_pool,
+                base=self.palettes.get(room.kind, self.floor_sheet),
+                family=self.biome_of)
+            self._palettes[room.id] = pal
+        return pal
+
+    def sheet_for(self, floor: int, kind: str = "", room=None) -> str:
+        """Grass sheet for a room / stair: this island's biome sheet for a
+        raised terrace, an elevation sheet for the LD-8 worlds, otherwise the
+        kind palette (or the ground sheet).
+
+        `room` is what makes the answer per-island. Every painter has one to
+        hand; without it the call falls back to the flat behaviour rather than
+        guessing which island was meant."""
+        if floor > 0:
+            if config.HEIGHTMAP_ROOMS and self.biome_pool and room is not None:
+                pal = self.biome_palette(room)
+                if floor in pal:
+                    return pal[floor]
+            if floor in self.floor_sheets:
+                return self.floor_sheets[floor]
         return self.palettes.get(kind, self.floor_sheet)
+
+    def has_shoreline(self, sheet: str) -> bool:
+        """Does this tileset's shoreline block carry real surf? A sheet flagged
+        otherwise draws every fringe from its raised block."""
+        return bool(self._sheet_flags.get(sheet, {}).get("shoreline", True))
 
     def cliff_idx(self, row: str, edge: str) -> int:
         rs = self.cliff_slots.get(row, {})

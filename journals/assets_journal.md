@@ -2207,3 +2207,327 @@ plateau's own rim against stone does not.
 **Where it lives.** `world/terrain/autotile.py` (`_GROUND_SLOT`, `mask_slot`),
 `world/terrain/grid_paint.py` (`_floor_sides`, `_at_water`, the `GROUND` branch
 of `paint_room_grid`).
+
+---
+
+## Terrain: `tilemap_7`, merged from `tilemap_flat` + `tilemap_6`
+
+**What it is.** A standard 9x6 / 576x384 sheet assembled from two supplied
+sheets that were not in the standard layout: `tilemap_flat` (10x4 -- two 4x4
+autotile blocks, green and sand, each with a trailing spacer column) and
+`tilemap_6` (4x8 -- stone surfaces, cliff faces and strata).
+
+| standard block | source |
+|---|---|
+| shoreline, cols 0-3 rows 0-3 | `tilemap_flat` sand block |
+| raised, cols 5-8 rows 0-3 | `tilemap_flat` green block |
+| cliff body, row 4 | `tilemap_6` row 3 |
+| cliff bottom, row 5 | `tilemap_6` row 7 (strata) |
+
+**Why the merge is clean, which had to be checked rather than assumed:** the
+shoreline block is *the same 4x4 autotile ordering* as the raised block.
+`(3,0)` is `strip_v` top = `nwe`; `(0,3)` is `strip_h`'s west cap = `nsw`;
+`(3,3)` is `single` = `nswe`. So any well-formed 4x4 block drops into either
+half. Verified slot by slot by measuring which edges of each tile carry a
+fringe -- `tilemap_flat`'s green block detects *more* cleanly than
+`tilemap_1`'s own raised block.
+
+**The one real gap, and the rule that answers it.** Neither supplied block is a
+shoreline block. Transparency in the top band: `tilemap_1` shoreline **55.2%**,
+its raised 25.3%, flat green 18.2%, flat sand **15.4%**. The animated foam is
+drawn *beneath* the tiles and shows through that gap, so the sand bank would
+read as a hard edge with almost no foam.
+
+Rather than fake it, a sheet may now declare `"shoreline": false` in
+`terrain.json` `sheet_flags`. `TileSheets.has_shoreline` reads it and
+`grid_paint._ground_tile` takes the **raised block for every fringe** on such a
+sheet -- the same thing it already does where a tile borders stone. The biome
+simply has no beaches, which is the honest reading for a rocky highland and
+needs no new art.
+
+Cheap in practice: measured over 16 worlds the shoreline block covers 22% of
+sea-level ground but only **1.1% of level 1 and 3.3% of level 2** -- 364 tiles
+in ~23,500. Every world has at least one, so it would have been seen, just
+rarely.
+
+**Wiring.** `terrain.json` gains `heightmap_floor_sheets`, consulted by
+`sheet_for` only when `config.HEIGHTMAP_ROOMS` is on. Editing `floor_sheets`
+directly was not an option: it is shared with the LD-8 path, where
+`test_verticality` pins an expected grass tone per floor. `tilemap_7` is
+assigned to **floor 2 only** -- giving it to both 1 and 2 made adjacent floors
+share a tileset, against the standing rule that no two adjacent floors may. The
+map is an interim stand-in for the per-island biome palette.
+
+**`rocky_shadow.png`** is a drop-in alternative to `shadow.png`: identical tint
+and alpha `(22, 28, 46, 80)`, same 3x3 layout, but a crisper and wider blob --
+core exactly 4096 px (a full tile) against 4028, arms 338/235 against 200/184.
+Diagonals are 0 in both, so it needs the same corner fill as C24. Unused so
+far; a candidate for a per-biome shadow, harder-edged for rock.
+
+**Left over for another sheet:** `tilemap_6` slots 16-19 (a 4x2 short block)
+and 20-23 (a second cliff-face row) are unused, and the sand block currently
+only fills `tilemap_7`'s dead shoreline slots. A sand-ground sheet with the
+alternate rock face is assemblable from what is already in the folder.
+
+---
+
+## Terrain: three ground sheets from the same two sources
+
+`tilemap_6.png` was **renamed to `tilemap_rocky.png`** between the last entry
+and this one; `tilemap_7` had been built from it under the old name.
+
+The supplied art carries three distinct *grounds* -- rocky (`tilemap_rocky`
+rows 0-3), green and sand (`tilemap_flat`'s two 4x4 blocks). Each is now its
+own standard 9x6 sheet, all three sharing `tilemap_rocky`'s faces for the cliff
+rows:
+
+| sheet | ground | cliff body / bottom |
+|---|---|---|
+| `tilemap_6` | rocky | rocky rows 5 / 7 |
+| `tilemap_7` | green | rocky rows 3 / 7 |
+| `tilemap_8` | sand | rocky rows 3 / 7 |
+
+`tilemap_7` was rebuilt: it previously carried the sand block in its shoreline
+slots, which `shoreline: false` then made unreachable -- dead art. Both halves
+are green now and the sand has its own sheet.
+
+**The rocky block needed one synthesised row.** A standard raised block is
+sixteen combinations; `tilemap_rocky` supplies twelve -- `nw n ne nwe` /
+`w '' e we` (twice, an interchangeable middle) / `sw s se swe`, with no row for
+the thin `nsw ns nse nswe`. Those are built by compositing: a tile open north
+*and* south is the top half of the `n` tile over the bottom half of the `s`
+tile, same column. The two share a base texture, so the join at mid-tile does
+not show. `tilemap_flat`'s blocks needed none of this -- both are complete
+sixteens already.
+
+**Verification, and where it disagreed.** Each assembled raised block was
+re-measured against the standard ordering. `tilemap_7` matches on all sixteen.
+`tilemap_6` and `tilemap_8` each disagree on two -- sand's right-edge fringe at
+`(7,0)` / `(8,0)`, rocky's south fringe at `(6,2)` and the row synthesised from
+it. In every case **the same disagreement appears on the raw source art**, so
+it is the edge detector's threshold on a subtle fringe rather than a fault in
+the merge; confirmed by eye against the rendered sheets.
+
+**Wiring.** `heightmap_floor_sheets` now reads `1 -> tilemap_8` (sand),
+`2 -> tilemap_6` (rocky); floor 0 keeps the room-kind palette, which is the only
+one with a real surf block. All three floors are on different sheets, satisfying
+the rule that no two adjacent floors share a tileset. All three new sheets carry
+`shoreline: false`.
+
+`tilemap_7` (green) is now unused by the wiring but stays in the library -- it
+is a third distinct ground for the per-island biome pool, which is what will
+replace this fixed floor map.
+
+---
+
+## `tilemap_6` rebuilt: rocky top only, borrowed faces, and its own stairs
+
+The first cut of `tilemap_6` took its whole look from `tilemap_rocky` --- the
+pale rubble for the ground rows and the same sheet's stratified rock for the
+cliffs. Only the rubble was right. `tilemap_rocky` has **no south-fringed
+ground row at all**: in that art a rocky surface's south edge is always drawn as
+a *face*, chunky columns seen from the side, so the previous build had put a
+wall texture flat on the ground for every `sw s se swe` tile, and the cliff rows
+never matched the faces every other tileset renders.
+
+The rebuild (`utilities/build_ground_tilemaps.py`, the first of these assembly
+scripts to be kept rather than thrown away) uses only the top-down rubble and
+borrows everything vertical:
+
+| slots | source |
+|---|---|
+| `nw n ne nwe` | `tilemap_rocky` r0 |
+| `w '' e we` | `tilemap_rocky` r1 |
+| `sw s se swe` | r0 **flipped vertically** --- the north rim becomes a south rim |
+| `nsw ns nse nswe` | top half of the north row over the bottom half of the south |
+| `cliff.body`, `cliff.bottom` | `tilemap_1` |
+| ramp wedges | `rocky_temp_stairs.png` |
+
+The vertical flip works because the rubble has no up/down reading of its own;
+only the rim is directional, and flipping is exactly what turns it into the
+opposite rim. `vflip(nw)` is fringed south and west, which *is* `sw`.
+
+Note that `cliff.top` (32--35) is the **same four slots** as the raised block's
+thin row, so it stays rubble rather than coming from `tilemap_1` with the other
+cliff slots. That sharing is deliberate in the original sheets: a cliff top is
+the ground lip seen from above, so it has to match the ground, not the face.
+
+Re-measured against the standard ordering with a luminance rim test (a raised
+block's fringe is a dark rim drawn *in colour*, not cut alpha --- an
+alpha-based edge test reads every one of these tiles as unfringed and is
+useless here), `tilemap_6` and `tilemap_8` now match all sixteen. `tilemap_1`,
+the hand-authored reference, itself misses two on the same test, which is the
+threshold on a weak south rim rather than a fault in either sheet.
+
+### The supplied stair art
+
+`rocky_temp_stairs.png` arrives as a 2892x1440 render on a flat white backdrop
+with **no alpha channel at all**. It works: the two wedges' silhouettes match
+the ones already in `tilemap_1` to within about 2px of a 64px tile (mean error
+0.034 and 0.011 of a tile width across sixteen sampled rows), and the aspect is
+715x1440, within half a percent of the 1:2 a two-tile-tall wedge needs. It is
+plainly a recolour of the existing wedge, rubble where `tilemap_1` has grass,
+down to the stone foot at the bottom.
+
+Keying it needed two passes, not one. Eroding the backdrop inward along each
+**row** is the obvious move and is wrong on its own twice over: the two wedges
+sit side by side, so a row scan run before the shapes are separated bridges the
+gap and reads them as one; and the wedge's foot is a row of rock lobes with
+backdrop in the notches between them, enclosed left-to-right, which survives a
+row scan and comes through the downscale as white specks along the bottom edge.
+Splitting on column occupancy first and then eroding from **both** the rows and
+the columns clears both. A final guard drops any downscaled cell that averages
+to a neutral near-white, since nothing in this rock is one.
+
+The downscale averages **only the opaque source pixels** in each output cell's
+footprint, so the white backdrop never bleeds into the silhouette edge; coverage
+below 45% leaves the cell clear.
+
+Which wedge is which is asserted, not assumed --- the westward wedge is the one
+whose mass leans right across its top quarter --- so a re-render that swaps them
+fails loudly instead of silently mirroring every staircase in the game.
+
+**The one open point** is palette: the wedges are a neutral grey (mean RGB
+96, 99, 107) against teal-grey cliff faces (92, 136, 137) and pale blue-green
+rubble (135, 186, 184). In place they read as loose scree rather than as the
+same stone, which makes a climbable ramp instantly distinguishable from a cliff
+face --- arguably a readability gain, so they are left as supplied.
+
+### Fixed in passing: the sibling sheets had no ramp wedges
+
+`tilemap_7` and `tilemap_8` were assembled without slots 36/45 and 39/48.
+Nothing complained, because a missing ramp is not an error: `grid_paint` blits
+those slots unconditionally and an empty slot simply draws nothing. Every
+east/west staircase on floors 1 and 2 was therefore rendering as bare cliff with
+a walkable but **invisible** flight over it. The green sheet now takes
+`tilemap_1`'s grass wedges, the sand sheet the rocky ones --- a bare outcrop of
+steps reads better on sand than a tuft of grass.
+
+---
+
+## Importing a hand re-rendered sheet: `utilities/key_sheet.py`
+
+`new_tilemap_6.png` came back as the assembled sheet re-rendered with the stair
+wedges recoloured into the teal family --- 2528x1686, flat on white, **no alpha
+channel at all**. Restoring the transparency is not a threshold; it took three
+distinct passes, each fixing a failure the previous one left behind.
+
+**1. Connectivity, not colour.** A tilesheet is full of enclosed light pixels
+--- the cream highlights in the rock, the pale crack fills --- so "near-white is
+transparent" punches holes through the middle of tiles. The near-white mask is
+flood filled instead, so only ground reachable from outside the art is cleared.
+The fill walks row *runs* rather than pixels: a few thousand nodes against four
+million, which is what makes a pure-Python fill fast enough that scipy (not
+installed here) is not needed.
+
+**2. Seed from every tile seam, not the image border.** A sheet is not one
+picture. Its tiles butt against each other, so the notches between the rock
+lobes along a tile's south fringe are enclosed by the *neighbouring* tile's art.
+Keying from the border alone left **891** opaque white pixels wedged into
+exactly those fringes --- slots 19, 24, 28, 33 and the cliff bodies --- against
+**zero** in the hand-authored `tilemap_1`. Each tile is its own drawing, so each
+tile's own edge counts as an outside. That took it to 3.
+
+**3. Erode the blend ring.** These renders are upscales, so art meets ground
+across a few pixels of blend rather than a hard edge: sampled across the
+boundary the run reads 243,253,254 -> 232,246,246 -> 227,239,239 -> 203,217,220
+-> rock. Those pixels are too dim for the near-white test and too tinted for the
+neutrality test, but they are mostly backdrop by weight, and counting them as
+art pulled boundary luminance to a maximum of 250 against `tilemap_1`'s 225.
+They are taken by growing the *known* backdrop into anything still above 205 ---
+which cannot run away into the rock's own cream highlights, because those do not
+touch the backdrop --- capped near the upscale factor.
+
+A final guard drops any downscaled cell that averages to a neutral near-white,
+for a notch genuinely sealed on all four sides. One pixel of 160,000 survives
+everything.
+
+**The downscale averages only the opaque source pixels** under each output cell.
+Box filtering the raw image would drag white into every silhouette edge; a cell
+under 45% covered stays clear, which reproduces the hard alpha edge the
+hand-authored sheets have.
+
+**Verification.** Alpha IoU against the sheet this one re-renders is 0.9916, and
+the only slots whose *colour* moved are 36/39/45/48 --- the four ramp wedges,
+exactly as described. The raised block matches all sixteen combinations on the
+luminance rim test. The wedges now read 121,154,157 and 109,145,148, sitting
+between the cliff faces at 94,134,136 and the ground at 137,185,186 instead of
+the neutral grey 96,99,107 they were.
+
+`utilities/build_ground_tilemaps.py` now defaults to this import path, so
+running it reproduces what is on disk rather than overwriting the re-render with
+the older derivation; `--derive` still rebuilds from the source art. It also
+hands the keyed wedges to `tilemap_8`, which had been given the grey ones ---
+two floors of the same island were rendering staircases in different colours.
+
+---
+
+## `tilemap_8`: same import, plus a face transplant
+
+`new_tilemap_8.png` arrived the same way as the rocky one --- 2528x1686 flat on
+white, no alpha --- with the ramp wedges recoloured to sand. It goes through the
+same `key_sheet` pipeline, and the pipeline needed one more turn of the screw
+for it.
+
+**The neutral guard now cuts at 225, not 238.** Sand is a light colour, so the
+blend where art meets backdrop runs through pale yellows rather than dropping
+straight to a dark outline, and a downscaled cell straddling a tile seam can
+catch a sliver of that blend from *both* neighbours and average out to a light
+neutral grey. Five such pixels survived at the old threshold. The right
+discriminator was never brightness: this art is teal rock and yellow sand, both
+strongly tinted, and `tilemap_1` contains no light neutral pixel at all, so a
+cell that averages to one is backdrop however it got there. That took the rocky
+sheet to zero and the sand sheet to five pixels of 167,000, at the outermost
+ring of the silhouette where they are invisible against any ground.
+
+**The cliff faces are swapped for `tilemap_1`'s.** The render carried
+`tilemap_rocky`'s stratified rock in its cliff rows, which is the one part of
+that source that never matched the rest of the game --- the same problem that
+prompted the `tilemap_6` rebuild. `cliff.body` and `cliff.bottom` now come from
+`tilemap_1` verbatim (byte-identical, asserted).
+
+`cliff.top` (32--35) deliberately does **not**: it is the same four slots as the
+raised block's thin row, so taking it from `tilemap_1` would put green grass on
+the rim of a sand terrace *and* break every thin sand strip at the same time. It
+keeps the sheet's own sand, which is what a ground lip seen from above should
+be.
+
+**Each floor's staircase now matches its own ground** --- teal rubble wedges on
+the rocky summit, sand wedges on the sand terrace. The stopgap that gave
+`tilemap_8` the rocky wedges is gone, so `_fill_ramps_on_green` is down to the
+green sheet, the only one without a hand re-render.
+
+---
+
+## All three sheets on one stone; and a tidy-up that moved a live asset
+
+`tilemap_7`, the one sheet with no hand re-render, gets the same face transplant
+as `tilemap_8`: `cliff.body` and `cliff.bottom` from `tilemap_1`, byte-identical,
+with `cliff.top` left on the sheet's own ground for the reason it always is ---
+those four slots are also the raised block's thin row.
+
+`tilemap_6`'s faces were taken verbatim too. They already *came* from
+`tilemap_1`, but they made the round trip through the re-render's upscale and
+back down, which left them about 4/255 off and carrying the same blend
+artefacts at their edges that the keying fights everywhere else. Taking them
+straight cost nothing and is measurable: the sheet's maximum boundary luminance
+dropped from 233.5 to exactly `tilemap_1`'s 225.0. All three sheets now render
+literally the same stone.
+
+**Sources moved to `assets/terrain/tiles/extras/`.** The large renders and raw
+source sheets are inputs, not shipped art, so the tiles directory now holds only
+what the game loads. `build_ground_tilemaps` reads `new_tilemap_6`,
+`new_tilemap_8`, `rocky_temp_stairs`, `tilemap_rocky` and `tilemap_flat` from
+there.
+
+**`vstairs.png` went with them, and it is not an extra.** It is still live:
+`data/terrain.json` names it as `vstair.sheet`, and `world/terrain/cliffs.py`
+loads it through `Sheets.vstair_overlay` for the LD-8a rock staircase. That path
+fails *soft* --- a missing sheet returns `None` and the caller quietly renders
+the biome grass ramp instead --- so nothing crashed and nothing logged; the two
+tests that noticed (`test_vstair_overlay_sprite_is_a_real_srcalpha_file` and
+`RampTests::test_ramp_units_render_by_style`) were the only signal. It has been
+moved back beside the other live tiles.
+
+`vertical_stairs.png` really is unused --- nothing in the codebase or the data
+names it --- so it stays in `extras/`.

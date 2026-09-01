@@ -10,12 +10,17 @@ Extra hit filters:
   * cone_half_angle > 0  -- Soul Scythe; the collision resolver also requires
                  the target to lie within this angle of `cone_dir`.
   * chain_left > 0        -- Thunder Orb; resolver redirects instead of despawning.
+
+`fire_level` carries the terrain elevation the shot was fired from, for the
+LD-9 D10 rule; see `TransientFx.block_on_terrain`.
 """
 from __future__ import annotations
 
 import math
 
 import pygame
+
+from world.elevation import NONE as _NO_LEVEL
 
 
 class Projectile:
@@ -26,6 +31,7 @@ class Projectile:
         "anchor", "orbit_angle", "orbit_radius", "orbit_speed",
         "rehit_interval", "rehit_timer",
         "cone_dir", "cone_half_angle", "style", "fx", "trail_shed",
+        "fire_level",
     )
 
     def __init__(self) -> None:
@@ -55,6 +61,13 @@ class Projectile:
         self.style = ""          # render-only: forces a `projectiles/` draw family
         self.fx: dict = {}       # render-only: per-weapon effect tuning
         self.trail_shed = 0.0    # render-only: world px travelled since the last trail puff
+        # LD-9 D10: the terrain elevation this shot was fired from. Stamped by
+        # the spawner right after `reset`, because only the spawner knows the
+        # true muzzle position -- by the projectile's first update it has
+        # already moved several pixels, which at a rim is enough to sample the
+        # wrong tile. `NONE` disables the rule, which is what a flat world and
+        # every unit test that builds a projectile directly get.
+        self.fire_level = _NO_LEVEL
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
               pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
@@ -89,6 +102,8 @@ class Projectile:
         self.style = style
         self.fx = fx if fx is not None else {}
         self.trail_shed = 0.0
+        # Pooled: a recycled projectile must not inherit the last shot's level.
+        self.fire_level = _NO_LEVEL
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:
