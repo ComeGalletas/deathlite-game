@@ -288,8 +288,9 @@ class TerrainRenderer:
         sx, sy = (o.pos.x - ox) * z, (o.pos.y - oy) * z
         entry = self.gm._decos.get(i)
         if entry is not None:
-            ax, ay, fps, frs = entry
-            frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
+            ax, ay, fps, frs, phase = entry
+            frame = (frs[(int(pygame.time.get_ticks() * 0.001 * fps) + phase)
+                         % len(frs)]
                      if fps else frs[0])
             drop_scale = self.gm._sprite_drop.get(o.kind, config.SPRITE_ANCHOR_DROP)
             drop = drop_scale * o.radius * z

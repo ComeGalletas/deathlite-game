@@ -96,3 +96,13 @@ _STAIR_WIDE_ROOM_TILES = 7
 _GRID_OBSTACLES_PER_1000 = 85.0
 _GRID_PLACE_TRIES = 20
 _GRID_CLEAR_RADIUS = 176.0             # ~2.75 tiles kept clear round an island's centre
+
+# LD-10: the boss island is scattered like any other now, less an arena in the
+# middle. Eight tiles clears about a fifth of a ~1,000-cell island -- enough to
+# fight in without the rim reading as a bare slab, which is what the whole
+# island was while the scatter skipped it outright.
+_GRID_BOSS_CLEAR_RADIUS = 512.0        # 8 tiles
+# The start island is scattered like any other full stop; this is only the
+# bubble around the pixel the hero spawns at, big enough for the widest
+# obstacle radius (34) plus the player's (16) plus a margin.
+_GRID_SPAWN_CLEAR = 96.0               # 1.5 tiles

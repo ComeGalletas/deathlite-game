@@ -105,7 +105,9 @@ class GameMap:
         self._foam: list[pygame.Surface] | None = None
         self._foam_routines: tuple[tuple[float, int], ...] = (
             (9.0, 0), (12.0, 5), (15.0, 10))
-        # Obstacle index -> (anchor_x, anchor_y, fps, [frame, ...]). Each obstacle
+        # Obstacle index -> (anchor_x, anchor_y, fps, [frame, ...], phase). A
+        # tree takes its `fps` and frame offset from `tree_routines` so a grove
+        # does not sway in lock-step; everything else is (rig fps, 0). Each obstacle
         # is skinned with a decoration rig scaled to its collider; obstacles with
         # no entry (missing tileset / flag off) fall back to a drawn circle.
         self._decos: dict[int, tuple] = {}

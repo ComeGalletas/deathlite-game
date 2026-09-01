@@ -12,6 +12,34 @@ import random
 import pygame
 
 from game import config
+from world.gen import biomes
+
+
+def _tree_routines(terrain) -> tuple:
+    """`((fps, phase), ...)` for the tree sway, from `terrain.json`.
+
+    Same shape and the same reason as `foam_routines`: one clock for every
+    instance of an animation makes a whole coastline -- or a whole forest --
+    breathe in step, which reads as a single object rather than many. Empty
+    when nothing is declared, and then a tree keeps its rig's own fps and no
+    offset, exactly as before.
+    """
+    out = tuple((max(0.1, float(r["fps"])), int(r.get("phase", 0)))
+                for r in terrain.get("tree_routines", [])
+                if float(r.get("fps", 0)) > 0)
+    return out
+
+
+def _routine_of(routines, o):
+    """Which routine this tree sways on -- a stable spatial bucket, so two
+    trees in one grove differ and a rebake does not reshuffle them.
+
+    Bucketed at half a tile rather than the foam's full tile: trees stand
+    closer together than shore patches do (`_TREE_TREE_GAP` is 22 px), and a
+    whole-tile bucket would hand a pair in the same tile the same clock.
+    """
+    key = (int(o.pos.x) // 32) * 31 + (int(o.pos.y) // 32) * 17
+    return routines[key % len(routines)]
 
 
 def build_obstacle_decor(store, a) -> None:
@@ -24,6 +52,18 @@ def build_obstacle_decor(store, a) -> None:
     `obstacle_decor.render_radius` may override the radius used *for drawing*
     per kind, so a kind can keep its sprite size while its collider shrinks
     (trees: small trunk ring, full-size canopy).
+
+    The entry is `(anchor_x, anchor_y, fps, frames, phase)`. `phase` is a frame
+    offset and, for a tree, `fps` comes from its `tree_routines` entry rather
+    than from the rig -- see `_tree_routines`.
+
+    LD-10: a biome may name its own `trees`, and an obstacle standing on that
+    biome indexes its variant into that list instead of the global one. The
+    five tree rigs fall into two groups the eye reads immediately -- pines
+    (1, 2, 5) and autumn crowns (3, 4) -- and mixing them across a terrace was
+    the last thing keeping an island from looking like one place. The biome
+    comes off the obstacle, stamped there by the scatter, so nothing is
+    re-derived here.
     """
     conf = a.terrain.get("obstacle_decor", {})
     rig_map = conf.get("rigs", {})
@@ -37,8 +77,15 @@ def build_obstacle_decor(store, a) -> None:
     }
     resolved: dict[tuple, tuple | None] = {}      # (rig, size) -> entry | None
 
+    routines = _tree_routines(a.terrain)
+    biome_trees = {fam: spec["trees"]
+                   for fam, spec in a.terrain.get("biomes", {}).items()
+                   if spec.get("trees")}
+
     for i, o in enumerate(store.obstacles):
         choices = rig_map.get(o.kind)
+        if o.kind == "tree":
+            choices = biome_trees.get(getattr(o, "biome", ""), choices)
         if not choices:
             continue
         rig = choices[(int(getattr(o, "variant", 1)) - 1) % len(choices)]
@@ -61,7 +108,12 @@ def build_obstacle_decor(store, a) -> None:
                 resolved[key] = (ax0 * scale, ay0 * scale, fps, frs)
         entry = resolved[key]
         if entry is not None:
-            store._decos[i] = entry
+            ax, ay, fps, frs = entry
+            if o.kind == "tree" and routines and len(frs) > 1:
+                fps, phase = _routine_of(routines, o)
+            else:
+                phase = 0
+            store._decos[i] = (ax, ay, fps, frs, phase)
 
     if config.TERRAIN_SHADOWS:
         build_tree_shadows(store, conf)
@@ -94,6 +146,62 @@ def build_tree_shadows(store, conf: dict) -> None:
             store._tree_shadows[i] = (o.pos.x, o.pos.y, r, disc(r))
 
 
+def _cell_biomes(room, floor) -> dict:
+    """`{(col, row): biome}` for a height-map room's interior cells.
+
+    Empty for a legacy room: no grid, no palette, nothing to key on -- and the
+    callers then treat every entry as universal, which is what that world has
+    always done.
+    """
+    if not floor or not room.grid or not room.palette:
+        return {}
+    out = {}
+    for pos in floor:
+        cell = room.grid.get(pos)
+        if cell is None:
+            continue
+        sheet = room.palette.get(cell.level)
+        if sheet:
+            out[pos] = biomes.biome_of(sheet)
+    return out
+
+
+def _terraces(room, floor) -> list:
+    """`[(biome, cells)]` -- the room's interior split by the biome standing on
+    it. One `(None, floor)` group for a legacy room, which is what keeps that
+    world's decor exactly as it was."""
+    fam_of = _cell_biomes(room, floor)
+    if not fam_of:
+        return [(None, floor or [])]
+    groups: dict = {}
+    for cell in floor:
+        groups.setdefault(fam_of.get(cell), []).append(cell)
+    return sorted(groups.items(), key=lambda kv: (kv[0] is None, kv[0] or ""))
+
+
+def _budget_scale(terrain, fam, n_cells, legal) -> float:
+    """How far to stretch the authored `per_room` counts on this terrace.
+
+    `per_room` was tuned against LD-8 rooms of ~60 cells and is being applied
+    to height-map islands of 700-1000 -- the same mismatch the obstacle scatter
+    had before D8 gave it a per-thousand rate, and the reason a terrace could
+    render with four pebbles on it. A biome's `decor.per_1000` is that rate: it
+    sets the terrace's whole budget, and the authored counts become the
+    *weights* by which the legal props share it.
+
+    A biome that declares no rate returns 1.0 and the counts are used as
+    written -- a floor, not a default, and the only thing the legacy world
+    ever sees.
+    """
+    spec = (terrain.get("biomes", {}).get(fam, {}).get("decor") if fam else None)
+    if not spec or not legal or not n_cells:
+        return 1.0
+    want = n_cells * float(spec["per_1000"]) / 1000.0
+    expect = sum((e.get("per_room", [0, 2])[0] + e.get("per_room", [0, 2])[1]) / 2
+                 for e in legal)
+    return want / expect if expect > 0 else 1.0
+
+
 def build_decor_scatter(store, a) -> None:
     """Seeded, non-colliding scenery from `terrain.json` "decorations":
     interior clutter per room + water scenery in the void.
@@ -103,6 +211,20 @@ def build_decor_scatter(store, a) -> None:
     nothing here touches `store.obstacles` or `is_walkable`. A new prop is a
     new rig + a new "decorations" entry, no code. `collision: true` entries
     are handled by world generation (trees, T9), not here.
+
+    LD-10 step 4: an entry may name the `biomes` it belongs to, and is then
+    only placed on terraces wearing one of them -- bones on sand, fungi in the
+    forest, mossy stone in the wetland. An entry that names none is universal,
+    which is the default a new prop gets and what keeps every terrace from
+    being able to come out bare. The filter is per **terrace**, not per island:
+    a volcanic island can be wetland at the waterline and rock at the summit,
+    and the pumpkins have no business up top.
+
+    The same split fixes a density mismatch that predates it: `per_room` was
+    authored for LD-8 rooms of ~60 cells and was being applied whole to islands
+    of 700-1000, so a terrace could come out with four pebbles on it. A biome's
+    `decor.per_1000` now sets each terrace's budget and the authored counts are
+    the weights by which its legal props share it.
     """
     reg = a.terrain.get("decorations", [])
     if not reg:
@@ -153,34 +275,43 @@ def build_decor_scatter(store, a) -> None:
         # small `min_gap` lets flora (mushrooms, flowers) bunch into patches
         # while a default-gap prop (bush, pebble) still holds everything off.
         gaps: list[float] = []
-        for e in room_reg:
-            lo, hi = e.get("per_room", [0, 2])
-            entry = load(e["rig"], float(e.get("scale", 1.0)))
-            if entry is None:
-                continue
-            frs, ax, ay, fps = entry
-            my_gap = float(e.get("min_gap", 40))
-            for _ in range(rng.randint(lo, hi)):
-                for _try in range(6):
-                    if floor:
-                        col, row = rng.choice(floor)
-                    else:
-                        col = rng.randint(1, cols - 2)
-                        row = rng.randint(1, rows - 2)
-                    x = r.x + col * px + rng.uniform(6, px - 6)
-                    y = r.y + row * px + rng.uniform(6, px - 6)
-                    if (x - cx) ** 2 + (y - cy) ** 2 < clear_sq:
-                        continue
-                    if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
-                           < (o.radius + 20) ** 2 for o in store.obstacles):
-                        continue
-                    if any((x - p[4]) ** 2 + (y - p[5]) ** 2
-                           < max(my_gap, g) ** 2
-                           for p, g in zip(placed, gaps)):
-                        continue
-                    placed.append((frs, ax, ay, fps, x, y))
-                    gaps.append(my_gap)
-                    break
+        # One pass per terrace rather than one per island. An island can be
+        # wetland at the waterline and rock at the summit, so neither "which
+        # props suit this island" nor "how many does it want" is a question
+        # with a single answer.
+        for fam, where in _terraces(room, floor):
+            legal = ([e for e in room_reg
+                      if not e.get("biomes") or fam in e["biomes"]]
+                     if fam else room_reg)
+            k = _budget_scale(a.terrain, fam, len(where), legal)
+            for e in legal:
+                lo, hi = e.get("per_room", [0, 2])
+                entry = load(e["rig"], float(e.get("scale", 1.0)))
+                if entry is None:
+                    continue
+                frs, ax, ay, fps = entry
+                my_gap = float(e.get("min_gap", 40))
+                for _ in range(round(rng.randint(lo, hi) * k)):
+                    for _try in range(6):
+                        if where:
+                            col, row = rng.choice(where)
+                        else:
+                            col = rng.randint(1, cols - 2)
+                            row = rng.randint(1, rows - 2)
+                        x = r.x + col * px + rng.uniform(6, px - 6)
+                        y = r.y + row * px + rng.uniform(6, px - 6)
+                        if (x - cx) ** 2 + (y - cy) ** 2 < clear_sq:
+                            continue
+                        if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
+                               < (o.radius + 20) ** 2 for o in store.obstacles):
+                            continue
+                        if any((x - p[4]) ** 2 + (y - p[5]) ** 2
+                               < max(my_gap, g) ** 2
+                               for p, g in zip(placed, gaps)):
+                            continue
+                        placed.append((frs, ax, ay, fps, x, y))
+                        gaps.append(my_gap)
+                        break
         if placed:
             store._room_decor[room.id] = placed
 

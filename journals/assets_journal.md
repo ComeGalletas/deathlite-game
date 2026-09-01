@@ -2531,3 +2531,47 @@ moved back beside the other live tiles.
 
 `vertical_stairs.png` really is unused --- nothing in the codebase or the data
 names it --- so it stays in `extras/`.
+
+---
+
+## `tree_sheet.png` -> a strip, and a stump that had no home
+
+The sheet arrived as a **4x3 grid of 192 px cells**: six animation frames of a
+pine across the first row and a half, a lone stump in the bottom-left, and five
+empty cells. Every other tree in `assets/terrain/props` is a **horizontal
+strip** -- `frame` width 192, `frames` frames, sheet width `192 * frames` -- and
+`Assets.frames` slices on exactly that, so a grid cannot be declared at all.
+Left as it was, the rig would have yielded blank and clipped frames.
+
+`utilities/slice_tree_sheet.py` lays the six frames out in row-major order and
+writes `tree_5.png` at 1152x192. The two empty cells at the end of row 1 are
+skipped by name rather than trusted: a strip with a blank frame reads as the
+tree vanishing mid-sway, and the script exits if a listed cell turns out empty.
+
+**The stump is not an animation frame.** It is a prop that happened to share the
+sheet, and leaving it in would have made it the seventh frame of the tree. It
+comes out as `stump_5.png` with its own rig -- which is also the only way it can
+ever be placed, since a decoration draws frame 0 of whatever rig it names.
+
+### The anchor and footprint were derived, not guessed
+
+Calibrated against `deco_tree_3`, whose art bottoms out at row 169 and is
+declared `anchor [96, 170]`, `footprint 43` against a widest base of 42. So the
+anchor sits one row under the lowest opaque pixel, on the horizontal centre of
+the base, and the footprint is the widest the base gets. Measured the same way,
+the new pine is `anchor [95, 178]`, `footprint 46` -- a little broader and
+taller than `tree_3`, which is what it looks like. The stump is
+`anchor [96, 176]`.
+
+Placed: `deco_tree_5` joins the `tree` obstacle pool, and `stump_c` is a
+non-colliding decoration at 0.7 scale, 0-2 a room. Measured over five worlds,
+45 stumps and pines throughout the scatter.
+
+### The test was pinning the wrong thing
+
+`test_tree_kind_maps_to_tree_rigs` asserted the exact four rig names and that
+each had exactly eight frames -- so a fifth tree with six frames failed it,
+while saying nothing about whether any of them were usable. It now asserts the
+constraint that actually matters: every rig in the pool exists, animates, and
+its sheet is `frames x frame width` across and `frame height` tall. That is
+precisely the check the original grid sheet would have failed.

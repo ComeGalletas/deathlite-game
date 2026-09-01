@@ -5,6 +5,7 @@ import pygame
 
 from entities.obstacle import KINDS, Obstacle
 from game import config
+from world.gen import biomes
 from world.gen.heightmap import walk_links
 from world.layout import VSTAIR, EWSTAIR
 from world.gen.tuning import (
@@ -13,6 +14,7 @@ from world.gen.tuning import (
     _HOUSE_MIN_ROOM_CELLS, _HOUSE_GLOBAL_CAP, _VILLAGE_MIN_ROOM_CELLS,
     _VILLAGE_EXTRA, _VILLAGE_RADIUS,
     _GRID_OBSTACLES_PER_1000, _GRID_PLACE_TRIES, _GRID_CLEAR_RADIUS,
+    _GRID_BOSS_CLEAR_RADIUS, _GRID_SPAWN_CLEAR,
 )
 
 
@@ -107,6 +109,87 @@ def _corridor_doorways(rooms, corridors) -> dict:
     return out
 
 
+# The LD-8 mix, kept as a literal because it is frozen: the flat generator is
+# pinned seed by seed in a dozen tests, and re-weighting it would rewrite worlds
+# that exist to describe how the old one behaved. Height-map islands draw their
+# mix per biome from `data/terrain.json` instead.
+_LEGACY_KINDS = ("tree", "rock", "pillar", "shrub")
+_LEGACY_WEIGHTS = (4, 3, 2, 3)
+
+
+def _biome_batches(room) -> list:
+    """LD-10 step 3: one scatter batch per terrace, mixed for its biome.
+
+    The mix and the density both belong to the biome, not to the room. A rocky
+    terrace wants boulders where a forest one wants trunks -- "a rocky layout
+    for tilemap_6 needs a lot more rocks than trees" -- and open sand is meant
+    to read as open, so it takes 40 attempts per thousand cells against the
+    forest's 100. That cannot be decided per room: a volcanic island can wear
+    wetland at the waterline, forest above it and rock on top, and the three
+    should not scatter alike.
+
+    So the floor is split by level first and each terrace scattered on its own
+    terms. `room.palette` is the island's `{level: sheet}`, decided back in
+    generation (`world/gen/biomes.py`) -- reading it here rather than
+    re-deriving it is what keeps the rocks and the rock tiles on the same
+    terrace.
+
+    A terrace whose biome declares no `scatter` block falls back to the LD-8
+    mix at `_GRID_OBSTACLES_PER_1000`. That is a floor, not a per-biome
+    default: every declared biome carries its own block, and a test says so.
+    """
+    levels: dict[int, list] = {}
+    for pos in room.cells:
+        cell = room.grid.get(pos)
+        levels.setdefault(cell.level if cell else 0, []).append(pos)
+    out = []
+    for level in sorted(levels):
+        cells = sorted(levels[level])
+        sheet = room.palette.get(level)
+        mix = biomes.scatter_mix(sheet)
+        kinds, weights, per_1000 = mix or (_LEGACY_KINDS, _LEGACY_WEIGHTS,
+                                           _GRID_OBSTACLES_PER_1000)
+        out.append((biomes.biome_of(sheet) if sheet else "", cells, kinds,
+                    weights, int(len(cells) * per_1000 / 1000.0)))
+    return out
+
+
+def _biome_at(room, col, row) -> str:
+    """The biome of the terrace `(col, row)` stands on -- what an obstacle
+    records so the bake can skin it in that biome's trees without working the
+    palette out a second time."""
+    cell = room.grid.get((col, row)) if room.grid else None
+    sheet = (room.palette.get(cell.level)
+             if cell is not None and room.palette else None)
+    return biomes.biome_of(sheet) if sheet else ""
+
+
+def _clear_radius(room, start_id, boss_id) -> float:
+    """The disc at a room's centre that no obstacle may enter.
+
+    Shared by the scatter and the tree top-up. They used to decide it
+    separately and disagreed: the top-up kept the LD-8 fraction-of-the-room
+    rule even on a height-map island, so a thicket could grow into the arena
+    the scatter had just held open.
+    """
+    special = room.kind in SPECIAL_KINDS
+    if not room.grid:
+        # The LD-8 rule, frozen: a fraction of the room's own size.
+        return min(room.rect.width, room.rect.height) * 0.24 if special else 0.0
+    if room.id == boss_id:
+        return _GRID_BOSS_CLEAR_RADIUS           # the arena, kept open
+    if room.id == start_id:
+        # Not special treatment of the island -- just not dropping a boulder on
+        # the pixel the hero materialises at. `GameMap.center` is the start
+        # room's centroid and the hero spawns exactly there.
+        return _GRID_SPAWN_CLEAR
+    # The special-room "keep the interaction space clear" disc is a fraction of
+    # the room's own size, which on a height-map island works out at ~460 px --
+    # it blanks the entire upper plateau, since that is what sits in the middle
+    # of a concentric island. A fixed few tiles is all the altar / shrine needs.
+    return _GRID_CLEAR_RADIUS if special else 0.0
+
+
 def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> list:
     """A few convex obstacles per room, placed on floor cells and always clear
     of every corridor doorway (so movement is never blocked). Count scales with
@@ -137,64 +220,66 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
         _scatter_houses(rooms, all_doors, rng, boss_id, out)
 
     for room in rooms:
-        if room.id in (start_id, boss_id):
+        # LD-10: on a height-map world the start and boss islands scatter like
+        # any other. The LD-8 rule skipped them outright -- a safe spawn and a
+        # clear fight arena -- and it was written when a room was ~60 cells. On
+        # a 1,000-cell island it left two of the nine as bare slabs, a fifth of
+        # all the land. Each keeps a clear disc instead (below); the flat
+        # generator keeps the old skip, being pinned seed by seed in its tests.
+        if not room.grid and room.id in (start_id, boss_id):
             continue
         special = room.kind in SPECIAL_KINDS
         if room.grid:
             # A height-map room is 700-1000 cells and is always a "special"
             # kind, so the legacy rule below would give it two obstacles. Scale
             # with floor area instead; see `_GRID_OBSTACLES_PER_1000`.
-            density = int(len(room.cells) * _GRID_OBSTACLES_PER_1000 / 1000.0)
             tries = _GRID_PLACE_TRIES
+            batches = _biome_batches(room)
         else:
             base = (4 if room.kind == "elite_arena"
                     else 2 if special else rng.randint(3, 7))
             bonus = 0 if special else len(room.cells) // 48
             density = min(base + bonus, 14)
             tries = 12
+            floor = sorted(room.cells) if room.cells else None
+            batches = [("", floor, _LEGACY_KINDS, _LEGACY_WEIGHTS, density)]
         r = room.rect
-        floor = sorted(room.cells) if room.cells else None
         # Keep the interaction / fight space clear around *both* the shaped-room
         # centroid and the bounding-box centre -- for an L / T room the two can
         # sit a cell or two apart, and a shot-blocker near either reads as
         # "middle of the room".
         centres = ((room.center.x, room.center.y), (r.centerx, r.centery))
-        if room.grid:
-            # The special-room "keep the interaction space clear" disc is a
-            # fraction of the room's own size, which on a height-map island
-            # works out at ~460 px -- it blanks the entire upper plateau, since
-            # that is what sits in the middle of a concentric island. A fixed
-            # few tiles around the centre is all the altar / shrine needs.
-            clear = _GRID_CLEAR_RADIUS if special else 0.0
-        else:
-            clear = min(r.width, r.height) * 0.24 if special else 0.0
-        for _ in range(density):
-            for _try in range(tries):
-                # Kind is drawn first so the placement gap can depend on it:
-                # tree-next-to-tree keeps only `_TREE_TREE_GAP` (groves), every
-                # other pairing keeps the full `_OBSTACLE_GAP`.
-                kind = rng.choices(("tree", "rock", "pillar", "shrub"),
-                                   weights=(4, 3, 2, 3), k=1)[0]
-                if floor:
-                    col, row = rng.choice(floor)
-                    x = r.left + col * px + rng.uniform(px * 0.28, px * 0.72)
-                    y = r.top + row * px + rng.uniform(px * 0.28, px * 0.72)
-                else:
-                    x = rng.uniform(r.left + 40, r.right - 40)
-                    y = rng.uniform(r.top + 40, r.bottom - 40)
-                if clear and any((x - mx) ** 2 + (y - my) ** 2 < clear ** 2
-                                 for mx, my in centres):
-                    continue
-                if _blocks(all_doors, x, y, _radius(kind)):
-                    continue
-                if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
-                       < (o.radius + (_TREE_TREE_GAP
-                                      if kind == "tree" and o.kind == "tree"
-                                      else _OBSTACLE_GAP)) ** 2
-                       for o in out):
-                    continue
-                out.append(Obstacle(kind, x, y))
-                break
+        clear = _clear_radius(room, start_id, boss_id)
+        for fam, floor, kinds, weights, density in batches:
+            for _ in range(density):
+                for _try in range(tries):
+                    # Kind is drawn first so the placement gap can depend on
+                    # it: tree-next-to-tree keeps only `_TREE_TREE_GAP`
+                    # (groves), every other pairing keeps the full
+                    # `_OBSTACLE_GAP`.
+                    kind = rng.choices(kinds, weights=weights, k=1)[0]
+                    if floor:
+                        col, row = rng.choice(floor)
+                        x = r.left + col * px + rng.uniform(px * 0.28, px * 0.72)
+                        y = r.top + row * px + rng.uniform(px * 0.28, px * 0.72)
+                    else:
+                        x = rng.uniform(r.left + 40, r.right - 40)
+                        y = rng.uniform(r.top + 40, r.bottom - 40)
+                    if clear and any((x - mx) ** 2 + (y - my) ** 2 < clear ** 2
+                                     for mx, my in centres):
+                        continue
+                    if _blocks(all_doors, x, y, _radius(kind)):
+                        continue
+                    if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
+                           < (o.radius + (_TREE_TREE_GAP
+                                          if kind == "tree" and o.kind == "tree"
+                                          else _OBSTACLE_GAP)) ** 2
+                           for o in out):
+                        continue
+                    ob = Obstacle(kind, x, y)
+                    ob.biome = fam
+                    out.append(ob)
+                    break
 
     # Cosmetic decoration variant per obstacle (see world/map.py). Assigned in a
     # separate pass so placement above is byte-identical to before this existed.
@@ -234,7 +319,7 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
     tagged: list[tuple] = []
     room_clear: dict[int, tuple] = {}
     for room in rooms:
-        if room.id in (start_id, boss_id) or not room.cells:
+        if not room.cells or (not room.grid and room.id in (start_id, boss_id)):
             continue
         rr = room.rect
         cellset = room.cells
@@ -244,10 +329,9 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
                        int((o.pos.y - rr.top) // px)) in cellset]
         if not rtrees:
             continue
-        special = room.kind in SPECIAL_KINDS
         room_clear[room.id] = (
             ((room.center.x, room.center.y), (rr.centerx, rr.centery)),
-            min(rr.width, rr.height) * 0.24 if special else 0.0)
+            _clear_radius(room, start_id, boss_id))
         for t in rtrees:
             tagged.append((t, room))
     if not tagged:
@@ -282,6 +366,8 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
             continue
         t = Obstacle("tree", x, y)
         t.variant = rng.randint(1, 4)
+        # Its own terrace, not the anchor's: a thicket can spill over a step.
+        t.biome = _biome_at(room, col, row)
         out.append(t)
         tagged.append((t, room))
         placed += 1

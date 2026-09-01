@@ -38,6 +38,7 @@ from world.gen.islands import _build_room_grids, _grid_tile_meta
 from world.gen.placement import (
     topography_of, _resize_by_topography, _offset_in_chunk,
 )
+from world.gen.biomes import assign_palettes
 from world.gen.scatter import _scatter_obstacles
 
 __all__ = ["generate_world"]
@@ -189,6 +190,11 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         # links stay plank corridors for now (LD-9 B2 matches their levels).
         _build_room_grids(rooms, corridors, rng)
         corridors = _seat_corridors(rooms, corridors, seed)
+        # LD-10: which tileset each terrace wears. Generation decides it, not
+        # the bake -- the scatter below picks its obstacle mix from the biome,
+        # so the world and the tile painter have to read one answer. Keyed by
+        # seed and room id, so it draws nothing from `rng`.
+        assign_palettes(rooms, seed)
     elif config.WORLD_VERTICALITY:
         _assign_floors(rooms, edges, rng, start_id, boss_id)
         # Cross-floor links become stairs/ramp units below. Keep their approach
