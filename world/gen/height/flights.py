@@ -13,7 +13,7 @@ from world.gen.height.const import (
     SIDE_STAIRS, SIDE_STAIRS_HIGH, SIDE_STAIRS_HIGH_FROM, SIDE_SPACING,
 )
 from world.gen.height.graph import reachable, _components
-from world.gen.height.walls import _raise_walls
+from world.gen.height.walls import _raise_walls, _foot_stone_frees
 
 def _vstair_site(grid, c, r):
     """Is `(c, r)` the head of a straight flight? Needs solid wall in its own
@@ -89,6 +89,21 @@ def _ewstair_site(grid, c, r, side):
 LATERAL = "side_"
 
 
+def _clear_above(grid, c, r) -> bool:
+    """Is there nothing standing on top of a crossing that would start at
+    `(c, r)`?
+
+    Everything else about siting one reasons east/west -- the terrace it is
+    entered from on one side, the floor it descends to on the other -- and the
+    unit is two cells tall. Without this a crossing could be cut directly
+    beneath a southward cliff face: the stone lands on the head, and the one
+    edge meant to be the way in from the north is a wall. The wall is right;
+    it is the crossing that is in the wrong place, so the site is refused and
+    the shuffle takes another candidate off the same face."""
+    over = grid.get((c, r - 1))
+    return over is None or over.kind != CLIFF
+
+
 def _lateral_site(grid, c, r, side):
     """The upper level a two-tile crossing at `(c, r)` would join, or `None`.
 
@@ -149,6 +164,14 @@ def _lateral_site(grid, c, r, side):
         cell = grid.get(nb)
         if cell is None or cell.kind != GROUND or cell.level != low:
             return None
+    if not _clear_above(grid, c, r):
+        return None
+    # And the stone under the foot has to be stone that can be given back.
+    # `_free_flight_feet` lifts the leftover face a crossing is cut in front
+    # of, but only where it bottoms out on the floor the foot arrives at; where
+    # the ground below is higher, the wall would stay standing under the ramp.
+    if not _foot_stone_frees(grid, (c, r + 1), low):
+        return None
     return level
 
 

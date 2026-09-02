@@ -66,17 +66,44 @@ def walk_links(grid, pos) -> list:
         dc = 1 if cell.tag.endswith("e") else -1        # the drop direction
         low = cell.level - cell.drop
         # Head and foot, exactly as a wall-cut flight has them -- and for the
-        # same reason. Letting *either* cell reach both terraces looked
-        # harmless and was not: a body could then cut the corner diagonally
-        # from the low ground to the high ground past the crossing, never
-        # standing on it, because `can_step` only asks whether one right-angle
-        # detour is open end to end. That is the exact hole the diagonal rule
-        # exists to close.
+        # same reason. Only the head reaches the terrace above and only the
+        # foot the one below; letting the *foot* reach up would put the whole
+        # drop one step from the low ground.
+        #
+        # The head does now touch both terraces, through the low tile north of
+        # it. That was the corner-cutting hole for a while: a body could take
+        # the diagonal from the low ground to the high ground past the
+        # crossing, never standing on it, because `can_step` only asked whether
+        # one right-angle detour was open end to end. It asks something else as
+        # well now -- `elevation.diagonal_blocked` refuses any diagonal between
+        # two ground tiles of different levels, which is where that move was
+        # actually wrong -- so the reach is safe and the wall it used to cost
+        # is gone.
+        #
+        # The column also carries on past both ends of the unit, and on a
+        # crossing that protrudes from the side what lies there is the *low*
+        # terrace. Those two edges are open as well -- a side face has no stone
+        # in it, so refusing them walled off open ground. Only a cliff, or
+        # nothing at all, still stops you.
+        # The head's downhill edge is open too. The ramp's top tile is a
+        # diagonal wedge with no art at all along that edge -- the low terrace
+        # shows through it -- so the only wall the unit keeps is the foot's
+        # uphill flank, which is where the drop is actually drawn.
+        # North opens onto the *low* terrace only. Ground at the head's own
+        # level above means the crossing is notched into the terrace and a
+        # backdrop cliff is painted between them, so that edge is a drawn face
+        # and stays shut; the notch is entered from its uphill flank.
         if cell.row == 0:                              # head: the upper end
             ground((c - dc, r), cell.level)
-            ground((c, r - 1), cell.level)
+            ground((c, r - 1), low)
+            ground((c + dc, r), low)
+        # ...and the foot's uphill flank, so the unit may be stepped onto
+        # sideways from either terrace at either of its cells. A ramp is a
+        # ramp; the flank is drawn, but it is not a wall.
         if cell.row == cell.drop:                      # foot: the lower end
             ground((c + dc, r), low)
+            ground((c, r + 1), low)
+            ground((c - dc, r), cell.level)
     else:
         # East/west flight. The wall jogs one row across it, so the upper
         # terrace reaches the flight's head from the side the wall has not

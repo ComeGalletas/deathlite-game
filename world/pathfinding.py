@@ -36,7 +36,7 @@ from array import array
 import pygame
 
 from game import config
-from world.elevation import LevelIndex, NONE, can_cross
+from world.elevation import LevelIndex, NONE, can_cross, diagonal_blocked
 
 # The canonical neighbour order. `FlowField._NEI` and `NavGrid.step_mask` are
 # both built from it, so bit *i* of a cell's mask is always the move in
@@ -193,12 +193,21 @@ class NavGrid:
         tmask: dict = {}
         for tl in seen:
             om = orth[tl]
+            tc, tr = tl % tcols, tl // tcols
             m = 0
             for d, bit in _TILE_BIT.items():
                 dc, dr = d
                 if not (dc and dr):
                     if om & (1 << _ORTH.index(d)):
                         m |= bit
+                    continue
+                # Same endpoint rule the collider applies before it looks at
+                # any detour: two ground tiles of different levels are never
+                # one move apart. Without it here the field would route an
+                # enemy diagonally past a lateral crossing that the collider
+                # then refuses to let it through, and it would push against the
+                # corner for ever.
+                if diagonal_blocked(ix, (tc, tr), (tc + dc, tr + dr)):
                     continue
                 h = tl + dc                       # step east/west first, ...
                 v = tl + dr * tcols               # ... or north/south first

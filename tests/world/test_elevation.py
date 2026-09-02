@@ -22,9 +22,12 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
-from world.elevation import LevelIndex, NONE, can_cross, can_step
+from world.elevation import (LevelIndex, NONE, can_cross, can_step,
+                            diagonal_blocked)
+from world.gen.height.walls import _foot_stone_frees
 from world.gen.heightmap import reachable, walk_links
-from world.layout import GROUND, VSTAIR, EWSTAIR, WALKABLE_KINDS
+from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
+                          WALKABLE_KINDS)
 from world.map import GameMap
 from world.pathfinding import NavField, NavGrid, FlowField, NAV_DIRS, _INF
 from world.procedural import generate_world
@@ -217,8 +220,14 @@ class CanCrossTests(unittest.TestCase):
             self.assertGreater(changes, 50, f"seed {seed}: no drops to test")
 
     def test_a_diagonal_cannot_cut_the_corner_of_a_drop(self):
-        """`can_step` composes a diagonal from its right-angle detours, so a
-        diagonal is open only where at least one of them is."""
+        """`can_step` composes a diagonal from its right-angle detours, and
+        then refuses it outright between two ground tiles of different levels.
+
+        The second half is not redundant. A lateral crossing's head touches the
+        terrace above it *and* the low ground north of it -- that is what keeps
+        a plateau's side face free of invisible walls -- so the detour through
+        the head is open end to end, and the endpoint rule is the only thing
+        left saying you cannot change level in one diagonal move."""
         for seed in SEEDS:
             layout, _gm, ix = _world(seed)
             for row in range(ix.rows):
@@ -234,7 +243,355 @@ class CanCrossTests(unittest.TestCase):
                         v = (col, row + dr)
                         legs = ((can_cross(ix, a, h) and can_cross(ix, h, b))
                                 or (can_cross(ix, a, v) and can_cross(ix, v, b)))
-                        self.assertEqual(can_step(ix, a, b), legs)
+                        self.assertEqual(can_step(ix, a, b),
+                                         legs and not diagonal_blocked(ix, a, b))
+
+    def test_no_diagonal_ever_changes_level_between_two_terraces(self):
+        """The invariant itself, stated without reference to how it is
+        implemented: a body never gains or loses a level in one diagonal move
+        with ground under both ends of it."""
+        for seed in SEEDS:
+            layout, _gm, ix = _world(seed)
+            for row in range(ix.rows):
+                for col in range(ix.cols):
+                    a = (col, row)
+                    if ix.kind_at(*a) != GROUND:
+                        continue
+                    for dc, dr in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+                        b = (col + dc, row + dr)
+                        if ix.kind_at(*b) != GROUND:
+                            continue
+                        if ix.level_at(*a) == ix.level_at(*b):
+                            continue
+                        self.assertFalse(can_step(ix, a, b),
+                                         f"seed {seed}: {a}->{b} changes level")
+
+    def test_the_endpoint_rule_is_load_bearing(self):
+        """It has to actually catch something, or the test above passes for the
+        wrong reason. These are the corners beside a lateral crossing."""
+        caught = 0
+        for seed in SEEDS:
+            layout, _gm, ix = _world(seed)
+            for row in range(ix.rows):
+                for col in range(ix.cols):
+                    a = (col, row)
+                    if not ix.has_surface(*a):
+                        continue
+                    for dc, dr in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+                        b = (col + dc, row + dr)
+                        if not ix.has_surface(*b):
+                            continue
+                        h = (col + dc, row)
+                        v = (col, row + dr)
+                        legs = ((can_cross(ix, a, h) and can_cross(ix, h, b))
+                                or (can_cross(ix, a, v) and can_cross(ix, v, b)))
+                        if legs and diagonal_blocked(ix, a, b):
+                            caught += 1
+        self.assertGreater(caught, 0,
+                           "no diagonal is held back by the endpoint rule")
+
+
+class LateralCrossingEdgeTests(unittest.TestCase):
+    """A crossing on a plateau's flank must not stand on the low terrace as an
+    invisible obstacle.
+
+    A side face carries no stone -- `_raise_walls` only stones southward drops
+    -- so a crossing that protrudes from one has plain ground north of its head
+    and south of its foot. Both edges used to be refused, which put a wall
+    across open grass at either end of nine crossings in ten. They are open
+    now; a cliff, and only a cliff, still closes them.
+    """
+
+    def _crossings(self, seed):
+        """`(head_tile, foot_tile, cell, dc, grid_at)` for every lateral unit."""
+        layout, _gm, ix = _world(seed)
+        for room in layout.rooms:
+            if not room.grid:
+                continue
+            to_abs = _abs_tiles(room)
+            for (col, row), c in room.grid.items():
+                if c.kind != EWSTAIR or not str(c.tag).startswith("side_"):
+                    continue
+                if c.row != 0:
+                    continue
+                dc = 1 if c.tag.endswith("e") else -1
+                yield (ix, to_abs((col, row)), to_abs((col, row + 1)), c, dc,
+                       lambda p, g=room.grid: g.get(p), (col, row))
+
+    def test_there_are_lateral_crossings_to_test(self):
+        found = sum(1 for seed in SEEDS for _ in self._crossings(seed))
+        self.assertGreater(found, 20, "no lateral crossings in the sample")
+
+    def test_the_head_opens_north_onto_the_low_terrace(self):
+        """The protruding alignment: the low terrace runs straight into the
+        crossing from the north, nothing is drawn between them, and refusing
+        that edge was the invisible wall this whole thread began with."""
+        opened = 0
+        for seed in SEEDS:
+            for ix, head, _foot, cell, _dc, at, (col, row) in self._crossings(seed):
+                up = at((col, row - 1))
+                if up is None or up.kind != GROUND:
+                    continue
+                if up.level != cell.level - cell.drop:
+                    continue
+                opened += 1
+                self.assertTrue(
+                    can_cross(ix, (head[0], head[1] - 1), head),
+                    f"seed {seed}: wall north of the head at {head} "
+                    f"with {up.kind}@{up.level} on the other side")
+        self.assertGreater(opened, 15, "no crossing has low ground north of it")
+
+    def test_the_head_is_walled_north_under_its_own_backdrop(self):
+        """The notched alignment, and the one edge of a crossing that is still
+        a wall. `grid_paint` paints a backdrop cliff on the head exactly when
+        the tile above is ground at the head's own level -- the terrace drops
+        into the notch, and there is a face drawn between the two. Walking
+        south off that terrace is walking off a cliff."""
+        walled = 0
+        for seed in SEEDS:
+            for ix, head, _foot, cell, _dc, at, (col, row) in self._crossings(seed):
+                up = at((col, row - 1))
+                if up is None or up.kind != GROUND or up.level != cell.level:
+                    continue
+                walled += 1
+                self.assertFalse(
+                    can_cross(ix, (head[0], head[1] - 1), head),
+                    f"seed {seed}: head at {head} opens north through its own "
+                    f"backdrop cliff")
+        self.assertGreater(walled, 5, "no notched crossings in the sample")
+
+    def test_no_flight_opens_onto_stone(self):
+        """Stone still stops you -- the edges freed above are edges onto floor.
+
+        This used to sweep the crossings for a cliff above the head and check
+        that edge was refused. `test_nothing_stands_on_top_of_a_crossing` made
+        that case impossible to find, so the same property is checked where it
+        can still be seen: every flight in the world, against every stone cell
+        touching it. A wall-cut staircase has stone on both sides by
+        construction, so this is far from vacuous."""
+        walled = 0
+        for seed in SEEDS:
+            layout, _gm, ix = _world(seed)
+            for room in layout.rooms:
+                if not room.grid:
+                    continue
+                to_abs = _abs_tiles(room)
+                for (col, row), cell in room.grid.items():
+                    if cell.kind not in (VSTAIR, EWSTAIR):
+                        continue
+                    me = to_abs((col, row))
+                    for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        nb = room.grid.get((col + dc, row + dr))
+                        if nb is None or nb.kind != CLIFF:
+                            continue
+                        walled += 1
+                        self.assertFalse(
+                            can_cross(ix, (me[0] + dc, me[1] + dr), me),
+                            f"seed {seed}: flight at {me} opens onto stone")
+        self.assertGreater(walled, 20, "no stone touching any flight")
+
+    def test_the_foot_opens_south_onto_the_low_terrace(self):
+        opened = 0
+        for seed in SEEDS:
+            for ix, _head, foot, c, _dc, at, (col, row) in self._crossings(seed):
+                low = c.level - c.drop
+                down = at((col, row + 2))
+                if down is None or down.kind != GROUND or down.level != low:
+                    continue
+                opened += 1
+                self.assertTrue(
+                    can_cross(ix, (foot[0], foot[1] + 1), foot),
+                    f"seed {seed}: wall south of the foot at {foot}")
+        self.assertGreater(opened, 15, "no crossing has low ground below it")
+
+    def test_nothing_stands_on_top_of_a_crossing(self):
+        """The site rule looks up as well as sideways.
+
+        The unit is two cells tall and everything else about placing it reasons
+        east/west, so a crossing could be cut directly beneath a southward
+        cliff face. The stone landed on the head and walled the one edge that
+        is meant to be the way in from the north -- a correct wall in the wrong
+        place, since what was misplaced was the crossing."""
+        for seed in SEEDS:
+            for ix, head, _foot, _c, _dc, at, (col, row) in self._crossings(seed):
+                up = at((col, row - 1))
+                self.assertFalse(
+                    up is not None and up.kind == CLIFF,
+                    f"seed {seed}: stone on top of the crossing at {head}")
+
+    def test_every_crossing_is_enterable_from_the_terrace_above(self):
+        """Narrowed from "from the north": a notched crossing is deliberately
+        walled there, because its own backdrop cliff stands in the way. What
+        must hold for every crossing regardless of alignment is that the
+        terrace it climbs to can reach it at all -- through the head's uphill
+        flank, which is the entrance a notch is cut for."""
+        checked = 0
+        for seed in SEEDS:
+            for ix, head, _foot, _c, dc, at, (col, row) in self._crossings(seed):
+                if at((col - dc, row)) is None:
+                    continue            # the island ends there
+                checked += 1
+                self.assertTrue(
+                    can_cross(ix, (head[0] - dc, head[1]), head),
+                    f"seed {seed}: terrace cannot reach the crossing at {head}")
+        self.assertGreater(checked, 20)
+
+    def test_neither_flank_of_the_unit_blocks_sideways(self):
+        """A ramp may be stepped onto from either side at either of its cells.
+
+        The head's downhill edge follows from the art -- the top tile is a
+        diagonal wedge with 0 of 64 pixels along that edge. The foot's uphill
+        flank does not: the sheet draws 58 of 64 pixels of rocky step there.
+        It is open anyway, by design rather than by measurement -- the flank is
+        drawn, but a ramp is a ramp and you may walk onto it sideways.
+
+        Both cells therefore touch both terraces, which is only safe because
+        `diagonal_blocked` refuses the ground-to-ground corner: a body still
+        has to stand on the crossing to change level, which
+        `test_a_chase_up_a_terrace_goes_through_a_flight` checks from the other
+        end."""
+        checked = 0
+        for seed in SEEDS:
+            for ix, head, foot, _c, dc, at, (col, row) in self._crossings(seed):
+                if at((col + dc, row)) is not None:
+                    checked += 1
+                    self.assertTrue(
+                        can_cross(ix, (head[0] + dc, head[1]), head),
+                        f"seed {seed}: wall on the head's downhill edge {head}")
+                if at((col - dc, row + 1)) is not None:
+                    checked += 1
+                    self.assertTrue(
+                        can_cross(ix, (foot[0] - dc, foot[1]), foot),
+                        f"seed {seed}: wall on the foot's uphill flank {foot}")
+        self.assertGreater(checked, 30, "no flank edges to check")
+
+    def test_a_crossing_only_ever_walls_a_rise_in_the_terrain(self):
+        """Nothing on the unit itself is a wall any more. What is left is the
+        ground south of the foot where that ground sits a level *higher* --
+        that wall belongs to the terrace, not to the staircase, and this
+        tileset never draws stone on a northward rise anywhere in the world."""
+        for seed in SEEDS:
+            for ix, head, foot, cell, dc, at, (col, row) in self._crossings(seed):
+                low = cell.level - cell.drop
+                for me, (dcol, drow) in (((head), (dc, 0)), ((head), (-dc, 0)),
+                                         ((head), (0, -1)), ((foot), (dc, 0)),
+                                         ((foot), (-dc, 0))):
+                    off = (0 if me == head else 1)
+                    nb = at((col + dcol, row + off + drow))
+                    if nb is None:
+                        continue
+                    if (drow == -1 and nb.kind == GROUND
+                            and nb.level == cell.level):
+                        continue        # the notch's own backdrop cliff
+                    self.assertTrue(
+                        can_cross(ix, (me[0] + dcol, me[1] + drow), me),
+                        f"seed {seed}: wall at {me} toward "
+                        f"{(dcol, drow)} ({nb.kind}@{nb.level})")
+                south = at((col, row + 2))
+                if south is not None and south.kind == GROUND:
+                    open_s = can_cross(ix, (foot[0], foot[1] + 1), foot)
+                    self.assertEqual(open_s, south.level == low,
+                                     f"seed {seed}: foot south at {foot} vs "
+                                     f"{south.kind}@{south.level}")
+
+
+class FootStoneTests(unittest.TestCase):
+    """No staircase descends into a wall.
+
+    `_raise_walls` gives every southward drop its face and runs long before any
+    flight is cut, so carving a flight into that ground used to leave the face
+    standing directly under the new foot -- 37 of them across six worlds, with
+    ordinary ground at the foot's own level on the far side. `_free_flight_feet`
+    gives those cells back to the floor; `_lateral_site` refuses the handful of
+    places where the stone could not be given back.
+    """
+
+    def _feet(self, seed):
+        layout, _gm, ix = _world(seed)
+        for room in layout.rooms:
+            if not room.grid:
+                continue
+            for (c, r), cell in room.grid.items():
+                if cell.kind not in (VSTAIR, EWSTAIR):
+                    continue
+                foot = (cell.drop - 1 if cell.kind == VSTAIR else cell.drop)
+                if cell.row == foot:
+                    yield room, (c, r), cell
+
+    def test_there_are_feet_to_test(self):
+        self.assertGreater(sum(1 for seed in SEEDS for _ in self._feet(seed)),
+                           20)
+
+    def test_no_flight_foot_has_stone_directly_under_it(self):
+        for seed in SEEDS:
+            for room, (c, r), cell in self._feet(seed):
+                below = room.grid.get((c, r + 1))
+                self.assertFalse(
+                    below is not None and below.kind == CLIFF,
+                    f"seed {seed} room {room.id}: stone under the foot at "
+                    f"{(c, r)} ({cell.kind}, level {cell.level})")
+
+    def test_the_foot_can_walk_out_onto_what_replaced_it(self):
+        """The pathing half. A freed cell is floor at the level the foot lands
+        on, so the collider has to let the body step off the stair onto it --
+        which is the whole point of taking the stone away rather than leaving a
+        wall the renderer had stopped drawing."""
+        checked = 0
+        for seed in SEEDS:
+            _layout, _gm, ix = _world(seed)
+            to_abs = None
+            for room, (c, r), cell in self._feet(seed):
+                below = room.grid.get((c, r + 1))
+                if below is None or below.kind != GROUND:
+                    continue
+                if below.level != cell.level - cell.drop:
+                    continue            # a rise below the foot, not a freed cell
+                to_abs = _abs_tiles(room)
+                foot, south = to_abs((c, r)), to_abs((c, r + 1))
+                checked += 1
+                self.assertTrue(can_cross(ix, south, foot),
+                                f"seed {seed}: foot at {(c, r)} cannot step "
+                                f"onto the floor below it")
+        self.assertGreater(checked, 10, "no foot opens onto its own floor")
+
+
+class FootStoneRuleTests(unittest.TestCase):
+    """`_foot_stone_frees` on hand-built grids, where every case is visible."""
+
+    def _grid(self, below):
+        """A foot at (0, 0) arriving on level 0, with `below` laid out south
+        of it as a list of cells starting at (0, 1)."""
+        return {(0, i + 1): cell for i, cell in enumerate(below)}
+
+    def test_bare_ground_under_the_foot_is_fine(self):
+        g = self._grid([Cell(GROUND, level=0)])
+        self.assertTrue(_foot_stone_frees(g, (0, 0), 0))
+
+    def test_nothing_at_all_under_the_foot_is_fine(self):
+        self.assertTrue(_foot_stone_frees({}, (0, 0), 0))
+
+    def test_stone_bottoming_out_on_the_landing_floor_can_be_freed(self):
+        g = self._grid([Cell(CLIFF, level=1, drop=1, row=0),
+                        Cell(GROUND, level=0)])
+        self.assertTrue(_foot_stone_frees(g, (0, 0), 0))
+
+    def test_stone_over_higher_ground_cannot(self):
+        """The four sites this rejects: lifting the stone here would leave a
+        bare level change instead of a wall you can see."""
+        g = self._grid([Cell(CLIFF, level=1, drop=1, row=0),
+                        Cell(GROUND, level=1)])
+        self.assertFalse(_foot_stone_frees(g, (0, 0), 0))
+
+    def test_stone_over_open_water_cannot(self):
+        g = self._grid([Cell(CLIFF, level=1, drop=1, row=0)])
+        self.assertFalse(_foot_stone_frees(g, (0, 0), 0))
+
+    def test_a_two_cell_face_is_taken_as_a_whole(self):
+        g = self._grid([Cell(CLIFF, level=2, drop=2, row=0),
+                        Cell(CLIFF, level=2, drop=2, row=1),
+                        Cell(GROUND, level=0)])
+        self.assertTrue(_foot_stone_frees(g, (0, 0), 0))
+        self.assertFalse(_foot_stone_frees(g, (0, 0), 1))
 
 
 class ColliderTests(unittest.TestCase):

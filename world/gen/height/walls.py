@@ -55,6 +55,69 @@ def _face_the_sea(grid, mask) -> None:
 
 
 
+def _stone_run(grid, foot):
+    """The unbroken run of stone directly south of `foot`, and the ground it
+    bottoms out on -- `(cells, ground_cell_or_None)`. An empty run means there
+    is nothing under the foot to argue about."""
+    c, r = foot
+    run, rr = [], r + 1
+    while True:
+        below = grid.get((c, rr))
+        if below is None or below.kind != CLIFF:
+            break
+        run.append((c, rr))
+        rr += 1
+    beyond = grid.get((c, rr))
+    return run, (beyond if beyond is not None and beyond.kind == GROUND
+                 else None)
+
+
+def _foot_stone_frees(grid, foot, low) -> bool:
+    """May a flight foot be put at `foot`, arriving on level `low`?
+
+    Only where whatever stone lies below it is stone `_free_flight_feet` will
+    be able to lift: none at all, or a run bottoming out on ground at `low`.
+    Where the ground beyond is higher the drop is real, the face would stay
+    standing under the ramp, and a staircase descending into a wall is the one
+    thing these crossings must not be. That site is simply the wrong place."""
+    run, beyond = _stone_run(grid, foot)
+    return not run or (beyond is not None and beyond.level == low)
+
+
+def _free_flight_feet(grid) -> None:
+    """Take the stone back out from under a staircase's foot.
+
+    `_raise_walls` gives every southward drop its face, and it runs long before
+    any flight is cut. Carve a flight into that ground afterwards and the face
+    it used to hold up is still standing -- one tile of stone directly below
+    the foot, with ground at the foot's own level on the far side of it. It
+    reads as a staircase descending into a wall, and it is one: the collider
+    refuses the edge because stone is stone.
+
+    Nothing is facing on it any more. A cliff cell is the wall of the ground
+    directly north of it, and that cell is the staircase now, so the drop the
+    stone records no longer exists. It goes back to floor at the level the foot
+    arrives on -- which is the level its own south neighbour is already at, so
+    the tile joins ground that is there rather than inventing a terrace.
+
+    Only where the run bottoms out at the foot's level. Anywhere else the drop
+    below it is real and the stone stays."""
+    for (c, r), cell in list(grid.items()):
+        if cell.kind not in (VSTAIR, EWSTAIR):
+            continue
+        # The asymmetry `_flight_opens` documents: a straight flight's foot is
+        # row `drop - 1`, an east/west one's is `drop`.
+        foot = cell.drop - 1 if cell.kind == VSTAIR else cell.drop
+        if cell.row != foot:
+            continue
+        low = cell.level - cell.drop
+        run, beyond = _stone_run(grid, (c, r))
+        if not run or beyond is None or beyond.level != low:
+            continue
+        for p in run:
+            grid[p] = Cell(GROUND, level=low)
+
+
 def _wall_flight_sides(grid) -> None:
     """Put stone back beside any flight the beach opened up.
 
