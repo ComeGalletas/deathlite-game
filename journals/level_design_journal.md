@@ -5507,3 +5507,227 @@ became `..._from_the_terrace_above`, checking the uphill flank, which is what
 actually has to hold for a notch; and `test_a_crossing_only_ever_walls_a_rise_in_the_terrain`
 now excepts the backdrop. A new one, `test_the_head_is_walled_north_under_its_own_backdrop`,
 pins the wall from the other side so it cannot quietly vanish again.
+
+---
+
+## U — the terrace margin, phase 1: the field — ✅ DONE
+
+A character standing at a terrace edge puts most of itself over the floor
+below. `world/frontier.py` already keeps *props* off a boundary; nothing has
+ever kept a body off one, because `is_walkable` applies the elevation rule to
+the centre and leaves the radius probes as a plain floor test.
+
+The requirement, as set: an 8 px margin, computed **when the level is
+generated** -- before the bake, before every scatter, before anything spawns --
+so one authority answers "how far inside its own terrace is this point?" rather
+than five consumers each deriving it. And **water is not a frontier**: a
+coastline is not a floor boundary, and insetting every shore takes a slice off
+every island for nothing anyone would see. That is a deliberate divergence from
+`frontier.py`, whose prop rules *do* count a lake edge.
+
+`world/inset.py` builds one `uint8` field per room on an 8 px lattice, each
+sample holding the distance to the nearest floor of another level (a cliff face
+counts -- it is a level change with stone in it). `_build_inset_fields` runs
+immediately after `_build_room_grids`, the moment the grid stops changing.
+
+| | |
+|---|---|
+| islands with a field, three worlds | 22 of 27 |
+| field size | **86.8 KB** per island |
+| walkable samples an 8 px margin forbids | **5.5%** |
+| walkable tiles stranded, margins 6-12 px | **0 of 19,473** |
+| flight cells still standable | 467 of 467 |
+
+Nothing reads it yet. That is the phase, and there is a test asserting it --
+props, movement and the flow field each land separately, so that if one of them
+changes how the world plays it does so alone.
+
+### Three ways it was wrong first
+
+**The origin went stale.** The field stored `room.rect.x/y` and mapped world
+points through it. Island rects are still being packed after the grids are
+built, so by the time anything read the field every query landed in a different
+room: one island's origin came back as `(-64, 1920)` against a final rect of
+`(11008, 4736)`. The field is room-relative now, like the grid, and
+`world_clear` does the conversion against the *current* rect.
+
+**The chamfer measured centre to centre.** The nearest possible sample of
+another terrace is one step away, so every own-level sample scored 8 px and an
+8 px margin forbade **nothing at all** -- 0 of 1,246,272 samples. The boundary
+sits half a step short of that neighbouring centre, and subtracting it is what
+makes the number mean what it says.
+
+**And reading the sample raw over-reported.** A sample holds the distance at
+its own centre; a point near the far corner of that sample is closer to the
+boundary than the sample knows -- measured at up to **+8.9 px**, more than the
+margin itself, so a body could stand flush against the very edge the rule
+exists to hold it off. `at()` takes the minimum of the four samples bracketing
+the point instead. Against a brute-force reference within 40 px of a boundary:
+
+| | raw sample | four-sample minimum |
+|---|---|---|
+| mean error | +0.40 px | **-3.15 px** |
+| worst over-report | +8.90 px | **+3.40 px** |
+| over-reporting by more than 4 px | 5.35% | **0.00%** |
+
+Negative is the safe direction: it may hold a body a pixel or two further
+inside than asked, and never lets one stand closer. For a rule about not
+overhanging, that asymmetry is the whole point.
+
+---
+
+## V — the terrace margin, phase 2: the props move onto the field — ✅ DONE
+
+`frontier_clear` asked eight rim points, at exactly +/- margin, whether they
+were still on this terrace. Eight points have gaps between them, and the gaps
+are not theoretical: it is the same weakness `uphill_clear` had, where a wide
+box straddled a narrow terrace strip and every sample missed it.
+
+It reads the field now. Over 11,160 sample points at the 8 px `edge_inset`:
+
+| | |
+|---|---|
+| same answer | 9,831 (**88.1%**) |
+| rim test allowed, field refuses | 1,329 (**11.9%**) |
+| rim test refused, field allows | **0** |
+
+Strictly tighter, in one direction only, which is what replacing a sampled test
+with an exact one should look like. And it costs no clutter: the scatter gets
+six tries per prop, so a refusal relocates it rather than losing it.
+
+| | rim test | field |
+|---|---|---|
+| decorations, three worlds | 3,756 | **3,761** (+0.1%) |
+| obstacles | 1,614 | 1,614 (unchanged) |
+
+### One field, two questions
+
+The props have always counted the **water's edge** as a frontier -- a pebble on
+a shoreline reads as floating -- and the movement rule deliberately will not,
+because walking to the water's edge reads as standing on a beach. That is the
+one place the two consumers genuinely disagree, so the field carries two
+channels: `data`, the distance to another *level*, and `edge`, the distance to
+anything that is not floor at all. `clear` reads the first, `prop_clear` the
+smaller of both.
+
+The flight exemption moved out of the pixels and into a set of tiles while this
+was being done. Baking it into `data` had made it a property of the geometry,
+which it is not -- it is a rule about *movement*. A prop has no business
+standing on a staircase whichever way the margin falls, and now it cannot,
+because `prop_clear` does not consult the exemption at all.
+
+### The phase gate
+
+`test_only_the_landed_phases_read_the_field` walks the source and asserts the
+field's readers are exactly `islands.py` (which builds it) and `frontier.py`
+(which now asks it). Movement and the flow field are still to come, and the
+point of four small landings is that if one of them changes how the world plays
+it does so alone and visibly. A test is a cheaper way to keep that promise than
+remembering to.
+
+---
+
+## W — the terrace margin, phase 3: the collider — ✅ DONE
+
+`is_walkable` applied the elevation rule to a body's centre and left the radius
+probes as a plain floor test, deliberately, so a large enemy could still stand
+near a rim. That is why a character could sit with 40% of itself over the floor
+below and nothing objected. The margin now applies to the centre as well.
+
+`GameMap.inset_ok` asks the room the point actually stands on -- mirroring
+`_point_ok`'s search rather than testing bounding boxes, since grown island
+rects overlap in the void. `body_inset` is read from `terrain.json`, not
+defaulted in code, and 0 switches the rule off entirely.
+
+| | |
+|---|---|
+| standing points the margin refuses, two worlds | **11.5-11.8%** |
+| `tests/characters`, `tests/ai`, spawning, elevation | green, 212 tests |
+
+**Fixed pixels, not body radius.** The boss is 46 px of radius; a
+radius-derived margin would forbid it from most of a 64 px terrace. The rule
+exists so two floors read as separate, not so bodies are physically excluded.
+
+**Cannot enter, may leave.** A body already inside the margin -- spawned there
+before the rule existed, knocked back into it, standing where a crossing's
+exemption ends -- may still move, provided it does not go deeper. Refusing
+outright would freeze anything the moment something put it there, and things
+will.
+
+### What phase 4 has to close, exactly
+
+The collider and the flow field are two authorities again, and the drift is
+measurable:
+
+| nav class | cell px | cells the field routes through that the collider now refuses |
+|---|---|---|
+| small | 32 | **0 of 32,784** |
+| large | 48 | **889 of 14,594** (6.1%) |
+
+Zero for the small class is not luck. Its cells are 32 px on a 64 px tile
+lattice, so every walkable cell centre sits exactly 16 px from the nearest tile
+edge -- twice the margin, and frontiers are tile-aligned. The 48 px class does
+not divide into 64, so its centres land anywhere and 6% of them fall inside the
+margin. That is the whole of the drift, and it is what phase 4 bakes out.
+
+### Two ways the tests were wrong before they were right
+
+The escape-hatch test walked a body from inside the margin to a point 24 px
+away and asserted it could move. It could not -- but not because of the margin:
+one direction crossed a level change and `path_ok` refused it, the other had a
+rock sitting in it. A test phrased as "walk somewhere" measures three rules and
+blames whichever one is being changed. It states the margin rule on its own
+now: refused when arriving from outside, allowed when already there.
+
+And the phase gate caught `map.py` reading the field before I had updated it,
+which is exactly the job it was written for.
+
+---
+
+## X — the terrace margin, phase 4: the flow field — ✅ DONE
+
+Phase 3 left the collider refusing ground the flow field still routed through:
+889 of 14,594 cells on the 48 px nav class, none at all on the 32 px one. An
+enemy sent at one of those cells would arrive at a boundary the collider will
+not let it cross and grind on the corner for ever -- which reads as broken AI
+rather than as a rule, and is the third time this milestone that two
+authorities over the same geometry have drifted apart.
+
+The margin is baked into `NavGrid` now, where the walkable mask is built. Both
+sides read `inset.body_inset()` -- one accessor, one data key -- because the
+lesson from `walk_links` against `_flight_opens`, and from the baked step mask
+against `can_step`, is that the fix is never to make the second derivation
+match; it is to delete the second derivation.
+
+| nav class | cell px | walkable before | after | drift after |
+|---|---|---|---|---|
+| small | 32 | 32,784 | 32,784 (**-0.0%**) | **0** |
+| large | 48 | 14,594 | 13,705 (**-6.1%**) | **0** |
+
+Three worlds, and no flight cell falls off either grid.
+
+### Not walkable, and not stone
+
+A margin cell is skipped rather than marked `blocked`. `blocked` seeds the wall
+chamfer that produces `clearance`, so calling a margin stone would shrink the
+clearance of every cell near a rim -- which is exactly what would stop the
+48 px class threading a one-tile neck, and there are 323 of those. The test for
+it does not inspect the flag, which is local to the constructor anyway; it
+builds the field twice, with the margin on and off, and requires the clearance
+transform to come out byte for byte identical.
+
+### Where the margin landed, end to end
+
+| | |
+|---|---|
+| built | `_build_inset_fields`, right after the grid is final |
+| size | 2 channels + a tile set, ~174 KB an island |
+| props | `frontier_clear` reads it; strictly tighter, 0 loosenings |
+| bodies | centre must sit 8 px inside its own floor |
+| AI | same rule, baked once per nav class |
+| floor lost | **0 tiles**, margins 6 to 12 px |
+| crossings | exempt, and still on both nav grids |
+| water | not a frontier, by decision |
+
+Four landings, each with its own suite, and a test that walks the source to
+make sure a fifth reader of the field is a decision rather than an accident.

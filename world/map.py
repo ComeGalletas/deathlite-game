@@ -17,6 +17,7 @@ import pygame
 
 from game import config
 from game.assets import get_assets
+from world import inset as terrain_inset
 from world.elevation import LevelIndex, can_step
 from world.procedural import Room, WorldLayout, generate_world
 from world.terrain import autotile
@@ -53,6 +54,11 @@ class GameMap:
             # (all level 0) with the height-map flag off, so it refuses
             # nothing there.
             self._levels = LevelIndex(self.layout)
+
+        # The terrace margin (`world/inset.py`): how far inside its own floor a
+        # body's centre has to stand. Read from the data rather than defaulted
+        # in code; 0 switches the whole rule off.
+        self._body_inset = terrain_inset.body_inset()
 
         # Tiled-terrain state, built lazily on the first draw() (needs a display).
         self._tiles_ready = False
@@ -179,6 +185,38 @@ class GameMap:
                 return True
         return False
 
+    def _room_of(self, x: float, y: float):
+        """The room whose floor the point actually stands on, or `None`.
+
+        Mirrors `_point_ok`'s search rather than testing bounding boxes: grown
+        island rects overlap in the void, so a point inside two boxes belongs
+        to whichever one has a cell there.
+        """
+        if self.layout is None:
+            return None
+        for r in self.layout.rooms:
+            rr = r.rect
+            if (rr.left <= x < rr.right and rr.top <= y < rr.bottom
+                    and self.room_cell(r, x, y) in r.cells):
+                return r
+        return None
+
+    def inset_at(self, x: float, y: float) -> float:
+        """How far inside its own terrace `(x, y)` stands, in pixels.
+
+        `CAP` off any island floor -- a corridor, a bridge, a plank stair --
+        because those are flat and carry no level boundary to keep away from.
+        """
+        room = self._room_of(x, y)
+        if room is None:
+            return float(terrain_inset.CAP)
+        return float(terrain_inset.world_at(room, x, y))
+
+    def inset_ok(self, x: float, y: float) -> bool:
+        """Is `(x, y)` far enough inside its own terrace for a body to stand?"""
+        return (self._body_inset <= 0.0
+                or self.inset_at(x, y) >= self._body_inset)
+
     def path_ok(self, prev: pygame.Vector2, new: pygame.Vector2) -> bool:
         """May a body travel from `prev` to `new` given the terrain's elevation?
 
@@ -225,9 +263,26 @@ class GameMap:
         below stay a plain floor test, as they always were: a terrace is a few
         tiles wide, so demanding that every probe sit on the centre's level
         would stop a large enemy standing anywhere near a rim, and overhanging
-        a drop is exactly what those probes already tolerate against a wall."""
+        a drop is exactly what those probes already tolerate against a wall.
+
+        The **terrace margin** is applied to the centre as well, and for the
+        same reason it is a fixed number of pixels rather than a body radius:
+        it exists so that two floors read as separate, not so that bodies are
+        physically excluded. Scaling it by radius would forbid the boss, at 46
+        px, from most of a 64 px terrace.
+
+        A body already inside the margin -- spawned there before the rule
+        existed, knocked back into it, or standing where a crossing's exemption
+        ends -- may still move, as long as it does not go *deeper*. "Cannot
+        enter, may leave" is what stops the rule wedging anything; refusing
+        outright would freeze a body the moment anything put it there."""
         if not self._point_ok(pos.x, pos.y):
             return False
+        if self._body_inset > 0.0 and not self.inset_ok(pos.x, pos.y):
+            if frm is None:
+                return False
+            if self.inset_at(pos.x, pos.y) < self.inset_at(frm.x, frm.y):
+                return False
         if frm is not None and not self.path_ok(frm, pos):
             return False
         if radius > 0 and not (

@@ -1,56 +1,133 @@
 {
   "tile_px": 64,
   "floor_sheet": "terrain/tiles/tilemap_1.png",
-  "floor_sheets": { "1": "terrain/tiles/tilemap_2.png", "2": "terrain/tiles/tilemap_3.png", "3": "terrain/tiles/tilemap_5.png" },
-  "grid": [9, 6],
+  "floor_sheets": {
+    "1": "terrain/tiles/tilemap_2.png",
+    "2": "terrain/tiles/tilemap_3.png",
+    "3": "terrain/tiles/tilemap_5.png"
+  },
+  "grid": [
+    9,
+    6
+  ],
   "water_tile": "terrain/tiles/water_background.png",
   "tree_routines": [
-    {"fps": 4, "phase": 0},
-    {"fps": 5, "phase": 2},
-    {"fps": 6, "phase": 4}
+    {
+      "fps": 4,
+      "phase": 0
+    },
+    {
+      "fps": 5,
+      "phase": 2
+    },
+    {
+      "fps": 6,
+      "phase": 4
+    }
   ],
-
   "foam_routines": [
-    {"fps": 9, "phase": 0},
-    {"fps": 12, "phase": 5},
-    {"fps": 15, "phase": 10}
+    {
+      "fps": 9,
+      "phase": 0
+    },
+    {
+      "fps": 12,
+      "phase": 5
+    },
+    {
+      "fps": 15,
+      "phase": 10
+    }
   ],
-
   "slots": {
     "interior": 10,
-    "edge_n": 1, "edge_s": 19, "edge_w": 9, "edge_e": 11,
-    "corner_nw": 0, "corner_ne": 2, "corner_sw": 18, "corner_se": 20,
-    "strip_v": [3, 12, 21],
-    "strip_h": [27, 28, 29],
+    "edge_n": 1,
+    "edge_s": 19,
+    "edge_w": 9,
+    "edge_e": 11,
+    "corner_nw": 0,
+    "corner_ne": 2,
+    "corner_sw": 18,
+    "corner_se": 20,
+    "strip_v": [
+      3,
+      12,
+      21
+    ],
+    "strip_h": [
+      27,
+      28,
+      29
+    ],
     "single": 30,
     "cliff": {
-      "top":    { "left": 32, "mid": 33, "right": 34, "single": 35 },
-      "body":   { "left": 41, "mid": 42, "right": 43, "single": 44 },
-      "bottom": { "left": 50, "mid": 51, "right": 52, "single": 53 }
+      "top": {
+        "left": 32,
+        "mid": 33,
+        "right": 34,
+        "single": 35
+      },
+      "body": {
+        "left": 41,
+        "mid": 42,
+        "right": 43,
+        "single": 44
+      },
+      "bottom": {
+        "left": 50,
+        "mid": 51,
+        "right": 52,
+        "single": 53
+      }
     },
     "ramp": {
-      "w": [36, 45],
-      "e": [39, 48],
-      "s": [17, 17]
+      "w": [
+        36,
+        45
+      ],
+      "e": [
+        39,
+        48
+      ],
+      "s": [
+        17,
+        17
+      ]
     },
     "raised": {
-      "":   15,
-      "n":  6,  "s":  24, "w":  14, "e":  16,
-      "nw": 5,  "ne": 7,  "sw": 23, "se": 25, "ns": 33, "we": 17,
-      "nwe": 8, "swe": 26, "nsw": 32, "nse": 34,
+      "": 15,
+      "n": 6,
+      "s": 24,
+      "w": 14,
+      "e": 16,
+      "nw": 5,
+      "ne": 7,
+      "sw": 23,
+      "se": 25,
+      "ns": 33,
+      "we": 17,
+      "nwe": 8,
+      "swe": 26,
+      "nsw": 32,
+      "nse": 34,
       "nswe": 35
     }
   },
-
   "bridge": {
     "sheet": "terrain/bridge/bridge_all.png",
-    "grid": [3, 4],
+    "grid": [
+      3,
+      4
+    ],
     "slots": {
-      "h_left": 0, "h_mid": 1, "h_right": 2,
-      "v_top": 3, "v_mid": 6, "v_bot": 9
+      "h_left": 0,
+      "h_mid": 1,
+      "h_right": 2,
+      "v_top": 3,
+      "v_mid": 6,
+      "v_bot": 9
     }
   },
-
   "vstair": {
     "sheet": "terrain/tiles/vstairs.png",
     "core_cols": 1,
@@ -59,114 +136,827 @@
       "2": "terrain/tiles/vstairs_2.png"
     }
   },
-
   "room_palettes": {
-    "default":  "terrain/tiles/tilemap_1.png",
-    "boss":     "terrain/tiles/tilemap_4.png",
+    "default": "terrain/tiles/tilemap_1.png",
+    "boss": "terrain/tiles/tilemap_4.png",
     "treasure": "terrain/tiles/tilemap_2.png",
-    "shrine":   "terrain/tiles/tilemap_3.png",
+    "shrine": "terrain/tiles/tilemap_3.png",
     "fountain": "terrain/tiles/tilemap_5.png"
   },
-
   "decor_placement": {
     "edge_inset": 8,
     "uphill_keepback": 1.0,
     "centre_clear": 176
   },
-
-  "decorations": [
-    {"id": "pebble_small",  "rig": "deco_rock_1", "placement": "room_interior", "scale": 0.45, "per_room": [1, 4], "min_gap": 20, "collision": false, "tier": "ground_cover"},
-    {"id": "pebble_flat",   "rig": "deco_rock_3", "placement": "room_interior", "scale": 0.5,  "per_room": [0, 1], "min_gap": 20, "collision": false, "tier": "ground_cover"},
-    {"id": "water_rock_a",  "rig": "deco_water_rock_1", "placement": "void", "scale": 1.0, "chance": 0.05},
-    {"id": "water_rock_b",  "rig": "deco_water_rock_2", "placement": "void", "scale": 1.0, "chance": 0.05},
-    {"id": "water_rock_c",  "rig": "deco_water_rock_3", "placement": "void", "scale": 0.85, "chance": 0.04},
-    {"id": "water_rock_d",  "rig": "deco_water_rock_4", "placement": "void", "scale": 0.85, "chance": 0.04},
-    {"id": "duck",          "rig": "deco_duck", "placement": "void", "scale": 1.0, "chance": 0.02},
-
-    {"id": "stone_slab", "rig": "deco_ground_5", "placement": "room_interior", "scale": 0.6, "per_room": [0, 3], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["rock", "sand", "wetland", "drab"]},
-    {"id": "stone_cluster", "rig": "deco_ground_6", "placement": "room_interior", "scale": 0.6, "per_room": [0, 4], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["rock", "sand", "drab"]},
-    {"id": "stone_pair", "rig": "deco_ground_4", "placement": "room_interior", "scale": 0.5, "per_room": [0, 2], "min_gap": 20, "collision": false, "tier": "feature", "biomes": ["rock", "sand", "wetland", "drab"]},
-    {"id": "boulder_big", "rig": "deco_rock_2", "placement": "room_interior", "scale": 0.5, "per_room": [0, 2], "min_gap": 22, "collision": false, "tier": "feature", "biomes": ["rock", "sand"]},
-    {"id": "boulder_pile", "rig": "deco_rock_4", "placement": "room_interior", "scale": 0.45, "per_room": [0, 2], "min_gap": 22, "collision": false, "tier": "feature", "biomes": ["rock", "wetland"]},
-    {"id": "mossy_stone", "rig": "deco_ground_7", "placement": "room_interior", "scale": 0.55, "per_room": [0, 2], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["wetland", "rock", "forest"]},
-    {"id": "mossy_rocks", "rig": "deco_ground_8", "placement": "room_interior", "scale": 0.55, "per_room": [0, 2], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["wetland", "rock"]},
-    {"id": "bone_rib", "rig": "deco_ground_14", "placement": "room_interior", "scale": 0.4, "per_room": [0, 2], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["sand", "rock"]},
-    {"id": "bone_shard", "rig": "deco_ground_15", "placement": "room_interior", "scale": 0.4, "per_room": [0, 2], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["sand", "rock"]},
-
-    {"id": "grass_tuft", "rig": "deco_ground_9", "placement": "room_interior", "scale": 0.5, "per_room": [1, 4], "min_gap": 12, "collision": false, "tier": "ground_cover", "biomes": ["meadow", "forest", "drab", "wetland"]},
-    {"id": "grass_blades", "rig": "deco_ground_11", "placement": "room_interior", "scale": 0.9, "per_room": [1, 4], "min_gap": 10, "collision": false, "tier": "ground_cover"},
-    {"id": "grass_sprout", "rig": "deco_ground_10", "placement": "room_interior", "scale": 1.0, "per_room": [1, 4], "min_gap": 10, "collision": false, "tier": "ground_cover"},
-    {"id": "mushroom_small", "rig": "deco_ground_2", "placement": "room_interior", "scale": 0.6, "per_room": [0, 3], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["forest", "wetland"]},
-    {"id": "mushroom_red", "rig": "deco_ground_1", "placement": "room_interior", "scale": 0.5, "per_room": [0, 2], "min_gap": 16, "collision": false, "tier": "feature", "biomes": ["forest", "wetland"]},
-    {"id": "mushroom_big", "rig": "deco_ground_3", "placement": "room_interior", "scale": 0.45, "per_room": [0, 1], "min_gap": 18, "collision": false, "tier": "feature", "biomes": ["forest"]},
-    {"id": "pumpkin_a", "rig": "deco_ground_pumpkin_2", "placement": "room_interior", "scale": 0.5, "per_room": [0, 1], "min_gap": 14, "collision": false, "tier": "feature", "biomes": ["meadow", "forest", "drab"]},
-    {"id": "pumpkin_b", "rig": "deco_ground_pumpkin_1", "placement": "room_interior", "scale": 0.5, "per_room": [0, 2], "min_gap": 14, "collision": false, "tier": "feature", "biomes": ["meadow", "forest", "drab"]},
-
-    {"id": "stump_a", "rig": "deco_stump_1", "placement": "room_interior", "scale": 0.77, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["forest", "meadow", "drab", "rock", "sand"]},
-    {"id": "stump_b", "rig": "deco_stump_3", "placement": "room_interior", "scale": 0.7, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["forest", "meadow", "drab", "rock", "sand"]},
-    {"id": "stump_c", "rig": "deco_stump_5", "placement": "room_interior", "scale": 0.98, "per_room": [0, 2], "min_gap": 20, "collision": false, "tier": "landmark", "biomes": ["forest", "meadow", "drab", "rock", "sand"]},
-    {"id": "stump_d", "rig": "deco_stump_2", "placement": "room_interior", "scale": 0.77, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["forest", "drab", "rock", "sand"]},
-    {"id": "stump_e", "rig": "deco_stump_4", "placement": "room_interior", "scale": 0.77, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["forest", "drab", "rock", "sand"]},
-
-    {"id": "bush_a", "rig": "deco_bush_1", "placement": "room_interior", "scale": 0.75, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["meadow", "forest", "drab", "wetland"]},
-    {"id": "bush_b", "rig": "deco_bush_2", "placement": "room_interior", "scale": 0.75, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["meadow", "forest", "drab"]},
-    {"id": "bush_c", "rig": "deco_bush_3", "placement": "room_interior", "scale": 0.75, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["forest", "wetland", "drab"]},
-    {"id": "bush_d", "rig": "deco_bush_4", "placement": "room_interior", "scale": 0.75, "per_room": [0, 1], "collision": false, "tier": "landmark", "biomes": ["meadow", "forest", "wetland"]},
-
-
-    {"id": "shore_rock_a",  "rig": "deco_water_rock_1", "placement": "shore", "scale": 1.0,  "chance": 0.09},
-    {"id": "shore_rock_b",  "rig": "deco_water_rock_2", "placement": "shore", "scale": 1.0,  "chance": 0.09},
-    {"id": "shore_rock_c",  "rig": "deco_water_rock_3", "placement": "shore", "scale": 0.85, "chance": 0.07},
-    {"id": "shore_rock_d",  "rig": "deco_water_rock_4", "placement": "shore", "scale": 0.85, "chance": 0.07},
-
-    {"id": "lake_rock_a",   "rig": "deco_water_rock_3", "placement": "lake",  "scale": 0.75, "chance": 0.10},
-    {"id": "lake_rock_b",   "rig": "deco_water_rock_4", "placement": "lake",  "scale": 0.75, "chance": 0.10},
-    {"id": "lake_rock_c",   "rig": "deco_water_rock_1", "placement": "lake",  "scale": 0.70, "chance": 0.08},
-    {"id": "lake_duck",     "rig": "deco_duck",         "placement": "lake",  "scale": 1.0,  "chance": 0.09},
-
-    {"id": "cloud_a",       "rig": "deco_cloud_2", "placement": "void", "scale": 0.30, "chance": 0.006},
-    {"id": "cloud_b",       "rig": "deco_cloud_3", "placement": "void", "scale": 0.30, "chance": 0.006},
-    {"id": "cloud_c",       "rig": "deco_cloud_5", "placement": "void", "scale": 0.26, "chance": 0.005},
-    {"id": "cloud_d",       "rig": "deco_cloud_7", "placement": "void", "scale": 0.32, "chance": 0.006},
-    {"id": "cloud_e",       "rig": "deco_cloud_1", "placement": "void", "scale": 0.28, "chance": 0.005},
-    {"id": "cloud_f",       "rig": "deco_cloud_4", "placement": "void", "scale": 0.30, "chance": 0.005},
-    {"id": "cloud_g",       "rig": "deco_cloud_6", "placement": "void", "scale": 0.34, "chance": 0.005},
-    {"id": "cloud_h",       "rig": "deco_cloud_8", "placement": "void", "scale": 0.26, "chance": 0.004}
-  ],
-
-  "biomes": {
-    "meadow": {"tint": [152, 181, 86], "note": "bright yellow-green",
-      "scatter": {"per_1000": 85,
-        "weights": {"tree": 5, "rock": 2, "pillar": 1, "shrub": 4, "sign": 0.4, "scarecrow": 0.35}},
-      "decor": {"per_1000": {"ground_cover": 260, "feature": 60, "landmark": 14}},
-      "trees": ["deco_tree_3", "deco_tree_4"]},
-    "forest": {"tint": [115, 172, 93], "note": "deeper green",
-      "scatter": {"per_1000": 100,
-        "weights": {"tree": 7, "rock": 1, "pillar": 1, "shrub": 4, "sign": 0.4}},
-      "decor": {"per_1000": {"ground_cover": 240, "feature": 80, "landmark": 18}},
-      "trees": ["deco_tree_1", "deco_tree_2", "deco_tree_5"]},
-    "drab": {"tint": [130, 152, 94], "note": "olive, worn",
-      "scatter": {"per_1000": 80,
-        "weights": {"tree": 4, "rock": 3, "pillar": 2, "shrub": 3, "sign": 0.4, "scarecrow": 0.35}},
-      "decor": {"per_1000": {"ground_cover": 200, "feature": 65, "landmark": 14}},
-      "trees": ["deco_tree_3", "deco_tree_4"]},
-    "wetland": {"tint": [87, 153, 139], "note": "teal-green, damp",
-      "scatter": {"per_1000": 75,
-        "weights": {"tree": 3, "rock": 4, "pillar": 2, "shrub": 3}},
-      "decor": {"per_1000": {"ground_cover": 170, "feature": 70, "landmark": 12}},
-      "trees": ["deco_tree_1", "deco_tree_2", "deco_tree_5"]},
-    "rock": {"tint": [137, 185, 186], "note": "pale blue-grey stone",
-      "scatter": {"per_1000": 140,
-        "weights": {"tree": 0.3, "rock": 6, "pillar": 4, "shrub": 1}},
-      "decor": {"per_1000": {"ground_cover": 80, "feature": 85, "landmark": 10}},
-      "trees": ["deco_tree_1", "deco_tree_2", "deco_tree_5"]},
-    "sand": {"tint": [244, 224, 125], "note": "pale yellow",
-      "scatter": {"per_1000": 45,
-        "weights": {"tree": 0.3, "rock": 3, "pillar": 1, "shrub": 1}},
-      "decor": {"per_1000": {"ground_cover": 55, "feature": 70, "landmark": 8}},
-      "trees": ["deco_tree_3", "deco_tree_4"]}
+  "frontier": {
+    "body_inset": 8
   },
-
+  "decorations": [
+    {
+      "id": "pebble_small",
+      "rig": "deco_rock_1",
+      "placement": "room_interior",
+      "scale": 0.45,
+      "per_room": [
+        1,
+        4
+      ],
+      "min_gap": 20,
+      "collision": false,
+      "tier": "ground_cover"
+    },
+    {
+      "id": "pebble_flat",
+      "rig": "deco_rock_3",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        0,
+        1
+      ],
+      "min_gap": 20,
+      "collision": false,
+      "tier": "ground_cover"
+    },
+    {
+      "id": "water_rock_a",
+      "rig": "deco_water_rock_1",
+      "placement": "void",
+      "scale": 1.0,
+      "chance": 0.05
+    },
+    {
+      "id": "water_rock_b",
+      "rig": "deco_water_rock_2",
+      "placement": "void",
+      "scale": 1.0,
+      "chance": 0.05
+    },
+    {
+      "id": "water_rock_c",
+      "rig": "deco_water_rock_3",
+      "placement": "void",
+      "scale": 0.85,
+      "chance": 0.04
+    },
+    {
+      "id": "water_rock_d",
+      "rig": "deco_water_rock_4",
+      "placement": "void",
+      "scale": 0.85,
+      "chance": 0.04
+    },
+    {
+      "id": "duck",
+      "rig": "deco_duck",
+      "placement": "void",
+      "scale": 1.0,
+      "chance": 0.02
+    },
+    {
+      "id": "stone_slab",
+      "rig": "deco_ground_5",
+      "placement": "room_interior",
+      "scale": 0.6,
+      "per_room": [
+        0,
+        3
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "rock",
+        "sand",
+        "wetland",
+        "drab"
+      ]
+    },
+    {
+      "id": "stone_cluster",
+      "rig": "deco_ground_6",
+      "placement": "room_interior",
+      "scale": 0.6,
+      "per_room": [
+        0,
+        4
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "rock",
+        "sand",
+        "drab"
+      ]
+    },
+    {
+      "id": "stone_pair",
+      "rig": "deco_ground_4",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 20,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "rock",
+        "sand",
+        "wetland",
+        "drab"
+      ]
+    },
+    {
+      "id": "boulder_big",
+      "rig": "deco_rock_2",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 22,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "rock",
+        "sand"
+      ]
+    },
+    {
+      "id": "boulder_pile",
+      "rig": "deco_rock_4",
+      "placement": "room_interior",
+      "scale": 0.45,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 22,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "rock",
+        "wetland"
+      ]
+    },
+    {
+      "id": "mossy_stone",
+      "rig": "deco_ground_7",
+      "placement": "room_interior",
+      "scale": 0.55,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "wetland",
+        "rock",
+        "forest"
+      ]
+    },
+    {
+      "id": "mossy_rocks",
+      "rig": "deco_ground_8",
+      "placement": "room_interior",
+      "scale": 0.55,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "wetland",
+        "rock"
+      ]
+    },
+    {
+      "id": "bone_rib",
+      "rig": "deco_ground_14",
+      "placement": "room_interior",
+      "scale": 0.4,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "sand",
+        "rock"
+      ]
+    },
+    {
+      "id": "bone_shard",
+      "rig": "deco_ground_15",
+      "placement": "room_interior",
+      "scale": 0.4,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "sand",
+        "rock"
+      ]
+    },
+    {
+      "id": "grass_tuft",
+      "rig": "deco_ground_9",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        1,
+        4
+      ],
+      "min_gap": 12,
+      "collision": false,
+      "tier": "ground_cover",
+      "biomes": [
+        "meadow",
+        "forest",
+        "drab",
+        "wetland"
+      ]
+    },
+    {
+      "id": "grass_blades",
+      "rig": "deco_ground_11",
+      "placement": "room_interior",
+      "scale": 0.9,
+      "per_room": [
+        1,
+        4
+      ],
+      "min_gap": 10,
+      "collision": false,
+      "tier": "ground_cover"
+    },
+    {
+      "id": "grass_sprout",
+      "rig": "deco_ground_10",
+      "placement": "room_interior",
+      "scale": 1.0,
+      "per_room": [
+        1,
+        4
+      ],
+      "min_gap": 10,
+      "collision": false,
+      "tier": "ground_cover"
+    },
+    {
+      "id": "mushroom_small",
+      "rig": "deco_ground_2",
+      "placement": "room_interior",
+      "scale": 0.6,
+      "per_room": [
+        0,
+        3
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "forest",
+        "wetland"
+      ]
+    },
+    {
+      "id": "mushroom_red",
+      "rig": "deco_ground_1",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 16,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "forest",
+        "wetland"
+      ]
+    },
+    {
+      "id": "mushroom_big",
+      "rig": "deco_ground_3",
+      "placement": "room_interior",
+      "scale": 0.45,
+      "per_room": [
+        0,
+        1
+      ],
+      "min_gap": 18,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "forest"
+      ]
+    },
+    {
+      "id": "pumpkin_a",
+      "rig": "deco_ground_pumpkin_2",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        0,
+        1
+      ],
+      "min_gap": 14,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "meadow",
+        "forest",
+        "drab"
+      ]
+    },
+    {
+      "id": "pumpkin_b",
+      "rig": "deco_ground_pumpkin_1",
+      "placement": "room_interior",
+      "scale": 0.5,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 14,
+      "collision": false,
+      "tier": "feature",
+      "biomes": [
+        "meadow",
+        "forest",
+        "drab"
+      ]
+    },
+    {
+      "id": "stump_a",
+      "rig": "deco_stump_1",
+      "placement": "room_interior",
+      "scale": 0.77,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "forest",
+        "meadow",
+        "drab",
+        "rock",
+        "sand"
+      ]
+    },
+    {
+      "id": "stump_b",
+      "rig": "deco_stump_3",
+      "placement": "room_interior",
+      "scale": 0.7,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "forest",
+        "meadow",
+        "drab",
+        "rock",
+        "sand"
+      ]
+    },
+    {
+      "id": "stump_c",
+      "rig": "deco_stump_5",
+      "placement": "room_interior",
+      "scale": 0.98,
+      "per_room": [
+        0,
+        2
+      ],
+      "min_gap": 20,
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "forest",
+        "meadow",
+        "drab",
+        "rock",
+        "sand"
+      ]
+    },
+    {
+      "id": "stump_d",
+      "rig": "deco_stump_2",
+      "placement": "room_interior",
+      "scale": 0.77,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "forest",
+        "drab",
+        "rock",
+        "sand"
+      ]
+    },
+    {
+      "id": "stump_e",
+      "rig": "deco_stump_4",
+      "placement": "room_interior",
+      "scale": 0.77,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "forest",
+        "drab",
+        "rock",
+        "sand"
+      ]
+    },
+    {
+      "id": "bush_a",
+      "rig": "deco_bush_1",
+      "placement": "room_interior",
+      "scale": 0.75,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "meadow",
+        "forest",
+        "drab",
+        "wetland"
+      ]
+    },
+    {
+      "id": "bush_b",
+      "rig": "deco_bush_2",
+      "placement": "room_interior",
+      "scale": 0.75,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "meadow",
+        "forest",
+        "drab"
+      ]
+    },
+    {
+      "id": "bush_c",
+      "rig": "deco_bush_3",
+      "placement": "room_interior",
+      "scale": 0.75,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "forest",
+        "wetland",
+        "drab"
+      ]
+    },
+    {
+      "id": "bush_d",
+      "rig": "deco_bush_4",
+      "placement": "room_interior",
+      "scale": 0.75,
+      "per_room": [
+        0,
+        1
+      ],
+      "collision": false,
+      "tier": "landmark",
+      "biomes": [
+        "meadow",
+        "forest",
+        "wetland"
+      ]
+    },
+    {
+      "id": "shore_rock_a",
+      "rig": "deco_water_rock_1",
+      "placement": "shore",
+      "scale": 1.0,
+      "chance": 0.09
+    },
+    {
+      "id": "shore_rock_b",
+      "rig": "deco_water_rock_2",
+      "placement": "shore",
+      "scale": 1.0,
+      "chance": 0.09
+    },
+    {
+      "id": "shore_rock_c",
+      "rig": "deco_water_rock_3",
+      "placement": "shore",
+      "scale": 0.85,
+      "chance": 0.07
+    },
+    {
+      "id": "shore_rock_d",
+      "rig": "deco_water_rock_4",
+      "placement": "shore",
+      "scale": 0.85,
+      "chance": 0.07
+    },
+    {
+      "id": "lake_rock_a",
+      "rig": "deco_water_rock_3",
+      "placement": "lake",
+      "scale": 0.75,
+      "chance": 0.1
+    },
+    {
+      "id": "lake_rock_b",
+      "rig": "deco_water_rock_4",
+      "placement": "lake",
+      "scale": 0.75,
+      "chance": 0.1
+    },
+    {
+      "id": "lake_rock_c",
+      "rig": "deco_water_rock_1",
+      "placement": "lake",
+      "scale": 0.7,
+      "chance": 0.08
+    },
+    {
+      "id": "lake_duck",
+      "rig": "deco_duck",
+      "placement": "lake",
+      "scale": 1.0,
+      "chance": 0.09
+    },
+    {
+      "id": "cloud_a",
+      "rig": "deco_cloud_2",
+      "placement": "void",
+      "scale": 0.3,
+      "chance": 0.006
+    },
+    {
+      "id": "cloud_b",
+      "rig": "deco_cloud_3",
+      "placement": "void",
+      "scale": 0.3,
+      "chance": 0.006
+    },
+    {
+      "id": "cloud_c",
+      "rig": "deco_cloud_5",
+      "placement": "void",
+      "scale": 0.26,
+      "chance": 0.005
+    },
+    {
+      "id": "cloud_d",
+      "rig": "deco_cloud_7",
+      "placement": "void",
+      "scale": 0.32,
+      "chance": 0.006
+    },
+    {
+      "id": "cloud_e",
+      "rig": "deco_cloud_1",
+      "placement": "void",
+      "scale": 0.28,
+      "chance": 0.005
+    },
+    {
+      "id": "cloud_f",
+      "rig": "deco_cloud_4",
+      "placement": "void",
+      "scale": 0.3,
+      "chance": 0.005
+    },
+    {
+      "id": "cloud_g",
+      "rig": "deco_cloud_6",
+      "placement": "void",
+      "scale": 0.34,
+      "chance": 0.005
+    },
+    {
+      "id": "cloud_h",
+      "rig": "deco_cloud_8",
+      "placement": "void",
+      "scale": 0.26,
+      "chance": 0.004
+    }
+  ],
+  "biomes": {
+    "meadow": {
+      "tint": [
+        152,
+        181,
+        86
+      ],
+      "note": "bright yellow-green",
+      "scatter": {
+        "per_1000": 85,
+        "weights": {
+          "tree": 5,
+          "rock": 2,
+          "pillar": 1,
+          "shrub": 4,
+          "sign": 0.4,
+          "scarecrow": 0.35
+        }
+      },
+      "decor": {
+        "per_1000": {
+          "ground_cover": 260,
+          "feature": 60,
+          "landmark": 14
+        }
+      },
+      "trees": [
+        "deco_tree_3",
+        "deco_tree_4"
+      ]
+    },
+    "forest": {
+      "tint": [
+        115,
+        172,
+        93
+      ],
+      "note": "deeper green",
+      "scatter": {
+        "per_1000": 100,
+        "weights": {
+          "tree": 7,
+          "rock": 1,
+          "pillar": 1,
+          "shrub": 4,
+          "sign": 0.4
+        }
+      },
+      "decor": {
+        "per_1000": {
+          "ground_cover": 240,
+          "feature": 80,
+          "landmark": 18
+        }
+      },
+      "trees": [
+        "deco_tree_1",
+        "deco_tree_2",
+        "deco_tree_5"
+      ]
+    },
+    "drab": {
+      "tint": [
+        130,
+        152,
+        94
+      ],
+      "note": "olive, worn",
+      "scatter": {
+        "per_1000": 80,
+        "weights": {
+          "tree": 4,
+          "rock": 3,
+          "pillar": 2,
+          "shrub": 3,
+          "sign": 0.4,
+          "scarecrow": 0.35
+        }
+      },
+      "decor": {
+        "per_1000": {
+          "ground_cover": 200,
+          "feature": 65,
+          "landmark": 14
+        }
+      },
+      "trees": [
+        "deco_tree_3",
+        "deco_tree_4"
+      ]
+    },
+    "wetland": {
+      "tint": [
+        87,
+        153,
+        139
+      ],
+      "note": "teal-green, damp",
+      "scatter": {
+        "per_1000": 75,
+        "weights": {
+          "tree": 3,
+          "rock": 4,
+          "pillar": 2,
+          "shrub": 3
+        }
+      },
+      "decor": {
+        "per_1000": {
+          "ground_cover": 170,
+          "feature": 70,
+          "landmark": 12
+        }
+      },
+      "trees": [
+        "deco_tree_1",
+        "deco_tree_2",
+        "deco_tree_5"
+      ]
+    },
+    "rock": {
+      "tint": [
+        137,
+        185,
+        186
+      ],
+      "note": "pale blue-grey stone",
+      "scatter": {
+        "per_1000": 140,
+        "weights": {
+          "tree": 0.3,
+          "rock": 6,
+          "pillar": 4,
+          "shrub": 1
+        }
+      },
+      "decor": {
+        "per_1000": {
+          "ground_cover": 80,
+          "feature": 85,
+          "landmark": 10
+        }
+      },
+      "trees": [
+        "deco_tree_1",
+        "deco_tree_2",
+        "deco_tree_5"
+      ]
+    },
+    "sand": {
+      "tint": [
+        244,
+        224,
+        125
+      ],
+      "note": "pale yellow",
+      "scatter": {
+        "per_1000": 45,
+        "weights": {
+          "tree": 0.3,
+          "rock": 3,
+          "pillar": 1,
+          "shrub": 1
+        }
+      },
+      "decor": {
+        "per_1000": {
+          "ground_cover": 55,
+          "feature": 70,
+          "landmark": 8
+        }
+      },
+      "trees": [
+        "deco_tree_3",
+        "deco_tree_4"
+      ]
+    }
+  },
   "sheet_biomes": {
     "terrain/tiles/tilemap_1.png": "meadow",
     "terrain/tiles/tilemap_2.png": "forest",
@@ -177,119 +967,1352 @@
     "terrain/tiles/tilemap_7.png": "meadow",
     "terrain/tiles/tilemap_8.png": "sand"
   },
-
-
   "sheet_flags": {
-    "terrain/tiles/tilemap_6.png": {"shoreline": false},
-    "terrain/tiles/tilemap_7.png": {"shoreline": false},
-    "terrain/tiles/tilemap_8.png": {"shoreline": false}
-  },
-
-  "obstacles": {
-    "tree":   {"radius": 15, "blocks_projectiles": true, "color": [54, 82, 54]},
-    "rock":   {"radius": 30, "blocks_projectiles": true, "color": [92, 92, 100]},
-    "pillar": {"radius": 21, "blocks_projectiles": true, "color": [120, 118, 130]},
-    "house":  {"radius": 34, "blocks_projectiles": true, "color": [150, 120, 90]},
-    "sign":      {"radius": 8,  "blocks_projectiles": false, "color": [122, 96, 62]},
-    "scarecrow": {"radius": 10, "blocks_projectiles": false, "color": [150, 128, 74]}
-  },
-
-  "obstacle_decor": {
-    "size_boost": 1.25,
-    "render_radius": {"tree": 22},
-    "sprite_drop": {"house": 1.35},
-    "render_scale": {"sign": 1.0, "scarecrow": 1.0},
-    "tree_shadow": {"radius_scale": 1.9, "radius_padding": 5, "color": [12, 18, 22], "alpha": 66},
-    "rigs": {
-      "tree":   ["deco_tree_1", "deco_tree_2", "deco_tree_3", "deco_tree_4",
-                 "deco_tree_5"],
-      "rock":   ["deco_rock_1", "deco_rock_2", "deco_rock_3", "deco_rock_4"],
-      "sign":      ["deco_ground_cross_sign", "deco_ground_left_arrow_sign"],
-      "scarecrow": ["deco_ground_scarecrow"],
-      "pillar": ["deco_rock_1", "deco_rock_2", "deco_rock_3", "deco_rock_4"],
-      "house":  ["house_blue_1", "house_blue_2", "house_blue_3",
-                 "house_red_1", "house_red_2", "house_red_3",
-                 "house_yellow_1", "house_yellow_2", "house_yellow_3",
-                 "house_purple_1", "house_purple_2", "house_purple_3",
-                 "house_black_1", "house_black_2", "house_black_3"]
+    "terrain/tiles/tilemap_6.png": {
+      "shoreline": false
+    },
+    "terrain/tiles/tilemap_7.png": {
+      "shoreline": false
+    },
+    "terrain/tiles/tilemap_8.png": {
+      "shoreline": false
     }
   },
-
+  "obstacles": {
+    "tree": {
+      "radius": 15,
+      "blocks_projectiles": true,
+      "color": [
+        54,
+        82,
+        54
+      ]
+    },
+    "rock": {
+      "radius": 30,
+      "blocks_projectiles": true,
+      "color": [
+        92,
+        92,
+        100
+      ]
+    },
+    "pillar": {
+      "radius": 21,
+      "blocks_projectiles": true,
+      "color": [
+        120,
+        118,
+        130
+      ]
+    },
+    "house": {
+      "radius": 34,
+      "blocks_projectiles": true,
+      "color": [
+        150,
+        120,
+        90
+      ]
+    },
+    "sign": {
+      "radius": 8,
+      "blocks_projectiles": false,
+      "color": [
+        122,
+        96,
+        62
+      ]
+    },
+    "scarecrow": {
+      "radius": 10,
+      "blocks_projectiles": false,
+      "color": [
+        150,
+        128,
+        74
+      ]
+    }
+  },
+  "obstacle_decor": {
+    "size_boost": 1.25,
+    "render_radius": {
+      "tree": 22
+    },
+    "sprite_drop": {
+      "house": 1.35
+    },
+    "render_scale": {
+      "sign": 1.0,
+      "scarecrow": 1.0
+    },
+    "tree_shadow": {
+      "radius_scale": 1.9,
+      "radius_padding": 5,
+      "color": [
+        12,
+        18,
+        22
+      ],
+      "alpha": 66
+    },
+    "rigs": {
+      "tree": [
+        "deco_tree_1",
+        "deco_tree_2",
+        "deco_tree_3",
+        "deco_tree_4",
+        "deco_tree_5"
+      ],
+      "rock": [
+        "deco_rock_1",
+        "deco_rock_2",
+        "deco_rock_3",
+        "deco_rock_4"
+      ],
+      "sign": [
+        "deco_ground_cross_sign",
+        "deco_ground_left_arrow_sign"
+      ],
+      "scarecrow": [
+        "deco_ground_scarecrow"
+      ],
+      "pillar": [
+        "deco_rock_1",
+        "deco_rock_2",
+        "deco_rock_3",
+        "deco_rock_4"
+      ],
+      "house": [
+        "house_blue_1",
+        "house_blue_2",
+        "house_blue_3",
+        "house_red_1",
+        "house_red_2",
+        "house_red_3",
+        "house_yellow_1",
+        "house_yellow_2",
+        "house_yellow_3",
+        "house_purple_1",
+        "house_purple_2",
+        "house_purple_3",
+        "house_black_1",
+        "house_black_2",
+        "house_black_3"
+      ]
+    }
+  },
   "rigs": {
-    "deco_bush_1": {"frame": [128, 128], "anchor": [64, 76], "footprint": 73, "anims": {"loop": {"file": "terrain/props/bush_1.png", "frames": 8, "fps": 6, "loop": true}}},
-    "deco_bush_2": {"frame": [128, 128], "anchor": [64, 76], "footprint": 46, "anims": {"loop": {"file": "terrain/props/bush_2.png", "frames": 8, "fps": 6, "loop": true}}},
-    "deco_bush_3": {"frame": [128, 128], "anchor": [64, 80], "footprint": 81, "anims": {"loop": {"file": "terrain/props/bush_3.png", "frames": 8, "fps": 6, "loop": true}}},
-    "deco_bush_4": {"frame": [128, 128], "anchor": [64, 76], "footprint": 46, "anims": {"loop": {"file": "terrain/props/bush_4.png", "frames": 8, "fps": 6, "loop": true}}},
-
-    "deco_rock_1": {"frame": [64, 64], "anchor": [32, 50], "footprint": 32, "anims": {"loop": {"file": "terrain/props/rock_1.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_rock_2": {"frame": [64, 64], "anchor": [32, 50], "footprint": 50, "anims": {"loop": {"file": "terrain/props/rock_2.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_rock_3": {"frame": [64, 64], "anchor": [32, 50], "footprint": 39, "anims": {"loop": {"file": "terrain/props/rock_3.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_rock_4": {"frame": [64, 64], "anchor": [32, 50], "footprint": 59, "anims": {"loop": {"file": "terrain/props/rock_4.png", "frames": 1, "fps": 0, "loop": false}}},
-
-    "deco_tree_1": {"frame": [192, 256], "anchor": [94, 241], "footprint": 59, "anims": {"loop": {"file": "terrain/props/tree_1.png", "frames": 8, "fps": 5, "loop": true}}},
-    "deco_tree_2": {"frame": [192, 256], "anchor": [95, 249], "footprint": 63, "anims": {"loop": {"file": "terrain/props/tree_2.png", "frames": 8, "fps": 5, "loop": true}}},
-    "deco_tree_3": {"frame": [192, 192], "anchor": [96, 170], "footprint": 43, "anims": {"loop": {"file": "terrain/props/tree_3.png", "frames": 8, "fps": 5, "loop": true}}},
-    "deco_tree_4": {"frame": [192, 192], "anchor": [98, 168], "footprint": 32, "anims": {"loop": {"file": "terrain/props/tree_4.png", "frames": 8, "fps": 5, "loop": true}}},
-    "deco_tree_5": {"frame": [192, 192], "anchor": [95, 178], "footprint": 46, "anims": {"loop": {"file": "terrain/props/tree_5.png", "frames": 6, "fps": 5, "loop": true}}},
-
-    "deco_water_rock_1": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/props/water_rock_1.png", "frames": 16, "fps": 10, "loop": true}}},
-    "deco_water_rock_2": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/props/water_rock_2.png", "frames": 16, "fps": 10, "loop": true}}},
-    "deco_water_rock_3": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/props/water_rock_3.png", "frames": 16, "fps": 10, "loop": true}}},
-    "deco_water_rock_4": {"frame": [64, 64], "anchor": [32, 54], "anims": {"loop": {"file": "terrain/props/water_rock_4.png", "frames": 16, "fps": 10, "loop": true}}},
-
-    "deco_duck": {"frame": [32, 32], "anchor": [16, 24], "anims": {"loop": {"file": "terrain/props/duck.png", "frames": 3, "fps": 5, "loop": true}}},
-
-    "deco_ground_1":  {"frame": [64, 64],   "anchor": [33, 43],  "anims": {"loop": {"file": "terrain/props/deco_1.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_2":  {"frame": [64, 64],   "anchor": [34, 47],  "anims": {"loop": {"file": "terrain/props/deco_2.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_3":  {"frame": [64, 64],   "anchor": [33, 49],  "anims": {"loop": {"file": "terrain/props/deco_3.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_4":  {"frame": [64, 64],   "anchor": [34, 37],  "anims": {"loop": {"file": "terrain/props/deco_4.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_5":  {"frame": [64, 64],   "anchor": [32, 40],  "anims": {"loop": {"file": "terrain/props/deco_5.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_6":  {"frame": [64, 64],   "anchor": [34, 49],  "anims": {"loop": {"file": "terrain/props/deco_6.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_7":  {"frame": [64, 64],   "anchor": [31, 43],  "anims": {"loop": {"file": "terrain/props/deco_7.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_8":  {"frame": [64, 64],   "anchor": [32, 49],  "anims": {"loop": {"file": "terrain/props/deco_8.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_9":  {"frame": [64, 64],   "anchor": [32, 53],  "anims": {"loop": {"file": "terrain/props/deco_9.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_10": {"frame": [64, 64],   "anchor": [33, 46],  "anims": {"loop": {"file": "terrain/props/deco_10.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_11": {"frame": [64, 64],   "anchor": [36, 50],  "anims": {"loop": {"file": "terrain/props/deco_11.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_pumpkin_1": {"frame": [64, 64],   "anchor": [31, 51],  "anims": {"loop": {"file": "terrain/props/deco_12.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_pumpkin_2": {"frame": [64, 64],   "anchor": [33, 55],  "anims": {"loop": {"file": "terrain/props/deco_13.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_14": {"frame": [64, 64],   "anchor": [33, 47],  "anims": {"loop": {"file": "terrain/props/deco_14.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_15": {"frame": [64, 64],   "anchor": [36, 44],  "anims": {"loop": {"file": "terrain/props/deco_15.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_cross_sign":       {"frame": [64, 128],  "anchor": [33, 104], "footprint": 52, "anims": {"loop": {"file": "terrain/props/deco_16.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_left_arrow_sign":  {"frame": [64, 128],  "anchor": [31, 105], "footprint": 59, "anims": {"loop": {"file": "terrain/props/deco_17.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_ground_scarecrow":        {"frame": [192, 192], "anchor": [97, 169], "footprint": 87, "anims": {"loop": {"file": "terrain/props/deco_18.png", "frames": 1, "fps": 0, "loop": false}}},
-
-    "deco_stump_1": {"frame": [192, 256], "anchor": [99, 240], "anims": {"loop": {"file": "terrain/props/stump_1.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_stump_2": {"frame": [192, 256], "anchor": [94, 245], "anims": {"loop": {"file": "terrain/props/stump_2.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_stump_3": {"frame": [192, 256], "anchor": [97, 232], "anims": {"loop": {"file": "terrain/props/stump_3.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_stump_4": {"frame": [192, 256], "anchor": [99, 228], "anims": {"loop": {"file": "terrain/props/stump_4.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_stump_5": {"frame": [192, 192], "anchor": [96, 176], "anims": {"loop": {"file": "terrain/props/stump_5.png", "frames": 1, "fps": 0, "loop": false}}},
-
-    "deco_cloud_1": {"frame": [576, 256], "anchor": [285, 120], "anims": {"loop": {"file": "terrain/props/cloud_1.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_2": {"frame": [576, 256], "anchor": [286, 140], "anims": {"loop": {"file": "terrain/props/cloud_2.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_3": {"frame": [576, 256], "anchor": [287, 139], "anims": {"loop": {"file": "terrain/props/cloud_3.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_4": {"frame": [576, 256], "anchor": [287, 143], "anims": {"loop": {"file": "terrain/props/cloud_4.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_5": {"frame": [576, 256], "anchor": [284, 125], "anims": {"loop": {"file": "terrain/props/cloud_5.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_6": {"frame": [576, 256], "anchor": [294, 139], "anims": {"loop": {"file": "terrain/props/cloud_6.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_7": {"frame": [576, 256], "anchor": [290, 133], "anims": {"loop": {"file": "terrain/props/cloud_7.png", "frames": 1, "fps": 0, "loop": false}}},
-    "deco_cloud_8": {"frame": [576, 256], "anchor": [282, 136], "anims": {"loop": {"file": "terrain/props/cloud_8.png", "frames": 1, "fps": 0, "loop": false}}},
-
-    "terrain_foam": {"frame": [192, 192], "anims": {"loop": {"file": "terrain/tiles/water_foam.png", "frames": 16, "fps": 12, "loop": true}}},
-    "terrain_shadow": {"frame": [192, 192], "anims": {"loop": {"file": "terrain/tiles/shadow.png", "frames": 1, "fps": 0, "loop": false}}},
-
-    "house_blue_1":   {"frame": [128, 192], "anchor": [64, 173], "footprint": 112, "anims": {"loop": {"file": "buildings/blue/house_1.png",   "frames": 1, "fps": 0, "loop": false}}},
-    "house_blue_2":   {"frame": [128, 192], "anchor": [64, 178], "footprint": 128, "anims": {"loop": {"file": "buildings/blue/house_2.png",   "frames": 1, "fps": 0, "loop": false}}},
-    "house_blue_3":   {"frame": [128, 192], "anchor": [64, 172], "footprint": 122, "anims": {"loop": {"file": "buildings/blue/house_3.png",   "frames": 1, "fps": 0, "loop": false}}},
-    "house_red_1":    {"frame": [128, 192], "anchor": [64, 173], "footprint": 112, "anims": {"loop": {"file": "buildings/red/house_1.png",    "frames": 1, "fps": 0, "loop": false}}},
-    "house_red_2":    {"frame": [128, 192], "anchor": [64, 178], "footprint": 128, "anims": {"loop": {"file": "buildings/red/house_2.png",    "frames": 1, "fps": 0, "loop": false}}},
-    "house_red_3":    {"frame": [128, 192], "anchor": [64, 172], "footprint": 122, "anims": {"loop": {"file": "buildings/red/house_3.png",    "frames": 1, "fps": 0, "loop": false}}},
-    "house_yellow_1": {"frame": [128, 192], "anchor": [64, 173], "footprint": 112, "anims": {"loop": {"file": "buildings/yellow/house_1.png", "frames": 1, "fps": 0, "loop": false}}},
-    "house_yellow_2": {"frame": [128, 192], "anchor": [64, 178], "footprint": 128, "anims": {"loop": {"file": "buildings/yellow/house_2.png", "frames": 1, "fps": 0, "loop": false}}},
-    "house_yellow_3": {"frame": [128, 192], "anchor": [64, 172], "footprint": 122, "anims": {"loop": {"file": "buildings/yellow/house_3.png", "frames": 1, "fps": 0, "loop": false}}},
-    "house_purple_1": {"frame": [128, 192], "anchor": [64, 173], "footprint": 112, "anims": {"loop": {"file": "buildings/purple/house_1.png", "frames": 1, "fps": 0, "loop": false}}},
-    "house_purple_2": {"frame": [128, 192], "anchor": [64, 178], "footprint": 128, "anims": {"loop": {"file": "buildings/purple/house_2.png", "frames": 1, "fps": 0, "loop": false}}},
-    "house_purple_3": {"frame": [128, 192], "anchor": [64, 172], "footprint": 122, "anims": {"loop": {"file": "buildings/purple/house_3.png", "frames": 1, "fps": 0, "loop": false}}},
-    "house_black_1":  {"frame": [128, 192], "anchor": [64, 173], "footprint": 112, "anims": {"loop": {"file": "buildings/black/house_1.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "house_black_2":  {"frame": [128, 192], "anchor": [64, 178], "footprint": 128, "anims": {"loop": {"file": "buildings/black/house_2.png",  "frames": 1, "fps": 0, "loop": false}}},
-    "house_black_3":  {"frame": [128, 192], "anchor": [64, 172], "footprint": 122, "anims": {"loop": {"file": "buildings/black/house_3.png",  "frames": 1, "fps": 0, "loop": false}}}
+    "deco_bush_1": {
+      "frame": [
+        128,
+        128
+      ],
+      "anchor": [
+        64,
+        76
+      ],
+      "footprint": 73,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/bush_1.png",
+          "frames": 8,
+          "fps": 6,
+          "loop": true
+        }
+      }
+    },
+    "deco_bush_2": {
+      "frame": [
+        128,
+        128
+      ],
+      "anchor": [
+        64,
+        76
+      ],
+      "footprint": 46,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/bush_2.png",
+          "frames": 8,
+          "fps": 6,
+          "loop": true
+        }
+      }
+    },
+    "deco_bush_3": {
+      "frame": [
+        128,
+        128
+      ],
+      "anchor": [
+        64,
+        80
+      ],
+      "footprint": 81,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/bush_3.png",
+          "frames": 8,
+          "fps": 6,
+          "loop": true
+        }
+      }
+    },
+    "deco_bush_4": {
+      "frame": [
+        128,
+        128
+      ],
+      "anchor": [
+        64,
+        76
+      ],
+      "footprint": 46,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/bush_4.png",
+          "frames": 8,
+          "fps": 6,
+          "loop": true
+        }
+      }
+    },
+    "deco_rock_1": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        50
+      ],
+      "footprint": 32,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/rock_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_rock_2": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        50
+      ],
+      "footprint": 50,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/rock_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_rock_3": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        50
+      ],
+      "footprint": 39,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/rock_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_rock_4": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        50
+      ],
+      "footprint": 59,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/rock_4.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_tree_1": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        241
+      ],
+      "footprint": 59,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/tree_1.png",
+          "frames": 8,
+          "fps": 5,
+          "loop": true
+        }
+      }
+    },
+    "deco_tree_2": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        95,
+        249
+      ],
+      "footprint": 63,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/tree_2.png",
+          "frames": 8,
+          "fps": 5,
+          "loop": true
+        }
+      }
+    },
+    "deco_tree_3": {
+      "frame": [
+        192,
+        192
+      ],
+      "anchor": [
+        96,
+        170
+      ],
+      "footprint": 43,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/tree_3.png",
+          "frames": 8,
+          "fps": 5,
+          "loop": true
+        }
+      }
+    },
+    "deco_tree_4": {
+      "frame": [
+        192,
+        192
+      ],
+      "anchor": [
+        98,
+        168
+      ],
+      "footprint": 32,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/tree_4.png",
+          "frames": 8,
+          "fps": 5,
+          "loop": true
+        }
+      }
+    },
+    "deco_tree_5": {
+      "frame": [
+        192,
+        192
+      ],
+      "anchor": [
+        95,
+        178
+      ],
+      "footprint": 46,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/tree_5.png",
+          "frames": 6,
+          "fps": 5,
+          "loop": true
+        }
+      }
+    },
+    "deco_water_rock_1": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        54
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/water_rock_1.png",
+          "frames": 16,
+          "fps": 10,
+          "loop": true
+        }
+      }
+    },
+    "deco_water_rock_2": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        54
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/water_rock_2.png",
+          "frames": 16,
+          "fps": 10,
+          "loop": true
+        }
+      }
+    },
+    "deco_water_rock_3": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        54
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/water_rock_3.png",
+          "frames": 16,
+          "fps": 10,
+          "loop": true
+        }
+      }
+    },
+    "deco_water_rock_4": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        54
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/water_rock_4.png",
+          "frames": 16,
+          "fps": 10,
+          "loop": true
+        }
+      }
+    },
+    "deco_duck": {
+      "frame": [
+        32,
+        32
+      ],
+      "anchor": [
+        16,
+        24
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/duck.png",
+          "frames": 3,
+          "fps": 5,
+          "loop": true
+        }
+      }
+    },
+    "deco_ground_1": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        33,
+        43
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_2": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        34,
+        47
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_3": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        33,
+        49
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_4": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        34,
+        37
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_4.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_5": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        40
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_5.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_6": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        34,
+        49
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_6.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_7": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        31,
+        43
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_7.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_8": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        49
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_8.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_9": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        53
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_9.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_10": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        33,
+        46
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_10.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_11": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        36,
+        50
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_11.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_pumpkin_1": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        31,
+        51
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_12.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_pumpkin_2": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        33,
+        55
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_13.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_14": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        33,
+        47
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_14.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_15": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        36,
+        44
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_15.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_cross_sign": {
+      "frame": [
+        64,
+        128
+      ],
+      "anchor": [
+        33,
+        104
+      ],
+      "footprint": 52,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_16.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_left_arrow_sign": {
+      "frame": [
+        64,
+        128
+      ],
+      "anchor": [
+        31,
+        105
+      ],
+      "footprint": 59,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_17.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_ground_scarecrow": {
+      "frame": [
+        192,
+        192
+      ],
+      "anchor": [
+        97,
+        169
+      ],
+      "footprint": 87,
+      "anims": {
+        "loop": {
+          "file": "terrain/props/deco_18.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_stump_1": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        99,
+        240
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/stump_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_stump_2": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        245
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/stump_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_stump_3": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        97,
+        232
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/stump_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_stump_4": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        99,
+        228
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/stump_4.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_stump_5": {
+      "frame": [
+        192,
+        192
+      ],
+      "anchor": [
+        96,
+        176
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/stump_5.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_1": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        285,
+        120
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_2": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        286,
+        140
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_3": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        287,
+        139
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_4": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        287,
+        143
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_4.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_5": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        284,
+        125
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_5.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_6": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        294,
+        139
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_6.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_7": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        290,
+        133
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_7.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "deco_cloud_8": {
+      "frame": [
+        576,
+        256
+      ],
+      "anchor": [
+        282,
+        136
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/props/cloud_8.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "terrain_foam": {
+      "frame": [
+        192,
+        192
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/tiles/water_foam.png",
+          "frames": 16,
+          "fps": 12,
+          "loop": true
+        }
+      }
+    },
+    "terrain_shadow": {
+      "frame": [
+        192,
+        192
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/tiles/shadow.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_blue_1": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        173
+      ],
+      "footprint": 112,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/house_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_blue_2": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        178
+      ],
+      "footprint": 128,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/house_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_blue_3": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        172
+      ],
+      "footprint": 122,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/house_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_red_1": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        173
+      ],
+      "footprint": 112,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/house_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_red_2": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        178
+      ],
+      "footprint": 128,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/house_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_red_3": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        172
+      ],
+      "footprint": 122,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/house_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_yellow_1": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        173
+      ],
+      "footprint": 112,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/house_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_yellow_2": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        178
+      ],
+      "footprint": 128,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/house_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_yellow_3": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        172
+      ],
+      "footprint": 122,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/house_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_purple_1": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        173
+      ],
+      "footprint": 112,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/house_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_purple_2": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        178
+      ],
+      "footprint": 128,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/house_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_purple_3": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        172
+      ],
+      "footprint": 122,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/house_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_black_1": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        173
+      ],
+      "footprint": 112,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/house_1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_black_2": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        178
+      ],
+      "footprint": 128,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/house_2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "house_black_3": {
+      "frame": [
+        128,
+        192
+      ],
+      "anchor": [
+        64,
+        172
+      ],
+      "footprint": 122,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/house_3.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    }
   }
 }

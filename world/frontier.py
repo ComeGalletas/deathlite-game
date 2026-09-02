@@ -74,7 +74,21 @@ def frontier_clear(room, x, y, level, margin, px) -> bool:
     when the *diagonal* neighbour is another terrace. This is the sub-tile half
     of the same rule: the few pixels of air that stop a prop reading as glued
     to the boundary line between two tilesets.
+
+    Answered from the room's inset field where there is one -- built once at
+    generation, in `world/inset.py`. The eight-point rim test below is what it
+    replaces, and the reason for replacing it is that eight points have gaps
+    between them: a prop can sit with a corner of its margin over another
+    terrace and pass, because no sample happened to land there. A distance
+    field has no gaps.
+
+    The fallback is the old test, unchanged, for a room with no field: the flat
+    LD-8 world, which is pinned seed by seed in its own tests and has no level
+    changes to begin with.
     """
+    field = room.inset
+    if field is not None:
+        return field.prop_clear(x - room.rect.x, y - room.rect.y, margin)
     return all(tile_level(room, x + dx * margin, y + dy * margin, px) == level
                for dx, dy in AROUND)
 

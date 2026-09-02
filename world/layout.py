@@ -100,6 +100,12 @@ class Room:
     # painter does, and one authority is the point. Empty unless
     # `config.HEIGHTMAP_ROOMS`.
     palette: dict = field(default_factory=dict)
+    # The terrace inset field (`world/inset.py`): distance, per 8 px sample,
+    # from that point to the nearest floor of a different level. Built once
+    # when the grid is final and before anything is baked, scattered or
+    # spawned, so every later stage asks one authority how far inside its own
+    # terrace a point stands. `None` where the room has no level changes.
+    inset: object = None
 
     @property
     def tile_dims(self) -> tuple[int, int]:

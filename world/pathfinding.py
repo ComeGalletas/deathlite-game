@@ -36,6 +36,7 @@ from array import array
 import pygame
 
 from game import config
+from world import inset as terrain_inset
 from world.elevation import LevelIndex, NONE, can_cross, diagonal_blocked
 
 # The canonical neighbour order. `FlowField._NEI` and `NavGrid.step_mask` are
@@ -72,6 +73,26 @@ def _point_on_floor(layout, x: float, y: float) -> bool:
     return False
 
 
+def _point_inset_ok(layout, x: float, y: float, margin: float) -> bool:
+    """Mirror of `GameMap.inset_ok`: is the point far enough inside its own
+    terrace for a body to stand?
+
+    Same search as `_point_on_floor` -- the room whose *cells* hold the point,
+    not merely whose bounding box does, since grown island rects overlap in the
+    void. A point on a corridor or a plank stair belongs to no room and carries
+    no margin, which is right: those are flat.
+    """
+    if margin <= 0.0:
+        return True
+    px = config.TILE_PX
+    for r in layout.rooms:
+        rr = r.rect
+        if (rr.left <= x < rr.right and rr.top <= y < rr.bottom
+                and (int((x - rr.left) // px), int((y - rr.top) // px)) in r.cells):
+            return terrain_inset.world_at(r, x, y) >= margin
+    return True
+
+
 def _point_in_corridor(layout, x: float, y: float) -> bool:
     """A narrow inter-region link that gets M3 clearance leniency: a plank
     corridor or (LD-1) a stair -- both are the only ways between room groups, so
@@ -103,6 +124,15 @@ class NavGrid:
         ox, oy = self.origin
         half = self.cell * 0.5
 
+        # The terrace margin, baked in here rather than asked per step. The
+        # collider refuses a body's centre within `margin` px of a level
+        # change, so a field that still routed through those cells would send
+        # an enemy at a boundary the collider will not let it cross, and it
+        # would grind against the corner for ever. Same class of bug as
+        # `walk_links` disagreeing with `_flight_opens`; same fix, which is
+        # that both sides read one authority.
+        margin = terrain_inset.body_inset()
+
         for row in range(self.rows):
             cy = oy + row * self.cell + half
             base = row * self.cols
@@ -110,6 +140,13 @@ class NavGrid:
                 cx = ox + col * self.cell + half
                 i = base + col
                 if _point_on_floor(layout, cx, cy):
+                    if not _point_inset_ok(layout, cx, cy, margin):
+                        # Not walkable, and deliberately not `blocked` either:
+                        # `blocked` seeds the wall chamfer, and treating a
+                        # margin as stone would shrink the clearance of every
+                        # cell near a rim -- which is exactly what stops the
+                        # 48 px class threading a one-tile neck.
+                        continue
                     walkable[i] = 1
                     if _point_in_corridor(layout, cx, cy):
                         corridor[i] = 1

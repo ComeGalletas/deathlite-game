@@ -34,7 +34,8 @@ from world.gen import heightmap
 from world.gen.heightmap import build_grid
 from world.gen.repair import unseal
 from world.gen.bridges import _seat_corridors
-from world.gen.islands import _build_room_grids, _grid_tile_meta
+from world.gen.islands import (_build_room_grids, _grid_tile_meta,
+                               _build_inset_fields)
 from world.gen.placement import (
     topography_of, _resize_by_topography, _offset_in_chunk,
 )
@@ -195,6 +196,10 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         # so the world and the tile painter have to read one answer. Keyed by
         # seed and room id, so it draws nothing from `rng`.
         assign_palettes(rooms, seed)
+        # The terrace inset field, before the bake and before every scatter,
+        # so the margin between floors is decided once and read by everything
+        # downstream rather than re-derived per consumer.
+        _build_inset_fields(rooms)
     elif config.WORLD_VERTICALITY:
         _assign_floors(rooms, edges, rng, start_id, boss_id)
         # Cross-floor links become stairs/ramp units below. Keep their approach
