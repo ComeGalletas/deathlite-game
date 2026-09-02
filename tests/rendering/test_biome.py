@@ -94,8 +94,14 @@ class PoolDataTests(unittest.TestCase):
             self.assertTrue(mix, f"{name} declares no scatter block")
             self.assertGreater(float(mix["per_1000"]), 0, name)
             weights = mix["weights"]
-            self.assertEqual(set(weights), {"tree", "rock", "pillar", "shrub"},
-                             f"{name} weights the wrong set of kinds")
+            # The four core kinds are mandatory; a biome may additionally name
+            # a post kind (`sign` / `scarecrow`), which only some of them do --
+            # a scarecrow belongs on farmland, not on a rock shelf.
+            self.assertTrue({"tree", "rock", "pillar", "shrub"} <= set(weights),
+                            f"{name} is missing a core kind")
+            self.assertTrue(set(weights) <= {"tree", "rock", "pillar", "shrub",
+                                             "sign", "scarecrow"},
+                            f"{name} weights an unknown kind")
             self.assertGreater(sum(weights.values()), 0, name)
 
     def test_every_sheet_a_topography_names_is_a_real_file(self):
@@ -314,7 +320,12 @@ class ScatterMixTests(unittest.TestCase):
     only claim worth pinning is that the biomes come out clearly different.
     """
 
-    SEEDS = (21, 22, 23)
+    # Twelve seeds, not three. These are proportions over a weighted draw, and
+    # the per-seed spread is wide: measured over thirty worlds the forest tree
+    # share has a standard deviation of 0.060 and a range of 0.54 to 0.79.
+    # Three worlds could not tell the design intent from that noise; twelve
+    # pool to 0.673 against a thirty-seed 0.697, which is close enough to judge.
+    SEEDS = tuple(range(21, 33))
 
     @classmethod
     def setUpClass(cls):
@@ -353,6 +364,22 @@ class ScatterMixTests(unittest.TestCase):
         self.assertGreater(self._share("rock", ("rock", "pillar")), 0.7)
 
     def test_a_forest_terrace_is_mostly_trees(self):
+        """Back at 0.7 -- and now with margin it did not have before.
+
+        This briefly had to be lowered. The uphill keep-back rejects trees far
+        more often than anything else (a canopy reaches four tiles north where
+        a boulder reaches half of one), and the scatter used to re-draw the
+        kind on *every* retry, so a slot that opened as a tree and failed came
+        back as a boulder. That quietly re-weighted every biome toward whatever
+        was easiest to place: measured over thirty worlds the forest share sat
+        at 0.697 pooled with a 0.060 standard deviation, and sixteen of those
+        thirty seeds fell below 0.7 individually.
+
+        Drawing the kind once per slot instead (`world/gen/scatter.py`) fixed
+        the mix rather than the threshold: 0.772 pooled, standard deviation
+        0.040, three of thirty below 0.7. The remaining gap to the raw weights
+        is the +25% tree top-up, which is not in them.
+        """
         self.assertGreater(self._share("forest", ("tree",)), 0.7)
 
     def test_the_two_are_not_the_same_scatter_with_a_different_tileset(self):
@@ -434,23 +461,47 @@ class DecorBiomeTests(unittest.TestCase):
         self.assertEqual(decor._terraces(bare, floor), [(None, floor)])
 
     def test_a_terrace_that_declares_no_rate_keeps_the_authored_counts(self):
-        """The scale is a floor, not a default: an unrated biome -- and every
-        legacy room -- uses `per_room` exactly as written."""
-        legal = [{"per_room": [0, 2]}] * 4
-        self.assertEqual(decor._budget_scale({}, None, 500, legal), 1.0)
+        """No rates means no scaling: an unrated biome -- and every legacy
+        room, which has no biome at all -- uses `per_room` exactly as written.
+        The caller reads a missing tier out of this as 1.0."""
+        legal = [{"per_room": [0, 2], "tier": decor.FEATURE}] * 4
+        self.assertEqual(decor._tier_scales({}, None, 500, legal), {})
         self.assertEqual(
-            decor._budget_scale({"biomes": {"x": {}}}, "x", 500, legal), 1.0)
+            decor._tier_scales({"biomes": {"x": {}}}, "x", 500, legal), {})
 
     def test_the_rate_sets_the_terrace_budget(self):
         """`per_room` was authored for 60-cell LD-8 rooms; the rate is what
         stretches it over a 500-cell terrace, with the authored counts as the
-        weights that share the budget out."""
-        legal = [{"per_room": [0, 2]}] * 5          # expects 5 props as written
-        terrain = {"biomes": {"x": {"decor": {"per_1000": 60}}}}
+        weights that share that tier's budget out."""
+        legal = [{"per_room": [0, 2], "tier": decor.FEATURE}] * 5
+        terrain = {"biomes": {"x": {"decor": {"per_1000": {"feature": 60}}}}}
         # 500 cells at 60 per thousand = a budget of 30, over an expectation
-        # of 5 -> every count multiplied by 6.
-        self.assertAlmostEqual(
-            decor._budget_scale(terrain, "x", 500, legal), 6.0)
+        # of 5 -> every count in that tier multiplied by 6.
+        got = decor._tier_scales(terrain, "x", 500, legal)
+        self.assertAlmostEqual(got[decor.FEATURE], 6.0)
+
+    def test_each_tier_is_priced_independently(self):
+        """The reason tiers exist: with one budget the authored counts were
+        shares of a single number, so making grass common could only take
+        props away from the boulders."""
+        legal = [{"per_room": [0, 2], "tier": decor.GROUND_COVER},
+                 {"per_room": [0, 2], "tier": decor.FEATURE}]
+        terrain = {"biomes": {"x": {"decor": {"per_1000": {
+            "ground_cover": 250, "feature": 50}}}}}
+        got = decor._tier_scales(terrain, "x", 1000, legal)
+        self.assertAlmostEqual(got[decor.GROUND_COVER], 250.0)
+        self.assertAlmostEqual(got[decor.FEATURE], 50.0)
+        # ...and raising one leaves the other exactly where it was.
+        terrain["biomes"]["x"]["decor"]["per_1000"]["ground_cover"] = 500
+        again = decor._tier_scales(terrain, "x", 1000, legal)
+        self.assertAlmostEqual(again[decor.GROUND_COVER], 500.0)
+        self.assertAlmostEqual(again[decor.FEATURE], got[decor.FEATURE])
+
+    def test_a_tier_a_biome_does_not_price_places_nothing(self):
+        legal = [{"per_room": [0, 2], "tier": decor.LANDMARK}]
+        terrain = {"biomes": {"x": {"decor": {"per_1000": {"feature": 50}}}}}
+        self.assertEqual(
+            decor._tier_scales(terrain, "x", 1000, legal)[decor.LANDMARK], 0.0)
 
     def test_every_tag_names_a_declared_biome(self):
         declared = set(self.t["biomes"])

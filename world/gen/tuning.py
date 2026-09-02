@@ -54,6 +54,23 @@ _TREE_THICKET_MAX = 96.0
 _TREE_TREE_GAP = 22
 _OBSTACLE_GAP = 46
 
+# The height-map world spaces its canopies instead of its trunks. The gap above
+# is measured off the *collider*, which is a 15 px trunk ring, so two trees can
+# stand 37 px apart -- while the art they wear is 93 to 138 px wide. A third of
+# all trees were closer than 70 px to a neighbour and the grove read as one
+# green mass with no trunks in it.
+#
+# 70 px between centres puts the near edge of a canopy inside its neighbour by
+# about a third, which is a grove with depth rather than a blob, and the median
+# lands near 120 px where two canopies just touch. It costs nothing: the top-up
+# offsets widen with it, so the same ~265 trees a world still place.
+#
+# The flat LD-8 generator keeps the tight gap. It is pinned seed by seed in a
+# dozen tests, and those worlds exist to describe how the old scatter behaved.
+_TREE_TREE_GAP_GRID = 55
+_TREE_THICKET_MIN_GRID = 70.0
+_TREE_THICKET_MAX_GRID = 128.0
+
 # Houses (config.TERRAIN_BUILDINGS): a circular `Obstacle` skinned per colour,
 # placed off-centre in big rooms; a roomy room grows a colour-matched village
 # cluster. `variant` = colour_band * 3 + (type - 1) + 1, indexing the 15-entry

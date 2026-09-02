@@ -24,11 +24,15 @@ class ShrubRetiredTests(unittest.TestCase):
             self.assertFalse(any(o.kind == "shrub"
                                  for o in generate_world(seed).obstacles))
 
-    def test_obstacle_kinds_are_only_minerals_trees_and_houses(self):
+    def test_obstacle_kinds_are_only_the_declared_families(self):
+        """`sign` and `scarecrow` joined the list when the three post props
+        (deco_16..deco_18) stopped being unreachable decoration entries and
+        became real obstacles with small colliders."""
         seen = set()
         for seed in range(25):
             seen.update(o.kind for o in generate_world(seed).obstacles)
-        self.assertTrue(seen.issubset({"tree", "rock", "pillar", "house"}), seen)
+        self.assertTrue(seen.issubset(
+            {"tree", "rock", "pillar", "house", "sign", "scarecrow"}), seen)
 
 
 class TreeColliderTests(unittest.TestCase):
@@ -95,7 +99,17 @@ class TreeDensityBoostTests(unittest.TestCase):
 
 class TreeSpacingTests(unittest.TestCase):
     def test_a_tree_pair_is_tighter_than_the_old_floor(self):
-        # before the change the closest two trees could sit was 2*15 + 46 = 76 px
+        """Trees group; minerals do not. Before the tree gap existed the closest
+        two obstacles of any kind could sit was 2*15 + 46 = 76 px, and the point
+        of the tree-to-tree gap is that a pair can stand closer than that.
+
+        The bound is 76, not the 70 it was, because the height-map world now
+        spaces *canopies* rather than trunks (`tuning._TREE_TREE_GAP_GRID`): a
+        tree's collider is a 15 px trunk ring but its art is 93-138 px wide, so
+        the old 37 px floor let a third of all trees overlap a neighbour by
+        most of a canopy. The floor is 70 px there now -- still inside the
+        mineral spacing this test is really about, which is what makes a grove
+        a grove."""
         tightest = 1e9
         for seed in range(20):
             trees = [o.pos for o in generate_world(seed).obstacles
@@ -103,7 +117,7 @@ class TreeSpacingTests(unittest.TestCase):
             for i in range(len(trees)):
                 for j in range(i + 1, len(trees)):
                     tightest = min(tightest, trees[i].distance_to(trees[j]))
-        self.assertLess(tightest, 70, "tree spacing never tightened into a grove")
+        self.assertLess(tightest, 76, "tree spacing never tightened into a grove")
 
     def test_trees_never_collide_with_a_mineral(self):
         rt = KINDS["tree"][0]

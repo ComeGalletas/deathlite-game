@@ -43,11 +43,11 @@ from world.gen.height.coast import (            # noqa: F401
     _despike,
 )
 from world.gen.height.terraces import _all_neighbours_in, _cap, _carve_canyons
-from world.gen.height.walls import (            # noqa: F401
+from world.gen.height.walls import (
     _raise_walls, _face_the_sea, _wall_flight_sides,
 )
 from world.gen.height.flights import (          # noqa: F401
-    _vstair_site, _ewstair_site, _cut_flights, _link_levels,
+    _vstair_site, _ewstair_site, _cut_flights, _cut_lateral_stairs, _link_levels,
 )
 from world.gen.height.water import (            # noqa: F401
     _trim_lake_stubs, _water_blobs, _fill_holes, _carve_lakes,
@@ -115,6 +115,21 @@ def build_grid(mask: frozenset, cols: int, rows: int, rng, base: int = 0,
     _wall_flight_sides(grid)
     if lakes:
         _carve_lakes(grid, rng, lakes, lake_size)
+    # After the lakes, not before: a lake accretes over ground of its own
+    # terrace, and four crossings in six worlds had their foot's landing eaten
+    # out from under them that way -- a stair that looks like a way down and
+    # is not.
+    #
+    # The stream is put back exactly as it was found. This pass draws from it
+    # like any other, but every stage below -- `_link_levels`, the prune, the
+    # hole fill, and the corridor seating outside this function -- would
+    # otherwise see a different stream purely because side stairs exist, and
+    # start producing different coastlines and bridges. Two `test_repair`
+    # failures came from precisely that, neither of them anything to do with a
+    # staircase. `floor_palette` guards the same way, for the same reason.
+    state = rng.getstate()
+    _cut_lateral_stairs(grid, rng)
+    rng.setstate(state)
     _link_levels(grid, rng)
     _prune_unreachable(grid)
     # LD-10: last, because every stage above can leave a one-tile hole behind --

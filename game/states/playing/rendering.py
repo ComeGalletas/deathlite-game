@@ -94,10 +94,20 @@ class WorldRenderer:
             surface.blit(prompt, prompt.get_rect(center=(w // 2, h - 96)))
 
     # --- world props ----------------------------------------------
-    def interactables(self, surface) -> None:
+    def _off_band(self, level, pos) -> bool:
+        """Is this flat effect on some other terrace than the band being
+        painted? `level is None` means "draw it wherever it is", which is what
+        every caller outside the banded world path passes."""
+        if level is None:
+            return False
+        return self.ps.game_map.renderer.level_at(pos[0], pos[1]) != level
+
+    def interactables(self, surface, level=None) -> None:
         ps = self.ps
         z = ps.camera.zoom
         for it in ps.interactables:
+            if self._off_band(level, it.pos):
+                continue
             sx, sy = ps.camera.world_to_screen(it.pos)
             done = it.used or it.state == "done"
             col = (90, 90, 100) if done else it.colour
@@ -108,10 +118,12 @@ class WorldRenderer:
                 pygame.draw.circle(surface, (255, 120, 120), (int(sx), int(sy)),
                                    round((it.radius + 120) * z), 1)
 
-    def hazards(self, surface) -> None:
+    def hazards(self, surface, level=None) -> None:
         ps = self.ps
         z = ps.camera.zoom
         for hz in ps.hazards:
+            if self._off_band(level, hz.pos):
+                continue
             sx, sy = ps.camera.world_to_screen(hz.pos)
             frac = max(0.0, hz.life / hz.max_life)
             rr = max(1, round(hz.radius * z))
@@ -124,12 +136,14 @@ class WorldRenderer:
         sx, sy = self.ps.camera.world_to_screen(s.pos)
         draw_summon(surface, sx, sy, s, self._draw_ctx(), default="disc")
 
-    def gems(self, surface) -> None:
+    def gems(self, surface, level=None) -> None:
         ps = self.ps
         z = ps.camera.zoom
         assets = ps.game.assets
 
         for gem in ps.gems:
+            if self._off_band(level, gem.pos):
+                continue
             sx, sy = ps.camera.world_to_screen(gem.pos)
             rig = _ORB_RIGS.get(gem.tier, "xp_orb_small")
             base_size = assets.scale_for(rig) or (8, 8)
@@ -153,16 +167,18 @@ class WorldRenderer:
                     round((3 + gem.tier) * z),
                 )
 
-    def explosions(self, surface) -> None:
+    def explosions(self, surface, level=None) -> None:
         ps = self.ps
         z = ps.camera.zoom
         for ex in ps._explosions:
+            if self._off_band(level, ex["pos"]):
+                continue
             frac = ex["t"] / ex["dur"]
             sx, sy = ps.camera.world_to_screen(ex["pos"])
             pygame.draw.circle(surface, (255, 180, 90),
                                (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
 
-    def trail_fx(self, surface) -> None:
+    def trail_fx(self, surface, level=None) -> None:
         """Projectile dust trails -- each `[Animator, pos, size, tint, fade]`
         entry blits the current burst frame (tinted), optionally alpha-ramped
         over its life. Anchored in world space; the bolt draws over it."""
@@ -170,6 +186,8 @@ class WorldRenderer:
         z = ps.camera.zoom
         a = ps.game.assets
         for anim, pos, (w, h), tint, fade in ps._trail_fx:
+            if self._off_band(level, pos):
+                continue
             size = (max(1, round(w * z)), max(1, round(h * z)))
             fr = a.frame(anim.rig, anim.anim, anim.index, size=size, tint=tint)
             if fr is None:
@@ -349,9 +367,11 @@ class WorldRenderer:
         ps = self.ps
         return DrawCtx(ps.game.assets, ps.stats["time"], ps.camera.zoom)
 
-    def player_projectiles(self, surface) -> None:
+    def player_projectiles(self, surface, level=None) -> None:
         cam, ctx = self.ps.camera, self._draw_ctx()
         for p in self.ps.projectiles:
+            if self._off_band(level, p.pos):
+                continue
             sx, sy = cam.world_to_screen(p.pos)
             draw_projectile(surface, sx, sy, p, ctx, default="bolt")
 

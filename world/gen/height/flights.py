@@ -6,9 +6,11 @@ rather than a stack of islands.
 """
 from __future__ import annotations
 
-from world.layout import Cell, GROUND, CLIFF, VSTAIR, EWSTAIR
+from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
+                          WALKABLE_KINDS)
 from world.gen.height.const import (
     MAX_DROP, MIN_TERRACE_ROWS, REGION, STAIR_SPACING,
+    SIDE_STAIRS, SIDE_STAIRS_HIGH, SIDE_STAIRS_HIGH_FROM, SIDE_SPACING,
 )
 from world.gen.height.graph import reachable, _components
 from world.gen.height.walls import _raise_walls
@@ -79,6 +81,134 @@ def _ewstair_site(grid, c, r, side):
     return d
 
 
+
+
+# A lateral crossing carries this tag prefix, so the step rules and the painter
+# can tell it from a wall-cut flight without re-deriving the geometry: it stands
+# on a bare boundary with no stone behind it, and it opens east/west.
+LATERAL = "side_"
+
+
+def _lateral_site(grid, c, r, side):
+    """The upper level a two-tile crossing at `(c, r)` would join, or `None`.
+
+    A plateau's east and west boundary is a bare level change -- `_raise_walls`
+    only stones southward drops -- so there is nothing here to cut through. The
+    crossing is two cells of the boundary handed over to the ramp, and it comes
+    in two alignments. `=` is terrace, `>` the stair:
+
+        notched into the terrace          protruding from its side
+            = = =                             = = =
+            = = >                             = = = >
+            = = =                             = = =
+
+    They look different and test the same. Whichever pair of cells the unit
+    takes, one step against the drop has to be the upper terrace and one step
+    with it the lower; the alignment is just *which* of those two terraces the
+    cells themselves came from. Notched cells were upper terrace, so the
+    terrace closes over the stair again above and below it; protruding cells
+    were lower terrace, so nothing stands over it.
+
+    That difference is what decides the backdrop at paint time -- a notch has a
+    terrace tile directly above it and needs its wall drawn, a protrusion has
+    nothing to draw. See `grid_paint`.
+
+    **Both** rows are required either way: the ramp is a two-tile unit and each
+    half needs a face beside it to connect to.
+    """
+    dc = 1 if side == "e" else -1          # the direction the ground drops
+    top, bot = grid.get((c, r)), grid.get((c, r + 1))
+    if top is None or bot is None:
+        return None
+    if top.kind != GROUND or bot.kind != GROUND or top.level != bot.level:
+        return None
+    # one step against the drop: the terrace it is entered from
+    up, up2 = grid.get((c - dc, r)), grid.get((c - dc, r + 1))
+    if up is None or up.kind != GROUND:
+        return None
+    level = up.level
+    if up2 is None or up2.kind != GROUND or up2.level != level:
+        return None
+    low = level - 1
+    # one step with the drop: the floor it descends to
+    for rr in (r, r + 1):
+        d = grid.get((c + dc, rr))
+        if d is None or d.kind != GROUND or d.level != low:
+            return None
+    # the cells taken must belong to one of those two terraces and no other
+    if top.level not in (level, low):
+        return None
+    # The landing has to be somewhere you can actually stand. A crossing whose
+    # foot drops into a one-cell pocket of lower terrace is walkable for a
+    # small enemy and sealed for a large one: the coarse navigation class uses
+    # 48 px cells against 64 px tiles, and a pocket like that measures 15.9 px
+    # of clearance against the 22 it needs.
+    foot = (c + dc, r + 1)
+    for nb in ((foot[0] + dc, foot[1]), (foot[0], foot[1] - 1),
+               (foot[0], foot[1] + 1)):
+        cell = grid.get(nb)
+        if cell is None or cell.kind != GROUND or cell.level != low:
+            return None
+    return level
+
+
+def _cut_lateral_stairs(grid, rng, spacing: int = None) -> None:
+    """Two or three crossings on each side face of every plateau.
+
+    The scanner in `_cut_flights` can only find sites where stone already is,
+    which is the south rim and nowhere else. This puts the same `EWSTAIR` --
+    same cells, same art, same step rules -- on the bare east and west faces,
+    which is the only way onto a plateau from its sides.
+
+    Every cut is provisional: it is rolled back unless the room is still one
+    connected piece afterwards, since handing two cells of a rim to a stair can
+    sever a terrace as easily as open one.
+    """
+    spacing = SIDE_SPACING if spacing is None else spacing
+    levels = sorted({cl.level for cl in grid.values() if cl.kind == GROUND},
+                    reverse=True)
+    walkable = {p for p, cl in grid.items() if cl.kind in WALKABLE_KINDS}
+    taken = [p for p, cl in grid.items()
+             if cl.kind in (VSTAIR, EWSTAIR) and cl.row == 0]
+
+    for level in levels:
+        if level <= 0:
+            continue
+        want = (SIDE_STAIRS_HIGH if level >= SIDE_STAIRS_HIGH_FROM
+                else SIDE_STAIRS)
+        for side in ("w", "e"):
+            quota = rng.randint(*want)
+            if quota <= 0:
+                continue
+            # Every ground cell of *either* terrace is a candidate, not only
+            # those on this one: a protruding crossing is cut from the lower
+            # terrace, and `_lateral_site` is what says which plateau a pair
+            # actually joins. Shuffling them together is what mixes the two
+            # alignments, off the room's own seeded stream.
+            here = [(c, r) for (c, r), cl in grid.items()
+                    if cl.kind == GROUND and cl.level in (level, level - 1)]
+            rng.shuffle(here)
+            cut = 0
+            for c, r in here:
+                if cut >= quota:
+                    break
+                if any(abs(c - tc) < spacing and abs(r - tr) < spacing
+                       for tc, tr in taken):
+                    continue
+                if _lateral_site(grid, c, r, side) != level:
+                    continue
+                undo = [((c, r + k), grid[(c, r + k)]) for k in range(2)]
+                for k in range(2):
+                    grid[(c, r + k)] = Cell(EWSTAIR, level=level, drop=1,
+                                            row=k, tag=LATERAL + side)
+                now = {p for p, cl in grid.items() if cl.kind in WALKABLE_KINDS}
+                if len(reachable(grid)) < len(now):
+                    for p, cell in undo:
+                        grid[p] = cell
+                    continue
+                walkable = now
+                taken.append((c, r))
+                cut += 1
 
 
 def _cut_flights(grid, rng, per_region: int, region: int = None,

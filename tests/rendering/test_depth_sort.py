@@ -96,6 +96,10 @@ class SceneryDrawablesTests(unittest.TestCase):
             calls.append(("shadow", shadow_owner[id(shadow)])))
         gm.renderer._draw_one_obstacle = (
             lambda _surface, _camera, i, _obstacle: calls.append(("obstacle", i)))
+        # Interior clutter shares this layer now (it used to be painted flat,
+        # before the characters). It is not what this test is about, and it is
+        # the only drawable here that would touch the `None` surface below.
+        gm.renderer._blit_one_decor = lambda _surface, _camera, _inst: None
 
         drawables = sorted(gm.renderer.scenery_drawables(cam), key=lambda item: item[0])
         for _depth, draw in drawables:
@@ -170,13 +174,20 @@ class DepthOrderTests(unittest.TestCase):
         game, p = fresh_playing()
         try:
             order = []
-            p._draw_player_projectiles = lambda s: order.append("weapon_fx")
-            p._draw_depth_layer = lambda s: order.append("depth")
+            p._draw_player_projectiles = (
+                lambda s, level=None: order.append("weapon_fx"))
+            p._draw_player = lambda s: order.append("hero")
             p._draw_hostile_projectiles = lambda s: order.append("hostile")
             p.draw(game.screen)
-            # Tree shades are now inside depth; enemy shots remain on top.
-            self.assertLess(order.index("weapon_fx"), order.index("depth"))
-            self.assertLess(order.index("depth"), order.index("hostile"))
+            # A5 composites the world terrace by terrace, so the flat effects
+            # and the sprites now repeat once per band -- but the invariant is
+            # the one this always asserted: a weapon effect lies under the
+            # character that made it, and enemy shots stay on top of everything
+            # for danger readability.
+            self.assertLess(order.index("weapon_fx"), order.index("hero"))
+            self.assertLess(order.index("hero"), order.index("hostile"))
+            self.assertEqual(order.count("hostile"), 1,
+                             "enemy shots must be drawn once, above the world")
         finally:
             pygame.quit()
 

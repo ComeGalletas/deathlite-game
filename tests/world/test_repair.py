@@ -203,6 +203,17 @@ class InlandHoleTests(_Heightmap):
                     if n in holes and n not in seen:
                         seen.add(n)
                         stack.append(n)
+            # A component touching the bounding box edge is a **bay**, not an
+            # inland hole. The fill above is clipped to the box, so it cannot
+            # see the sea the hole opens onto -- and there is by definition no
+            # land beyond that edge, or the box would be bigger. Counting land
+            # neighbours alone misreads such a notch as enclosed: seed 2's
+            # room 1 has a two-tile one in the box's own corner, draining
+            # south and west past rows the box does not cover, which the
+            # generator correctly leaves alone as a bay.
+            if any(q[0] in (min(cs), max(cs)) or q[1] in (min(rs), max(rs))
+                   for q in comp):
+                continue
             touching = sum(1 for q in comp for dx, dy in _NB
                            if (q[0] + dx, q[1] + dy) in land)
             yield comp, touching

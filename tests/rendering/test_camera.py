@@ -85,5 +85,37 @@ class CameraZoomTests(unittest.TestCase):
         self.assertAlmostEqual(back.y, world.y)
 
 
+class ZoomGranularityTests(unittest.TestCase):
+    """A tile must land on a whole number of screen pixels at every zoom the
+    game actually ships.
+
+    Terrain is composited from several independently scaled surfaces (per room,
+    per corridor, per cliff band), each blitted at a truncated screen position.
+    When `TILE_PX * zoom` is fractional, two adjacent surfaces round to
+    positions that do not quite meet and the sea painted underneath shows
+    through the 1 px crack as blue seams along the tile frontiers. The web
+    profile shipped at 1.2 (76.8 px per tile) and had them; 1.25 (80 px) does
+    not.
+    """
+
+    def _shipped_zooms(self):
+        from game import config
+        saved = (config.SCREEN_WIDTH, config.SCREEN_HEIGHT, config.CAMERA_ZOOM,
+                 config.SAVE_ENABLED, config.FPS)
+        yield "desktop", config.CAMERA_ZOOM, config.TILE_PX
+        try:
+            config.apply_web_profile()
+            yield "web", config.CAMERA_ZOOM, config.TILE_PX
+        finally:
+            (config.SCREEN_WIDTH, config.SCREEN_HEIGHT, config.CAMERA_ZOOM,
+             config.SAVE_ENABLED, config.FPS) = saved
+
+    def test_a_tile_is_a_whole_number_of_pixels(self):
+        for name, zoom, px in self._shipped_zooms():
+            scaled = px * zoom
+            self.assertEqual(scaled, int(scaled),
+                             f"{name} build: tile is {scaled} px at zoom {zoom}")
+
+
 if __name__ == "__main__":
     unittest.main()
