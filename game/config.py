@@ -619,10 +619,19 @@ def apply_web_profile() -> None:
     * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
     * `FPS = 60` -- the page composites at ~60 Hz; targeting 120 just spends
       WASM budget on frames that are never presented.
-    * `1280x720` render target at `CAMERA_ZOOM = 1.2` -- that is the pygbag
-      canvas size, so there is no downscale, and `1280 / 1.2 == 1600 / 1.5`
-      keeps the visible world extent (and on-screen sprite size) identical to
-      the desktop build while cutting per-frame blit work by ~35%.
+    * `1280x720` render target at `CAMERA_ZOOM = 1.25` -- that is the pygbag
+      canvas size, so there is no downscale, and per-frame blit work drops by
+      ~35% against the desktop target.
+
+      The zoom used to be 1.2, chosen because `1280 / 1.2 == 1600 / 1.5` made
+      the visible world extent identical to desktop. It cost more than it was
+      worth: terrain is composited from several independently scaled surfaces
+      (per room, per corridor, per cliff band), each blitted at a truncated
+      screen position, so a *fractional* scaled tile size lets adjacent
+      surfaces round apart and the sea painted underneath shows through the
+      1 px crack as blue seams along tile frontiers. `TILE_PX * 1.2 == 76.8`
+      seams; `TILE_PX * 1.25 == 80.0` does not. The web view is ~4% tighter
+      than desktop as a result (1024 px of world across, against 1066).
 
     Everything reads these at call time (the one default-arg capture,
     `systems.camera.Camera`, is overridden by an explicit argument in
@@ -632,4 +641,4 @@ def apply_web_profile() -> None:
     SAVE_ENABLED = False
     FPS = 60
     SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
-    CAMERA_ZOOM = 1.2
+    CAMERA_ZOOM = 1.25

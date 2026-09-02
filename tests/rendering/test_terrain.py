@@ -151,7 +151,8 @@ class TerrainMetadataTests(unittest.TestCase):
         for e in reg:
             self.assertNotIn(e["id"], ids, f"duplicate decoration id {e['id']}")
             ids.add(e["id"])
-            self.assertIn(e["placement"], ("room_interior", "void", "room_edge"))
+            self.assertIn(e["placement"],
+                          ("room_interior", "void", "room_edge", "shore", "lake"))
             self.assertIn(e["rig"], rigs, f"{e['id']}: rig {e['rig']} not in rigs")
             self.assertGreater(float(e.get("scale", 1.0)), 0)
             if e["placement"] == "room_interior":

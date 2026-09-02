@@ -4798,3 +4798,379 @@ The skin entry grew a fifth field: `(anchor_x, anchor_y, fps, frames, phase)`.
 Only an animated tree takes a routine; everything else keeps its rig's fps and
 a phase of 0, since a one-frame rock has nothing to offset.
 
+
+
+
+## M — side stairs on the plateau flanks — ✅ DONE
+
+An island was crossable only from the south. Every way up sat in a south-facing
+wall, so a plateau's east and west faces were sheer for their whole length and
+the player walked around to the bottom of the island to change level.
+
+### Why, and the one measurement that decided the approach
+
+`walls._raise_walls` gives stone to **southward** drops only -- a cap's south
+rim is the face the camera sees, and the face the tileset draws.
+`flights._cut_flights` then *finds* its sites by scanning for `CLIFF` cells, so
+the two rules compose into an unintended one: a crossing can only exist where
+the camera can see a wall.
+
+The first attempt was a new kind of crossing for the bare flanks entirely --
+one tile, its own step rules, its own art. It worked, and it was the wrong
+shape for the problem. Measuring the sides properly is what showed why:
+
+| on the east/west quarters of a plateau, over six worlds | |
+|---|---|
+| positions with usable wall beside them | **722** |
+| ...refused **only** for want of the one-row jog | **667 (92%)** |
+| refused on anything else (no head / foot / above) | 10 |
+| real sites | 45 |
+
+The stone is already there. What is missing is the jog -- and the jog is not
+arbitrary: without it the cell you would step on from the side is itself stone,
+so relaxing the test would place flights nobody could reach.
+
+So the pass makes the jog and cuts an ordinary flight into it. Same `EWSTAIR`
+cells, same art, same `walk_links` and `can_step`. Nothing downstream knows
+this pass exists.
+
+### `_cut_side_stairs`
+
+Two or three crossings per **side** of a plateau -- a long east face and a long
+west face each want their own way up. A plateau above the first floor takes
+about a quarter of that (`SIDE_STAIRS_HIGH`, 0-1): those are small and already
+well served by the south rim, and stacking ways up onto a summit nobody
+struggles to reach is wasted terrain.
+
+`_carve_side_jog` hands the entry column's top wall cell back to the terrace
+and pushes the wall down a row underneath it -- one column, one row, the same
+size of edit `_raise_walls` already makes. Every carve is **provisional**: it
+is rolled back unless `_ewstair_site` then accepts the site *and* the room is
+still one connected piece. Moving a wall cell can seal a terrace as easily as
+open one, and only the round trip through the real site test proves it did not.
+
+### The carve may not eat a ledge
+
+The first build sealed a flight. Not one of the new ones -- an ordinary
+straight staircase on seed 35, which the large nav class (radius 22) could no
+longer thread. Pushing a wall down a row necessarily **consumes a cell of the
+terrace below it**, exactly the trade `_raise_walls` makes, and that is fine on
+open ground and not fine on a narrow shelf: it pinches the ledge under the
+clearance a big body needs.
+
+So a carve now refuses unless the lower terrace runs on past the cell it would
+take. That is the honest cost of this pass: it drops the yield from 1.95
+crossings a side to **1.36**, because a lot of side wall on these islands sits
+on exactly such a ledge. Correctness first -- a stair only half the bestiary
+can climb is worse than no stair.
+
+Worth recording because the failure did not look like this pass at all: the
+sealed flight was one the scanner had placed, several tiles away, and the
+carve had only narrowed the floor it landed on.
+
+### The knob that mattered was not the quota
+
+The quota was never the binding constraint. `STAIR_SPACING` was: it is a square
+keep-clear sized for a rim that runs east-west, and crossings on a side quarter
+run *up* the rim instead, so they kept landing inside each other's square. That
+one rule refused **508** carves against 49 refused on their geometry, and held
+the sides to 1.6 crossings where two or three were asked for.
+
+`SIDE_SPACING = 2` is its own separation for this pass. It was briefly 3, on a
+measurement taken before the ledge guard existed; with the guard in place the
+guard is the limit and not the spacing, and 3 costs a fifth of the yield for
+nothing (1.11 a side against 1.36). 1 is indistinguishable from 2.
+
+### Where it landed
+
+| crossings, by zone, over six worlds | before | after |
+|---|---|---|
+| east/west side | 47 | **91** |
+| south rim | 239 | 232 |
+| north back / middle | 42 | 37 |
+
+| per plateau side | |
+|---|---|
+| level 1 | mean **1.36** (target was 2-3) |
+| level 2+ | mean **0.64** (target 0-1) |
+| disconnected rooms | **0** |
+
+Level 1 lands under the two-to-three that was asked for, and the ledge guard is
+why: roughly 45% of otherwise-good carves sit above a shelf too thin to give a
+cell up. Raising it further means either accepting pinched ledges -- the sealed
+flight again -- or a wider change to how the caps are inset so the sides are
+not ledges in the first place. Neither is worth doing quietly.
+
+Crossings per multi-level island went 7.7 -> 9.8: the sides gained without the
+south losing much, which is what preferring a side candidate inside each
+region's bucket buys. The south rim had 223 spare candidates and the sides 24,
+so spending a region's quota on a side costs the south nothing.
+
+
+## M — lateral stairs: climbing a plateau from its sides — ✅ DONE
+
+An island was crossable only from the south. Every way up sat in a south-facing
+wall, so a plateau's east and west faces were sheer for their whole length and
+the player walked round to the bottom of the island to change level.
+
+### Two wrong turns first, both worth recording
+
+**A metric that measured the wrong thing.** The first attempt spread the
+existing scanner's crossings into the left and right *columns* of a terrace and
+reported side crossings rising 47 to 91. The classifier only looked at the
+column and ignored the row, so a stair in the bottom-left corner scored as a
+"side" stair: 79% of what it counted sat in the southern third of its terrace,
+median row fraction 0.85 against 0.86 for crossings generally. The number moved
+and the picture did not, which is exactly what a proxy metric does when nobody
+checks it against the thing it stands for.
+
+**Stone that nothing could read.** The second attempt faced every east/west
+drop with cliff, so the existing site tests would have something to cut. It
+gave 2.5x the stone, ate 2,900 cells of walkable ground, and changed the
+distribution not at all -- 78% to 79% in the southern third. `_vstair_site` and
+`_ewstair_site` both require ground directly *north* of the wall and ground
+directly *south* at the foot; a side wall has ground east and west, so both
+still refuse it. Adding stone cannot help when nothing can read it, and once
+the site tests can read sideways the stone is not needed. It also looked wrong:
+every cliff tile in the project is a horizontal run drawn as if seen from the
+south, and standing one on end reads as a garden wall.
+
+### What a lateral face actually is
+
+Measured over six worlds: **zero** vertical stone runs. Every cliff cell is
+part of a horizontal south-facing run (37%) or an isolated single (63%). A
+plateau's east and west boundary carries no stone at all -- on the sample
+island, 46 stone cells, all south-facing, against 66 bare lateral drop cells.
+
+So a crossing there stands on nothing and must bring its own art.
+
+### The crossing
+
+The two-tile ramp unit the tileset already ships (`slots.ramp`, at the same
+indices in all eight tilemaps, each in its own material) laid straight onto the
+bare boundary. No stone added, no new art, no new cell kind -- an ordinary
+`EWSTAIR` tagged `side_*`, so the step rules and the painter can tell it from a
+wall cut without re-deriving anything.
+
+`_lateral_site` requires **both** rows: the ramp is two tiles and each half
+needs a face beside it to connect to. 508 runs of two or more exist over six
+worlds and every multi-level island has one, so insisting costs little.
+
+Two guards, both added after a test caught something real:
+
+**Head and foot, not both at once.** The first step rule let *either* cell of
+the unit reach both terraces. A body could then cut the corner diagonally from
+the low ground to the high ground *past* the crossing, never standing on it,
+because `can_step` only asks whether one right-angle detour is open end to end
+-- the exact hole the diagonal rule exists to close. Row 0 is the head and
+reaches only the upper terrace; row `drop` is the foot and reaches only the
+lower, precisely as a wall-cut flight already worked.
+
+**A landing you can stand on.** A crossing whose foot dropped into a one-cell
+pocket of lower terrace was walkable for a small enemy and sealed for a large
+one: the coarse navigation class uses 48 px cells against 64 px tiles, and such
+a pocket measures 15.9 px of clearance against the 22 it needs. Every cell
+around the landing, bar the one the stair occupies, must be more of that
+terrace.
+
+And one ordering fix: the pass runs **after** `_carve_lakes`, because a lake
+accretes over ground of its own terrace and had eaten the landing out from
+under four crossings in six worlds.
+
+### The art faces the way the ground drops
+
+The side is taken straight from the tag -- a crossing that drops east draws
+`ramp.e`. It was mirrored at first, reasoning from a one-tile prototype about
+which way the riser should face; in the finished two-tile unit that points every
+ramp the wrong way, which is plain on screen and was not in the numbers.
+
+### Two alignments, and the backdrop one of them needs
+
+A crossing can sit in the boundary two ways, and the first build only ever made
+the first. `=` is terrace, `>` the stair:
+
+```
+    notched into the terrace          protruding from its side
+        = = =                             = = =
+        = = >                             = = = >
+        = = =                             = = =
+```
+
+They look different and test the same. Whichever pair of cells the unit takes,
+one step against the drop has to be the upper terrace and one step with it the
+lower; the alignment is only *which* of those two terraces the cells came from.
+Notched cells were upper terrace, so it closes over the stair again above and
+below; protruding cells were lower terrace, so nothing stands over it. So the
+site test is unchanged in shape and the candidate list simply widened to both
+terraces -- the room's own seeded shuffle then mixes them, 56% protruding to
+44% notched.
+
+**A notch needs its wall drawn and was not getting one.** The backdrop was
+removed wholesale when this was built, on the reasoning that a side face has no
+stone. True of the face and false of the notch: once the stair is cut in, the
+terrace tile standing directly above it drops into the notch, and with no wall
+there the crossing reads as a hole rather than a way down. It is painted on the
+**head** only -- the drop is one level, so one tile of face is the whole wall --
+and only when a terrace tile of the crossing's own level actually sits above
+it, which is what tells the two alignments apart at paint time.
+
+### The pass puts the stream back
+
+Two `test_repair` failures arrived with the second alignment, and neither was
+about a staircase. A two-tile bay in the corner of an island's bounding box was
+read as an inland hole; a bridge took a lane four tiles longer than the best
+available. Both were the same cause: this pass draws from the shared `rng`, so
+every stage below it -- `_link_levels`, the prune, the hole fill, and the
+corridor seating outside `build_grid` entirely -- saw a different stream purely
+because side stairs exist, and produced different coastlines and bridges.
+
+Measured over thirty seeds, the bridge lane was exact (span == best) on all 25
+over-cap bridges without the pass and on 27 of 28 with it. One tail case, and
+nothing to do with the feature.
+
+So the pass saves the stream and restores it. It still draws like any other
+stage, and the world below it is bit-for-bit what it would have been. This is
+the guard `floor_palette` already carries, for the same reason -- and the right
+default for any pass added late to a generator whose every later stage is
+pinned by seed.
+
+**A blind spot it exposed, fixed separately.** `test_repair`'s hole detector
+floods within the island's bounding box, so a notch in the box's own *corner*
+-- draining south and west past rows the box does not cover -- counts its three
+land neighbours and reads as enclosed. The generator is right to leave it: it
+is a bay. A component touching the box edge is now skipped, because there is by
+definition no land beyond that edge or the box would be bigger.
+
+### The rim ran out at every crossing
+
+The island's boundary line vanished for the two rows of each lateral crossing
+and picked up again below it. Two rules met and neither drew it: the floor
+under the crossing is *lower* ground, which never fringes against something
+higher, and the terrace cell beside it is suppressed by `_floor_sides`'s flight
+rule -- a flight is normally part of its own floor's outline, so a terrace
+carries its rim straight past one rather than stopping either side of it. True
+of a wall-cut flight, which sits inside the wall. Not true of a lateral
+crossing, which sits on the far side of the boundary.
+
+The first attempt put the rim on the floor *under* the crossing, and it was the
+wrong tile: measured against the art's alpha, `ramp.e`'s leftmost eight columns
+carry 60 to 64 opaque pixels of 64 -- the ramp is solid on the side facing the
+upper terrace, necessarily, because that is where it joins it, and transparent
+on the downhill side. So the rim was painted and then covered. It moved 356
+pixels, almost all of them hidden, which is the shape of a fix that measures as
+working and does not look like anything.
+
+The rim belongs on the **terrace cell beside the crossing**, and only beside
+its **foot**. The head tile of the ramp carries a grass fringe in its own art
+and a second one next to it reads as a doubled line; the foot tile has stone
+there instead and leaves the terrace's grass running flat into it. So the
+suppression is lifted for `row == drop` and nowhere else.
+
+### It casts a shade like anything else standing on a terrace
+
+`_shadow_casts` excluded lateral crossings at first, on the reasoning that a
+side face carries no stone so nothing is there to cast. Wrong on its own terms:
+the crossing stands proud of the floor below it whichever alignment it takes,
+and without the shade it reads as painted flat onto that floor rather than
+stepping down onto it.
+
+Deleting the exclusion is the whole change -- a crossing then falls through to
+the same line a `CLIFF` uses, an unclipped blob at its own cell bound for the
+terrace below. The ordering was already right: `_shade` is pass 2 and the ramp
+is pass 3, which is the contract that pass has always stated -- ground, shadow,
+stone. Only the **foot** casts, though, which is where this differs from a cliff. Both
+cells did at first, by falling through to the cliff branch, and that is right
+for a cliff -- every cell of a run is wall standing the full height. It is
+wrong for a ramp: the upper tile is the ramp's own surface, level with the
+terrace it leaves, and only the lower one stands proud of the floor below.
+`row == drop` picks it, the same test `walk_links` uses to find the end that
+opens onto that floor.
+
+Both alignments take it. The notched one is unarguable -- there is a wall above
+it -- and the protruding one carries the ramp's own rocky step, so it earns a
+shade too.
+
+**And a north-facing tile casts nothing, whatever gave it that edge.** The rule
+is older than this milestone -- a shadow falling north fights the rest of the
+lighting, so a plateau's back edge and the corners where it meets a flank are
+left clean -- but it was implemented as "does lower *ground* drop away to the
+north", and a north edge has three other causes. The tile directly below a
+crossing's foot is the one that showed it up: its north neighbour is the stair,
+so the old test saw nothing and let it cast sideways onto the terrace below,
+which reads as the shade bleeding into the tile next door rather than sitting
+under anything. Asking `_floor_sides` for the edge instead catches all four
+causes. Over six worlds it silences 125 casters of 1,194 -- 78 with stone to
+the north, 38 with a flight, 9 with open sea -- and every one that still casts
+has no north edge at all.
+
+### Where it landed
+
+| | |
+|---|---|
+| lateral crossings, six worlds | **147** |
+| protruding / notched | **59% / 41%** |
+| per plateau side, level 1 | mean **1.60**, 65% on exactly 2-3 |
+| per plateau side, level 2+ | 0.20 |
+| crossings failing to link two levels | **0** |
+| disconnected rooms | **0** |
+| stone cells added | **0** |
+
+`SIDE_SPACING = 2`: the unit is two tiles tall, so a pair can sit back to back
+but never overlap.
+
+---
+
+## N — the blue seams were a fractional tile, and only in the browser — ✅ DONE
+
+Thin bluish lines along tile frontiers, reported off a screenshot. Reproduced,
+and the cause is not the terrain at all.
+
+Terrain is not one surface. It is composited from several that are scaled and
+blitted independently -- per room, per corridor, per cliff band, and since A5
+one per terrace on top of that -- and each lands at a *truncated* screen
+position. When the scaled tile size is fractional the neighbours round to
+positions that do not quite meet, and the sea buffer painted underneath shows
+through the 1 px crack.
+
+The correlation is exact: seams appear if and only if `TILE_PX * zoom` is not
+an integer.
+
+| zoom | tile px | | seam px |
+|---|---|---|---|
+| 0.75 | 48.00 | integer | 1 |
+| 1.00 | 64.00 | integer | 0 |
+| 1.25 | 80.00 | integer | 0 |
+| 1.50 | 96.00 | integer | 0 |
+| 2.00 | 128.00 | integer | 0 |
+| 0.90 | 57.60 | fractional | 239 |
+| **1.20** | **76.80** | fractional | **252** |
+| 1.30 | 83.20 | fractional | 32 |
+
+Which matters because `apply_web_profile()` set `CAMERA_ZOOM = 1.2`. Desktop
+runs at 1.5 -- 96 px, clean -- so this was a defect the browser build shipped
+and the desktop build never showed.
+
+1.2 was not arbitrary: it was picked so `1280 / 1.2 == 1600 / 1.5`, giving the
+web canvas exactly the desktop build's visible world extent. That parity is
+what the fix spends. At 1.25 the web view shows 1024 x 576 of world against
+desktop's 1067 x 600 -- about 4% tighter, and sprites 4% larger. Across five
+worlds and three islands each, **3,402 seam pixels to 0**.
+
+The alternative was to snap every surface's size and destination onto one
+integer grid, which fixes any zoom instead of one. It is the better repair and
+it stays on the table; it also moves surfaces a pixel relative to the entities
+drawn over them, which is a bigger thing to land for a defect that has exactly
+one shipping trigger.
+
+`tests/rendering/test_camera.py::ZoomGranularityTests` pins the invariant for
+every zoom the game ships, so the next zoom change has to notice.
+
+### A different hole, found while measuring
+
+The seam counter never quite reached zero, and the residue was informative: all
+of it exactly `(71, 171, 169)` -- `water_background.png`'s fill -- all of it on
+`vstair` tiles, in two thin vertical strips one tile apart, and *present at
+every zoom including the integer ones*, desktop's 1.5 among them. So it is not
+rounding. A vertical staircase's art does not fill the full width of its tile,
+nothing is painted behind the flanks, and the sea shows through. 25 to 52 px
+per island, pre-existing, unrelated to this milestone, and left alone here.

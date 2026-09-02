@@ -695,15 +695,7 @@ class PlayingState(State):
         offset = self.shake.offset / self.camera.zoom
         self.camera.pos -= offset
         try:
-            self.game_map.renderer.draw_ground(surface, self.camera)
-            self.game_map.renderer.draw_room_clutter(surface, self.camera)
-            self.renderer.interactables(surface)
-            self.renderer.hazards(surface)
-            self.renderer.gems(surface)
-            self.renderer.explosions(surface)
-            self.renderer.trail_fx(surface)             # projectile dust trails, under the bolts
-            self._draw_player_projectiles(surface)      # weapon effects sit behind the characters
-            self._draw_depth_layer(surface)
+            self._draw_world(surface)
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
             self.particles.draw(surface, self.camera)
             self.damage_numbers.draw(surface, self.camera)
@@ -716,28 +708,89 @@ class PlayingState(State):
         self.renderer.feedback_overlays(surface)
     # --- render: scene composition ---------------
     def _depth_items(self) -> list:
-        """`(depth_y, draw_fn)` for the whole depth-sorted layer -- map scenery
-        (obstacles + interior decorations) plus the characters (hero, enemies,
-        boss, summons) -- sorted back-to-front by ground-contact Y."""
-        items = self.game_map.renderer.scenery_drawables(self.camera)
-        for e in self.enemies:
-            items.append((e.pos.y, lambda s, e=e: self._draw_one_enemy(s, e)))
-        for fx in self._death_fx:                  # one-shot death poofs
-            items.append((fx[1].y, lambda s, fx=fx: self._draw_death_fx(s, fx)))
-        if self.boss is not None and self.boss.alive:
-            items.append((self.boss.pos.y, self._draw_boss))
-        for sm in self.summons:
-            items.append((sm.pos.y, lambda s, sm=sm: self._draw_one_summon(s, sm)))
-        items.append((self.player.pos.y, self._draw_player))
+        """`(depth_y, draw_fn)` for the whole sprite layer -- map scenery
+        (obstacles + interior decorations) plus the characters -- sorted
+        back-to-front by ground-contact Y, ignoring which terrace each stands
+        on.
+
+        `draw()` composites band by band instead (`_draw_world`), so this is no
+        longer the paint order for a world with terraces; it stays as the
+        flat view of the same items, which is what the ordering tests describe
+        and what a single-level world still paints exactly.
+        """
+        r = self.game_map.renderer
+        items = [(depth, fn) for _lvl, depth, fn in r.banded_scenery(self.camera)]
+        items += [(depth, fn) for _lvl, depth, fn in self._actor_items()]
         items.sort(key=lambda t: t[0])
         return items
 
-    def _draw_depth_layer(self, surface) -> None:
-        """Paint the depth-sorted layer: a sprite lower on the map draws over the
-        ones above it, so a character standing behind (a smaller Y than) a tree
-        is hidden by its canopy."""
-        for _, fn in self._depth_items():
-            fn(surface)
+    def _draw_world(self, surface) -> None:
+        """The world, composited one terrace at a time: sea, then for each
+        level its ground, the flat effects lying on it, and the sprites
+        standing on it.
+
+        A5. The whole world used to be painted before any sprite, so a sprite
+        on a low terrace was drawn over every terrace above it -- its art
+        reaches beyond its own cell, and an island bakes as one surface, so
+        nothing could cover it. Banding the ground and slotting the sprites in
+        is what makes a higher terrace occlude what stands below it, while the
+        stone a character is standing *in front of* still sits behind them:
+        a wall bands with the terrace it drops onto, not the one it holds up
+        (`grid_paint.paint_room_levels`).
+
+        Flat effects -- pickups, hazard discs, dust -- go between a band and
+        its sprites, which is exactly where they were relative to the terrain
+        and the characters before this existed.
+        """
+        r = self.game_map.renderer
+        r.draw_water(surface, self.camera)
+        scenery = r.banded_scenery(self.camera)
+        actors = self._actor_items()
+        levels = sorted({lvl for lvl, _d, _f in scenery}
+                        | {lvl for lvl, _d, _f in actors}
+                        | set(r.ground_levels()))
+        for level in levels:
+            r.draw_ground_band(surface, self.camera, level)
+            self._draw_flat_effects(surface, level)
+            items = [(d, f) for lvl, d, f in scenery if lvl == level]
+            items += [(d, f) for lvl, d, f in actors if lvl == level]
+            items.sort(key=lambda t: t[0])
+            for _depth, fn in items:
+                fn(surface)
+
+    def _draw_flat_effects(self, surface, level: int) -> None:
+        """Everything that lies flat on one terrace: interactables, hazard
+        discs, gems, explosion rings, dust trails and the player's own shots.
+
+        Filtered by level rather than drawn once, because they belong under the
+        characters standing on their own terrace -- which is where they were
+        before the world was banded.
+        """
+        self.renderer.interactables(surface, level)
+        self.renderer.hazards(surface, level)
+        self.renderer.gems(surface, level)
+        self.renderer.explosions(surface, level)
+        self.renderer.trail_fx(surface, level)
+        self._draw_player_projectiles(surface, level)
+
+    def _actor_items(self) -> list:
+        """`(level, depth_y, draw_fn)` for the characters -- hero, enemies,
+        boss, summons and the one-shot death poofs."""
+        lvl = self.game_map.renderer.level_at
+        out = [(lvl(e.pos.x, e.pos.y), e.pos.y,
+                lambda s, e=e: self._draw_one_enemy(s, e)) for e in self.enemies]
+        for fx in self._death_fx:
+            out.append((lvl(fx[1].x, fx[1].y), fx[1].y,
+                        lambda s, fx=fx: self._draw_death_fx(s, fx)))
+        if self.boss is not None and self.boss.alive:
+            out.append((lvl(self.boss.pos.x, self.boss.pos.y),
+                        self.boss.pos.y, self._draw_boss))
+        for sm in self.summons:
+            out.append((lvl(sm.pos.x, sm.pos.y), sm.pos.y,
+                        lambda s, sm=sm: self._draw_one_summon(s, sm)))
+        out.append((lvl(self.player.pos.x, self.player.pos.y),
+                    self.player.pos.y, self._draw_player))
+        return out
 
     # --- render: thin forwarders to WorldRenderer -------------
     # The bodies live in `game/states/playing/rendering.py`; these stay so that
@@ -764,8 +817,8 @@ class PlayingState(State):
     def _draw_death_fx(self, surface, fx) -> None:
         self.renderer.death_fx(surface, fx)
 
-    def _draw_player_projectiles(self, surface) -> None:
-        self.renderer.player_projectiles(surface)
+    def _draw_player_projectiles(self, surface, level=None) -> None:
+        self.renderer.player_projectiles(surface, level)
 
     def _draw_hostile_projectiles(self, surface) -> None:
         self.renderer.hostile_projectiles(surface)

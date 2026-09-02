@@ -80,9 +80,13 @@ def bake(gm) -> None:
         # scenery setup below.
         gm._shore = []
         for r in layout.rooms:
-            got = grid_paint.paint_room_grid(gm, sheets, layout, r)
-            if got is not None:
-                gm._grid_surfs.append((got[0], got[1], r.floor))
+            # One surface per terrace, not one per island. The third element is
+            # the terrace's own level now (it used to be `r.floor`, which is a
+            # height-map room's *base* and therefore always 0), and the renderer
+            # composites the world band by band so sprites can sit between them.
+            for blit, surf, level in grid_paint.paint_room_levels(
+                    gm, sheets, layout, r):
+                gm._grid_surfs.append((blit, surf, level))
             gm._shore.extend(grid_paint.grid_shore(r))
         for c in layout.corridors:
             rc = grid_paint.paint_bridge(sheets, c)
@@ -157,6 +161,7 @@ def _finish(gm, a, sheets) -> None:
 
     if config.TERRAIN_DECOR:
         terrain_decor.build_decor_scatter(gm, a)
+        terrain_decor.build_water_decor(gm, a)
 
     gm._tiles_ok = True
 

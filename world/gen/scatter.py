@@ -5,12 +5,15 @@ import pygame
 
 from entities.obstacle import KINDS, Obstacle
 from game import config
+from world import frontier
 from world.gen import biomes
 from world.gen.heightmap import walk_links
 from world.layout import VSTAIR, EWSTAIR
 from world.gen.tuning import (
     SPECIAL_KINDS, _OBSTACLE_GAP, _TREE_TREE_GAP, _TREE_DENSITY_BOOST,
-    _TREE_THICKET_MIN, _TREE_THICKET_MAX, _HOUSE_RADIUS, _HOUSE_ROOM_CHANCE,
+    _TREE_THICKET_MIN, _TREE_THICKET_MAX, _TREE_TREE_GAP_GRID,
+    _TREE_THICKET_MIN_GRID, _TREE_THICKET_MAX_GRID,
+    _HOUSE_RADIUS, _HOUSE_ROOM_CHANCE,
     _HOUSE_MIN_ROOM_CELLS, _HOUSE_GLOBAL_CAP, _VILLAGE_MIN_ROOM_CELLS,
     _VILLAGE_EXTRA, _VILLAGE_RADIUS,
     _GRID_OBSTACLES_PER_1000, _GRID_PLACE_TRIES, _GRID_CLEAR_RADIUS,
@@ -37,6 +40,41 @@ def _blocks(doors, x: float, y: float, radius: float) -> bool:
         if (x - cx) ** 2 + (y - cy) ** 2 < radius * radius:
             return True
     return False
+
+
+def _tree_spacing(room):
+    """`(tree_gap, thicket_min, thicket_max)` for this room.
+
+    The height-map world spaces canopies, the flat LD-8 world spaces trunks --
+    see `tuning._TREE_TREE_GAP_GRID`. Read through one helper so the scatter
+    and the top-up cannot pick different answers.
+    """
+    if room is not None and room.grid:
+        return (_TREE_TREE_GAP_GRID, _TREE_THICKET_MIN_GRID,
+                _TREE_THICKET_MAX_GRID)
+    return _TREE_TREE_GAP, _TREE_THICKET_MIN, _TREE_THICKET_MAX
+
+
+def _uphill_ok(room, x: float, y: float, kind: str, reach: dict, px: int) -> bool:
+    """May an obstacle of `kind` stand here without its art reaching onto a
+    terrace above the one it stands on?
+
+    Always true on the flat LD-8 world, which has no grid and no levels -- and
+    which is pinned seed by seed in its tests, so a new rejection there would
+    rewrite worlds that exist to describe how the old generator behaved.
+
+    `reach` is per *kind* rather than per instance because the rig an obstacle
+    ends up wearing is drawn in a later pass (`variant`) and depends on the
+    biome; see `frontier.obstacle_reach`. Trees are what this is really for --
+    a canopy is 256 px tall and reaches some four tiles north of its trunk.
+    """
+    if not room.grid:
+        return True
+    level = frontier.tile_level(room, x, y, px)
+    if level is None:
+        return True
+    north, west, east = reach.get(kind, (0.0, 0.0, 0.0))
+    return frontier.uphill_clear(room, x, y, level, north, west, east, px)
 
 
 def _radius(kind: str) -> float:
@@ -199,6 +237,10 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
     doorways = _corridor_doorways(rooms, corridors)
     all_doors = [d for slabs in doorways.values() for d in slabs]
     px = config.TILE_PX
+    # Imported here rather than at module scope for the reason `KINDS` is: this
+    # module stays importable without the asset layer.
+    from game.assets import get_assets
+    reach = frontier.obstacle_reach(get_assets().terrain)
     # LD-1: no obstacle on a stair or its immediate mouths. `stairs` is empty
     # without WORLD_VERTICALITY, so this is a no-op for the legacy world.
     # LD-3 R7: a ramp step keeps **two** tiles clear below it instead of one.
@@ -217,7 +259,7 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
     # Houses first, so the small obstacles below space themselves off a house
     # via the shared `(o.radius + 46)` check. Gated -> off is byte-identical.
     if config.TERRAIN_BUILDINGS:
-        _scatter_houses(rooms, all_doors, rng, boss_id, out)
+        _scatter_houses(rooms, all_doors, rng, boss_id, out, reach)
 
     for room in rooms:
         # LD-10: on a height-map world the start and boss islands scatter like
@@ -250,14 +292,34 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
         # "middle of the room".
         centres = ((room.center.x, room.center.y), (r.centerx, r.centery))
         clear = _clear_radius(room, start_id, boss_id)
+        # LD-11: on a height-map island the kind is drawn once per slot rather
+        # than again on every retry. A biome's weights are a statement about
+        # the *mix*, and re-drawing quietly re-weights it toward whatever is
+        # easiest to place: a slot that opens as a tree and fails becomes a
+        # boulder, so the terrace ends up with more boulders than the table
+        # asks for. The uphill keep-back made that visible rather than causing
+        # it -- a canopy reaches four tiles north where a boulder reaches half
+        # of one, so trees are rejected far more often. A slot that cannot seat
+        # its kind now simply goes unfilled, which costs density and keeps the
+        # mix honest.
+        #
+        # The flat LD-8 world keeps the per-try draw: it is pinned seed by seed
+        # in a dozen tests, and changing the stream would rewrite the worlds
+        # those tests exist to describe.
+        sticky = bool(room.grid)
+        tree_gap, _tmin, _tmax = _tree_spacing(room)
         for fam, floor, kinds, weights, density in batches:
             for _ in range(density):
+                # Kind is drawn before the position either way, so the
+                # placement gap can depend on it: tree-next-to-tree keeps only
+                # `_TREE_TREE_GAP` (groves), every other pairing keeps the full
+                # `_OBSTACLE_GAP`.
+                kind = rng.choices(kinds, weights=weights, k=1)[0] if sticky else None
                 for _try in range(tries):
-                    # Kind is drawn first so the placement gap can depend on
-                    # it: tree-next-to-tree keeps only `_TREE_TREE_GAP`
-                    # (groves), every other pairing keeps the full
-                    # `_OBSTACLE_GAP`.
-                    kind = rng.choices(kinds, weights=weights, k=1)[0]
+                    if not sticky:
+                        # Drawn per try, exactly as the flat generator always
+                        # did -- an extra draw out here would shift its stream.
+                        kind = rng.choices(kinds, weights=weights, k=1)[0]
                     if floor:
                         col, row = rng.choice(floor)
                         x = r.left + col * px + rng.uniform(px * 0.28, px * 0.72)
@@ -270,8 +332,11 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
                         continue
                     if _blocks(all_doors, x, y, _radius(kind)):
                         continue
+                    # O(1), so it goes ahead of the O(n) spacing sweep below.
+                    if not _uphill_ok(room, x, y, kind, reach, px):
+                        continue
                     if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
-                           < (o.radius + (_TREE_TREE_GAP
+                           < (o.radius + (tree_gap
                                           if kind == "tree" and o.kind == "tree"
                                           else _OBSTACLE_GAP)) ** 2
                            for o in out):
@@ -290,7 +355,7 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
 
     # Global +25% tree top-up, clumped into the existing groves. Runs after the
     # variant pass so every obstacle above keeps its exact `variant` draw.
-    _topup_trees(rooms, all_doors, rng, start_id, boss_id, out)
+    _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach)
 
     # Bushes are non-colliding decoration now, not obstacles. They still ride the
     # weighted pick above (and consume a `variant` draw) so the `(radius + gap)`
@@ -300,7 +365,7 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id, stairs=()) -> l
     return [o for o in out if o.kind != "shrub"]
 
 
-def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
+def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach) -> None:
     """Append `_TREE_DENSITY_BOOST` x the current tree count in extra trees, each
     placed 0.55-1.5 tiles from a randomly chosen existing tree (drawn uniformly
     across the whole world -> a global boost) and kept on that tree's room floor,
@@ -345,7 +410,8 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
         rr = room.rect
         cellset = room.cells
         centres, clear = room_clear[room.id]
-        off = pygame.Vector2(rng.uniform(_TREE_THICKET_MIN, _TREE_THICKET_MAX), 0)
+        tree_gap, thicket_min, thicket_max = _tree_spacing(room)
+        off = pygame.Vector2(rng.uniform(thicket_min, thicket_max), 0)
         off.rotate_ip(rng.uniform(0, 360))
         x, y = anchor.pos.x + off.x, anchor.pos.y + off.y
         col, row = int((x - rr.left) // px), int((y - rr.top) // px)
@@ -356,9 +422,11 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
             continue
         if _blocks(all_doors, x, y, _radius("tree")):
             continue
+        if not _uphill_ok(room, x, y, "tree", reach, px):
+            continue
         gap_hit = False
         for o in out:
-            gap = _TREE_TREE_GAP if o.kind == "tree" else _OBSTACLE_GAP
+            gap = tree_gap if o.kind == "tree" else _OBSTACLE_GAP
             if (x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < (o.radius + gap) ** 2:
                 gap_hit = True
                 break
@@ -373,7 +441,7 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out) -> None:
         placed += 1
 
 
-def _scatter_houses(rooms, all_doors, rng, boss_id, out) -> None:
+def _scatter_houses(rooms, all_doors, rng, boss_id, out, reach) -> None:
     """One house in ~35% of big rooms (any kind but `boss`), placed off-centre
     and clear of every corridor doorway; a roomy room grows a colour-matched
     village cluster around it. Appends `Obstacle("house", ...)` to `out`."""
@@ -417,6 +485,8 @@ def _scatter_houses(rooms, all_doors, rng, boss_id, out) -> None:
                        for mx, my in centres):
                     continue
                 if _blocks(fat_doors, x, y, _radius("house")):
+                    continue
+                if not _uphill_ok(room, x, y, "house", reach, px):
                     continue
                 if near is not None:
                     lo, hi = _VILLAGE_RADIUS

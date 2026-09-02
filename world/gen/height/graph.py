@@ -56,6 +56,27 @@ def walk_links(grid, pos) -> list:
             ground((c, r - 1), cell.level)
         if cell.row == cell.drop - 1:
             ground((c, r + 1), cell.level - cell.drop)
+    elif str(cell.tag).startswith("side_"):
+        # A lateral crossing on a plateau's bare side face. Both halves of the
+        # unit behave the same: the terrace it was cut from lies behind on the
+        # entry side, the terrace it descends to in front on the exit side, and
+        # the column it sits in carries on above and below so walking the rim
+        # past a crossing still works. The two halves link to each other
+        # through the `stair` calls above.
+        dc = 1 if cell.tag.endswith("e") else -1        # the drop direction
+        low = cell.level - cell.drop
+        # Head and foot, exactly as a wall-cut flight has them -- and for the
+        # same reason. Letting *either* cell reach both terraces looked
+        # harmless and was not: a body could then cut the corner diagonally
+        # from the low ground to the high ground past the crossing, never
+        # standing on it, because `can_step` only asks whether one right-angle
+        # detour is open end to end. That is the exact hole the diagonal rule
+        # exists to close.
+        if cell.row == 0:                              # head: the upper end
+            ground((c - dc, r), cell.level)
+            ground((c, r - 1), cell.level)
+        if cell.row == cell.drop:                      # foot: the lower end
+            ground((c + dc, r), low)
     else:
         # East/west flight. The wall jogs one row across it, so the upper
         # terrace reaches the flight's head from the side the wall has not

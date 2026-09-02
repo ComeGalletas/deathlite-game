@@ -38,7 +38,6 @@ class TerrainRenderer:
         self.draw_ground(surface, camera)
         if self.gm.layout is None:
             return
-        #self.gm._draw_room_clutter(surface, camera)
         for _depth, draw in sorted(self.scenery_drawables(camera), key=lambda item: item[0]):
             draw(surface)
 
@@ -60,14 +59,8 @@ class TerrainRenderer:
         """Terrain only -- water, void scenery, foam, room floors, bridges (or
         the flat fallback). The depth-sorted layer (`scenery_drawables` +
         entities) is composited on top by the caller."""
-        if not self.gm._tiles_ready:
-            self.gm._build_tiles()
-
-        z = getattr(camera, "zoom", 1.0)
-        if z != self.gm._render_zoom:
-            self.gm._render_zoom = z
-            self.gm._blit_cache.clear()
-
+        self._prepare(surface, camera)
+        z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         if self.gm.layout is None:
             surface.fill(_VOID)
@@ -86,11 +79,89 @@ class TerrainRenderer:
                 pygame.draw.rect(surface, _WALL, self._screen_rect(r.rect, camera),
                                  width=3)
 
+    def _prepare(self, surface, camera) -> None:
+        """Bake if the world has not been baked, and re-sync the zoom cache.
+        Every entry point starts here, because any of them may be the first."""
+        if not self.gm._tiles_ready:
+            self.gm._build_tiles()
+        z = getattr(camera, "zoom", 1.0)
+        if z != self.gm._render_zoom:
+            self.gm._render_zoom = z
+            self.gm._blit_cache.clear()
+
+    def _draw_water_band(self, surface, camera) -> None:
+        """Sea, shoreline foam, and the scenery floating on it -- the band that
+        sits under every terrace. Factored out of `_draw_tiled` so the banded
+        caller can paint it once before the first terrace."""
+        gm = self.gm
+        z = gm._render_zoom
+        ox, oy = camera.pos.x, camera.pos.y
+        if gm._water_buf is not None:
+            wt = gm._water_tile
+            surface.blit(self._z_surf(gm._water_buf),
+                         (-(ox % wt) * z, -(oy % wt) * z))
+        else:
+            surface.fill(_VOID)
+        view = camera.visible_rect()
+        if gm._foam:
+            seconds = pygame.time.get_ticks() * 0.001
+            fsz = gm._foam[0].get_width()
+            fhalf = fsz // 2 - config.TILE_PX // 2
+            fview = view.inflate(fsz, fsz)
+            for wx, wy in gm._shore:
+                if fview.collidepoint(wx, wy):
+                    surface.blit(self._z_surf(gm._foam_frame_at(wx, wy, seconds)),
+                                 ((wx - ox - fhalf) * z, (wy - oy - fhalf) * z))
+        if gm._void_decor:
+            self._blit_decor(surface, camera, gm._void_decor, view)
+
     def _screen_rect(self, rect: pygame.Rect, camera) -> pygame.Rect:
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         return pygame.Rect(round((rect.x - ox) * z), round((rect.y - oy) * z),
                            round(rect.width * z), round(rect.height * z))
+
+    def level_at(self, wx: float, wy: float) -> int:
+        """Which terrace a world point stands on -- 0 when the world has no
+        elevation index at all, which collapses the whole banded path back to
+        a single band and the ordering this had before A5."""
+        ix = self.gm._levels
+        if ix is None:
+            return 0
+        got = ix.level_at_point(wx, wy)
+        return 0 if got < 0 else got
+
+    def ground_levels(self) -> list:
+        """Every terrace level the baked world holds, ascending."""
+        return sorted({lvl for _b, _s, lvl in self.gm._grid_surfs}) or [0]
+
+    def draw_water(self, surface, camera) -> None:
+        """The band under everything: sea, shoreline foam, and the water
+        scenery that floats on it. Split out of `draw_ground` so the caller can
+        put the terrace bands -- and the sprites between them -- on top."""
+        self._prepare(surface, camera)
+        if self.gm.layout is None or not self.gm._tiles_ok:
+            self.draw_ground(surface, camera)
+            return
+        self._draw_water_band(surface, camera)
+
+    def draw_ground_band(self, surface, camera, level: int) -> None:
+        """One terrace level of the whole world, south-first within it."""
+        gm = self.gm
+        if gm.layout is None or not gm._tiles_ok or not gm._grid_surfs:
+            return
+        self._prepare(surface, camera)
+        z, ox, oy = gm._render_zoom, camera.pos.x, camera.pos.y
+        view = camera.visible_rect()
+        for blit, surf, lvl in sorted(gm._grid_surfs, key=lambda t: t[0].y):
+            if lvl == level and blit.colliderect(view):
+                surface.blit(self._z_surf(surf),
+                             ((blit.x - ox) * z, (blit.y - oy) * z))
+        if level == self.ground_levels()[0]:
+            for rect, surf, _lvl in gm._corr_surfs:
+                if rect.colliderect(view):
+                    surface.blit(self._z_surf(surf),
+                                 ((rect.x - ox) * z, (rect.y - oy) * z))
 
     def scenery_drawables(self, camera) -> list:
         """`(depth_y, draw_fn)` for every visible interior-clutter decoration and
@@ -98,26 +169,33 @@ class TerrainRenderer:
         caller merges these with the entities and paints them back-to-front, so
         a sprite lower on the map overlaps the ones above it and a character
         standing behind (a lower y than) an obstacle is hidden by it."""
+        return [(depth, fn) for _lvl, depth, fn in self.banded_scenery(camera)]
+
+    def banded_scenery(self, camera) -> list:
+        """`(level, depth_y, draw_fn)` -- the same items, each tagged with the
+        terrace it stands on so the caller can slot it between two ground
+        bands. The level has to be taken here, where the world position is
+        still in hand; once an item is a closure it is gone.
+        """
         if self.gm.layout is None:
             return []
         cull = camera.visible_rect().inflate(320, 320)
         out: list = []
-        """
         for inst_list in self.gm._room_decor.values():
             for inst in inst_list:
                 if cull.collidepoint(inst[4], inst[5]):
-                    out.append((inst[5],
+                    out.append((self.level_at(inst[4], inst[5]), inst[5],
                                 lambda s, c=camera, it=inst:
                                 self._blit_one_decor(s, c, it)))
-        """
         for i, o in enumerate(self.gm.obstacles):
             if cull.collidepoint(o.pos.x, o.pos.y):
+                lvl = self.level_at(o.pos.x, o.pos.y)
                 shadow = self.gm._tree_shadows.get(i)
                 if shadow is not None:
-                    out.append((o.pos.y - 0.01,
+                    out.append((lvl, o.pos.y - 0.01,
                                 lambda s, c=camera, sh=shadow:
                                 self._draw_one_tree_shadow(s, c, sh)))
-                out.append((o.pos.y,
+                out.append((lvl, o.pos.y,
                             lambda s, c=camera, idx=i, ob=o:
                             self._draw_one_obstacle(s, c, idx, ob)))
         return out
@@ -125,12 +203,7 @@ class TerrainRenderer:
     def _draw_tiled(self, surface, camera) -> None:
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
-        if self.gm._water_buf is not None:
-            wt = self.gm._water_tile
-            surface.blit(self._z_surf(self.gm._water_buf),
-                         (-(ox % wt) * z, -(oy % wt) * z))
-        else:
-            surface.fill(_VOID)
+        self._draw_water_band(surface, camera)
 
         view = camera.visible_rect()
         gm = self.gm
@@ -156,25 +229,19 @@ class TerrainRenderer:
                     surface.blit(self._z_surf(frame),
                                  ((wx - ox - fhalf) * z, (wy - oy - fhalf) * z))
 
-        # Base water layer: the sea shoreline foam that every floor sits on,
-        # then the open-water scenery (rocks, ducks) so a shoreline animation
-        # never washes over it.
-        _foam_at(gm._shore)
-        if gm._void_decor:
-            self._blit_decor(surface, camera, gm._void_decor, view)
-
         if gm.layout is None:
             # Interior clutter is NOT drawn here -- it is depth-sorted with the
             # obstacles and the characters (see `scenery_drawables`).
             return
 
         if gm._grid_surfs:
-            # LD-9: each room is one baked surface holding its own terraces,
-            # walls and flights, so the only ordering left is between rooms.
-            # South-first, then a room lower down the map overlaps the one
-            # above it, the same way its own terraces do.
+            # A5: one baked surface per *terrace*, composited level by level.
+            # Within a level, south-first, so a room lower down the map overlaps
+            # the one above it. Across levels, ascending, so a higher terrace is
+            # always painted over the one it stands on -- which is what lets the
+            # depth layer slot sprites between two bands (`ground_bands`).
             for blit, surf, _lvl in sorted(gm._grid_surfs,
-                                           key=lambda t: t[0].y):
+                                           key=lambda t: (t[2], t[0].y)):
                 _blit(blit, surf)
             for rect, surf, _lvl in gm._corr_surfs:
                 _blit(rect, surf)
@@ -236,17 +303,6 @@ class TerrainRenderer:
         # Interior clutter is NOT drawn here -- it is depth-sorted with the
         # obstacles and the characters (see `scenery_drawables`).
 
-    def draw_room_clutter(self, surface, camera) -> None:
-        """All interior clutter, unsorted -- only the whole-map `draw()` path.
-            Public method so it can be called from outside the class to draw room clutter and don't belong in the depth culling / sorting of the main draw pass.
-        """
-        if self.gm.layout is not None:
-            view = camera.visible_rect()
-            for r in self.gm.layout.rooms:
-                inst = self.gm._room_decor.get(r.id)
-                if inst and r.rect.colliderect(view):
-                    self._blit_decor(surface, camera, inst, view)
-
     def _blit_one_decor(self, surface, camera, inst) -> None:
         """Blit one `(frames, anchor_x, anchor_y, fps, wx, wy)` scenery instance:
         current animation frame, base on `(wx, wy)`."""
@@ -259,8 +315,8 @@ class TerrainRenderer:
                      (round((wx - ox) * z - ax * z), round((wy - oy) * z - ay * z)))
 
     def _blit_decor(self, surface, camera, instances, view=None) -> None:
-        """View-culled batch blit of scenery instances (void scatter + the
-        unsorted `draw()` clutter path)."""
+        """View-culled batch blit of scenery instances -- the void scatter,
+        which sits under the whole depth layer and needs no sorting."""
         if view is None:
             view = camera.visible_rect()
         cull = view.inflate(256, 256)

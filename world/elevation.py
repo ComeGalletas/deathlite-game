@@ -259,6 +259,18 @@ def _flight_opens(index: LevelIndex, ftile, gtile) -> bool:
                 or (cell.row == cell.drop - 1
                     and ground((c, r + 1), cell.level - cell.drop)))
 
+    if str(cell.tag).startswith("side_"):
+        # The runtime half of the lateral rule in `graph.walk_links`. The two
+        # are written together on purpose: `check_grid` validates generation
+        # against that one, while the collider and the flow field ask this one,
+        # and a disagreement between them is its own class of bug.
+        dc = 1 if cell.tag.endswith("e") else -1
+        low = cell.level - cell.drop
+        if cell.row == 0:                              # head: the upper end
+            return (ground((c - dc, r), cell.level)
+                    or ground((c, r - 1), cell.level))
+        return cell.row == cell.drop and ground((c + dc, r), low)
+
     entry = 1 if cell.tag == "w" else -1     # "w" descends west, entered east
     low = cell.level - cell.drop
     if cell.row == 0 and (ground((c + entry, r), cell.level)

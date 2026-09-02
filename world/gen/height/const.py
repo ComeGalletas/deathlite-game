@@ -44,5 +44,32 @@ CANYONS = 3
 CANYON_DEPTH = (4, 10)
 CANYON_WIDTH = (3, 5)
 
+# Lateral stairs: crossings on a plateau's east and west faces, so an island
+# can be climbed from its sides and not only from the bottom.
+#
+# Those faces carry no stone. `_raise_walls` only stones a *southward* drop --
+# every cliff tile in the tileset is a horizontal run drawn as if seen from the
+# south -- so measured over six worlds there are zero vertical stone runs, and
+# a plateau's east/west boundary is a bare level change. Every existing site
+# test needs a `CLIFF` to work from, which is why no stair ever landed there.
+#
+# A lateral crossing is the two-tile ramp unit the tileset already ships
+# (`slots.ramp`, present in all eight tilemaps) laid straight onto that bare
+# boundary: no stone added, no new art. It needs **two vertically adjacent**
+# drop tiles so both halves of the unit have a face to connect to -- 508 such
+# runs exist over six worlds, 888 distinct placements, and every multi-level
+# island has at least one.
+SIDE_STAIRS = (2, 3)
+# A plateau above the first floor is small and already well served by the south
+# rim, so it takes about a quarter of that.
+SIDE_STAIRS_HIGH = (0, 1)
+SIDE_STAIRS_HIGH_FROM = 2          # the first level counted as "high"
+# Separation between two lateral crossings, in tiles. The unit is two tiles
+# tall, so 2 lets a pair sit back to back but never overlap -- the site test
+# needs plain ground under both halves, and a placed crossing is not ground.
+# Measured, it is what actually reaches the target: 77% of plateau sides land
+# on exactly two or three crossings against 58% at 3.
+SIDE_SPACING = 2
+
 
 # --- terrace planning -----------------------------------------------------
