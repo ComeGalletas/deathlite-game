@@ -266,10 +266,51 @@ def _flight_opens(index: LevelIndex, ftile, gtile) -> bool:
         # and a disagreement between them is its own class of bug.
         dc = 1 if cell.tag.endswith("e") else -1
         low = cell.level - cell.drop
+        # The column the unit sits in carries on north of the head and south of
+        # the foot, and on a *protruding* crossing what carries on there is the
+        # lower terrace -- flat ground with no stone in it, because a plateau's
+        # side face has none. Refusing those two edges put an invisible wall on
+        # open ground at both ends of nine crossings in ten. They open onto
+        # whichever terrace actually lies there; only a cliff still stops you.
+        #
+        # Letting the head reach the low terrace is what the `walk_links`
+        # comment warns about -- it is the corner-cutting hole -- so it is safe
+        # only because `can_step` now refuses any diagonal between two ground
+        # tiles of different levels outright. The foot never had that problem:
+        # both of its edges lead to the low terrace, so no level is gained.
+        #
+        # The head's *downhill* edge goes with them, and for the same reason
+        # read off the art rather than off the level. The ramp's top tile is a
+        # diagonal wedge: 64 of 64 pixels along its uphill edge and **0** along
+        # its downhill one, where the tile is transparent and the low terrace
+        # shows through. A wall there is a wall across open ground. The stone
+        # of the drop is drawn on the *foot's* uphill flank -- 58 of 64 -- and
+        # that is the one edge of the unit that stays shut.
+        # North is the one edge where a terrace above may still be walled, and
+        # the test is the renderer's: `grid_paint` paints a backdrop cliff on
+        # the head exactly when the tile above is ground at the head's own
+        # level -- a crossing notched *into* the terrace, with that terrace
+        # dropping into the notch. There is a face drawn between the two, so
+        # walking south off it is walking off a cliff. Such a crossing is
+        # entered from its uphill flank instead, which is what a notch is for.
+        # Ground at the *foot's* level above is the other alignment: the low
+        # terrace running straight into the crossing, nothing drawn, no wall.
         if cell.row == 0:                              # head: the upper end
             return (ground((c - dc, r), cell.level)
-                    or ground((c, r - 1), cell.level))
-        return cell.row == cell.drop and ground((c + dc, r), low)
+                    or ground((c, r - 1), low)
+                    or ground((c + dc, r), low))
+        # The foot's uphill flank is open too, by the same judgement applied to
+        # the ramp rather than to the tilesheet. The sheet does draw 58 of 64
+        # pixels of rocky step along that edge, so this is not the "no art, no
+        # wall" rule -- it is the ramp being a ramp: you may step onto it
+        # sideways from the terrace it descends from, and off it the same way.
+        # Both cells of the unit therefore touch both terraces, which is safe
+        # for the same reason the head's reach is: `diagonal_blocked` refuses
+        # the ground-to-ground corner, so a body still has to stand on the
+        # crossing to change level.
+        return cell.row == cell.drop and (ground((c + dc, r), low)
+                                          or ground((c, r + 1), low)
+                                          or ground((c - dc, r), cell.level))
 
     entry = 1 if cell.tag == "w" else -1     # "w" descends west, entered east
     low = cell.level - cell.drop
@@ -278,6 +319,21 @@ def _flight_opens(index: LevelIndex, ftile, gtile) -> bool:
         return True
     return cell.row == cell.drop and (ground((c - entry, r), low)
                                       or ground((c, r + 1), low))
+
+
+def diagonal_blocked(index: LevelIndex, a, b) -> bool:
+    """Is the diagonal `a` -> `b` illegal on its endpoints alone?
+
+    Two *ground* tiles of different levels are never one move apart, whatever
+    detour composes the diagonal: nothing on this terrain changes level without
+    standing on a flight. Stating that directly is what lets a flight's head
+    open onto both terraces -- the corner-cut it used to enable is now refused
+    where it happens rather than by denying the head a neighbour.
+
+    Both the collider (`can_step`) and the baked step mask in
+    `world/pathfinding.py` consult this, so the two cannot drift."""
+    return (index.kind_at(*a) == GROUND and index.kind_at(*b) == GROUND
+            and index.level_at(*a) != index.level_at(*b))
 
 
 def can_cross(index: LevelIndex, a, b) -> bool:
@@ -316,13 +372,17 @@ def can_step(index: LevelIndex, a, b) -> bool:
     """`can_cross`, plus the diagonal case composed from its orthogonal parts.
 
     A diagonal is open only if one of its two right-angle detours is open end
-    to end. That is what stops a body slipping across the corner of a drop --
-    the one place a pure per-axis test would let it through."""
+    to end, *and* its endpoints are not two ground tiles of different levels.
+    Both halves stop a body slipping across the corner of a drop; the detour
+    test catches it where the corner has stone in it, `diagonal_blocked` where
+    the detour runs through a flight that legitimately touches both terraces."""
     if a == b:
         return True
     dc = b[0] - a[0]
     dr = b[1] - a[1]
     if dc and dr and abs(dc) == 1 and abs(dr) == 1:
+        if diagonal_blocked(index, a, b):
+            return False
         via_h = (a[0] + dc, a[1])
         via_v = (a[0], a[1] + dr)
         return ((can_cross(index, a, via_h) and can_cross(index, via_h, b))

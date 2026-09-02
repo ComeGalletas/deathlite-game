@@ -5174,3 +5174,336 @@ every zoom including the integer ones*, desktop's 1.5 among them. So it is not
 rounding. A vertical staircase's art does not fill the full width of its tile,
 nothing is painted behind the flanks, and the sea shows through. 25 to 52 px
 per island, pre-existing, unrelated to this milestone, and left alone here.
+
+---
+
+## O — a crossing on a flank is not an obstacle — ✅ DONE
+
+A lateral crossing that protrudes from a plateau's side had an invisible wall
+at both ends of it. Reported off a screenshot, and the measurement is blunt:
+of 111 protruding crossings over six worlds, **91 had plain ground north of the
+head with the edge refused**, and only 5 of 111 let you approach the foot from
+the south.
+
+`_flight_opens` opened the head's north edge only onto ground *at the
+crossing's own level*:
+
+```python
+if cell.row == 0:                              # head: the upper end
+    return (ground((c - dc, r), cell.level)
+            or ground((c, r - 1), cell.level))
+```
+
+which is true for a notched crossing -- 32 of 32 open -- and those are exactly
+the ones that get a backdrop cliff, because the render test is the same test. A
+protruding crossing has the *lower* terrace north of it, so the edge closed
+with nothing drawn to explain it. The collider and the renderer were reading
+the same fact and disagreeing about what it meant.
+
+Both ends open onto whatever terrace actually lies there now. A cliff, and only
+a cliff, still stops you: 9 crossings in 10 gain the north edge, 11 keep the
+wall because there is stone above them.
+
+### Why it could not just be deleted
+
+Letting the head reach the low terrace *is* the corner-cutting hole the
+`walk_links` comment warns about. With the head touching both terraces, the
+diagonal from the low ground north of it to the high ground beside it has a
+right-angle detour that is open end to end -- through the head -- so `can_step`
+would wave a body across a level change it never climbed. That is the hole
+`test_a_chase_up_a_terrace_goes_through_a_flight` exists for.
+
+The fix is to say the thing that is actually true rather than to keep denying
+the head a neighbour: **two ground tiles of different levels are never one
+diagonal apart**, whatever detour composes it. Nothing on this terrain changes
+level without standing on a flight. `elevation.diagonal_blocked` states it, and
+both authorities consult it -- `can_step` for the collider, and the baked
+`step_mask` in `world/pathfinding.py`, which composes its diagonals from
+orthogonal bits and would otherwise have routed enemies into corners the
+collider refuses.
+
+`test_the_endpoint_rule_is_load_bearing` checks it catches something: the
+corners beside these crossings are diagonals the old composition would have
+allowed, so the guard is doing work rather than passing for free.
+
+### Where it landed
+
+| | before | after |
+|---|---|---|
+| head opens north (protruding) | 9 / 111 | **104 / 115** |
+| foot opens south (protruding) | 5 / 111 | **73 / 115** |
+| head opens north (notched) | 32 / 32 | 33 / 33 |
+| foot reaches the terrace it descends from | 0 | **0** |
+
+The remaining closed edges are stone or a step up -- both walls you can see.
+Crossing counts move a little (111 -> 115) because `walk_links` gained the same
+two edges, so a handful of sites that failed validation now pass.
+
+---
+
+## P — a staircase that descends into a wall — ✅ DONE
+
+Reported off a screenshot: a cliff face drawn directly under a crossing's foot,
+collision included.
+
+The cause is ordering, not classification. `_raise_walls` gives every southward
+drop its face and runs at the very top of the build; flights are cut some
+twenty lines later and lateral crossings later still. Carve a staircase into
+ground that was holding a wall up and the wall is still standing -- one tile of
+stone under the new foot, with the drop it records no longer existing, because
+the terrace it was the face of is a staircase now.
+
+Six worlds, 37 of them: 31 lateral crossings and 6 east/west flights, no
+straight ones. The shape never varied.
+
+| | |
+|---|---|
+| stone cells in the run | **always exactly 1** |
+| what the stone records | `level = foot + 1`, `drop 1`, `row 0` |
+| what lies beyond it | ground at **exactly** the foot's level, 37 times |
+
+So the repair had no choice to make. The cell goes back to floor at the level
+the foot arrives on -- which is the level its own south neighbour already is --
+and joins ground that is there rather than inventing a terrace. Nothing else
+was leaning on it: a cliff cell is the face of the ground directly north of it,
+and north of this one is the stair.
+
+`_free_flight_feet` does that, after every flight is cut and before
+`_link_levels`. It draws nothing from the stream, which is what keeps
+`test_repair` still looking at the same coastlines.
+
+### The four it could not fix
+
+33 of 37 fell to the rule above. The other four had *higher* ground beyond the
+stone, and both of the repairs available there are worse than the disease:
+giving the cell to the lower floor leaves a bare level change against the
+terrace to its south, giving it to the upper floor leaves the foot facing that
+terrace. Either way a visible wall is traded for an invisible one, which is the
+thing the previous milestone existed to remove.
+
+So `_lateral_site` refuses those sites instead -- `_foot_stone_frees` asks
+whether the stone under a prospective foot is stone that can be given back, and
+a site where it cannot is simply the wrong place for a crossing. It costs
+nothing: 148 crossings before, 148 after, because the seeded shuffle just takes
+a different candidate off the same face.
+
+**Cliff cells under a flight foot, six worlds: 37 -> 0.**
+
+The pathing needed no work of its own. `_flight_opens` already opens a foot
+southward onto ground at the level it lands on, for all three flight kinds --
+for lateral crossings that is the edge opened in milestone O, which is a nice
+demonstration that the two fixes are the same fix seen from two sides.
+
+---
+
+## Q — nothing stands on top of a crossing — ✅ DONE
+
+The tail of milestone O, and the correction to it. Freeing the head's north
+edge exposed a placement bug that the wall had been hiding: `_lateral_site`
+validates the two cells it takes, the terrace beside them, the floor they
+descend to and the foot's landing -- and never once looks *north*. Everything
+about siting a crossing reasons east/west, and the unit is two cells tall.
+
+So a crossing could be cut directly beneath a southward cliff face. Stone lands
+on the head, and the one edge meant to be the way in from the north is a wall.
+The wall itself is right -- there is stone there, and stone stops you -- but it
+is right about a crossing that should never have been placed in that spot.
+
+Thirteen of 148, found by scanning the column above every crossing:
+
+| head−1 | head−2 | north edge | before | after |
+|---|---|---|---|---|
+| ground | ground | open | 108 | 119 |
+| **cliff** | ground | **blocked** | **13** | **0** |
+| ground | cliff | open | 13 | 14 |
+| another stair | — | open | 12 | 12 |
+| other | — | — | 2 | 2 |
+
+`_clear_above` refuses those sites. It costs one crossing across six worlds --
+148 to 147 -- because the seeded shuffle simply takes another candidate off the
+same face, the same way the four rejections in milestone P cost nothing.
+
+**Every crossing in every sampled world can now be entered from the north**:
+147 of 147, against 135 of 148 before.
+
+### What the remaining walls are
+
+Worth writing down, because "no invisible walls" could be read as "no walls".
+What is left on a crossing is exactly two edges, and both are the ramp's own
+height rather than absent stone:
+
+* the **head**, sideways toward the low ground it descends to -- stepping off
+  there is stepping off the top of the ramp;
+* the **foot**, sideways toward the terrace it came from -- the ramp's flank.
+
+Both are drawn by the ramp art itself, so both are walls you can see. A third
+appears now and again where the ground south of the foot is not at the level
+the foot lands on, which is an ordinary step up.
+
+### A test that outlived its case
+
+`test_the_head_still_refuses_north_where_there_is_stone` swept the crossings
+for a cliff above the head and checked that edge was refused. This milestone
+made that configuration impossible, so the test could no longer find its own
+premise and failed on the `assertGreater` guarding it against vacuity -- which
+is the guard doing its job. The property it cared about is checked where it can
+still be seen: every flight in the world against every stone cell touching it,
+which a wall-cut staircase supplies in quantity.
+
+---
+
+## R — the wall follows the ramp, and the ramp is a diagonal — ✅ DONE
+
+Two walls survived milestone Q on every crossing: the head's downhill edge and
+the foot's uphill flank. I had written both off as "the ramp's own height".
+Half of that was wrong, and the tilesheet says so plainly. Opaque pixels along
+each edge, out of 64:
+
+| tile | north | south | uphill | **downhill** |
+|---|---|---|---|---|
+| `ramp.e` top (head) | 1 | 60 | 64 | **0** |
+| `ramp.e` bottom (foot) | 60 | 9 | 59 | **0** |
+| `ramp.w` top (head) | 1 | 61 | 64 | **0** |
+| `ramp.w` bottom (foot) | 61 | 6 | 58 | **0** |
+
+The top tile is a **diagonal wedge**. Its art fills the uphill half and tapers
+to nothing at the downhill edge, where the tile is transparent and the terrace
+below shows straight through. So the wall I was defending as the ramp's height
+stood on 0 of 64 pixels of art. The height is drawn on the *foot's* uphill
+flank -- 58 of 64 -- and that is the edge that should be shut.
+
+The same measurement is the retroactive justification for milestone O: the
+head's north edge carries 1 pixel.
+
+`_flight_opens` opens the head's downhill edge, mirrored in `walk_links`. The
+collision boundary now traces the ramp's diagonal as closely as tile edges can:
+open at the head's downhill corner, shut at the foot's uphill flank. It cannot
+trace it exactly -- `can_cross` answers per orthogonal tile pair, so a wall
+running *through* a tile is not expressible without a different collision model
+-- but the asymmetry between those two edges is that diagonal, quantised.
+
+### The census
+
+Every blocked and open edge on all 147 crossings over six worlds, against how
+much art the sheet draws along it:
+
+| edge | art | walled | open |
+|---|---|---|---|
+| head downhill | 0/64 | **0** | 147 |
+| foot downhill | 0/64 | 0 | 147 |
+| head north | 1/64 | 0 | 147 |
+| head uphill | 64/64 | 0 | 147 |
+| head south / foot north | 60-61/64 | 0 | 147 |
+| **foot uphill** | **58-59/64** | **147** | 0 |
+| foot south | 6-9/64 | 39 | 108 |
+
+Every edge the sheet leaves empty is open, and the one edge it draws stone on
+is shut, on every crossing in every world. Nothing in between.
+
+The 39 walled `foot south` edges are the exception that is not one: those are
+where the ground south of the foot sits a level *higher*, so the wall belongs
+to that terrace rather than to the crossing. It is bare because this tileset
+never draws stone on a northward rise -- true of the whole world, not of these
+staircases, and out of scope here.
+
+### The lesson worth keeping
+
+"Is anything drawn here?" is a question about a tile *edge*, not a tile. The
+head tile is half full of art and still has an edge with none. Reading the
+sheet's alpha along the edge in question is a two-line check and would have
+settled milestone O, Q and this one in a single pass.
+
+---
+
+## S — a ramp is a ramp: neither flank blocks — ✅ DONE
+
+Milestone R ended with one wall left on every crossing, the foot's uphill
+flank, and I defended it with the tilesheet: 58 of 64 pixels of rocky step are
+drawn along that edge, so by the "no art, no wall" rule it was the one edge
+that had earned its keep.
+
+The user overruled it, and the reasoning is not about pixels. A ramp is a ramp.
+You may step onto it sideways from the terrace it descends from, and off it the
+same way, whether or not the artist drew a step along that edge. The flank is
+scenery, not geometry.
+
+So the foot reaches the terrace above as well, and **both cells of the unit now
+touch both terraces**. That is exactly the arrangement the original
+`walk_links` comment forbade -- and it is safe now for the reason established
+in milestone O: `diagonal_blocked` refuses any diagonal between two ground
+tiles of different levels, so a body still has to *stand on the crossing* to
+change level. The head/foot split was never the load-bearing part; the diagonal
+rule was.
+
+### The census, finished
+
+All 147 crossings over six worlds:
+
+| edge | art | walled | open |
+|---|---|---|---|
+| head north | 1/64 | 0 | 147 |
+| head uphill | 64/64 | 0 | 147 |
+| head downhill | 0/64 | 0 | 147 |
+| head south / foot north | 60-61/64 | 0 | 147 |
+| foot uphill | 58-59/64 | **0** | 147 |
+| foot downhill | 0/64 | 0 | 147 |
+| foot south | 6-9/64 | 39 | 108 |
+
+**A lateral crossing now contributes no collision wall of its own at all.** The
+39 that remain are the ground south of a foot sitting a level *higher* -- a
+wall belonging to that terrace, and bare only because this tileset never draws
+stone on a northward rise, which is true of every terrace in the world and has
+nothing to do with staircases.
+
+### The arc, in one line
+
+O freed the north edge, Q stopped crossings being cut under cliffs, R freed the
+head's downhill edge on the evidence of the art, and S freed the last flank on
+the evidence that it should never have been a wall. The measurement was a good
+servant and a bad master: it settled three of the four, and the fourth needed
+someone to say what a ramp is for.
+
+---
+
+## T — the notch keeps its wall — ✅ DONE
+
+Milestone O freed the head's north edge on a single test: is there a cliff
+tile above? There is not, in either alignment, so both were opened. That was
+one test too coarse, and it took until now to see it, because the thing
+standing between a *notched* crossing and the terrace above it is not a cliff
+tile in the grid -- it is the backdrop cliff `grid_paint` paints onto the head.
+
+Across six worlds only three things ever sit directly north of a crossing head,
+and there is no fourth case:
+
+| at y+1 | backdrop painted | count | north edge |
+|---|---|---|---|
+| ground at the **foot's** level | no | 103 | open |
+| ground at the **head's** level | **yes** | **34** | **walled** |
+| another staircase | no | 10 | open |
+
+So the rule states itself: the head's north edge opens onto the low terrace and
+nothing else. Ground at the head's own level above means the crossing is
+notched *into* that terrace, the terrace drops into the notch, and a face is
+drawn between them -- walking south off it is walking off a cliff. Those
+crossings are entered from the uphill flank, which is the entrance a notch is
+cut for, and every one of them still is.
+
+The collision test is now literally the render test. `_flight_opens` and
+`grid_paint` ask the same question of the same tile and agree by construction
+rather than by coincidence.
+
+### Which way the principle cuts
+
+Everything since milestone O has been about removing walls that nothing draws.
+This is the same principle run the other way: **add the wall where something
+is drawn.** Worth writing down because four milestones of taking walls away
+builds a habit, and the habit is wrong -- the rule was never "fewer walls", it
+was "the collider and the renderer describe the same world".
+
+Three tests moved with it. `test_the_head_opens_north_onto_whatever_ground_lies_there`
+narrowed to the low terrace; `test_every_crossing_can_be_entered_from_the_north`
+became `..._from_the_terrace_above`, checking the uphill flank, which is what
+actually has to hold for a notch; and `test_a_crossing_only_ever_walls_a_rise_in_the_terrain`
+now excepts the backdrop. A new one, `test_the_head_is_walled_north_under_its_own_backdrop`,
+pins the wall from the other side so it cannot quietly vanish again.

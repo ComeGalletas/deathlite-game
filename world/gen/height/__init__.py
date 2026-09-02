@@ -45,6 +45,7 @@ from world.gen.height.coast import (            # noqa: F401
 from world.gen.height.terraces import _all_neighbours_in, _cap, _carve_canyons
 from world.gen.height.walls import (
     _raise_walls, _face_the_sea, _wall_flight_sides,
+    _free_flight_feet,
 )
 from world.gen.height.flights import (          # noqa: F401
     _vstair_site, _ewstair_site, _cut_flights, _cut_lateral_stairs, _link_levels,
@@ -130,6 +131,9 @@ def build_grid(mask: frozenset, cols: int, rows: int, rng, base: int = 0,
     state = rng.getstate()
     _cut_lateral_stairs(grid, rng)
     rng.setstate(state)
+    # Every flight is cut by now, so this is the first moment the leftover
+    # faces can all be seen at once. It draws nothing from the stream.
+    _free_flight_feet(grid)
     _link_levels(grid, rng)
     _prune_unreachable(grid)
     # LD-10: last, because every stage above can leave a one-tile hole behind --
