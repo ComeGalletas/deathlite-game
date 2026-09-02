@@ -10,6 +10,7 @@ from __future__ import annotations
 import pygame
 
 from game import config
+from world.inset import build as build_inset
 from world.layout import TileMeta, GROUND, VSTAIR, EWSTAIR, WALKABLE_KINDS
 from world.gen import heightmap
 from world.gen.height import build_grid
@@ -85,6 +86,20 @@ def _build_room_grids(rooms, corridors, rng) -> None:
                           if cell.kind == GROUND), default=0)
 
 
+
+
+def _build_inset_fields(rooms) -> None:
+    """Attach each room's terrace inset field.
+
+    Straight after `_build_room_grids`, which is the moment the grid stops
+    changing: the coastline is walked, the terraces are capped, the walls are
+    up and the flights are cut. Everything after this point -- the tile meta,
+    the obstacle scatter, the bake, the decorations, spawn placement, and the
+    collider at run time -- can ask how far inside its own terrace a point
+    stands instead of working it out again from the grid.
+    """
+    for room in rooms:
+        room.inset = build_inset(room, config.TILE_PX)
 
 
 def _grid_tile_meta(rooms) -> None:
