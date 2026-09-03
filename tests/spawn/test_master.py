@@ -200,6 +200,10 @@ class GroupAndModifierTests(unittest.TestCase):
             return master.spawned
         slow_host, fast_host = FakeHost(seed=2), FakeHost(seed=2)
         slow, fast = _master(slow_host, seed=8), _master(fast_host, seed=8)
+        # From base 1: the shipped base is high enough that x2 on top of it
+        # saturates the director (one pack per `update` is its ceiling), so
+        # the doubling would not show.
+        slow.pacing.base = fast.pacing.base = 1.0
         fast.set_modifier("test", 2.0)
         n_slow = spawned_in(slow, slow_host, 30.0)
         n_fast = spawned_in(fast, fast_host, 30.0)

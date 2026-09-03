@@ -764,3 +764,45 @@ out of the way; `test_tables` refuses a base of 0 or a string.
 
 1,011 tests, 1,010 passed and 1 skipped (6 min 57 s), after two test
 repairs the sprite commit had left behind (`journals/journal.md`).
+
+---
+
+## Base spawn pressure x3 again: 5 -> 15 (2026-09-03)
+
+**Asked:** three times the current default pressure.
+
+**Done**, one number: `pacing.base` 5.0 -> 15.0. The cadence is now
+fifteen times the tables' schedule before the condition signal and the
+modifiers.
+
+**What it actually changes: almost nothing in a run.** Seed 35, dev, hero
+invulnerable and not attacking, 60 s:
+
+| base | spawned by 10 / 20 / 30 / 40 / 50 / 60 s | live cap first full |
+|---|---|---|
+| 5 | 21 / 34 / 45 / 45 / 50 / 50 | 29.0 s |
+| 15 | 23 / 35 / 42 / 45 / 50 / 50 | 33.2 s |
+
+The **live cap** is the binding constraint, not the cadence: 40 bodies at
+the start of a run, +5 every 20 s, and it fills within half a minute at
+either value. Past that the master spawns only into the gaps kills leave,
+so the extra cadence is spent on refill speed alone. (Base 15 filling
+marginally *later* is the pacing signal's crowd term pushing back, not a
+regression.)
+
+Uncapped, the director does scale: 4.2 enemies/s at base 5, 12.6 at 15,
+37.8 at 45 -- but it emits at most **one pack per `update`**, so at 60 Hz
+the hard ceiling is one pack a frame, and past roughly base 10 a further
+multiplier buys progressively less. Two tests had to learn this: the
+modifier test now measures from base 1 (a x2 on top of 15 saturates and
+would not show), and the base test pins the 5x ratio at base 5 rather
+than at whatever ships.
+
+**To actually see more enemies**, raise the crowd, not the cadence:
+`config.ENEMY_COUNT_BASE` (40) and `ENEMY_COUNT_STEP` (5 per 20 s) are
+the director's schedule, `ENEMY_LIVE_CAP` (100) is the simulation budget
+the S7 profile sized. Say the word and I will measure a raise there.
+
+### Suite
+
+1,022 tests, 1,021 passed and 1 skipped (7 min 7 s).
