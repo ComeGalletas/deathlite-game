@@ -150,11 +150,14 @@ class MasterTests(unittest.TestCase):
         m.clear_modifier("dev_menu")
         self.assertAlmostEqual(m.pressure, m.pacing.base * m.pacing.value)
 
-    def test_the_base_is_five_and_spawns_about_five_times_as_much(self):
+    def test_the_base_multiplies_the_cadence(self):
         """S9: the standing multiplier. Two masters on the same seed, one
-        with the base forced back to 1, over the same window: the shipped
-        base spawns about five times as many, cap permitting."""
-        self.assertEqual(get_content().spawn_tables.pacing["base"], 5.0)
+        with the base forced back to 1, over the same window: base 5 spawns
+        about five times as many, cap permitting. Pinned at 5 rather than
+        at whatever ships, because past ~10 the director saturates (it can
+        emit at most one pack per `update`) and the ratio stops holding --
+        see the journal."""
+        self.assertGreaterEqual(get_content().spawn_tables.pacing["base"], 1.0)
         counts = {}
         for base in (1.0, 5.0):
             host = FakeHost(seed=4)

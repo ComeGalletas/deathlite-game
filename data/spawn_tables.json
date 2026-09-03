@@ -82,7 +82,7 @@
   },
 
   "pacing": {
-    "base": 5.0,
+    "base": 15.0,
     "bounds": [0.6, 1.5],
     "tau": 8.0,
     "dead_band": 0.1,
