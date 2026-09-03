@@ -451,6 +451,34 @@ class TerrainRenderer:
         return ghost
 
     @staticmethod
+    def _disjoint(pieces: list, rect: pygame.Rect) -> None:
+        """Add `rect` to `pieces` as the parts of it not already covered by a
+        piece, so the pieces stay pairwise disjoint. Two crowns over one
+        body would otherwise each blit the ghost and the alpha would stack
+        where they overlap (three crowns at 27 % read as 60 %)."""
+        todo = [rect]
+        for have in pieces:
+            nxt = []
+            for r in todo:
+                if not r.colliderect(have):
+                    nxt.append(r)
+                    continue
+                # up to four slivers of `r` around `have`
+                if r.top < have.top:
+                    nxt.append(pygame.Rect(r.left, r.top, r.width, have.top - r.top))
+                if r.bottom > have.bottom:
+                    nxt.append(pygame.Rect(r.left, have.bottom, r.width, r.bottom - have.bottom))
+                top, bottom = max(r.top, have.top), min(r.bottom, have.bottom)
+                if r.left < have.left:
+                    nxt.append(pygame.Rect(r.left, top, have.left - r.left, bottom - top))
+                if r.right > have.right:
+                    nxt.append(pygame.Rect(have.right, top, r.right - have.right, bottom - top))
+            todo = [t for t in nxt if t.width > 0 and t.height > 0]
+            if not todo:
+                return
+        pieces.extend(todo)
+
+    @staticmethod
     def _ghost_uncached(frame: pygame.Surface, alpha: int) -> pygame.Surface:
         ghost = frame.copy()
         ghost.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
@@ -478,7 +506,7 @@ class TerrainRenderer:
             wx0, wy0 = ox + frame_rect.left / z, oy + frame_rect.top / z
             wx1, wy1 = ox + frame_rect.right / z, oy + frame_rect.bottom / z
             seen: set = set()
-            drawn = None
+            pieces: list = []
             for gx in range(int(wx0 // c), int(wx1 // c) + 1):
                 for gy in range(int(wy0 // c), int(wy1 // c) + 1):
                     for i, (ax, ay, aw, ah) in index.get((gx, gy), ()):
@@ -490,15 +518,17 @@ class TerrainRenderer:
                         art = pygame.Rect(round((ax - ox) * z), round((ay - oy) * z),
                                           round(aw * z), round(ah * z))
                         clip = art.clip(frame_rect)
-                        if clip.width <= 0 or clip.height <= 0:
-                            continue
-                        if drawn is None:
-                            drawn = (self._ghost_of(frame, alpha) if cacheable
-                                     else self._ghost_uncached(frame, alpha))
-                        surface.set_clip(clip)
-                        surface.blit(drawn, dest)
-                        surface.set_clip(None)
-                        blits += 1
+                        if clip.width > 0 and clip.height > 0:
+                            self._disjoint(pieces, clip)
+            if not pieces:
+                continue
+            drawn = (self._ghost_of(frame, alpha) if cacheable
+                     else self._ghost_uncached(frame, alpha))
+            for piece in pieces:
+                surface.set_clip(piece)
+                surface.blit(drawn, dest)
+                blits += 1
+            surface.set_clip(None)
         return blits
 
     def draw_tree_shadows(self, surface, camera) -> None:
