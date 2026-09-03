@@ -153,6 +153,42 @@ class GhostPassTests(unittest.TestCase):
         px = surface.get_at((100, 90))
         self.assertGreater(px.r, px.b, "the ghost took another body's pixels")
 
+    def test_overlapping_crowns_do_not_stack_the_ghost(self):
+        """Two trees whose art overlaps over the body: the pixel under both
+        is exactly as faint as under one -- the clips are made disjoint."""
+        from entities.obstacle import Obstacle
+        gm, r = self._lone_tree()
+        gm.__dict__["_obstacles"].append(Obstacle("tree", 130, 100))
+        # overlaps the first over the body's top, and alone covers rows
+        # 110..130 of it, so a second, disjoint piece has to be drawn
+        gm.terrain.art_rects[1] = (90.0, 0.0, 80.0, 130.0)
+        cam = SimpleNamespace(pos=pygame.Vector2(0, 0), zoom=1.0)
+        surface = pygame.Surface((256, 256))
+        r.begin_frame()
+        r.record_character(_character_frame(40, 60), (80, 80), 90.0)
+        blits = r.ghost_pass(surface, cam)
+        self.assertEqual(blits, 2)                                # the first crown, then the sliver below it
+        under_both = surface.get_at((100, 90))                    # x 90..140, y < 110: both crowns
+        under_one = surface.get_at((85, 90))                      # x 60..90: the first only
+        under_second = surface.get_at((100, 120))                 # y 110..130: the second only
+        self.assertEqual(under_both, under_one, "the ghost stacked where the crowns overlap")
+        self.assertEqual(under_second, under_one)
+        self.assertEqual(surface.get_at((100, 135)), (0, 0, 0, 255))   # past both
+
+    def test_disjoint_pieces_never_overlap(self):
+        from world.terrain.render import TerrainRenderer
+        pieces = []
+        for rect in (pygame.Rect(0, 0, 50, 50), pygame.Rect(25, 25, 50, 50),
+                     pygame.Rect(10, 10, 20, 20), pygame.Rect(60, 0, 30, 30)):
+            TerrainRenderer._disjoint(pieces, rect)
+        for i, a in enumerate(pieces):
+            for b in pieces[i + 1:]:
+                self.assertFalse(a.colliderect(b), (a, b))
+        # the union: two 50-squares overlapping by 25x25, a square inside the
+        # first, and a 30-square that overlaps the second by 15x5
+        area = sum(p.width * p.height for p in pieces)
+        self.assertEqual(area, 2500 + 2500 - 625 + 0 + 900 - 75)
+
     def test_the_art_index_holds_only_listed_kinds(self):
         index = self.r._art_index()
         kinds = set(get_content().terrain["obstacle_decor"]["ghost"]["kinds"])
