@@ -124,7 +124,8 @@ class DeathPoofTests(unittest.TestCase):
         for _ in range(2):
             g.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        return g, g.state_machine.current
+        from tests.boot import settle
+        return g, settle(g)                # through the loading screen
 
     def _kill_one(self, p, eid):
         p._spawn_enemy(eid, at=p.player.pos + pygame.Vector2(60, 0))
@@ -186,7 +187,8 @@ class ProjectileTrailTests(unittest.TestCase):
         for _ in range(2):
             g.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        return g, g.state_machine.current
+        from tests.boot import settle
+        return g, settle(g)                # through the loading screen
 
     def _shoot(self, p, **kw):
         """Fire east from the hero, with the LD-9 D10 elevation rule switched
@@ -285,7 +287,8 @@ class SpriteAnchorDropTests(unittest.TestCase):
         for _ in range(2):
             g.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        return g, g.state_machine.current
+        from tests.boot import settle
+        return g, settle(g)                # through the loading screen
 
     def test_sprite_drop_is_fraction_of_radius_times_zoom(self):
         from game import config
@@ -349,7 +352,8 @@ class EnemyStateRingsTests(unittest.TestCase):
         for _ in range(2):
             g.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        return g, g.state_machine.current
+        from tests.boot import settle
+        return g, settle(g)                # through the loading screen
 
     def _circles(self, p, e):
         """Count pygame.draw.circle calls made by _draw_one_enemy(e)."""

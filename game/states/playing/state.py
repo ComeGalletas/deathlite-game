@@ -43,7 +43,7 @@ from ui.hud import HUD
 from ui.damage_numbers import DamageNumbers
 from world.map import GameMap
 from world.pathfinding import NavField
-from world.spawning import SpawnDirector
+from spawn.budget import SpawnDirector
 from game.states.playing import rendering as _rendering
 from game.states.playing.rendering import WorldRenderer
 from game.states.playing.combat import CombatResolver
@@ -61,7 +61,12 @@ STARTING_WEAPON = "arcane_bolt"
 
 class PlayingState(State):
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
-              dev: bool = False, difficulty: str | None = None, **kwargs) -> None:
+              dev: bool = False, difficulty: str | None = None,
+              prebuilt=None, **kwargs) -> None:
+        # `prebuilt` is the loading screen's world -- a baked `GameMap` and a
+        # `NavField` built a slice at a time under this same seed. Without it
+        # the run builds everything here, as the tests and any other caller do.
+        self._prebuilt = prebuilt
         self._init_run(seed, dev, difficulty)
         self._init_world()
         self._init_player(character_id)
@@ -81,12 +86,14 @@ class PlayingState(State):
         self._dev_no_damage = False      # weapons still fire, hits deal 0 (dev menu)
         self._dev_hp_floor = 0.0
         self._dev_show_colliders = False  # F7 / dev menu: true collider overlay
+        self._dev_show_spawn_points = False  # F8 / dev menu: generated spawn points
         self.run_seed = seed if seed is not None else random.randrange(1 << 30)
         self.rng = random.Random(self.run_seed)
 
     def _init_world(self) -> None:
         """The map, its special locations, and the phase-based spawn director."""
-        self.game_map = GameMap(seed=self.run_seed)
+        self.game_map = (self._prebuilt.game_map if self._prebuilt is not None
+                         else GameMap(seed=self.run_seed))
         self.locations = SpecialLocations(self)
         self.locations.build()
         self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng,
@@ -160,6 +167,7 @@ class PlayingState(State):
         # its one-shot burst where it was dropped, then is culled.
         self._trail_fx: list = []
         self._last_move_dir = pygame.Vector2(1, 0)
+        self._frame = 0                       # update count; the tick LOD's phase
         self._awaiting_level_up = False
         self._hurt_flash_t = 0.0
         self._boss_warning_t = 0.0
@@ -196,7 +204,9 @@ class PlayingState(State):
         self._nav_rebuilds = 0
         self._obstacle_grid: SpatialGrid | None = None
         if config.ENEMY_PATHFINDING and self.game_map.layout is not None:
-            self._nav = NavField(self.game_map.layout, self.game_map.obstacles)
+            ready = getattr(self._prebuilt, "nav", None)
+            self._nav = (ready if ready is not None
+                         else NavField(self.game_map.layout, self.game_map.obstacles))
             self._nav.rebuild(self.player.pos)
             self._nav_t = config.ENEMY_NAV_REBUILD_INTERVAL
             # Static -> built once; `path_chase` reads it for local obstacle
@@ -219,6 +229,9 @@ class PlayingState(State):
     def exit(self) -> None:
         for name, handler in getattr(self, "_subs", ()):
             self.game.events.unsubscribe(name, handler)
+        spawn = getattr(self, "spawn", None)
+        if spawn is not None:
+            spawn.close()                    # the master's pacing signals
 
     # --- events -------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -250,6 +263,10 @@ class PlayingState(State):
             if not self.dev_mode:
                 return False                     # collider overlay is dev-only
             self._dev_show_colliders = not self._dev_show_colliders
+        elif key == keys["toggle_spawn_vis"]:
+            if not self.dev_mode:
+                return False                     # spawn-point overlay is dev-only
+            self._dev_show_spawn_points = not self._dev_show_spawn_points
         else:
             return False
         return True
@@ -346,8 +363,27 @@ class PlayingState(State):
         self.spawn.tick_director(dt)
 
         ectx = self._enemy_context(dt)
-        for e in self.enemies:
-            e.update(ectx)
+        self._frame += 1
+        lod = config.ENEMY_LOD_SKIP
+        if lod > 1:
+            # Spawn master S7 tick LOD: an enemy that is neither chasing nor
+            # on screen updates every `lod` frames with a `dt` spanning the
+            # gap, and sits the frames between out entirely. The profile
+            # put the per-enemy cost in the movement probe, not the AI, so
+            # the whole frame is skipped, not just the behaviour tick.
+            lod_ctx = self._enemy_context(dt * lod)
+            view = self.camera.visible_rect().inflate(config.ENEMY_LOD_VIEW_PAD,
+                                                      config.ENEMY_LOD_VIEW_PAD)
+            eligible = self.spawn.lod_eligible
+            for i, e in enumerate(self.enemies):
+                if eligible(e, view):
+                    if (self._frame + i) % lod == 0:
+                        e.update(lod_ctx)
+                else:
+                    e.update(ectx)
+        else:
+            for e in self.enemies:
+                e.update(ectx)
         if self.boss is not None and self.boss.alive:
             self.boss.update(ectx)
 
@@ -660,8 +696,9 @@ class PlayingState(State):
     def _restart_dev_run(self) -> None:
         """Reload the developer run from scratch: same world seed, fresh hero,
         level 1, no blessings / items / upgrades, enemies cleared."""
+        from game.states.loading_state import LoadingState
         self.game.state_machine.change(
-            PlayingState(self.game), character_id=self.character_id,
+            LoadingState(self.game), character_id=self.character_id,
             seed=self.run_seed, dev=True)
 
     # --- debug -----------------------------------
@@ -683,6 +720,18 @@ class PlayingState(State):
         d.set_metric("particles", len(self.particles))
         d.set_metric("level", self.levels.level)
         d.set_metric("kills", self.stats["kills"])
+        m = self.spawn.master
+        loc = m.locality
+        d.set_metric("zone", f"cur {loc.current} head {loc.heading} grace {loc.grace_room}"
+                             + ("  ALL" if m.all_active else "")
+                             + ("  FROZEN" if m.frozen else ""))
+        d.set_metric("population",
+                     f"live {len(self.enemies)} dormant {m.population.total_dormant} "
+                     f"cap {self.director.enemy_count_cap(self.stats['time'])}/{m.world_cap} "
+                     f"debt {m.debt} recycled {m.recycled}")
+        mods = " ".join(f"{k}x{v:g}" for k, v in m.modifiers.items()) or "-"
+        d.set_metric("pressure", f"{m.pressure:.2f} = pace {m.pacing.value:.2f} x mods {mods}"
+                                 f"  [{m.pacing.describe()}]")
         if self._nav is not None:
             d.set_metric("nav", f"on {self._nav_last_ms:4.1f}ms  x{self._nav_rebuilds}")
         elif config.ENEMY_PATHFINDING:
@@ -700,6 +749,7 @@ class PlayingState(State):
             self.particles.draw(surface, self.camera)
             self.damage_numbers.draw(surface, self.camera)
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world
+            self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
         finally:
             self.camera.pos += offset
 

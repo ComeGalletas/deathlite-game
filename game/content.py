@@ -11,6 +11,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from spawn.tables import SpawnTables, TableError
+
 log = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -68,14 +70,23 @@ class Content:
             "weapon_sprites.json", "prop_sprites.json")
         self.terrain: dict = _load("terrain.json")
         self.ui_sprites: dict[str, dict] = _load("ui_sprites.json")
+        # The spawn schedule (spawn master S2). Checked here, against the
+        # enemies just loaded, so a phase that names an enemy that does not
+        # exist fails at boot rather than at minute eight.
+        try:
+            self.spawn_tables = SpawnTables(_load("spawn_tables.json"),
+                                            enemy_ids=self.enemies)
+        except TableError as exc:
+            raise ContentError(str(exc)) from exc
         log.info("content loaded: %d weapons, %d enemies, %d bosses, "
                  "%d characters, %d blessings, %d affixes, %d meta upgrades, "
-                 "%d sprite rigs, %d terrain rigs, %d ui rigs",
+                 "%d sprite rigs, %d terrain rigs, %d ui rigs, "
+                 "%d spawn phases",
                  len(self.weapons), len(self.enemies), len(self.bosses),
                  len(self.characters), len(self.blessings),
                  len(self.items.get("affixes", {})), len(self.meta_upgrades),
                  len(self.sprites), len(self.terrain.get("rigs", {})),
-                 len(self.ui_sprites))
+                 len(self.ui_sprites), len(self.spawn_tables.phases()))
 
     def weapon(self, weapon_id: str) -> dict:
         try:

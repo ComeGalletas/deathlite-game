@@ -39,9 +39,16 @@ class SmokeTest(unittest.TestCase):
             game.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=k))
 
-        # MENU -> CHARACTER_SELECT -> PLAYING
+        # MENU -> CHARACTER_SELECT -> LOADING -> PLAYING
         key(pygame.K_RETURN)
         key(pygame.K_RETURN)  # pick the first hero
+        from game.states.loading_state import LoadingState
+        self.assertIsInstance(game.state_machine.current, LoadingState)
+        for _ in range(5000):
+            if not isinstance(game.state_machine.current, LoadingState):
+                break
+            game.state_machine.update(1 / 60)
+            game._render()
         playing = game.state_machine.current
         self.assertIsInstance(playing, PlayingState)
 

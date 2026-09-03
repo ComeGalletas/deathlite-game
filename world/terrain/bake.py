@@ -4,6 +4,11 @@ Runs once, lazily, on the first draw (it needs a display), and returns a
 `BakedTerrain` -- `GameMap._build_tiles` stores it. Nothing here touches the
 map: the painters take the baked result as their store, and the floor test
 they need comes from `world/rules/floor.py` like everyone else's.
+
+`bake_steps` is the same pass as a generator, one island (or one decor pass)
+per step, so the loading screen can keep animating between them; `bake`
+drives it to the end. The two do the same work in the same order, which the
+pinned bake digest checks.
 """
 from __future__ import annotations
 
@@ -17,6 +22,17 @@ from world.terrain.sheets import TileSheets
 
 
 def bake(layout) -> BakedTerrain:
+    steps = bake_steps(layout)
+    while True:
+        try:
+            next(steps)
+        except StopIteration as done:
+            return done.value
+
+
+def bake_steps(layout):
+    """Yields a label after each island and each finishing pass; *returns*
+    the `BakedTerrain` when exhausted."""
     t = BakedTerrain(layout, list(layout.obstacles) if layout is not None else [])
     if layout is None:
         return t
@@ -35,15 +51,13 @@ def bake(layout) -> BakedTerrain:
         for blit, surf, level in grid_paint.paint_room_levels(t, sheets, layout, r):
             t.grid_surfs.append((blit, surf, level))
         t.shore.extend(grid_paint.grid_shore(r))
+        yield f"painting island {r.id + 1} of {len(layout.rooms)}"
     for c in layout.corridors:
         rc = grid_paint.paint_bridge(sheets, c)
         t.corr_surfs.append((rc[0], rc[1], layout.room(c.a).floor))
-    _finish(t, a)
-    return t
+    yield "bridges"
 
-
-def _finish(t: BakedTerrain, a) -> None:
-    """The water buffer, drop shadow, foam frames and scenery scatter."""
+    # The water buffer, drop shadow, foam frames and scenery scatter.
     data = a.terrain
     water = a.tile(str(data.get("water_tile")), 0)
     if water is not None:
@@ -69,12 +83,17 @@ def _finish(t: BakedTerrain, a) -> None:
                        for r in routines if float(r.get("fps", 0)) > 0)
         if parsed:
             t.foam_routines = parsed
+    yield "water"
 
     if config.TERRAIN_DECORATIONS:
         terrain_decor.build_obstacle_decor(t, a)
+        yield "obstacle skins"
 
     if config.TERRAIN_DECOR:
         terrain_decor.build_decor_scatter(t, a)
+        yield "clutter"
         terrain_decor.build_water_decor(t, a)
+        yield "water scenery"
 
     t.ok = True
+    return t

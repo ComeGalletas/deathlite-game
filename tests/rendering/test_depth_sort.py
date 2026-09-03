@@ -26,7 +26,8 @@ def fresh_playing():
     game.state_machine.change(MenuState(game))
     game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
     game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    p = game.state_machine.current
+    from tests.boot import settle
+    p = settle(game)                  # through the loading screen
     assert isinstance(p, PlayingState)
     return game, p
 

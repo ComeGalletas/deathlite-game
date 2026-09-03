@@ -166,6 +166,13 @@ HEIGHTMAP_SHORE_RING: int = 1
 # per world. Off is only for isolating placement from repair -- with it off,
 # roughly one seed in three walls an island away from the large enemies.
 HEIGHTMAP_UNSEAL: bool = True
+# Spawn master (S1, `documentation/spawn_master_design.md`): enemy spawn
+# points are placed at generation, after the scatter and the repair, so the
+# run never searches for a spot. This many per **terrace of each island** --
+# an island with three floors carries thirty. A small upper terrace that
+# cannot seat that many keeps what fits; the director draws from the whole
+# active zone, not one floor. 0 switches the stage off.
+SPAWN_POINTS_PER_FLOOR: int = 10
 # LD-10: after the tree's own bridges are seated, join islands that ended up
 # close together but were never linked. The lattice grows a tree, so without
 # this every route between two islands is unique and a run backtracks over the
@@ -374,6 +381,9 @@ COLOR_DEBUG_SOFT = (70, 150, 95)      # pickup / trigger radii in that overlay
 COLOR_DEBUG_HIT = (255, 120, 255)     # projectile hitboxes in that overlay
 COLOR_DEBUG_REACH = (255, 180, 90)    # weapon / summon reach rings (CB-2) in that overlay
 COLOR_DEBUG_KNOCK = (120, 200, 255)   # live `_knock` bump/hit impulse vectors (CB-3)
+COLOR_DEBUG_SPAWN = (255, 230, 90)    # enemy spawn points (large class) in the dev overlay
+COLOR_DEBUG_SPAWN_SMALL = (200, 160, 60)  # ... points only the small class fits
+COLOR_DEBUG_RESOURCE = (120, 220, 255)   # resource anchors in that overlay
 COLOR_DAMAGE_IN = (235, 70, 70)      # damage the hero takes -- floating red numbers
 
 # --- Start menu ----------------------------------------------------------
@@ -423,6 +433,23 @@ VOLUME_STEP: float = 0.05
 # the step scaled by the run's difficulty. BASE + STEP are tuned so the Normal
 # schedule tracks the old fixed per-phase soft caps (40 / 70 / 100 / 130 / 150).
 ENEMY_COUNT_HARD_CAP: int = 600
+# Spawn master S4: two caps. `ENEMY_LIVE_CAP` bounds the enemies that are
+# simulated (the performance budget -- the time-growing cap above is clamped
+# to it for the director); `ENEMY_COUNT_HARD_CAP` bounds live + dormant, the
+# run's whole population.
+ENEMY_LIVE_CAP: int = 100
+# Spawn master S7: update divisor for enemies that are neither chasing nor
+# on screen. 1 updates every enemy every frame; 2 updates such an enemy
+# every other frame with a doubled `dt` and skips it entirely on the frames
+# between (the profile put the per-enemy cost in the movement probe, not the
+# AI). Measured with `python -m spawn.stress` before choosing the default:
+# 2 took the 100-live p50 from 7.8 to 5.8 ms, 3 only to 5.1 -- see the spawn
+# master journal (S7).
+ENEMY_LOD_SKIP: int = 2
+# How far past the view's edge an enemy still counts as on screen for the
+# LOD (world px, added to each side), so a body walking into view is
+# already ticking at full rate when it appears.
+ENEMY_LOD_VIEW_PAD: int = 192
 ENEMY_COUNT_BASE: int = 40
 ENEMY_COUNT_STEP: int = 5
 ENEMY_COUNT_STEP_PERIOD: float = 20.0
@@ -538,6 +565,7 @@ DEBUG_KEYS = {
     "spawn_boss": 1073741886,           # K_F5
     "toggle_invuln": 1073741887,        # K_F6
     "toggle_collision_vis": 1073741888,  # K_F7
+    "toggle_spawn_vis": 1073741889,      # K_F8
 }
 
 # Start with the debug overlay hidden; F1 toggles it. Debug tools are never
