@@ -447,14 +447,23 @@ VOLUME_STEP: float = 0.05
 # limiter. The live limit is SpawnDirector.enemy_count_cap(): it starts at
 # ENEMY_COUNT_BASE and grows by ENEMY_COUNT_STEP every ENEMY_COUNT_STEP_PERIOD
 # seconds of *in-game* time (the value the HUD timer shows -- not wall clock),
-# the step scaled by the run's difficulty. BASE + STEP are tuned so the Normal
-# schedule tracks the old fixed per-phase soft caps (40 / 70 / 100 / 130 / 150).
+# the step scaled by the run's difficulty.
+#
+# 2026-09-03: raised for a constant flow of enemies -- they spawn heavily and
+# die fast, so the crowd should sit near its ceiling rather than creep to it.
+# BASE 40 -> 100 (the schedule no longer throttles the first two minutes;
+# placement is what paces the fill, about one body a second) and LIVE_CAP
+# 100 -> 150. Measured with `python -m spawn.stress` and a two-minute run:
+# a real run holds ~125 live at p50 7.4 / p99 11.6 ms a frame, 4 frames of
+# 7,200 over the 60 fps budget; the harness, which packs every body into the
+# zone around the hero, takes 146 live at p50 13.4 ms (2 % over budget) and
+# 197 at p50 15.2 (21 % over) -- so 150 is the ceiling the frame can hold.
 ENEMY_COUNT_HARD_CAP: int = 600
 # Spawn master S4: two caps. `ENEMY_LIVE_CAP` bounds the enemies that are
 # simulated (the performance budget -- the time-growing cap above is clamped
 # to it for the director); `ENEMY_COUNT_HARD_CAP` bounds live + dormant, the
 # run's whole population.
-ENEMY_LIVE_CAP: int = 100
+ENEMY_LIVE_CAP: int = 150
 # Spawn master S7: update divisor for enemies that are neither chasing nor
 # on screen. 1 updates every enemy every frame; 2 updates such an enemy
 # every other frame with a doubled `dt` and skips it entirely on the frames
@@ -472,7 +481,7 @@ ENEMY_LOD_VIEW_PAD: int = 192
 # to be drawn -- and shaded against every tree in the world -- whether or
 # not it could be seen.
 RENDER_ACTOR_CULL_PAD: int = 320
-ENEMY_COUNT_BASE: int = 40
+ENEMY_COUNT_BASE: int = 100
 ENEMY_COUNT_STEP: int = 5
 ENEMY_COUNT_STEP_PERIOD: float = 20.0
 MAX_PROJECTILES: int = 800

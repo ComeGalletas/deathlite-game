@@ -11,6 +11,7 @@ import json
 import random
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from game import config
 from game.content import get_content
@@ -19,9 +20,25 @@ from spawn.budget import SpawnDirector
 _SEQUENCE = Path(__file__).with_name("director_sequence.json")
 
 
+# The concurrency knobs as they stood when `director_sequence.json` was
+# recorded. The fixture asks "do the tables reproduce the old literal", and
+# the answer must not depend on later *tuning*: the cap enters the pack
+# roll (`min(pack, cap - active)`), so raising `ENEMY_COUNT_BASE` for the
+# game would otherwise rewrite the sequence and the proof with it.
+_FIXTURE_COUNT_BASE = 40
+_FIXTURE_COUNT_STEP = 5
+
+
 def _scripted_run(difficulty: str, duration: float = 600.0, seed: int = 11) -> list:
     """The script that produced the fixture: a run at `duration`, 30 Hz, two
-    kills every twenty frames, the boss marked in-line."""
+    kills every twenty frames, the boss marked in-line, under the count
+    schedule of the day."""
+    with mock.patch.multiple(config, ENEMY_COUNT_BASE=_FIXTURE_COUNT_BASE,
+                             ENEMY_COUNT_STEP=_FIXTURE_COUNT_STEP):
+        return _replay(difficulty, duration, seed)
+
+
+def _replay(difficulty: str, duration: float, seed: int) -> list:
     d = SpawnDirector(run_duration=duration, rng=random.Random(seed),
                       difficulty=difficulty)
     spawned, elapsed, active, frame = [], 0.0, 0, 0
