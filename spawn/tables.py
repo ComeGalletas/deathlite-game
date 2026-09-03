@@ -37,7 +37,9 @@ Sections:
     pacing      S6: bounds, smoothing (`tau`), dead-band and signal weights
                 of the pressure multiplier, the rate `window`, the
                 `lull_seconds` to a full lull, and `damage_rate_full`, the
-                HP fraction per second that reads as -1
+                HP fraction per second that reads as -1. S9: `base`, the
+                standing multiplier on the director's cadence that the
+                pacing value and the modifiers then scale (5 today)
 
 Every enemy id named anywhere is checked against `enemies.json` when the
 content loads, so a typo fails at boot rather than at minute eight.
@@ -168,6 +170,9 @@ class SpawnTables:
             if b is not None and not (isinstance(b, list) and len(b) == 2
                                       and 0 < b[0] <= 1.0 <= b[1]):
                 bad.append("pacing: `bounds` must be [lo, hi] with lo <= 1 <= hi")
+            base = pc.get("base", 1.0)
+            if not (isinstance(base, (int, float)) and base > 0):
+                bad.append("pacing: `base` must be a number > 0")
             w = pc.get("weights", {})
             if not isinstance(w, dict) or any(
                     not (isinstance(v, (int, float)) and v >= 0) for v in w.values()):

@@ -146,9 +146,31 @@ class MasterTests(unittest.TestCase):
         host = FakeHost()
         m = self._master(host)
         m.set_modifier("dev_menu", 2.0)
-        self.assertAlmostEqual(m.pressure, m.pacing.value * 2.0)
+        self.assertAlmostEqual(m.pressure, m.pacing.base * m.pacing.value * 2.0)
         m.clear_modifier("dev_menu")
-        self.assertAlmostEqual(m.pressure, m.pacing.value)
+        self.assertAlmostEqual(m.pressure, m.pacing.base * m.pacing.value)
+
+    def test_the_base_is_five_and_spawns_about_five_times_as_much(self):
+        """S9: the standing multiplier. Two masters on the same seed, one
+        with the base forced back to 1, over the same window: the shipped
+        base spawns about five times as many, cap permitting."""
+        self.assertEqual(get_content().spawn_tables.pacing["base"], 5.0)
+        counts = {}
+        for base in (1.0, 5.0):
+            host = FakeHost(seed=4)
+            m = self._master(host, seed=6)
+            m.use_locality = False
+            m.pacing.base = base
+            m.pacing.weights = {k: 0.0 for k in m.pacing.weights}   # the signal at rest
+            t = 0.0
+            while t < 20.0:
+                t += 1 / 30
+                host.elapsed = t
+                m.update(1 / 30)
+                host.live = host.live[-5:]                        # never near the cap
+            counts[base] = m.spawned
+        self.assertGreater(counts[5.0], counts[1.0] * 3.5)
+        self.assertLess(counts[5.0], counts[1.0] * 6.5)
 
     def test_the_run_signals_reach_the_pacing_through_the_bus(self):
         host = FakeHost()

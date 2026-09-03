@@ -393,7 +393,7 @@ class DevMenuTests(unittest.TestCase):
         self.assertEqual(seen, list(_PRESSURE_STEPS[1:]) + [1.0])
         self.assertEqual(m.modifiers, {})                    # x1 clears it
         menu._activate("pressure")
-        self.assertAlmostEqual(m.pressure, m.pacing.value * 2.0)
+        self.assertAlmostEqual(m.pressure, m.pacing.base * m.pacing.value * 2.0)
         _key(game, pygame.K_BACKQUOTE)
         playing.update(1 / 60)
         playing._report_debug()                              # the pressure line renders

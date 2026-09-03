@@ -178,21 +178,32 @@ class GroupAndModifierTests(unittest.TestCase):
     def test_modifiers_multiply_and_scale_the_cadence(self):
         host = FakeHost()
         m = _master(host)
-        self.assertEqual(m.pressure, 1.0)
+        base = m.pacing.base                                 # the standing x5 (S9)
+        self.assertEqual(m.pressure, base)
         m.set_modifier("dev", 2.0)
         m.set_modifier("blessing", 1.5)
-        self.assertAlmostEqual(m.pressure, 3.0)
+        self.assertAlmostEqual(m.pressure, base * 3.0)
         self.assertEqual(m.modifiers, {"dev": 2.0, "blessing": 1.5})
         m.clear_modifier("dev")
-        self.assertAlmostEqual(m.pressure, 1.5)
+        self.assertAlmostEqual(m.pressure, base * 1.5)
         m.clear_modifier("blessing")
-        # twice the pressure -> about twice the spawns over the same window
+        # twice the pressure -> about twice the spawns over the same window,
+        # with the crowd trimmed each tick so the live cap never decides it
+        # (at the standing base of 5 both runs would fill the cap in seconds)
+        def spawned_in(master, host, seconds: float) -> int:
+            t = 0.0
+            while t < seconds:
+                master.update(1 / 30)
+                t += 1 / 30
+                host.elapsed = t
+                host.live = host.live[-5:]
+            return master.spawned
         slow_host, fast_host = FakeHost(seed=2), FakeHost(seed=2)
         slow, fast = _master(slow_host, seed=8), _master(fast_host, seed=8)
         fast.set_modifier("test", 2.0)
-        _run(slow, slow_host, 30.0)
-        _run(fast, fast_host, 30.0)
-        self.assertGreater(len(fast_host.live), len(slow_host.live) * 1.6)
+        n_slow = spawned_in(slow, slow_host, 30.0)
+        n_fast = spawned_in(fast, fast_host, 30.0)
+        self.assertGreater(n_fast, n_slow * 1.6)
 
 
 class FallbackTests(unittest.TestCase):

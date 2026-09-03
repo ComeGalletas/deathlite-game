@@ -2828,3 +2828,18 @@ above put them; no percentage was given, so the art follows the collider's
 reads the same scale, so the scatter's uphill keep-back shrank with the
 art and three of the four pinned layouts moved a placement or two; the
 bake and frame digests moved for the smaller sprites. Re-pinned.
+
+Follow-up: `tests/world/test_prop_coverage.py` pinned the posts at their
+authored size and `render_scale` at 1.0; both now read the scale off the
+data (the full suite was not run before the sprite commit -- caught on
+the next one).
+
+Second follow-up: the same missed full run hid
+`test_gradient_walk_trends_down_and_reaches_the_target` failing on seed 42.
+Not a field bug: the test's walker hopped half a cell from a level-0 cell
+into the level-1 cell beside it at a cliff edge, which the field never
+steers into and the collider would refuse (`is_walkable(frm=...)` holds
+the elevation rule), then read that cell's long-way-round cost as a jump.
+The walker now applies the same rule (`_same_floor` in
+`tests/ai/test_pathfinding.py`: a hop may not change terrace level except
+through a flight cell). The field is untouched.

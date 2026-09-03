@@ -175,6 +175,21 @@ class NavGridCorridorTests(unittest.TestCase):
         self.assertTrue(_bfs_reaches(ng, start, goal, 24, corridor_lenient=True))
 
 
+def _same_floor(ng, a, b) -> bool:
+    """The collider's elevation rule, for the walker: a hop may not change
+    terrace level except through a flight cell. A blended gradient at a
+    cliff edge can point between two downhill cells, and a hop of half a
+    cell then lands on the terrace above -- reached by the field the long
+    way round, at a higher cost -- which `GameMap.is_walkable(frm=...)`
+    would refuse and slide instead. Without this the walk read a cost jump
+    at exactly such an edge (seed 42, after a scatter change)."""
+    ca, cb = ng.cell_of(a.x, a.y), ng.cell_of(b.x, b.y)
+    if not (ng.in_bounds(*ca) and ng.in_bounds(*cb)):
+        return False
+    ia, ib = ng.idx(*ca), ng.idx(*cb)
+    return ng.level[ia] == ng.level[ib] or bool(ng.flight[ia]) or bool(ng.flight[ib])
+
+
 def _follow(ff, ng, start_world, max_steps=8000):
     """Walk the flow field from `start_world` the way an enemy does: a short
     hop along `steer_at`, sliding along one axis when the full hop would
@@ -191,7 +206,7 @@ def _follow(ff, ng, start_world, max_steps=8000):
         step = d * (ng.cell * 0.5)
         for cand in (p + step, pygame.Vector2(p.x + step.x, p.y),
                      pygame.Vector2(p.x, p.y + step.y)):
-            if ff.cost_at(cand) < _INF:
+            if ff.cost_at(cand) < _INF and _same_floor(ng, p, cand):
                 p = cand
                 break
         else:

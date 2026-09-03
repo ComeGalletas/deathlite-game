@@ -731,7 +731,8 @@ class PlayingState(State):
                      f"cap {self.director.enemy_count_cap(self.stats['time'])}/{m.world_cap} "
                      f"debt {m.debt} recycled {m.recycled}")
         mods = " ".join(f"{k}x{v:g}" for k, v in m.modifiers.items()) or "-"
-        d.set_metric("pressure", f"{m.pressure:.2f} = pace {m.pacing.value:.2f} x mods {mods}"
+        d.set_metric("pressure", f"{m.pressure:.2f} = base {m.pacing.base:g} x pace "
+                                 f"{m.pacing.value:.2f} x mods {mods}"
                                  f"  [{m.pacing.describe()}]")
         if self._nav is not None:
             d.set_metric("nav", f"on {self._nav_last_ms:4.1f}ms  x{self._nav_rebuilds}")

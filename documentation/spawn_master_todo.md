@@ -164,6 +164,36 @@ Conventions that apply to every item below:
 
 ---
 
+## S9 — Base spawn pressure x5 — done 2026-09-03 (see `journals/spawn_master_journal.md`)
+
+The master's cadence multiplier (`SpawnMaster.pressure`) is the pacing
+signal (bounded 0.6-1.5, resting at 1.0) times the named modifiers. There
+is no standing baseline: "normal" is 1x. This adds one -- `base` -- and
+sets it to 5, so the director's interval is divided by five before pacing
+and the dev modifiers apply. Nothing else moves: the live cap, the world
+cap, the phase mix, the stat ramp and the pinned director sequence are
+untouched (the sequence test drives the director directly, not through
+the master).
+
+- [x] `data/spawn_tables.json` `pacing`: add `"base": 5.0`, the standing
+      multiplier on the director's cadence.
+- [x] `spawn/tables.py`: document `base` in the `pacing` section; validate
+      it is a number > 0.
+- [x] `spawn/pacing.py`: read `base` (required, no code default) into
+      `Pacing.base`; `_KEYS` gains it.
+- [x] `spawn/master.py`: `pressure` = `pacing.base` x `pacing.value` x the
+      modifier product; the docstring says so.
+- [x] `game/states/playing/state.py` debug line: show the base
+      (`pressure 5.40 = base 5 x pace 1.08 x mods -`).
+- [x] Tests: `test_master.test_modifiers_multiply_and_scale_the_cadence`
+      and `test_pacing.test_pressure_is_pacing_times_modifiers` learn the
+      base; a new test pins that base 5 spawns about five times what base
+      1 does over the same window; `test_tables` checks a bad `base` is
+      refused.
+- [x] Measure: spawns in the first 60 s of a run at base 1 and base 5, and
+      how long the live cap takes to fill; journal it.
+- [x] Journal entry.
+
 ## Open questions to settle before S4
 
 - Should residents scale with difficulty only, or also with the run
