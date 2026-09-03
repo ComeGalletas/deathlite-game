@@ -429,3 +429,62 @@ JSON; a new *kind* of move is one component file + one line in a builder.
 - Port `Boss` onto the same components (its phase FSM is the last bespoke AI).
 - `push_radius` enemy-vs-enemy crowd-collision pass as its own system.
 - `data/behaviors.json` so behaviour *shape* is data too, not just numbers.
+
+---
+
+## The elite and the tank can actually fight (2026-09-03)
+
+**Asked:** attack animations and behaviour for the elite and the tank,
+with the chaser as the reference and 15 % more wind-up before the attack
+collision ring appears.
+
+**What was wrong.** Both carried `contact_damage_enabled: false` -- the
+flag that says "a melee hitbox deals my damage instead of a passive body
+bite" -- while their `behavior` was plain `path_chase`, which has no
+attack. So neither of them dealt **any** damage. Measured before the
+change, ten seconds glued to the hero: chaser 160 -> 145 HP, elite
+160 -> 160, tank 160 -> 160.
+
+**Done**, in `data/enemies.json` only -- both already had an unused
+`attack` strip in their rig:
+
+| | behaviour | wind-up | swing | attack strip |
+|---|---|---|---|---|
+| chaser (reference) | `path_chase_attack` | 0.2875 | 0.4375 | skull, 7f @ 14 = 0.50 s |
+| elite | `path_chase_attack` | **0.3306** | 0.4194 | bear, 9f @ 12 = 0.75 s |
+| tank | `path_chase_attack` | **0.3306** | 0.6694 | turtle, 10f @ 10 = 1.00 s |
+
+The wind-up is the chaser's x 1.15, as asked. The swing is then sized so
+wind-up + swing equals the rig's own attack strip, which the chaser does
+not do (its 0.5 s strip finishes inside a 0.725 s beat and holds the last
+frame). Sizing it that way keeps the bear's and the turtle's longer
+animations from being cut back to `walk` mid-swing. A longer swing is a
+wider window to connect, not more damage: `MeleeHitbox` spends itself on
+the first frame it catches the player.
+
+**After**, ten seconds with the enemy walking in from 26 px and the hero
+still: elite 160 -> 120 (3 hits), tank 160 -> 96 (6 hits), and both cycle
+`walk` / `attack` / `idle`. The tank lands more than the elite because it
+is slow enough to stay in reach between swings; the elite drifts.
+
+**`shielded` had the identical defect** -- contact damage disabled,
+`path_chase`, no attack, and a `panda` rig with an attack strip going
+spare -- found by the invariant test below and verified harmless over ten
+seconds at point-blank. Fixed on the owner's call in the same pass, but
+**on the chaser's timing exactly** (0.2875 / 0.4375), not the elite's and
+the tank's longer wind-up: asked for by name, and the bulwark is a
+light 16 px body that should read like the husk, not like a heavy. Its
+panda strip is 0.93 s against a 0.725 s beat, so the animation holds its
+last frame the way the chaser's does. After: 160 -> 134 HP, 4 hits in
+ten seconds.
+
+Tests: `tests/ai/test_melee_enemies.py` (7) -- all four melee enemies run
+the attack beat, **no enemy disables its contact damage without an
+attacking behaviour** (the invariant that caught all three, and now holds
+with no exemptions), the shielded one keeping the chaser's beat, the 15 %
+wind-up on the other two, the swing matching the strip, the art existing,
+and the built state machine.
+
+### Suite
+
+1,029 tests, 1,028 passed and 1 skipped (9 min 58 s).
