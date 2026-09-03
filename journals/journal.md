@@ -2813,3 +2813,18 @@ before -- which is the cost of the field and the repair agreeing;
 `test_it_takes_back_only_a_handful` moved its bound from one in twenty to
 one in twelve and says why. All five pathfinding seeds reach the boss
 island on both classes again. Digests re-pinned once more.
+
+---
+
+## Post props drawn smaller (2026-09-03)
+
+`data/terrain.json` `obstacle_decor.render_scale`: `sign` and `scarecrow`
+1.0 -> 0.75. That is the draw scale of `deco_16` (cross sign), `deco_17`
+(left-arrow sign) and `deco_18` (scarecrow), the three post props whose
+art is drawn as authored rather than fitted to the collider
+(`frontier.rig_scale`'s override). The colliders stay where the trim
+above put them; no percentage was given, so the art follows the collider's
+25 %, which keeps the art-to-hitbox ratio where it was. `obstacle_reach`
+reads the same scale, so the scatter's uphill keep-back shrank with the
+art and three of the four pinned layouts moved a placement or two; the
+bake and frame digests moved for the smaller sprites. Re-pinned.
