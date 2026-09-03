@@ -53,11 +53,24 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
     m.update(0.0)                                # settle the zone
     config.ENEMY_LOD_SKIP = lod
     ids = list(ps.content.spawn_tables.phase_at(0.5)["types"])
-    # Live bodies: the master's own placement, in the zone, off screen.
+    # Live bodies, seated on the zone's own spawn points with a spread.
+    # They used to go through `m.spawn_at` with no position, which is
+    # placement's job -- and placement's 3 s point cooldown meant a tight
+    # loop got a few dozen bodies and refusals after that, so the harness
+    # silently measured a third of the crowd it was asked for. Placement
+    # has its own tests; this is a population builder.
+    import random as _random
+    rng = _random.Random(seed)
+    pts = ps.game_map.layout.spawn_points
+    zone = [p for p in pts if p.room_id in m.active] or list(pts)
     i = 0
-    while len(ps.enemies) < live and i < live * 4:
-        m.spawn_at(ids[i % len(ids)], owner="stress")
+    while len(ps.enemies) < live and i < live * 20:
+        p = zone[i % len(zone)]
+        eid = ids[i % len(ids)]
         i += 1
+        spot = pygame.Vector2(p.x + rng.uniform(-60, 60), p.y + rng.uniform(-60, 60))
+        if ps.game_map.is_walkable(spot, ps.content.enemy(eid)["radius"]):
+            m.spawn_at(eid, spot, owner="stress")
     # Dormant records: banked directly, spread over the other islands.
     lay = ps.game_map.layout
     others = [r for r in lay.rooms if r.id not in m.active] or lay.rooms

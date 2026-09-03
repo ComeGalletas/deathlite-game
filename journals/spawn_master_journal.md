@@ -806,3 +806,69 @@ the S7 profile sized. Say the word and I will measure a raise there.
 ### Suite
 
 1,022 tests, 1,021 passed and 1 skipped (7 min 7 s).
+
+---
+
+## More enemies on screen: count base 40 -> 100, live cap 100 -> 150 (2026-09-03)
+
+**Asked:** raise the live cap and the count base so more enemies are on
+screen -- they spawn constantly and die fast, and the crowd should hold a
+roughly constant flow.
+
+**Done.** `config.ENEMY_COUNT_BASE` 40 -> 100 and `ENEMY_LIVE_CAP`
+100 -> 150. The director's schedule still grows +5 every 20 s and is
+still clamped to the live cap, so a run now starts at 100, reaches 150
+about four minutes in, and holds there.
+
+### Measured
+
+A real two-minute dev run (seed 35, hero invulnerable), live bodies at
+20 s steps:
+
+| | 20 s | 40 s | 60 s | 80 s | 100 s | 120 s |
+|---|---|---|---|---|---|---|
+| hero fighting | 33 | 56 | 77 | 94 | 111 | 123 |
+| no kills | 35 | 57 | 78 | 103 | 120 | 125 |
+
+Frame time over those 7,200 frames (update + render, dummy driver):
+p50 7.4, p90 10.6, p99 11.6 ms fighting, with **4 frames over the 60 fps
+budget**. The two curves being so close is the point: the crowd tracks
+its ceiling whether or not the player is killing, which is the constant
+flow that was asked for.
+
+The **fill rate is placement-bound, not schedule-bound** -- about one
+body a second. The zone offers ten points per terrace of the islands in
+play, each on a 3 s cooldown, and a spawn must be off screen and 220 px
+from the hero; that is what paces the first two minutes, not the count
+schedule. Raising the base past 100 would not fill faster.
+
+Where the frame actually runs out, from the harness (which packs every
+body into the zone around the hero, so it is the pessimistic case):
+
+| live | total p50 | p90 | p99 | over 16.7 ms |
+|---|---|---|---|---|
+| 99 | 9.99 | 11.85 | 14.51 | 3 / 600 |
+| 146 | 13.35 | 15.39 | 17.75 | 13 / 600 |
+| 197 | 15.22 | 17.80 | 23.06 | 126 / 600 |
+| 297 | 16.47 | 18.41 | 30.03 | 250 / 600 |
+
+150 is the last value that holds; 200 spends a fifth of its frames over
+budget. `ENEMY_COUNT_HARD_CAP` (600, live + dormant) is untouched.
+
+### Fixed on the way
+
+- **The harness was measuring a third of the crowd it was asked for.**
+  `stress.build` seated bodies through `m.spawn_at` with no position,
+  which is placement's job -- and placement's point cooldown refused most
+  of a tight loop, so `--live 300` produced 85. It seats them on the
+  zone's own spawn points with a spread now. Placement has its own tests;
+  the harness is a population builder.
+- **The S2 sequence fixture is now immune to tuning.** The cap enters the
+  pack roll (`min(pack, cap - active)`), so raising the count base
+  rewrote the pinned sequence and with it the proof that the S2 table
+  move was behaviour-preserving. `_scripted_run` pins the two count knobs
+  to the values they had when the fixture was recorded.
+
+### Suite
+
+1,022 tests, 1,021 passed and 1 skipped (8 min 2 s).
