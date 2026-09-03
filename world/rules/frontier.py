@@ -1,15 +1,8 @@
 """Terrace frontiers: where a prop may stand relative to a level change.
 
-A leaf module, imported by both `world/gen/scatter.py` (obstacles, at
-generation) and `world/terrain/decor.py` (clutter, at bake). It is deliberately
-free of every other world module -- `world/terrain` already depends on
-`world/gen`, so putting this in either package would close a cycle. The same
-trick `world/gen/height/const.py` plays for the height stages.
-
-Everything here reads a `Room`'s `grid` / `cells` / `rect` and nothing else, and
-every rule answers trivially "clear" for a room with no grid. The flat LD-8
-world has none, is pinned seed by seed in its tests, and is untouched by all of
-this.
+Read by `world/gen/scatter.py` (obstacles, at generation) and by the decor
+painters (clutter, at bake). Everything here reads a `Room`'s `grid` /
+`cells` / `rect` and nothing else.
 
 The problem being solved: an island's terraces bake into a **single** ground
 surface (`world/terrain/bake.py`), composited before any sprite is drawn. A
@@ -47,8 +40,7 @@ def interior_cells(room):
     The test this replaces asked only whether a neighbour was in `room.cells` --
     the walkable set across every level of the island -- so a cell at the foot
     of a terrace read as fully interior and a prop could stand hard against a
-    level change. `Room.grid` is what knows the levels; a legacy room has none
-    and keeps the membership test exactly as it was.
+    level change. `Room.grid` is what knows the levels.
     """
     if not room.cells:
         return None
@@ -76,15 +68,14 @@ def frontier_clear(room, x, y, level, margin, px) -> bool:
     to the boundary line between two tilesets.
 
     Answered from the room's inset field where there is one -- built once at
-    generation, in `world/inset.py`. The eight-point rim test below is what it
+    generation, in `world/rules/inset.py`. The eight-point rim test below is what it
     replaces, and the reason for replacing it is that eight points have gaps
     between them: a prop can sit with a corner of its margin over another
     terrace and pass, because no sample happened to land there. A distance
     field has no gaps.
 
-    The fallback is the old test, unchanged, for a room with no field: the flat
-    LD-8 world, which is pinned seed by seed in its own tests and has no level
-    changes to begin with.
+    The fallback is the eight-point rim test, for an island with no field --
+    one terrace and no stone, so nothing to keep away from.
     """
     field = room.inset
     if field is not None:
@@ -162,7 +153,7 @@ def obstacle_reach(terrain: dict) -> dict:
     render_radius = conf.get("render_radius", {})
     render_scale = conf.get("render_scale", {})
 
-    # A biome may substitute its own tree list (LD-10); take the union.
+    # A biome may substitute its own tree list; take the union.
     extra: dict = {}
     for spec in terrain.get("biomes", {}).values():
         if spec.get("trees"):

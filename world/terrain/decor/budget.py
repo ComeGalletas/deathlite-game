@@ -6,7 +6,7 @@ as placing it.
 """
 from __future__ import annotations
 
-from world.gen import biomes
+from world.rules import biome as biomes
 
 
 # --- density tiers --------------------------------------------------------
@@ -24,9 +24,8 @@ TIERS = (GROUND_COVER, FEATURE, LANDMARK)
 def _cell_biomes(room, floor) -> dict:
     """`{(col, row): biome}` for a height-map room's interior cells.
 
-    Empty for a legacy room: no grid, no palette, nothing to key on -- and the
-    callers then treat every entry as universal, which is what that world has
-    always done.
+    Empty for a room with no palette (nothing to key on), and the callers
+    then treat every entry as universal.
     """
     if not floor or not room.grid or not room.palette:
         return {}
@@ -43,8 +42,7 @@ def _cell_biomes(room, floor) -> dict:
 
 def _terraces(room, floor) -> list:
     """`[(biome, cells)]` -- the room's interior split by the biome standing on
-    it. One `(None, floor)` group for a legacy room, which is what keeps that
-    world's decor exactly as it was."""
+    it. One `(None, floor)` group for a room with no palette."""
     fam_of = _cell_biomes(room, floor)
     if not fam_of:
         return [(None, floor or [])]
@@ -58,7 +56,7 @@ def _tier_scales(terrain, fam, n_cells, legal) -> dict:
     """`{tier: scale}` -- how far to stretch each tier's authored `per_room`
     counts on this terrace.
 
-    `per_room` was tuned against LD-8 rooms of ~60 cells and is applied to
+    `per_room` was tuned against rooms of ~60 cells and is applied to
     height-map islands of several hundred, so the counts cannot be used as
     written; a biome's per-thousand rate sets the real budget and the counts
     become the *weights* by which its props share it.
@@ -68,8 +66,8 @@ def _tier_scales(terrain, fam, n_cells, legal) -> dict:
     biome prices ground cover, features and landmarks separately, so grass can
     be common on a meadow and sparse on sand without touching either's stones.
 
-    An empty dict for a biome that prices nothing -- the legacy world, which
-    then uses the authored counts exactly as written.
+    An empty dict for a biome that prices nothing, which then uses the
+    authored counts exactly as written.
     """
     spec = (terrain.get("biomes", {}).get(fam, {}).get("decor") if fam else None)
     rates = (spec or {}).get("per_1000")

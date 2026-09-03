@@ -1,8 +1,7 @@
 """How far inside its own terrace a point stands.
 
-A leaf module, like `world/frontier.py` and for the same reason: it is read at
-generation, at bake and (later) by the collider, and `world/terrain` already
-depends on `world/gen`, so it can live in neither package.
+Read at generation (the scatter), at bake (the decor) and every frame by
+the collider, through `world/rules/floor.py`.
 
 The problem: a body's position is a point, but a body is a disc, and a sprite
 is wider still. Standing with your centre one pixel inside a terrace puts most
@@ -34,6 +33,7 @@ from __future__ import annotations
 
 import math
 from array import array
+from itertools import compress
 
 from world.layout import CLIFF, VSTAIR, EWSTAIR, WALKABLE_KINDS
 
@@ -141,7 +141,7 @@ class InsetField:
         water's edge?
 
         The placement question. A prop standing at a shoreline reads as
-        floating on the sea, so `world/frontier.py`'s rules have always counted
+        floating on the sea, so `world/rules/frontier.py`'s rules have always counted
         water; a body walking to the water's edge reads as standing on a beach,
         so the movement rule does not. No exemption here: nothing is placed on
         a staircase on purpose.
@@ -151,31 +151,63 @@ class InsetField:
 
 
 def _levels_and_seeds(room, px, step, cols, rows):
-    """Per sample: its own level, and whether it is a frontier for other levels.
+    """Per sample: its own level (`own`, -1 off the floor), and what stands
+    there (`kinds`: 1 = cliff, 2 = flight), plus `codes`, the same `own`
+    as one byte per sample (`level + 1`, so 0 is "not floor") for the
+    byte-wise seed masks below.
 
-    One pass over the lattice rather than one per level, because the tile
-    lookup is the expensive part.
+    Filled one *tile* at a time -- every sample of a tile carries the tile's
+    answer -- rather than looking the tile up once per sample, which was
+    eight by eight times the work for the same result.
     """
-    own = array("h", [-1]) * (cols * rows)
-    kinds = array("b", [0]) * (cols * rows)      # 1 = cliff, 2 = flight
-    grid = room.grid
-    half = step * 0.5
-    for row in range(rows):
-        y = row * step + half
-        trow = int(y // px)
-        base = row * cols
-        for col in range(cols):
-            x = col * step + half
-            cell = grid.get((int(x // px), trow))
-            if cell is None:
-                continue
-            if cell.kind == CLIFF:
-                kinds[base + col] = 1
-            elif cell.kind in WALKABLE_KINDS:
-                own[base + col] = cell.level
-                if cell.kind in (VSTAIR, EWSTAIR):
-                    kinds[base + col] = 2
-    return own, kinds
+    n = cols * rows
+    own = array("h", [-1]) * n
+    kinds = array("b", [0]) * n
+    codes = bytearray(n)
+    per = px // step                      # samples per tile edge
+    for (tc, tr), cell in room.grid.items():
+        if cell.kind == CLIFF:
+            k, lvl = 1, None
+        elif cell.kind in WALKABLE_KINDS:
+            k = 2 if cell.kind in (VSTAIR, EWSTAIR) else 0
+            lvl = cell.level
+        else:
+            continue
+        c0, r0 = tc * per, tr * per
+        if c0 < 0 or r0 < 0 or c0 >= cols or r0 >= rows:
+            continue
+        w = min(per, cols - c0)
+        lv = array("h", [lvl]) * w if lvl is not None else None
+        cv = bytes((lvl + 1,)) * w if lvl is not None else None
+        kv = array("b", [k]) * w if k else None
+        for r in range(r0, min(r0 + per, rows)):
+            base = r * cols + c0
+            if lv is not None:
+                own[base:base + w] = lv
+                codes[base:base + w] = cv
+            if kv is not None:
+                kinds[base:base + w] = kv
+    return own, kinds, codes
+
+
+def _mask_or(a: bytes, b: bytes) -> bytes:
+    """Byte-wise OR of two equal-length 0/1 masks, without a Python loop."""
+    n = len(a)
+    return (int.from_bytes(a, "little") | int.from_bytes(b, "little")).to_bytes(n, "little")
+
+
+def _level_box(room, level, per, cols, rows, pad):
+    """`(c_lo, c_hi, r_lo, r_hi)` -- the sample columns / rows (half-open)
+    holding this terrace, widened by `pad` samples and clipped to the
+    lattice, or `None` when the terrace has no floor."""
+    tiles = [(c, r) for (c, r), cell in room.grid.items()
+             if cell.kind in WALKABLE_KINDS and cell.level == level]
+    if not tiles:
+        return None
+    cs = [c for c, _r in tiles]
+    rs = [r for _c, r in tiles]
+    return (max(0, min(cs) * per - pad), min(cols, (max(cs) + 1) * per + pad),
+            max(0, min(rs) * per - pad), min(rows, (max(rs) + 1) * per + pad))
 
 
 def _chamfer(seed, cols, rows, step) -> array:
@@ -188,9 +220,8 @@ def _chamfer(seed, cols, rows, step) -> array:
     d = array("f", [big]) * (cols * rows)
     diag = step * _SQRT2
     fstep = float(step)
-    for i, s in enumerate(seed):
-        if s:
-            d[i] = 0.0
+    for i in compress(range(cols * rows), seed):
+        d[i] = 0.0
     for row in range(rows):
         base = row * cols
         up = base - cols
@@ -247,8 +278,8 @@ def _chamfer(seed, cols, rows, step) -> array:
 def build(room, px: int, step: int = STEP) -> InsetField | None:
     """The field for one room, or `None` where there is nothing to measure.
 
-    A room with no height grid -- the flat LD-8 world -- has no level changes
-    at all, so it gets no field and every query against it answers "clear".
+    An island with one terrace and no stone has no level change anywhere,
+    so it gets no field and every query against it answers "clear".
     """
     if not room.grid or not room.cells:
         return None
@@ -263,44 +294,59 @@ def build(room, px: int, step: int = STEP) -> InsetField | None:
             return None
     cols = max(1, math.ceil(room.rect.width / step))
     rows = max(1, math.ceil(room.rect.height / step))
-    own, kinds = _levels_and_seeds(room, px, step, cols, rows)
+    own, kinds, codes = _levels_and_seeds(room, px, step, cols, rows)
+    per = px // step
+    half = step * 0.5
 
     n = cols * rows
     out = array("B", [CAP]) * n
-    seed = array("b", [0]) * n
+    # 1 where stone stands; a byte-wise translation of `kinds`.
+    stone = bytes(kinds).translate(bytes([0, 1] + [0] * 254))
+    # Nothing at all past this many samples matters: the field clamps at
+    # `CAP`, and a chamfer path shorter than that spans fewer samples than
+    # this along either axis, so a terrace's chamfer run on its own bounding
+    # box widened by this much stores exactly what the whole lattice would.
+    pad = int(CAP // step) + 2
     for level in sorted(levels):
-        # Seeds for *this* terrace: stone, and any floor that is not it.
-        for i in range(n):
-            o = own[i]
-            seed[i] = 1 if (kinds[i] == 1 or (o >= 0 and o != level)) else 0
-        if not any(seed):
+        box = _level_box(room, level, per, cols, rows, pad)
+        if box is None:
             continue
-        d = _chamfer(seed, cols, rows, step)
+        c_lo, c_hi, r_lo, r_hi = box
+        # Seeds for *this* terrace: stone, and any floor that is not it.
+        table = bytearray(256)
+        for code in range(1, 256):
+            table[code] = 1 if code != level + 1 else 0
+        seed = _mask_or(codes.translate(bytes(table)), stone)
+        w, h = c_hi - c_lo, r_hi - r_lo
+        sub = b"".join(seed[r * cols + c_lo:r * cols + c_hi]
+                       for r in range(r_lo, r_hi))
+        if not any(sub):
+            continue
+        d = _chamfer(sub, w, h, step)
         # The chamfer measures centre to centre, but what a body cares about is
         # the *boundary*, which lies half a step short of the first sample of
         # the other terrace: a sample sitting right against the edge is 8 px
         # from the neighbouring centre and 4 px from the edge itself. Without
         # this correction the nearest possible sample already scores a full
         # step and an 8 px margin forbids nothing at all.
-        half = step * 0.5
-        for i in range(n):
-            if own[i] == level:
-                v = d[i] - half
-                out[i] = 0 if v <= 0 else (CAP if v >= CAP else int(v))
+        for r in range(r_lo, r_hi):
+            base = r * cols
+            row_own = own[base + c_lo:base + c_hi]
+            row_d = d[(r - r_lo) * w:(r - r_lo + 1) * w]
+            for k in compress(range(w), map(level.__eq__, row_own)):
+                v = row_d[k] - half
+                out[base + c_lo + k] = 0 if v <= 0 else (CAP if v >= CAP else int(v))
 
     # The second channel: distance to anything that is not floor. Water, the
     # open sea and stone all seed it, which is what makes a prop keep off a
     # shoreline as well as off a level change.
-    for i in range(n):
-        seed[i] = 1 if own[i] < 0 else 0
+    seed = codes.translate(bytes([1] + [0] * 255))
     edge = array("B", [CAP]) * n
     if any(seed):
         d = _chamfer(seed, cols, rows, step)
-        half = step * 0.5
-        for i in range(n):
-            if own[i] >= 0:
-                v = d[i] - half
-                edge[i] = 0 if v <= 0 else (CAP if v >= CAP else int(v))
+        for i in compress(range(n), codes):
+            v = d[i] - half
+            edge[i] = 0 if v <= 0 else (CAP if v >= CAP else int(v))
 
     return InsetField(step, cols, rows, out, edge, _flight_tiles(room), px)
 
@@ -328,10 +374,9 @@ def _flight_tiles(room) -> frozenset:
 def world_clear(room, wx: float, wy: float, margin: float) -> bool:
     """Is the world point `(wx, wy)` at least `margin` px inside its terrace?
 
-    The movement question: level changes only, crossings exempt. Tolerates a
-    room with no field at all -- the flat world, and any island with a single
-    terrace and no stone -- by answering "clear", which is what "there is no
-    level boundary here" means.
+    The movement question: level changes only, crossings exempt. An island
+    with no field at all -- a single terrace and no stone -- answers "clear",
+    which is what "there is no level boundary here" means.
     """
     field = room.inset
     if field is None:

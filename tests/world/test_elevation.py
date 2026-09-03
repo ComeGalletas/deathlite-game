@@ -1,7 +1,4 @@
-"""LD-9 phase D: nav and collision obey the height map.
-
-The feature is gated on `config.HEIGHTMAP_ROOMS`, which is off by default, so
-this module flips it for its own worlds and restores it in `tearDownModule`.
+"""Nav and collision obey the height map.
 
 What is actually at stake: `Room.cells` is the walkable subset of the grid, so
 cliffs and lakes already block by geometry alone. What does *not* block is a
@@ -22,12 +19,13 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
-from world.elevation import (LevelIndex, NONE, can_cross, can_step,
-                            diagonal_blocked)
+from world.elevation import LevelIndex, NONE
+from world.rules.steps import can_cross, can_step, diagonal_blocked
 from world.gen.height.walls import _foot_stone_frees
-from world.gen.heightmap import reachable, walk_links
+from world.gen.height.graph import reachable, walk_links
 from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
+from tests import worlds
 from world.map import GameMap
 from world.pathfinding import NavField, NavGrid, FlowField, NAV_DIRS, _INF
 from world.procedural import generate_world
@@ -38,30 +36,14 @@ from world.procedural import generate_world
 # apiece, which is where the confidence comes from.
 SEEDS = (35, 7)
 
-_SAVED = None
-_WORLDS: dict = {}
 
 
-def setUpModule():
-    global _SAVED
-    pygame.init()
-    if pygame.display.get_surface() is None:
-        pygame.display.set_mode((1, 1))
-    _SAVED = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = True
-
-
-def tearDownModule():
-    config.HEIGHTMAP_ROOMS = _SAVED
-    _WORLDS.clear()
 
 
 def _world(seed):
-    """Layout + map + index, built once per seed for the whole module."""
-    if seed not in _WORLDS:
-        gm = GameMap(seed=seed)
-        _WORLDS[seed] = (gm.layout, gm, gm._levels)
-    return _WORLDS[seed]
+    """Layout + map + index, from the shared cache."""
+    gm = worlds.game_map(seed)
+    return (gm.layout, gm, gm._levels)
 
 
 def _centre(ix, tile):

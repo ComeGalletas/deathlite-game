@@ -2,7 +2,7 @@
 
 The water half of the decoration scatter; `scatter_room.py` is the land half.
 All three passes here feed the one
-`store._void_decor` list, because all three draw at the same moment: the
+`store.void_decor` list, because all three draw at the same moment: the
 renderer paints the water buffer, then the shoreline foam, then this, and only
 *then* the islands' baked ground surfaces. A lake cell is left transparent by
 that bake ("the water buffer shows through" -- `grid_paint.paint_room_grid`),
@@ -60,7 +60,7 @@ def build_water_decor(store, a) -> None:
 
     b = store.layout.bounds
     cap = max(240, int(_MAX_PER_MP * b.width * b.height / 1_000_000))
-    store._void_decor = out[:cap]
+    store.void_decor = out[:cap]
 
 
 def _pick(rng, entries, weights, total):
@@ -89,7 +89,9 @@ def _open_sea(store, entries, place) -> None:
         return
     seed = store.layout.seed
     b = store.layout.bounds
-    inset = config.CHUNK_SIZE // 3
+    # How far in from the world's edge the scenery grid starts, px. A third
+    # of the old 720 px chunk; kept as the number so the bake does not move.
+    inset = 240
     gy = b.y + inset
     while gy < b.bottom - inset:
         gx = b.x + inset
@@ -100,8 +102,8 @@ def _open_sea(store, entries, place) -> None:
                 y = gy + rng.uniform(0, _SEA_STEP)
                 # Clear of land by a margin, so an open-sea rock never crowds
                 # a beach -- that band is the `shore` pass's job.
-                if not (store._point_ok(x, y) or any(
-                        store._point_ok(x + dx, y + dy)
+                if not (store.point_ok(x, y) or any(
+                        store.point_ok(x + dx, y + dy)
                         for dx in (-36, 36) for dy in (-36, 36))):
                     place(_pick(rng, entries, weights, total), x, y)
             gx += _SEA_STEP
@@ -140,7 +142,7 @@ def _scatter_tiles(store, entries, place, tiles_of, tag: str) -> None:
     """Shared body of the shore and lake passes: roll each candidate water tile
     of every island, and place at a jittered point inside it.
 
-    `store._point_ok` is the final word in both cases. The grid says a tile is
+    `store.point_ok` is the final word in both cases. The grid says a tile is
     water; only the collision layer knows whether some *other* island's rect
     overlaps it, which the height-map generator allows.
     """
@@ -160,7 +162,7 @@ def _scatter_tiles(store, entries, place, tiles_of, tag: str) -> None:
                 continue
             x = room.rect.x + col * px + rng.uniform(px * 0.25, px * 0.75)
             y = room.rect.y + row * px + rng.uniform(px * 0.25, px * 0.75)
-            if store._point_ok(x, y):
+            if store.point_ok(x, y):
                 continue
             place(_pick(rng, entries, weights, total), x, y)
 

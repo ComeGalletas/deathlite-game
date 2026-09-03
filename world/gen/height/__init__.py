@@ -1,5 +1,5 @@
-"""LD-9: build a room's **height map** -- the per-cell grid that replaces the
-old "one `floor` integer plus a cliff band hanging off the south rim" model.
+"""Build an island's **height map**: the per-cell grid of terraces, walls and
+flights that everything downstream reads.
 
 A room is a stack of terraces running north to south, highest at the top, each
 separated from the next by a wall of cliff tiles. The walls are the level
@@ -15,20 +15,24 @@ The grid this emits is the machine form of the ASCII layouts in the journal::
     = = = = = #
     = = = = = =      terrace, level 0
 
-Invariants every grid satisfies (asserted by `check_grid`):
+Invariants every grid satisfies (asserted by `check_grid`, and read back off
+every finished world by `world/gen/validate.py`):
 
-* the whole boundary between two levels is cliff, except where a stair crosses;
+* a drop to the *south* always has a wall: that is the face the camera
+  sees. A plateau's east and west flanks and its north back are open level
+  changes with no stone in them, drawn by the higher terrace's own edge tile
+  and refused by the step rule, not by geometry;
 * adjacent levels differ by at most 2, so level 0 never touches level 3;
 * no floating ground -- a ground cell above sea level always has ground or
   cliff directly south of it;
-* a stair touches ground of another level only at its two ends;
+* a stair spans at most 2 levels and *links* other terraces only at its two
+  ends (`walk_links` is the authority on which cells those are);
 * every walkable cell is reachable from every other one.
 
 Rendering reads the grid and nothing else.
 
-Split into stages under `world/gen/height/` -- this module is the pipeline and
-the package's public face. Everything that imported `world.gen.heightmap` still
-works: that module is now a shim re-exporting these names.
+Split into stages under `world/gen/height/`; this module is the pipeline and
+the package's public face.
 """
 from __future__ import annotations
 
@@ -65,8 +69,7 @@ def build_grid(mask: frozenset, cols: int, rows: int, rng, base: int = 0,
                cap_inset=None, cap_roughness: float = None,
                cap_min_cells: int = None, region: int = None,
                spacing: int = None, canyons: int = None,
-               canyon_depth=None, canyon_width=None,
-               **_legacy) -> dict:
+               canyon_depth=None, canyon_width=None) -> dict:
     """The height map for one island: a **mountain**, not a staircase.
 
     The whole island is sea-level ground. On top of it sits a smaller,
@@ -83,10 +86,7 @@ def build_grid(mask: frozenset, cols: int, rows: int, rng, base: int = 0,
 
     The sea-level ring around the outside is never built on. That keeps a
     walkable shore all the way round, which is what lets a bridge always find a
-    mouth (bridges only ever meet sea level).
-
-    `**_legacy` swallows the row-band tuning that the previous terracing took;
-    it has no meaning for concentric caps."""
+    mouth (bridges only ever meet sea level)."""
     grid = {p: Cell(GROUND, level=base) for p in mask}
 
     ring = max(1, shore)
@@ -136,7 +136,7 @@ def build_grid(mask: frozenset, cols: int, rows: int, rng, base: int = 0,
     _free_flight_feet(grid)
     _link_levels(grid, rng)
     _prune_unreachable(grid)
-    # LD-10: last, because every stage above can leave a one-tile hole behind --
+    # Last, because every stage above can leave a one-tile hole behind --
     # a bay bitten in by the coast walk, a pocket the prune emptied.
     _fill_holes(grid)
     # Once more at the end: carving lakes and pruning stranded pockets both

@@ -8,7 +8,7 @@ takes no floor away from anyone.
 
 Three things this suite exists to stop coming back.
 
-`world/inset.py` originally stored an absolute origin taken from `room.rect`.
+`world/rules/inset.py` originally stored an absolute origin taken from `room.rect`.
 Island rects are still being packed when the field is built, so every query
 landed in a different room by the time anything read it. The field is
 room-relative now, and `test_the_field_is_room_relative` is the regression.
@@ -33,36 +33,19 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
-from world import inset as I
+from world.rules import inset as I
 from world.layout import CLIFF, VSTAIR, EWSTAIR, WALKABLE_KINDS
+from tests import worlds
 from world.map import GameMap
 
 SEEDS = (35, 7)
 MARGIN = 8.0
-_SAVED = None
-_MAPS: dict = {}
 
 
-def setUpModule():
-    global _SAVED
-    pygame.init()
-    if pygame.display.get_surface() is None:
-        pygame.display.set_mode((1, 1))
-    _SAVED = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = True
-
-
-def tearDownModule():
-    config.HEIGHTMAP_ROOMS = _SAVED
-    _MAPS.clear()
 
 
 def _map(seed: int) -> GameMap:
-    if seed not in _MAPS:
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
-        _MAPS[seed] = gm
-    return _MAPS[seed]
+    return worlds.baked(seed)
 
 
 def _rooms(seed):
@@ -345,7 +328,7 @@ class CostTests(unittest.TestCase):
 class PropChannelTests(unittest.TestCase):
     """Phase 2: the props read the field, and they read a different channel.
 
-    `world/frontier.py`'s rules have always counted the water's edge as a
+    `world/rules/frontier.py`'s rules have always counted the water's edge as a
     frontier -- a pebble at the shoreline reads as floating -- while the
     movement rule deliberately does not, because walking to the water's edge
     reads as standing on a beach. One field, two questions.
@@ -383,7 +366,7 @@ class PropChannelTests(unittest.TestCase):
         gaps between its samples; a distance field has none, so every
         disagreement should be the field refusing something the rim test let
         through, and never the other way round."""
-        from world import frontier as FR
+        from world.rules import frontier as FR
         px = config.TILE_PX
         rng = random.Random(17)
         looser = checked = 0
@@ -580,13 +563,14 @@ class NavTests(unittest.TestCase):
         margin on and off.
         """
         import world.pathfinding as P
-        real = P.terrain_inset.body_inset
+        import world.nav.lattice as L          # where the grid reads the margin
+        real = L.terrain_inset.body_inset
         try:
             for seed in SEEDS:
                 gm = _map(seed)
-                P.terrain_inset.body_inset = lambda: 0.0
+                L.terrain_inset.body_inset = lambda: 0.0
                 off = P.NavField(gm.layout, gm.obstacles)
-                P.terrain_inset.body_inset = real
+                L.terrain_inset.body_inset = real
                 on = P.NavField(gm.layout, gm.obstacles)
                 for name in off.grids:
                     self.assertEqual(
@@ -597,7 +581,7 @@ class NavTests(unittest.TestCase):
                     self.assertLess(sum(on.grids[name].walkable),
                                     sum(off.grids[name].walkable) + 1)
         finally:
-            P.terrain_inset.body_inset = real
+            L.terrain_inset.body_inset = real
 
     def test_every_crossing_stays_on_both_nav_grids(self):
         """The margin may not take a staircase away from either body size."""
@@ -635,8 +619,9 @@ class PhaseTests(unittest.TestCase):
         of them changes how the world plays it does so alone and visibly:
         phase 1 built the field, phase 2 moved the props onto it, phase 3 gave
         it to the collider, and phase 4 baked it into the flow field. All four
-        have landed, so this is now a fence rather than a gate: a fifth reader
-        is a decision, not an accident.
+        have landed, so this is now a fence rather than a gate: a further
+        reader is a decision, not an accident. (`floor.py` is the collider
+        and the nav grid reading through one body, not a fifth phase.)
         """
         import pathlib
         readers = set()
@@ -647,13 +632,13 @@ class PhaseTests(unittest.TestCase):
             text = q.read_text(encoding="utf-8", errors="ignore")
             # Both ways in: importing the module, and reading the field the
             # generation stage hangs on every room.
-            if ("world.inset" in text or "from world import inset" in text
+            if ("world.rules.inset" in text or "from world.rules import inset" in text
                     or "room.inset" in text or ".inset is not None" in text):
                 readers.add(q.name)
         readers.discard("inset.py")
         self.assertEqual(
             readers,
-            {"islands.py", "frontier.py", "map.py", "pathfinding.py"},
+            {"islands.py", "frontier.py", "floor.py", "map.py", "lattice.py"},
                          f"unexpected readers of the inset field: {readers}")
 
 

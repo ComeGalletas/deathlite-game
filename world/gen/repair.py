@@ -1,10 +1,10 @@
-"""LD-9: take back the obstacles that seal part of the world off.
+"""Take back the obstacles that seal part of the world off.
 
 The scatter places obstacles against a set of keep-clear rectangles -- corridor
 mouths, staircases and their landings, a special room's interaction disc. Those
 protect the places a seal was *expected*, and they are not enough. Once the
-obstacles grew (D8 raised their density from 1.8 to 47.5 per thousand cells, and
-their radii with it), the widest navigating body started finding worlds where a
+obstacles grew (per-area density raised them from 1.8 to 47.5 per thousand
+cells, and their radii with it), the widest navigating body started finding worlds where a
 whole island was walled off behind two or three of them, and measurement said it
 was not rare: on the large navigation class -- 48 px lattice, 22 px body -- four
 of ten sample seeds lost between 1,300 and 6,300 reachable cells, one of them
@@ -102,7 +102,7 @@ def _regions(grid, dead):
 
     One Dijkstra can then reopen **every** region at once instead of one per
     round. That matters: the walk is over the whole lattice however small the
-    seal is, so six rounds meant six full sweeps, and with LD-10's island count
+    seal is, so six rounds meant six full sweeps, and with nine islands
     the repair had grown to 60% of world generation.
     """
     cols, rows = grid.cols, grid.rows
@@ -228,7 +228,7 @@ def unseal(layout, rounds: int = 40):
     `rounds` is a **safety valve, not a budget**: the loop already stops the
     moment nothing is sealed, and each round is one Dijkstra over a lattice the
     NavGrid build above dwarfs. It was 8, which quietly became too few when
-    LD-10 raised the island count -- seeds finished with a handful of cells
+    the island count went up -- seeds finished with a handful of cells
     still walled off, and the test that says obstacles never cut off more than
     bare terrain went red on five cells. Measured, the seeds that needed more
     wanted one or two extra rounds, not thirty.

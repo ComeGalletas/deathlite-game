@@ -14,8 +14,9 @@ import pygame
 from game import config
 from world.layout import Corridor, GROUND
 from world.gen.placement import topography_of
+from world.gen.settings import settings_or_config
 
-def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
+def _seat_corridors(rooms, corridors, seed: int = 0, settings=None) -> list:
     """Slide each bridge along the rooms' shared edge until both of its mouths
     land on walkable ground, preferring a lane where the two ends are at the
     same level so the planks read as flat, then stretch it to actually reach
@@ -48,6 +49,7 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
     survives, falling back to the shortest crossing if the random pass finds
     nothing, since dropping it would disconnect the world; the extras are
     optional and are discarded when there is no room for them."""
+    s = settings_or_config(settings)
     px = config.TILE_PX
 
     def reach(room, axis, fixed, along, step, limit, strict=True):
@@ -146,10 +148,10 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
         """How many bridges this link may carry, given what its two islands
         have already spent on the sides it uses."""
         a, b = rooms[c.a], rooms[c.b]
-        want = min(topography_of(a).get("bridges", 1),
-                   topography_of(b).get("bridges", 1))
+        want = min(topography_of(a, s).get("bridges", 1),
+                   topography_of(b, s).get("bridges", 1))
         for room, other in ((a, b), (b, a)):
-            cap = topography_of(room).get("bridges", 1)
+            cap = topography_of(room, s).get("bridges", 1)
             spent = used.get((room.id, side_of(room, other, c.axis)), 0)
             want = min(want, cap - spent)
         return max(1, want)          # a link always keeps one: dropping it
@@ -161,10 +163,10 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
 
     kept = []
     used: dict = {}
-    gap = max(1, config.HEIGHTMAP_BRIDGE_MIN_GAP) * px
-    cap = config.HEIGHTMAP_BRIDGE_MAX * px
+    gap = max(1, s.bridge_min_gap) * px
+    cap = s.bridge_max * px
     for (a_id, b_id, _axis), group in sorted(links.items()):
-        # LD-10: the group arrives with exactly one corridor. Clone it up to the
+        # The group arrives with exactly one corridor. Clone it up to the
         # allowance before seating, so every copy is seated as a peer.
         want = allowance(group[0], used)
         base = group[0]
@@ -181,7 +183,7 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
                 used[key] = used.get(key, 0) + 1
             continue
         pick = random.Random(f"{seed}:bridges:{a_id}:{b_id}")
-        # LD-10: a crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a
+        # A crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a
         # causeway rather than a bridge. Lanes inside the cap are the pool; if
         # a link has none, its *first* bridge still has to exist, so it falls
         # back to the shortest lane there is -- refusing it would cut the world
@@ -203,7 +205,7 @@ def _seat_corridors(rooms, corridors, seed: int = 0) -> list:
         for room, other in ((rooms[a_id], rooms[b_id]), (rooms[b_id], rooms[a_id])):
             key = (room.id, side_of(room, other, group[0].axis))
             used[key] = used.get(key, 0) + min(len(group), len(chosen))
-    _add_shortcuts(rooms, kept, used, options, apply, seed)
+    _add_shortcuts(rooms, kept, used, options, apply, seed, s)
     return kept
 
 
@@ -234,7 +236,7 @@ def _shortcut_axis(a, b):
     return None
 
 
-def _add_shortcuts(rooms, kept, used, options, apply, seed) -> list:
+def _add_shortcuts(rooms, kept, used, options, apply, seed, settings=None) -> list:
     """Join islands that ended up close together but were never linked.
 
     The lattice grows a **tree**, so every route between two islands is unique
@@ -256,10 +258,11 @@ def _add_shortcuts(rooms, kept, used, options, apply, seed) -> list:
     `options` wants a *beach* on the same lane on both sides and ragged coasts
     rarely line up. About one extra crossing a world.
     """
-    if not config.HEIGHTMAP_SHORTCUTS:
+    s = settings_or_config(settings)
+    if not s.shortcuts:
         return kept
     px = config.TILE_PX
-    max_gap = config.HEIGHTMAP_SHORTCUT_GAP
+    max_gap = s.shortcut_gap
     linked = {(min(c.a, c.b), max(c.a, c.b)) for c in kept}
 
     cand = []
@@ -289,7 +292,7 @@ def _add_shortcuts(rooms, kept, used, options, apply, seed) -> list:
         # a small island takes one crossing a side, and both ends have to have
         # room for it.
         if any(used.get((room.id, _side_of(room, other, axis)), 0)
-               >= topography_of(room).get("bridges", 1)
+               >= topography_of(room, s).get("bridges", 1)
                for room, other in ((a, b), (b, a))):
             continue
         c = Corridor(a_id, b_id, pygame.Rect(0, 0, px, px), axis,
@@ -297,7 +300,7 @@ def _add_shortcuts(rooms, kept, used, options, apply, seed) -> list:
                      "east" if axis == "h" else "south",
                      room_low, room_high, 0)
         opts = [o for o in options(c)
-                if o[1] <= config.HEIGHTMAP_BRIDGE_MAX * px]
+                if o[1] <= s.bridge_max * px]
         if not opts:
             continue        # no lane with a beach on both sides, or all too long
         apply(c, min(opts, key=lambda o: o[1]))

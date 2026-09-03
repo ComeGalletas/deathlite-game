@@ -10,14 +10,15 @@ from __future__ import annotations
 import pygame
 
 from game import config
-from world.inset import build as build_inset
+from world.rules.inset import build as build_inset
 from world.layout import TileMeta, GROUND, VSTAIR, EWSTAIR, WALKABLE_KINDS
-from world.gen import heightmap
+from world.gen import height as heightmap
 from world.gen.height import build_grid
 from world.gen.placement import topography_of
+from world.gen.settings import settings_or_config
 
-def _build_room_grids(rooms, corridors, rng) -> None:
-    """LD-9: give every room a height map, then re-derive the fields the rest
+def _build_room_grids(rooms, corridors, rng, settings=None) -> None:
+    """Give every island a height map, then re-derive the fields the rest
     of the engine reads from it -- `cells` is the walkable subset (so collision
     and the nav grid need no changes) and `floor` collapses to the room's base
     level, which is all the palette lookup still wants.
@@ -28,6 +29,7 @@ def _build_room_grids(rooms, corridors, rng) -> None:
     that room at its summit, so any room a bridge enters from the north has its
     summit capped -- the standing "never more than two levels between connected
     areas" rule, applied across open water."""
+    s = settings_or_config(settings)
     caps = {room.id: heightmap.MAX_LEVEL for room in rooms}
     for c in corridors:
         if c.axis != "v":
@@ -47,35 +49,28 @@ def _build_room_grids(rooms, corridors, rng) -> None:
         # Not every island is a mountain. A plain one-level island is a room in
         # its own right, and it connects to its neighbours with no elevation to
         # reconcile at all.
-        spec = topography_of(room)
+        spec = topography_of(room, s)
         # The floor count is now *drawn from the topography's range* rather
         # than being a coin flip between all three floors and one. A volcanic
         # island can come out two-floor, which the old generator had no way to
         # express at all.
         tiers = rng.randint(*spec["tiers"])
-        coast = heightmap.coast_shape(spec["coast"])
+        coast = heightmap.coast_shape(spec["coast"], s.coast_presets)
         want = coast["grid_keep"] * cols * rows
         grid = None
         for margin in range(coast["margin"], -1, -1):
             shape = heightmap.coast_mask(cols, rows, rng, margin,
-                                         keep=config.HEIGHTMAP_COAST_KEEP,
-                                         shape=coast)
+                                         keep=s.coast_keep, shape=coast)
             grid = build_grid(shape, cols, rows, rng, base=0,
-                              stairs_per_wall=config.HEIGHTMAP_STAIRS_PER_REGION,
-                              lakes=config.HEIGHTMAP_LAKES,
-                              lake_size=config.HEIGHTMAP_LAKE_SIZE, top=caps[room.id],
-                              shore=config.HEIGHTMAP_SHORE_RING, tiers=tiers,
-                              cap_inset=(config.HEIGHTMAP_CAP_INSET_S,
-                                         config.HEIGHTMAP_CAP_INSET_N,
-                                         config.HEIGHTMAP_CAP_INSET_W,
-                                         config.HEIGHTMAP_CAP_INSET_E),
-                              cap_roughness=config.HEIGHTMAP_CAP_ROUGHNESS,
-                              cap_min_cells=config.HEIGHTMAP_CAP_MIN_CELLS,
-                              region=config.HEIGHTMAP_STAIR_REGION,
-                              spacing=config.HEIGHTMAP_STAIR_SPACING,
-                              canyons=config.HEIGHTMAP_CANYONS,
-                              canyon_depth=config.HEIGHTMAP_CANYON_DEPTH,
-                              canyon_width=config.HEIGHTMAP_CANYON_WIDTH)
+                              stairs_per_wall=s.stairs_per_region,
+                              lakes=s.lakes, lake_size=s.lake_size,
+                              top=caps[room.id], shore=s.shore_ring,
+                              tiers=tiers, cap_inset=s.cap_inset,
+                              cap_roughness=s.cap_roughness,
+                              cap_min_cells=s.cap_min_cells,
+                              region=s.stair_region, spacing=s.stair_spacing,
+                              canyons=s.canyons, canyon_depth=s.canyon_depth,
+                              canyon_width=s.canyon_width)
             if sum(1 for c in grid.values()
                    if c.kind in WALKABLE_KINDS) >= want:
                 break
@@ -106,7 +101,7 @@ def _grid_tile_meta(rooms) -> None:
     """`TileMeta` for every walkable cell of a height-map room.
 
     The grid already knows each cell's level, so this is a straight projection
-    -- no rim/lip derivation, which is the whole point of LD-9. Only sea-level
+    -- nothing to derive. Only sea-level
     ground can carry shoreline foam; a terrace's edge is a cliff, not a beach."""
     for room in rooms:
         meta = {}

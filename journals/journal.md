@@ -2678,3 +2678,49 @@ resolves it.
 (colour + fx resolved from the new file). Weapon tests reworked: `.style`
 asserts → `.weapon_id` + a `weapon_visual()` check; `BOLT` fixture completed;
 the category-fallback test → a category-is-required test.
+
+---
+
+## World modularity implementation plan (2026-09-02)
+
+**What was done:** Reviewed the world pipeline from seeded structured layout
+generation through runtime collision/elevation, lazy terrain baking, and final
+terrain composition. Added `documentation/world_modularity_todo.md`, an
+implementation-ready, behavior-preserving phased TODO with acceptance criteria
+and a standalone handoff brief for an AI or human implementer.
+
+**Key decision:** Keep `generate_world` and `GameMap` stable at the public
+boundary. First characterize current flat and heightmap layout, bake, and draw
+output; then introduce explicit generation settings, split the two generator
+pipelines, separate runtime geometry from `GameMap`, and replace broad mutable
+renderer state with a dedicated baked-terrain result.
+
+**Verified:** Markdown diagnostics are clean for the planning document and this
+journal entry. No runtime behavior or production code changed.
+
+**Risks / limitations:** The plan reflects the current architecture but has not
+yet established cross-mode layout, bake, or screenshot characterization hashes.
+
+**Expected next phase:** Phase 0 in `documentation/world_modularity_todo.md`:
+add reusable deterministic layout, bake, and draw characterization coverage
+before moving world modules or changing ownership boundaries.
+
+---
+
+## World generation refactor executed (2026-09-02)
+
+**What was done:** `documentation/worldgen_refactor_plan.md` reconciled the
+two modularity todo lists into one plan; every phase of it is now done, with
+the LD-8 flat generator retired. Per-phase evidence lives in
+`journals/world_refactor_plan_journal.md`. In short: a shared world cache and
+tiers for the tests (default run ~20 min -> 6 min 36 s), a layout / bake /
+frame digest that pins the shipping seeds, `world/legacy/` and the mode flags
+deleted, generation ~30 % faster per world, `world/rules/` (floor, steps,
+inset, frontier, biome) below generation, bake and runtime with an
+import-direction test, `GenSettings` + `validate`, `world/nav/` and
+`BakedTerrain`, and the comments rewritten to state rules in the present
+tense.
+
+**Verified:** default tier 855 passed / 1 skipped, sweep tier 7 passed,
+`python -m unittest discover -s tests -t .` green; the world byte-identical to
+`b0114d6` for every pinned seed. Nothing committed.

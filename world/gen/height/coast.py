@@ -1,7 +1,6 @@
 """The island's outline: where land meets sea.
 
-Split out of `world/gen/heightmap.py`, which had grown to six unrelated
-concerns in one file. The coastline is the first stage of `build_grid` and the
+The coastline is the first stage of `build_grid` and the
 only one whose parameters are a named preset -- see
 `config.HEIGHTMAP_COAST_PRESETS`, and `world/terrain/biome.py` for the same idea
 applied to tilesets.
@@ -12,18 +11,26 @@ from world.gen.height.const import _NB
 
 # --- terrace planning -----------------------------------------------------
 
-def coast_shape(name: str = None) -> dict:
+def coast_shape(name: str = None, presets: dict = None,
+                default: str = None) -> dict:
     """The coastline's shape parameters, by preset name.
 
-    LD-10 rewrites how ragged a shore is, and the old behaviour has to stay one
-    setting away -- `classic` reproduces it exactly, which a test pins by
-    comparing whole generated worlds rather than by eye. The preset is a dict
-    rather than four loose constants because C gives each **topography** its own
-    coastline: a "castle" island is described as more squared, which is this
-    table with a low margin, not a new algorithm."""
-    from game import config
-    presets = config.HEIGHTMAP_COAST_PRESETS
-    return presets[name or config.HEIGHTMAP_COAST_PRESET]
+    How ragged a shore is. `classic` is the older, squarer coast, kept one
+    setting away and pinned by a test that compares whole generated worlds
+    rather than judging by eye. The preset is a dict rather than four loose
+    constants because each **topography** has its own coastline: a "castle"
+    island is described as more squared, which is this table with a low
+    margin, not a new algorithm."""
+    if presets is None:
+        # Generation passes its settings' table; a test driving one stage
+        # alone gets today's config.
+        from game import config
+        presets = config.HEIGHTMAP_COAST_PRESETS
+        default = default or config.HEIGHTMAP_COAST_PRESET
+    if default is None:
+        from game import config
+        default = config.HEIGHTMAP_COAST_PRESET
+    return presets[name or default]
 
 
 

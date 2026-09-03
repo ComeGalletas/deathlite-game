@@ -1,6 +1,6 @@
 """Cutting the ways up: straight and east/west staircases through a wall.
 
-Split out of `world/gen/heightmap.py`. A wall is the level boundary and a
+A wall is the level boundary and a
 flight is the only hole in it, so this stage is what makes an island walkable
 rather than a stack of islands.
 """

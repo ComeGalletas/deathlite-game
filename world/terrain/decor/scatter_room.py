@@ -3,13 +3,13 @@
 The land half of the decoration scatter; `scatter_water.py` is the other. What
 this owns is *placement* -- the rules about where a prop may stand. How many of
 them there should be lives in `budget.py`, the frontier rules in
-`world/frontier.py`, and the separation test in `spacing.py`.
+`world/rules/frontier.py`, and the separation test in `spacing.py`.
 """
 from __future__ import annotations
 
 import random
 
-from world import frontier
+from world.rules import frontier
 from world.terrain.decor.budget import _terraces, _tier_scales
 from world.terrain.decor.rigs import load_rig
 from world.terrain.decor.spacing import _Neighbourhood
@@ -23,9 +23,9 @@ def build_decor_scatter(store, a) -> None:
     seed so it is stable regardless of `PYTHONHASHSEED`. These are cosmetic:
     nothing here touches `store.obstacles` or `is_walkable`. A new prop is a
     new rig + a new "decorations" entry, no code. `collision: true` entries
-    are handled by world generation (trees, T9), not here.
+    are handled by world generation (trees), not here.
 
-    LD-10 step 4: an entry may name the `biomes` it belongs to, and is then
+    An entry may name the `biomes` it belongs to, and is then
     only placed on terraces wearing one of them -- bones on sand, fungi in the
     forest, mossy stone in the wetland. An entry that names none is universal,
     which is the default a new prop gets and what keeps every terrace from
@@ -34,7 +34,7 @@ def build_decor_scatter(store, a) -> None:
     and the pumpkins have no business up top.
 
     The same split fixes a density mismatch that predates it: `per_room` was
-    authored for LD-8 rooms of ~60 cells and was being applied whole to islands
+    authored for rooms of ~60 cells and was being applied whole to islands
     of 700-1000, so a terrace could come out with four pebbles on it. A biome's
     `decor.per_1000` now sets each terrace's budget and the authored counts are
     the weights by which its legal props share it.
@@ -75,16 +75,12 @@ def build_decor_scatter(store, a) -> None:
         # shoreline, a notch edge, or hard against a level change
         floor = frontier.interior_cells(room)
         cx, cy = room.center
-        # A fraction of the room's own size, which is the LD-8 rule and right
-        # for a 60-cell room -- but on a 3200 x 1792 island it is a 394 px
-        # radius, blanking a 788 px circle out of the middle of every island.
-        # The obstacle scatter hit this exact wall and swapped the fraction for
-        # a fixed few tiles (`tuning._GRID_CLEAR_RADIUS`); interior clutter
-        # never did, and no amount of raising the biome rates would have shown
-        # through it. Height-map islands take the fixed disc; the legacy world
-        # keeps the fraction, being pinned seed by seed in its tests.
-        clear_sq = (float(place.get("centre_clear", 0.0)) ** 2 if room.grid
-                    else (min(r.width, r.height) * 0.22) ** 2)
+        # A fixed disc round the island's centre (`centre_clear`, px). A
+        # fraction of the room's own size was right for a 60-cell room, but on
+        # a 3200 x 1792 island it is a 394 px radius, blanking a 788 px circle
+        # out of the middle of every island -- no amount of raising the biome
+        # rates would have shown through it.
+        clear_sq = float(place.get("centre_clear", 0.0)) ** 2
         placed: list[tuple] = []
         # Separations live in the index rather than in a list parallel to
         # `placed`: at ground-cover densities the old pairwise scan was the
@@ -124,13 +120,12 @@ def build_decor_scatter(store, a) -> None:
                         y = r.y + row * px + rng.uniform(inset, px - inset)
                         if (x - cx) ** 2 + (y - cy) ** 2 < clear_sq:
                             continue
-                        if room.grid:
-                            lvl = frontier.cell_level(room, (col, row))
-                            if not frontier.frontier_clear(room, x, y, lvl, inset, px):
-                                continue
-                            if not frontier.uphill_clear(room, x, y, lvl,
-                                                 north, west, east, px):
-                                continue
+                        lvl = frontier.cell_level(room, (col, row))
+                        if not frontier.frontier_clear(room, x, y, lvl, inset, px):
+                            continue
+                        if not frontier.uphill_clear(room, x, y, lvl,
+                                                     north, west, east, px):
+                            continue
                         if obstacles.blocked(x, y):
                             continue
                         if near.blocked(x, y, my_gap):
@@ -139,4 +134,4 @@ def build_decor_scatter(store, a) -> None:
                         near.add(x, y, my_gap)
                         break
         if placed:
-            store._room_decor[room.id] = placed
+            store.room_decor[room.id] = placed

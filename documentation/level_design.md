@@ -1,378 +1,296 @@
 # Level design — generation & display
 
-How a level comes to exist and how it gets on screen. The important split:
+How a level comes to exist and how it gets on screen. Four layers, each
+reading the one below and never the one above:
 
-- **Generation** (`world/procedural.py`) is **pure data and never touches an
-  asset.** Same seed → identical `WorldLayout`, with or without a single PNG on
-  disk.
-- **Display** (`world/map.py` + `game/assets.py`) has **two renderers** that
-  draw the *same layout*: an **asset-backed tiled** renderer and a **primitive
-  flat** renderer. The flat one is the permanent fallback — the game is fully
-  playable with an empty `assets/`.
+- **Generation** (`world/gen/`) turns a seed into a `WorldLayout`: nine
+  islands, each a height map of terraces, walls and flights, joined by plank
+  bridges, with a palette per terrace and obstacles scattered on the floor.
+  It loads no image and needs no display; it reads `data/terrain.json` for
+  the biome tables. Same seed → identical layout, byte for byte
+  (`tests/world/test_digest.py` pins it).
+- **Rules** (`world/rules/`) are the questions every layer asks the same way:
+  is this point on floor, how far inside its terrace is it, may a body step
+  from this tile to that one, where may a prop stand, what a tileset *is*.
+- **Runtime** (`world/map.py`, `world/elevation.py`, `world/nav/`) is the
+  collider, the elevation index and the enemy flow field. Assetless.
+- **Display** (`world/terrain/`) bakes the layout into one surface per terrace
+  (`BakedTerrain`) and composites the world band by band, with the depth-sorted
+  sprites slotted between bands. If the tileset is missing, a primitive flat
+  renderer draws the same layout — the game is fully playable with an empty
+  `assets/`.
 
 > File references are `path — symbol`; line numbers drift, symbols don't.
-> Related: `COMBAT_CALCS.md` (damage), `terrain_tile_slots_formula.md` (how a
-> tilemap cell is addressed / cut / placed), `../journals/assets_journal.md`
-> (the terrain integration passes T1–T9).
+> Related: `combat_calculations.md` (damage), `terrain_tile_slots_formula.md`
+> (how a tilemap cell is addressed / cut / placed),
+> `../journals/level_design_journal.md` (every design pass, with diagrams),
+> `worldgen_refactor_plan.md` (why the code is shaped as it is).
 
 ---
 
-## 1 · Generation — `world/procedural.py` (assetless, pure, deterministic)
+## 1 · Generation — `world/gen/`
 
-`generate_world(seed, room_count=None) -> WorldLayout` is pure: the same seed and
-the same code produce an identical layout (spec 8, "procedural generation
-determinism"). All randomness goes through one `random.Random(seed)`.
+`generate_world(seed, room_count=None, settings=None) -> WorldLayout`
+(`world/gen/__init__.py`) is the pipeline; each stage is a module beside it.
+All randomness comes from one `random.Random(seed)` stream, consumed in the
+order below, except where a stage keys its own RNG by seed and island so that
+it draws nothing from the world's. Moving a stage moves every world.
+
+The knobs are a frozen `GenSettings` (`gen/settings.py`), snapshotted from
+`game.config` at the top and handed to every stage that reads one. A test
+passes `GenSettings.from_config(unseal=False)` instead of mutating the global.
+`TILE_PX` (64) stays a global: it is the world's grid unit, shared with the
+data, the bake and the renderer.
 
 ### 1.1 Chunk lattice → spanning tree
 
-The world is a lattice of square **chunk cells** (`config.CHUNK_SIZE`, 720 px).
-Generation grows a **tree** of occupied cells outward from the start cell
-`(0, 0)`: each step picks a random free cell orthogonally adjacent to an
-occupied one and links it to its parent. Because it's a tree, **every room is
-reachable from start by construction** (spec 5.4: "do not generate unreachable
-critical rooms"). Stops at `config.WORLD_ROOM_COUNT` (16) cells.
+The world is a lattice of chunk cells, `HEIGHTMAP_CHUNK_COLS × ROWS` tiles each
+(50 × 30). Generation grows a **tree** of occupied cells outward from the start
+cell `(0, 0)`: each step picks a random free cell orthogonally adjacent to an
+occupied one and links it to its parent. Because it is a tree, **every island
+is reachable from the start by construction.** Stops at `HEIGHTMAP_ROOM_COUNT`
+(9) cells.
 
-### 1.2 Rooms
+### 1.2 Islands, roles and topography
 
-One room per cell. `Room(id, cell, rect, kind, neighbors, cells)`.
+One island per cell. `Room(id, cell, rect, kind, neighbors, cells, grid,
+topography, palette, inset, tile_meta)`.
 
-`rect` is the axis-aligned world-pixel **bounding box**, sized `42–88 %` of the
-cell (`rng.uniform`, with an 18 % roll for a `78–94 %` "big" room), then **each
-dimension snapped to a `config.TILE_PX` (64) multiple** — `round(dim / 64) * 64`,
-floor-clamped to `3 × 64` — and re-centred (T7). Snapping means the tiled
-renderer's 64 px cell grid covers a room exactly.
+`rect` is `HEIGHTMAP_ROOM_COLS × ROWS` tiles (46–52 × 28–32), centred in its
+chunk and then **snapped to the world tile lattice**: a rect of odd tile
+width centred in a chunk sits half a tile off the grid, and then no two
+islands share one, so a bridge could never land square on a tile at both
+ends. Every island rect is tile-aligned and tile-sized; `LevelIndex` and the
+navigation grid depend on it, and `gen/validate.py` checks it.
 
-`cells: frozenset[(col, row)]` is the floor as **room-relative tile coords**
-(relative because a room is tile-*sized* but not world-tile-*aligned*). With
-`config.IRREGULAR_ROOMS` on (default):
+Roles: `start_id = 0`; `boss_id` is the island farthest from the start by
+tree distance; the rest are shuffled and the first few become one each of
+`SPECIAL_KINDS = (shrine, treasure, fountain, altar, merchant)`; the
+remainder stay `combat`.
 
-- `_grow_rooms` first lets some `combat` rooms (`_MULTICHUNK_ROOM_CHANCE`)
-  extend a full-width/height 3–7-cell block into **one empty adjacent chunk
-  cell** (the spanning tree leaves cells free) — a large 2-chunk arena. Rejected
-  if the block escapes the home + target chunk, hits another room / corridor, or
-  breaks `ROOM_SIZE_MAX_CELLS`. `_relink_corridors` then re-seats each corridor
-  in the overlap of its (possibly moved) two rooms.
-- `_carve_room_shapes` then bites **1–3 corner blocks** (2–3 cells each,
-  depth-capped at `w//2−1` / `h//2−1`) out of each `combat` room → L / T / plus /
-  stepped floors; `start` / `boss` and rooms smaller than 6×6 stay full
-  rectangles; special rooms get 0–1 bites. Every bite is validated: the mask
-  stays 4-connected, ≥ 9 cells, ≤ `ROOM_SIZE_MAX_CELLS`, and every border
-  row/column keeps a cell (so `rect` never shrinks and corridor mouths remain
-  valid).
+**Topography** (`gen/graph.py — assign_topography`) is what *shape* an island
+is, separate from `kind`, which is what happens on it: a shrine can stand on
+a small island. The boss island is the one fixed assignment
+(`HEIGHTMAP_BOSS_TOPOGRAPHY`); the rest are drawn by weight from
+`HEIGHTMAP_TOPOGRAPHIES`, whose entries carry the island's size scale, coast
+preset, terrace count range, bridge allowance per side and tileset pool.
+`gen/placement.py` then resizes each island to its topography and slides it
+within its chunk toward its neighbours, so islands are not all centred.
 
-Flag off → every room is the full `W × H` rectangle on the old `55–86 %` band.
+### 1.3 The height map — `world/gen/height/`
 
-`room.center` is the bbox centre for a plain rectangle, or the floor centroid
-snapped to an occupied cell for a shaped room. `room.neighbors` comes from the
-tree edges; the corridor axis keys off the two rooms' **chunk cells**, not their
-(now movable) bbox centres.
+`islands._build_room_grids` gives every island a per-cell **height map**,
+`Room.grid: {(col, row): Cell}`, room-relative. A `Cell` is `(kind, level,
+drop, row, tag)`:
 
-### 1.3 Corridors
+    `=` ground   walkable surface at `level`
+    `#` cliff    the wall holding up `level`; not walkable
+    `0` vstair   straight N/S flight, `level` down to `level - drop`
+    `>` ewstair  east/west flight (or a lateral crossing on a flank)
+    `~` lake     inland water inside a terrace; not walkable
+    ` ` void     open sea
 
-One `Corridor` per tree edge — a straight axis-aligned rectangle, **one tile
-wide** (`config.TILE_PX`, 64 px; T7), spanning from the interior of one room to
-the interior of its neighbor. Same-floor corridors choose a deterministic,
-tile-aligned **lane** from the shared edge's interior span, so bridges enter at
-varied positions instead of every room center. Two tiles are reserved at each
-shared-edge end to keep the connection clear of irregular corner bites and
-navigation bottlenecks; narrow overlaps fall back to their middle lane.
+`height.build_grid` is the pipeline: a jittered **coast mask** from the
+topography's preset (`coast.py`), then concentric **caps** pushed toward the
+island's north side (`terraces.py` — the plateau stack is a mountain, not a
+staircase; canyons cut into each cap from its southern rim), **walls** on
+every southward drop (`walls.py` — the only face the camera sees; east, west
+and north are open flanks drawn by the higher terrace's edge tile), **flights**
+cut through the walls and **lateral crossings** on the flanks (`flights.py`),
+**lakes** (`water.py`), then a prune of unreachable pockets, a hole fill and
+one more re-facing. `graph.walk_links` is the authority on what joins what;
+`check_grid` lists the invariants (a southward drop always has a wall,
+adjacent levels differ by at most 2, no floating ground, a flight links other
+terraces only at its ends, every walkable cell reachable).
 
-Cross-floor links retain the shared-span center before becoming plank stairs or
-ramp units, preserving their two-tile navigation approaches. If a room grows,
-`_relink_corridors` keeps its lane when valid or moves it to the nearest valid
-shared lane. Each corridor records this geometry plus its **bridge edge
-identity**:
+`Room.cells` is the walkable subset of the grid; `Room.floor` is the base
+level (0). Collision and navigation read `cells` and need to know nothing
+about levels; the elevation index reads the grid.
 
-```python
-axis: str          # "h"  -> west/east ends | "v" -> north/south ends
-end_low:  str      # "west"  (h) | "north" (v)  — the edge at the smaller x / y
-end_high: str      # "east"  (h) | "south" (v)  — the edge at the larger  x / y
-room_low, room_high: int   # the room ids those two edges butt against
-lane: int                  # cross-axis tile-centre coordinate of the mouth
-```
+### 1.4 Bridges — `gen/bridges.py`
 
-The tiled renderer uses `axis` + `room_low` / `room_high` to draw a directional
-plank **bridge** whose end-cap tiles land on each room's shoreline tile — the
-bake spans one tile *into* each room so the planks overlap the grass (§3.3); the
-flat renderer draws a plain `_FLOOR` strip along `rect`. A 1-wide corridor is
-deliberate — the bridge art is one tile on its short axis — and is accepted as a
-pinch point for the largest enemy colliders (brute r30); revisit if playtests
-show it bottlenecking.
+One `Corridor` per tree edge, created on the tree's own lane and then
+**seated by `_seat_corridors`** once the coastlines exist: the rect is
+stretched beach to beach on a lane where both islands have shore, a link may
+carry more than one crossing (per the two islands' `bridges` allowance, spent
+per side), a crossing longer than `HEIGHTMAP_BRIDGE_MAX` tiles is refused,
+and a **shortcut** pass adds a crossing between islands that ended up close,
+so the world stops being a tree and a run need not backtrack over the bridge
+it arrived by. One tile wide, always at sea level; each records its `axis`,
+`end_low` / `end_high` and `room_low` / `room_high` so the bake draws the
+matching end-cap tile at each mouth.
 
-### 1.4 Roles & special kinds
+### 1.5 Palettes and the inset field
 
-- `start_id = 0`.
-- `boss_id` = the room with the greatest BFS distance from start.
-- `_assign_kinds`: `start` and `boss` are fixed; the remaining ids are shuffled
-  and the first few become one each of
-  `SPECIAL_KINDS = (shrine, treasure, fountain, altar, merchant, elite_arena)`;
-  the rest stay `"combat"`.
+`gen/biomes.py — assign_palettes` decides which tileset each terrace wears
+(`Room.palette: {level: sheet}`) with an RNG keyed by seed and island: a
+seeded shuffle of the topography's pool, each raised level differing in
+**biome** from the one below it, and level 0 only from sheets whose shoreline
+block carries real surf. What a sheet *is* — its biome, its surf, its scatter
+mix — is `world/rules/biome.py`, read by the scatter and the painters alike;
+generation decides, rendering reads, so the rocks and the rock tiles land on
+the same terrace.
 
-### 1.5 Obstacles — `_scatter_obstacles`
-
-Per room, **skipping `start` and `boss`**, a few convex circular colliders:
-
-| kind | radius | blocks projectiles | count rule |
-|------|--------|--------------------|------------|
-| `tree`   | 20 | yes | `rng.randint(3,7)` per combat room |
-| `rock`   | 25 | yes | `10` in an `elite_arena` |
-| `pillar` | 18 | yes | `2` in a shrine/treasure/fountain/altar/merchant |
-| `shrub`  | 14 | no  | |
-
-Each obstacle is placed on a **random floor cell** (`room.cells`) with an
-in-cell jitter, so nothing lands in a bitten-out region; the per-room count is
-the base rule above **plus `len(room.cells) // 48`** (bigger rooms get a few
-more, capped at 14). Never placed on a **corridor doorway** tile
-(`_corridor_doorways` — the mouth cell of each corridor + one tile of margin) so
-an entrance is always walkable, and ≥ 46 px from every other obstacle.
-**Special** rooms (`shrine` / `treasure` / `fountain` / `altar` / `merchant` /
-`elite_arena`) additionally keep a clear central `min(w,h) * 0.22` disc around
-`room.center` (the centroid for a shaped room) for their interaction / fight
-space; plain `combat` rooms fill freely. Each gets a cosmetic
-`Obstacle.variant` (1–4, from the seed) used only by the renderer.
-(`entities/obstacle.py — KINDS`.)
+`islands._build_inset_fields` then builds each island's **inset field**
+(`world/rules/inset.py`): per 8 px sample, the distance to the nearest floor
+of a different level, plus a second channel for the distance to anything
+that is not floor. Built once, here, so the scatter, the decor, the collider
+and the flow field all read one answer to "how far inside its terrace is
+this point".
 
 ### 1.6 Bounds & shift
 
-`bounds` = the union of every room + corridor rect, inflated by one chunk. The
-**whole world is then translated so `bounds` starts at `(0, 0)`** — keeps the
-camera clamp and collision math in a simple positive coordinate space.
+`bounds` = the union of every island and bridge rect, inflated by one chunk;
+the whole world is then translated so `bounds` starts at `(0, 0)`.
 
-### 1.7 `WorldLayout` — the seam
+### 1.7 Obstacles — `gen/scatter.py`
 
-```python
-@dataclass
-class WorldLayout:
-    seed: int
-    rooms: list[Room]
-    corridors: list[Corridor]
-    bounds: pygame.Rect
-    start_id: int
-    boss_id: int
-    obstacles: list        # entities.obstacle.Obstacle
-```
+Every island scatters, the start and boss ones included. Per terrace, the
+biome's `scatter` block gives the kinds, their weights and the density
+(attempts per thousand cells); a slot draws its kind once and goes unfilled
+if it cannot seat it, so the mix stays honest. A placement must be on a
+floor cell, clear of every **keep-clear rect** — bridge mouths, every flight
+and the ground it joins at both ends — by the obstacle's own radius, off the
+island's **clear disc** (`_GRID_BOSS_CLEAR_RADIUS` round the boss island's
+centre, `_GRID_SPAWN_CLEAR` round the hero's spawn pixel,
+`_GRID_CLEAR_RADIUS` round a special island's interactable), far enough from
+a terrace above that its art does not reach onto it (`rules/frontier.py`),
+and spaced off every other obstacle (trees space their canopies, 55 px).
+Houses go first, then a tree **top-up** thickens the groves already there.
 
-Consumed by: the **camera** (clamp to `bounds`), **collision** (`GameMap`), the
-**spawn director** (`world/spawning.py` reads rooms), and **both renderers**.
-Helpers: `.room(id)`, `.walkable_rects()`, `.bfs_distances(src)`,
-`.is_connected()`.
+Then `gen/repair.py — unseal`: can the widest navigating body still reach
+everywhere bare terrain allows? Where not, the fewest obstacles that reopen
+the region are taken back. The keep-clear rules protect the chokes we knew
+about; this catches the ones nobody predicted.
 
-*(There is no decorations field on `WorldLayout`. Colliding scenery is a skin on
-the obstacles; the non-colliding scatter — interior clutter + water scenery — is
-built inside `GameMap` from a seed, never as entities. See §3.4 / §3.6.)*
+### 1.8 What comes out
 
----
+`islands._grid_tile_meta` projects the grids into `Room.tile_meta`
+(`TileMeta(floor, surface, foam, room_id, ramp)`) for the renderer and any
+later system. `WorldLayout(seed, rooms, corridors, bounds, start_id,
+boss_id, obstacles)` is the seam: the camera clamps to `bounds`, the collider
+reads rooms and bridges, the spawn director reads rooms, the bake reads
+everything.
 
-## 2 · Collision & movement — `world/map.py` (assetless)
-
-`GameMap(seed)` wraps a `WorldLayout` (or, with `seed=None`, one big
-`WORLD_WIDTH × WORLD_HEIGHT` room used by tests and menus).
-
-- `self._rects` = every room + corridor rect = the walkable set.
-- `is_walkable(pos, radius=0)` — the point (and, if `radius>0`, the four cardinal
-  offsets) must lie in some walkable rect **and** outside every obstacle circle.
-- `resolve_movement(prev, new, radius)` — try the full move; if blocked, try
-  sliding on X only, then Y only, else stay at `prev`. No physics engine.
-- `blocking_obstacle_hit(pos, radius)` — first projectile-blocking obstacle
-  overlapping a circle (used by the projectile resolver).
-- `offscreen_spawn_point(camera, rng)` — a walkable point just outside the view,
-  biased to the nearest rooms.
-
-**None of this reads an asset.** Gameplay is identical whether or not the
-tileset exists.
+`gen/validate.py — validate(layout)` reads every promise above back off a
+finished world as a list of sentences; the tests run it on every cached
+world. `world/digest.py` fingerprints the layout, the bake and one drawn
+frame; `python -m world.digest --write` re-pins them after an intended
+change.
 
 ---
 
-## 3 · Display — two renderers over one layout
+## 2 · Runtime — collision, elevation, navigation (assetless)
 
-`GameMap.draw(surface, camera)` picks a path **once**, on the first call, in
-`_build_tiles()`:
+**`GameMap(seed)`** (`world/map.py`) wraps a `WorldLayout` (or, with
+`seed=None`, one big `WORLD_WIDTH × WORLD_HEIGHT` room for tests and menus).
 
-```
-layout is None                     -> §3.1 trivial renderer (tests / menus)
-assets.tile(floor_sheet, interior) is None  -> §3.2 flat renderer  (assetless)
-assets.tile(floor_sheet, interior) is a Surface -> §3.3 tiled renderer (asset-backed)
-```
+- `_point_ok(x, y)` — on an island cell or a bridge. The body of this rule is
+  `world/rules/floor.py — point_on_floor`; the navigation grid reads the same
+  function, so the two cannot drift.
+- `inset_ok(x, y)` — at least `body_inset()` px (from `terrain.json`) inside
+  its own terrace, read off the inset field; a body already inside the
+  margin may still move as long as it does not go deeper.
+- `path_ok(prev, new)` — the elevation rule: the segment is walked half a
+  tile at a time and every tile change must satisfy `rules/steps.py —
+  can_step` against the `LevelIndex`. A plateau's flank and back edge are
+  level changes with no stone in them; only a flight crosses them.
+- `is_walkable(pos, radius, frm)` combines the three with the obstacle
+  circles; `resolve_movement` tries the move, then each axis slide, then a
+  short hop in the compass direction nearest the intended heading.
+- `blocking_obstacle_hit`, `random_point_in_room`, `offscreen_spawn_point`
+  as before.
 
-`self._tiles_ready` guards the one-time build; `self._tiles_ok` records which
-renderer won. The build is deferred to the first `draw()` because it needs an
-initialised display (`Surface.convert()`); headless tests that never draw never
-build tiles.
+**`LevelIndex`** (`world/elevation.py`) rasterises every island grid into
+flat per-tile arrays — `level` (the floor here, or none), `kind`, `top` (the
+elevation of whatever stands here, walkable or not: what a shot has to
+clear) and the flight cells verbatim. The only place the runtime learns an
+elevation. **It answers elevation, not walkability.**
 
-### 3.1 No layout (`seed=None`)
+**`world/nav/`** — `NavGrid` (`lattice.py`) rasterises the floor outward
+from the island cells and bridge rects at 32 or 48 px, marks bridges and
+flights as leniency corridors, bakes a per-cell **step mask** from
+`rules/steps.py`, and carries a per-cell **clearance** (`clearance.py`: a
+chamfer distance to the nearest wall, lowered by the exact distance to each
+obstacle edge). `FlowField` / `NavField` (`field.py`) build the shared
+distance field enemies steer on, one per body class. `world/pathfinding.py`
+re-exports the names.
 
-`surface.fill(_VOID)` → one `_FLOOR` rect the size of the world → a 3 px `_WALL`
-border → a 128 px debug grid (`_draw_grid`). Used by unit tests and any
-non-run context.
+---
 
-### 3.2 Flat renderer — **assetless fallback** (`_draw_flat_layout`)
+## 3 · Display — `world/terrain/`
 
-Triggered when `assets/terrain/tiles/tilemap_1.png` (the `floor_sheet`)
-is missing or unreadable. Pure `pygame.draw`:
+### 3.1 The bake — `bake.py` → `BakedTerrain`
 
-| element | how |
-|---|---|
-| void | `surface.fill(_VOID)` — `(10, 10, 14)` |
-| corridors | `_FLOOR` rects — `(26, 26, 34)` |
-| rooms | `_SPECIAL_FLOORS[kind]` rect if the kind has a tint (start / boss / shrine / treasure / fountain / altar / merchant / elite_arena), else `_FLOOR` |
-| walls | 3 px `_WALL` border per room — `(68, 70, 92)` |
-| obstacles | `_draw_obstacles`: filled circle in `Obstacle.color` + 2 px `_WALL` outline, at `Obstacle.radius` |
+Once, lazily, on the first draw (it needs a display). `TileSheets`
+(`sheets.py`) adapts `terrain.json`'s tileset metadata and caches tiles;
+`grid_paint.paint_room_levels` paints **one `SRCALPHA` surface per terrace
+of every island** straight off its grid — ground autotiled against its own
+terrace only, cliff faces from the sheet's cliff block (left / mid / right /
+single × top / body / bottom), the stone flight sprites, the lateral ramp
+wedges, the drop shadow a face casts, lakes left transparent for the water
+buffer — and `grid_shore` lists the ground cells with sea or a lake beside
+them, the foam anchors. `paint_bridge` tiles each bridge along its own rect
+from the bridge sheet with the matching end caps. Then the water buffer, the
+drop shadow sprite, the foam frames and their three routines, the obstacle
+skins (`decor/obstacle_skins.py`), the tree shades (`decor/shadows.py`),
+the interior clutter (`decor/scatter_room.py`) and the water scenery
+(`decor/scatter_water.py`).
 
-No water, no foam, no shoreline, no scenery sprites — just tinted rectangles and
-circles. Fully playable.
+All of it lands on a `BakedTerrain` (`baked.py`), which `GameMap.terrain`
+holds; the old private names (`_grid_surfs`, `_shore`, `_decos`, ...) are
+forwarding properties on the map.
 
-### 3.3 Tiled renderer — **asset-backed** (`_build_tiles` + `_draw_tiled`)
+### 3.2 The frame — `render.py — TerrainRenderer`
 
-**Bake (once).** `data/terrain.json` supplies the vocabulary (§4).
+`draw_water` paints the scrolling water buffer, then a foam frame under every
+in-view shore anchor (three fps/phase routines assigned by a stable spatial
+bucket, so the coastline does not advance in lock-step), then the void
+scenery. `draw_ground_band(level)` paints every terrace surface of that
+level, south-first within the level, and the bridges with level 0.
+`PlayingState` calls the bands ascending and slots the depth-sorted layer
+(`banded_scenery` / `scenery_drawables`: obstacles, their tree shades,
+interior clutter, and the characters, ordered by ground-contact Y) between
+them, so a sprite standing on a lower terrace is covered by the terrace
+above it. Animation time comes from `TerrainRenderer.seconds()`, a seam the
+frame digest pins.
 
-- **Rooms** — `paint_room(r)` allocates one **`Surface(rect.size, pygame.SRCALPHA)`**
-  (T6: per-pixel alpha, so the autotile edge/corner tiles' transparent
-  water-facing side is *kept*, not flattened to black), then walks **only the
-  cells in `room.cells`** (bitten-out cells stay transparent — foam / water show
-  through) and blits the tile `_mask_slot(cells, col, row, slots)` picks: a
-  **4-bit autotile** on which of the cell's four orthogonal neighbours are also
-  floor — 0 gaps → `interior`, 1 → the matching `edge_*`, 2-adjacent → the outer
-  `corner_*`; opposite-pair / nub / **concave (inner) corners fall back to
-  `interior`** (the sheet has only the 8 rectangle slots — the two adjoining
-  `edge_*` cells form the visible inner corner, and decor fills it). Tiles come
-  from that room kind's palette (`room_palettes[kind]`). Any cell with a
-  non-floor orthogonal neighbour is added to `self._shore`, so foam traces the
-  true irregular coastline. (`_slot_for`, the old rectangle 9-slice, is kept
-  only for its unit test.)
-- **Corridors** — `paint_corridor(c)` bakes a **directional plank bridge** from
-  `bridge.sheet` (`terrain/bridge/bridge_all.png`, its *own* 3-wide grid — passed to
-  `Assets.tile(..., cols=3)`). The surface spans from **one tile inside
-  `room_low`** to **one tile inside `room_high`** (`edge ∓ tile_px`), *not* the
-  centre-to-centre collision `rect`: the end-cap tiles land on each room's
-  shoreline tile so the planks visibly meet the grass instead of falling short
-  of it or being buried at the room centres. `_bridge_slot(c.axis, i, ncells)` gives the
-  low cap (`h_left` / `v_top`) at cell 0, the high cap (`h_right` / `v_bot`) at
-  the last cell, `h_mid` / `v_mid` between — matching `Corridor.end_low` /
-  `end_high`. SRCALPHA (the plank gaps are transparent); bridges render above
-  nearby ground-shore foam but never add `_shore` anchors of their own. No
-  bridge sheet → the plain `interior` grass tile. `_corr_surfs` holds
-  `(blit_rect, surface)` — the blit rect is this tight mouth-to-mouth span.
-- **Final shoreline filter** — after rooms, corridors, cliffs, and stairs are
-  built, every `_shore` anchor comes from a ground-room cell and must still
-  have at least one non-walkable cardinal neighbor. Every qualifying ground
-  edge retains foam, regardless of corridors or other surfaces drawn above it.
-  `_cliff_foam` is the explicit non-walkable, void-facing exception.
-- Also baked: `self._water_buf` (the `water_tile` tiled into a `SCREEN + 1 tile`
-  scroll buffer, opaque `.convert()` — bottom layer, biggest blit); if enabled,
-  `self._foam` (`Water_Foam.png`, 16 frames) with three spatially assigned
-  `{fps, phase}` routines from `terrain.json`; `self._decos` (one scaled rig per
-  obstacle) + `self._tree_shadows` (a round shade per tree — §3.4); and the
-  seeded non-colliding scatter `self._room_decor` / `self._void_decor` (§3.6).
+Draw-time zoom: baked surfaces are 1:1 world pixels; `_z_surf` scales a
+cached copy per zoom.
 
-**Ground pass (per frame), `GameMap.draw_ground` → `_draw_tiled`** — bottom to top:
+### 3.3 Flat fallback — `_draw_flat_layout`
 
-1. `self._water_buf` blitted at `(-(ox % wt), -(oy % wt))` — the scrolling water
-   void (one blit). `water_tile` missing → `surface.fill(_VOID)` instead; the
-   baked rooms still draw.
-2. `config.TERRAIN_FOAM` → a `Water_Foam` frame centred under every in-view
-  `_shore` tile or void-facing `_cliff_foam` foot. It is the first layer above
-  water, behind void props and all terrain. A stable coordinate bucket assigns
-  each anchor to one of three routines (9 / 12 / 15 fps with distinct phase
-  offsets), preventing the whole coastline from advancing in lockstep.
-3. **void scenery** (`self._void_decor`) — water rocks / a duck on the open
-  water, animated, view-culled and always above foam (§3.6).
-4. each in-view room's baked surface at `room.rect - camera`.
-5. each in-view corridor's baked bridge surface.
+Triggered when the `floor_sheet` is missing or unreadable. Pure
+`pygame.draw`: `_VOID` fill, `_FLOOR` bridge strips, per-kind tinted island
+rects with a 3 px `_WALL` border, obstacles as filled circles in
+`Obstacle.color`. No water, foam, terraces or sprites — and fully playable.
 
-Interior clutter and obstacles are **not** drawn here — they go in the
-depth-sorted layer (§3.7). `GameMap.draw` (the whole-map convenience used
-outside `PlayingState`) instead follows `draw_ground` with `_draw_room_clutter`
-+ `_draw_obstacles`, both unsorted.
-
-**Per-frame cost** ≈ 1 water blit + ~5 baked-surface blits + ~30–60 foam blits
-≈ 1 ms, plus ~50 scatter/decoration blits and the obstacle skins in §3.7.
-
-### 3.4 Obstacles in each renderer
-
-`_draw_one_obstacle(surface, camera, i, o)` is shared (looped by
-`_draw_obstacles` for the unsorted path, and wrapped as a depth entry by
-`scenery_drawables` for the sorted one):
-
-- **tiled + `TERRAIN_DECORATIONS`**: the obstacle is skinned with a decoration
-  rig (`obstacle_decor.rigs[kind]`, `Obstacle.variant` picks one of four) scaled
-  so the rig's measured `footprint` covers `2 · radius · size_boost` on screen;
-  `tree` → the animated `deco_tree_1..4` (8-frame sway), `shrub` → `deco_bush_*`,
-  `rock` / `pillar` → `deco_rock_*`. No under-skin shadow — obstacles just blit
-  their frame at the collider centre.
-- **flat renderer, `TERRAIN_DECORATIONS` off, or a decoration rig missing**:
-  the obstacle falls back to the drawn circle from §3.2.
-
-So collision is always the circle; only the *pixels* differ.
-
-**Tree shade (B3).** When `config.TERRAIN_SHADOWS` is on, each skinned `tree`
-gets a soft round patch — a small SRCALPHA surface of concentric translucent
-fills (`obstacle_decor.tree_shadow = {radius_scale, color, alpha}`,
-`R = radius · 1.9`), precomputed once per distinct `R` in `_build_tree_shadows`.
-`draw_tree_shadows` blits it centred on the trunk **after** the depth-sorted
-layer (§3.7), so a hero / enemy standing under a tree is gently darkened. It is
-the only obstacle that casts anything.
-
-### 3.5 Independent degradation
+### 3.4 Independent degradation
 
 | missing / off | effect |
 |---|---|
-| `floor_sheet` (`tilemap_1.png`) | whole level falls back to §3.2 flat |
-| `water_tile` | tiled rooms still draw; void becomes `surface.fill(_VOID)` |
-| `bridge.sheet` (`Bridge_All.png`) | corridors bake plain `interior` grass instead of planks |
-| `Water_Foam.png` **or** `config.TERRAIN_FOAM = False` | no shoreline foam (autotile edge tiles are the boundary) |
+| `floor_sheet` | whole level falls back to §3.3 |
+| `water_tile` | terraces still draw; void becomes `surface.fill(_VOID)` |
+| `bridge.sheet` | bridges bake plain `interior` grass instead of planks |
+| `Water_Foam.png` **or** `config.TERRAIN_FOAM = False` | no shoreline foam |
 | a `deco_*` rig / `config.TERRAIN_DECORATIONS = False` | that obstacle draws a circle |
-| `config.TERRAIN_SHADOWS = False` | no tree shade patch (nothing else changes) |
-| `config.TERRAIN_DECOR = False` or empty `decorations` | no interior clutter, no void scenery (§3.6) |
-| one `tilemap_N.png` palette | that room kind falls back to `floor_sheet` (`cell()` returns the `probe` tile) |
+| `config.TERRAIN_SHADOWS = False` | no tree shade patch |
+| `config.TERRAIN_DECOR = False` or empty `decorations` | no interior clutter, no water scenery |
+| `config.TERRAIN_BUILDINGS = False` | no houses (a generation knob: the layout changes) |
+| one `tilemap_N.png` of a palette | that terrace falls back to `floor_sheet` (`cell()` returns the probe tile) |
 
-Every flag is independent; hero / enemy / projectile sprites degrade the same
-way — see `README.md` "Assets" and `COMBAT_CALCS.md`.
+### 3.5 Non-colliding decoration scatter
 
-### 3.6 Non-colliding decoration scatter (T8) — `_build_decor_scatter`
-
-Cosmetic scenery, built once from a **string seed** (`f"{layout.seed}:{room.id}:decor"`
-/ `f"{seed}:{gx}:{gy}:void"` — stable regardless of `PYTHONHASHSEED`) and drawn
-per frame. **Nothing here touches `self.obstacles` or `is_walkable`.**
-
-- **Registry** — `terrain.json` `decorations` is an array; each entry is
-  `{id, rig, placement, scale, per_room|chance, collision}` where `rig` names an
-  existing entry in `rigs`. A new prop is a new rig + a new line — no code.
-- **`placement: room_interior`** — clutter (`pebble_*` → `deco_rock_*` at ~0.5×)
-  on a room's *interior* cells only, kept clear of the centre, ≥ 20 px off any
-  obstacle, ≥ 40 px apart; `per_room: [lo, hi]` count.
-- **`placement: void`** — water scenery (`water_rock_*` → `deco_water_rock_*`,
-  `duck` → `deco_duck`) on a 160 px grid over `bounds` (inset `CHUNK//3`), placed
-  only where the point *and* ±36 px all fail `_point_ok` (never clipping a
-  shore); per-cell `chance`, capped at 240.
-- Instances are `(frames, anchor_x·scale, anchor_y·scale, fps, world_x, world_y)`,
-  resolved once. `_blit_one_decor` picks the current `get_ticks` frame and blits
-  the base at `(world_x, world_y)`. `collision: true` entries are the world
-  generator's job (trees are already obstacles), not this scatter.
-
-### 3.7 Depth-sorted layer — scenery + characters interleaved
-
-Obstacles, interior clutter and the characters (hero, enemies, boss, summons,
-death animations) are painted in **one back-to-front pass ordered by
-ground-contact world Y** — so a sprite lower on the map (larger Y) draws over the
-ones above it, and a character standing behind (a *smaller* Y than) a tree is
-hidden by its canopy.
-
-- `GameMap.scenery_drawables(camera)` → `[(depth_y, fn), …]` — one entry per
-  in-view obstacle (`depth_y = o.pos.y`, `fn` = `_draw_one_obstacle`, the skin
-  frame) and per in-view clutter instance (`depth_y = world_y`,
-  `fn` = `_blit_one_decor`).
-- `PlayingState._depth_items()` appends the characters — `depth_y = entity.pos.y`
-  (the sprite anchor sits on `pos`, i.e. the feet) — then `sort`s by `depth_y`
-  (stable: on a tie, scenery < enemies < dying < boss < summons < player).
-- `PlayingState._draw_depth_layer` just calls each `fn(surface)` in order.
-- Immediately after, `GameMap.draw_tree_shadows` blits each visible tree's shade
-  patch — *over* the characters, so anyone under a tree is darkened (§3.4).
-
-Everything else keeps its fixed layer: `draw_ground` under this pass;
-interactables / hazards / gems / explosions between the ground and this pass;
-projectiles, particles, damage numbers, then the HUD on top. `GameMap.draw`
-(non-`PlayingState` callers) still draws clutter + obstacles unsorted, then the
-tree shades.
+Cosmetic scenery, built once from string seeds (`f"{seed}:{room.id}:decor"`,
+`f"{seed}:{gx}:{gy}:void"` — stable regardless of `PYTHONHASHSEED`), drawn per
+frame. **Nothing here touches `obstacles` or `is_walkable`.** The
+`decorations` registry in `terrain.json` names each prop's rig, placement
+(`room_interior`, `void`, `shore`, `lake`), tier and density; interior props
+are budgeted per terrace by biome (`decor/budget.py`), placed on interior
+cells clear of every frontier and obstacle (`decor/spacing.py`,
+`rules/frontier.py`), and grouped by the biome's tree family. Water scenery
+lands on a 160 px lattice over the open sea, on the shoreline ring of every
+island, and on the lakes.
 
 ---
 
@@ -381,24 +299,23 @@ tree shades.
 | key | meaning |
 |---|---|
 | `tile_px` | cell size in the sheet (64) |
-| `grid` | `[cols, rows]` of the tilemap sheet (`[9, 6]`) |
-| `floor_sheet` | default floor tilemap; its presence is the tiled/flat switch |
+| `grid` | `[cols, rows]` of a ground tilemap sheet (`[9, 6]`) |
+| `floor_sheet` | default ground tilemap; its presence is the tiled/flat switch |
 | `water_tile` | single tile used to fill the void buffer |
-| `slots` | semantic name → flat sheet index: `interior`, `edge_n/s/w/e`, `corner_nw/ne/sw/se`, `strip_v/h`, `single`. **Index → cell → cut rect and the position rule that picks a slot per room cell: `terrain_tile_slots_formula.md`.** |
-| `bridge` | corridor plank autotile — `{sheet, grid: [cols, rows], slots: {h_left, h_mid, h_right, v_top, v_mid, v_bot}}`. Its own grid width (3), passed to `Assets.tile(..., cols=3)`. |
-| `room_palettes` | room kind → tilemap path (`default`, `boss`, `treasure`, `shrine`, `fountain`); other kinds use `floor_sheet` |
-| `decorations` | **array** of non-colliding scatter entries `{id, rig, placement, scale, per_room|chance, collision}` — see §3.6 |
-| `obstacle_decor.size_boost` | how much bigger than the collider a skin draws (1.25) |
-| `obstacle_decor.tree_shadow` | `{radius_scale, color, alpha}` for the round shade patch each tree casts over the characters (§3.4) |
-| `obstacle_decor.rigs` | obstacle kind → list of interchangeable decoration rig names (`tree` → `deco_tree_*`, `shrub` → `deco_bush_*`, `rock`/`pillar` → `deco_rock_*`) |
-| `rigs` | animation rigs (`deco_bush_1..4`, `deco_rock_1..4`, `deco_tree_1..4`, `deco_water_rock_*`, `deco_duck`, `terrain_foam`): `frame`, `anchor`, `footprint`, `anims.loop = {file, frames, fps, loop}` |
+| `slots` | semantic name → sheet index: the autotile ring, `cliff` (× top / body / bottom), `raised` (keyed by exposed sides), `ramp` (keyed by descent direction). **Index → cell → cut rect: `terrain_tile_slots_formula.md`.** |
+| `bridge` | plank autotile — `{sheet, grid, slots: {h_left, h_mid, h_right, v_top, v_mid, v_bot}}` |
+| `vstair` | the stone flight sprites, one per drop |
+| `floor_sheets`, `room_palettes` | per-level and per-kind fallbacks for a terrace the island's palette does not name |
+| `sheet_biomes`, `sheet_flags`, `biomes` | what each tileset *is*: its biome, whether its shoreline block carries surf, and per biome the `scatter` mix, the `decor` rates per tier and the `trees` family (`world/rules/biome.py`) |
+| `decor_placement`, `decorations`, `rigs` | the prop registry, rig definitions and placement rules (§3.5) |
+| `obstacle_decor` | obstacle skins: `rigs` per kind, `size_boost`, `render_radius`, `render_scale`, `sprite_drop`, `tree_shadow` |
+| `foam_routines`, `tree_routines` | the desynchronised animation clocks |
+| `body_inset`, `decor_placement.edge_inset` | the terrace margin a body / a prop keeps |
 
-`game/assets.py — Assets.tile(sheet_rel, index, *, size=None, cols=None)` slices
-one cell: `sheet.subsurface(rect).copy()` (the sheet is loaded `convert_alpha()`,
-so cells keep their alpha), optional `pygame.transform.scale`, memoised by
-`(sheet_rel, index, size, cols)`. `cols` defaults to `terrain.grid[0]` (the
-floor sheet's width) — pass it for a sheet of a different width, e.g. the 3-wide
-bridge sheet. Returns `None` for a missing sheet or an out-of-range index.
+`game/assets.py — Assets.tile(sheet_rel, index, *, size=None, cols=None)`
+slices one cell from a sheet loaded `convert_alpha()`, memoised by
+`(sheet_rel, index, size, cols)`; returns `None` for a missing sheet or an
+out-of-range index.
 
 ---
 
@@ -406,20 +323,17 @@ bridge sheet. Returns `None` for a missing sheet or an out-of-range index.
 
 | aspect | assetless (flat) | asset-backed (tiled) |
 |--------|------------------|----------------------|
-| layout, room graph, roles | `world/procedural.py` — **identical** | identical |
-| collision, `resolve_movement`, spawn points | `GameMap` — **identical** | identical |
+| layout, height maps, roles, obstacles | `world/gen` — **identical** | identical |
+| collision, elevation, navigation, spawn points | `GameMap`, `LevelIndex`, `NavField` — **identical** | identical |
 | camera clamp | `bounds` — **identical** | identical |
-| floor | tinted `pygame.draw.rect` per room / corridor | baked grass `tilemap_N` surface, autotiled edges |
-| room-kind cue | `_SPECIAL_FLOORS` colour | `room_palettes` tileset (boss = color4, …) |
-| void | `_VOID` fill | scrolling `Water_Background` buffer + water scenery scatter (§3.6) |
-| corridors | plain `_FLOOR` strip, 64 px wide | directional plank **bridge** (`Bridge_All.png`), drawn above nearby shoreline foam |
-| room boundary | 3 px grey `_WALL` rect border | autotile `edge_*` / `corner_*` tiles (+ foam at every sea-facing ground edge) |
-| shoreline foam | — | `Water_Foam` 16-frame animation above water but behind every prop/tile; three desynchronized spatial routines |
-| obstacles | filled + outlined circle (`Obstacle.color`, `.radius`) | scaled decoration rig (`deco_tree_*` / `deco_bush_*` / `deco_rock_*`); circle if a rig is missing. Trees also cast a round shade patch over the characters |
-| interior detail | — | seeded non-colliding clutter on room interiors (§3.6) |
-| obstacle / character order | fixed: map first, then all entities | **depth-sorted by feet Y** (§3.7) — a hero above a tree is drawn behind it |
-| draw cost | a few dozen `draw` calls | ~1 water blit + ~5 baked + ~30–60 foam + ~50 scatter + the sort ≈ 1–1.5 ms |
-| config flags | none | `TERRAIN_FOAM`, `TERRAIN_DECORATIONS`, `TERRAIN_DECOR`, `TERRAIN_SHADOWS` (each independent) |
+| terraces | one tinted rect per island | one baked, autotiled surface per terrace, composited band by band |
+| cliffs, flights | — (the elevation rule still applies) | cliff faces, stone flights, ramp wedges, drop shadows |
+| void | `_VOID` fill | scrolling water buffer + water scenery |
+| bridges | plain `_FLOOR` strip | directional plank bridge with end caps |
+| shoreline | 3 px `_WALL` border | autotile fringe + animated foam at every water-facing ground cell |
+| obstacles | filled circle | a decoration rig per biome; trees cast a round shade over the characters |
+| interior detail | — | seeded clutter per terrace, by biome |
+| draw order | map, then all entities | terrace bands with the depth-sorted sprites between them |
 
 **Guarantee:** an empty `assets/` still boots, generates, and plays every
 system — only the look changes to primitives.
@@ -430,34 +344,17 @@ system — only the look changes to primitives.
 
 ### Authored (non-procedural) levels
 
-`generate_world` is the only producer of a `WorldLayout` today, but the renderer
-and collision only consume the dataclass. A hand-authored layout — rooms /
-corridors as rects, obstacles, `start_id` / `boss_id` — dropped into a
-`WorldLayout` would render and play with **no renderer changes**.
-`terrain.json` stays the tile *vocabulary*; the authored file is the *where*.
-`slots` lets an authored map name tiles semantically instead of hand-placing
-indices.
+`generate_world` is the only producer of a `WorldLayout` today, but the
+runtime and the bake only consume the dataclass. A hand-authored layout —
+islands with a `grid`, bridges, obstacles, `start_id` / `boss_id` — dropped
+into a `WorldLayout` would render and play with no renderer change; run
+`gen/validate.py` over it first, and `assign_palettes` /
+`_build_inset_fields` if the palette and the inset field are not authored.
 
-### Tile layering / transparency — **shipped** (T6–T9)
+### A new tileset
 
-The baked room/corridor surfaces are `pygame.Surface(size, pygame.SRCALPHA)`
-(T6): the autotile `edge_*` / `corner_*` tiles keep their transparent
-water-facing side instead of baking it to black, so lower layers (water, foam,
-void scenery) show through the fringe with no black gaps.
-The water buffer stays opaque `.convert()` (bottom layer, biggest blit). On top
-of that:
-
-- **T7** — rooms snap to a 64 px grid so the autotile ring always completes;
-  corridors are directional plank **bridges** (`bridge` block), SRCALPHA, drawn
-  over the ground shoreline foam without producing plank-gap foam themselves.
-- **T8** — a data-driven `decorations` registry feeds a seeded non-colliding
-  scatter (interior clutter + void water scenery), drawn per frame between the
-  water and the terrain / above the terrain (§3.6).
-- **T9 / B3** — real animated tree skins for `tree` obstacles and a soft round
-  **tree shade** cast over the characters (B3 replaced the T9 per-obstacle
-  contact shadow).
-
-Blending two room palettes into one surface is now straightforward (the bake
-carries alpha) but not yet done — it would be another `decorations`-style slot
-list composited in `paint_room`. Full history: `../journals/assets_journal.md`
-"Terrain layering — T6–T10".
+Add the sheet to a topography's pool in `config.HEIGHTMAP_TOPOGRAPHIES`, name
+its biome in `sheet_biomes` (an unlisted sheet is its own biome, "unlike
+everything"), flag it `shoreline: false` in `sheet_flags` if its shore block
+has no surf, and give the biome a `scatter` mix, `decor` rates and a `trees`
+family in `biomes`. No code.

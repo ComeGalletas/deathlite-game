@@ -1,9 +1,6 @@
-"""World data model — the types `generate_world` produces and everything else
-reads.
-
-Split out of `world/procedural.py` (W0 of `journals/world_refactor.md`) so the
-generation *stages* and the *shape they build* live apart. `world.procedural`
-re-exports every name here, so `from world.procedural import Room` still works.
+"""World data model -- the types `generate_world` produces and everything else
+reads. `world.procedural` re-exports every name here, so
+`from world.procedural import Room` still works.
 """
 from __future__ import annotations
 
@@ -17,8 +14,8 @@ from game import config
 
 
 class Cell(NamedTuple):
-    """LD-9: one tile of a room's **height map**. Generation emits a grid of
-    these -- the machine-readable form of the ASCII layouts in the level-design
+    """One tile of a room's **height map**. Generation emits a grid of these
+    -- the machine-readable form of the ASCII layouts in the level-design
     journal -- and rendering is a pure function of the grid.
 
         `=` ground   walkable surface at `level`
@@ -46,22 +43,17 @@ WALKABLE_KINDS = frozenset({GROUND, VSTAIR, EWSTAIR})
 
 
 class TileMeta(NamedTuple):
-    """LD-2 E0: per-tile classification produced at world generation so the
-    renderer -- and any later system (per-floor decor, elevation tint, footstep
-    audio, minimap, drop gameplay) -- read one source of truth instead of
-    re-deriving it. Room cells carry these in `Room.tile_meta` (room-relative
-    keys); corridor / stair cells are synthesised by `WorldLayout.tile_at`."""
-    floor: int                 # 0..3
-    surface: str               # "room" | "corridor" | "stair"
+    """Per-tile classification produced at world generation so the renderer
+    -- and any later system (per-floor decor, footstep audio, minimap) --
+    read one source of truth instead of re-deriving it. Room cells carry
+    these in `Room.tile_meta` (room-relative keys); bridge cells are
+    synthesised by `WorldLayout.tile_at`."""
+    floor: int                 # the terrace level
+    surface: str               # "room" | "corridor"
     foam: bool                 # may this cell join the water shoreline (`_shore`)?
-    cliff: str = ""            # "" | "top" -- a raised room's south-rim cell (starts a cliff face)
-    cliff_var: str = ""        # "" | "left" | "mid" | "right" | "single" (run position)
-    lip: str = ""              # "" | any of "n"/"e"/"w" concatenated -- raised non-south exposed edges
-    room_id: int = -1          # owning room, or -1 for a corridor / stair cell
-    # LD-3: set on the single rim cell a ramp run starts at -- "w" or "e", the
-    # direction it descends. The run's own cells live in the cliff band, which
-    # is outside `Room.cells`, so the renderer and the nav layer walk the run
-    # out from here: `face_h` steps, one column and one row each.
+    room_id: int = -1          # owning room, or -1 for a bridge cell
+    # A flight cell: "s" for a straight north/south flight, "w" / "e" for an
+    # east/west one, the direction it descends. "" on ground.
     ramp: str = ""
 
 
@@ -69,42 +61,34 @@ class TileMeta(NamedTuple):
 class Room:
     id: int
     cell: tuple[int, int]
-    rect: pygame.Rect          # world-pixel bounding box of the floor
+    rect: pygame.Rect          # world-pixel bounding box of the island; tile-aligned
     kind: str
     neighbors: list[int] = field(default_factory=list)
-    floor: int = 0             # LD-1 elevation index (0 = ground); >0 only with WORLD_VERTICALITY
-    # Room-relative (col, row) tile coords that make up the floor. Relative
-    # because room rects are tile-*sized* but not world-tile-*aligned*. A plain
-    # rectangular room is the full W x H set; a shaped one has corner bites.
+    floor: int = 0             # the island's base level; always 0 today
+    # Room-relative (col, row) tiles a body may stand on: the walkable subset
+    # of `grid`. Collision and navigation read this and need to know nothing
+    # about levels.
     cells: frozenset = field(default_factory=frozenset)
-    tile_meta: dict = field(default_factory=dict)   # LD-2 E0: (col,row) -> TileMeta, room-relative
-    # LD-5: structure tiles this room owns that are outside `cells` -- a
-    # staircase-unit landing sitting in the cliff band, a plank end-cap. Folded
-    # into the room's autotiled shape so its edges connect flat. Empty unless
-    # config.STRUCT_ANNEX.
-    annex: frozenset = field(default_factory=frozenset)
-    # LD-9: the room's height map, `(col, row) -> Cell`, room-relative. Empty
-    # unless `config.HEIGHTMAP_ROOMS`. When set it is the source of truth for
-    # the room's shape, elevation and stairs -- `cells` is derived from it (the
-    # walkable subset) and `floor` is just its base level.
+    tile_meta: dict = field(default_factory=dict)   # (col,row) -> TileMeta, room-relative
+    # The island's height map, `(col, row) -> Cell`, room-relative. The source
+    # of truth for the room's shape, elevation and flights; `cells` is derived
+    # from it and `floor` is its base level.
     grid: dict = field(default_factory=dict)
-    # LD-10: the island's *shape* type -- "volcanic", "small", "boss". Separate
-    # from `kind`, which says what happens on it: a shrine can stand on a small
-    # island. Chosen once in `_assign_topography` and read by the room sizing,
-    # the coastline and the terrace count, so all three agree. Empty unless
-    # `config.HEIGHTMAP_ROOMS`.
+    # The island's *shape* type -- "volcanic", "small", "boss". Separate from
+    # `kind`, which says what happens on it: a shrine can stand on a small
+    # island. Chosen once in `assign_topography` and read by the room sizing,
+    # the coastline and the terrace count, so all three agree.
     topography: str = ""
-    # LD-10: `{level: sheet}` -- which ground tileset each terrace of this
-    # island wears. Decided at generation (`world/gen/biomes.py`) rather than
-    # at bake, because the obstacle scatter reads the biome as well as the tile
-    # painter does, and one authority is the point. Empty unless
-    # `config.HEIGHTMAP_ROOMS`.
+    # `{level: sheet}` -- which ground tileset each terrace wears. Decided at
+    # generation (`world/gen/biomes.py`), not at bake, because the obstacle
+    # scatter reads the biome as well as the tile painter does, and one
+    # authority is the point.
     palette: dict = field(default_factory=dict)
-    # The terrace inset field (`world/inset.py`): distance, per 8 px sample,
+    # The terrace inset field (`world/rules/inset.py`): distance, per 8 px sample,
     # from that point to the nearest floor of a different level. Built once
     # when the grid is final and before anything is baked, scattered or
     # spawned, so every later stage asks one authority how far inside its own
-    # terrace a point stands. `None` where the room has no level changes.
+    # terrace a point stands. `None` where the island has no level changes.
     inset: object = None
 
     @property
@@ -114,9 +98,9 @@ class Room:
 
     @property
     def center(self) -> pygame.Vector2:
-        """Bounding-box centre for a plain rectangle (unchanged); for a shaped
-        room, the floor centroid snapped to an occupied cell (a corner bite can
-        push the bbox centre into the void)."""
+        """The floor centroid snapped to an occupied cell -- the coastline can
+        put the bounding-box centre in a lake or over the sea. A room with no
+        mask yet (or a full one) answers its bounding-box centre."""
         px = config.TILE_PX
         w, h = self.tile_dims
         if not self.cells or len(self.cells) == w * h:
@@ -131,6 +115,8 @@ class Room:
 
 @dataclass
 class Corridor:
+    """A plank bridge between two islands. One tile wide; always at sea
+    level, because a bridge only ever lands on a beach."""
     a: int
     b: int
     rect: pygame.Rect          # collision span: room centre to room centre
@@ -143,39 +129,9 @@ class Corridor:
     end_high: str = "east"            # "east"  (h) | "south" (v)
     room_low: int = -1
     room_high: int = -1
-    # Cross-axis centre of the connection. This is selected from the rooms'
-    # shared tile-aligned edge span rather than always using both room centres.
+    # Cross-axis centre of the connection, chosen on the two islands'
+    # beaches by `_seat_corridors`.
     lane: int = 0
-
-
-@dataclass
-class Stair:
-    """LD-1: a cross-floor room link. Same role as a `Corridor` (it replaces one
-    on a tree edge whose rooms differ in `floor`) but 1-2 tiles wide and tagged
-    with the elevation change. `axis` is the run direction ("h" west/east, "v"
-    north/south); every system treats its `rect` as a plain walkable strip with
-    corridor-style clearance leniency."""
-    low_room: int
-    high_room: int
-    rect: pygame.Rect
-    axis: str = "h"
-    width_tiles: int = 1
-    d_floor: int = 1
-    # LD-3: set on the steps of a ramp run so a system can tell a staircase
-    # unit from a plank stair. Every step of one run shares its `low_room` /
-    # `high_room`. The value is the descent direction -- "s" for a vertical
-    # (N/S) unit, "w"/"e" for a horizontal (E/W) one. "" for an ordinary stair.
-    ramp: str = ""
-    # LD-8a-Phase1: the unit's orientation, decided at generation. "v" -- the
-    # rooms are stacked and the flight runs straight north->south; "h" -- the
-    # rooms sit side by side and the flight runs east<->west (the LD-4 unit with
-    # sideways landings). The renderer picks the tile layout / asset from this.
-    orient: str = "v"
-    # LD-8a: which staircase look this ramp unit renders with -- "rock" (the
-    # `vstairs.png` overlay, the N/S asset we have) or "grass" (a plain grass
-    # flight for "v"; the biome `slots.ramp` sideways ramp for "h"). Seeded per
-    # link in `_plan_ramps`; only meaningful when `ramp`.
-    style: str = "grass"
 
 
 @dataclass
@@ -187,19 +143,17 @@ class WorldLayout:
     start_id: int
     boss_id: int
     obstacles: list = field(default_factory=list)
-    stairs: list = field(default_factory=list)   # LD-1; empty without WORLD_VERTICALITY
 
     def room(self, rid: int) -> Room:
         return self.rooms[rid]
 
     def walkable_rects(self) -> list[pygame.Rect]:
-        return ([r.rect for r in self.rooms] + [c.rect for c in self.corridors]
-                + [s.rect for s in self.stairs])
+        return [r.rect for r in self.rooms] + [c.rect for c in self.corridors]
 
     def tile_at(self, wx: float, wy: float) -> "TileMeta | None":
-        """LD-2 E0: the `TileMeta` for the tile under a world point, or `None`
-        in the void. Room cells read from `Room.tile_meta` (room-relative key);
-        corridor / stair cells are uniform enough to synthesise here."""
+        """The `TileMeta` for the tile under a world point, or `None` in the
+        void. Room cells read from `Room.tile_meta` (room-relative key);
+        bridge cells are uniform enough to synthesise here."""
         px = config.TILE_PX
         for r in self.rooms:
             rr = r.rect
@@ -212,10 +166,6 @@ class WorldLayout:
             if c.rect.collidepoint(wx, wy):
                 f = self.rooms[c.a].floor
                 return TileMeta(floor=f, surface="corridor", foam=(f == 0))
-        for s in self.stairs:
-            if s.rect.collidepoint(wx, wy):
-                return TileMeta(floor=self.rooms[s.high_room].floor,
-                                surface="stair", foam=False)
         return None
 
     # --- graph queries (used by tests + gameplay) -----------------

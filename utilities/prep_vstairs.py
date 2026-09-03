@@ -6,7 +6,7 @@ big foliage bushes. The bushes are **not** wanted -- the vertical pathway is a
 bare stone flight that has to read against whatever biome grass surrounds it,
 so this crops the stone column only and drops the greenery.
 
-A vertical pathway spans one or two levels (`CLIFF_TILES` each), so two sprites
+A vertical pathway spans one or two levels (one cliff tile each), so two sprites
 are written, each one tile wide and cropped at its own aspect so the steps stay
 square-ish rather than being squashed by a runtime rescale:
 

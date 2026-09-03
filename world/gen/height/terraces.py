@@ -1,6 +1,6 @@
 """Stacking the plateaus: each cap is the one below it, eroded inward.
 
-Split out of `world/gen/heightmap.py`. The asymmetry in `_cap` is what makes a
+The asymmetry in `_cap` is what makes a
 mountain rather than a dome, and `_carve_canyons` is what stops the north of an
 island having no way up.
 """

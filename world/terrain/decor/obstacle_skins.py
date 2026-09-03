@@ -8,7 +8,7 @@ about.
 from __future__ import annotations
 
 from game import config
-from world import frontier
+from world.rules import frontier
 from world.terrain.decor.shadows import build_tree_shadows
 
 
@@ -32,7 +32,7 @@ def _routine_of(routines, o):
     trees in one grove differ and a rebake does not reshuffle them.
 
     Bucketed at half a tile rather than the foam's full tile: trees stand
-    closer together than shore patches do (`_TREE_TREE_GAP` is 22 px), and a
+    closer together than shore patches do (`_TREE_TREE_GAP_GRID` is 55 px), and a
     whole-tile bucket would hand a pair in the same tile the same clock.
     """
     key = (int(o.pos.x) // 32) * 31 + (int(o.pos.y) // 32) * 17
@@ -54,7 +54,7 @@ def build_obstacle_decor(store, a) -> None:
     offset and, for a tree, `fps` comes from its `tree_routines` entry rather
     than from the rig -- see `_tree_routines`.
 
-    LD-10: a biome may name its own `trees`, and an obstacle standing on that
+    A biome may name its own `trees`, and an obstacle standing on that
     biome indexes its variant into that list instead of the global one. The
     five tree rigs fall into two groups the eye reads immediately -- pines
     (1, 2, 5) and autumn crowns (3, 4) -- and mixing them across a terrace was
@@ -69,7 +69,7 @@ def build_obstacle_decor(store, a) -> None:
     boost = float(conf.get("size_boost", 1.25))
     render_radius = conf.get("render_radius", {})
     render_scale = conf.get("render_scale", {})
-    store._sprite_drop = {
+    store.sprite_drop = {
         kind: float(value)
         for kind, value in conf.get("sprite_drop", {}).items()
     }
@@ -111,7 +111,7 @@ def build_obstacle_decor(store, a) -> None:
                 fps, phase = _routine_of(routines, o)
             else:
                 phase = 0
-            store._decos[i] = (ax, ay, fps, frs, phase)
+            store.decos[i] = (ax, ay, fps, frs, phase)
 
     if config.TERRAIN_SHADOWS:
         build_tree_shadows(store, conf)

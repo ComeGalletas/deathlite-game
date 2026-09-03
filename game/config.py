@@ -42,38 +42,22 @@ SAVE_ENABLED: bool = True
 WORLD_WIDTH: int = 3200
 WORLD_HEIGHT: int = 3200
 
-# Procedural world (Phase 3): a lattice of chunk cells, one room per cell,
-# joined into a tree of corridors. See world/procedural.py.
-CHUNK_SIZE: int = 720
-WORLD_ROOM_COUNT: int = 16
 # World grid unit. Room rects and corridor widths are snapped to this so the
 # tiled renderer covers each cell exactly (terrain T7). Keep in sync with
 # data/terrain.json "tile_px" (Assets.tile uses that for sheet slicing).
 TILE_PX: int = 64
 
-# Rooms are tile-aligned irregular (rectilinear) polygons -- a rectangle with
-# 2-3-cell corner bites (L / T / plus / stepped) -- and their size varies more.
-# Off -> the old plain rectangles + old size band, for reproducing pinned-seed
-# layouts. See world/procedural.py (`Room.cells`, `_carve_room_shapes`).
-IRREGULAR_ROOMS: bool = True
-# Hard ceiling on one room's tile-cell count (a room can't eat the world); also
-# the cap for the deferred multi-chunk "large room" pass.
-ROOM_SIZE_MAX_CELLS: int = 160
-
-# --- LD-9: rooms are height maps ----------------------------------------
-# Each room gets a per-cell grid (`world/gen/heightmap.py`) with its own
-# terraces, cliffs and stairs, instead of one `floor` integer plus a cliff band
-# hanging off its south rim. Off -> the LD-8 model, byte-identical layouts.
+# --- Islands: rooms are height maps ----------------------------------------
+# Each room is an island: a per-cell grid (`world/gen/height/`) with its own
+# terraces, cliffs and flights. Nav and collision read the grid, so a flank
+# or a terrace's back edge is a wall and only a flight crosses it; the
+# obstacle scatter keeps flights clear; enemies have an aggro range and give
+# up, without which a flow field routes one the length of an island to reach
+# a player across a drop; and the field is bounded, without which a repath
+# on these large worlds cost 37.9 ms.
 #
-# On by default since phase D. What had to land first: nav and collision read
-# the grid (D0-D4), so a flank or a terrace's back edge is a wall and only a
-# flight crosses it; obstacle scatter keeps flights clear (D5); enemies have an
-# aggro range and give up (D7), without which a flow field routes one the length
-# of an island to reach a player across a drop; and the field is bounded (D9),
-# without which a repath on these much larger worlds cost 37.9 ms.
-HEIGHTMAP_ROOMS: bool = True
-# With the flag on: fewer, larger rooms, because a room now has to hold several
-# terraces and the walls between them. A terrace needs 3 walkable rows plus its
+# Fewer, larger rooms, because a room has to hold several terraces and the
+# walls between them. A terrace needs 3 walkable rows plus its
 # wall, so a room wants ~14 rows to carry three of them.
 # Big enough that the widest room still leaves a water gap to its neighbours --
 # rooms are islands, and overlapping ones would fuse into one landmass.
@@ -309,56 +293,6 @@ HEIGHTMAP_CAP_MIN_CELLS: int = 24
 HEIGHTMAP_CANYONS: int = 5
 HEIGHTMAP_CANYON_DEPTH: tuple = (4, 10)
 HEIGHTMAP_CANYON_WIDTH: tuple = (3, 5)
-
-# --- Layered verticality (journals/level_design_journal.md LD-1) ---------
-# Rooms carry a `floor` (0 = ground, up to 3). A cross-floor room link is a
-# `Stair` (1-2 tiles wide) instead of a plank `Corridor`; the raised room's
-# south edge grows a stone cliff-face skirt. Off -> every room stays floor 0,
-# no stairs, and the generated `WorldLayout` is byte-identical to the
-# pre-verticality world (reproduces pinned-seed layouts).
-WORLD_VERTICALITY: bool = True
-# LD-8 #2: one cliff-face tile per floor of elevation. Plateau face height is
-# the floor number, uncapped (floor 3 sits one tile above floor 2). A
-# cross-floor link therefore drops 1 tile (Delta 1) or 2 tiles (Delta 2); the
-# 2-floor-max connectivity rule keeps it from ever being deeper. Provisional --
-# raise back toward 2 if a 1-tile ledge clips character sprites too much.
-CLIFF_TILES: int = 1
-# Whether generation insets a raised room's walkable cells to make room for an
-# inset cliff face (LD-1 V5, render). Off for now: the plateau rim already
-# borders void, so pathing is correct without it, and an aggressive inset can
-# choke the flow field through a raised room. Turn on with the render pass.
-CLIFF_CARVE: bool = False
-
-# LD-3: replace the cross-floor plank "stair" with a sideways **ramp run** cut
-# into the cliff band -- `face_h` ramp pieces stepping one column and one row
-# each (see the level-design journal). Needs the two rooms in contact, so
-# generation snaps the low room's top edge to the plateau's cliff base; a pair
-# is skipped (and stays a bridge) when that move exceeds `RAMP_SNAP_TILES` or
-# the run's footprint does not fit. Off -> layouts are byte-identical to LD-2.
-RAMP_STAIRS: bool = True
-# How far a room may be moved to bring it flush with a cliff base, in tiles,
-# per floor of drop (a Delta 2 link is allowed twice this). Deliberately a
-# constant, not a literal: longer approaches later just raise it.
-RAMP_SNAP_TILES: int = 2
-# LD-8a: chance a cross-floor ramp unit renders as the rock `vstairs.png`
-# overlay instead of the biome grass sideways ramp, keyed by the plateau's
-# floor. A seeded per-link roll -- higher / rockier floors lean rock. Missing
-# floor -> the fallback below. Pure render tag; draws no world RNG.
-RAMP_ROCK_BIAS: dict = {1: 0.35, 2: 0.8, 3: 1.0}
-RAMP_ROCK_BIAS_DEFAULT: float = 0.5
-# LD-8 #1: chance a cross-floor link renders as the LD-4 **side-landing** unit
-# (stair column with a grass landing jogged one tile to each side) instead of a
-# straight one-column flight. Seeded per link; consumes no world RNG.
-RAMP_LANDING_BIAS: float = 0.4
-
-# LD-5: give every generation-placed tile that is in no room's cell mask (plank
-# planks, plank-stair strips, staircase-unit landings) an owning room, so it
-# draws in that room's palette and is folded into the room's autotiled shape.
-# Off -> `tile_meta` and the baked terrain are byte-identical to LD-4.
-STRUCT_ANNEX: bool = True
-# One plank stair in `STAIR_WIDE_EVERY` is 2 tiles wide (deterministic count,
-# no RNG). The rest are 1 wide. Both render as plank bridges.
-STAIR_WIDE_EVERY: int = 7
 
 # Animated shoreline foam where a room floor meets the water (terrain T3).
 # Off falls back to the baked autotile edge tiles alone.

@@ -1,11 +1,6 @@
-"""Decoration placement respects terrace frontiers (height-map worlds).
+"""Decoration placement respects terrace frontiers.
 
-The rules under test are all bake-time and all live on the `config.HEIGHTMAP_ROOMS`
-path, so this module pins that flag **on** -- the two older decor suites
-(`tests/rendering/test_terrain.py`, `tests/world/test_room_shapes.py`) pin it
-off to keep describing the flat LD-8 world, and neither can see a level change.
-
-What is actually at stake: an island's terraces bake into a *single* ground
+All bake-time rules, on the shared cached worlds. What is actually at stake: an island's terraces bake into a *single* ground
 surface, which is composited before any sprite is drawn. A prop standing below
 a terrace therefore paints over that terrace's tiles however the depth layer
 sorts it. Sorting cannot fix that; only not standing there can, which is why
@@ -21,36 +16,20 @@ import pygame
 
 from game import config
 from game.content import get_content
+from tests import worlds
 from world.map import GameMap
-from world import frontier as F
+from world.rules import frontier as F
 
 SEEDS = (35, 7, 1234)
 
-_SAVED = None
 
 
-def setUpModule():
-    global _SAVED
-    pygame.init()
-    if pygame.display.get_surface() is None:
-        pygame.display.set_mode((1, 1))
-    _SAVED = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = True
 
 
-def tearDownModule():
-    config.HEIGHTMAP_ROOMS = _SAVED
-
-
-_MAPS: dict = {}
 
 
 def _map(seed: int) -> GameMap:
-    if seed not in _MAPS:
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
-        _MAPS[seed] = gm
-    return _MAPS[seed]
+    return worlds.baked(seed)
 
 
 def _placed(gm):

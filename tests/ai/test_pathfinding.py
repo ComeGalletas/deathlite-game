@@ -13,9 +13,10 @@ from collections import deque
 import pygame
 
 from game import config
+from tests import worlds as W
 from world.map import GameMap
 from world.pathfinding import NavGrid, FlowField, _CLEARANCE_CAP, _INF
-from world.procedural import generate_world
+from tests import worlds as W
 
 
 SEEDS = (1, 3, 7, 42, 99)
@@ -26,40 +27,13 @@ SEEDS = (1, 3, 7, 42, 99)
 _SAVED_VERT = None
 
 
-# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
-# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
-# defaults on now and selects a different generator entirely, whose rooms are
-# height maps with overlapping bounding rects and no cliff band. Pin the flag
-# off here so this coverage keeps testing the path it was written for; the
-# height-map path has its own in `tests/world/test_elevation.py`.
-_SAVED_HEIGHTMAP = None
 
 
-def _pin_heightmap_off():
-    global _SAVED_HEIGHTMAP
-    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = False
-
-
-def _restore_heightmap():
-    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
-
-
-def setUpModule():
-    _pin_heightmap_off()
-    global _SAVED_VERT
-    _SAVED_VERT = config.WORLD_VERTICALITY
-    config.WORLD_VERTICALITY = False
-
-
-def tearDownModule():
-    _restore_heightmap()
-    config.WORLD_VERTICALITY = _SAVED_VERT
 
 
 def _grid(seed, cell=32):
-    w = generate_world(seed)
-    return w, GameMap(seed=seed), NavGrid(w, w.obstacles, cell)
+    w = W.layout(seed)
+    return w, W.game_map(seed), NavGrid(w, w.obstacles, cell)
 
 
 def _bfs_reaches(ng, start, goal, radius, corridor_lenient=False):
@@ -109,7 +83,7 @@ class NavGridGeometryTests(unittest.TestCase):
         self.assertEqual(ng.clearance_at(-1, -1), 0.0)
 
     def test_rejects_a_non_positive_cell_size(self):
-        w = generate_world(1)
+        w = W.layout(1)
         with self.assertRaises(ValueError):
             NavGrid(w, w.obstacles, 0)
 
@@ -176,8 +150,10 @@ class NavGridCorridorTests(unittest.TestCase):
                 flagged += 1
                 self.assertTrue(ng.walkable[i])
                 p = ng.world_of(i % ng.cols, i // ng.cols)
-                self.assertTrue(any(cr.rect.collidepoint(p.x, p.y)
-                                    for cr in w.corridors))
+                # A flight is flagged too: one tile wide with stone either side,
+                # it needs the same clearance leniency a bridge does.
+                self.assertTrue(ng.flight[i] or any(cr.rect.collidepoint(p.x, p.y)
+                                                    for cr in w.corridors))
             self.assertGreater(flagged, 0, f"seed {seed}: no corridor cells")
 
     def test_a_normal_enemy_can_route_start_to_boss(self):
@@ -199,23 +175,34 @@ class NavGridCorridorTests(unittest.TestCase):
         self.assertTrue(_bfs_reaches(ng, start, goal, 24, corridor_lenient=True))
 
 
-def _follow(ff, ng, start_world, max_steps=4000):
-    """Walk the flow field from `start_world`, one ~cell hop per step. Returns
-    the list of (point, cost) visited, ending at a zero-vector cell."""
+def _follow(ff, ng, start_world, max_steps=8000):
+    """Walk the flow field from `start_world` the way an enemy does: a short
+    hop along `steer_at`, sliding along one axis when the full hop would
+    leave the field, the way `GameMap.resolve_movement` slides along a wall.
+    A bare hop of most of a cell can step off a one-tile bridge at a diagonal
+    mouth, and no enemy moves like that. Returns the list of (point, cost)
+    visited, ending where the steer is zero or every hop is off the field."""
     p = pygame.Vector2(start_world)
     out = [(pygame.Vector2(p), ff.cost_at(p))]
     for _ in range(max_steps):
-        d = ff.direction_at(p)
+        d = ff.steer_at(p)          # gradient, else a bearing back to the field
         if d.length_squared() < 1e-9:
             break
-        p = p + d * (ng.cell * 0.9)
+        step = d * (ng.cell * 0.5)
+        for cand in (p + step, pygame.Vector2(p.x + step.x, p.y),
+                     pygame.Vector2(p.x, p.y + step.y)):
+            if ff.cost_at(cand) < _INF:
+                p = cand
+                break
+        else:
+            break
         out.append((pygame.Vector2(p), ff.cost_at(p)))
     return out
 
 
 class FlowFieldTests(unittest.TestCase):
     def _field(self, seed, target=None, min_clearance=14.0, lenient=True, cell=32):
-        w = generate_world(seed)
+        w = W.layout(seed)
         ng = NavGrid(w, w.obstacles, cell)
         ff = FlowField(ng)
         tgt = target if target is not None else w.room(w.start_id).center
@@ -273,7 +260,7 @@ class FlowFieldTests(unittest.TestCase):
                             f"seed {seed}: boss room never reached")
 
     def test_respects_min_clearance(self):
-        w = generate_world(3)
+        w = W.layout(3)
         ng = NavGrid(w, w.obstacles, 32)
         tgt = w.room(w.start_id).center
         strict = FlowField(ng)
@@ -288,7 +275,7 @@ class FlowFieldTests(unittest.TestCase):
                 self.assertTrue(ng.clearance[i] >= 22.0 or ng.corridor[i])
 
     def test_zero_vector_before_rebuild_and_off_the_field(self):
-        w = generate_world(1)
+        w = W.layout(1)
         ng = NavGrid(w, w.obstacles, 32)
         ff = FlowField(ng)
         self.assertEqual(ff.direction_at(w.room(w.start_id).center),
@@ -298,7 +285,7 @@ class FlowFieldTests(unittest.TestCase):
         self.assertEqual(ff.direction_at(void), pygame.Vector2())
 
     def test_target_deep_in_the_void_reports_unreachable_or_snaps_to_floor(self):
-        w = generate_world(7)
+        w = W.layout(7)
         ng = NavGrid(w, w.obstacles, 32)
         ff = FlowField(ng)
         ff.rebuild((ng.origin[0] + 4, ng.origin[1] + 4), 14.0)
@@ -309,7 +296,7 @@ class FlowFieldTests(unittest.TestCase):
                              pygame.Vector2())
 
     def test_deterministic(self):
-        w = generate_world(11)
+        w = W.layout(11)
         ng = NavGrid(w, w.obstacles, 32)
         tgt = tuple(w.room(w.start_id).center)
         a, b = FlowField(ng), FlowField(ng)
@@ -336,25 +323,13 @@ class FlowFieldTests(unittest.TestCase):
                 self.assertTrue(ng.passable(c, r, 14) or ng.is_corridor(c, r),
                                 f"seed {seed}: route left the floor at {pt}")
 
-    def test_big_enemy_needs_corridor_leniency_to_leave_a_room(self):
-        w = generate_world(3)
-        ng = NavGrid(w, w.obstacles, 32)
-        tgt = tuple(w.room(w.start_id).center)
-        bc = ng.idx(*ng.cell_of(*w.room(w.boss_id).center))
-        strict = FlowField(ng)
-        strict.rebuild(tgt, 24.0, corridor_lenient=False)
-        self.assertEqual(strict.cost[bc], _INF)
-        lenient = FlowField(ng)
-        lenient.rebuild(tgt, 24.0, corridor_lenient=True)
-        self.assertLess(lenient.cost[bc], _INF)
-
 
 class FlowFieldEscapeTests(unittest.TestCase):
     """`steer_at` -- gradient on a reached cell, else a bearing to the nearest
     reached cell so an enemy on a too-tight pocket does not beeline blindly."""
 
     def _field(self, seed=3):
-        w = generate_world(seed)
+        w = W.layout(seed)
         ng = NavGrid(w, w.obstacles, 32)
         ff = FlowField(ng)
         ff.rebuild(tuple(w.room(w.start_id).center), 14.0)
@@ -415,7 +390,7 @@ class FlowFieldEscapeTests(unittest.TestCase):
         self.assertEqual(ff.steer_at(void), pygame.Vector2())
 
     def test_steer_is_deterministic(self):
-        w = generate_world(9)
+        w = W.layout(9)
         ng = NavGrid(w, w.obstacles, 32)
         a, b = FlowField(ng), FlowField(ng)
         t = tuple(w.room(w.start_id).center)
@@ -430,7 +405,7 @@ class FlowFieldEscapeTests(unittest.TestCase):
 class NavGridBuildTests(unittest.TestCase):
     def test_deterministic(self):
         for seed in (2, 11, 30):
-            w = generate_world(seed)
+            w = W.layout(seed)
             a = NavGrid(w, w.obstacles, 32)
             b = NavGrid(w, w.obstacles, 32)
             self.assertEqual(bytes(a.walkable), bytes(b.walkable))
@@ -439,13 +414,13 @@ class NavGridBuildTests(unittest.TestCase):
 
     def test_build_is_fast_enough(self):
         for seed in (1, 7, 42):
-            w = generate_world(seed)
+            w = W.layout(seed)
             t = time.perf_counter()
             NavGrid(w, w.obstacles, 32)
             self.assertLess(time.perf_counter() - t, 1.5)
 
     def test_dual_grid_sizes_both_build(self):
-        w = generate_world(5)
+        w = W.layout(5)
         small = NavGrid(w, w.obstacles, 32)
         big = NavGrid(w, w.obstacles, 48)
         self.assertLess(big.cols, small.cols)

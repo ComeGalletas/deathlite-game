@@ -30,7 +30,7 @@ def build_tree_shadows(store, conf: dict) -> None:
         return cache[r]
 
     for i, o in enumerate(store.obstacles):
-        if o.kind == "tree" and i in store._decos:
+        if o.kind == "tree" and i in store.decos:
             draw_r = float(render_radius.get(o.kind, o.radius))
             r = max(1, round(draw_r * rs) + padding)
-            store._tree_shadows[i] = (o.pos.x, o.pos.y, r, disc(r))
+            store.tree_shadows[i] = (o.pos.x, o.pos.y, r, disc(r))

@@ -25,34 +25,18 @@ import pygame
 
 from game import config
 from game.content import get_content
-from world import frontier as F
+from world.rules import frontier as F
+from tests import worlds
 from world.map import GameMap
 from world.terrain import decor as D
 
 SEEDS = (35, 7, 1234)
-_SAVED = None
-_MAPS: dict = {}
 
 
-def setUpModule():
-    global _SAVED
-    pygame.init()
-    if pygame.display.get_surface() is None:
-        pygame.display.set_mode((1, 1))
-    _SAVED = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = True
-
-
-def tearDownModule():
-    config.HEIGHTMAP_ROOMS = _SAVED
 
 
 def _map(seed: int) -> GameMap:
-    if seed not in _MAPS:
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
-        _MAPS[seed] = gm
-    return _MAPS[seed]
+    return worlds.baked(seed)
 
 
 def _room_entries():
