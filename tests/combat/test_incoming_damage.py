@@ -40,7 +40,8 @@ def _run(hero_index=0):
     for _ in range(hero_index):
         _key(game, pygame.K_RIGHT)
     _key(game, pygame.K_RETURN)               # -> playing
-    p = game.state_machine.current
+    from tests.boot import settle
+    p = settle(game)                  # through the loading screen
     assert isinstance(p, PlayingState)
     p.player.weapons = []                     # silence the hero's own attacks
     p.player.invulnerable = False

@@ -56,7 +56,8 @@ class HeroDamageTests(unittest.TestCase):
         for _ in range(2):
             g.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        p = g.state_machine.current
+        from tests.boot import settle
+        p = settle(g)                  # through the loading screen
         assert isinstance(p, PlayingState)
 
         before = len(p.damage_numbers)

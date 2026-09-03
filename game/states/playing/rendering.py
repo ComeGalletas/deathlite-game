@@ -31,6 +31,7 @@ _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
                 "shock": (255, 230, 120)}
 _HIT_TINT = (150, 30, 30)
 _KNOCK_VEC_SCALE = 0.15     # dev overlay: `_knock` px/s -> screen px line length
+_SPAWN_MARK_PX = 6          # dev overlay: half-size of a spawn-point mark, world px
 
 
 def hit_tinted(frame):
@@ -382,6 +383,51 @@ class WorldRenderer:
             draw_projectile(surface, sx, sy, p, ctx, default="arrow")
 
     # --- dev overlay -------------------------------------------
+    def spawn_point_overlay(self, surface) -> None:
+        """Dev-mode: every spawn point and resource anchor the generator
+        decided, read straight off the layout. Enemy points are diamonds
+        (bright for the large class, dim for small-only), resource anchors
+        squares, each with its floor number. Toggle with F8 or the dev
+        menu's 'Spawn points' row. Same shape as `collider_overlay`."""
+        ps = self.ps
+        if not (ps.dev_mode and ps._dev_show_spawn_points):
+            return
+        layout = ps.game_map.layout
+        if layout is None:
+            return
+        cam = ps.camera
+        z = cam.zoom
+        view = cam.visible_rect().inflate(200, 200)
+        font = fonts.mono(10)
+        half = max(3, round(_SPAWN_MARK_PX * z))
+
+        def label(sx, sy, text, col):
+            surface.blit(font.render(text, True, col), (sx + half + 2, sy - 6))
+
+        placement = ps.spawn.master.placement
+        now = ps.stats["time"]
+        for p in layout.spawn_points:
+            if not view.collidepoint(p.x, p.y):
+                continue
+            sx, sy = cam.world_to_screen(p.pos)
+            sx, sy = int(sx), int(sy)
+            col = (config.COLOR_DEBUG_SPAWN if p.clearance == "large"
+                   else config.COLOR_DEBUG_SPAWN_SMALL)
+            if placement.on_cooldown(p, now):        # just used: dimmed
+                col = tuple(c // 3 for c in col)
+            pygame.draw.polygon(surface, col, ((sx, sy - half), (sx + half, sy),
+                                               (sx, sy + half), (sx - half, sy)), 2)
+            label(sx, sy, str(p.floor), col)
+        for p in layout.resource_points:
+            if not view.collidepoint(p.x, p.y):
+                continue
+            sx, sy = cam.world_to_screen(p.pos)
+            sx, sy = int(sx), int(sy)
+            col = config.COLOR_DEBUG_RESOURCE
+            pygame.draw.rect(surface, col,
+                             pygame.Rect(sx - half, sy - half, 2 * half, 2 * half), 2)
+            label(sx, sy, f"{p.floor} {p.kind[0]}", col)
+
     def collider_overlay(self, surface) -> None:
         """Dev-mode: every true circular collider / hitbox in one pass, read
         straight off the fields the physics uses. Toggle with F7 or the dev

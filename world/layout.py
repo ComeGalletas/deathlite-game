@@ -134,6 +134,44 @@ class Corridor:
     lane: int = 0
 
 
+class SpawnPoint(NamedTuple):
+    """A spot an enemy may materialise on, decided at generation
+    (`world/gen/spawnpoints.py`) so the run never searches for one.
+
+    `clearance` is the widest navigation class that fits: `"large"` seats
+    any body in the game, `"small"` only the common ones. `tags` describe
+    the spot for the placement rules that come later: `"upper"` (a terrace
+    above sea level), `"edge"` (near the coast), `"bridge"` (near a bridge
+    mouth), `"boss"` (in the boss island, for the fight's adds only).
+    """
+    room_id: int
+    floor: int
+    x: float
+    y: float
+    clearance: str = "large"
+    tags: frozenset = frozenset()
+
+    @property
+    def pos(self) -> pygame.Vector2:
+        return pygame.Vector2(self.x, self.y)
+
+
+class ResourcePoint(NamedTuple):
+    """An anchor for something to be found rather than fought -- a chest,
+    a breakable, an ambient pickup. Emitted at generation next to the spawn
+    points; nothing consumes them yet. `kind` is a hint drawn per point:
+    `"chest"`, `"breakable"` or `"ambient"`."""
+    room_id: int
+    floor: int
+    x: float
+    y: float
+    kind: str = "ambient"
+
+    @property
+    def pos(self) -> pygame.Vector2:
+        return pygame.Vector2(self.x, self.y)
+
+
 @dataclass
 class WorldLayout:
     seed: int
@@ -143,6 +181,9 @@ class WorldLayout:
     start_id: int
     boss_id: int
     obstacles: list = field(default_factory=list)
+    # Decided last, once the obstacles are final (`world/gen/spawnpoints.py`).
+    spawn_points: list = field(default_factory=list)
+    resource_points: list = field(default_factory=list)
 
     def room(self, rid: int) -> Room:
         return self.rooms[rid]

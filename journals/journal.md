@@ -2724,3 +2724,63 @@ tense.
 **Verified:** default tier 855 passed / 1 skipped, sweep tier 7 passed,
 `python -m unittest discover -s tests -t .` green; the world byte-identical to
 `b0114d6` for every pinned seed. Nothing committed.
+
+---
+
+## Planned Phase -- Loading screen for world generation (2026-09-02)
+
+**Brief.** After ENTER on the hero-select screen, and on the developer menu's
+"restart run", show a dark screen with the text "Loading..." and the chosen
+hero's sprite playing its movement animation in place, until the world is
+ready; then drop straight into the run. Nothing else on the screen.
+
+**Why.** `PlayingState.enter` builds the world synchronously -- `GameMap`
+~1.5 s, `NavField` ~0.5 s, and the terrain bake ~2.5 s on the first draw --
+so the frame freezes for four to five seconds after ENTER, and the browser
+build's tab hangs with it. The loop is single-threaded and pygbag has no
+threads (pygame surfaces have to be baked on the main thread anyway), so the
+sprite can only animate if the work is done in slices between frames.
+
+**Design.**
+
+1. Slice the work. `world/gen/__init__.py` gains `generate_world_steps(seed,
+   settings)`, a generator yielding after each stage (tree and rects, one
+   yield per island height map, bridges, palettes, one per island inset field,
+   scatter, repair); `generate_world` runs every step, so the RNG order and the
+   pinned digests do not move. Likewise `bake_steps(layout)` in
+   `world/terrain/bake.py` (one yield per island, then the decor passes) and
+   the two navigation classes. Steps run 50-350 ms; the loading state may run
+   several small ones per frame up to a ~30 ms budget.
+2. `game/states/loading_state.py`: `LoadingState`, entered with the same
+   keywords `PlayingState` takes. Each frame it advances a step, updates an
+   `Animator` on the hero's rig with its movement animation (`walk` -- the rigs
+   have `idle` / `walk` / `attack`), and draws a dark fill, "Loading..." centred
+   in the heading font, and the sprite in place below it. A hero with no rig
+   draws the run's primitive circle instead.
+3. Handoff: on the last step, `state_machine.change(PlayingState, ...,
+   prebuilt=...)`; `PlayingState.enter` uses the baked map and the nav field
+   it is handed and otherwise builds as today, so tests and any other caller
+   keep working. `character_select_state` and `_restart_dev_run` both go
+   through `LoadingState`.
+4. Tests: the loading state with fake steps; one driving it to completion and
+   asserting the run starts with a baked map; the smoke test's state walk
+   extended by one state; the digest tests unchanged.
+
+**Files.** `world/gen/__init__.py`, `world/terrain/bake.py`, `world/map.py`,
+`game/states/playing/state.py`, `game/states/character_select_state.py`, the
+new state and its test.
+
+**Status.** DONE (2026-09-02). Landed as designed, with two details decided
+on the way: the hero runs **in place** (its `walk` animation -- the rigs have
+`idle` / `walk` / `attack`), and the dev-menu restart keeps passing no
+difficulty, exactly as before. `generate_world_steps` yields 22 labels a
+world (lattice, placement, nine islands, bridges, nine terrace fields,
+obstacles, repair) and `bake_steps` fourteen (nine islands, bridges, water,
+skins, clutter, water scenery); `generate_world` and `bake` drive them to the
+end, and the pinned layout / bake / frame digests did not move. `GameMap`
+accepts a prebuilt `layout`; `PlayingState.enter(prebuilt=...)` takes the
+baked map and the nav field. Tests: `tests/core/test_loading.py` (hands over
+a baked world under the same seed and the same digest, the sprite advances,
+the screen is dark with text and hero, the dev restart loads too);
+`tests/boot.settle` drives the loader for the eight test helpers that walk
+the menu into a run.

@@ -622,6 +622,8 @@ class PhaseTests(unittest.TestCase):
         have landed, so this is now a fence rather than a gate: a further
         reader is a decision, not an accident. (`floor.py` is the collider
         and the nav grid reading through one body, not a fifth phase.)
+        Spawn master S1 (`spawnpoints.py`) is such a decision: a spawn
+        point keeps the same margin a body does, asked of the same field.
         """
         import pathlib
         readers = set()
@@ -638,7 +640,8 @@ class PhaseTests(unittest.TestCase):
         readers.discard("inset.py")
         self.assertEqual(
             readers,
-            {"islands.py", "frontier.py", "floor.py", "map.py", "lattice.py"},
+            {"__init__.py", "frontier.py", "floor.py", "map.py", "lattice.py",
+             "spawnpoints.py"},
                          f"unexpected readers of the inset field: {readers}")
 
 

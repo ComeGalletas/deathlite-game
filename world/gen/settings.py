@@ -54,6 +54,7 @@ _KEYS = {
     "shortcut_gap": "HEIGHTMAP_SHORTCUT_GAP",
     "unseal": "HEIGHTMAP_UNSEAL",
     "buildings": "TERRAIN_BUILDINGS",
+    "spawn_points_per_floor": "SPAWN_POINTS_PER_FLOOR",
 }
 
 
@@ -90,6 +91,7 @@ class GenSettings:
     shortcut_gap: int
     unseal: bool
     buildings: bool
+    spawn_points_per_floor: int
 
     @classmethod
     def from_config(cls, **overrides) -> "GenSettings":

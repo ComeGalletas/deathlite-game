@@ -34,8 +34,10 @@ _ESCAPE_DIRS = ((1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0),
 
 
 class GameMap:
-    def __init__(self, seed: int | None = None) -> None:
-        if seed is None:
+    def __init__(self, seed: int | None = None, *, layout: WorldLayout | None = None) -> None:
+        """`seed` generates the world here; `layout` hands one in that was
+        generated elsewhere (the loading screen, a step at a time)."""
+        if seed is None and layout is None:
             self.layout: WorldLayout | None = None
             self._levels = None
             self.width = config.WORLD_WIDTH
@@ -43,7 +45,7 @@ class GameMap:
             self._rects = [pygame.Rect(0, 0, self.width, self.height)]
             self.obstacles = []
         else:
-            self.layout = generate_world(seed)
+            self.layout = layout if layout is not None else generate_world(seed)
             b = self.layout.bounds
             self.width, self.height = b.width, b.height
             self._rects = self.layout.walkable_rects()
@@ -262,7 +264,11 @@ class GameMap:
     def offscreen_spawn_point(self, camera, rng: random.Random) -> pygame.Vector2:
         """A walkable point just outside the view: prefer the closest rooms that
         are not fully on screen, so pressure stays on the player even though the
-        world is large."""
+        world is large.
+
+        Since spawn master S3 this is the **fallback** only -- the world with
+        no layout, or one generated with no spawn points. A generated world
+        places on its `layout.spawn_points` (`spawn/placement.py`)."""
         view = camera.visible_rect()
         vc = pygame.Vector2(view.center)
 

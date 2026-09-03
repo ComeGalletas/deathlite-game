@@ -33,18 +33,36 @@ from world.gen.graph import assign_topography, _distances, _assign_kinds
 from world.gen.links import _connection_lane
 from world.gen.repair import unseal
 from world.gen.bridges import _seat_corridors
-from world.gen.islands import (_build_room_grids, _grid_tile_meta,
-                               _build_inset_fields)
+from world.gen.islands import build_island, island_caps, _grid_tile_meta
 from world.gen.placement import _resize_by_topography, _offset_in_chunk
 from world.gen.biomes import assign_palettes
 from world.gen.scatter import _scatter_obstacles
 from world.gen.settings import GenSettings, settings_or_config
+from world.gen.spawnpoints import place_points
+from world.rules.inset import build as build_inset
 
-__all__ = ["generate_world"]
+__all__ = ["generate_world", "generate_world_steps"]
 
 
 def generate_world(seed: int, room_count: int | None = None,
                    settings: GenSettings | None = None) -> WorldLayout:
+    """The whole pipeline in one call."""
+    steps = generate_world_steps(seed, room_count, settings)
+    while True:
+        try:
+            next(steps)
+        except StopIteration as done:
+            return done.value
+
+
+def generate_world_steps(seed: int, room_count: int | None = None,
+                         settings: GenSettings | None = None):
+    """The pipeline as a generator: it yields a label after every stage
+    (one per island for the height maps and the inset fields, the two
+    expensive ones) and *returns* the `WorldLayout` when it is exhausted.
+    The loading screen drives it one step per frame so the hero keeps
+    animating; `generate_world` drives it to the end. Both consume the RNG
+    in exactly the same order, which the pinned digests check."""
     settings = settings_or_config(settings)
     rng = random.Random(seed)
     px = config.TILE_PX
@@ -74,6 +92,7 @@ def generate_world(seed: int, room_count: int | None = None,
         occupied[new_cell] = new_id
         order.append(new_cell)
         edges.append((occupied[parent], new_id))
+    yield "lattice"
 
     # --- one island rect per cell --------------------------------
     # Tile-sized, and snapped to the *world* tile lattice, not merely centred
@@ -137,6 +156,7 @@ def generate_world(seed: int, room_count: int | None = None,
     assign_topography(rooms, rng, boss_id, settings)
     _resize_by_topography(rooms, settings)
     _offset_in_chunk(rooms, chunk, rng)
+    yield "islands placed"
 
     # --- height maps ---------------------------------------------
     # The coastline in `_build_room_grids` overwrites `cells` wholesale; the
@@ -148,10 +168,16 @@ def generate_world(seed: int, room_count: int | None = None,
     # how far inside its own terrace a point stands.
     for room in rooms:
         room.cells = _full_cells(*room.tile_dims)
-    _build_room_grids(rooms, corridors, rng, settings)
+    caps = island_caps(rooms, corridors)
+    for room in rooms:
+        build_island(room, rng, caps[room.id], settings)
+        yield f"island {room.id + 1} of {len(rooms)}"
     corridors = _seat_corridors(rooms, corridors, seed, settings)
+    yield "bridges"
     assign_palettes(rooms, seed, settings)
-    _build_inset_fields(rooms)
+    for room in rooms:
+        room.inset = build_inset(room, px)
+        yield f"terraces {room.id + 1} of {len(rooms)}"
 
     # --- bounds (union of everything + margin) ---------------
     union = rooms[0].rect.copy()
@@ -175,6 +201,7 @@ def generate_world(seed: int, room_count: int | None = None,
     # bridge-mouth keep-clear rects match the world the game sees.
     obstacles = _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
                                    settings)
+    yield "obstacles"
 
     # Per-tile classification, a straight projection of the finished grids.
     # Reads only finalised geometry and draws no RNG.
@@ -188,4 +215,11 @@ def generate_world(seed: int, room_count: int | None = None,
     # `world/gen/repair.py`.
     if settings.unseal:
         unseal(layout)
+        yield "repair"
+    # Spawn points and resource anchors, last of all: they are tested against
+    # the obstacles as the repair left them and the lattice the game steers
+    # on. Their only RNG is private (keyed by seed and island), so this
+    # stage moves nothing above it. See `world/gen/spawnpoints.py`.
+    for room in place_points(layout, settings):
+        yield f"spawn points {room.id + 1} of {len(rooms)}"
     return layout

@@ -112,8 +112,11 @@ class SpecialLocations:
                 for _ in range(3):
                     off = pygame.Vector2(ps.rng.uniform(-90, 90),
                                          ps.rng.uniform(-90, 90))
-                    ps.spawn.spawn_enemy("elite", at=it.pos + off)
-                    it.arena_ids.add(id(ps.enemies[-1]))
+                    # Scripted: the spawn master seats arena elites whatever
+                    # the live cap says (`owners.cap_exempt` in the tables).
+                    e = ps.spawn.spawn_enemy("elite", at=it.pos + off, owner="arena")
+                    if e is not None:
+                        it.arena_ids.add(id(e))
                 ps._boss_warning_t = 1.6
                 ps._boss_name = "Elite Arena"
             elif it.state == "active":

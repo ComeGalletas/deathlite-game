@@ -105,6 +105,8 @@ class Enemy:
 
     # --- per-frame ------------------------------------------------
     def update(self, ctx) -> None:
+        """One frame -- or, under the spawn master's tick LOD, one frame
+        whose `ctx.dt` spans the frames this enemy sat out."""
         self.contact_damage = self._base_contact
         self.contact_cd = max(0.0, self.contact_cd - ctx.dt)
         self._behavior.tick(self, ctx, ctx)          # ctx satisfies Perception + Combat
