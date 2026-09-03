@@ -12,7 +12,7 @@ from __future__ import annotations
 # sprite / tile. 16:9.
 SCREEN_WIDTH: int = 1600
 SCREEN_HEIGHT: int = 900
-FPS: int = 60
+FPS: int = 61
 TITLE: str = "Death Lite Game"
 
 # Largest delta time (seconds) a single frame is allowed to represent. Without
