@@ -1,8 +1,7 @@
 """What connects to what, and whether the grid is legal.
 
-Split out of `world/gen/heightmap.py`. `walk_links` is the authority on
-adjacency -- `world/elevation.py` mirrors it at runtime rather than deriving its
-own -- and `check_grid` is the list of invariants every generated room has to
+`walk_links` is the authority on adjacency -- `world/rules/steps.py` mirrors
+it at runtime rather than deriving its own -- and `check_grid` is the list of invariants every generated room has to
 satisfy.
 """
 from __future__ import annotations
@@ -75,7 +74,7 @@ def walk_links(grid, pos) -> list:
         # the diagonal from the low ground to the high ground past the
         # crossing, never standing on it, because `can_step` only asked whether
         # one right-angle detour was open end to end. It asks something else as
-        # well now -- `elevation.diagonal_blocked` refuses any diagonal between
+        # well now -- `steps.diagonal_blocked` refuses any diagonal between
         # two ground tiles of different levels, which is where that move was
         # actually wrong -- so the reach is safe and the wall it used to cost
         # is gone.
@@ -202,14 +201,13 @@ def check_grid(grid) -> list[str]:
         if cell.kind in (VSTAIR, EWSTAIR):
             if cell.drop > MAX_DROP:
                 bad.append(f"stair drop {cell.drop} at ({c},{r})")
-            # a flight must meet other levels only at its own two ends
-            ends = set(walk_links(grid, (c, r)))
-            for p in ((c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)):
-                nb = grid.get(p)
-                if (nb is not None and nb.kind == GROUND
-                        and nb.level != cell.level and p not in ends):
-                    bad.append(f"flight at ({c},{r}) is open to level "
-                               f"{nb.level} at its side")
+            # A flight *links* other levels only at its ends (`walk_links`
+            # says where), but it may well *touch* one at its side: a flight
+            # cut on a plateau's flank has the lower terrace beside it with
+            # no stone between, exactly as the flank itself does everywhere
+            # else, and the step rule refuses that edge the same way. The
+            # old band-era check that flagged the touch is gone; the link
+            # rule is what the runtime mirrors and the elevation tests pin.
     walk = {p for p, cell in grid.items() if cell.kind in WALKABLE_KINDS}
     if walk and reachable(grid) != walk:
         bad.append(f"{len(walk - reachable(grid))} unreachable walkable cells")

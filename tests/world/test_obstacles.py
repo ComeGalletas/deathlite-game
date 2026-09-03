@@ -1,50 +1,22 @@
-"""Milestone 9: obstacles -- collision, projectile blocking, deterministic
-placement that keeps rooms navigable (spec 5.3)."""
+"""Obstacles: collision, projectile blocking, and a scatter that keeps the
+world navigable.
+
+The collision tests use the layout-less `GameMap()` -- one big room, no
+procedural obstacles -- and place their own. The scatter tests read the
+shared cached worlds. Determinism is `test_digest.py`'s job; that every
+island is scattered and that the start and boss islands keep their clear
+discs is `test_repair.py`'s.
+"""
 import unittest
 
 import pygame
 
-from game import config
 from entities.obstacle import Obstacle
+from game import config
+from tests import worlds as W
+from world.gen.tuning import _GRID_CLEAR_RADIUS
 from world.map import GameMap
-from world.procedural import SPECIAL_KINDS, generate_world
-
-
-# Pinned-seed obstacle-scatter assertions run against the flat base layout;
-# LD-1 verticality shifts the RNG stream. Verticality's own stair keep-clear is
-# checked in tests/world/test_verticality.py.
-_SAVED_VERT = None
-
-
-# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
-# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
-# defaults on now and selects a different generator entirely, whose rooms are
-# height maps with overlapping bounding rects and no cliff band. Pin the flag
-# off here so this coverage keeps testing the path it was written for; the
-# height-map path has its own in `tests/world/test_elevation.py`.
-_SAVED_HEIGHTMAP = None
-
-
-def _pin_heightmap_off():
-    global _SAVED_HEIGHTMAP
-    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = False
-
-
-def _restore_heightmap():
-    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
-
-
-def setUpModule():
-    _pin_heightmap_off()
-    global _SAVED_VERT
-    _SAVED_VERT = config.WORLD_VERTICALITY
-    config.WORLD_VERTICALITY = False
-
-
-def tearDownModule():
-    _restore_heightmap()
-    config.WORLD_VERTICALITY = _SAVED_VERT
+from world.procedural import SPECIAL_KINDS, _corridor_doorways
 
 
 class ObstacleCollisionTests(unittest.TestCase):
@@ -109,69 +81,82 @@ class ObstacleCollisionTests(unittest.TestCase):
 
 
 class ObstacleGenerationTests(unittest.TestCase):
-    def test_deterministic_with_seed(self):
-        a = generate_world(77).obstacles
-        b = generate_world(77).obstacles
-        self.assertEqual([(o.kind, tuple(o.pos)) for o in a],
-                         [(o.kind, tuple(o.pos)) for o in b])
-
-    def test_none_in_start_or_boss_room(self):
-        w = generate_world(5)
-        for rid in (w.start_id, w.boss_id):
-            r = w.room(rid).rect
-            self.assertFalse(any(r.collidepoint(o.pos.x, o.pos.y)
-                                 for o in w.obstacles))
-
-    def test_special_room_centres_kept_clear(self):
-        for seed in (5, 9, 42):
-            w = generate_world(seed)
-            for room in w.rooms:
-                if room.kind not in SPECIAL_KINDS:
-                    continue                       # combat rooms may fill the middle
-                cx, cy = room.rect.center
-                clear = min(room.rect.width, room.rect.height) * 0.2
-                for o in w.obstacles:
-                    if (o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2 < clear ** 2:
-                        self.fail(f"obstacle blocks the centre of {room.kind} "
-                                  f"room {room.id} (seed {seed})")
-
-    def test_combat_rooms_may_place_obstacles_near_the_centre(self):
-        seen = False
-        for seed in range(30):
-            w = generate_world(seed)
-            for room in w.rooms:
-                if room.kind != "combat":
-                    continue
-                cx, cy = room.rect.center
-                near = min(room.rect.width, room.rect.height) * 0.15
-                if any((o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2 < near ** 2
-                       for o in w.obstacles):
-                    seen = True
-        self.assertTrue(seen, "no combat room ever placed an obstacle mid-room")
-
     def test_some_obstacles_exist(self):
-        self.assertGreater(len(generate_world(1).obstacles), 5)
+        for seed in W.SEEDS:
+            self.assertGreater(len(W.layout(seed).obstacles), 5, f"seed {seed}")
 
-    def test_no_obstacle_on_a_corridor_doorway_tile(self):
-        from world.procedural import _corridor_doorways
-        px = 64
-        for seed in (1, 3, 7, 9, 42, 77, 123):
-            w = generate_world(seed)
-            slabs = _corridor_doorways(w.rooms, w.corridors)
-            door_tiles = [d.inflate(-2 * px, -2 * px)          # back to the bare 64px cell
-                          for lst in slabs.values() for d in lst]
-            for o in w.obstacles:
-                for tile in door_tiles:
-                    if tile.width > 0 and tile.collidepoint(o.pos.x, o.pos.y):
-                        self.fail(f"seed {seed}: {o.kind} sits on a corridor doorway")
+    def test_every_obstacle_stands_on_a_floor_cell(self):
+        for seed in W.SEEDS:
+            gm = W.game_map(seed)
+            for o in gm.obstacles:
+                self.assertTrue(gm._point_ok(o.pos.x, o.pos.y),
+                                f"seed {seed}: {o.kind} at {tuple(o.pos)} is off "
+                                f"the floor")
 
-    def test_doorway_clearance_leaves_combat_rooms_populated(self):
-        w = generate_world(9)
-        combat = [r for r in w.rooms if r.kind == "combat"]
-        with_obstacles = sum(
-            1 for r in combat
-            if any(r.rect.collidepoint(o.pos.x, o.pos.y) for o in w.obstacles))
-        self.assertGreaterEqual(with_obstacles, max(1, len(combat) - 1))
+    def test_special_island_centres_keep_a_clear_disc(self):
+        """A special island (shrine, altar, ...) keeps `_GRID_CLEAR_RADIUS`
+        round its centre so the interactable there can be reached. The start
+        and boss islands have their own discs, checked in `test_repair`; a
+        combat island may fill its middle."""
+        for seed in W.SEEDS:
+            w = W.layout(seed)
+            for room in w.rooms:
+                if (room.id in (w.start_id, w.boss_id)
+                        or room.kind not in SPECIAL_KINDS):
+                    continue
+                c = room.center
+                for o in w.obstacles:
+                    if not room.rect.collidepoint(o.pos.x, o.pos.y):
+                        continue
+                    self.assertGreaterEqual(
+                        o.pos.distance_to(c), _GRID_CLEAR_RADIUS - o.radius,
+                        f"seed {seed}: {o.kind} blocks the centre of "
+                        f"{room.kind} island {room.id}")
+
+    def test_nothing_stands_on_a_bridge_landing(self):
+        """The two tiles at each end of every bridge -- the last plank and
+        the landing beyond it -- plus one tile of margin, keep every
+        obstacle's whole disc out, not just its centre. Measured off the
+        bridge rects directly rather than through `_corridor_doorways`, so
+        the test says what the rule promises, not what the helper computes."""
+        px = config.TILE_PX
+        for seed in W.SEEDS:
+            w = W.layout(seed)
+            for c in w.corridors:
+                r = c.rect
+                if c.axis == "h":
+                    ends = (pygame.Rect(r.left - px, r.top, 2 * px, r.height),
+                            pygame.Rect(r.right - px, r.top, 2 * px, r.height))
+                else:
+                    ends = (pygame.Rect(r.left, r.top - px, r.width, 2 * px),
+                            pygame.Rect(r.left, r.bottom - px, r.width, 2 * px))
+                for end in ends:
+                    keep = end.inflate(2 * px, 2 * px)
+                    for o in w.obstacles:
+                        cx = min(max(o.pos.x, keep.left), keep.right)
+                        cy = min(max(o.pos.y, keep.top), keep.bottom)
+                        self.assertGreaterEqual(
+                            (o.pos.x - cx) ** 2 + (o.pos.y - cy) ** 2,
+                            o.radius ** 2,
+                            f"seed {seed}: {o.kind} at {tuple(o.pos)} intrudes on "
+                            f"the landing of bridge {c.a}-{c.b}")
+
+    def test_the_doorway_helper_covers_every_bridge_end(self):
+        """`_corridor_doorways` is what the scatter reads; it has to name the
+        bridge end tiles, which it did not while it measured from the island
+        rect (that edge is open sea once bridges are seated beach to beach)."""
+        px = config.TILE_PX
+        for seed in W.SEEDS:
+            w = W.layout(seed)
+            doors = [d for lst in _corridor_doorways(w.rooms, w.corridors).values()
+                     for d in lst]
+            for c in w.corridors:
+                r = c.rect
+                for tile in ((r.left, r.top), (r.right - px, r.bottom - px)):
+                    end = pygame.Rect(tile, (px, px))
+                    self.assertTrue(any(d.contains(end) for d in doors),
+                                    f"seed {seed}: bridge {c.a}-{c.b} end {tile} "
+                                    f"has no keep-clear rect")
 
 
 if __name__ == "__main__":

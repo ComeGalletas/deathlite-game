@@ -1,4 +1,4 @@
-"""LD-9: obstacles must not seal part of the world off, and lakes must read as
+"""Obstacles must not seal part of the world off, and lakes must read as
 lakes.
 
 Two generation-stage guarantees that were both being broken quietly.
@@ -19,18 +19,20 @@ import unittest
 import pygame
 
 from game import config
-from world.gen import generate_world
+from tests import worlds as W
 from world.gen.bridges import _seat_corridors
 from world.gen.placement import _toward_neighbours
 from world.gen.rooms import _cell_rect
 from world.gen.tuning import (_GRID_BOSS_CLEAR_RADIUS,
                              _GRID_SPAWN_CLEAR)
 from world.gen.repair import _killers, _reachable, _start_cell, _widest_class
-from world.gen.heightmap import _trim_lake_stubs, _walk, check_grid
+from world.gen.height.coast import _walk
+from world.gen.height.graph import check_grid
+from world.gen.height.water import _trim_lake_stubs
 from world.layout import Corridor, GROUND, LAKE
 from world.pathfinding import NavGrid
 
-_SEEDS = range(8)
+_SEEDS = range(1, 9)
 _NB = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
@@ -64,24 +66,13 @@ def _sealed(layout, obstacles=None) -> int:
                if open_[i] and not killers[i] and not seen[i])
 
 
-class _Heightmap(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls._saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = True
-
-    @classmethod
-    def tearDownClass(cls):
-        config.HEIGHTMAP_ROOMS = cls._saved
-
-
-class SealTests(_Heightmap):
+class SealTests(unittest.TestCase):
     def test_obstacles_never_cut_off_more_than_bare_terrain_does(self):
         """What the repair actually promises. Terrain has its own unreachable
         fringe (see `_sealed`); the guarantee is that obstacles add nothing to
         it."""
         for seed in _SEEDS:
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             self.assertLessEqual(_sealed(layout), _sealed(layout, []),
                                  f"seed {seed}: obstacles cut off more than the "
                                  f"terrain alone")
@@ -95,58 +86,25 @@ class SealTests(_Heightmap):
         than common and small: over twenty seeds the deltas run
         0, 0, 1, 2, ... 10, 14, 80, 567, **2319**. The first eight seeds top out
         at 14, so the range used elsewhere would let this pass while proving
-        nothing at all.
+        nothing at all. Tier `sweep`.
         """
-        saved = config.HEIGHTMAP_UNSEAL
-        try:
-            config.HEIGHTMAP_UNSEAL = False
-            worst = max(_sealed(w) - _sealed(w, [])
-                        for w in (generate_world(s) for s in range(20)))
-        finally:
-            config.HEIGHTMAP_UNSEAL = saved
+        worst = max(_sealed(w) - _sealed(w, [])
+                    for w in (W.layout(s, HEIGHTMAP_UNSEAL=False)
+                              for s in range(20)))
         self.assertGreater(worst, 100,
                            "no seed seals without the repair -- the test above "
                            "is proving nothing")
 
     def test_it_takes_back_only_a_handful(self):
         """A repair that clears the map would also pass the test above."""
-        saved = config.HEIGHTMAP_UNSEAL
-        try:
-            config.HEIGHTMAP_UNSEAL = False
-            before = [len(generate_world(s).obstacles) for s in _SEEDS]
-        finally:
-            config.HEIGHTMAP_UNSEAL = saved
-        after = [len(generate_world(s).obstacles) for s in _SEEDS]
-        for s, (b, a) in zip(_SEEDS, zip(before, after)):
+        # The pinned seeds: their repaired worlds are shared with the digest
+        # and the unrepaired variant is the only extra build.
+        before = [len(W.layout(s, HEIGHTMAP_UNSEAL=False).obstacles)
+                  for s in W.SEEDS]
+        after = [len(W.layout(s).obstacles) for s in W.SEEDS]
+        for s, (b, a) in zip(W.SEEDS, zip(before, after)):
             self.assertLessEqual(b - a, max(4, b // 20),
                                  f"seed {s}: removed {b - a} of {b}")
-
-    def test_it_is_deterministic(self):
-        a = [(o.kind, tuple(o.pos)) for o in generate_world(5).obstacles]
-        b = [(o.kind, tuple(o.pos)) for o in generate_world(5).obstacles]
-        self.assertEqual(a, b)
-
-
-class LegacyWorldTests(unittest.TestCase):
-    def test_the_ld8_world_is_left_alone(self):
-        """The seals were measured on the height-map worlds; the legacy
-        generator is pinned seed by seed in the tests that describe it, so
-        neither the repair nor the widened mouth test may touch it."""
-        saved = config.HEIGHTMAP_ROOMS
-        try:
-            config.HEIGHTMAP_ROOMS = False
-            with_repair = [(o.kind, tuple(o.pos))
-                           for o in generate_world(3).obstacles]
-            saved_u = config.HEIGHTMAP_UNSEAL
-            try:
-                config.HEIGHTMAP_UNSEAL = False
-                without = [(o.kind, tuple(o.pos))
-                           for o in generate_world(3).obstacles]
-            finally:
-                config.HEIGHTMAP_UNSEAL = saved_u
-        finally:
-            config.HEIGHTMAP_ROOMS = saved
-        self.assertEqual(with_repair, without)
 
 
 def _components(cells):
@@ -168,7 +126,7 @@ def _components(cells):
     return out
 
 
-class InlandHoleTests(_Heightmap):
+class InlandHoleTests(unittest.TestCase):
     """LD-10: the three-tile minimum covers *any* inland water, not just lakes.
 
     The offenders were never lakes. Measured over ten worlds before the fix: 43
@@ -220,7 +178,7 @@ class InlandHoleTests(_Heightmap):
 
     def test_no_inland_hole_is_smaller_than_three_tiles(self):
         for seed in _SEEDS:
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if not room.grid:
                     continue
                 for comp, touching in self._holes(room):
@@ -234,7 +192,7 @@ class InlandHoleTests(_Heightmap):
         """Nearly half the holes have their south side open, so a fill puts new
         ground where there was water and something has to stand under it."""
         for seed in _SEEDS:
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if not room.grid:
                     continue
                 for (col, row), cell in room.grid.items():
@@ -249,12 +207,12 @@ class InlandHoleTests(_Heightmap):
         """Both fill branches only ever replace water, so the walkable set can
         grow but never split."""
         for seed in _SEEDS:
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if room.grid:
                     check_grid(room.grid)
 
 
-class CoastPresetTests(_Heightmap):
+class CoastPresetTests(unittest.TestCase):
     """LD-10: the coastline is a named preset, and `classic` is the way back.
 
     The old shore was straight because the walk had **no room to wander**, not
@@ -269,7 +227,7 @@ class CoastPresetTests(_Heightmap):
         """Run lengths along the west and north shores of every island."""
         runs = []
         for seed in seeds:
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if not room.grid:
                     continue
                 land = {p for p, c in room.grid.items() if c.kind != LAKE}
@@ -299,7 +257,7 @@ class CoastPresetTests(_Heightmap):
 
     def test_no_island_is_a_rectangle(self):
         for seed in range(1, 6):
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if not room.grid:
                     continue
                 land = {p for p, c in room.grid.items() if c.kind != LAKE}
@@ -324,7 +282,7 @@ class CoastPresetTests(_Heightmap):
                 self.assertLessEqual(n, cap, f"seed {seed}: {got}")
 
 
-class TopographyTests(_Heightmap):
+class TopographyTests(unittest.TestCase):
     """LD-10: an island's *shape* type, declared as a table.
 
     Orthogonal to room kind -- kind says what happens on an island, topography
@@ -335,7 +293,7 @@ class TopographyTests(_Heightmap):
 
     def _rooms(self, seeds=range(1, 9)):
         for seed in seeds:
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if room.grid:
                     yield seed, room
 
@@ -353,7 +311,7 @@ class TopographyTests(_Heightmap):
         per-topography `HEIGHTMAP_COAST_KEEP`, and boss islands are a deferred
         conversation -- so this asserts only what is actually true."""
         for seed in range(1, 9):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             boss = layout.room(layout.boss_id)
             if not boss.grid:
                 continue
@@ -407,20 +365,8 @@ class TopographyTests(_Heightmap):
         for seed, room in self._rooms():
             self.assertNotEqual(room.kind, "elite_arena", f"seed {seed}")
 
-    def test_but_the_legacy_generator_still_has_them(self):
-        """Dropping a kind there re-labels its rooms, and a re-labelled room is
-        shaped and scattered differently -- which moved four pinned-seed LD-8
-        tests that have nothing to do with elite arenas."""
-        saved = config.HEIGHTMAP_ROOMS
-        try:
-            config.HEIGHTMAP_ROOMS = False
-            kinds = {r.kind for s in range(12) for r in generate_world(s).rooms}
-        finally:
-            config.HEIGHTMAP_ROOMS = saved
-        self.assertIn("elite_arena", kinds)
 
-
-class PlacementTests(_Heightmap):
+class PlacementTests(unittest.TestCase):
     """LD-10 D: more islands, off-centre in their cells, with a per-topography
     bridge allowance."""
 
@@ -445,7 +391,7 @@ class PlacementTests(_Heightmap):
         px = config.TILE_PX
         for seed in range(1, 13):
             cells = {}
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if not room.grid:
                     continue
                 for (c, r), cell in room.grid.items():
@@ -467,7 +413,7 @@ class PlacementTests(_Heightmap):
         each island's land that far inside its own rect."""
         px = config.TILE_PX
         for seed in range(1, 9):
-            rooms = generate_world(seed).rooms
+            rooms = W.layout(seed).rooms
             for i, a in enumerate(rooms):
                 for b in rooms[i + 1:]:
                     hit = a.rect.clip(b.rect)
@@ -497,7 +443,7 @@ class PlacementTests(_Heightmap):
         chunk = (config.HEIGHTMAP_CHUNK_COLS * px, config.HEIGHTMAP_CHUNK_ROWS * px)
         moved = 0
         for seed in range(1, 5):
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if _cell_rect(room.cell, chunk).center != room.rect.center:
                     moved += 1
         self.assertGreater(moved, 0, "every island sits dead centre")
@@ -505,14 +451,14 @@ class PlacementTests(_Heightmap):
     def test_every_room_stays_on_the_world_tile_grid(self):
         px = config.TILE_PX
         for seed in range(1, 9):
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 self.assertEqual((int(room.rect.left) % px,
                                   int(room.rect.top) % px), (0, 0),
                                  f"seed {seed} room {room.id}")
 
     def test_a_side_never_carries_more_bridges_than_its_topography_allows(self):
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for (rid, side), n in self._sides(layout).items():
                 cap = config.HEIGHTMAP_TOPOGRAPHIES[
                     layout.room(rid).topography]["bridges"]
@@ -525,7 +471,7 @@ class PlacementTests(_Heightmap):
         wording, and because it is the case the `min` of the two ends is doing
         the work: a small island linked to a volcanic one still gets one."""
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for (rid, _side), n in self._sides(layout).items():
                 if layout.room(rid).topography == "small":
                     self.assertEqual(n, 1, f"seed {seed}: small room {rid}")
@@ -534,7 +480,7 @@ class PlacementTests(_Heightmap):
         """A cap nobody reaches is not a rule."""
         doubled = 0
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for (rid, _s), n in self._sides(layout).items():
                 if n > 1 and layout.room(rid).topography == "volcanic":
                     doubled += 1
@@ -543,7 +489,7 @@ class PlacementTests(_Heightmap):
     def test_the_world_is_still_one_piece(self):
         """Bridges are cloned and dropped here; the tree must survive it."""
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             adj = {r.id: set() for r in layout.rooms}
             for c in layout.corridors:
                 adj[c.a].add(c.b)
@@ -557,7 +503,7 @@ class PlacementTests(_Heightmap):
             self.assertEqual(len(seen), len(layout.rooms), f"seed {seed}")
 
 
-class ShortcutTests(_Heightmap):
+class ShortcutTests(unittest.TestCase):
     """LD-10: extra bridges between islands that ended up close together.
 
     The lattice grows a **tree**, so without this every route between two
@@ -595,7 +541,7 @@ class ShortcutTests(_Heightmap):
     def test_most_worlds_get_at_least_one_loop(self):
         looped = 0
         for seed in range(1, 13):
-            adj = self._graph(generate_world(seed))
+            adj = self._graph(W.layout(seed))
             edges = {(min(a, b), max(a, b)) for a in adj for b in adj[a]}
             if len(edges) > len(adj) - 1:
                 looped += 1
@@ -607,30 +553,26 @@ class ShortcutTests(_Heightmap):
         links off the critical path at once -- 100% down to about 47%."""
         cut, total = 0, 0
         for seed in range(1, 13):
-            c, t = self._cut_edges(self._graph(generate_world(seed)))
+            c, t = self._cut_edges(self._graph(W.layout(seed)))
             cut += c
             total += t
         self.assertLess(cut / total, 0.75, f"{cut}/{total} links still the only way")
 
     def test_without_it_every_link_is_the_only_way(self):
         """Proves the number above is the pass working, not the lattice."""
-        saved = config.HEIGHTMAP_SHORTCUTS
-        try:
-            config.HEIGHTMAP_SHORTCUTS = False
-            cut, total = 0, 0
-            for seed in range(1, 7):
-                c, t = self._cut_edges(self._graph(generate_world(seed)))
-                cut += c
-                total += t
-        finally:
-            config.HEIGHTMAP_SHORTCUTS = saved
+        cut, total = 0, 0
+        for seed in range(1, 7):
+            c, t = self._cut_edges(self._graph(
+                W.layout(seed, HEIGHTMAP_SHORTCUTS=False)))
+            cut += c
+            total += t
         self.assertEqual(cut, total, "the lattice is not a tree any more")
 
     def test_a_shortcut_still_obeys_the_per_side_allowance(self):
         """It reuses the same `used` counter the tree's own bridges fill, so a
         small island cannot be given a second crossing on one side."""
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             per_side = {}
             for c in layout.corridors:
                 a, b = layout.room(c.a), layout.room(c.b)
@@ -650,19 +592,19 @@ class ShortcutTests(_Heightmap):
         """`Room.neighbors` is read by callers that never look at the corridor
         list, so a shortcut has to appear in both."""
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for c in layout.corridors:
                 self.assertIn(c.b, layout.room(c.a).neighbors, f"seed {seed}")
                 self.assertIn(c.a, layout.room(c.b).neighbors, f"seed {seed}")
 
     def test_it_is_deterministic(self):
         """No RNG is drawn: candidates are sorted by gap and then by id."""
-        a = [(c.a, c.b, tuple(c.rect)) for c in generate_world(4).corridors]
-        b = [(c.a, c.b, tuple(c.rect)) for c in generate_world(4).corridors]
+        a = [(c.a, c.b, tuple(c.rect)) for c in W.layout(4).corridors]
+        b = [(c.a, c.b, tuple(c.rect)) for c in W.layout(4).corridors]
         self.assertEqual(a, b)
 
 
-class BridgeLengthTests(_Heightmap):
+class BridgeLengthTests(unittest.TestCase):
     """LD-10: a crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a causeway.
 
     The cap alone could not have delivered this. Measured before the change, the
@@ -678,7 +620,7 @@ class BridgeLengthTests(_Heightmap):
         px = config.TILE_PX
         out = []
         for seed in seeds:
-            for c in generate_world(seed).corridors:
+            for c in W.layout(seed).corridors:
                 out.append(max(c.rect.width, c.rect.height) // px)
         return sorted(out)
 
@@ -696,7 +638,7 @@ class BridgeLengthTests(_Heightmap):
         cap = config.HEIGHTMAP_BRIDGE_MAX
         for seed in range(1, 13):
             per = {}
-            for c in generate_world(seed).corridors:
+            for c in W.layout(seed).corridors:
                 key = (min(c.a, c.b), max(c.a, c.b))
                 per.setdefault(key, []).append(
                     max(c.rect.width, c.rect.height) // px)
@@ -719,7 +661,7 @@ class BridgeLengthTests(_Heightmap):
         cap = config.HEIGHTMAP_BRIDGE_MAX
         checked = 0
         for seed in range(1, 13):
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for c in layout.corridors:
                 span = max(c.rect.width, c.rect.height) // px
                 if span <= cap:
@@ -765,10 +707,10 @@ class BridgeLengthTests(_Heightmap):
         self.assertEqual(_toward_neighbours(rooms[3], rooms, 0, -4, 4), (-4, 4))
 
 
-class LakeShapeTests(_Heightmap):
+class LakeShapeTests(unittest.TestCase):
     def _lakes(self):
         for seed in _SEEDS:
-            for room in generate_world(seed).rooms:
+            for room in W.layout(seed).rooms:
                 if not room.grid:
                     continue
                 cells = {p for p, c in room.grid.items() if c.kind == LAKE}
@@ -806,7 +748,7 @@ class LakeShapeTests(_Heightmap):
                              f"has an arm the trim would take")
 
 
-class EveryIslandIsScatteredTests(_Heightmap):
+class EveryIslandIsScatteredTests(unittest.TestCase):
     """LD-10: the start and boss islands are no longer skipped.
 
     The LD-8 scatter skipped both by id -- a safe spawn and a clear fight arena
@@ -824,7 +766,7 @@ class EveryIslandIsScatteredTests(_Heightmap):
 
     def test_no_island_is_left_bare(self):
         for seed in self.SEEDS:
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for room in layout.rooms:
                 if not room.grid:
                     continue
@@ -840,7 +782,7 @@ class EveryIslandIsScatteredTests(_Heightmap):
         brief was "keep a basic radius in the center free from obstacles and
         spread other obstacles on the outside"."""
         for seed in self.SEEDS:
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             room = layout.room(layout.boss_id)
             if not room.grid:
                 continue
@@ -857,7 +799,7 @@ class EveryIslandIsScatteredTests(_Heightmap):
         that exact pixel, so this is spawn safety rather than special treatment
         of the island -- everything outside the bubble scatters normally."""
         for seed in self.SEEDS:
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             room = layout.room(layout.start_id)
             if not room.grid:
                 continue
@@ -867,23 +809,6 @@ class EveryIslandIsScatteredTests(_Heightmap):
                 self.assertGreaterEqual(d, _GRID_SPAWN_CLEAR - o.radius,
                                         f"seed {seed}: a {o.kind} overlaps the "
                                         f"spawn point")
-
-    def test_the_legacy_world_still_skips_them(self):
-        """Dropping the skip there would re-scatter two rooms of every pinned
-        LD-8 seed, which those tests exist to describe."""
-        saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = False
-        try:
-            layout = generate_world(7)
-        finally:
-            config.HEIGHTMAP_ROOMS = saved
-        for rid in (layout.start_id, layout.boss_id):
-            room = layout.room(rid)
-            # Houses were never part of that skip -- `_scatter_houses` has
-            # always been allowed to build in the start room, and only ever
-            # excluded the boss.
-            got = [o for o in self._on(layout, room) if o.kind != "house"]
-            self.assertEqual(got, [], f"legacy room {rid} was scattered")
 
 
 if __name__ == "__main__":

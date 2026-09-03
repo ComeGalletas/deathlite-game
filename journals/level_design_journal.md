@@ -5731,3 +5731,35 @@ transform to come out byte for byte identical.
 
 Four landings, each with its own suite, and a test that walks the source to
 make sure a fifth reader of the field is a decision rather than an accident.
+
+## Y — nothing stands on a bridge landing — ✅ DONE
+
+Stepping off a bridge could land you in a rock. The keep-clear rule for
+bridge mouths existed -- `_corridor_doorways` in `world/gen/scatter.py`, one
+tile of margin round the mouth, in place since the corridor days -- but it
+measured the mouth against the **island's rect** edge. Bridges have been seated
+beach to beach since F, and an island's coast wanders inside its rect, so that
+edge is open sea. Measured over the four pinned seeds: the keep-clear rects
+covered **0 of 102** bridge end tiles, and eight of those tiles had an obstacle
+standing on the landing (trees, rocks, a pillar).
+
+The mouth is read off the bridge's own rect now: the two tiles at each end --
+the last plank and the landing beyond it -- plus the same one tile of margin,
+and the whole obstacle disc has to stay out, not just its centre (`_blocks`).
+Two tiles rather than one because the seated rect is not symmetric: the low
+end includes its beach tile, the high end stops at the beach's edge.
+
+| | before | after |
+|---|---|---|
+| bridge end tiles covered by a keep-clear rect | 0 / 102 | 102 / 102 |
+| bridge end tiles with an obstacle on them | 8 / 102 | **0 / 102** |
+| obstacles a world (seeds 35 / 7 / 1234 / 42) | — | 565 / 572 / 471 / 486 |
+
+Islands, coasts, terraces and bridges are byte-identical before and after (the
+schema-independent fingerprint agrees on `rooms`, `corridors` and `bounds`);
+only the obstacles moved, and the layout digest was re-pinned for it.
+
+Two tests: `test_nothing_stands_on_a_bridge_landing` measures the promise off
+the bridge rects directly, and `test_the_doorway_helper_covers_every_bridge_end`
+pins that the helper the scatter reads names the right tiles -- the one that
+would have failed all along.

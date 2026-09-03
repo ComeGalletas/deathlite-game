@@ -23,6 +23,7 @@ from entities.projectile import Projectile
 from game import config
 from world.elevation import NONE
 from world.layout import CLIFF
+from tests import worlds as W
 from world.map import GameMap
 
 SEED = 21
@@ -59,14 +60,9 @@ class _World(unittest.TestCase):
     def setUpClass(cls):
         pygame.init()
         pygame.display.set_mode((1, 1))
-        cls._saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = True
-        cls.gm = GameMap(seed=SEED)
+        cls.gm = W.game_map(SEED)
         cls.levels = cls.gm._levels
 
-    @classmethod
-    def tearDownClass(cls):
-        config.HEIGHTMAP_ROOMS = cls._saved
 
     def _world_of(self, col, row):
         ox, oy = self.levels.origin

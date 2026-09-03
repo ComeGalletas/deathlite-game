@@ -1,14 +1,23 @@
-"""Seeded procedural world generation (spec 5.2 / 5.4).
+"""Seeded world generation.
 
-Authored chunks assembled procedurally, not per-tile noise. The world is a
-lattice of chunk cells; rooms occupy single cells and are joined by short
-corridors. Generation grows a *tree* from the start cell, so the connectivity
-graph is always fully reachable -- "Do not generate unreachable critical rooms"
-(spec 5.4).
+The world is a lattice of chunk cells grown as a tree from the start cell,
+so every island is reachable by construction. Each cell holds one island:
+a height map of terraces, walls and flights (`world/gen/height/`), seated
+bridges on its beaches (`bridges.py`), a palette per terrace (`biomes.py`),
+and obstacles scattered last, in final coordinates (`scatter.py`).
 
-`generate_world(seed)` is pure: the same seed and the same code produce an
-identical `WorldLayout` (spec 8). W1 of journals/world_refactor.md split the
-stages into sibling modules; this module keeps only the orchestrator.
+`generate_world(seed)` is pure: one seed, one `WorldLayout`, with no asset
+loaded and no display. All randomness comes from one `random.Random(seed)`
+stream, except where a stage says it keys its own RNG by seed and room so
+that it draws nothing from the world's. The order of the stages below is
+the order that stream is consumed in; moving one moves every world.
+
+The knobs come from one `GenSettings` (`settings.py`), snapshotted from
+`game.config` at the top and handed to every stage that reads one, so a
+world is generated under one setting throughout and a test can pass its
+own instead of mutating the global.
+
+This module is the pipeline. Each stage lives beside it.
 """
 from __future__ import annotations
 
@@ -17,45 +26,32 @@ import random
 import pygame
 
 from game import config
-from world.layout import (
-    Corridor, Room, TileMeta, WorldLayout,
-    GROUND, VSTAIR, EWSTAIR, WALKABLE_KINDS,
-)
+from world.layout import Corridor, Room, WorldLayout
 from world.gen.tuning import _DIRS
-from world.gen.rooms import (
-    _cell_rect, _room_frac, _full_cells, _carve_room_shapes, _grow_rooms,
-)
-from world.gen.graph import assign_topography, _assign_floors, _distances, _assign_kinds
-from world.gen.links import _connection_lane, _relink_corridors, _split_links
-from world.legacy.verticality import (
-    _plan_ramps, _ramp_steps, _collect_annex, _carve_cliffs, _build_tile_meta,
-)
-from world.gen import heightmap
-from world.gen.heightmap import build_grid
+from world.gen.rooms import _cell_rect, _full_cells
+from world.gen.graph import assign_topography, _distances, _assign_kinds
+from world.gen.links import _connection_lane
 from world.gen.repair import unseal
 from world.gen.bridges import _seat_corridors
 from world.gen.islands import (_build_room_grids, _grid_tile_meta,
                                _build_inset_fields)
-from world.gen.placement import (
-    topography_of, _resize_by_topography, _offset_in_chunk,
-)
+from world.gen.placement import _resize_by_topography, _offset_in_chunk
 from world.gen.biomes import assign_palettes
 from world.gen.scatter import _scatter_obstacles
+from world.gen.settings import GenSettings, settings_or_config
 
 __all__ = ["generate_world"]
 
 
-def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
+def generate_world(seed: int, room_count: int | None = None,
+                   settings: GenSettings | None = None) -> WorldLayout:
+    settings = settings_or_config(settings)
     rng = random.Random(seed)
-    # LD-9: a height-map room carries several terraces and the walls between
-    # them, so it needs far more room than a flat one -- fewer, larger rooms in
-    # bigger chunks.
-    heightmap = config.HEIGHTMAP_ROOMS
-    chunk = ((config.HEIGHTMAP_CHUNK_COLS * config.TILE_PX,
-              config.HEIGHTMAP_CHUNK_ROWS * config.TILE_PX) if heightmap
-             else config.CHUNK_SIZE)
-    room_count = room_count or (config.HEIGHTMAP_ROOM_COUNT if heightmap
-                                else config.WORLD_ROOM_COUNT)
+    px = config.TILE_PX
+    # An island carries several terraces and the walls between them, so the
+    # lattice cell is large and there are few of them.
+    chunk = (settings.chunk_cols * px, settings.chunk_rows * px)
+    room_count = room_count or settings.room_count
 
     # --- grow a tree of occupied cells ---------------------------
     start_cell = (0, 0)
@@ -79,43 +75,35 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         order.append(new_cell)
         edges.append((occupied[parent], new_id))
 
-    # --- build rooms (random floor size within each cell) --------
-    # Snapped to config.TILE_PX so the tiled renderer's cell grid covers the
-    # room exactly (no clipped autotile edge). Min 3 tiles -> a real interior.
-    px = config.TILE_PX
-    irregular = config.IRREGULAR_ROOMS
+    # --- one island rect per cell --------------------------------
+    # Tile-sized, and snapped to the *world* tile lattice, not merely centred
+    # in the chunk: centring a room of odd tile-width leaves it half a tile
+    # off the grid, and then no two rooms share one. A bridge between them
+    # could never sit squarely on a tile at both ends -- its end caps landed
+    # mid-tile and the planks read crooked.
     rooms: list[Room] = []
     for cell in order:
         rid = occupied[cell]
         full = _cell_rect(cell, chunk)
-        if heightmap:
-            w = rng.randint(*config.HEIGHTMAP_ROOM_COLS) * px
-            h = rng.randint(*config.HEIGHTMAP_ROOM_ROWS) * px
-        else:
-            w = max(3 * px,
-                    round(full.width * _room_frac(rng, irregular) / px) * px)
-            h = max(3 * px,
-                    round(full.height * _room_frac(rng, irregular) / px) * px)
+        w = rng.randint(*settings.room_cols) * px
+        h = rng.randint(*settings.room_rows) * px
         rect = pygame.Rect(0, 0, w, h)
         rect.center = full.center
-        if heightmap:
-            # Centring a room of odd tile-width in its chunk leaves it half a
-            # tile off the world grid, and then no two rooms share one. A
-            # bridge between them can never sit squarely on a tile at both
-            # ends -- its end caps land mid-tile and the planks read crooked.
-            # Snap every room to the global grid so they all agree.
-            rect.x = round(rect.x / px) * px
-            rect.y = round(rect.y / px) * px
+        rect.x = round(rect.x / px) * px
+        rect.y = round(rect.y / px) * px
         rooms.append(Room(rid, cell, rect, "combat"))
 
     for a, b in edges:
         rooms[a].neighbors.append(b)
         rooms[b].neighbors.append(a)
 
-    # --- corridors along each tree edge -----------------------
-    # One tile wide -- rendered as a plank bridge over the water (terrain T7).
-    # Each corridor records which edge is which (west/east or north/south) so the
-    # renderer draws the matching end-cap tile at each mouth.
+    # --- one bridge per tree edge --------------------------------
+    # One tile wide, rendered as a plank bridge over the water. Each records
+    # which edge is which (west/east or north/south) so the renderer draws
+    # the matching end-cap tile at each mouth. One per link *here*, always:
+    # how many a link actually carries is a property of the two islands, and
+    # neither their topography nor their shape exists yet. `_seat_corridors`
+    # clones them once both are known and it can see where the beaches are.
     corridors: list[Corridor] = []
     width = px
     for a, b in edges:
@@ -134,99 +122,36 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
             lane = _connection_lane(seed, a, b, axis, lo_r, hi_r, px)
             rect = pygame.Rect(lo_r.centerx, lane - width // 2,
                                hi_r.centerx - lo_r.centerx, width)
-        # LD-9: a link may carry more than one bridge. They are created here as
-        # copies on the tree's own lane and then spread out by `_seat_corridors`,
-        # which is the only place that knows where each island's beaches
-        # actually are. One is the legacy behaviour and leaves the flag-off
-        # world byte-identical.
-        # LD-10: one per link here, always. How many a link actually carries is
-        # a property of the two islands, and neither their topography nor their
-        # shape exists yet at this point -- `_seat_corridors` clones them once
-        # both are known and it can see where the beaches are.
         corridors.append(Corridor(a, b, rect.copy(), axis,
                                   e_lo, e_hi, lo, hi, lane))
 
-    # --- assign roles ------------------------------------------
+    # --- roles, then shape ---------------------------------------
+    # Kind says what happens on an island; topography says what shape it is.
+    # Shape type, then resize to match it, then slide each island within its
+    # chunk -- all before the grids are built, because every later stage (the
+    # coastline, the terrace count, the tile mask) reads one or the other.
     start_id = 0
     dist = _distances(rooms, start_id)
     boss_id = max(dist, key=dist.get)
     _assign_kinds(rooms, rng, start_id, boss_id, dist)
-    # LD-10: shape type, then resize to match it. Both have to happen before the
-    # cells are filled in below and long before the grids are built, because
-    # every later stage -- the coastline, the terrace count, the tile mask --
-    # reads one or the other.
-    assign_topography(rooms, rng, boss_id)
-    _resize_by_topography(rooms)
+    assign_topography(rooms, rng, boss_id, settings)
+    _resize_by_topography(rooms, settings)
     _offset_in_chunk(rooms, chunk, rng)
 
-    # --- room floor shape (tile masks) -----------------------
-    # Plain rectangle by default. `IRREGULAR_ROOMS`: some combat rooms first grow
-    # a block into one empty neighbour chunk (W5), then every combat room may get
-    # 2-3-cell corner bites (L / T / plus / stepped).
-    if heightmap:
-        # LD-9 supplies its own outline -- the coastline in `_build_room_grids`
-        # overwrites `cells` wholesale, so the corner-bite pass has nothing to
-        # contribute. Skipping the growth pass also matters: it moves a room's
-        # rect off the world tile grid, and then a bridge cannot land square on
-        # a tile at both ends.
-        for room in rooms:
-            room.cells = _full_cells(*room.tile_dims)
-    elif irregular:
-        grew = _grow_rooms(rooms, corridors, occupied, rng, start_id, boss_id)
-        _carve_room_shapes(rooms, rng, start_id, boss_id)
-        if grew:
-            _relink_corridors(rooms, corridors)
-    else:
-        for room in rooms:
-            room.cells = _full_cells(*room.tile_dims)
-
-    # --- LD-1 verticality: floors, stairs, cliff-band carve ------
-    # Fully gated: with WORLD_VERTICALITY off, `stairs` stays empty, every room
-    # keeps floor 0, and the layout is byte-identical.
-    stairs: list = []
-    plan: list = []
-    if heightmap:
-        # LD-9: every room becomes a height map -- its own terraces, the walls
-        # between them and the flights cut through those walls. Cross-room
-        # links stay plank corridors for now (LD-9 B2 matches their levels).
-        _build_room_grids(rooms, corridors, rng)
-        corridors = _seat_corridors(rooms, corridors, seed)
-        # LD-10: which tileset each terrace wears. Generation decides it, not
-        # the bake -- the scatter below picks its obstacle mix from the biome,
-        # so the world and the tile painter have to read one answer. Keyed by
-        # seed and room id, so it draws nothing from `rng`.
-        assign_palettes(rooms, seed)
-        # The terrace inset field, before the bake and before every scatter,
-        # so the margin between floors is decided once and read by everything
-        # downstream rather than re-derived per consumer.
-        _build_inset_fields(rooms)
-    elif config.WORLD_VERTICALITY:
-        _assign_floors(rooms, edges, rng, start_id, boss_id)
-        # Cross-floor links become stairs/ramp units below. Keep their approach
-        # on the shared-span centre used by the established vertical navigation;
-        # only same-floor plank corridors use the varied entrance lanes.
-        for c in corridors:
-            if rooms[c.a].floor == rooms[c.b].floor:
-                continue
-            first, second = rooms[c.a].rect, rooms[c.b].rect
-            if c.axis == "h":
-                c.lane = (max(first.top, second.top) +
-                          min(first.bottom, second.bottom)) // 2
-            else:
-                c.lane = (max(first.left, second.left) +
-                          min(first.right, second.right)) // 2
-        _relink_corridors(rooms, corridors)
-        # LD-3 R1: bring usable cross-floor pairs into contact *before* the
-        # links are cut, so `_split_links` sees the snapped geometry and can
-        # skip the edges a ramp run now carries.
-        plan = (_plan_ramps(rooms, edges, corridors, seed)
-                if config.RAMP_STAIRS else [])
-        ramped = {frozenset((hi, lo)) for hi, lo, *_ in plan}
-        stairs = _split_links(rooms, corridors, rng, ramped)
-        stairs += _ramp_steps(rooms, plan)
-        _collect_annex(rooms, plan)
-        if config.CLIFF_CARVE:
-            _carve_cliffs(rooms, corridors, stairs)
+    # --- height maps ---------------------------------------------
+    # The coastline in `_build_room_grids` overwrites `cells` wholesale; the
+    # full rectangle is only the starting mask. Then the bridges are seated on
+    # the beaches, each terrace picks its tileset (generation decides, not the
+    # bake: the scatter reads the biome too, and one authority is the point),
+    # and the terrace inset field is built once, here, before anything is
+    # baked, scattered or spawned, so every later stage asks one answer for
+    # how far inside its own terrace a point stands.
+    for room in rooms:
+        room.cells = _full_cells(*room.tile_dims)
+    _build_room_grids(rooms, corridors, rng, settings)
+    corridors = _seat_corridors(rooms, corridors, seed, settings)
+    assign_palettes(rooms, seed, settings)
+    _build_inset_fields(rooms)
 
     # --- bounds (union of everything + margin) ---------------
     union = rooms[0].rect.copy()
@@ -234,9 +159,7 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
         union.union_ip(r.rect)
     for c in corridors:
         union.union_ip(c.rect)
-    for s in stairs:
-        union.union_ip(s.rect)
-    cw, ch = chunk if isinstance(chunk, tuple) else (chunk, chunk)
+    cw, ch = chunk
     union.inflate_ip(cw, ch)
 
     # Shift the whole world so bounds start at (0, 0) -- keeps camera clamp simple.
@@ -246,31 +169,23 @@ def generate_world(seed: int, room_count: int | None = None) -> WorldLayout:
     for c in corridors:
         c.rect.move_ip(shift)
         c.lane += shift.y if c.axis == "h" else shift.x
-    for s in stairs:
-        s.rect.move_ip(shift)
     union.move_ip(shift)
 
     # Scatter obstacles last, in the final (0,0)-based coordinate space, so the
-    # corridor-doorway keep-clear rects match the world the game sees.
+    # bridge-mouth keep-clear rects match the world the game sees.
     obstacles = _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
-                                   stairs=stairs)
+                                   settings)
 
-    # LD-2 E0: per-tile classification. Reads only finalised geometry, draws no
-    # RNG, so a flag-off world stays byte-identical. Built unconditionally -- a
-    # flat world just gets `floor 0 / foam True` everywhere.
-    if heightmap:
-        _grid_tile_meta(rooms)
-    else:
-        _build_tile_meta(rooms, plan)
+    # Per-tile classification, a straight projection of the finished grids.
+    # Reads only finalised geometry and draws no RNG.
+    _grid_tile_meta(rooms)
 
     layout = WorldLayout(seed, rooms, corridors, union, start_id, boss_id,
-                         obstacles, stairs)
-    # LD-9: the keep-clear rectangles above protect the chokes we knew about.
-    # This checks the one that matters -- can the widest body still reach
-    # everywhere bare terrain allows -- and takes back the few obstacles that
-    # say no. See `world/gen/repair.py`. Height-map worlds only: that is where
-    # the seals were measured, and the legacy generator is pinned seed by seed
-    # in the tests that describe it.
-    if heightmap and config.HEIGHTMAP_UNSEAL:
+                         obstacles)
+    # The keep-clear rectangles protect the chokes we knew about. This checks
+    # the one that matters -- can the widest body still reach everywhere bare
+    # terrain allows -- and takes back the few obstacles that say no. See
+    # `world/gen/repair.py`.
+    if settings.unseal:
         unseal(layout)
     return layout

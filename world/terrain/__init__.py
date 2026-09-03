@@ -1,7 +1,10 @@
 """Terrain baking and drawing.
 
-W0 of `journals/world_refactor.md` scaffolds this package. W2 extracts
-`TileSheets` (the tileset-metadata adapter), W3 the autotile helpers, W4 the
-room / cliff painters, W5 the decor bakes, and W6 the `TerrainRenderer` draw
-path -- all currently inside `GameMap` in `world/map.py`.
+    sheets      `TileSheets` -- the tileset adapter and per-bake tile cache
+    autotile    the autotile slot maths
+    grid_paint  one surface per terrace, straight off an island's height map
+    decor/      obstacle skins, tree shades, interior clutter, water scenery
+    baked       `BakedTerrain` -- what the bake produces
+    bake        the one-off pass: layout -> `BakedTerrain`
+    render      `TerrainRenderer` -- the baked result on screen, band by band
 """

@@ -1,6 +1,6 @@
 """Water inside the island: lakes, and the holes that are not lakes.
 
-Split out of `world/gen/heightmap.py`. Both halves answer the same rule -- any
+Both halves answer the same rule -- any
 inland water is at least three contiguous tiles on one terrace -- from opposite
 directions: `_carve_lakes` makes water and refuses to make it too small,
 `_fill_holes` finds water the other stages left behind and closes it.
@@ -49,7 +49,7 @@ def _trim_lake_stubs(blob: set) -> set:
         blob = blob - stubs
 
 
-# LD-10: a hole in an island smaller than a lake is allowed to be. The three-tile
+# A hole in an island smaller than a lake is allowed to be. The three-tile
 # minimum the lakes carry (`_LAKE_MIN`) applies to *any* inland water, and the
 # offenders were never lakes: measured over ten worlds, 43 one-tile and 156
 # two-tile near-enclosed holes, and 199 of 205 were cells absent from the grid

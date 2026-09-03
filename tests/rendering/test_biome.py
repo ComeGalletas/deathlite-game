@@ -32,7 +32,7 @@ import pygame
 
 from game import config
 from game.assets import ASSETS_DIR, get_assets
-from world.gen import generate_world
+from tests import worlds as W
 from world.map import GameMap
 from world.layout import GROUND
 from world.gen import biomes
@@ -192,15 +192,10 @@ class BakedWorldTests(unittest.TestCase):
     def setUpClass(cls):
         pygame.init()
         pygame.display.set_mode((1, 1))
-        cls._saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = True
 
-    @classmethod
-    def tearDownClass(cls):
-        config.HEIGHTMAP_ROOMS = cls._saved
 
     def _sheets(self, seed):
-        layout = generate_world(seed)
+        layout = W.layout(seed)
         return layout, TileSheets(get_assets(), layout.seed)
 
     def test_every_raised_level_of_every_island_gets_a_pool_sheet(self):
@@ -330,12 +325,10 @@ class ScatterMixTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pygame.init()
-        cls._saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = True
         cls.tally = {}
         px = config.TILE_PX
         for seed in cls.SEEDS:
-            layout = generate_world(seed)
+            layout = W.layout(seed)
             for o in layout.obstacles:
                 for room in layout.rooms:
                     if not room.rect.collidepoint(o.pos.x, o.pos.y):
@@ -349,9 +342,6 @@ class ScatterMixTests(unittest.TestCase):
                     cls.tally.setdefault(fam, collections.Counter())[o.kind] += 1
                     break
 
-    @classmethod
-    def tearDownClass(cls):
-        config.HEIGHTMAP_ROOMS = cls._saved
 
     def _share(self, fam, kinds):
         got = self.tally.get(fam)
@@ -415,18 +405,13 @@ class DecorBiomeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pygame.init()
-        cls._saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = True
-        cls.layout = generate_world(21)
+        cls.layout = W.layout(21)
         with open(os.path.join("data", "terrain.json"), encoding="utf-8") as fh:
             cls.t = json.load(fh)
         cls.props = [e for e in cls.t["decorations"]
                      if e.get("placement") == "room_interior"
                      and not e.get("collision")]
 
-    @classmethod
-    def tearDownClass(cls):
-        config.HEIGHTMAP_ROOMS = cls._saved
 
     def _mixed_room(self):
         """An island wearing more than one biome -- the only kind where the
@@ -546,14 +531,9 @@ class TreeGroupTests(unittest.TestCase):
     def setUpClass(cls):
         pygame.init()
         pygame.display.set_mode((1, 1))
-        cls._saved = config.HEIGHTMAP_ROOMS
-        config.HEIGHTMAP_ROOMS = True
         with open(os.path.join("data", "terrain.json"), encoding="utf-8") as fh:
             cls.t = json.load(fh)
 
-    @classmethod
-    def tearDownClass(cls):
-        config.HEIGHTMAP_ROOMS = cls._saved
 
     def test_every_biome_picks_one_of_the_two_groups(self):
         for fam, spec in self.t["biomes"].items():
@@ -572,9 +552,8 @@ class TreeGroupTests(unittest.TestCase):
         self.assertEqual(len(got), 2, "every biome picked the same group")
 
     def test_a_tree_is_skinned_from_its_own_terrace_group(self):
-        layout = generate_world(41)
-        gm = GameMap(seed=41)
-        gm._build_tiles()
+        layout = W.layout(41)
+        gm = W.baked(41)
         if not gm._tiles_ok:
             self.skipTest("tileset missing")
         checked = 0

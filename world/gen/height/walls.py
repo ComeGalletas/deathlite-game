@@ -1,6 +1,6 @@
 """Stone: the cliff faces that hold a terrace up.
 
-Split out of `world/gen/heightmap.py`. Two rules, and both run more than once
+Two rules, and both run more than once
 during a build because later stages take cells away: `_raise_walls` gives every
 southward drop its face, `_face_the_sea` makes sure no raised ground is left
 hanging over open water.

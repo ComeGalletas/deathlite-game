@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from game import config
 from world.gen.rooms import _cell_rect
+from world.gen.settings import settings_or_config
 
-def topography_of(room) -> dict:
+def topography_of(room, settings=None) -> dict:
     """The room's topography record, defaulting to the first weighted entry so
     a room built before `assign_topography` ran still has somewhere to read
     from."""
-    table = config.HEIGHTMAP_TOPOGRAPHIES
+    table = settings_or_config(settings).topographies
     if room.topography in table:
         return table[room.topography]
     return next(spec for spec in table.values() if spec.get("weight", 0) > 0)
@@ -22,7 +23,7 @@ def topography_of(room) -> dict:
 
 
 
-def _resize_by_topography(rooms) -> None:
+def _resize_by_topography(rooms, settings=None) -> None:
     """Shrink or grow each room's rect to its topography's `size`.
 
     Done by resizing the finished rect rather than by drawing a different size
@@ -37,11 +38,9 @@ def _resize_by_topography(rooms) -> None:
     half a tile off the grid, and the snap would then move the island rather
     than resize it.
     """
-    if not config.HEIGHTMAP_ROOMS:
-        return
     px = config.TILE_PX
     for room in rooms:
-        scale = topography_of(room).get("size", 1.0)
+        scale = topography_of(room, settings).get("size", 1.0)
         if scale == 1.0:
             continue
         w, h = room.tile_dims
@@ -82,8 +81,6 @@ def _offset_in_chunk(rooms, chunk, rng) -> None:
     resize, because how much slack a room has depends on the size its
     topography settled on.
     """
-    if not config.HEIGHTMAP_ROOMS:
-        return
     px = config.TILE_PX
     for room in rooms:
         cell = _cell_rect(room.cell, chunk)

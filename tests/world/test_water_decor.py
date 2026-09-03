@@ -19,33 +19,17 @@ import pygame
 from game import config
 from game.content import get_content
 from world.layout import GROUND, CLIFF, VSTAIR, EWSTAIR
+from tests import worlds
 from world.map import GameMap
 from world.terrain.decor import scatter_water as W
 
 SEEDS = (35, 7, 1234)
-_SAVED = None
-_MAPS: dict = {}
 
 
-def setUpModule():
-    global _SAVED
-    pygame.init()
-    if pygame.display.get_surface() is None:
-        pygame.display.set_mode((1, 1))
-    _SAVED = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = True
-
-
-def tearDownModule():
-    config.HEIGHTMAP_ROOMS = _SAVED
 
 
 def _map(seed: int) -> GameMap:
-    if seed not in _MAPS:
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
-        _MAPS[seed] = gm
-    return _MAPS[seed]
+    return worlds.baked(seed)
 
 
 def _blobs(cells):
@@ -159,6 +143,9 @@ class PlacementTests(unittest.TestCase):
                            "the open-sea pass placed nothing")
 
     def test_is_deterministic_per_seed(self):
+        # Fresh maps, baked outside the cache: the cache brings its own
+        # display, these need one too (an earlier module may have quit it).
+        worlds.display()
         a, b = GameMap(seed=99), GameMap(seed=99)
         a._build_tiles()
         b._build_tiles()

@@ -1,10 +1,10 @@
 """The playable world.
 
-`GameMap` wraps a procedural `WorldLayout` (rooms + corridors). It answers "is
+`GameMap` wraps a procedural `WorldLayout` (islands + bridges). It answers "is
 this walkable?", slides entities along walls, and picks legal spawn points;
 without a seed it degrades to one big rectangular room (tests and any non-run
-context). It also **bakes** the tiled terrain (`_build_tiles` -> the room /
-corridor / cliff / stair / decor `Surface`s and anchor lists, via
+context). It also **bakes** the tiled terrain (`_build_tiles` -> one `Surface`
+per terrace, the bridges, the decor and the anchor lists, via
 `world/terrain/`) and hands a `TerrainRenderer` (`world/terrain/render.py`) the
 job of drawing it. If the tileset is missing, that renderer's flat fallback is
 permanent.
@@ -17,16 +17,14 @@ import pygame
 
 from game import config
 from game.assets import get_assets
-from world import inset as terrain_inset
-from world.elevation import LevelIndex, can_step
+from world.elevation import LevelIndex
+from world.rules import floor as floor_rules
+from world.rules import inset as terrain_inset
+from world.rules.steps import can_step
 from world.procedural import Room, WorldLayout, generate_world
 from world.terrain import autotile
 from world.terrain import bake as terrain_bake
-from world.legacy import terrain_cliffs
-from world.terrain import decor as terrain_decor
-from world.terrain import grid_paint
-from world.legacy import terrain_rooms
-from world.terrain.sheets import TileSheets
+from world.terrain.baked import BakedTerrain
 from world.terrain.render import TerrainRenderer
 
 # Compass directions for the last-resort unwedge hop in `resolve_movement`.
@@ -50,83 +48,19 @@ class GameMap:
             self.width, self.height = b.width, b.height
             self._rects = self.layout.walkable_rects()
             self.obstacles = self.layout.obstacles
-            # LD-9 D0/D2: elevation lookup for the movement rule. Flat
-            # (all level 0) with the height-map flag off, so it refuses
-            # nothing there.
+            # Elevation lookup for the movement rule.
             self._levels = LevelIndex(self.layout)
 
-        # The terrace margin (`world/inset.py`): how far inside its own floor a
+        # The terrace margin (`world/rules/inset.py`): how far inside its own floor a
         # body's centre has to stand. Read from the data rather than defaulted
         # in code; 0 switches the whole rule off.
         self._body_inset = terrain_inset.body_inset()
 
-        # Tiled-terrain state, built lazily on the first draw() (needs a display).
-        self._tiles_ready = False
-        self._tiles_ok = False
-        self._water_buf: pygame.Surface | None = None
-        self._water_tile = 0            # water tile size in world px (scroll stride)
-        self._room_surfs: dict[int, pygame.Surface] = {}
-        # `(blit_rect, surf, floor)` -- LD-8b: every terrain container below
-        # carries the floor it belongs to so `_draw_tiled` can composite the
-        # map one elevation at a time (a floor's grass, then the next floor's
-        # cliff wall dropping onto it, then that floor's grass, ...).
-        self._corr_surfs: list[tuple] = []
-        # LD-1 verticality: one baked south-facing cliff-face skirt per raised
-        # room, and one baked strip per stair. `(blit_rect, surf, floor)`.
-        self._cliff_surfs: list[tuple] = []
-        self._stair_surfs: list[tuple] = []
-        # LD-9: `(blit_rect, surf, base_level)` -- one baked surface per
-        # height-map room, covering its terraces, walls and flights together.
-        # Used instead of every other terrain collection when
-        # `config.HEIGHTMAP_ROOMS` is on.
-        self._grid_surfs: list[tuple] = []
-        # LD-7: the LD-4 staircase-unit tiles (landings + the 1x2 stair piece),
-        # lifted out of the cliff surface so they paint in the walkable-structure
-        # layer, above the drop shadow, not under the room floors. Same
-        # `(blit_rect, surf, high_floor)` shape as `_stair_surfs`.
-        self._ramp_surfs: list[tuple] = []
-        # LD-8a: `(blit_rect, surf, high_floor)` -- the rock stair overlay
-        # sprite for a "rock"-style ramp unit, drawn on top of its own floor's
-        # terrain so its foliage feathers over the neighbouring grass/cliff.
-        self._stair_overlays: list[tuple] = []
-        # LD-7a: `(blit_rect, tile, floor)` -- one lower-room grass tile drawn
-        # at a cliff-face foot cell that has a room floor directly south of it,
-        # in a pass *before* that floor's cliff faces so the stone sits on
-        # grass, not sea. `floor` is the raised room whose face it carries.
-        self._cliff_underlay: list[tuple] = []
-        # LD-7a: `(room_id, col, row)` ground-room edge cells with a cliff band
-        # flush overhead -- painted with the north side closed (no shoreline
-        # autotile) and seeded with no foam.
-        self._cliff_capped: set = set()
-        self._shore: list[tuple[int, int]] = []       # top-left world px of shoreline tiles
-        # LD-2 E8: `(x, y, floor)` -- top-left world px of a cliff foot that
-        # drops into open water, plus the raised room's floor so it laps in
-        # that level's pass. Kept out of `_shore` (sea-facing ground tiles only).
-        self._cliff_foam: list[tuple] = []
-        # LD-6: `(x, y, floor)` -- top-left world px of a cliff foot that lands
-        # on a lower room's floor -- a static drop shadow, no animation, drawn
-        # just under that level's cliff faces. `floor` is the raised room's.
-        self._cliff_shadow: list[tuple] = []
-        self._shadow: pygame.Surface | None = None
-        self._foam: list[pygame.Surface] | None = None
-        self._foam_routines: tuple[tuple[float, int], ...] = (
-            (9.0, 0), (12.0, 5), (15.0, 10))
-        # Obstacle index -> (anchor_x, anchor_y, fps, [frame, ...], phase). A
-        # tree takes its `fps` and frame offset from `tree_routines` so a grove
-        # does not sway in lock-step; everything else is (rig fps, 0). Each obstacle
-        # is skinned with a decoration rig scaled to its collider; obstacles with
-        # no entry (missing tileset / flag off) fall back to a drawn circle.
-        self._decos: dict[int, tuple] = {}
-        self._sprite_drop: dict[str, float] = {}
-        # Obstacle index -> (world_x, world_y, radius, surf) for tree shades.
-        # Each is depth-sorted immediately before its owning tree.
-        self._tree_shadows: dict[int, tuple] = {}
-        # Non-colliding scenery scatter (T8), resolved at build time. Each
-        # instance is (frames, anchor_x, anchor_y, fps, world_x, world_y).
-        self._room_decor: dict[int, list[tuple]] = {}   # room id -> interior clutter
-        self._void_decor: list[tuple] = []              # water scenery in the void
+        # The baked terrain (`world/terrain/baked.py`), built lazily on the
+        # first draw() -- it needs a display. `None` until then.
+        self.terrain: BakedTerrain | None = None
 
-        # Draw-time zoom (C3): the baked terrain surfaces are 1:1 world pixels;
+        # Draw-time zoom: the baked terrain surfaces are 1:1 world pixels;
         # every render method scales blit positions by `camera.zoom` and blits a
         # `_z_surf()`-scaled copy so the tiled world matches the zoomed entities.
         # `_z_surf` caches by source-surface id for the current zoom.
@@ -169,48 +103,25 @@ class GameMap:
         return (int((x - room.rect.left) // px), int((y - room.rect.top) // px))
 
     def _point_ok(self, x: float, y: float) -> bool:
+        """Is the point on floor? `world/rules/floor.py` is the one body of
+        this rule; the navigation grid reads the same function."""
         if self.layout is None:
             return self._rects[0].collidepoint(x, y)
-        for r in self.layout.rooms:
-            rr = r.rect
-            if (rr.left <= x < rr.right and rr.top <= y < rr.bottom
-                    and self.room_cell(r, x, y) in r.cells):
-                return True                # W5: grown-room bboxes can overlap in
-                                           # the void -> check every room, no break
-        for c in self.layout.corridors:
-            if c.rect.collidepoint(x, y):
-                return True
-        for s in self.layout.stairs:          # LD-1: a stair is a walkable strip
-            if s.rect.collidepoint(x, y):
-                return True
-        return False
+        return floor_rules.point_on_floor(self.layout, x, y)
 
     def _room_of(self, x: float, y: float):
-        """The room whose floor the point actually stands on, or `None`.
-
-        Mirrors `_point_ok`'s search rather than testing bounding boxes: grown
-        island rects overlap in the void, so a point inside two boxes belongs
-        to whichever one has a cell there.
-        """
+        """The island whose floor the point actually stands on, or `None`."""
         if self.layout is None:
             return None
-        for r in self.layout.rooms:
-            rr = r.rect
-            if (rr.left <= x < rr.right and rr.top <= y < rr.bottom
-                    and self.room_cell(r, x, y) in r.cells):
-                return r
-        return None
+        return floor_rules.room_of(self.layout, x, y)
 
     def inset_at(self, x: float, y: float) -> float:
-        """How far inside its own terrace `(x, y)` stands, in pixels.
-
-        `CAP` off any island floor -- a corridor, a bridge, a plank stair --
-        because those are flat and carry no level boundary to keep away from.
-        """
-        room = self._room_of(x, y)
-        if room is None:
+        """How far inside its own terrace `(x, y)` stands, in pixels. `CAP`
+        off any island floor -- on a bridge -- because a bridge is flat and
+        carries no level boundary to keep away from."""
+        if self.layout is None:
             return float(terrain_inset.CAP)
-        return float(terrain_inset.world_at(room, x, y))
+        return float(floor_rules.inset_at(self.layout, x, y))
 
     def inset_ok(self, x: float, y: float) -> bool:
         """Is `(x, y)` far enough inside its own terrace for a body to stand?"""
@@ -231,7 +142,7 @@ class GameMap:
         bare endpoint test would let it vault a cliff. Sampling every half tile
         cannot skip one.
 
-        No index (the flag off, or no layout) means no elevation to respect."""
+        No index (no layout) means no elevation to respect."""
         ix = self._levels
         if ix is None:
             return True
@@ -337,7 +248,7 @@ class GameMap:
     def random_point_in_room(self, room: Room, rng: random.Random,
                              margin: float = 24.0) -> pygame.Vector2:
         px = config.TILE_PX
-        if not room.cells:                          # plain rect (flag off)
+        if not room.cells:                          # no mask: a plain rect
             r = room.rect
             return pygame.Vector2(
                 rng.uniform(r.left + margin, r.right - margin),
@@ -374,34 +285,62 @@ class GameMap:
         return best
 
     # --- tiled terrain (built once, on the first draw) ----------
-    # W3 (journals/world_refactor.md): the autotile slot maths moved verbatim to
-    # world/terrain/autotile.py. These aliases keep `self._mask_slot(...)` (in
-    # the painters) and `GameMap._bridge_slot` (test_terrain) working.
+    # The autotile slot maths lives in world/terrain/autotile.py; these
+    # aliases keep `GameMap._bridge_slot` (test_terrain) working.
     _slot_for = staticmethod(autotile.slot_for)
     _mask_slot = staticmethod(autotile.mask_slot)
     _bridge_slot = staticmethod(autotile.bridge_slot)
 
-    @staticmethod
-    def _foam_routine_index(wx: float, wy: float, count: int) -> int:
-        """Stable spatial bucket so neighboring shore patches do not lock-step."""
-        col = int(wx) // config.TILE_PX
-        row = int(wy) // config.TILE_PX
-        return (col * 31 + row * 17) % max(1, count)
+    _foam_routine_index = staticmethod(BakedTerrain.foam_routine_index)
 
     def _foam_frame_at(self, wx: float, wy: float, seconds: float) -> pygame.Surface:
-        assert self._foam
-        routine = self._foam_routines[
-            self._foam_routine_index(wx, wy, len(self._foam_routines))
-        ]
-        fps, phase = routine
-        return self._foam[(int(seconds * fps) + phase) % len(self._foam)]
+        return self.terrain.foam_frame_at(wx, wy, seconds)
 
     def _build_tiles(self) -> None:
-        """Bake the layout into surfaces. Body in `world/terrain/bake.py`."""
-        terrain_bake.bake(self)
+        """Bake the layout into `self.terrain`, once. Body in
+        `world/terrain/bake.py`. Idempotent: tests that share one map through
+        `tests/worlds.py` rely on a second call being free."""
+        if self.terrain is None:
+            self.terrain = terrain_bake.bake(self.layout)
+
+    # The baked fields under the names the renderer and the tests read them
+    # by. Each forwards to `self.terrain`; before the bake they answer empty.
+    # `__dict__.get`, not `self.terrain`: the pure-helper tests build a map
+    # with `GameMap.__new__` and never run `__init__`.
+    _tiles_ready = property(lambda self: self.__dict__.get("terrain") is not None)
+    _tiles_ok = property(lambda self: bool(self.__dict__.get("terrain")
+                                           and self.terrain.ok))
+    _sheets = property(lambda self: getattr(self.__dict__.get("terrain"), "sheets", None))
+
+    def _baked(name, empty):
+        def get(self):
+            t = self.__dict__.get("terrain")
+            return empty() if t is None else getattr(t, name)
+
+        def put(self, value):
+            if self.__dict__.get("terrain") is None:
+                self.terrain = BakedTerrain(self.__dict__.get("layout"),
+                                            list(self.__dict__.get("obstacles", ())))
+            setattr(self.terrain, name, value)
+        return property(get, put)
+
+    _water_buf = _baked("water_buf", lambda: None)
+    _water_tile = _baked("water_tile", lambda: 0)
+    _grid_surfs = _baked("grid_surfs", list)
+    _corr_surfs = _baked("corr_surfs", list)
+    _shore = _baked("shore", list)
+    _shadow = _baked("shadow", lambda: None)
+    _foam = _baked("foam", lambda: None)
+    _foam_routines = _baked("foam_routines", lambda: BakedTerrain.foam_routines)
+    _decos = _baked("decos", dict)
+    _sprite_drop = _baked("sprite_drop", dict)
+    _tree_shadows = _baked("tree_shadows", dict)
+    _room_decor = _baked("room_decor", dict)
+    _void_decor = _baked("void_decor", list)
+    del _baked
 
     # --- render -----------------------------------------------
-    # Bodies live in `world/terrain/render.py` (`TerrainRenderer`, W6) and
+    # Bodies live in `world/terrain/render.py` (`TerrainRenderer`) and
     # callers reach them through the `renderer` property above. There used to be
     # eleven forwarders here doing nothing but `return self.renderer.<same
     # name>(...)`, and two of them were round trips: `TerrainRenderer` called

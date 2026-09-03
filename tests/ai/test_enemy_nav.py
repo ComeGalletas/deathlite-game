@@ -14,12 +14,12 @@ from game import config
 from game.game import Game
 from game.states.playing_state import PlayingState
 from world.pathfinding import NavField, _INF
-from world.procedural import generate_world
+from tests import worlds as W
 
 
 class NavFieldTests(unittest.TestCase):
     def _nf(self, seed=3):
-        w = generate_world(seed)
+        w = W.layout(seed)
         return w, NavField(w, w.obstacles)
 
     def test_builds_one_grid_and_field_per_class(self):
@@ -87,7 +87,7 @@ class NavFieldTests(unittest.TestCase):
         self.assertTrue(nf.target_cell_changed(p + pygame.Vector2(96, 96)))
 
     def test_deterministic(self):
-        w = generate_world(9)
+        w = W.layout(9)
         a, b = NavField(w, w.obstacles), NavField(w, w.obstacles)
         t = w.room(w.start_id).center
         a.rebuild(t)
@@ -193,7 +193,7 @@ class NavRebuildStaggerTests(unittest.TestCase):
         self.assertEqual(calls, [None])       # None -> all classes
 
     def test_navfield_rebuild_only_touches_the_named_field(self):
-        w = generate_world(3)
+        w = W.layout(3)
         nf = NavField(w, w.obstacles)
         nf.rebuild(w.room(w.start_id).center)
         snap_small = nf.fields["small"].cost.tobytes()

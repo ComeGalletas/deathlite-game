@@ -1,11 +1,8 @@
-"""LD-9 Phase C: bake a height-map room straight from its grid.
+"""Bake an island straight from its height map.
 
-This is the whole terrain painter for a room now -- one pass over
-`Room.grid`, one tile per cell. It replaces the LD-8 arrangement where the
-room floor, the cliff band under its south rim, the band's underlay tiles, the
-drop shadow and the ramp units were five separate collections stitched
-together by `_draw_tiled` in a fixed order. Since generation already decided
-every cell's kind and level, rendering has nothing left to derive.
+The whole terrain painter for an island: one pass over `Room.grid`, one tile
+per cell, one surface per terrace. Generation already decided every cell's
+kind and level, so rendering has nothing left to derive.
 
 Layering inside the returned surface, per cell:
 
@@ -340,8 +337,7 @@ def _shade(surf, sheets, casters, px) -> None:
     straight down: the blobs are three cells wide but sit one cell apart, so
     along a continuous run six of them overlap on every tile and normal alpha
     compositing stacks into lumpy over-darkened patches. Taking the per-pixel
-    maximum merges the run into one even strip. (The LD-8 band renderer hit
-    this and solved it the same way; see `terrain/render.py`.)"""
+    maximum merges the run into one even strip."""
     shadow = sheets.cliff_shadow
     if shadow is None or not casters:
         return
@@ -609,9 +605,9 @@ def _paint_room(store, sheets, layout, room, banded: bool):
 def paint_bridge(sheets, corridor):
     """`(blit_rect, surface)` for one plank bridge, tiled along its own rect.
 
-    The LD-8 painter derived the span from the two rooms' rects. That no longer
-    works: a height-map room's coastline wanders inside its rect, so a bridge
-    drawn rect-to-rect stops short and hangs over open water. `_seat_corridors`
+    Not from the two rooms' rects: an island's coastline wanders inside its
+    rect, so a bridge drawn rect-to-rect stops short and hangs over open
+    water. `_seat_corridors`
     has already stretched the rect coast to coast, so here the rect *is* the
     bridge."""
     px = sheets.px

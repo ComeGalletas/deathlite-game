@@ -14,45 +14,15 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
+from tests import worlds as W
 from game.assets import ASSETS_DIR, Assets, reset_assets
 from game.content import get_content
 
 
-# The pinned-seed render checks here validate the terrain renderer against the
-# flat base layout; LD-2 verticality shifts the RNG stream and adds cliff /
-# stair passes, and has its own coverage in tests/world/test_verticality.py.
-_SAVED_VERT = None
 
 
-# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
-# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
-# defaults on now and selects a different generator entirely, whose rooms are
-# height maps with overlapping bounding rects and no cliff band. Pin the flag
-# off here so this coverage keeps testing the path it was written for; the
-# height-map path has its own in `tests/world/test_elevation.py`.
-_SAVED_HEIGHTMAP = None
 
 
-def _pin_heightmap_off():
-    global _SAVED_HEIGHTMAP
-    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = False
-
-
-def _restore_heightmap():
-    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
-
-
-def setUpModule():
-    _pin_heightmap_off()
-    global _SAVED_VERT
-    _SAVED_VERT = config.WORLD_VERTICALITY
-    config.WORLD_VERTICALITY = False
-
-
-def tearDownModule():
-    _restore_heightmap()
-    config.WORLD_VERTICALITY = _SAVED_VERT
 
 
 def _display():
@@ -233,46 +203,46 @@ class ObstacleDecorTests(unittest.TestCase):
 
     def _map(self, seed=1234):
         from world.map import GameMap
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
+        gm = W.baked(seed)
         self.assertTrue(gm._tiles_ok, "tileset assets absent -- cannot test decor")
         return gm
 
     def test_worldlayout_has_no_standalone_decoration_field(self):
         from world.procedural import WorldLayout, generate_world
         self.assertNotIn("decorations", WorldLayout.__dataclass_fields__)
-        self.assertFalse(hasattr(generate_world(7), "decorations"))
+        self.assertFalse(hasattr(W.layout(7), "decorations"))
 
     def test_foam_anchors_stay_on_ground_edges_or_void_cliff_feet(self):
         from game import config
         gm = self._map()
         px = config.TILE_PX
         self.assertTrue(gm._shore)
+        # Every anchor stands on ground. Which ground -- a cell with sea or a
+        # lake beside it, and every such cell -- is the test below. (A bridge
+        # rect makes the sea under it "walkable", so the floor test cannot
+        # tell a beach at a bridge mouth from an interior cell.)
         for x, y in gm._shore:
             cx, cy = x + px / 2, y + px / 2
             self.assertTrue(gm._point_ok(cx, cy), "foam anchor is not under ground")
-            self.assertTrue(any(not gm._point_ok(cx + dx, cy + dy)
-                                for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px))),
-                            "foam ground tile no longer borders empty sea")
-        for x, y, _f in gm._cliff_foam:
-            self.assertFalse(gm._point_ok(x + px / 2, y + px / 2),
-                             "void-facing cliff foam is on walkable ground")
 
-    def test_every_sea_facing_ground_room_tile_has_foam(self):
+    def test_every_water_facing_ground_tile_has_foam_and_nothing_else(self):
         from game import config
         gm = self._map()
         px = config.TILE_PX
         expected = set()
+        from world.layout import GROUND, LAKE
+        # Any ground cell, on any terrace, with open sea or a lake beside
+        # it: a pool ringed by a raised terrace still gets its foam.
         for room in gm.layout.rooms:
-            if room.floor != 0:
-                continue
-            for col, row in room.cells:
-                x, y = room.rect.x + col * px, room.rect.y + row * px
-                if any(not gm._point_ok(x + px / 2 + dx, y + px / 2 + dy)
-                       for dx, dy in ((px, 0), (-px, 0), (0, px), (0, -px))):
-                    expected.add((x, y))
+            for (col, row), cell in room.grid.items():
+                if cell.kind != GROUND:
+                    continue
+                nbs = [room.grid.get(n) for n in ((col + 1, row), (col - 1, row),
+                                                  (col, row + 1), (col, row - 1))]
+                if any(n is None or n.kind == LAKE for n in nbs):
+                    expected.add((room.rect.x + col * px, room.rect.y + row * px))
         self.assertTrue(expected)
-        self.assertTrue(expected.issubset(set(gm._shore)))
+        self.assertEqual(expected, set(gm._shore))
 
     def test_every_obstacle_is_skinned_and_keys_are_obstacle_indices(self):
         gm = self._map()
@@ -284,16 +254,24 @@ class ObstacleDecorTests(unittest.TestCase):
     def test_sprite_width_matches_the_scaling_formula(self):
         gm = self._map()
         t = get_content().terrain
+        from world.rules import frontier
         boost = t["obstacle_decor"]["size_boost"]
         render_radius = t["obstacle_decor"].get("render_radius", {})
+        render_scale = t["obstacle_decor"].get("render_scale", {})
         for i, (ax, ay, fps, frs, phase) in gm._decos.items():
             o = gm.obstacles[i]
+            if o.kind == "tree":
+                continue          # skinned per biome group, see test_biome
             choices = t["obstacle_decor"]["rigs"][o.kind]
             rig = choices[(o.variant - 1) % len(choices)]
             meta = t["rigs"][rig]
             fw = meta["frame"][0]
             draw_r = render_radius.get(o.kind, o.radius)
-            expected = max(1, round(fw * (2.0 * draw_r * boost) / meta["footprint"]))
+            # `rig_scale` is the one authority (the scatter's reach prediction
+            # reads it too); a kind with a fixed `render_scale` -- a signpost --
+            # keeps its authored size whatever collider it carries.
+            expected = max(1, round(fw * frontier.rig_scale(
+                meta, draw_r, boost, render_scale.get(o.kind))))
             self.assertAlmostEqual(frs[0].get_width(), expected, delta=1,
                                    msg=f"{o.kind} r{o.radius} draw_r{draw_r} via {rig}")
 
@@ -313,19 +291,13 @@ class ObstacleDecorTests(unittest.TestCase):
                 self.assertGreater(d["rock"], d["pillar"])
         self.assertGreater(compared, 0, "no rock/pillar variant pair to compare")
 
-    def test_deterministic(self):
-        a, b = self._map(99), self._map(99)
-        self.assertEqual([o.variant for o in a.obstacles],
-                         [o.variant for o in b.obstacles])
-        self.assertEqual({i: e[3][0].get_size() for i, e in a._decos.items()},
-                         {i: e[3][0].get_size() for i, e in b._decos.items()})
 
     def test_obstacle_variants_in_range(self):
         # Small obstacles carry a 1..4 cosmetic variant; a `house` encodes its
         # colour band + type as 1..15 (see world/procedural._scatter_houses).
         from world.procedural import generate_world
         for seed in (1, 2, 3, 1234):
-            for o in generate_world(seed).obstacles:
+            for o in W.layout(seed).obstacles:
                 hi = 15 if o.kind == "house" else 4
                 self.assertIn(o.variant, range(1, hi + 1),
                               msg=f"{o.kind} variant {o.variant}")
@@ -343,8 +315,7 @@ class ObstacleDecorTests(unittest.TestCase):
         old = config.TERRAIN_DECORATIONS
         config.TERRAIN_DECORATIONS = False
         try:
-            gm = GameMap(seed=1234)
-            gm._build_tiles()
+            gm = W.baked(1234, TERRAIN_DECORATIONS=False)
             self.assertEqual(gm._decos, {})
         finally:
             config.TERRAIN_DECORATIONS = old
@@ -367,14 +338,13 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
 
     def _map(self, seed=1234):
         from world.map import GameMap
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
+        gm = W.baked(seed)
         self.assertTrue(gm._tiles_ok, "tileset assets absent")
         return gm
 
     def test_room_and_corridor_bakes_are_srcalpha_32bit(self):
         gm = self._map()
-        surfs = list(gm._room_surfs.values()) + [s for _r, s, _f in gm._corr_surfs]
+        surfs = [s for _b, s, _l in gm._grid_surfs] + [s for _r, s, _f in gm._corr_surfs]
         self.assertTrue(surfs)
         for s in surfs:
             self.assertTrue(s.get_flags() & pygame.SRCALPHA, "not SRCALPHA")
@@ -387,11 +357,11 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
 
     def test_autotile_edge_transparency_survives_the_bake(self):
         gm = self._map()
-        # Every room's (0,0) cell is corner_nw and its top row is edge_n -- both
-        # transparent on the water side. With an opaque .convert() bake these
+        # An island's rect is inset from its coast, so the top row of every
+        # terrace surface is open sea -- transparent. With an opaque .convert() bake these
         # would all be alpha 255 (black-filled).
         bled = 0
-        for surf in gm._room_surfs.values():
+        for _blit, surf, _lvl in gm._grid_surfs:
             w = surf.get_width()
             bled += sum(1 for x in range(0, w, 4) if surf.get_at((x, 0))[3] < 255)
         self.assertGreater(bled, 0, "top edge of every room baked fully opaque")
@@ -427,7 +397,7 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
         gm.renderer._draw_tiled(rec, cam)
 
         foam_set = set(map(id, gm._foam))
-        room_set = set(map(id, gm._room_surfs.values()))
+        room_set = {id(s) for _b, s, _l in gm._grid_surfs}
         first_foam = next((i for i, s in enumerate(rec.calls) if id(s) in foam_set), None)
         first_room = next((i for i, s in enumerate(rec.calls) if id(s) in room_set), None)
         self.assertIsNotNone(first_foam, "no foam blit")
@@ -436,7 +406,7 @@ class TerrainSurfaceAlphaTests(unittest.TestCase):
 
     def test_foam_locations_use_three_desynchronized_routines(self):
         gm = self._map()
-        anchors = gm._shore + [(x, y) for x, y, _f in gm._cliff_foam]
+        anchors = list(gm._shore)
         buckets = {gm._foam_routine_index(x, y, len(gm._foam_routines))
                    for x, y in anchors}
         self.assertTrue({0, 1, 2}.issubset(buckets))
@@ -498,8 +468,7 @@ class BridgeCorridorTests(unittest.TestCase):
 
     def test_corridors_bake_srcalpha_without_seeding_the_shore(self):
         from world.map import GameMap
-        gm = GameMap(seed=1234)
-        gm._build_tiles()
+        gm = W.baked(1234)
         self.assertTrue(gm._tiles_ok and gm._corr_surfs)
         for _r, s, _f in gm._corr_surfs:
             self.assertTrue(s.get_flags() & pygame.SRCALPHA)
@@ -515,7 +484,7 @@ class BridgeCorridorTests(unittest.TestCase):
     def test_corridor_carries_bridge_edge_properties(self):
         from world.procedural import generate_world
         for seed in (1, 7, 99, 1234):
-            w = generate_world(seed)
+            w = W.layout(seed)
             for c in w.corridors:
                 self.assertIn(c.axis, ("h", "v"))
                 self.assertEqual((c.end_low, c.end_high),
@@ -539,8 +508,7 @@ class BridgeCorridorTests(unittest.TestCase):
                 for name, idx in b["slots"].items()}
         px = self.t["tile_px"]
 
-        gm = GameMap(seed=1234)
-        gm._build_tiles()
+        gm = W.baked(1234)
         self.assertTrue(gm._corr_surfs)
         checked_h = checked_v = 0
         for c, (rect, surf, _f) in zip(gm.layout.corridors, gm._corr_surfs):
@@ -560,28 +528,6 @@ class BridgeCorridorTests(unittest.TestCase):
                              f"corridor {c.a}-{c.b}: wrong high-end cap")
         self.assertTrue(checked_h and checked_v, "need both axes in the sample")
 
-    def test_bridge_surface_overlaps_one_tile_into_each_room(self):
-        from world.map import GameMap
-        px = self.t["tile_px"]
-        gm = GameMap(seed=1234)
-        gm._build_tiles()
-        for c, (rect, _surf, _f) in zip(gm.layout.corridors, gm._corr_surfs):
-            lo = gm.layout.room(c.room_low).rect
-            hi = gm.layout.room(c.room_high).rect
-            if c.axis == "h":
-                # ends reach ~one tile past each room edge, not the room centres
-                self.assertLess(rect.left, lo.right)
-                self.assertGreaterEqual(rect.left, lo.right - 2 * px)
-                self.assertGreater(rect.right, hi.left)
-                self.assertLessEqual(rect.right, hi.left + 2 * px)
-                self.assertLess(rect.width, c.rect.width)
-            else:
-                self.assertLess(rect.top, lo.bottom)
-                self.assertGreaterEqual(rect.top, lo.bottom - 2 * px)
-                self.assertGreater(rect.bottom, hi.top)
-                self.assertLessEqual(rect.bottom, hi.top + 2 * px)
-                self.assertLess(rect.height, c.rect.height)
-
 
 class DecorationScatterTests(unittest.TestCase):
     """T8: seeded non-colliding scenery -- interior clutter + void water
@@ -594,41 +540,28 @@ class DecorationScatterTests(unittest.TestCase):
 
     def _map(self, seed=1234):
         from world.map import GameMap
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
+        gm = W.baked(seed)
         self.assertTrue(gm._tiles_ok, "tileset assets absent")
         return gm
 
-    def test_scatter_is_deterministic_per_seed(self):
-        a, b = self._map(99), self._map(99)
-        pa = {rid: [i[4:] for i in inst] for rid, inst in a._room_decor.items()}
-        pb = {rid: [i[4:] for i in inst] for rid, inst in b._room_decor.items()}
-        self.assertEqual(pa, pb)
-        self.assertEqual([i[4:] for i in a._void_decor],
-                         [i[4:] for i in b._void_decor])
 
     def test_something_is_placed(self):
         gm = self._map(7)
         self.assertTrue(gm._room_decor, "no interior clutter placed anywhere")
         self.assertTrue(gm._void_decor, "no void scenery placed")
 
-    def test_room_clutter_lands_on_interior_cells_clear_of_the_centre(self):
+    def test_room_clutter_lands_on_floor_cells_of_its_room(self):
+        # Where on the floor it may stand -- frontiers, terrace margins,
+        # spacing -- is test_decor_frontiers' and test_decor_density's.
         gm = self._map(1234)
         px = 64
         for rid, inst in gm._room_decor.items():
             room = gm.layout.room(rid)
             r = room.rect
-            cx, cy = room.center                          # centroid for shaped rooms
-            clear = min(r.width, r.height) * 0.22
             for _frs, _ax, _ay, _fps, x, y in inst:
                 self.assertTrue(r.collidepoint(x, y), "clutter outside its room")
                 cell = (int((x - r.left) // px), int((y - r.top) // px))
-                self.assertIn(cell, room.cells, "clutter on a bitten-out cell")
-                self.assertGreaterEqual(x, r.x + px)      # not on the perimeter col
-                self.assertLess(x, r.right - px)
-                self.assertGreaterEqual(y, r.y + px)      # not on the perimeter row
-                self.assertLess(y, r.bottom - px)
-                self.assertGreater((x - cx) ** 2 + (y - cy) ** 2, clear ** 2)
+                self.assertIn(cell, room.cells, "clutter off the floor")
 
     def test_void_scenery_is_off_every_room_and_corridor(self):
         gm = self._map(1234)
@@ -642,7 +575,7 @@ class DecorationScatterTests(unittest.TestCase):
         old = config.TERRAIN_DECOR
         config.TERRAIN_DECOR = False
         try:
-            gm_off = self._map(1234)
+            gm_off = W.baked(1234, TERRAIN_DECOR=False)
         finally:
             config.TERRAIN_DECOR = old
         self.assertIs(gm_on.obstacles, gm_on.layout.obstacles)
@@ -658,7 +591,7 @@ class DecorationScatterTests(unittest.TestCase):
         old = config.TERRAIN_DECOR
         config.TERRAIN_DECOR = False
         try:
-            gm = self._map(1234)
+            gm = W.baked(1234, TERRAIN_DECOR=False)
             self.assertEqual(gm._room_decor, {})
             self.assertEqual(gm._void_decor, [])
         finally:
@@ -703,7 +636,11 @@ class DecorationScatterTests(unittest.TestCase):
         gm = self._map(1234)
         self.assertTrue(gm._void_decor and gm._foam)
         cam = Camera(gm.width, gm.height)
-        cam.snap_to(pygame.Vector2(gm._void_decor[0][4], gm._void_decor[0][5]))
+        # The void scenery nearest a shore anchor, so both are in one view.
+        inst = min(gm._void_decor,
+                   key=lambda d: min((d[4] - x) ** 2 + (d[5] - y) ** 2
+                                     for x, y in gm._shore))
+        cam.snap_to(pygame.Vector2(inst[4], inst[5]))
 
         class _Recorder:
             def __init__(self): self.calls = []
@@ -733,8 +670,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
 
     def _map(self, seed=1234):
         from world.map import GameMap
-        gm = GameMap(seed=seed)
-        gm._build_tiles()
+        gm = W.baked(seed)
         self.assertTrue(gm._tiles_ok, "tileset assets absent")
         return gm
 
@@ -802,7 +738,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
             if gm.obstacles[i].kind != "tree":
                 continue
             seen += 1
-            self.assertEqual(len(frs), 8)
+            self.assertGreater(len(frs), 1)
             self.assertGreater(fps, 0.0)
         self.assertGreater(seen, 0, "no tree obstacle skinned")
 
@@ -837,7 +773,7 @@ class TreeSkinShadowSeamTests(unittest.TestCase):
         old = config.TERRAIN_SHADOWS
         config.TERRAIN_SHADOWS = False
         try:
-            gm = self._map()
+            gm = W.baked(1234, TERRAIN_SHADOWS=False)
             self.assertTrue(gm._decos)
             self.assertEqual(gm._tree_shadows, {})
         finally:

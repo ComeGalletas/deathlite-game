@@ -1,14 +1,9 @@
 """`TerrainRenderer` -- everything that turns the baked terrain + obstacle
 skins into pixels on the frame.
 
-W6 of `journals/world_refactor.md`. Lifted verbatim off `GameMap`; `self.gm`
-is the `GameMap`, which still owns the bake (`_build_tiles`) and every `_*surfs`
-/ `_shore` / `_decos` / `_tree_shadows` container this reads, plus
-`_foam_frame_at` / `_foam_routine_index`. Cross-method calls stay `self.*`;
-state and the two painters a test monkey-patches on the instance
-(`_draw_one_obstacle`, `_draw_one_tree_shadow`) route through `self.gm.*` so the
-patch still wins. `GameMap` keeps a thin delegator for every name
-`game/states/playing` or the rendering tests call.
+`self.gm` is the `GameMap`: the layout, the elevation index, the zoom cache,
+and -- through its forwarding properties -- the `BakedTerrain` it holds
+after the first draw. Drawing happens here and nowhere else.
 """
 from __future__ import annotations
 
@@ -32,6 +27,14 @@ _SPECIAL_FLOORS = {
 class TerrainRenderer:
     def __init__(self, game_map) -> None:
         self.gm = game_map
+        # Animation time source. `None` reads the pygame clock; a test or the
+        # frame digest (`world/digest.py`) sets a callable returning fixed
+        # seconds so foam and decor land on a known frame.
+        self.clock = None
+
+    def seconds(self) -> float:
+        return (self.clock() if self.clock is not None
+                else pygame.time.get_ticks() * 0.001)
 
     def draw(self, surface: pygame.Surface, camera) -> None:
         """Whole map in one pass, with tree shades and obstacles depth-sorted."""
@@ -104,7 +107,7 @@ class TerrainRenderer:
             surface.fill(_VOID)
         view = camera.visible_rect()
         if gm._foam:
-            seconds = pygame.time.get_ticks() * 0.001
+            seconds = self.seconds()
             fsz = gm._foam[0].get_width()
             fhalf = fsz // 2 - config.TILE_PX // 2
             fview = view.inflate(fsz, fsz)
@@ -213,93 +216,21 @@ class TerrainRenderer:
                 surface.blit(self._z_surf(surf),
                              ((rect.x - ox) * z, (rect.y - oy) * z))
 
-        seconds = pygame.time.get_ticks() * 0.001
-        foam_ready = bool(gm._foam)
-        if foam_ready:
-            fsz = gm._foam[0].get_width()
-            fhalf = fsz // 2 - config.TILE_PX // 2
-            fview = view.inflate(fsz, fsz)
-
-        def _foam_at(points):
-            if not foam_ready:
-                return
-            for wx, wy in points:
-                if fview.collidepoint(wx, wy):
-                    frame = gm._foam_frame_at(wx, wy, seconds)
-                    surface.blit(self._z_surf(frame),
-                                 ((wx - ox - fhalf) * z, (wy - oy - fhalf) * z))
-
         if gm.layout is None:
             # Interior clutter is NOT drawn here -- it is depth-sorted with the
             # obstacles and the characters (see `scenery_drawables`).
             return
 
-        if gm._grid_surfs:
-            # A5: one baked surface per *terrace*, composited level by level.
-            # Within a level, south-first, so a room lower down the map overlaps
-            # the one above it. Across levels, ascending, so a higher terrace is
-            # always painted over the one it stands on -- which is what lets the
-            # depth layer slot sprites between two bands (`ground_bands`).
-            for blit, surf, _lvl in sorted(gm._grid_surfs,
-                                           key=lambda t: (t[2], t[0].y)):
-                _blit(blit, surf)
-            for rect, surf, _lvl in gm._corr_surfs:
-                _blit(rect, surf)
-            return
-
-        # LD-8b: composite the map one elevation at a time, bottom up. For each
-        # floor -- the cliff wall dropping onto the level below it (its foot
-        # foam over open water, the LD-7a underlay grass + contact shadow, then
-        # the stone faces), this level's baked room grass, then its walkable
-        # connectors (plank stairs, LD-4 ramp units, corridors) and finally the
-        # LD-8a rock stair overlay. A higher floor's wall is therefore painted
-        # over the finished lower floor, never the reverse. Flat worlds have a
-        # single floor 0 with no cliffs, so this is just the room + corridor pass.
-        for f in sorted({r.floor for r in gm.layout.rooms}):
-            _foam_at([(x, y) for x, y, ff in gm._cliff_foam if ff == f])
-
-            for rect, tile, uf in gm._cliff_underlay:
-                if uf == f:
-                    _blit(rect, tile)
-
-            if gm._shadow is not None:
-                pts = [(wx, wy) for wx, wy, sf in gm._cliff_shadow if sf == f]
-                sh_half = gm._shadow.get_width() // 2 - config.TILE_PX // 2
-                sview = view.inflate(gm._shadow.get_width(),
-                                     gm._shadow.get_height())
-                vis = [p for p in pts if sview.collidepoint(*p)]
-                if vis:
-                    # Accumulate on a scratch layer with MAX so overlapping
-                    # blobs of a continuous run merge into one soft strip
-                    # instead of stacking their alpha and over-darkening.
-                    zsh = self._z_surf(gm._shadow)
-                    scratch = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-                    for wx, wy in vis:
-                        scratch.blit(zsh, ((wx - ox - sh_half) * z,
-                                           (wy - oy - sh_half) * z),
-                                     special_flags=pygame.BLEND_RGBA_MAX)
-                    surface.blit(scratch, (0, 0))
-
-            for blit, surf, cfl in gm._cliff_surfs:
-                if cfl == f:
-                    _blit(blit, surf)
-
-            for r in gm.layout.rooms:
-                if r.floor == f:
-                    _blit(r.rect, gm._room_surfs[r.id])
-
-            for blit, surf, sfl in gm._stair_surfs:
-                if sfl == f:
-                    _blit(blit, surf)
-            for blit, surf, rfl in gm._ramp_surfs:
-                if rfl == f:
-                    _blit(blit, surf)
-            for rect, surf, cfl in gm._corr_surfs:
-                if cfl == f:
-                    _blit(rect, surf)
-            for rect, surf, ofl in gm._stair_overlays:
-                if ofl == f:
-                    _blit(rect, surf)
+        # One baked surface per *terrace*, composited level by level. Within
+        # a level, south-first, so an island lower down the map overlaps the
+        # one above it. Across levels, ascending, so a higher terrace is
+        # always painted over the one it stands on -- which is what lets the
+        # depth layer slot sprites between two bands (`ground_bands`).
+        for blit, surf, _lvl in sorted(gm._grid_surfs,
+                                       key=lambda t: (t[2], t[0].y)):
+            _blit(blit, surf)
+        for rect, surf, _lvl in gm._corr_surfs:
+            _blit(rect, surf)
         # Interior clutter is NOT drawn here -- it is depth-sorted with the
         # obstacles and the characters (see `scenery_drawables`).
 
@@ -309,7 +240,7 @@ class TerrainRenderer:
         frs, ax, ay, fps, wx, wy = inst
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
-        frame = (frs[int(pygame.time.get_ticks() * 0.001 * fps) % len(frs)]
+        frame = (frs[int(self.seconds() * fps) % len(frs)]
                  if fps else frs[0])
         surface.blit(self._z_surf(frame),
                      (round((wx - ox) * z - ax * z), round((wy - oy) * z - ay * z)))
@@ -345,8 +276,7 @@ class TerrainRenderer:
         entry = self.gm._decos.get(i)
         if entry is not None:
             ax, ay, fps, frs, phase = entry
-            frame = (frs[(int(pygame.time.get_ticks() * 0.001 * fps) + phase)
-                         % len(frs)]
+            frame = (frs[(int(self.seconds() * fps) + phase) % len(frs)]
                      if fps else frs[0])
             drop_scale = self.gm._sprite_drop.get(o.kind, config.SPRITE_ANCHOR_DROP)
             drop = drop_scale * o.radius * z

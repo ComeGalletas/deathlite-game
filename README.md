@@ -61,17 +61,39 @@ See `journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
 ## Run the tests
 
 ```bash
-python -m unittest discover -s tests -t . -v
+python -m pytest
+```
+
+That is the `unit` and `world` tiers (see `pytest.ini`): hand-built grids,
+plus the four cached worlds in `tests/worlds.py`. The `sweep` tier builds
+many seeds to make statistical claims and runs before a commit:
+
+```bash
+python -m pytest -m sweep
+```
+
+Everything, under the standard library runner (no tiers):
+
+```bash
+python -m unittest discover -s tests -t .
 ```
 
 `tests/` is split by subject into `__init__.py` sub-packages — `ai/`,
 `rendering/`, `characters/`, `combat/`, `progression/`, `world/`, `systems/`,
-`core/` — so only `__init__.py` and the shared `aictx.py` fake-AI-context helper
-sit at the root. `-t .` makes the modules import as `tests.<area>.<name>` so the
-`combat` / `world` / `systems` / `progression` folders don't shadow the
-same-named source packages. `pytest` works too and needs no extra flag.
+`core/` — so only `__init__.py`, the shared `worlds.py` world cache, the
+`aictx.py` fake-AI-context helper and `conftest.py` (tier markers, by path)
+sit at the root. `-t .` makes the modules import as `tests.<area>.<name>` so
+the `combat` / `world` / `systems` / `progression` folders don't shadow the
+same-named source packages.
 
-578 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+A world is generated once per seed per process. A test that needs to mutate
+one takes `worlds.fresh(seed)`; one that changes generation settings passes
+them as keywords (`worlds.layout(seed, HEIGHTMAP_UNSEAL=False)`) and gets a
+separately cached build. `tests/world/test_digest.py` pins a fingerprint of
+the layout, the bake and one drawn frame for each cached seed; a change that
+moves the world says so and runs `python -m world.digest --write`.
+
+863 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
 terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
 depth-sorted rendering, the start menu + options + rankings screens, developer
@@ -175,10 +197,16 @@ deathlite-game/
 │                       shake, audio (+ mixer backend), animation, debug overlay
 ├── combat/             weapons, damage, targeting, status
 ├── progression/        experience, stats, upgrades, blessings, items, meta
-├── world/              map (GameMap facade: walkability + terrain bake),
-│                       layout (WorldLayout data model), gen/ (world-gen
-│                       stages), terrain/ (TileSheets + painters + renderer),
-│                       pathfinding, spawning (director)
+├── world/              layout (the WorldLayout data model); gen/ (seeded
+│                       generation: one module per stage, height/ for the
+│                       island height maps, settings + validate); rules/
+│                       (floor, steps, inset, frontier, biome -- shared by
+│                       generation, bake and runtime); elevation (LevelIndex);
+│                       map (GameMap: the collider, holding the BakedTerrain);
+│                       terrain/ (sheets, painters, bake -> BakedTerrain,
+│                       renderer); nav/ (NavGrid, flow field; `pathfinding`
+│                       re-exports); digest (layout / bake / frame
+│                       fingerprints); spawning (director)
 ├── ui/                 hud, level-up panel, damage numbers
 ├── data/               JSON content (weapons, enemies, bosses, characters,
 │                       blessings, items, meta_upgrades, sprites, terrain)
@@ -186,7 +214,7 @@ deathlite-game/
 │                       projectiles/, terrain/{tiles,bridge,props,resources}/,
 │                       buildings/, effects/, ui/title.png, CREDITS.md
 │                       (PNG sprites only — see assets/CREDITS.md)
-└── tests/              578 tests: pure logic + headless integration
+└── tests/              863 tests: pure logic + headless integration
     ├── ai/             behaviours, FSM enemies, pathfinding, nav, boss
     ├── rendering/      camera, animation, depth sort, terrain, sprites, assets,
     │                   screens

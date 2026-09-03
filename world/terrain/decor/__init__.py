@@ -1,6 +1,5 @@
 """Decoration: everything placed on the world that is not terrain or an entity.
 
-Split from a single `decor.py` once the module carried five separable concerns.
 Each leaf answers one question:
 
   `rigs`            -- what does a prop's art look like at this size?
@@ -12,12 +11,11 @@ Each leaf answers one question:
   `scatter_water`   -- ...and on the sea, the shoreline and the lakes
 
 The frontier rules the two scatters share -- what counts as a terrace edge, and
-how far a sprite's art reaches -- live in `world/frontier.py`, which the
-obstacle scatter in `world/gen/scatter.py` imports too and which therefore
-cannot live in here.
+how far a sprite's art reaches -- live in `world/rules/frontier.py`, shared
+with the obstacle scatter in `world/gen/scatter.py`.
 
-Everything the bake and the tests used to reach for on the flat module is
-re-exported below, so `from world.terrain import decor` keeps working.
+The builders and helpers are re-exported below, so `from world.terrain import
+decor` reaches all of them.
 """
 from world.terrain.decor.budget import (
     FEATURE, GROUND_COVER, LANDMARK, TIERS,

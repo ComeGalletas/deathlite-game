@@ -13,28 +13,12 @@ import pygame
 from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.playing_state import PlayingState
+from tests import worlds as W
 from world.map import GameMap
 from game import config
 
 
 
-# LD-9: this module covers the **LD-8 world model** -- grown room shapes,
-# corridors, cliff bands, one `floor` per room. `config.HEIGHTMAP_ROOMS`
-# defaults on now and selects a different generator entirely, whose rooms are
-# height maps with overlapping bounding rects and no cliff band. Pin the flag
-# off here so this coverage keeps testing the path it was written for; the
-# height-map path has its own in `tests/world/test_elevation.py`.
-_SAVED_HEIGHTMAP = None
-
-
-def _pin_heightmap_off():
-    global _SAVED_HEIGHTMAP
-    _SAVED_HEIGHTMAP = config.HEIGHTMAP_ROOMS
-    config.HEIGHTMAP_ROOMS = False
-
-
-def _restore_heightmap():
-    config.HEIGHTMAP_ROOMS = _SAVED_HEIGHTMAP
 
 
 def fresh_playing():
@@ -56,8 +40,7 @@ class SceneryDrawablesTests(unittest.TestCase):
 
     def test_one_entry_per_visible_obstacle_keyed_by_its_y(self):
         from systems.camera import Camera
-        gm = GameMap(seed=1234)
-        gm._build_tiles()
+        gm = W.baked(1234)
         cam = Camera(gm.width, gm.height)
         cam.snap_to(gm.center)
         view = cam.visible_rect().inflate(320, 320)
@@ -69,8 +52,7 @@ class SceneryDrawablesTests(unittest.TestCase):
 
     def test_drawables_are_callable_with_a_surface(self):
         from systems.camera import Camera
-        gm = GameMap(seed=7)
-        gm._build_tiles()
+        gm = W.baked(7)
         cam = Camera(gm.width, gm.height)
         cam.snap_to(gm.center)
         surf = pygame.Surface((320, 240))
@@ -79,31 +61,33 @@ class SceneryDrawablesTests(unittest.TestCase):
 
     def test_tree_shade_is_sorted_by_tree_depth_before_its_owner(self):
         from systems.camera import Camera
-        gm = GameMap(seed=7)
-        gm._build_tiles()
+        gm = W.baked(7)
         tree_idx = next(iter(gm._tree_shadows))
         cam = Camera(gm.width, gm.height)
         cam.snap_to(gm.obstacles[tree_idx].pos)
 
         shadow_owner = {id(shadow): i for i, shadow in gm._tree_shadows.items()}
         calls = []
-        # Patched on the renderer, which is where the drawing lives.
-        # `GameMap` used to carry a forwarder for each of these and
-        # `TerrainRenderer` called back through it to reach its own methods, so
-        # patching the map worked by accident; the round trip is gone.
-        gm.renderer._draw_one_tree_shadow = (
-            lambda _surface, _camera, shadow:
-            calls.append(("shadow", shadow_owner[id(shadow)])))
-        gm.renderer._draw_one_obstacle = (
-            lambda _surface, _camera, i, _obstacle: calls.append(("obstacle", i)))
-        # Interior clutter shares this layer now (it used to be painted flat,
-        # before the characters). It is not what this test is about, and it is
-        # the only drawable here that would touch the `None` surface below.
-        gm.renderer._blit_one_decor = lambda _surface, _camera, _inst: None
-
-        drawables = sorted(gm.renderer.scenery_drawables(cam), key=lambda item: item[0])
-        for _depth, draw in drawables:
-            draw(None)
+        # Patched on the renderer, which is where the drawing lives -- and
+        # restored, because the map is the shared cached one: a painter left
+        # patched here drew nothing for every later test of seed 7, the frame
+        # digest included.
+        from unittest import mock
+        # Interior clutter shares this layer. It is not what this test is
+        # about, and it is the only drawable here that would touch the `None`
+        # surface below.
+        with mock.patch.object(gm.renderer, "_draw_one_tree_shadow",
+                               lambda _surface, _camera, shadow:
+                               calls.append(("shadow", shadow_owner[id(shadow)]))), \
+             mock.patch.object(gm.renderer, "_draw_one_obstacle",
+                               lambda _surface, _camera, i, _obstacle:
+                               calls.append(("obstacle", i))), \
+             mock.patch.object(gm.renderer, "_blit_one_decor",
+                               lambda _surface, _camera, _inst: None):
+            drawables = sorted(gm.renderer.scenery_drawables(cam),
+                               key=lambda item: item[0])
+            for _depth, draw in drawables:
+                draw(None)
 
         shadow_pos = calls.index(("shadow", tree_idx))
         owner_pos = calls.index(("obstacle", tree_idx))
@@ -246,9 +230,3 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def setUpModule():
-    _pin_heightmap_off()
-
-
-def tearDownModule():
-    _restore_heightmap()
