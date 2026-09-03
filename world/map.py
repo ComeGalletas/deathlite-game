@@ -393,6 +393,8 @@ class GameMap:
     _decos = _baked("decos", dict)
     _sprite_drop = _baked("sprite_drop", dict)
     _tree_shadows = _baked("tree_shadows", dict)
+    _art_rects = _baked("art_rects", dict)
+    _ghost = _baked("ghost", dict)
     _room_decor = _baked("room_decor", dict)
     _void_decor = _baked("void_decor", list)
     del _baked

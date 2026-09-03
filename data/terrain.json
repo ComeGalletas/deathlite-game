@@ -1046,6 +1046,10 @@
       "sign": 0.75,
       "scarecrow": 0.75
     },
+    "ghost": {
+      "alpha": 110,
+      "kinds": ["tree", "house", "rock", "pillar"]
+    },
     "tree_shadow": {
       "radius_scale": 1.9,
       "radius_padding": 5,

@@ -353,9 +353,10 @@ When adding a new animated sprite:
 
 No code changes are required for a new asset that fits an existing consumer and rig format. New animation behavior, draw layering, or special transformations may require Python changes.
 
-## Seeing Characters Behind Obstacles (proposal, 2026-09-03)
+## Seeing Characters Behind Obstacles (proposed and implemented, 2026-09-03)
 
-> Proposed, not implemented. The hero and the enemies vanish behind a tree
+> Implemented the same day as written, as laid out below; the journal
+> entry with the measurements is in `journals/journal.md`. Originally: The hero and the enemies vanish behind a tree
 > crown, a house or a pillar the moment their ground-contact Y sorts below
 > the obstacle's, because the depth pass paints the obstacle's art over
 > them. The ask: keep them visible through the obstacle as a translucent

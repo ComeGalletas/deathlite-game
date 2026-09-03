@@ -46,6 +46,11 @@ class BakedTerrain:
     sprite_drop: dict = field(default_factory=dict)
     # Obstacle index -> (world_x, world_y, radius, surf) for tree shades.
     tree_shadows: dict = field(default_factory=dict)
+    # Obstacle index -> (world_x, world_y, w, h): where the skin's art is
+    # drawn, so the ghost pass can find the art that covers a character.
+    art_rects: dict = field(default_factory=dict)
+    # `obstacle_decor.ghost` from the data: `alpha` (0 = off) and `kinds`.
+    ghost: dict = field(default_factory=dict)
     # Non-colliding scenery, resolved at bake time. Each instance is
     # (frames, anchor_x, anchor_y, fps, world_x, world_y).
     room_decor: dict = field(default_factory=dict)   # room id -> interior clutter

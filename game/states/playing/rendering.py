@@ -69,9 +69,17 @@ class WorldRenderer:
         return config.SPRITE_ANCHOR_DROP * radius * self.ps.camera.zoom
 
     def _blit_character(self, surface, frame, dest, character_y: float) -> None:
-        frame = self.ps.game_map.renderer.shade_character_frame(
-            frame, dest, self.ps.camera, character_y)
-        surface.blit(frame, dest)
+        r = self.ps.game_map.renderer
+        drawn = r.shade_character_frame(frame, dest, self.ps.camera, character_y)
+        surface.blit(drawn, dest)
+        # For the ghost pass. A shaded result lives in a scratch surface the
+        # next character of the same size overwrites, so it is copied here;
+        # the unshaded frame is the asset cache's own object and is recorded
+        # as is (and the ghost of it is cached by identity).
+        if drawn is frame:
+            r.record_character(frame, dest, character_y)
+        else:
+            r.record_character(drawn.copy(), dest, character_y, cacheable=False)
 
     # --- feedback / hud-adjacent overlays --------------------------
     def feedback_overlays(self, surface: pygame.Surface) -> None:

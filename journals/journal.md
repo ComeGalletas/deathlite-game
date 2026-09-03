@@ -2843,3 +2843,49 @@ the elevation rule), then read that cell's long-way-round cost as a jump.
 The walker now applies the same rule (`_same_floor` in
 `tests/ai/test_pathfinding.py`: a hop may not change terrace level except
 through a flight cell). The field is untouched.
+
+---
+
+## Ghost silhouettes behind obstacles (2026-09-03)
+
+The proposal at the end of `documentation/sprite_functionality.md`, done.
+
+- `obstacle_skins.py` records, next to each skin, the world rectangle
+  `_draw_one_obstacle` will paint it in (`BakedTerrain.art_rects`), and
+  the data's `obstacle_decor.ghost` block (`BakedTerrain.ghost`).
+- `TerrainRenderer` buckets those rectangles like the tree shadows
+  (`_art_index`, listed kinds only), `record_character` notes every frame
+  `_blit_character` draws, and `ghost_pass` -- called once at the end of
+  `PlayingState._draw_world`, after every band -- blits each recorded
+  frame again at the data's alpha through the art that covers it and
+  sorts in front of it (obstacle Y greater than the body's), clipped to
+  that art. The alpha copy is cached by the frame's identity
+  (`_ghost_of`); the source frame is never touched.
+- `data/terrain.json`: `"ghost": {"alpha": 110, "kinds": ["tree",
+  "house", "rock", "pillar"]}`. Alpha 0 or a missing block is off.
+- Tests: `tests/rendering/test_ghost.py` (9) -- a synthetic one-tree map
+  pins the clip exactly (ghost under the art, nothing past its edge,
+  nothing for a body in front), the real world pins every covering crown
+  ghosts once, the kind filter, alpha 0, the cache, and a run frame.
+
+The bake and frame digests did not move: the digest frame has no
+characters and the new containers are not in `_BAKE_FIELDS`.
+
+**Caught on the way.** A shaded character's drawn frame is the renderer's
+reused scratch surface (the render fix that ended per-character
+allocations), so recording it for the ghost pass recorded a surface the
+next same-sized body overwrites. `_blit_character` now records a copy of
+a shaded result, flagged not cacheable, and the asset frame itself when
+no shade applied (its ghost is cached by identity). A test pins that a
+shaded body's ghost keeps its own pixels.
+
+**Cost.** Stress scene, 100 live, the walking-hero probe: with 57 bodies
+recorded and 25 clipped ghost blits in a frame, the pass adds 0.2-0.6 ms
+of render (on 5.6 / off 5.4 ms p50, measured back to back in one process
+while the suite ran on another core). The alpha of 110 reads strong over
+a bright crown; it is one number in `terrain.json` if a fainter ghost is
+wanted.
+
+Suite: 1,019 tests, 1,018 passed and 1 skipped (7 min 4 s); the run
+started before the scratch fix, whose 26 rendering tests were re-run
+green afterwards.

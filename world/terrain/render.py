@@ -36,6 +36,13 @@ class TerrainRenderer:
         self._shade_index: dict | None = None
         self._shade_index_key: tuple | None = None
         self._shade_scratch: dict[tuple, tuple] = {}
+        # The obstacle-art index and the characters drawn this frame
+        # (`record_character` / `ghost_pass`): bodies behind obstacle art
+        # are drawn again through it as a translucent silhouette.
+        self._art_buckets: dict | None = None
+        self._art_buckets_key: tuple | None = None
+        self._ghost_queue: list = []
+        self._ghost_cache: dict[int, tuple] = {}
 
     def seconds(self) -> float:
         return (self.clock() if self.clock is not None
@@ -389,6 +396,110 @@ class TerrainRenderer:
         shaded.blit(frame, (0, 0))
         shaded.blit(overlay, (0, 0))
         return shaded
+
+    # --- ghost silhouettes -------------------------------------------
+    def _art_index(self) -> dict:
+        """The obstacle skins' art rectangles (world px, baked by
+        `obstacle_skins`) bucketed the way the tree shadows are, holding
+        `(obstacle index, rect)` for the kinds the data says cover a body."""
+        rects = self.gm._art_rects
+        ghost = self.gm._ghost
+        key = (id(rects), len(rects), id(ghost))
+        if self._art_buckets is None or self._art_buckets_key != key:
+            kinds = set(ghost.get("kinds", ()))
+            c = self._SHADE_CELL
+            index: dict = {}
+            for i, rect in rects.items():
+                o = self.gm.obstacles[i]
+                if o.kind not in kinds:
+                    continue
+                x0, y0, w, h = rect
+                for gx in range(int(x0 // c), int((x0 + w) // c) + 1):
+                    for gy in range(int(y0 // c), int((y0 + h) // c) + 1):
+                        index.setdefault((gx, gy), []).append((i, rect))
+            self._art_buckets = index
+            self._art_buckets_key = key
+        return self._art_buckets
+
+    def begin_frame(self) -> None:
+        """Forget the characters of the previous frame."""
+        self._ghost_queue.clear()
+
+    def record_character(self, frame: pygame.Surface, dest, character_y: float,
+                         cacheable: bool = True) -> None:
+        """A character was just drawn: `frame` (as drawn -- shaded, tinted,
+        flipped) at screen `dest`, standing on ground-contact `character_y`.
+        `cacheable` says the frame is a long-lived object whose ghost may be
+        cached by identity; a per-frame copy (a shaded body) is not."""
+        if self.gm._ghost.get("alpha", 0):
+            self._ghost_queue.append((frame, (int(dest[0]), int(dest[1])), character_y,
+                                      cacheable))
+
+    def _ghost_of(self, frame: pygame.Surface, alpha: int) -> pygame.Surface:
+        """`frame` with its alpha scaled to `alpha`, cached by the frame's
+        identity (the animation frames are the asset cache's objects and come
+        back unchanged for the whole animation). Never `set_alpha` on the
+        frame itself: every other user would inherit it."""
+        hit = self._ghost_cache.get(id(frame))
+        if hit is not None and hit[0] is frame and hit[2] == alpha:
+            return hit[1]
+        ghost = frame.copy()
+        ghost.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+        if len(self._ghost_cache) >= 128:
+            self._ghost_cache.clear()
+        self._ghost_cache[id(frame)] = (frame, ghost, alpha)
+        return ghost
+
+    @staticmethod
+    def _ghost_uncached(frame: pygame.Surface, alpha: int) -> pygame.Surface:
+        ghost = frame.copy()
+        ghost.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+        return ghost
+
+    def ghost_pass(self, surface, camera) -> int:
+        """Draw every recorded character again, at the data's ghost alpha,
+        through the obstacle art that covers it and sorts in front of it --
+        clipped to that art, so the uncovered part of the body is not drawn
+        twice. Returns how many clipped blits were made."""
+        ghost = self.gm._ghost
+        alpha = int(ghost.get("alpha", 0))
+        if not alpha or not self._ghost_queue:
+            return 0
+        index = self._art_index()
+        if not index:
+            return 0
+        z = self.gm._render_zoom
+        ox, oy = camera.pos.x, camera.pos.y
+        c = self._SHADE_CELL
+        obstacles = self.gm.obstacles
+        blits = 0
+        for frame, dest, character_y, cacheable in self._ghost_queue:
+            frame_rect = frame.get_rect(topleft=dest)
+            wx0, wy0 = ox + frame_rect.left / z, oy + frame_rect.top / z
+            wx1, wy1 = ox + frame_rect.right / z, oy + frame_rect.bottom / z
+            seen: set = set()
+            drawn = None
+            for gx in range(int(wx0 // c), int(wx1 // c) + 1):
+                for gy in range(int(wy0 // c), int(wy1 // c) + 1):
+                    for i, (ax, ay, aw, ah) in index.get((gx, gy), ()):
+                        if i in seen:
+                            continue
+                        seen.add(i)
+                        if obstacles[i].pos.y <= character_y:
+                            continue          # painted before the body: it is behind
+                        art = pygame.Rect(round((ax - ox) * z), round((ay - oy) * z),
+                                          round(aw * z), round(ah * z))
+                        clip = art.clip(frame_rect)
+                        if clip.width <= 0 or clip.height <= 0:
+                            continue
+                        if drawn is None:
+                            drawn = (self._ghost_of(frame, alpha) if cacheable
+                                     else self._ghost_uncached(frame, alpha))
+                        surface.set_clip(clip)
+                        surface.blit(drawn, dest)
+                        surface.set_clip(None)
+                        blits += 1
+        return blits
 
     def draw_tree_shadows(self, surface, camera) -> None:
         """Compatibility painter; depth-aware callers use `scenery_drawables`."""

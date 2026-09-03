@@ -795,6 +795,7 @@ class PlayingState(State):
         and the characters before this existed.
         """
         r = self.game_map.renderer
+        r.begin_frame()
         r.draw_water(surface, self.camera)
         scenery = r.banded_scenery(self.camera)
         actors = self._actor_items()
@@ -809,6 +810,9 @@ class PlayingState(State):
             items.sort(key=lambda t: t[0])
             for _depth, fn in items:
                 fn(surface)
+        # After every band: the bodies that ended up behind obstacle art are
+        # drawn again through it as translucent silhouettes.
+        r.ghost_pass(surface, self.camera)
 
     def _draw_flat_effects(self, surface, level: int) -> None:
         """Everything that lies flat on one terrace: interactables, hazard
