@@ -153,11 +153,8 @@ algorithmic.
 
 ## 5. Smaller items, in order of value
 
-1. **Measure draw.** The stress harness times `update` only; the S7
-   journal addendum has one draw measurement. The renderer culls to the
-   view, so 100 live costs about what 10 in view cost, but the terrain
-   blit cache and the depth sort have not been profiled under a crowd.
-   Add `--draw` to `spawn.stress`.
+1. **Measure draw** -- done, section 7. Add `--draw` to `spawn.stress` so
+   it stays measured.
 2. **`room_of` chunk lookup** (section 2, second paragraph).
 3. **The bump resolver** is 0.6 ms a frame at 100 live and scales with
    local density, not the count. Fine as it is.
@@ -178,3 +175,73 @@ algorithmic.
 | time-sliced flow-field fill | a day | removes the 15-30 ms spikes | `world/nav/field.py`, `game/states/playing/navigation.py`, `tests/ai/test_enemy_nav.py` |
 | `room_of` chunk lookup | an hour | a further cut of the probe | `world/rules/floor.py` |
 | worker process for the fill | a day | desktop-only, only if the lag shows | new `world/nav/worker.py` |
+
+---
+
+## 7. Render (measured 2026-09-03)
+
+`game._render()` under the stress scene, dummy video driver, 300
+frames after a warm-up: **p50 22.6 ms, p90 25.7 ms** with 56 live and 18
+in view; a second run with 43 live measured 8.1 ms. The variance is
+which bodies are in view and under trees, and that is the whole story:
+
+| Cost centre | Share of render | Note |
+|---|---|---|
+| `shade_character_frame` | **74 %** | 15,147 calls in 300 frames; each walks all 336 tree shadows in the world (3.0 M `_z_surf` lookups) |
+| every other blit (terrain bands, decor, obstacles, water) | 12 % | 214 blits a frame at ~13 us; sheets are `convert_alpha`'d |
+| obstacles, water, ground bands, decor, scenery sort | 6 % | 1.2 + 1.0 + 0.8 + 0.4 + 0.6 ms |
+| HUD, overlays, fill, flip | < 2 % | |
+
+Two facts behind the 74 %:
+
+- **The actor pass does not cull.** `PlayingState._actor_items` emits a
+  draw for every live enemy; with the spawn master's zone that is up to
+  100 bodies a frame of which a dozen are on screen. Each off-screen
+  body still fetches its frame and runs the shade pass before blitting
+  nothing useful.
+- **The shade pass is O(characters x shadows).** For each character it
+  scales (cached) and rect-tests every tree shadow in the world, then
+  allocates an overlay surface and a frame copy when one intersects.
+
+Measured with monkeypatches on the 43-live scene (baseline 8.1 ms):
+
+| Variant | p50 | p90 |
+|---|---|---|
+| baseline | 8.10 | 8.87 ms |
+| A: cull actors outside the view + 256 px | 5.99 | 6.75 |
+| A + B: test only shadows near the view | 4.78 | 5.18 |
+| A + C: no character shading at all (the bound) | 3.65 | 4.10 |
+| world only, hero as the sole actor | 3.46 | 3.78 |
+
+So the static world costs ~3.5 ms and everything above that is the
+actor pass. In order:
+
+1. **Cull actors to the padded view** in `_actor_items` (enemies, death
+   poofs, summons; the boss when off screen). A body outside the view
+   plus its widest sprite reach draws nothing. About a quarter of the
+   render at 43 live, more at 100.
+2. **Index the tree shadows.** Bucket `_tree_shadows` once at bake (they
+   are static) in a coarse grid keyed by world cell, and have
+   `shade_character_frame` query the character's rect against that
+   instead of walking the world. Same result, O(nearby). Together with
+   1 this is the 4.8 ms row; a spatial index does slightly better than
+   the view prefilter measured because it also skips the on-screen
+   shadows that do not touch the character.
+3. **Stop allocating per character per frame.** When a shadow does
+   intersect, the pass makes a fresh SRCALPHA overlay and a frame copy;
+   a scratch overlay reused across characters (cleared per use) and an
+   in-place multiply on the copy halve the remaining shade cost. The
+   red hit tint (`hit_tinted`) likewise copies the frame every frame of
+   the 0.26 s hurt window; a one-entry cache keyed by the frame's id
+   makes that one copy per hit.
+4. **The static 3.5 ms** is ~200 blits of cached scaled surfaces plus
+   the water band and decor. The lever there is fewer, larger blits:
+   composite each island's ground bands into one surface per level at
+   bake (they are already per-level surfaces per room) and the decor
+   that never moves into them, leaving per-frame blits for the
+   animated foam and the sprites. That is the renderer refactor's job,
+   not a tweak; do it only if the frame is still over budget after 1-3.
+
+None of this touches the update loop; all of it is browser-relevant
+twice over, since render there is already 14-20 ms and scales the same
+way.
