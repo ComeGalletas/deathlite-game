@@ -572,3 +572,44 @@ the master returned and says so when it refuses. `PlayingState._spawn_enemy`
 returns the enemy and takes an owner, so the tests can too.
 Tests: `test_menu_spawns_are_not_bound_by_the_live_cap` (dev mode) and
 the exempt-owner check in `test_master`.
+
+---
+
+## The obstacle index in the collider (2026-09-03)
+
+Item 1 of `documentation/fluidity_plan.md`, done.
+
+`GameMap.is_walkable` and `blocking_obstacle_hit` ended with a scan of
+every obstacle in the world. `world/map.py` now carries
+`_ObstacleIndex`: the obstacles bucketed by a 128 px world grid, with the
+widest radius kept so a probe asks for `radius + reach` and gets a
+superset the exact disc test then filters. `GameMap.obstacles` became a
+property whose setter rebuilds the index, because the tests assign the
+list after construction (`test_obstacles`); obstacles never move once
+placed, so nothing else can stale it.
+
+| `python -m spawn.stress`, 100 live | p50 | p90 | p99 |
+|---|---|---|---|
+| before, LOD 2 | 5.78 | 27.02 | 29.82 ms |
+| after, LOD 2 | **1.13** | 24.34 | 30.33 ms |
+| after, LOD 1 (off) | 1.19 | 22.78 | 25.45 ms |
+
+The p90 and p99 are the flow-field rebuild and do not move; item 3 of
+the plan is what moves them. With the scan gone the tick LOD is worth
+0.06 ms a frame; its default is left at 2 for now, but it could go back
+to 1 (exact simulation for every body) at no measurable cost, which is
+a call for the owner.
+
+Tests: `tests/world/test_obstacle_index.py` (4) -- index against scan on
+4,000 random probes per cached seed at every body radius, walkability and
+projectile blocking unchanged, assignment rebuilds, bucket edges.
+
+Suite: 990 of 991 on the first full run; the one failure,
+`test_no_damage_keeps_the_hero_attacking_but_deals_zero`, did not
+reproduce -- the dev-mode file twice in order, the suspect pair, all of
+`tests/core`, the earlier directories replayed in front of it, and forty
+seeds of the scenario all pass. The dev run's seed is the global RNG, so
+it is a rare-seed flake in that test (the hero's shots not reaching a
+tank placed 30 px away for three seconds), unrelated to the index. Left
+open; if it recurs, pin the test's seed or place the tank on a verified
+floor spot.

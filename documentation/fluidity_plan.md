@@ -70,13 +70,14 @@ once for the AI's avoidance); the collider does not use it.
 | linear scan | 93 us | 6.0 ms |
 | spatial index | 4 us | 1.2 ms |
 
-**Proposal.** `GameMap` builds the obstacle grid once (obstacles are
-final after the unseal repair and never move) and `is_walkable` queries
-it; `blocking_obstacle_hit` (projectiles) reads the same grid. The
-playing state's own `_obstacle_grid` then reads `game_map`'s instead of
-building a second one. Risk: none that a test would not catch --
-`test_pathfinding` and the collider tests pin the answers, and the index
-returns a superset of the disc test's candidates.
+**Done (2026-09-03).** `world/map.py` carries `_ObstacleIndex` (128 px
+buckets, superset by the widest radius); `GameMap.obstacles` is a
+property that rebuilds it on assignment; both scans read it. Stress
+scene, 100 live: update p50 5.8 -> 1.1 ms; with the tick LOD off, 1.2 ms
+-- the LOD is now worth 0.06 ms and could go back to 1. The playing
+state's own `_obstacle_grid` (the AI's avoidance query) still builds its
+own `SpatialGrid`; folding it into the map's index is a tidy-up, not a
+win.
 
 After this the next per-enemy cost is `_point_ok` -> `room_of`, a
 linear walk over the nine island rects per probe (235k calls in the
@@ -245,3 +246,69 @@ actor pass. In order:
 None of this touches the update loop; all of it is browser-relevant
 twice over, since render there is already 14-20 ms and scales the same
 way.
+
+---
+
+## 8. Holding 60 fps on a modern PC (measured 2026-09-03)
+
+A stable 60 means every frame under 16.7 ms of update plus render plus
+flip, not a good average. Probed on the stress scene with the hero
+**walking** in a slow circle (so enemies come into view and the flow
+field's drift trigger fires as it does in play), 1,200 frames, the
+obstacle index in, tick LOD 2, a pytest run sharing the machine:
+
+| | total p50 | p90 | p99 | frames over 16.7 ms |
+|---|---|---|---|---|
+| 100 live | 16.9 | 23.1 | 58.0 ms | **51 %** |
+| 30 live (74 by the end, the director kept spawning) | 11.4 | 18.2 | 54.3 ms | 20 % |
+
+Of the frames over budget at 100 live: 59 held a flow-field rebuild
+(those frames total ~54 ms), 5 a terrain blit-cache fill, 1 a GC
+collection, and **551 were ordinary frames whose render alone was
+14-15 ms**. GC is not a factor: 260 collections in 20 s cost 16.5 ms in
+all, the worst one 6.7 ms.
+
+So consistency is two things, in this order:
+
+1. **The render median.** With bodies in view the draw is 10-15 ms
+   before update is added; section 7's three items (cull actors, index
+   the tree shadows, stop the per-character allocations) take it to
+   about 5 ms, which leaves ten for everything else. This is what turns
+   the 51 % into a few percent.
+2. **The rebuild spike.** A frame with a flow-field rebuild costs three
+   times the budget and there are three a second while the hero walks.
+   Section 3a (the time-sliced fill at ~3 ms a frame) is the only fix
+   that removes it rather than thinning it. After 1 and 2 the p99 sits
+   under the budget.
+
+Then the pacing itself, which cost reduction does not address:
+
+3. **Sync the flip to the display.** `set_mode` takes no flags and
+   `clock.tick(60)` throttles with a 1 ms sleep after the work, so even
+   a frame that fits is presented whenever it finishes, not on the
+   refresh: a frame that lands at 16.9 ms shows for two refreshes and
+   the next for none, which reads as a stutter although the average is
+   fine. pygame 2.5 offers `set_mode(..., pygame.SCALED | pygame.DOUBLEBUF,
+   vsync=1)`: the flip waits for the refresh and the cadence is the
+   monitor's. `SCALED` routes the window through a texture, which costs
+   an upload per frame (~1-2 ms at 1600x900) and changes nothing else
+   about the blits; the software `flip()` today costs about the same on
+   the dummy driver. Try it behind a `config.VSYNC` flag and measure
+   with the F1 overlay on the real display, where the current numbers
+   come from a dummy driver and say nothing about presentation.
+4. **Keep the deferrable work deferrable.** The spawn master already
+   spreads its own work (wakes 8 a frame, samples two enemies a frame in
+   the watchdog, one spawn pack a tick); the sliced fill puts the nav on
+   the same footing. The rule for anything added later: no single frame
+   does a job that can be split, and the split has a per-frame budget in
+   data.
+5. **Warm the blit cache during loading.** Five hitches a run from a
+   band's first appearance; a pre-warm pass over the start island during
+   the loading screen removes them and costs nothing visible.
+6. **`gc.freeze()` after loading**, and a raised generation-0 threshold,
+   are a cheap safety net against a future allocation-heavy feature,
+   not a fix for anything measured today.
+
+A fixed update step with render interpolation is not on this list: it
+decouples simulation from presentation, but with items 1-3 done the
+frame fits with margin and the complexity would buy nothing.
