@@ -89,7 +89,45 @@ class LoadingState(State):
         if config.ENEMY_PATHFINDING:
             nav = NavField(layout, layout.obstacles)
             yield "navigation"
+        yield from self._warm_steps(gm)
         self._prebuilt = PrebuiltWorld(gm, nav)
+
+    # The first frames of a run used to pay for every scaled surface the
+    # view needs (`TerrainRenderer._z_surf` fills `GameMap._blit_cache`
+    # lazily): a 62 ms frame on first sight of a band. Drawing the start
+    # island's surroundings once here, off screen, at the run's zoom and a
+    # few foam phases, leaves the cache warm for the run.
+    _WARM_RING = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1),
+                  (-1, -1), (1, -1), (-1, 1), (1, 1))
+    _WARM_FOAM_PHASES = (0.0, 0.37, 0.71)
+
+    def _warm_steps(self, gm):
+        """Render the view at the start position and the eight views around
+        it into a scratch surface, one position per step."""
+        if gm.layout is None:
+            return
+        from systems.camera import Camera
+        cam = Camera(gm.width, gm.height, config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
+                     zoom=config.CAMERA_ZOOM)
+        scratch = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        r = gm.renderer
+        centre = gm.center
+        span_w, span_h = cam.world_span()
+        saved_clock = r.clock
+        try:
+            for i, (dx, dy) in enumerate(self._WARM_RING):
+                cam.snap_to(pygame.Vector2(centre.x + dx * span_w, centre.y + dy * span_h))
+                phases = self._WARM_FOAM_PHASES if (dx, dy) == (0, 0) else (0.0,)
+                for t in phases:
+                    r.clock = lambda t=t: t
+                    r.draw_water(scratch, cam)
+                    for level in r.ground_levels():
+                        r.draw_ground_band(scratch, cam, level)
+                    for _lvl, _depth, fn in r.banded_scenery(cam):
+                        fn(scratch)
+                yield f"warming the view {i + 1} of {len(self._WARM_RING)}"
+        finally:
+            r.clock = saved_clock
 
     def update(self, dt: float) -> None:
         if self._anim is not None:

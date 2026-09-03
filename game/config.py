@@ -14,6 +14,15 @@ SCREEN_WIDTH: int = 1600
 SCREEN_HEIGHT: int = 900
 FPS: int = 61
 TITLE: str = "Death Lite Game"
+# Present frames on the display's refresh. The window is created with
+# `pygame.SCALED | pygame.DOUBLEBUF` and `vsync=1`, so `flip()` waits for the
+# refresh and the cadence is the monitor's; without it a frame that fits the
+# budget is still shown whenever it happens to finish, which reads as
+# stutter at a fine average. `SCALED` routes the window through a texture
+# (an upload per frame, ~1-2 ms at 1600x900). Falls back to a plain window
+# if the driver refuses (the tests' dummy driver does); `Game.vsync` says
+# which you got. Off in the browser profile, where pygbag owns the canvas.
+VSYNC: bool = True
 
 # Largest delta time (seconds) a single frame is allowed to represent. Without
 # this a stall (e.g. window drag) produces a huge dt that tunnels entities
@@ -612,8 +621,9 @@ def apply_web_profile() -> None:
     `systems.camera.Camera`, is overridden by an explicit argument in
     `PlayingState`), so a plain reassignment here propagates.
     """
-    global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM
+    global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
     SAVE_ENABLED = False
+    VSYNC = False
     FPS = 60
     SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
     CAMERA_ZOOM = 1.25
