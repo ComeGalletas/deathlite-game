@@ -34,12 +34,27 @@ _KNOCK_VEC_SCALE = 0.15     # dev overlay: `_knock` px/s -> screen px line lengt
 _SPAWN_MARK_PX = 6          # dev overlay: half-size of a spawn-point mark, world px
 
 
+_TINT_CACHE: dict[int, tuple] = {}     # id(frame) -> (frame, tinted copy)
+_TINT_CACHE_CAP = 128
+
+
 def hit_tinted(frame):
     """A red-tinted copy of a sprite frame -- the damage flash for rigs with no
     `hurt` strip. `BLEND_RGBA_ADD` brightens toward red and leaves the alpha
-    silhouette intact (transparent pixels stay transparent)."""
+    silhouette intact (transparent pixels stay transparent).
+
+    Cached by the frame's identity: the animation frames are the asset
+    cache's own objects, so the same one comes back for the whole 0.26 s
+    hurt window, and this used to copy it on every frame of it. The source
+    is kept in the entry so its id cannot be recycled under the cache."""
+    hit = _TINT_CACHE.get(id(frame))
+    if hit is not None and hit[0] is frame:
+        return hit[1]
     out = frame.copy()
     out.fill((*_HIT_TINT, 0), special_flags=pygame.BLEND_RGBA_ADD)
+    if len(_TINT_CACHE) >= _TINT_CACHE_CAP:
+        _TINT_CACHE.clear()
+    _TINT_CACHE[id(frame)] = (frame, out)
     return out
 
 

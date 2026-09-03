@@ -828,17 +828,25 @@ class PlayingState(State):
         """`(level, depth_y, draw_fn)` for the characters -- hero, enemies,
         boss, summons and the one-shot death poofs."""
         lvl = self.game_map.renderer.level_at
+        # Only what can be seen: every live body used to be listed, drawn and
+        # shaded whether or not it was anywhere near the view.
+        pad = config.RENDER_ACTOR_CULL_PAD
+        view = self.camera.visible_rect().inflate(2 * pad, 2 * pad)
         out = [(lvl(e.pos.x, e.pos.y), e.pos.y,
-                lambda s, e=e: self._draw_one_enemy(s, e)) for e in self.enemies]
+                lambda s, e=e: self._draw_one_enemy(s, e)) for e in self.enemies
+               if view.collidepoint(e.pos.x, e.pos.y)]
         for fx in self._death_fx:
-            out.append((lvl(fx[1].x, fx[1].y), fx[1].y,
-                        lambda s, fx=fx: self._draw_death_fx(s, fx)))
-        if self.boss is not None and self.boss.alive:
+            if view.collidepoint(fx[1].x, fx[1].y):
+                out.append((lvl(fx[1].x, fx[1].y), fx[1].y,
+                            lambda s, fx=fx: self._draw_death_fx(s, fx)))
+        if (self.boss is not None and self.boss.alive
+                and view.inflate(2 * pad, 2 * pad).collidepoint(self.boss.pos.x, self.boss.pos.y)):
             out.append((lvl(self.boss.pos.x, self.boss.pos.y),
                         self.boss.pos.y, self._draw_boss))
         for sm in self.summons:
-            out.append((lvl(sm.pos.x, sm.pos.y), sm.pos.y,
-                        lambda s, sm=sm: self._draw_one_summon(s, sm)))
+            if view.collidepoint(sm.pos.x, sm.pos.y):
+                out.append((lvl(sm.pos.x, sm.pos.y), sm.pos.y,
+                            lambda s, sm=sm: self._draw_one_summon(s, sm)))
         out.append((lvl(self.player.pos.x, self.player.pos.y),
                     self.player.pos.y, self._draw_player))
         return out

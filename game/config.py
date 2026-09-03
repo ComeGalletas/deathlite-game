@@ -366,6 +366,14 @@ ENEMY_PATHFINDING: bool = True
 # Seconds between full field rebuilds toward the player (also rebuilt early once
 # the player drifts a couple of navigation cells from the last rebuild target).
 ENEMY_NAV_REBUILD_INTERVAL: float = 0.4
+# How much of a frame a flow-field fill may take before it yields and picks
+# up next frame (seconds). A fill used to run whole -- 15-19 ms for the
+# small class on the LD-10 worlds, three times a second while the hero
+# walks, the single biggest frame-time spike in the game. Sliced, the
+# previous field keeps steering until the new one lands a few frames
+# later; the two-cell drift trigger already tolerates that lag. `None`
+# runs a fill whole in one frame.
+ENEMY_NAV_FILL_BUDGET: float | None = 0.003
 
 # --- Colours (RGB) ---------------------------------------------------------
 COLOR_BG = (16, 16, 22)
@@ -450,6 +458,11 @@ ENEMY_LOD_SKIP: int = 2
 # LOD (world px, added to each side), so a body walking into view is
 # already ticking at full rate when it appears.
 ENEMY_LOD_VIEW_PAD: int = 192
+# The draw pass skips characters farther than this outside the view (world
+# px, each side): the widest sprite reach plus slack. Every live body used
+# to be drawn -- and shaded against every tree in the world -- whether or
+# not it could be seen.
+RENDER_ACTOR_CULL_PAD: int = 320
 ENEMY_COUNT_BASE: int = 40
 ENEMY_COUNT_STEP: int = 5
 ENEMY_COUNT_STEP_PERIOD: float = 20.0

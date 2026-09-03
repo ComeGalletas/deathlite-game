@@ -98,7 +98,7 @@ the jump path fires several times a second.
 
 Three options, in the order to try them.
 
-**3a. Time-slice the fill.** Give `FlowField` a `step(budget_ms)` that
+**3a. Time-slice the fill -- done (2026-09-03), see the spawn master journal.** Give `FlowField` a `step(budget_ms)` that
 resumes the bucket loop where it stopped, and double-buffer the cost
 array so the *old* field keeps steering until the new one completes.
 `NavCoordinator` starts a fill and advances it ~3 ms a frame; a 17 ms
@@ -179,7 +179,7 @@ algorithmic.
 
 ---
 
-## 7. Render (measured 2026-09-03)
+## 7. Render (measured 2026-09-03; items 1-3 done the same day, see the spawn master journal)
 
 `game._render()` under the stress scene, dummy video driver, 300
 frames after a warm-up: **p50 22.6 ms, p90 25.7 ms** with 56 live and 18
@@ -250,6 +250,10 @@ way.
 ---
 
 ## 8. Holding 60 fps on a modern PC (measured 2026-09-03)
+
+> Items 1 and 2 below landed the same day. The walking-hero probe after
+> them: total p50 5.5, p90 8.5, p99 9.8 ms, one frame of 1,200 over
+> budget (a GC). Items 3-6 stand.
 
 A stable 60 means every frame under 16.7 ms of update plus render plus
 flip, not a good average. Probed on the stress scene with the hero
