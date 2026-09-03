@@ -212,7 +212,13 @@ class DevMenuState(State):
         if p is None:
             return
         offset = pygame.Vector2(120, 0).rotate(random.uniform(0.0, 360.0))
-        p._spawn_enemy(enemy_id, at=p.player.pos + offset)
+        # Owner `dev` is on the spawn master's `cap_exempt` list: a developer
+        # piling bodies up for a stress test is not bound by the live cap the
+        # director plays under. Count what was actually seated, not attempts.
+        made = p.spawn.spawn_enemy(enemy_id, at=p.player.pos + offset, owner="dev")
+        if made is None:
+            self._status = f"{enemy_id}: the spawn master refused (world cap)"
+            return
         self._spawn_counts[enemy_id] = self._spawn_counts.get(enemy_id, 0) + 1
         self._status = f"spawned {self._spawn_counts[enemy_id]} x {enemy_id}"
 

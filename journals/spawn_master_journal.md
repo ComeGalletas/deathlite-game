@@ -546,3 +546,29 @@ Two more measurements, on the way to `documentation/fluidity_plan.md`:
 - Draw + flip under the same crowd (15 bodies in view, dummy video
   driver): p50 7.7 ms, p90 8.7 ms, one 62 ms frame as the terrain blit
   cache filled.
+
+---
+
+## Dev-menu spawns and the live cap (2026-09-03)
+
+**Reported:** "Spawn enemy..." in the dev menu stops producing enemies
+after a certain amount.
+
+**Cause.** The menu spawned with the default owner `direct`, which the
+master holds to the director's cap: 40 bodies at the start of a run,
++5 every 20 s of game time, clamped to `ENEMY_LIVE_CAP` (100). Sixty
+menu spawns at t = 0 seated forty; `spawn_at` then answered `None`. The
+menu's status line still said "spawned 60 x chaser" because it counted
+attempts, not results. The limit moving with the clock is what made it
+read as random. The rule predates the master (the old `spawn_enemy`
+refused past the same cap); the master only made the refusal explicit
+and gave scripted owners a way round it.
+
+**Fix.** Dev spawns are scripted: they carry `owner="dev"`, and `dev`
+joins `arena` in `owners.cap_exempt` (`data/spawn_tables.json`), so the
+master seats them whatever the live count -- the world cap still holds.
+The dev menu and the F2 key pass the owner; the menu counts only what
+the master returned and says so when it refuses. `PlayingState._spawn_enemy`
+returns the enemy and takes an owner, so the tests can too.
+Tests: `test_menu_spawns_are_not_bound_by_the_live_cap` (dev mode) and
+the exempt-owner check in `test_master`.

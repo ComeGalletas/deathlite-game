@@ -252,7 +252,8 @@ class PlayingState(State):
             self.player.invulnerable = not self.player.invulnerable
             log.info("debug: invulnerable = %s", self.player.invulnerable)
         elif key == keys["spawn_enemy"]:
-            self.spawn.spawn_enemy("elite" if self.rng.random() < 0.3 else "chaser")
+            self.spawn.spawn_enemy("elite" if self.rng.random() < 0.3 else "chaser",
+                                   owner="dev")
         elif key == keys["grant_xp"]:
             self.levels.add_xp(25)
         elif key == keys["force_level_up"]:
@@ -502,8 +503,8 @@ class PlayingState(State):
                 and -margin <= pos.y <= self.game_map.height + margin)
 
     # Delegators: F2/F5 debug keys, elite arenas, and many tests call these.
-    def _spawn_enemy(self, enemy_id, at=None) -> None:
-        self.spawn.spawn_enemy(enemy_id, at)
+    def _spawn_enemy(self, enemy_id, at=None, owner="direct"):
+        return self.spawn.spawn_enemy(enemy_id, at, owner=owner)
 
     def _spawn_boss(self) -> None:
         self.spawn.spawn_boss()

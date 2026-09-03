@@ -101,7 +101,8 @@ class CapTests(unittest.TestCase):
         self.assertEqual(len(host.live), cap + 1)
         pack = m.spawn_group("warband", at=pygame.Vector2(500, 500), owner="arena")
         self.assertGreaterEqual(len(pack), 3)                                # whole pack lands
-        self.assertEqual(get_content().spawn_tables.owners["cap_exempt"], ["arena"])
+        self.assertEqual(get_content().spawn_tables.owners["cap_exempt"], ["arena", "dev"])
+        self.assertIsNotNone(m.spawn_at("chaser", pygame.Vector2(1, 1), owner="dev"))
 
     def test_a_pack_spawns_short_rather_than_over_the_cap(self):
         host = FakeHost()
