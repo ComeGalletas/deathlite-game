@@ -97,6 +97,13 @@ class ValidationTests(unittest.TestCase):
         self.assertTrue(any("`pack`" in b for b in bad), bad)
         self.assertTrue(any("`interval`" in b for b in bad), bad)
 
+    def test_a_bad_pacing_base_is_refused(self):
+        def m(d): d["pacing"]["base"] = 0
+        self.assertTrue(any("`base`" in b for b in self._bad(m)))
+
+        def m2(d): d["pacing"]["base"] = "five"
+        self.assertTrue(any("`base`" in b for b in self._bad(m2)))
+
     def test_a_broken_table_refuses_to_construct(self):
         data = _shipped()
         data["phases"][0]["types"] = {"dragon": 1.0}

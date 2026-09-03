@@ -19,9 +19,10 @@ bound, below zero toward the lower. The EMA (`tau`) is the smoothing, the
 dead-band (`dead_band`) the hysteresis, the bounds the safety rail -- a
 bad weight can make pacing dull, never empty or flood the map.
 
-`value` is the multiplier; the master multiplies it by the named
-modifiers (`SpawnMaster.set_modifier`) and scales the director's cadence
-with the product. Pacing never touches the mix or the stat ramp, and it
+`value` is the condition multiplier; the master multiplies `base` (the
+standing multiplier, 5 today) by it and by the named modifiers
+(`SpawnMaster.set_modifier`), and scales the director's cadence with the
+product. Pacing never touches the mix or the stat ramp, and it
 does not move the live cap: that is the performance budget.
 
 Knobs from the `pacing` section of `data/spawn_tables.json`.
@@ -33,7 +34,7 @@ from collections import deque
 
 __all__ = ["Pacing"]
 
-_KEYS = ("bounds", "tau", "dead_band", "weights", "window", "lull_seconds",
+_KEYS = ("base", "bounds", "tau", "dead_band", "weights", "window", "lull_seconds",
          "damage_rate_full")
 _SIGNALS = ("hp_fraction", "damage_rate", "kill_rate", "crowd", "lull")
 
@@ -47,6 +48,10 @@ class Pacing:
         missing = [k for k in _KEYS if k not in knobs]
         if missing:
             raise KeyError(f"spawn_tables.json `pacing` lacks {missing}")
+        # The standing multiplier on the cadence (S9): `value` and the named
+        # modifiers scale the director *on top* of it. 1 was "normal" until
+        # the owner set it to 5.
+        self.base = float(knobs["base"])
         self.lo, self.hi = (float(v) for v in knobs["bounds"])
         self.tau = float(knobs["tau"])
         self.dead_band = float(knobs["dead_band"])

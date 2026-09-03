@@ -352,3 +352,160 @@ When adding a new animated sprite:
 11. Run the asset and animation tests.
 
 No code changes are required for a new asset that fits an existing consumer and rig format. New animation behavior, draw layering, or special transformations may require Python changes.
+
+## Seeing Characters Behind Obstacles (proposal, 2026-09-03)
+
+> Proposed, not implemented. The hero and the enemies vanish behind a tree
+> crown, a house or a pillar the moment their ground-contact Y sorts below
+> the obstacle's, because the depth pass paints the obstacle's art over
+> them. The ask: keep them visible through the obstacle as a translucent
+> silhouette, and only there -- a character in the open is drawn as today.
+
+### What the effect is
+
+Two things could be made translucent, and they read very differently:
+
+- **The obstacle** goes see-through where it covers a character. Common in
+  top-down games, but it changes the prop's look every time someone walks
+  past it, the canopy flickers as bodies cross it, and a tree that four
+  enemies are walking behind becomes a ghost of itself.
+- **The character** is drawn again *through* the obstacle at reduced alpha.
+  The obstacle stays as painted, the covered part of the body shows as a
+  tinted silhouette on top of it, and the uncovered part is unchanged.
+
+The second is what the ask describes ("an alpha transparency to
+characters ... when going behind obstacles only"), and it is the cheaper
+one: nothing about the obstacle draw changes, and only the covered
+characters get a second, clipped blit.
+
+### Where it plugs in
+
+`PlayingState._draw_world` paints the world one terrace band at a time:
+the ground, the flat effects, then the band's depth-sorted items (obstacle
+skins, decor, tree shades and the characters standing on that terrace) in
+ground-contact-Y order. A character is hidden when an obstacle whose Y is
+greater than the character's (drawn later) has art that covers the
+character's frame.
+
+Every character blit already goes through one place,
+`WorldRenderer._blit_character(surface, frame, dest, character_y)` (which
+is also where the tree shades are applied). The proposal adds one record
+there and one pass afterwards:
+
+1. **Record.** `_blit_character` appends `(frame, dest, character_y)` to a
+   per-frame list on the renderer. That is the exact surface and screen
+   position just drawn -- shaded, tinted, flipped -- so the ghost matches
+   the body pixel for pixel. The list is cleared at the top of
+   `_draw_world`.
+2. **Ghost pass.** At the end of `_draw_world`, after every band, one
+   pass walks the recorded characters, finds the obstacle art that covers
+   each one and sorts in front of it, and blits the frame again at the
+   ghost alpha, **clipped to the covering art's rectangle** so the
+   uncovered part of the body is not drawn twice.
+
+The pass runs after all bands rather than per band on purpose: a
+character on a low terrace is also covered by an obstacle standing on the
+terrace above (painted in a later band), and one pass at the end sees
+both.
+
+### Finding the occluders cheaply
+
+The obstacle skins are static once baked (`obstacle_skins.py` fills
+`GameMap._decos[i] = (ax, ay, fps, frames, phase)`), so their art
+rectangles in world space are known at bake: anchor-relative, from the
+frame size and the same `sprite_drop` seat `_draw_one_obstacle` uses.
+Bucket them in a coarse world grid exactly as the tree shadows are
+(`TerrainRenderer._shadow_index`, 256 px cells), keyed by obstacle index,
+and query the character's world footprint. This is the same shape as the
+shade index and costs the same: a handful of rectangle tests per drawn
+character, no per-frame allocation.
+
+For each candidate obstacle `i` with position `o`:
+
+- it occludes only if `o.pos.y > character_y` (it was painted after the
+  body) -- the ordering rule the depth pass already uses, so a character
+  standing in *front* of a tree is never ghosted through its trunk;
+- its screen art rect (from the index, transformed by the camera the way
+  `_draw_one_obstacle` does) must intersect the character's frame rect;
+- its kind must be in the data's list -- trees, houses, rocks and pillars
+  cover bodies; signs and scarecrows are too thin to hide anyone and
+  should not ghost.
+
+Animated skins (the routine trees) change frame but not rectangle, so the
+index needs no per-frame update.
+
+### The ghost blit
+
+A ghost is the character's frame with its alpha scaled. Do not call
+`set_alpha` on the animation frame: it is the asset cache's own object and
+every other user would inherit the alpha. Make a copy with the alpha
+multiplied in (`BLEND_RGBA_MULT` with `(255, 255, 255, alpha)` on an
+SRCALPHA copy, so the silhouette's own edges stay soft) and cache it by
+`id(frame)` the way `hit_tinted` caches the red flash: a 0.26 s hurt
+window is a few frames, and a walk cycle is a handful, so the cache stays
+small and the copy is made once per frame object.
+
+Then, per covering obstacle:
+
+    surface.set_clip(art_rect.clip(frame_rect))
+    surface.blit(ghost, dest)
+    surface.set_clip(None)
+
+Two obstacles covering one body give two clipped blits; they can overlap
+where the obstacles overlap, which double-ghosts a sliver -- acceptable,
+or union the rects first if it shows. The tint of the ghost is a data
+choice: plain alpha reads as "the same body, through the leaves"; a light
+colour wash (blend the ghost toward the hero's accent colour, or a fixed
+outline colour for enemies) reads as an X-ray. Start with plain alpha.
+
+### Data
+
+One block in `data/terrain.json` under `obstacle_decor`, since it is a
+property of the obstacle art:
+
+    "ghost": {
+      "alpha": 110,
+      "kinds": ["tree", "house", "rock", "pillar"]
+    }
+
+`alpha` 0 switches the pass off. Per the project's rule there is no
+default in code: a missing block means no ghosting.
+
+Who gets ghosted: the hero, the enemies, the boss and the death poofs all
+go through `_blit_character`, so all of them, for free. The hero's own
+summons draw through `draw_summon`, not `_blit_character`; leave them out
+unless it shows in play.
+
+### Cost
+
+Per drawn character: one index query (a few dict reads) and up to a
+couple of rectangle tests. Per covered character: one cached copy the
+first time its frame is seen and one clipped blit per covering obstacle.
+The render pass today is ~3.5 ms for the world plus ~0.1 ms per body in
+view (after the culling and shade-index work in `fluidity_plan.md`
+section 7); this adds well under a millisecond with a crowd under the
+trees and nothing when no one is covered.
+
+### Tests
+
+- A character behind a tree (Y below the tree's, frame under its crown)
+  produces exactly one extra blit, clipped to the crown's rectangle; the
+  pixels of the body outside the crown are unchanged.
+- A character in front of the same tree (Y above) produces none.
+- A character under a sign produces none (kind not listed).
+- The ghost is the shaded / tinted frame, not the raw one (a hurt enemy
+  ghosts red).
+- `alpha` 0 in the data disables the pass; a missing block disables it.
+- The frame digest (`tests/world/test_digest.py`) is unaffected: the digest
+  frame has no characters.
+
+### Order of work
+
+1. Bake the obstacle art index next to the tree-shadow index
+   (`obstacle_skins.py` knows every rectangle it draws).
+2. Record character blits in `_blit_character`; the ghost pass at the end
+   of `_draw_world`.
+3. The cached alpha copy, the data block, the kind filter.
+4. Tests, then a screenshot with the hero under a crown for the journal.
+
+About a day.

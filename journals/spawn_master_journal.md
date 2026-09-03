@@ -721,3 +721,46 @@ which pins that the run's first draw adds at most three cache entries.
 The eight warnings are pygame's "no fast renderer available" from the
 vsync request under the dummy driver -- the accepted-with-software path,
 not a failure.
+
+---
+
+## S9 — Base spawn pressure x5 (2026-09-03)
+
+**Asked:** raise the spawn master's default pressure to five times.
+
+**Done.** `pacing.base` in `data/spawn_tables.json` (5.0), read by
+`Pacing.base` (required, no code default), and
+`SpawnMaster.pressure = base x pacing value x modifiers`. The director's
+interval is divided by the product, so the standing cadence is five
+times the tables' schedule before the condition signal (0.6-1.5) and the
+dev modifiers (x0.5-x4) move it. The overlay line reads
+`pressure 5.56 = base 5 x pace 1.11 x mods -`. Nothing else moved: the
+live and world caps, the phase mix, the stat ramp and the pinned director
+sequence (which drives the director directly) are as they were.
+
+### Measured
+
+Seed 35, dev run, hero invulnerable and not attacking, 60 s of game time:
+
+| base | spawned by 10 / 20 / 30 / 40 / 50 / 60 s | live cap first full |
+|---|---|---|
+| 1 | 9 / 18 / 26 / 35 / 43 / 51 | 57.7 s |
+| 5 | 21 / 34 / 45 / 45 / 50 / 50 | 29.7 s |
+
+The cadence is five times, but the **cap** is what the player meets: at
+the start of a run the director may hold 40 bodies, growing by 5 every
+20 s, so at base 5 the crowd is full inside half a minute and the extra
+cadence only shows as how fast the gaps left by kills refill. With a
+hero who kills, that is the whole point; with one who does not, the two
+runs converge on the cap. Raising the crowd itself is
+`config.ENEMY_COUNT_BASE` / `ENEMY_COUNT_STEP` (the director's schedule)
+and `ENEMY_LIVE_CAP` (the simulation budget), not this knob.
+
+Tests: the pressure tests learned the base; a new one pins that base 5
+spawns 3.5-6.5 times what base 1 does over the same window with the cap
+out of the way; `test_tables` refuses a base of 0 or a string.
+
+### Suite
+
+1,011 tests, 1,010 passed and 1 skipped (6 min 57 s), after two test
+repairs the sprite commit had left behind (`journals/journal.md`).

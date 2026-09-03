@@ -12,7 +12,8 @@ brought into the run:
                                   placed together on one point
     spawn_at(enemy_id, pos, owner)   one enemy, at `pos` or at a chosen point
     spawn_group(name, at, owner)  a template from the tables' `groups`
-    set_modifier / clear_modifier named factors; `pressure` is the pacing
+    set_modifier / clear_modifier named factors; `pressure` is the standing
+                                  base (`pacing.base`) times the pacing
                                   value (`spawn/pacing.py`, read off the
                                   run's condition) times their product,
                                   and scales the director's cadence
@@ -136,8 +137,9 @@ class SpawnMaster:
 
     @property
     def pressure(self) -> float:
-        """The cadence multiplier: the pacing value times every modifier."""
-        return self.pacing.value * self.modifier_product
+        """The cadence multiplier: the standing base (`pacing.base`, 5), times
+        the pacing value, times every modifier."""
+        return self.pacing.base * self.pacing.value * self.modifier_product
 
     # --- pacing signals (S6) --------------------------------------------
     def _on_player_damaged(self, amount: float = 0.0, **_kw) -> None:
