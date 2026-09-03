@@ -33,7 +33,7 @@
                   "prefer": ["upper"]}
   },
 
-  "owners": {"cap_exempt": ["arena"], "never_sleep": ["arena", "boss"]},
+  "owners": {"cap_exempt": ["arena", "dev"], "never_sleep": ["arena", "boss"]},
 
   "locality": {
     "dwell": 1.0,

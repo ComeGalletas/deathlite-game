@@ -362,6 +362,23 @@ class DevMenuTests(unittest.TestCase):
         menu._activate("freeze")
         self.assertFalse(m.all_active or m.frozen)
 
+    def test_menu_spawns_are_not_bound_by_the_live_cap(self):
+        """Sixty spawns at the start of a run, where the director's cap is
+        forty: every one lands, and the status counts what landed."""
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        cap = playing.director.enemy_count_cap(playing.stats["time"])
+        for _ in range(cap + 20):
+            menu._spawn("chaser")
+        self.assertEqual(len(playing.enemies), cap + 20)
+        self.assertIn(f"spawned {cap + 20} x chaser", menu._status)
+        self.assertTrue(all(e.spawn_owner == "dev" for e in playing.enemies))
+        # F2 goes the same way
+        n = len(playing.enemies)
+        playing.handle_debug_key(pygame.K_F2)
+        self.assertEqual(len(playing.enemies), n + 1)
+        self.assertEqual(playing.enemies[-1].spawn_owner, "dev")
+
     def test_pressure_row_cycles_the_dev_modifier(self):
         from game.states.dev_menu_state import _PRESSURE_STEPS
         game = _game()
