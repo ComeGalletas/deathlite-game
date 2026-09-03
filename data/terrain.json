@@ -1047,7 +1047,7 @@
       "scarecrow": 0.75
     },
     "ghost": {
-      "alpha": 110,
+      "alpha": 70,
       "kinds": ["tree", "house", "rock", "pillar"]
     },
     "tree_shadow": {

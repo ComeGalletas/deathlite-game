@@ -2889,3 +2889,7 @@ wanted.
 Suite: 1,019 tests, 1,018 passed and 1 skipped (7 min 4 s); the run
 started before the scratch fix, whose 26 rendering tests were re-run
 green afterwards.
+
+**Fainter (2026-09-03).** `obstacle_decor.ghost.alpha` 110 -> 70 (27 %
+opacity instead of 43 %): at 110 the silhouette read almost solid over a
+bright crown. Data only; the tests build their own alpha.
