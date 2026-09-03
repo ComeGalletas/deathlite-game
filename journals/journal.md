@@ -2784,3 +2784,32 @@ a baked world under the same seed and the same digest, the sprite advances,
 the screen is dark with text and hero, the dev restart loads too);
 `tests/boot.settle` drives the loader for the eight test helpers that walk
 the menu into a run.
+
+---
+
+## Collider trim: trees, signs, scarecrows (2026-09-03)
+
+`data/terrain.json` `obstacles`: tree 15 -> 13 px (-13 %, "about 15 %"
+kept to a whole pixel), sign 8 -> 6, scarecrow 10 -> 7.5 (-25 %). Only
+the collision discs; the drawn size (`render_radius`, the rigs) is
+untouched. Everything reads `KINDS` off the data, so nothing else moved
+by hand: the scatter spaces trees by the same constants, the unseal
+repair and the spawn-point stage see the smaller discs, and the pinned
+layout / bake / frame digests were regenerated (`python -m world.digest
+--write`) because a collider is part of the world they fingerprint.
+
+**What the trim uncovered.** `tests/ai/test_pathfinding.py` then found
+seed 1's boss island unreachable for both navigation classes -- a world
+the unseal repair had passed as whole. The repair's flood and its seal
+search walked diagonals freely; the flow field refuses a diagonal step
+that cuts a blocked corner (`FlowField.step`), and a body cannot squeeze
+through one either. A gap open only corner to corner therefore read as a
+route to the repair and as a wall to the field, so the repair removed
+nothing. Smaller tree colliders made more such gaps and the disagreement
+surfaced. `world/gen/repair.py` now applies the same corner rule in
+`_reachable` and `_seals` (`_corner_clips`). The repair takes back more
+obstacles for it -- 15-36 a world on nine seeds, 4-6 % against 1-2 %
+before -- which is the cost of the field and the repair agreeing;
+`test_it_takes_back_only_a_handful` moved its bound from one in twenty to
+one in twelve and says why. All five pathfinding seeds reach the boss
+island on both classes again. Digests re-pinned once more.
