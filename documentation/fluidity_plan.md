@@ -253,7 +253,8 @@ way.
 
 > Items 1 and 2 below landed the same day. The walking-hero probe after
 > them: total p50 5.5, p90 8.5, p99 9.8 ms, one frame of 1,200 over
-> budget (a GC). Items 3-6 stand.
+> budget (a GC). Items 3 (`config.VSYNC`) and 5 (the loading-screen
+> warm-up) landed after that; 4 is a rule, 6 stands.
 
 A stable 60 means every frame under 16.7 ms of update plus render plus
 flip, not a good average. Probed on the stress scene with the hero

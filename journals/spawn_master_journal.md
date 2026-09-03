@@ -679,3 +679,45 @@ Render p50 14.7 -> 3.6 ms; update p99 41.9 -> 5.1 ms.
 1,003 tests, 1,002 passed and 1 skipped on the first full run (5 min 59 s).
 The full rerun for the index commit, done before this, came back 991 green,
 so the dev-mode flake did not recur.
+
+---
+
+## The vsync flag and the blit-cache warm-up (2026-09-03)
+
+Items 3 and 5 of the frame-consistency list (`fluidity_plan.md` section 8).
+
+**`config.VSYNC`** (default on; the web profile turns it off, pygbag owns
+the canvas). `Game._open_window` asks for
+`set_mode(size, SCALED | DOUBLEBUF, vsync=1)` and falls back to the plain
+window on `pygame.error`, logging why; `Game.vsync` reports which it got.
+Under the suite's dummy driver pygame accepts the request with a software
+renderer ("no fast renderer available"), so the tests pin the fallback
+path by mocking a refusing driver, and the report -- the sync itself can
+only be judged on a real display with the F1 overlay.
+
+**The warm-up.** `LoadingState._warm_steps` draws the start view and the
+eight views around it (one view span each way) into a scratch surface at
+the run's zoom, the centre at three foam phases, one position per loading
+step ("warming the view N of 9"). `TerrainRenderer._z_surf` fills
+`GameMap._blit_cache` as it draws, and the map is handed to the run with
+that cache, so the run's first frames find every scaled surface ready.
+
+### Measured
+
+Seed 35, dev run, dummy driver: the warm-up adds 0.06 s to a 2.4 s
+load (nine steps, the slowest 18 ms), and hands the run a cache of 74
+scaled surfaces. The run's first five renders: 12.3, 3.4, 3.3, 3.2,
+3.3 ms -- against a 62 ms first frame before. The remaining 12 ms on the
+very first frame is the HUD's and overlays' own first-use work (font
+renders, the vignette surface), not the terrain.
+
+Tests: `tests/core/test_window.py` (5), and
+`test_the_view_is_warmed_before_the_run_starts` in `test_loading.py`,
+which pins that the run's first draw adds at most three cache entries.
+
+### Suite
+
+1,009 tests, 1,008 passed and 1 skipped on the first full run (6 min 17 s).
+The eight warnings are pygame's "no fast renderer available" from the
+vsync request under the dummy driver -- the accepted-with-software path,
+not a failure.

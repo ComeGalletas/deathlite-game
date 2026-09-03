@@ -49,6 +49,28 @@ class LoadingStateTests(unittest.TestCase):
                          digest.layout_digest(W.layout(SEED)))
         pygame.quit()
 
+    def test_the_view_is_warmed_before_the_run_starts(self):
+        """The blit cache the first frames would have filled is filled on
+        the loading screen: the run's first draw adds almost nothing."""
+        game = _game()
+        state = LoadingState(game)
+        game.state_machine.change(state, seed=SEED)
+        labels = []
+        steps = state._steps
+        state._steps = iter(lambda: (labels.append(next(steps)) or labels[-1]), None)
+        _drive(game)
+        p = game.state_machine.current
+        self.assertIsInstance(p, PlayingState)
+        warm = [l for l in labels if str(l).startswith("warming the view")]
+        self.assertEqual(len(warm), len(LoadingState._WARM_RING))
+        gm = p.game_map
+        before = len(gm._blit_cache)
+        self.assertGreater(before, 20, "the loading screen warmed nothing")
+        p.draw(game.screen)
+        self.assertLessEqual(len(gm._blit_cache) - before, 3,
+                             "the run's first frame still filled the cache")
+        pygame.quit()
+
     def test_the_hero_animates_while_it_waits(self):
         game = _game()
         state = LoadingState(game)
