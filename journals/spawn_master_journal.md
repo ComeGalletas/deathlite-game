@@ -532,3 +532,17 @@ decision), or fill incrementally across frames.
 ### Suite
 
 987 tests, 986 passed and 1 skipped on the first full run (6 min 42 s).
+
+### Addendum: after the commit (2026-09-03)
+
+Two more measurements, on the way to `documentation/fluidity_plan.md`:
+
+- `GameMap.is_walkable` ends with a linear scan of every obstacle in the
+  world (565 on seed 35), and `resolve_movement` calls it up to three
+  times a move with five probes each. Monkeypatching the scan to a
+  `SpatialGrid` query: 93 us -> 4 us a call, update p50 6.0 -> 1.2 ms at
+  100 live. The single biggest lever left, and outside the spawn master;
+  proposed there, not done here.
+- Draw + flip under the same crowd (15 bodies in view, dummy video
+  driver): p50 7.7 ms, p90 8.7 ms, one 62 ms frame as the terrain blit
+  cache filled.
