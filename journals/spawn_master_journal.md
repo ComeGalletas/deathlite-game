@@ -613,3 +613,69 @@ it is a rare-seed flake in that test (the hero's shots not reaching a
 tank placed 30 px away for three seconds), unrelated to the index. Left
 open; if it recurs, pin the test's seed or place the tank on a verified
 floor spot.
+
+---
+
+## Render fixes and the sliced flow-field fill (2026-09-03)
+
+Items 3 and 7 of `documentation/fluidity_plan.md`, done.
+
+**Render.** `PlayingState._actor_items` lists only the bodies inside the
+view padded by `config.RENDER_ACTOR_CULL_PAD` (enemies, death poofs,
+summons; the boss at twice the pad). `TerrainRenderer.shade_character_frame`
+asks a 256 px bucket index of the baked tree shadows (`_shadow_index`,
+rebuilt only when the baked dict is replaced) for the shadows touching
+the frame's footprint, instead of walking all 336 in the world, and
+draws through two reused scratch surfaces per frame size instead of
+allocating an overlay and a copy per character. `hit_tinted` caches the
+tinted copy by the frame object's identity for the hurt window.
+
+**Fill.** `FlowField.begin` starts a fill into a back buffer and
+`FlowField.step(budget_s)` advances it, reading the clock every 128
+relaxations; `_finish` swaps the buffers, so `cost` -- what the samplers
+read -- is always a completed field. `rebuild` is `begin` + `step(None)`
+and lands byte-identical results (pinned). `NavField.begin` / `step` /
+`filling` do the same per class, sharing one budget in class order, and
+record the target cell at `begin` so the drift trigger does not restart
+the fill every frame. `NavCoordinator` starts fills where it used to
+rebuild and advances them `config.ENEMY_NAV_FILL_BUDGET` (3 ms) a frame.
+
+### Measured
+
+`python -m spawn.stress`, 100 live, update only:
+
+| | p50 | p90 | p99 | max |
+|---|---|---|---|---|
+| after the obstacle index | 1.13 | 24.34 | 30.33 | 40.78 ms |
+| after the sliced fill | 3.94 | 4.35 | 4.87 | 7.93 ms |
+
+The p50 rose because the fill's slices now sit in ordinary frames; the
+spike is gone.
+
+The walking-hero probe (update + render, 100 live, 1,200 frames):
+
+| | total p50 | p90 | p99 | max | over 16.7 ms |
+|---|---|---|---|---|---|
+| before | 16.94 | 23.05 | 58.02 | 63.94 ms | 616 (51 %) |
+| after | 5.49 | 8.45 | 9.79 | 20.84 ms | 1 (a 5 ms GC) |
+
+Render p50 14.7 -> 3.6 ms; update p99 41.9 -> 5.1 ms.
+
+### Decided on the way
+
+- **The stagger tests changed meaning, not intent.** They spied on
+  `NavField.rebuild`; the coordinator no longer calls it. They spy on
+  `begin` now and let a fill land between ticks. "A jump rebuilds every
+  grid at once" became "a jump starts every grid's fill at once".
+- **A fill abandons its predecessor.** A jump while a periodic fill is
+  under way restarts every class; the partial work is dropped rather
+  than merged, since the target moved.
+- **The budget is per frame, not per class**: two fills in flight share
+  the 3 ms in class order, so the small class (the common enemies) lands
+  first.
+
+### Suite
+
+1,003 tests, 1,002 passed and 1 skipped on the first full run (5 min 59 s).
+The full rerun for the index commit, done before this, came back 991 green,
+so the dev-mode flake did not recur.

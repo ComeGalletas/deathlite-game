@@ -10,6 +10,7 @@ toward the player; `PlayingState` owns it and the enemy AI samples it.
 """
 from __future__ import annotations
 
+import time
 from array import array
 
 import pygame
@@ -20,6 +21,13 @@ from world.nav.lattice import NAV_DIRS, NavGrid
 _SQRT2 = 2.0 ** 0.5
 
 _INF = 1_000_000_000
+
+
+class _Fill:
+    """A fill in progress: where the bucket loop stopped, so `step` can pick
+    it up next frame."""
+
+    __slots__ = ("trav", "seed", "limit", "relax", "cur", "max_bucket", "buckets")
 
 
 class FlowField:
@@ -52,6 +60,11 @@ class FlowField:
         # well under 2**31, so a signed `long` array is plenty.
         self.cost = array("l", bytes(array("l").itemsize)) * n
         self._blank = array("l", [_INF]) * n
+        # The back buffer a sliced fill writes into (`begin` / `step`); it
+        # is swapped in whole when the fill completes, so `cost` -- what
+        # `direction_at` and friends read -- is always a finished field.
+        self._back = array("l", [_INF]) * n
+        self._fill: _Fill | None = None
         w_o = navgrid.cell
         w_d = int(round(navgrid.cell * _SQRT2))
         self._w_orth = w_o
@@ -104,7 +117,10 @@ class FlowField:
 
     def rebuild(self, target_world, min_clearance: float = 0.0,
                 corridor_lenient: bool = True, max_cost: int | None = None) -> None:
-        """Fill the field outward from `target_world`.
+        """Fill the field outward from `target_world`, whole, in this call:
+        `begin` + `step` run back to back, so a caller that wants the answer
+        now (the run's first field, the tests) gets exactly what the sliced
+        path produces over several frames.
 
         `max_cost` stops the fill once the frontier passes that path cost --
         **path**, not straight line, so a cell a few hundred pixels away across
@@ -114,36 +130,59 @@ class FlowField:
 
         Left `None` here and set by `NavField`, so the field's own contract is
         unchanged for anything constructing it directly."""
-        ng = self.navgrid
-        cols, rows = ng.cols, ng.rows
-        n = cols * rows
-        cost = self.cost
-        # Slice-assign a prebuilt blank rather than looping. The fill itself is
-        # bounded now (`max_cost`), so clearing 160k longs one at a time in
-        # Python had become the single biggest cost in a repath -- more than the
-        # search it was preparing for.
-        cost[:] = self._blank
-        self.relaxations = 0
+        self.begin(target_world, min_clearance, corridor_lenient, max_cost)
+        while not self.step(None):
+            pass
 
+    @property
+    def filling(self) -> bool:
+        return self._fill is not None
+
+    def begin(self, target_world, min_clearance: float = 0.0,
+              corridor_lenient: bool = True, max_cost: int | None = None) -> None:
+        """Start a fill toward `target_world` into the back buffer. Nothing
+        the samplers read changes until `step` reports the fill complete.
+        A fill already in progress is abandoned."""
+        ng = self.navgrid
+        back = self._back
+        # Slice-assign a prebuilt blank rather than looping: clearing 160k
+        # longs one at a time in Python had been the biggest cost in a repath.
+        back[:] = self._blank
         trav = self._traversable(min_clearance, corridor_lenient)
-        self._trav = trav
         tc = ng.cell_of(target_world[0], target_world[1])
         seed = self._nearest_traversable(tc[0], tc[1], trav)
-        self.target_cell = seed
-        self.reachable = seed is not None
-        if seed is None:
-            return
+        f = _Fill()
+        f.trav, f.seed = trav, seed
+        f.limit = _INF if max_cost is None else int(max_cost)
+        f.relax = f.cur = f.max_bucket = 0
+        f.buckets = {}
+        if seed is not None:
+            si = seed[1] * ng.cols + seed[0]
+            back[si] = 0
+            f.buckets = {0: [si]}
+        self._fill = f
 
+    def step(self, budget_s: float | None = None) -> bool:
+        """Advance the fill in progress for up to `budget_s` seconds (`None`:
+        to the end). True once the fill is complete and swapped in; False
+        when it yielded with work left."""
+        f = self._fill
+        if f is None:
+            return True
+        if f.seed is None:
+            self._finish(f)
+            return True
+        ng = self.navgrid
+        cols, rows = ng.cols, ng.rows
+        cost = self._back
+        trav = f.trav
         nei = self._NEI
         smask = ng.step_mask
-        si = seed[1] * cols + seed[0]
-        cost[si] = 0
-        buckets: dict[int, list] = {0: [si]}
-        cur = 0
-        max_bucket = 0
+        buckets = f.buckets
+        cur, max_bucket, relax, limit = f.cur, f.max_bucket, f.relax, f.limit
         cap = self.relax_cap
-        relax = 0
-        limit = _INF if max_cost is None else int(max_cost)
+        deadline = None if budget_s is None else time.perf_counter() + budget_s
+        done = True
         while cur <= max_bucket and cur <= limit:
             bucket = buckets.get(cur)
             if not bucket:
@@ -181,7 +220,25 @@ class FlowField:
                     buckets.setdefault(nc, []).append(v)
                     if nc > max_bucket:
                         max_bucket = nc
-        self.relaxations = relax
+            # The clock is read every 128 relaxations: ~0.2 ms of granularity
+            # against a 3 ms budget, a hundredth of the loop's own cost.
+            if deadline is not None and (relax & 127) == 0 and time.perf_counter() > deadline:
+                done = False
+                break
+        f.cur, f.max_bucket, f.relax = cur, max_bucket, relax
+        if not done:
+            return False
+        self._finish(f)
+        return True
+
+    def _finish(self, f) -> None:
+        """Swap the finished back buffer in: from here the samplers read it."""
+        self.cost, self._back = self._back, self.cost
+        self._trav = f.trav
+        self.target_cell = f.seed
+        self.reachable = f.seed is not None
+        self.relaxations = f.relax
+        self._fill = None
 
     # --- sample -------------------------------------------------
     def cost_at(self, world_pos) -> int:
@@ -322,17 +379,48 @@ class NavField:
         return self._order[-1][1]
 
     def rebuild(self, target_world, only: str | None = None) -> None:
-        """Refresh the flow field(s) toward `target_world`. `only` names a single
-        class to rebuild (staggering -- one grid per cycle keeps the ~8 ms
-        both-grids spike off any one frame); default rebuilds every class."""
+        """Refresh the flow field(s) toward `target_world`, whole, now.
+        `only` names a single class; default every class. The run's first
+        field and the tests use this; the run's refreshes use `begin` and
+        `step` so no single frame pays for a whole fill."""
+        self.begin(target_world, only)
+        self.step(None)
+
+    def begin(self, target_world, only: str | None = None) -> None:
+        """Start a fill toward `target_world` for `only` (one class) or
+        every class. The target cell is recorded here, at the start, so the
+        drift trigger measures against the fill under way rather than
+        starting another one every frame until it lands."""
         tx, ty = float(target_world[0]), float(target_world[1])
         names = [only] if only is not None else self.classes
         for name in names:
-            self.fields[name].rebuild((tx, ty), self._min_clear[name],
-                                      corridor_lenient=True,
-                                      max_cost=config.NAV_FILL_MAX_COST)
+            self.fields[name].begin((tx, ty), self._min_clear[name],
+                                    corridor_lenient=True,
+                                    max_cost=config.NAV_FILL_MAX_COST)
         self._target_cell = self._ref_grid.cell_of(tx, ty)
+
+    @property
+    def filling(self) -> bool:
+        return any(f.filling for f in self.fields.values())
+
+    def step(self, budget_s: float | None = None) -> bool:
+        """Advance every fill in progress, sharing `budget_s` between them in
+        class order (`None`: run them to the end). True when nothing is left
+        filling."""
+        deadline = None if budget_s is None else time.perf_counter() + budget_s
+        for name in self.classes:
+            f = self.fields[name]
+            if not f.filling:
+                continue
+            remaining = None
+            if deadline is not None:
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0.0:
+                    return False
+            if not f.step(remaining):
+                return False
         self.reachable = any(f.reachable for f in self.fields.values())
+        return True
 
     def target_cell_drift(self, target_world) -> int:
         """Chebyshev distance (in reference-grid cells) between `target_world`

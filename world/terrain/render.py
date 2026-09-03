@@ -31,6 +31,11 @@ class TerrainRenderer:
         # frame digest (`world/digest.py`) sets a callable returning fixed
         # seconds so foam and decor land on a known frame.
         self.clock = None
+        # The tree-shadow index and the shade scratch surfaces
+        # (`shade_character_frame`), built on first use.
+        self._shade_index: dict | None = None
+        self._shade_index_key: tuple | None = None
+        self._shade_scratch: dict[tuple, tuple] = {}
 
     def seconds(self) -> float:
         return (self.clock() if self.clock is not None
@@ -297,6 +302,41 @@ class TerrainRenderer:
                      (round((wx - ox) * z - r * z),
                       round((wy - oy) * z - r * z)))
 
+    _SHADE_CELL = 256      # world px; the widest shade is ~140 px across
+
+    def _shadow_index(self) -> dict:
+        """The tree shadows bucketed by a coarse world grid, each shadow in
+        every cell its disc touches. Shadows are static once baked; the
+        index is rebuilt only when the baked dict is replaced or grows."""
+        shadows = self.gm._tree_shadows
+        key = (id(shadows), len(shadows))
+        if self._shade_index is None or self._shade_index_key != key:
+            c = self._SHADE_CELL
+            index: dict = {}
+            for shadow in shadows.values():
+                wx, wy, r, _surf = shadow
+                for gx in range(int((wx - r) // c), int((wx + r) // c) + 1):
+                    for gy in range(int((wy - r) // c), int((wy + r) // c) + 1):
+                        index.setdefault((gx, gy), []).append(shadow)
+            self._shade_index = index
+            self._shade_index_key = key
+        return self._shade_index
+
+    def _scratch(self, size: tuple) -> tuple:
+        """Two cleared SRCALPHA surfaces of `size`: the shade overlay and the
+        shaded result. Reused across characters -- a frame is blitted the
+        moment it is returned, so nothing holds the previous one."""
+        pair = self._shade_scratch.get(size)
+        if pair is None:
+            pair = (pygame.Surface(size, pygame.SRCALPHA),
+                    pygame.Surface(size, pygame.SRCALPHA))
+            if len(self._shade_scratch) > 32:
+                self._shade_scratch.clear()
+            self._shade_scratch[size] = pair
+        for surf in pair:
+            surf.fill((0, 0, 0, 0))
+        return pair
+
     def shade_character_frame(self, frame: pygame.Surface, dest, camera,
                               character_y: float) -> pygame.Surface:
         """Overlay intersecting tree shades through a character frame's alpha.
@@ -304,32 +344,49 @@ class TerrainRenderer:
         The normal depth pass still controls shade-vs-scenery ordering. This
         character-only copy makes the same shade visible on a sprite regardless
         of whether that character sorts above or below the owning tree.
+
+        Only the shadows whose discs touch the frame's footprint are looked
+        at (`_shadow_index`); this used to walk every tree in the world for
+        every character drawn, which was three quarters of the render.
         """
-        if not self.gm._tree_shadows:
+        shadows = self.gm._tree_shadows
+        if not shadows:
             return frame
         frame_rect = frame.get_rect(topleft=(int(dest[0]), int(dest[1])))
-        overlay = None
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
-        for wx, wy, r, shade in self.gm._tree_shadows.values():
-            if character_y < wy - 0.01:
-                continue                    # the normal depth pass shades it later
-            scaled = self._z_surf(shade)
-            assert scaled is not None
-            shade_rect = scaled.get_rect(topleft=(
-                round((wx - ox) * z - r * z),
-                round((wy - oy) * z - r * z),
-            ))
-            if not frame_rect.colliderect(shade_rect):
-                continue
-            if overlay is None:
-                overlay = pygame.Surface(frame.get_size(), pygame.SRCALPHA)
-            overlay.blit(scaled, (shade_rect.x - frame_rect.x,
-                                  shade_rect.y - frame_rect.y))
+        # The frame's footprint in world space, then the index cells it spans.
+        c = self._SHADE_CELL
+        wx0, wy0 = ox + frame_rect.left / z, oy + frame_rect.top / z
+        wx1, wy1 = ox + frame_rect.right / z, oy + frame_rect.bottom / z
+        index = self._shadow_index()
+        overlay = shaded = None
+        seen: set = set()
+        for gx in range(int(wx0 // c), int(wx1 // c) + 1):
+            for gy in range(int(wy0 // c), int(wy1 // c) + 1):
+                for shadow in index.get((gx, gy), ()):
+                    key = id(shadow)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    wx, wy, r, shade = shadow
+                    if character_y < wy - 0.01:
+                        continue                # the normal depth pass shades it later
+                    scaled = self._z_surf(shade)
+                    shade_rect = scaled.get_rect(topleft=(
+                        round((wx - ox) * z - r * z),
+                        round((wy - oy) * z - r * z),
+                    ))
+                    if not frame_rect.colliderect(shade_rect):
+                        continue
+                    if overlay is None:
+                        overlay, shaded = self._scratch(frame.get_size())
+                    overlay.blit(scaled, (shade_rect.x - frame_rect.x,
+                                          shade_rect.y - frame_rect.y))
         if overlay is None:
             return frame
         overlay.blit(frame, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-        shaded = frame.copy()
+        shaded.blit(frame, (0, 0))
         shaded.blit(overlay, (0, 0))
         return shaded
 
