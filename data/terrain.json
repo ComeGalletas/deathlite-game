@@ -1043,8 +1043,8 @@
       "house": 1.35
     },
     "render_scale": {
-      "sign": 1.0,
-      "scarecrow": 1.0
+      "sign": 0.75,
+      "scarecrow": 0.75
     },
     "tree_shadow": {
       "radius_scale": 1.9,
