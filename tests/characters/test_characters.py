@@ -67,7 +67,7 @@ import pygame
 
 class _FreeWorld:
     """No walls -- movement is unconstrained (for trait tests)."""
-    def resolve_movement(self, prev, new, radius):
+    def resolve_movement(self, prev, new, radius, flying=False):
         return new
 
 

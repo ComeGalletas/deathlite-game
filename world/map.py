@@ -218,7 +218,7 @@ class GameMap:
         return cur == b or can_step(ix, cur, b)
 
     def is_walkable(self, pos: pygame.Vector2, radius: float = 0.0,
-                    frm: pygame.Vector2 | None = None) -> bool:
+                    frm: pygame.Vector2 | None = None, flying: bool = False) -> bool:
         """`frm` opts into the elevation rule: the move from there to here must
         be one the terrain allows. Callers that are only asking "is this spot
         free" -- the AI's `is_walkable` probe, spawn placement -- leave it None
@@ -243,6 +243,13 @@ class GameMap:
         outright would freeze a body the moment anything put it there."""
         if not self._point_ok(pos.x, pos.y):
             return False
+        # A flyer (`flying` tag, `The First Hunger`) is over the world, not on
+        # it: no terrace margin, no elevation rule, no obstacle, and no radius
+        # probe -- it passes above a boulder and across a cliff in one line.
+        # It still may not leave the floor: the sea is where a body goes to
+        # become unreachable, and the arena has to stay a fight.
+        if flying:
+            return True
         if self._body_inset > 0.0 and not self.inset_ok(pos.x, pos.y):
             if frm is None:
                 return False
@@ -273,17 +280,17 @@ class GameMap:
         return None
 
     def resolve_movement(self, prev: pygame.Vector2, new: pygame.Vector2,
-                         radius: float) -> pygame.Vector2:
+                         radius: float, flying: bool = False) -> pygame.Vector2:
         """Move toward `new`; if it hits a wall, slide along one axis; if that
         also fails, hop one short step to an open compass direction so a wedged
         entity always has an out. Unchanged if every hop is blocked too."""
-        if self.is_walkable(new, radius, frm=prev):
+        if self.is_walkable(new, radius, frm=prev, flying=flying):
             return new
         slide_x = pygame.Vector2(new.x, prev.y)
-        if self.is_walkable(slide_x, radius, frm=prev):
+        if self.is_walkable(slide_x, radius, frm=prev, flying=flying):
             return slide_x
         slide_y = pygame.Vector2(prev.x, new.y)
-        if self.is_walkable(slide_y, radius, frm=prev):
+        if self.is_walkable(slide_y, radius, frm=prev, flying=flying):
             return slide_y
         # Fully wedged (move + both axis slides blocked). Try a `radius`-length
         # hop in the eight compass directions, the one nearest the intended
@@ -295,7 +302,7 @@ class GameMap:
         for dx, dy in sorted(_ESCAPE_DIRS,
                              key=lambda d: -(d[0] * want.x + d[1] * want.y)):
             hop = pygame.Vector2(prev.x + dx * step, prev.y + dy * step)
-            if self.is_walkable(hop, radius, frm=prev):
+            if self.is_walkable(hop, radius, frm=prev, flying=flying):
                 return hop
         return pygame.Vector2(prev)
 

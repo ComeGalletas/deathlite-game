@@ -21,7 +21,7 @@ def _per(player=(0.0, -400.0), nav=(0.0, 0.0), dt=1 / 120):
         dt=dt, now=0.0, player_pos=pygame.Vector2(player), player=object(),
         rng=random.Random(0), nav_dir=lambda p, r: pygame.Vector2(nv),
         neighbors=lambda p, r: [], obstacles_near=lambda p, r: [],
-        is_walkable=lambda p, r: True, resolve_movement=lambda a, b, r: b)
+        is_walkable=lambda p, r: True, resolve_movement=lambda a, b, r, **kw: b)
 
 
 class RegistrationTests(unittest.TestCase):

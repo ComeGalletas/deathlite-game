@@ -27,7 +27,7 @@ class PlayingPerception:
     neighbors: Callable          # (pos, radius) -> list[entity]
     obstacles_near: Callable     # (pos, radius) -> list[obstacle]
     is_walkable: Callable        # (pos, radius) -> bool
-    resolve_movement: Callable   # (prev, new, radius) -> Vector2
+    resolve_movement: Callable   # (prev, new, radius, flying=False) -> Vector2
     # --- Combat -----------------------------------------------------
     fire_projectile: Callable    # (**kwargs) -> None
     summon: Callable             # (enemy_id, pos, count) -> None
