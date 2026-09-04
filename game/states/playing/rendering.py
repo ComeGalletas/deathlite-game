@@ -32,6 +32,11 @@ _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
 _HIT_TINT = (150, 30, 30)
 _KNOCK_VEC_SCALE = 0.15     # dev overlay: `_knock` px/s -> screen px line length
 _SPAWN_MARK_PX = 6          # dev overlay: half-size of a spawn-point mark, world px
+# Hazard fill: alpha at spawn is FLOOR + ALPHA, fading to FLOOR as the pool
+# expires. Halved from 70/20 when the pools gained art -- the disc still has
+# to state the area, but it no longer has to carry the whole effect.
+_HAZARD_FILL_ALPHA = 35
+_HAZARD_FILL_FLOOR = 10
 
 
 _TINT_CACHE: dict[int, tuple] = {}     # id(frame) -> (frame, tinted copy)
@@ -151,10 +156,41 @@ class WorldRenderer:
             sx, sy = ps.camera.world_to_screen(hz.pos)
             frac = max(0.0, hz.life / hz.max_life)
             rr = max(1, round(hz.radius * z))
+            # The disc states the area; the ring states its exact edge. Both
+            # are what a player reads, so the art below never replaces them --
+            # the fill is only kept faint enough to stop competing with it.
             surf = pygame.Surface((rr * 2, rr * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*hz.color, int(70 * frac + 20)), (rr, rr), rr)
+            pygame.draw.circle(surf, (*hz.color, int(_HAZARD_FILL_ALPHA * frac
+                                                     + _HAZARD_FILL_FLOOR)),
+                               (rr, rr), rr)
             surface.blit(surf, (sx - rr, sy - rr))
+            self._hazard_sprite(surface, hz, sx, sy, z)
             pygame.draw.circle(surface, hz.color, (int(sx), int(sy)), rr, 2)
+
+    def _hazard_sprite(self, surface, hz, sx: float, sy: float, z: float) -> None:
+        """The pool's flair, if it has a rig: the strip played once at its
+        own speed so it *ends* as the pool does, which reads as the blast
+        going off rather than as the pool simmering. Silent for a pool with
+        no rig, and for the whole of its life before the strip is due."""
+        if not hz.sprite:
+            return
+        assets = self.ps.game.assets
+        n = assets.frame_count(hz.sprite, "loop")
+        if not n:
+            return
+        fps = assets.fps(hz.sprite, "loop")
+        span = n / fps                       # 10 frames at 14 fps == 0.71 s
+        left = hz.life                       # seconds until the pool expires
+        if left > span:
+            return                           # not yet: the pool is still simmering
+        i = min(n - 1, max(0, int((span - left) * fps)))
+        base = assets.scale_for(hz.sprite) or (round(hz.radius * 2), round(hz.radius * 2))
+        size = (max(1, round(base[0] * z)), max(1, round(base[1] * z)))
+        frames = assets.frames(hz.sprite, "loop", size=size)
+        if not frames:
+            return
+        frame = frames[min(i, len(frames) - 1)]
+        surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
 
     def one_summon(self, surface, s) -> None:
         sx, sy = self.ps.camera.world_to_screen(s.pos)

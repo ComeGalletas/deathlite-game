@@ -511,9 +511,10 @@ trees and nothing when no one is covered.
 
 About a day.
 
-## The Warlock's Spell Art (check + proposal, 2026-09-03)
+## The Warlock's Spell Art (checked, proposed, then built -- 2026-09-03)
 
-> Checked, not implemented. Asked: how the warlock renders its attack, how
+> Built the same day; what shipped differs from the proposal where the
+> owner steered it, and the differences are recorded at the end. Asked: how the warlock renders its attack, how
 > the circle indicator is drawn, and what it would take to use
 > `hex_shaman_explosion_spell` as the attack's animation.
 
@@ -652,3 +653,48 @@ plus tests: the rig loads and slices to 10 frames, `scale` equals
 `2 * hazard_radius`, a hazard with no `hazard_sprite` still draws the bare
 circle, and the frame index is clamped at the end of the strip rather
 than wrapping. The frame digest is unaffected -- it draws no hazards.
+
+### What shipped, and where it differs from the proposal above
+
+The owner set the rules: **the ring stays untouched** as the reference for
+the attack's true range; **the disc stays too, fainter**, so the area is
+still readable without competing; **the art is flair only**; and it plays
+**in the pool's last 0.7 s** rather than across its whole life, so it reads
+as the blast going off rather than as the pool simmering.
+
+That last point is the one real departure from the proposal, and it is
+better. Stretching 10 frames over 3.5 s would have been 2.9 fps -- a
+slideshow. Played at its own 14 fps against the tail of the pool, the
+strip runs at the speed it was drawn for and lands its final frame exactly
+as the pool expires.
+
+| piece | what |
+|---|---|
+| `data/enemy_sprites.json` | rig `hex_shaman_explosion_spell`: 10 frames of 192, `content` `[34, 13, 130, 138]`, `anchor` centre, `scale` `[184, 184]` |
+| `data/enemies.json` | `warlock.hazard_sprite` names the rig |
+| `entities/hazard.py` | `Hazard.sprite`, carried, never read by the damage path |
+| `melee.py` / `effects.py` / `context.py` | `hazard_sprite` threaded from the cast to the pool |
+| `rendering.py` | `_hazard_sprite`, and the fill alpha halved to `35 * life_fraction + 10` |
+
+Two numbers worth keeping honest. **`scale` is `2 * hazard_radius`**, so
+the flair can never disagree with the circle a player is reading; a test
+pins the two together, and retuning the radius moves the art with it.
+**`content` crops the sheet's transparent margin** -- the ink is 130x138
+inside a 192 frame, so without the crop the burst drew at about two thirds
+of the ring and read as a smaller, weaker explosion than the area it
+represents. Measured from the sheet, not guessed.
+
+The frame is picked from the pool's remaining life rather than an
+`Animator`, the way obstacle skins are: a hazard is not an actor and does
+not need per-instance animation state. The index is clamped, not wrapped,
+so a pool that outlives its strip holds the last frame instead of
+restarting.
+
+### Still open
+
+The 0.8 s wind-up still marks nothing on the ground -- the telegraph ring
+in `one_enemy` is gated on `slam_radius`, which only the brute has. The
+owner has said the wind-up flag would help and that it belongs before the
+disc appears. Not built here; it is a gameplay change with its own
+before/after, and it wants the same rig drawn at the snapshotted `cast_at`
+during the `telegraph` state.

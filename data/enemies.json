@@ -123,6 +123,7 @@
     "contact_damage_enabled": false,
     "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8,
     "cast_duration": 0.2, "cast_recover": 1.8, "cast_interval": 3.2,
+    "hazard_sprite": "hex_shaman_explosion_spell",
     "hazard_radius": 92, "hazard_dps": 23, "hazard_duration": 3.5
   }
 }

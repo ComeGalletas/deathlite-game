@@ -2926,3 +2926,49 @@ between islands is not). The elevation and mirror suites, which guard the
 floor rules, pass unchanged.
 
 Suite: 1,038 tests, 1,037 passed and 1 skipped (9 min 30 s).
+
+---
+
+## The warlock's pool gets its explosion (2026-09-03)
+
+`hex_shaman_explosion_spell.png` had been sitting unreferenced in
+`assets/enemies/hex_shaman/`. It renders now, under rules the owner set:
+the **ring** is untouched and remains the reference for the attack's true
+range; the **disc** stays but at half its old alpha
+(`35 * life_fraction + 10`, was `70 * ... + 20`) so the area still reads
+without competing; the **art is flair** and is layered between the two, so
+it can never cover the edge a player judges safety by.
+
+**It plays in the pool's last 0.71 s, not across its life.** Ten frames
+stretched over 3.5 s would have been 2.9 fps -- a slideshow. Played at the
+14 fps it was drawn for, against the tail of the pool, it lands its final
+frame exactly as the pool expires and reads as the blast going off rather
+than the pool simmering. Traced: silent for 2.80 s, then frames 0..9 over
+the final 0.71 s.
+
+Plumbing, all data-driven: a rig in `data/enemy_sprites.json`, named by
+`warlock.hazard_sprite`, threaded through `fsm_warlock` ->
+`spawn_hazard` -> `Hazard.sprite`, and drawn by
+`WorldRenderer._hazard_sprite`. A pool with no rig is the bare circle it
+always was. `scale` is `2 * hazard_radius` with a test pinning the two, so
+the flair cannot disagree with the circle if the radius is retuned.
+
+**Caught by the first screenshot:** the burst drew at about two thirds of
+the ring, because the sheet carries a wide transparent margin and the rig
+had no `content` crop. Measured the ink across all ten frames --
+`[34, 13, 130, 138]` of a 192 frame -- and cropped to it; the burst fills
+the damage circle now. Details and the full check in
+`documentation/sprite_functionality.md`.
+
+**Not changed, deliberately.** The owner's phrasing ("before the ring
+disappears and the damage calculation goes off") reads as one damage burst
+at the end. The pool is area-denial today -- `Hazard` bites every
+`tick_interval` while the player stands in it, and the warlock is tagged
+`area-denial` -- so turning it into a delayed bomb is a balance change
+needing a damage number, not a rendering one. Left alone and flagged.
+
+**Still open:** the 0.8 s wind-up marks nothing on the ground, because the
+telegraph ring in `one_enemy` is gated on `slam_radius`, which only the
+brute carries.
+
+Suite: 1,048 tests, 1,047 passed and 1 skipped (9 min 13 s).

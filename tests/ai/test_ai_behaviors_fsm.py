@@ -30,7 +30,7 @@ def _ctx(dt, player, calls, rng):
         fire_projectile=lambda **k: calls["fire"].append(round(k["damage"])),
         summon=lambda i, p, n: calls["summon"].append((i, n)),
         explosion=lambda p, r, d: calls["explosion"].append((round(r), round(d))),
-        spawn_hazard=lambda p, r, dps, dur, tick=None: calls["hazard"].append(round(r)),
+        spawn_hazard=lambda p, r, dps, dur, tick=None, sprite=None: calls["hazard"].append(round(r)),
         report_damage=lambda a: None)
 
 
