@@ -1,9 +1,10 @@
 """The `flying` tag: over the world rather than on it.
 
-`The First Hunger` is a giant bat, so it crosses a boulder and a cliff in
-a straight line instead of rounding one and taking the stairs to the
-other. What it may *not* do is leave the floor -- a boss out over the sea
-is a boss the player cannot fight.
+`The First Hunger` is a giant bat, so it crosses a boulder, a cliff and
+its own island's lake in a straight line instead of rounding one, taking
+the stairs to the second and stopping dead at the third. What it may
+*not* do is leave the island -- a boss out over the sea is a boss the
+player cannot fight.
 """
 import os
 import unittest
@@ -82,13 +83,48 @@ class ColliderTests(unittest.TestCase):
         self.assertGreater(refused, 5, "no terrace step was refused on this seed")
         self.assertEqual(refused, crossed)
 
-    def test_a_flyer_still_may_not_leave_the_floor(self):
+    def test_a_flyer_crosses_its_own_islands_lake(self):
+        """A lake is a cell of the island's height map. A body that walks is
+        refused it; a bat that stops dead at a pond looks broken."""
+        from world.layout import LAKE
+        px = 64
+        lakes = [(r, cell) for r in self.gm.layout.rooms
+                 for cell, c in r.grid.items() if c.kind == LAKE]
+        self.assertTrue(lakes, "no inland lake on this seed")
+        for r, (col, row) in lakes:
+            p = pygame.Vector2(r.rect.left + (col + .5) * px,
+                               r.rect.top + (row + .5) * px)
+            self.assertFalse(self.gm.is_walkable(p, 0.0))
+            self.assertTrue(self.gm.is_walkable(p, 0.0, flying=True))
+
+    def test_a_flyer_still_may_not_leave_the_island(self):
+        """The sea is not a cell of anything: over it, flying buys nothing."""
         b = self.gm.layout.bounds
         for spot in (pygame.Vector2(b.left + 2, b.top + 2),
                      pygame.Vector2(b.centerx, b.top + 2),
                      pygame.Vector2(-500, -500)):
             self.assertFalse(self.gm.is_walkable(spot, 0.0, flying=True),
-                             f"a flyer left the floor at {spot}")
+                             f"a flyer left the island at {spot}")
+
+    def test_the_flying_floor_is_the_grid_plus_the_bridges(self):
+        """Every cell an island's height map holds -- ground, cliff, flight,
+        lake -- is flyable; the void between islands is not."""
+        import random
+        px, rng = 64, random.Random(7)
+        lay = self.gm.layout
+        checked = 0
+        for _ in range(400):
+            r = rng.choice(lay.rooms)
+            col = rng.randrange(r.rect.width // px)
+            row = rng.randrange(r.rect.height // px)
+            p = pygame.Vector2(r.rect.left + (col + .5) * px,
+                               r.rect.top + (row + .5) * px)
+            inside = (col, row) in r.grid
+            if not inside and self.gm._over_island(p.x, p.y):
+                continue                      # another island's rect overlaps here
+            self.assertEqual(self.gm.is_walkable(p, 0.0, flying=True), inside)
+            checked += 1
+        self.assertGreater(checked, 100)
 
     def test_resolve_movement_carries_the_flag_through_its_slides(self):
         """A step into a tree: refused for a walker (it slides or stays),
