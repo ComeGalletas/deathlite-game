@@ -94,7 +94,8 @@ def build_teleporter(cfg: dict) -> Behavior:
 @behavior("fsm_warlock")
 def build_warlock(cfg: dict) -> Behavior:
     haz = (cfg.get("hazard_radius", 90), cfg.get("hazard_dps", 20),
-           cfg.get("hazard_duration", 3.5), cfg.get("hazard_tick"))
+           cfg.get("hazard_duration", 3.5), cfg.get("hazard_tick"),
+           cfg.get("hazard_sprite"))
 
     def snapshot(actor, per, cmb):
         actor.bb.slot(ATTACK_SLOT)["cast_at"] = pygame.Vector2(per.player_pos)

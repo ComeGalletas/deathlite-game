@@ -20,7 +20,7 @@ def ai_ctx(dt=1 / 60, player=(0, 0), rng=None, **overrides):
         fire_projectile=lambda **kw: None,
         summon=lambda enemy_id, pos, n: None,
         explosion=lambda pos, r, d: None,
-        spawn_hazard=lambda pos, r, dps, dur, tick_interval=None: None,
+        spawn_hazard=lambda pos, r, dps, dur, tick_interval=None, sprite=None: None,
         melee_hit=lambda pos, r, dmg, dur: None,
         report_damage=lambda amount: None,
     )

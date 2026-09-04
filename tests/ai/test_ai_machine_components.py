@@ -35,7 +35,7 @@ def _spy_combat():
         fire_projectile=lambda **kw: calls["fire"].append(kw),
         summon=lambda i, p, n: calls["summon"].append((i, n)),
         explosion=lambda p, r, d: calls["explosion"].append((r, d)),
-        spawn_hazard=lambda p, r, dps, dur, tick=None:
+        spawn_hazard=lambda p, r, dps, dur, tick=None, sprite=None:
             calls["hazard"].append((tuple(p), r, dps, dur)),
         report_damage=lambda a: None), calls
 
