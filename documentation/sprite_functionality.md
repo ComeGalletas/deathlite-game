@@ -510,3 +510,145 @@ trees and nothing when no one is covered.
 4. Tests, then a screenshot with the hero under a crown for the journal.
 
 About a day.
+
+## The Warlock's Spell Art (check + proposal, 2026-09-03)
+
+> Checked, not implemented. Asked: how the warlock renders its attack, how
+> the circle indicator is drawn, and what it would take to use
+> `hex_shaman_explosion_spell` as the attack's animation.
+
+### What renders today, in three parts
+
+**1. The caster animates already.** `warlock` wears the `hex_shaman` rig,
+and `Enemy._anim_name()` returns `"attack"` for the whole
+`telegraph` + `attack` window (`Enemy._attacking`). Traced in a run: the
+warlock leaves `chase` at t = 3.20 s, enters `telegraph`, and plays
+`enemies/hex_shaman/attack.png` -- 10 frames at 14 fps, 0.714 s -- against
+a `cast_telegraph` of 0.8 s. The strip very nearly fills the wind-up, so
+nothing needs doing to the caster itself.
+
+**2. The pool is drawn procedurally -- there is no art in it at all.**
+`WorldRenderer.hazards` is the whole indicator:
+
+    frac = hz.life / hz.max_life
+    rr   = hz.radius * zoom
+    disc  = circle(hz.color + alpha(70 * frac + 20), rr)   # translucent fill
+    ring  = circle(hz.color, rr, width=2)                  # hard edge
+
+`hz.color` defaults to `(200, 90, 220)` -- `Hazard` takes a `color`
+argument and `TransientFx.spawn_hazard` never passes one, so every pool in
+the game is the same purple. The fill fades as the pool expires; the ring
+does not. It is drawn in the flat-effects layer, filtered per terrace
+band, so it sits under the characters standing on its own floor.
+
+`Hazard.__slots__` is `pos, radius, dps, life, max_life, color,
+tick_interval, _tick_accum`. **There is no sprite, animator or frame index
+anywhere on it**, and `spawn_hazard(pos, radius, dps, duration,
+tick_interval)` has nowhere to pass one.
+
+**3. The wind-up shows nothing on the ground.** The only telegraph
+indicator in the enemy painter is
+
+    if e.telegraphing and "slam_radius" in e.cfg:      # rendering.py:261
+
+which is the brute's slam. The warlock's key is `hazard_radius`, so the
+condition is false and **nothing marks where the pool will land** during
+the 0.8 s wind-up. Worse for reading it: the landing spot is snapshotted
+from the player's position at wind-up *start* (`fsm_warlock`'s
+`on_windup_start`), so the player who walks away is already safe and the
+player who stands still gets no warning. The caster's own animation is the
+only cue, and it is on the caster, not on the ground.
+
+### The art that exists
+
+| file | size | frames | referenced by |
+|---|---|---|---|
+| `hex_shaman/attack.png` | 1920x192 | 10 @ 192 | the `hex_shaman` rig |
+| `hex_shaman/hex_shaman_explosion_spell.png` | 1920x192 | 10 @ 192 | **nothing** |
+| `hex_shaman/explosion.png` | 1152x128 | 9 @ 128 | nothing |
+| `hex_shaman/projectile.png` | 384x128 | 3 @ 128 | nothing |
+| `hex_shaman/hex_shaman_transformation_spell.png` | -- | -- | nothing |
+
+The spell sheet is laid out exactly like the shaman's own attack strip,
+so it needs no special slicing. One number is a happy accident worth
+keeping: `hazard_radius` is 92, so the damage circle is **184 px** across,
+and a spell frame is **192 px**. Drawn at its native size the art lands
+within 4 % of the circle it is meant to represent.
+
+### Proposal
+
+Give the hazard an optional rig and let the renderer animate it. Three
+small pieces, in the project's usual order (data -> entity -> painter).
+
+**1. A rig entry** in `data/enemy_sprites.json`, alongside `hex_shaman`:
+
+    "hex_shaman_explosion_spell": {
+      "frame": [192, 192],
+      "anchor": [96, 96],          // centre: a pool is placed by its middle
+      "scale": [184, 184],         // == 2 * hazard_radius
+      "anims": { "loop": { "file": "enemies/hex_shaman/hex_shaman_explosion_spell.png",
+                           "frames": 10, "fps": 14, "loop": false } }
+    }
+
+`anchor` at the centre rather than at the feet, because a hazard is placed
+by its centre, not seated on the ground like a character. `scale` is the
+damage diameter, so the art can never disagree with the circle: if
+`hazard_radius` is retuned, this follows it (and a test should pin that
+the two agree).
+
+**2. One data key and one parameter.** `data/enemies.json` `warlock`
+gains `"hazard_sprite": "hex_shaman_explosion_spell"`; `fsm_warlock`
+passes it in the `haz` tuple it already builds; `spawn_hazard` and
+`Hazard.__init__` take a `sprite=None`; `Hazard.__slots__` gains
+`sprite` and `spawned_at`. No per-entity default in code -- a hazard with
+no `hazard_sprite` keeps today's bare circle, which is what the boss's own
+pools should keep unless someone gives them art too.
+
+**3. The painter.** `WorldRenderer.hazards` picks the frame from the
+pool's age rather than an `Animator`, the way the obstacle skins do
+(`_draw_one_obstacle` indexes `frames[(seconds * fps + phase) % len]`):
+the hazard is not an actor and does not need per-instance animation
+state. Roughly
+
+    age   = hz.max_life - hz.life
+    i     = min(len(frames) - 1, int(age * fps))   # one-shot: hold the last
+    blit(frames[i], centred on hz.pos, scaled by zoom)
+
+then the existing ring on top.
+
+### The three decisions this needs
+
+- **One-shot or looping.** The strip is 10 frames at 14 fps = 0.71 s; the
+  pool lives 3.5 s. An explosion reads as a one-shot, so the proposal
+  holds the final frame for the remaining 2.8 s. If the last frame is not
+  a stable "lingering" pose, the alternatives are to loop the whole strip
+  (reads as a pulsing pool) or to loop a tail slice (frames 6-9, say).
+  **Look at the sheet before choosing**; this is an art question, not a
+  code one.
+- **Does the art replace the ring or join it?** Keep the ring. The filled
+  disc can go -- the art is the fill now -- but the hard 2 px edge is the
+  only thing that states the damage radius exactly, and a player standing
+  one pixel outside a soft explosion needs to know they are safe. I would
+  drop the translucent disc, keep the ring, and let the ring keep
+  `hz.color`.
+- **The fade.** The disc currently fades with `life`, which is the only
+  cue that a pool is about to expire. A held final frame does not fade. I
+  would fade the sprite's alpha over the last ~0.5 s so the pool still
+  announces its own end.
+
+### Worth doing at the same time, separately
+
+**The wind-up should mark the ground.** The same rig, drawn at the
+snapshotted `cast_at` during the `telegraph` state at low alpha and
+growing, would turn an invisible 0.8 s into a readable one, and it needs
+no new art. That is a gameplay change rather than a rendering one, so it
+belongs in its own pass with its own before/after -- but it is the thing
+that would most improve the fight, more than the pool's own art.
+
+### Effort
+
+The three pieces above are perhaps two hours, most of it in the painter,
+plus tests: the rig loads and slices to 10 frames, `scale` equals
+`2 * hazard_radius`, a hazard with no `hazard_sprite` still draws the bare
+circle, and the frame index is clamped at the end of the strip rather
+than wrapping. The frame digest is unaffected -- it draws no hazards.
