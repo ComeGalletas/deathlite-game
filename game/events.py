@@ -57,6 +57,10 @@ class Events:
     XP_COLLECTED = "xp_collected"
     ITEM_COLLECTED = "item_collected"
     BOSS_SPAWNED = "boss_spawned"
+    ENEMY_SPAWNED = "enemy_spawned"     # spawn master: enemy_id, owner, room
+    ROOM_ACTIVATED = "room_activated"   # spawn master: room, woke, seeded
+    ROOM_DORMANT = "room_dormant"       # spawn master: room, slept
+    ENEMY_RECYCLED = "enemy_recycled"   # spawn master: enemy_id, reason
     BOSS_KILLED = "boss_killed"
     RUN_ENDED = "run_ended"
     DAMAGE_DEALT = "damage_dealt"

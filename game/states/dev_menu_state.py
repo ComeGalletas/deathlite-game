@@ -27,8 +27,11 @@ from game.content import get_content
 from game.state import State
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
+# The "Spawn pressure" row cycles the master's `dev_menu` modifier through these.
+_PRESSURE_STEPS = (1.0, 2.0, 4.0, 0.0, 0.5)
 
-_ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "difficulty",
+_ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
+              "all_rooms", "freeze", "pressure", "difficulty",
               "spawn", "blessings", "items", "reset", "exit", "close")
 
 _LABELS = {
@@ -36,6 +39,10 @@ _LABELS = {
     "no_attack":    "Stop attacking",
     "no_damage":    "Attacks deal 0 damage",
     "colliders":    "Collision shapes",
+    "spawn_points": "Spawn points",
+    "all_rooms":    "Activate all rooms",
+    "freeze":       "Freeze spawns",
+    "pressure":     "Spawn pressure",
     "difficulty":   "Difficulty",
     "spawn":        "Spawn enemy...",
     "blessings":    "Blessings...",
@@ -160,6 +167,27 @@ class DevMenuState(State):
         elif rid == "colliders":
             p._dev_show_colliders = not p._dev_show_colliders
             self._status = f"Collision shapes {'ON' if p._dev_show_colliders else 'off'}"
+        elif rid == "spawn_points":
+            p._dev_show_spawn_points = not p._dev_show_spawn_points
+            self._status = f"Spawn points {'ON' if p._dev_show_spawn_points else 'off'}"
+        elif rid == "all_rooms":
+            m = p.spawn.master
+            m.all_active = not m.all_active
+            self._status = f"All rooms active {'ON' if m.all_active else 'off'}"
+        elif rid == "freeze":
+            m = p.spawn.master
+            m.frozen = not m.frozen
+            self._status = f"Spawns {'FROZEN' if m.frozen else 'running'}"
+        elif rid == "pressure":
+            m = p.spawn.master
+            cur = m.modifiers.get("dev_menu", 1.0)
+            nxt = _PRESSURE_STEPS[(_PRESSURE_STEPS.index(cur) + 1) % len(_PRESSURE_STEPS)
+                                  if cur in _PRESSURE_STEPS else 0]
+            if nxt == 1.0:
+                m.clear_modifier("dev_menu")
+            else:
+                m.set_modifier("dev_menu", nxt)
+            self._status = f"Spawn pressure modifier x{nxt:g}"
         elif rid == "difficulty":
             order = config.DIFFICULTY_ORDER
             nxt = order[(order.index(p.difficulty) + 1) % len(order)]
@@ -184,7 +212,13 @@ class DevMenuState(State):
         if p is None:
             return
         offset = pygame.Vector2(120, 0).rotate(random.uniform(0.0, 360.0))
-        p._spawn_enemy(enemy_id, at=p.player.pos + offset)
+        # Owner `dev` is on the spawn master's `cap_exempt` list: a developer
+        # piling bodies up for a stress test is not bound by the live cap the
+        # director plays under. Count what was actually seated, not attempts.
+        made = p.spawn.spawn_enemy(enemy_id, at=p.player.pos + offset, owner="dev")
+        if made is None:
+            self._status = f"{enemy_id}: the spawn master refused (world cap)"
+            return
         self._spawn_counts[enemy_id] = self._spawn_counts.get(enemy_id, 0) + 1
         self._status = f"spawned {self._spawn_counts[enemy_id]} x {enemy_id}"
 
@@ -309,6 +343,14 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_no_damage else "   [  ]"
         elif rid == "colliders" and p is not None:
             label += "   [ON]" if p._dev_show_colliders else "   [  ]"
+        elif rid == "spawn_points" and p is not None:
+            label += "   [ON]" if p._dev_show_spawn_points else "   [  ]"
+        elif rid == "all_rooms" and p is not None:
+            label += "   [ON]" if p.spawn.master.all_active else "   [  ]"
+        elif rid == "freeze" and p is not None:
+            label += "   [ON]" if p.spawn.master.frozen else "   [  ]"
+        elif rid == "pressure" and p is not None:
+            label += f"   [x{p.spawn.master.modifiers.get('dev_menu', 1.0):g}]"
         elif rid == "difficulty" and p is not None:
             label += f"   [{config.DIFFICULTY_LABELS[p.difficulty]}]"
         return label

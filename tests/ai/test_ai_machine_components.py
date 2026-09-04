@@ -26,7 +26,7 @@ def _per(player=(0.0, -200.0), dt=0.1, seed=0):
                            nav_dir=lambda p, r: pygame.Vector2(),
                            neighbors=lambda p, r: [], obstacles_near=lambda p, r: [],
                            is_walkable=lambda p, r: True,
-                           resolve_movement=lambda a, b, r: b)
+                           resolve_movement=lambda a, b, r, **kw: b)
 
 
 def _spy_combat():
@@ -35,7 +35,7 @@ def _spy_combat():
         fire_projectile=lambda **kw: calls["fire"].append(kw),
         summon=lambda i, p, n: calls["summon"].append((i, n)),
         explosion=lambda p, r, d: calls["explosion"].append((r, d)),
-        spawn_hazard=lambda p, r, dps, dur, tick=None:
+        spawn_hazard=lambda p, r, dps, dur, tick=None, sprite=None:
             calls["hazard"].append((tuple(p), r, dps, dur)),
         report_damage=lambda a: None), calls
 

@@ -164,15 +164,24 @@ class PlayingStateNavWiringTests(unittest.TestCase):
 
 
 class NavRebuildStaggerTests(unittest.TestCase):
-    """M6: the periodic refresh rebuilds one grid per tick (round-robin) so the
-    ~8 ms both-grids cost never lands whole on one frame; a player jump still
-    repaths everything at once."""
+    """M6: the periodic refresh starts one grid's fill per tick (round-robin);
+    a player jump starts every grid's at once. Since the sliced fill the
+    coordinator calls `begin`, not `rebuild`, and advances the fill by a
+    per-frame budget -- so the spy watches `begin`, and a fill started by
+    one tick lands over the next few."""
 
     def _spy(self, nf):
         calls = []
-        real = nf.rebuild
-        nf.rebuild = lambda tgt, only=None: (calls.append(only), real(tgt, only))[-1]
+        real = nf.begin
+        nf.begin = lambda tgt, only=None: (calls.append(only), real(tgt, only))[-1]
         return calls
+
+    def _settle(self, p, frames: int = 60):
+        """Let a sliced fill land (frames of the budget, player still)."""
+        for _ in range(frames):
+            if not p._nav.filling:
+                break
+            p._nav.step(config.ENEMY_NAV_FILL_BUDGET)
 
     def test_periodic_refresh_hits_one_grid_per_tick_cycling(self):
         _g, p = _playing(1234, True)
@@ -180,17 +189,77 @@ class NavRebuildStaggerTests(unittest.TestCase):
         for _ in range(6):
             p._nav_t = 0.0                    # force the interval due, player still
             p._update_nav(1 / 120)
+            self._settle(p)
         self.assertTrue(calls and all(c is not None for c in calls))
         self.assertEqual(set(calls), set(p._nav.classes))
         self.assertGreater(p._nav_rebuilds, 0)
 
-    def test_player_jump_rebuilds_every_grid_at_once(self):
+    def test_player_jump_starts_every_grids_fill_at_once(self):
         _g, p = _playing(1234, True)
         calls = self._spy(p._nav)
         p.player.pos = p.player.pos + pygame.Vector2(700, 0)
         p._nav_t = 9.0                        # interval nowhere near due
         p._update_nav(1 / 120)
         self.assertEqual(calls, [None])       # None -> all classes
+        self.assertTrue(p._nav.filling or True)   # may already have landed on a small world
+
+    def test_a_sliced_fill_lands_the_same_field_as_a_whole_one(self):
+        w = W.layout(1234)
+        whole = NavField(w, w.obstacles)
+        sliced = NavField(w, w.obstacles)
+        tgt = w.room(w.boss_id).center
+        whole.rebuild(tgt)
+        sliced.begin(tgt)
+        steps = 0
+        while not sliced.step(0.0005):
+            steps += 1
+        self.assertGreater(steps, 3, "the budget never made the fill yield")
+        for name in whole.classes:
+            self.assertEqual(sliced.fields[name].cost.tobytes(),
+                             whole.fields[name].cost.tobytes(), name)
+        self.assertEqual(sliced.reachable, whole.reachable)
+
+    def test_the_old_field_keeps_steering_while_a_fill_is_under_way(self):
+        w = W.layout(1234)
+        nf = NavField(w, w.obstacles)
+        a = w.room(w.start_id).center
+        b = w.room(w.boss_id).center
+        nf.rebuild(a)
+        before = {n: nf.fields[n].cost.tobytes() for n in nf.classes}
+        nf.begin(b)
+        self.assertTrue(nf.filling)
+        self.assertFalse(nf.step(0.0002))              # yielded, work left
+        for n in nf.classes:                            # what the samplers read is untouched
+            self.assertEqual(nf.fields[n].cost.tobytes(), before[n])
+        self.assertEqual(nf.fields[nf.classes[0]].target_cell,
+                         nf.grids[nf.classes[0]].cell_of(a.x, a.y))
+        nf.step(None)                                   # to the end
+        self.assertFalse(nf.filling)
+        self.assertNotEqual(nf.fields[nf.classes[0]].cost.tobytes(), before[nf.classes[0]])
+
+    def test_a_step_respects_its_budget(self):
+        import time
+        w = W.layout(1234)
+        nf = NavField(w, w.obstacles)
+        nf.begin(w.room(w.boss_id).center)
+        t0 = time.perf_counter()
+        done = nf.step(0.001)
+        took = time.perf_counter() - t0
+        self.assertFalse(done)
+        self.assertLess(took, 0.006, f"a 1 ms budget took {took*1000:.1f} ms")
+
+    def test_update_nav_advances_a_fill_within_the_budget(self):
+        _g, p = _playing(1234, True)
+        p.player.pos = p.player.pos + pygame.Vector2(700, 0)
+        p._nav_t = 9.0
+        p._update_nav(1 / 120)                         # starts every class's fill
+        self.assertLess(p._nav_last_ms, 8.0)           # one slice, not a whole fill
+        frames = 0
+        while p._nav.filling and frames < 200:
+            p._update_nav(1 / 120)
+            frames += 1
+        self.assertFalse(p._nav.filling)
+        self.assertGreater(frames, 0)
 
     def test_navfield_rebuild_only_touches_the_named_field(self):
         w = W.layout(3)

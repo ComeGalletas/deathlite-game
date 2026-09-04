@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from game import config
 from world.gen.height.graph import check_grid
-from world.layout import WALKABLE_KINDS
+from world.layout import GROUND, WALKABLE_KINDS
 from world.rules import floor
 
 
@@ -62,4 +62,19 @@ def validate(layout) -> list[str]:
     for i, o in enumerate(layout.obstacles):
         if not floor.point_on_floor(layout, o.pos.x, o.pos.y):
             bad.append(f"obstacle {i} ({o.kind}) stands off the floor")
+    # Spawn points and resource anchors: on plain ground of the island and
+    # the terrace they say they are on.
+    for what, points in (("spawn point", layout.spawn_points),
+                         ("resource point", layout.resource_points)):
+        for i, p in enumerate(points):
+            room = floor.room_of(layout, p.x, p.y)
+            if room is None or room.id != p.room_id:
+                bad.append(f"{what} {i} is not on island {p.room_id}'s floor")
+                continue
+            cell = room.grid.get((int((p.x - room.rect.x) // px),
+                                  int((p.y - room.rect.y) // px)))
+            if cell is None or cell.kind != GROUND:
+                bad.append(f"{what} {i} is not on plain ground")
+            elif cell.level != p.floor:
+                bad.append(f"{what} {i} says floor {p.floor}, stands on {cell.level}")
     return bad

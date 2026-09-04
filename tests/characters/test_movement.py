@@ -42,7 +42,7 @@ class _RectWorld:
     def __init__(self, w, h):
         self.w, self.h = w, h
 
-    def resolve_movement(self, prev, new, radius):
+    def resolve_movement(self, prev, new, radius, flying=False):
         return pygame.Vector2(min(max(new.x, radius), self.w - radius),
                               min(max(new.y, radius), self.h - radius))
 

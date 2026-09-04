@@ -31,8 +31,7 @@ class Game:
     def __init__(self, save_path=None) -> None:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
-        self.screen = pygame.display.set_mode(
-            (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        self.screen, self.vsync = self._open_window()
         self.clock = pygame.time.Clock()
         self.running = False
 
@@ -82,6 +81,24 @@ class Game:
         for item in stats.get("dropped_items", ()):
             self.save.add_item(item)
         self.persist()
+
+    @staticmethod
+    def _open_window():
+        """The window, synced to the display when `config.VSYNC` asks and the
+        driver allows. Returns `(surface, vsync_on)`. A driver that cannot
+        (the headless dummy driver, some remote desktops) raises
+        `pygame.error`, and the plain window is the answer then -- the game
+        must never fail to open over presentation."""
+        size = (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
+        if config.VSYNC:
+            try:
+                surf = pygame.display.set_mode(
+                    size, pygame.SCALED | pygame.DOUBLEBUF, vsync=1)
+                return surf, True
+            except pygame.error as exc:
+                logging.getLogger(__name__).info(
+                    "vsync window refused (%s); plain window", exc)
+        return pygame.display.set_mode(size), False
 
     def _start(self) -> None:
         """Push the opening state and arm the loop. Shared by `run` (desktop)

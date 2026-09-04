@@ -17,11 +17,12 @@ from game import config
 
 class Hazard:
     __slots__ = ("pos", "radius", "dps", "life", "max_life", "color",
-                 "tick_interval", "_tick_accum")
+                 "tick_interval", "_tick_accum", "sprite")
 
     def __init__(self, x: float, y: float, radius: float, dps: float,
                  duration: float, color=(200, 90, 220),
-                 tick_interval: float | None = None) -> None:
+                 tick_interval: float | None = None,
+                 sprite: str | None = None) -> None:
         self.pos = pygame.Vector2(x, y)
         self.radius = radius
         self.dps = dps
@@ -29,6 +30,11 @@ class Hazard:
         self.color = color
         self.tick_interval = float(tick_interval or config.INCOMING_TICK_INTERVAL)
         self._tick_accum = 0.0
+        # Flair only: a rig (`data/enemy_sprites.json`) the renderer plays
+        # out over the pool's last seconds. The ring and the disc stay what a
+        # player reads for the damage radius; a pool with no rig is the bare
+        # circle it always was.
+        self.sprite = sprite
 
     @property
     def alive(self) -> bool:

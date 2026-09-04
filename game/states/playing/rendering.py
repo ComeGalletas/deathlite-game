@@ -31,14 +31,35 @@ _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
                 "shock": (255, 230, 120)}
 _HIT_TINT = (150, 30, 30)
 _KNOCK_VEC_SCALE = 0.15     # dev overlay: `_knock` px/s -> screen px line length
+_SPAWN_MARK_PX = 6          # dev overlay: half-size of a spawn-point mark, world px
+# Hazard fill: alpha at spawn is FLOOR + ALPHA, fading to FLOOR as the pool
+# expires. Halved from 70/20 when the pools gained art -- the disc still has
+# to state the area, but it no longer has to carry the whole effect.
+_HAZARD_FILL_ALPHA = 35
+_HAZARD_FILL_FLOOR = 10
+
+
+_TINT_CACHE: dict[int, tuple] = {}     # id(frame) -> (frame, tinted copy)
+_TINT_CACHE_CAP = 128
 
 
 def hit_tinted(frame):
     """A red-tinted copy of a sprite frame -- the damage flash for rigs with no
     `hurt` strip. `BLEND_RGBA_ADD` brightens toward red and leaves the alpha
-    silhouette intact (transparent pixels stay transparent)."""
+    silhouette intact (transparent pixels stay transparent).
+
+    Cached by the frame's identity: the animation frames are the asset
+    cache's own objects, so the same one comes back for the whole 0.26 s
+    hurt window, and this used to copy it on every frame of it. The source
+    is kept in the entry so its id cannot be recycled under the cache."""
+    hit = _TINT_CACHE.get(id(frame))
+    if hit is not None and hit[0] is frame:
+        return hit[1]
     out = frame.copy()
     out.fill((*_HIT_TINT, 0), special_flags=pygame.BLEND_RGBA_ADD)
+    if len(_TINT_CACHE) >= _TINT_CACHE_CAP:
+        _TINT_CACHE.clear()
+    _TINT_CACHE[id(frame)] = (frame, out)
     return out
 
 
@@ -53,9 +74,17 @@ class WorldRenderer:
         return config.SPRITE_ANCHOR_DROP * radius * self.ps.camera.zoom
 
     def _blit_character(self, surface, frame, dest, character_y: float) -> None:
-        frame = self.ps.game_map.renderer.shade_character_frame(
-            frame, dest, self.ps.camera, character_y)
-        surface.blit(frame, dest)
+        r = self.ps.game_map.renderer
+        drawn = r.shade_character_frame(frame, dest, self.ps.camera, character_y)
+        surface.blit(drawn, dest)
+        # For the ghost pass. A shaded result lives in a scratch surface the
+        # next character of the same size overwrites, so it is copied here;
+        # the unshaded frame is the asset cache's own object and is recorded
+        # as is (and the ghost of it is cached by identity).
+        if drawn is frame:
+            r.record_character(frame, dest, character_y)
+        else:
+            r.record_character(drawn.copy(), dest, character_y, cacheable=False)
 
     # --- feedback / hud-adjacent overlays --------------------------
     def feedback_overlays(self, surface: pygame.Surface) -> None:
@@ -127,10 +156,41 @@ class WorldRenderer:
             sx, sy = ps.camera.world_to_screen(hz.pos)
             frac = max(0.0, hz.life / hz.max_life)
             rr = max(1, round(hz.radius * z))
+            # The disc states the area; the ring states its exact edge. Both
+            # are what a player reads, so the art below never replaces them --
+            # the fill is only kept faint enough to stop competing with it.
             surf = pygame.Surface((rr * 2, rr * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*hz.color, int(70 * frac + 20)), (rr, rr), rr)
+            pygame.draw.circle(surf, (*hz.color, int(_HAZARD_FILL_ALPHA * frac
+                                                     + _HAZARD_FILL_FLOOR)),
+                               (rr, rr), rr)
             surface.blit(surf, (sx - rr, sy - rr))
+            self._hazard_sprite(surface, hz, sx, sy, z)
             pygame.draw.circle(surface, hz.color, (int(sx), int(sy)), rr, 2)
+
+    def _hazard_sprite(self, surface, hz, sx: float, sy: float, z: float) -> None:
+        """The pool's flair, if it has a rig: the strip played once at its
+        own speed so it *ends* as the pool does, which reads as the blast
+        going off rather than as the pool simmering. Silent for a pool with
+        no rig, and for the whole of its life before the strip is due."""
+        if not hz.sprite:
+            return
+        assets = self.ps.game.assets
+        n = assets.frame_count(hz.sprite, "loop")
+        if not n:
+            return
+        fps = assets.fps(hz.sprite, "loop")
+        span = n / fps                       # 10 frames at 14 fps == 0.71 s
+        left = hz.life                       # seconds until the pool expires
+        if left > span:
+            return                           # not yet: the pool is still simmering
+        i = min(n - 1, max(0, int((span - left) * fps)))
+        base = assets.scale_for(hz.sprite) or (round(hz.radius * 2), round(hz.radius * 2))
+        size = (max(1, round(base[0] * z)), max(1, round(base[1] * z)))
+        frames = assets.frames(hz.sprite, "loop", size=size)
+        if not frames:
+            return
+        frame = frames[min(i, len(frames) - 1)]
+        surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
 
     def one_summon(self, surface, s) -> None:
         sx, sy = self.ps.camera.world_to_screen(s.pos)
@@ -382,6 +442,51 @@ class WorldRenderer:
             draw_projectile(surface, sx, sy, p, ctx, default="arrow")
 
     # --- dev overlay -------------------------------------------
+    def spawn_point_overlay(self, surface) -> None:
+        """Dev-mode: every spawn point and resource anchor the generator
+        decided, read straight off the layout. Enemy points are diamonds
+        (bright for the large class, dim for small-only), resource anchors
+        squares, each with its floor number. Toggle with F8 or the dev
+        menu's 'Spawn points' row. Same shape as `collider_overlay`."""
+        ps = self.ps
+        if not (ps.dev_mode and ps._dev_show_spawn_points):
+            return
+        layout = ps.game_map.layout
+        if layout is None:
+            return
+        cam = ps.camera
+        z = cam.zoom
+        view = cam.visible_rect().inflate(200, 200)
+        font = fonts.mono(10)
+        half = max(3, round(_SPAWN_MARK_PX * z))
+
+        def label(sx, sy, text, col):
+            surface.blit(font.render(text, True, col), (sx + half + 2, sy - 6))
+
+        placement = ps.spawn.master.placement
+        now = ps.stats["time"]
+        for p in layout.spawn_points:
+            if not view.collidepoint(p.x, p.y):
+                continue
+            sx, sy = cam.world_to_screen(p.pos)
+            sx, sy = int(sx), int(sy)
+            col = (config.COLOR_DEBUG_SPAWN if p.clearance == "large"
+                   else config.COLOR_DEBUG_SPAWN_SMALL)
+            if placement.on_cooldown(p, now):        # just used: dimmed
+                col = tuple(c // 3 for c in col)
+            pygame.draw.polygon(surface, col, ((sx, sy - half), (sx + half, sy),
+                                               (sx, sy + half), (sx - half, sy)), 2)
+            label(sx, sy, str(p.floor), col)
+        for p in layout.resource_points:
+            if not view.collidepoint(p.x, p.y):
+                continue
+            sx, sy = cam.world_to_screen(p.pos)
+            sx, sy = int(sx), int(sy)
+            col = config.COLOR_DEBUG_RESOURCE
+            pygame.draw.rect(surface, col,
+                             pygame.Rect(sx - half, sy - half, 2 * half, 2 * half), 2)
+            label(sx, sy, f"{p.floor} {p.kind[0]}", col)
+
     def collider_overlay(self, surface) -> None:
         """Dev-mode: every true circular collider / hitbox in one pass, read
         straight off the fields the physics uses. Toggle with F7 or the dev

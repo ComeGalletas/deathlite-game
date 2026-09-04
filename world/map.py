@@ -33,9 +33,54 @@ _ESCAPE_DIRS = ((1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0),
                 (_R2, _R2), (_R2, -_R2), (-_R2, _R2), (-_R2, -_R2))
 
 
+class _ObstacleIndex:
+    """The obstacles bucketed by a coarse world grid, so a collision probe
+    asks the handful near a point instead of every obstacle in the world.
+
+    `is_walkable` used to end with a scan of the whole list -- 565
+    obstacles on a shipping seed, five probes a call, up to three calls a
+    move -- and that scan was 44 % of the update loop at a hundred live
+    enemies (93 us a call; 4 us with this). Rebuilt whenever the list is
+    assigned (`GameMap.obstacles`); obstacles never move once placed.
+    """
+
+    __slots__ = ("cell", "reach", "_buckets")
+
+    def __init__(self, obstacles, cell: int = 128) -> None:
+        self.cell = int(cell)
+        self.reach = 0.0                        # the widest obstacle's radius
+        self._buckets: dict[tuple[int, int], list] = {}
+        for o in obstacles:
+            key = (int(o.pos.x // self.cell), int(o.pos.y // self.cell))
+            self._buckets.setdefault(key, []).append(o)
+            if o.radius > self.reach:
+                self.reach = float(o.radius)
+
+    def near(self, x: float, y: float, radius: float) -> list:
+        """Every obstacle whose disc could overlap a disc of `radius` at
+        (x, y) -- a superset; the caller does the exact test."""
+        if not self._buckets:
+            return []
+        r = radius + self.reach
+        c = self.cell
+        x0, x1 = int((x - r) // c), int((x + r) // c)
+        y0, y1 = int((y - r) // c), int((y + r) // c)
+        if x0 == x1 and y0 == y1:
+            return self._buckets.get((x0, y0), [])
+        out: list = []
+        for gx in range(x0, x1 + 1):
+            for gy in range(y0, y1 + 1):
+                b = self._buckets.get((gx, gy))
+                if b:
+                    out.extend(b)
+        return out
+
+
 class GameMap:
-    def __init__(self, seed: int | None = None) -> None:
-        if seed is None:
+    def __init__(self, seed: int | None = None, *, layout: WorldLayout | None = None) -> None:
+        """`seed` generates the world here; `layout` hands one in that was
+        generated elsewhere (the loading screen, a step at a time)."""
+        if seed is None and layout is None:
             self.layout: WorldLayout | None = None
             self._levels = None
             self.width = config.WORLD_WIDTH
@@ -43,7 +88,7 @@ class GameMap:
             self._rects = [pygame.Rect(0, 0, self.width, self.height)]
             self.obstacles = []
         else:
-            self.layout = generate_world(seed)
+            self.layout = layout if layout is not None else generate_world(seed)
             b = self.layout.bounds
             self.width, self.height = b.width, b.height
             self._rects = self.layout.walkable_rects()
@@ -79,6 +124,15 @@ class GameMap:
 
     # --- geometry ------------------------------------------------
     @property
+    def obstacles(self) -> list:
+        return self._obstacles
+
+    @obstacles.setter
+    def obstacles(self, value) -> None:
+        self._obstacles = value
+        self._obstacle_index = _ObstacleIndex(value)
+
+    @property
     def center(self) -> pygame.Vector2:
         if self.layout is not None:
             return self.layout.room(self.layout.start_id).center
@@ -108,6 +162,14 @@ class GameMap:
         if self.layout is None:
             return self._rects[0].collidepoint(x, y)
         return floor_rules.point_on_floor(self.layout, x, y)
+
+    def _over_island(self, x: float, y: float) -> bool:
+        """The flying floor test: any cell of an island's grid, or a bridge.
+        `world/rules/floor.py` is the one body of this rule."""
+        if self.layout is None:
+            return self._rects[0].collidepoint(x, y)
+        return (floor_rules.over_island(self.layout, x, y)
+                or floor_rules.in_corridor(self.layout, x, y))
 
     def _room_of(self, x: float, y: float):
         """The island whose floor the point actually stands on, or `None`."""
@@ -164,7 +226,7 @@ class GameMap:
         return cur == b or can_step(ix, cur, b)
 
     def is_walkable(self, pos: pygame.Vector2, radius: float = 0.0,
-                    frm: pygame.Vector2 | None = None) -> bool:
+                    frm: pygame.Vector2 | None = None, flying: bool = False) -> bool:
         """`frm` opts into the elevation rule: the move from there to here must
         be one the terrain allows. Callers that are only asking "is this spot
         free" -- the AI's `is_walkable` probe, spawn placement -- leave it None
@@ -187,6 +249,14 @@ class GameMap:
         ends -- may still move, as long as it does not go *deeper*. "Cannot
         enter, may leave" is what stops the rule wedging anything; refusing
         outright would freeze a body the moment anything put it there."""
+        # A flyer (`flying` tag, `The First Hunger`) is over the world, not on
+        # it: no terrace margin, no elevation rule, no obstacle, and no radius
+        # probe -- it passes above a boulder and across a cliff in one line,
+        # and over its own island's lake, which is a cell of the height map
+        # like any other. It still may not leave the island: the sea is where
+        # a body goes to become unreachable, and the arena has to stay a fight.
+        if flying:
+            return self._over_island(pos.x, pos.y)
         if not self._point_ok(pos.x, pos.y):
             return False
         if self._body_inset > 0.0 and not self.inset_ok(pos.x, pos.y):
@@ -202,7 +272,7 @@ class GameMap:
                 and self._point_ok(pos.x, pos.y + radius)
                 and self._point_ok(pos.x, pos.y - radius)):
             return False
-        for o in self.obstacles:
+        for o in self._obstacle_index.near(pos.x, pos.y, radius):
             rr = o.radius + radius
             if (pos.x - o.pos.x) ** 2 + (pos.y - o.pos.y) ** 2 < rr * rr:
                 return False
@@ -210,7 +280,7 @@ class GameMap:
 
     def blocking_obstacle_hit(self, pos: pygame.Vector2, radius: float):
         """First projectile-blocking obstacle overlapping the circle, or None."""
-        for o in self.obstacles:
+        for o in self._obstacle_index.near(pos.x, pos.y, radius):
             if not o.blocks_projectiles:
                 continue
             rr = o.radius + radius
@@ -219,17 +289,17 @@ class GameMap:
         return None
 
     def resolve_movement(self, prev: pygame.Vector2, new: pygame.Vector2,
-                         radius: float) -> pygame.Vector2:
+                         radius: float, flying: bool = False) -> pygame.Vector2:
         """Move toward `new`; if it hits a wall, slide along one axis; if that
         also fails, hop one short step to an open compass direction so a wedged
         entity always has an out. Unchanged if every hop is blocked too."""
-        if self.is_walkable(new, radius, frm=prev):
+        if self.is_walkable(new, radius, frm=prev, flying=flying):
             return new
         slide_x = pygame.Vector2(new.x, prev.y)
-        if self.is_walkable(slide_x, radius, frm=prev):
+        if self.is_walkable(slide_x, radius, frm=prev, flying=flying):
             return slide_x
         slide_y = pygame.Vector2(prev.x, new.y)
-        if self.is_walkable(slide_y, radius, frm=prev):
+        if self.is_walkable(slide_y, radius, frm=prev, flying=flying):
             return slide_y
         # Fully wedged (move + both axis slides blocked). Try a `radius`-length
         # hop in the eight compass directions, the one nearest the intended
@@ -241,7 +311,7 @@ class GameMap:
         for dx, dy in sorted(_ESCAPE_DIRS,
                              key=lambda d: -(d[0] * want.x + d[1] * want.y)):
             hop = pygame.Vector2(prev.x + dx * step, prev.y + dy * step)
-            if self.is_walkable(hop, radius, frm=prev):
+            if self.is_walkable(hop, radius, frm=prev, flying=flying):
                 return hop
         return pygame.Vector2(prev)
 
@@ -262,7 +332,11 @@ class GameMap:
     def offscreen_spawn_point(self, camera, rng: random.Random) -> pygame.Vector2:
         """A walkable point just outside the view: prefer the closest rooms that
         are not fully on screen, so pressure stays on the player even though the
-        world is large."""
+        world is large.
+
+        Since spawn master S3 this is the **fallback** only -- the world with
+        no layout, or one generated with no spawn points. A generated world
+        places on its `layout.spawn_points` (`spawn/placement.py`)."""
         view = camera.visible_rect()
         vc = pygame.Vector2(view.center)
 
@@ -335,6 +409,8 @@ class GameMap:
     _decos = _baked("decos", dict)
     _sprite_drop = _baked("sprite_drop", dict)
     _tree_shadows = _baked("tree_shadows", dict)
+    _art_rects = _baked("art_rects", dict)
+    _ghost = _baked("ghost", dict)
     _room_decor = _baked("room_decor", dict)
     _void_decor = _baked("void_decor", list)
     del _baked

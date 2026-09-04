@@ -95,6 +95,20 @@
       "attack": {"file": "enemies/thief/attack.png", "frames": 6, "fps": 16, "loop": false}
     }
   },
+  "hex_shaman_explosion_spell": {
+    "frame": [192, 192],
+    "content": [34, 13, 130, 138],
+    "anchor": [96, 96],
+    "scale": [184, 184],
+    "anims": {
+      "loop": {
+        "file": "enemies/hex_shaman/hex_shaman_explosion_spell.png",
+        "frames": 10,
+        "fps": 14,
+        "loop": false
+      }
+    }
+  },
   "hex_shaman": {
     "frame": [192, 192], "content": [32, 41, 134, 96], "scale": [57, 41], "anchor": [26, 41], "face": "right",
     "anims": {

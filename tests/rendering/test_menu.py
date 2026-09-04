@@ -322,8 +322,9 @@ class CharacterSelectDifficultyTests(unittest.TestCase):
         from game.states.playing_state import PlayingState
         game, cs = self._select()
         _key(game, pygame.K_DOWN)                   # -> fast
-        _key(game, pygame.K_RETURN)                 # begin
-        run = game.state_machine.current
+        _key(game, pygame.K_RETURN)                 # begin -> loading -> run
+        from tests.boot import settle
+        run = settle(game)
         self.assertIsInstance(run, PlayingState)
         self.assertEqual(run.difficulty, "fast")
         self.assertEqual(run.director.difficulty, "fast")

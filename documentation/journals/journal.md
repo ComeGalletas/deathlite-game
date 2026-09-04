@@ -2724,3 +2724,251 @@ tense.
 **Verified:** default tier 855 passed / 1 skipped, sweep tier 7 passed,
 `python -m unittest discover -s tests -t .` green; the world byte-identical to
 `b0114d6` for every pinned seed. Nothing committed.
+
+---
+
+## Planned Phase -- Loading screen for world generation (2026-09-02)
+
+**Brief.** After ENTER on the hero-select screen, and on the developer menu's
+"restart run", show a dark screen with the text "Loading..." and the chosen
+hero's sprite playing its movement animation in place, until the world is
+ready; then drop straight into the run. Nothing else on the screen.
+
+**Why.** `PlayingState.enter` builds the world synchronously -- `GameMap`
+~1.5 s, `NavField` ~0.5 s, and the terrain bake ~2.5 s on the first draw --
+so the frame freezes for four to five seconds after ENTER, and the browser
+build's tab hangs with it. The loop is single-threaded and pygbag has no
+threads (pygame surfaces have to be baked on the main thread anyway), so the
+sprite can only animate if the work is done in slices between frames.
+
+**Design.**
+
+1. Slice the work. `world/gen/__init__.py` gains `generate_world_steps(seed,
+   settings)`, a generator yielding after each stage (tree and rects, one
+   yield per island height map, bridges, palettes, one per island inset field,
+   scatter, repair); `generate_world` runs every step, so the RNG order and the
+   pinned digests do not move. Likewise `bake_steps(layout)` in
+   `world/terrain/bake.py` (one yield per island, then the decor passes) and
+   the two navigation classes. Steps run 50-350 ms; the loading state may run
+   several small ones per frame up to a ~30 ms budget.
+2. `game/states/loading_state.py`: `LoadingState`, entered with the same
+   keywords `PlayingState` takes. Each frame it advances a step, updates an
+   `Animator` on the hero's rig with its movement animation (`walk` -- the rigs
+   have `idle` / `walk` / `attack`), and draws a dark fill, "Loading..." centred
+   in the heading font, and the sprite in place below it. A hero with no rig
+   draws the run's primitive circle instead.
+3. Handoff: on the last step, `state_machine.change(PlayingState, ...,
+   prebuilt=...)`; `PlayingState.enter` uses the baked map and the nav field
+   it is handed and otherwise builds as today, so tests and any other caller
+   keep working. `character_select_state` and `_restart_dev_run` both go
+   through `LoadingState`.
+4. Tests: the loading state with fake steps; one driving it to completion and
+   asserting the run starts with a baked map; the smoke test's state walk
+   extended by one state; the digest tests unchanged.
+
+**Files.** `world/gen/__init__.py`, `world/terrain/bake.py`, `world/map.py`,
+`game/states/playing/state.py`, `game/states/character_select_state.py`, the
+new state and its test.
+
+**Status.** DONE (2026-09-02). Landed as designed, with two details decided
+on the way: the hero runs **in place** (its `walk` animation -- the rigs have
+`idle` / `walk` / `attack`), and the dev-menu restart keeps passing no
+difficulty, exactly as before. `generate_world_steps` yields 22 labels a
+world (lattice, placement, nine islands, bridges, nine terrace fields,
+obstacles, repair) and `bake_steps` fourteen (nine islands, bridges, water,
+skins, clutter, water scenery); `generate_world` and `bake` drive them to the
+end, and the pinned layout / bake / frame digests did not move. `GameMap`
+accepts a prebuilt `layout`; `PlayingState.enter(prebuilt=...)` takes the
+baked map and the nav field. Tests: `tests/core/test_loading.py` (hands over
+a baked world under the same seed and the same digest, the sprite advances,
+the screen is dark with text and hero, the dev restart loads too);
+`tests/boot.settle` drives the loader for the eight test helpers that walk
+the menu into a run.
+
+---
+
+## Collider trim: trees, signs, scarecrows (2026-09-03)
+
+`data/terrain.json` `obstacles`: tree 15 -> 13 px (-13 %, "about 15 %"
+kept to a whole pixel), sign 8 -> 6, scarecrow 10 -> 7.5 (-25 %). Only
+the collision discs; the drawn size (`render_radius`, the rigs) is
+untouched. Everything reads `KINDS` off the data, so nothing else moved
+by hand: the scatter spaces trees by the same constants, the unseal
+repair and the spawn-point stage see the smaller discs, and the pinned
+layout / bake / frame digests were regenerated (`python -m world.digest
+--write`) because a collider is part of the world they fingerprint.
+
+**What the trim uncovered.** `tests/ai/test_pathfinding.py` then found
+seed 1's boss island unreachable for both navigation classes -- a world
+the unseal repair had passed as whole. The repair's flood and its seal
+search walked diagonals freely; the flow field refuses a diagonal step
+that cuts a blocked corner (`FlowField.step`), and a body cannot squeeze
+through one either. A gap open only corner to corner therefore read as a
+route to the repair and as a wall to the field, so the repair removed
+nothing. Smaller tree colliders made more such gaps and the disagreement
+surfaced. `world/gen/repair.py` now applies the same corner rule in
+`_reachable` and `_seals` (`_corner_clips`). The repair takes back more
+obstacles for it -- 15-36 a world on nine seeds, 4-6 % against 1-2 %
+before -- which is the cost of the field and the repair agreeing;
+`test_it_takes_back_only_a_handful` moved its bound from one in twenty to
+one in twelve and says why. All five pathfinding seeds reach the boss
+island on both classes again. Digests re-pinned once more.
+
+---
+
+## Post props drawn smaller (2026-09-03)
+
+`data/terrain.json` `obstacle_decor.render_scale`: `sign` and `scarecrow`
+1.0 -> 0.75. That is the draw scale of `deco_16` (cross sign), `deco_17`
+(left-arrow sign) and `deco_18` (scarecrow), the three post props whose
+art is drawn as authored rather than fitted to the collider
+(`frontier.rig_scale`'s override). The colliders stay where the trim
+above put them; no percentage was given, so the art follows the collider's
+25 %, which keeps the art-to-hitbox ratio where it was. `obstacle_reach`
+reads the same scale, so the scatter's uphill keep-back shrank with the
+art and three of the four pinned layouts moved a placement or two; the
+bake and frame digests moved for the smaller sprites. Re-pinned.
+
+Follow-up: `tests/world/test_prop_coverage.py` pinned the posts at their
+authored size and `render_scale` at 1.0; both now read the scale off the
+data (the full suite was not run before the sprite commit -- caught on
+the next one).
+
+Second follow-up: the same missed full run hid
+`test_gradient_walk_trends_down_and_reaches_the_target` failing on seed 42.
+Not a field bug: the test's walker hopped half a cell from a level-0 cell
+into the level-1 cell beside it at a cliff edge, which the field never
+steers into and the collider would refuse (`is_walkable(frm=...)` holds
+the elevation rule), then read that cell's long-way-round cost as a jump.
+The walker now applies the same rule (`_same_floor` in
+`tests/ai/test_pathfinding.py`: a hop may not change terrace level except
+through a flight cell). The field is untouched.
+
+---
+
+## Ghost silhouettes behind obstacles (2026-09-03)
+
+The proposal at the end of `documentation/sprite_functionality.md`, done.
+
+- `obstacle_skins.py` records, next to each skin, the world rectangle
+  `_draw_one_obstacle` will paint it in (`BakedTerrain.art_rects`), and
+  the data's `obstacle_decor.ghost` block (`BakedTerrain.ghost`).
+- `TerrainRenderer` buckets those rectangles like the tree shadows
+  (`_art_index`, listed kinds only), `record_character` notes every frame
+  `_blit_character` draws, and `ghost_pass` -- called once at the end of
+  `PlayingState._draw_world`, after every band -- blits each recorded
+  frame again at the data's alpha through the art that covers it and
+  sorts in front of it (obstacle Y greater than the body's), clipped to
+  that art. The alpha copy is cached by the frame's identity
+  (`_ghost_of`); the source frame is never touched.
+- `data/terrain.json`: `"ghost": {"alpha": 110, "kinds": ["tree",
+  "house", "rock", "pillar"]}`. Alpha 0 or a missing block is off.
+- Tests: `tests/rendering/test_ghost.py` (9) -- a synthetic one-tree map
+  pins the clip exactly (ghost under the art, nothing past its edge,
+  nothing for a body in front), the real world pins every covering crown
+  ghosts once, the kind filter, alpha 0, the cache, and a run frame.
+
+The bake and frame digests did not move: the digest frame has no
+characters and the new containers are not in `_BAKE_FIELDS`.
+
+**Caught on the way.** A shaded character's drawn frame is the renderer's
+reused scratch surface (the render fix that ended per-character
+allocations), so recording it for the ghost pass recorded a surface the
+next same-sized body overwrites. `_blit_character` now records a copy of
+a shaded result, flagged not cacheable, and the asset frame itself when
+no shade applied (its ghost is cached by identity). A test pins that a
+shaded body's ghost keeps its own pixels.
+
+**Cost.** Stress scene, 100 live, the walking-hero probe: with 57 bodies
+recorded and 25 clipped ghost blits in a frame, the pass adds 0.2-0.6 ms
+of render (on 5.6 / off 5.4 ms p50, measured back to back in one process
+while the suite ran on another core). The alpha of 110 reads strong over
+a bright crown; it is one number in `terrain.json` if a fainter ghost is
+wanted.
+
+Suite: 1,019 tests, 1,018 passed and 1 skipped (7 min 4 s); the run
+started before the scratch fix, whose 26 rendering tests were re-run
+green afterwards.
+
+**Fainter (2026-09-03).** `obstacle_decor.ghost.alpha` 110 -> 70 (27 %
+opacity instead of 43 %): at 110 the silhouette read almost solid over a
+bright crown. Data only; the tests build their own alpha.
+
+---
+
+## A flyer crosses its own island's lake (2026-09-03)
+
+The `flying` tag (`journals/enemy_ai_journal.md`) let the boss over
+boulders and cliffs but still stopped it at an inland lake, because the
+floor test it reused asks `room_of` -- the **walkable** subset of an
+island's height map -- and a lake is not walkable. A bat halting at a
+pond on its own island looks broken, so the flying test now asks the
+grid instead of the subset.
+
+`world/rules/floor.py` gains `over_island(layout, x, y)`: is the point
+over *any* cell of an island's height map -- ground, the cliff wall
+holding a terrace up, a flight, or a lake -- as against the open sea.
+`GameMap._over_island` is that plus the bridges, and
+`is_walkable(flying=True)` returns it directly instead of falling through
+the walking floor test. Seed 35 has 57 lake cells world-wide, 18 of them
+on the boss island, so this is visible in the fight the tag was added
+for.
+
+The sea is untouched: `VOID` belongs to no room's grid, so flying buys
+nothing over it. That limit is deliberate and the reasoning -- an arena
+leash rather than a per-frame reachability query -- is recorded at the
+end of the enemy AI journal's flying entry.
+
+Tests: two more in `tests/ai/test_flying.py` -- every lake cell in the
+world is refused to a walker and allowed to a flyer, and 400 random cells
+say the flying floor is exactly "in some island's grid" (the void
+between islands is not). The elevation and mirror suites, which guard the
+floor rules, pass unchanged.
+
+Suite: 1,038 tests, 1,037 passed and 1 skipped (9 min 30 s).
+
+---
+
+## The warlock's pool gets its explosion (2026-09-03)
+
+`hex_shaman_explosion_spell.png` had been sitting unreferenced in
+`assets/enemies/hex_shaman/`. It renders now, under rules the owner set:
+the **ring** is untouched and remains the reference for the attack's true
+range; the **disc** stays but at half its old alpha
+(`35 * life_fraction + 10`, was `70 * ... + 20`) so the area still reads
+without competing; the **art is flair** and is layered between the two, so
+it can never cover the edge a player judges safety by.
+
+**It plays in the pool's last 0.71 s, not across its life.** Ten frames
+stretched over 3.5 s would have been 2.9 fps -- a slideshow. Played at the
+14 fps it was drawn for, against the tail of the pool, it lands its final
+frame exactly as the pool expires and reads as the blast going off rather
+than the pool simmering. Traced: silent for 2.80 s, then frames 0..9 over
+the final 0.71 s.
+
+Plumbing, all data-driven: a rig in `data/enemy_sprites.json`, named by
+`warlock.hazard_sprite`, threaded through `fsm_warlock` ->
+`spawn_hazard` -> `Hazard.sprite`, and drawn by
+`WorldRenderer._hazard_sprite`. A pool with no rig is the bare circle it
+always was. `scale` is `2 * hazard_radius` with a test pinning the two, so
+the flair cannot disagree with the circle if the radius is retuned.
+
+**Caught by the first screenshot:** the burst drew at about two thirds of
+the ring, because the sheet carries a wide transparent margin and the rig
+had no `content` crop. Measured the ink across all ten frames --
+`[34, 13, 130, 138]` of a 192 frame -- and cropped to it; the burst fills
+the damage circle now. Details and the full check in
+`documentation/sprite_functionality.md`.
+
+**Not changed, deliberately.** The owner's phrasing ("before the ring
+disappears and the damage calculation goes off") reads as one damage burst
+at the end. The pool is area-denial today -- `Hazard` bites every
+`tick_interval` while the player stands in it, and the warlock is tagged
+`area-denial` -- so turning it into a delayed bomb is a balance change
+needing a damage number, not a rendering one. Left alone and flagged.
+
+**Still open:** the 0.8 s wind-up marks nothing on the ground, because the
+telegraph ring in `one_enemy` is gated on `slam_radius`, which only the
+brute carries.
+
+Suite: 1,048 tests, 1,047 passed and 1 skipped (9 min 13 s).

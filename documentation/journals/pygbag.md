@@ -244,3 +244,27 @@ does not survive a reload.
 - [x] W8 — pygbag files moved to `web/` (`pygbag.ini`, `build.sh`, `serve.sh`, README); `build/` gitignored; root clean
 - [ ] W9 — `.nojekyll` + `.github/workflows/deploy-web.yml` (sketch above); enable Pages (GitHub Actions source)
 - [ ] (optional) trim the browser bundle — audio synth runs at load; measure and, if slow in WASM, pre-bake the 8 buffers
+
+---
+
+## W10 check (2026-09-03) -- after spawn master S7
+
+Rebuilt and served the bundle from a plain static server (not pygbag's)
+and drove it from an embedded browser. Full findings and the plan:
+`documentation/web_plan.md`. In short:
+
+- `web/pygbag.ini` lacked `/.claude`; the worktree copy under it went into
+  the bundle (2,103 files / 82 MB). Fixed: 1,083 files / 44.8 MB, with
+  `spawn/` and `data/spawn_tables.json` in.
+- **A static host cannot serve the build as generated**: the loader asks
+  for `/cdn/cp312/pygame_ce-2.5.7-...whl` next to the page, which only
+  pygbag's dev server provides, 404s, and reloads in a loop. W9 (GitHub
+  Pages) needs the wheel vendored into `build/web/cdn/cp312/` -- with it
+  in place the game boots, starts a run, and the spawn master's overlay
+  lines show.
+- 670 of 893 asset files (34.7 MB of 45.8) are referenced by neither
+  data nor code; 29 MB is `assets/unordered-effects/`.
+- Per-frame WASM readings at a run's start: update 30-58 ms (the
+  flow-field rebuild), render 14-20 ms; about 2-4x desktop. Frame *rate*
+  could not be measured -- the embedded pane never fires
+  `requestAnimationFrame`, so its 0.3 FPS is the pane's, not the game's.

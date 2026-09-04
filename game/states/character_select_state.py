@@ -85,8 +85,8 @@ class CharacterSelectState(State):
         elif event.key in (pygame.K_DOWN, pygame.K_s):
             self.diff_index = (self.diff_index + 1) % len(config.DIFFICULTY_ORDER)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            from game.states.playing_state import PlayingState
-            self.game.state_machine.change(PlayingState(self.game),
+            from game.states.loading_state import LoadingState
+            self.game.state_machine.change(LoadingState(self.game),
                                            character_id=self.ids[self.index],
                                            difficulty=self.difficulty,
                                            dev=self._dev)
