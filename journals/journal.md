@@ -2893,3 +2893,36 @@ green afterwards.
 **Fainter (2026-09-03).** `obstacle_decor.ghost.alpha` 110 -> 70 (27 %
 opacity instead of 43 %): at 110 the silhouette read almost solid over a
 bright crown. Data only; the tests build their own alpha.
+
+---
+
+## A flyer crosses its own island's lake (2026-09-03)
+
+The `flying` tag (`journals/enemy_ai_journal.md`) let the boss over
+boulders and cliffs but still stopped it at an inland lake, because the
+floor test it reused asks `room_of` -- the **walkable** subset of an
+island's height map -- and a lake is not walkable. A bat halting at a
+pond on its own island looks broken, so the flying test now asks the
+grid instead of the subset.
+
+`world/rules/floor.py` gains `over_island(layout, x, y)`: is the point
+over *any* cell of an island's height map -- ground, the cliff wall
+holding a terrace up, a flight, or a lake -- as against the open sea.
+`GameMap._over_island` is that plus the bridges, and
+`is_walkable(flying=True)` returns it directly instead of falling through
+the walking floor test. Seed 35 has 57 lake cells world-wide, 18 of them
+on the boss island, so this is visible in the fight the tag was added
+for.
+
+The sea is untouched: `VOID` belongs to no room's grid, so flying buys
+nothing over it. That limit is deliberate and the reasoning -- an arena
+leash rather than a per-frame reachability query -- is recorded at the
+end of the enemy AI journal's flying entry.
+
+Tests: two more in `tests/ai/test_flying.py` -- every lake cell in the
+world is refused to a walker and allowed to a flyer, and 400 random cells
+say the flying floor is exactly "in some island's grid" (the void
+between islands is not). The elevation and mirror suites, which guard the
+floor rules, pass unchanged.
+
+Suite: 1,038 tests, 1,037 passed and 1 skipped (9 min 30 s).

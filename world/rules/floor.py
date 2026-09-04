@@ -31,6 +31,26 @@ def room_of(layout, x: float, y: float):
     return None
 
 
+def over_island(layout, x: float, y: float) -> bool:
+    """Is the point over *any* cell of an island's height map -- ground, the
+    cliff wall holding a terrace up, a flight, or an inland lake -- rather
+    than over the open sea?
+
+    The flying rule (`GameMap.is_walkable(flying=True)`). A body that walks
+    needs `room_of`, the walkable subset; a body that flies only needs the
+    island to be underneath it, so its own pond does not stop it dead. The
+    sea stays the sea: a boss out over the water is one the player cannot
+    fight, and the arena has to remain a fight.
+    """
+    px = config.TILE_PX
+    for r in layout.rooms:
+        rr = r.rect
+        if (rr.left <= x < rr.right and rr.top <= y < rr.bottom
+                and (int((x - rr.left) // px), int((y - rr.top) // px)) in r.grid):
+            return True
+    return False
+
+
 def in_corridor(layout, x: float, y: float) -> bool:
     """On a plank bridge -- the narrow link between islands that gets
     clearance leniency in the navigation grid, so the big rare enemies can
