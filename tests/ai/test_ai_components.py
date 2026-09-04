@@ -28,7 +28,7 @@ def _per(player=(300.0, 0.0), dt=0.1, nav=(0.0, 0.0), neighbors=(), obstacles=()
         neighbors=lambda pos, r: list(neighbors),
         obstacles_near=lambda pos, r: list(obstacles),
         is_walkable=lambda pos, r: True,
-        resolve_movement=lambda prev, new, r: new)
+        resolve_movement=lambda prev, new, r, **kw: new)
 
 
 def _run(components, actor, per):

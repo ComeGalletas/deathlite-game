@@ -1,14 +1,14 @@
 {
   "the_first_hunger": {
     "name": "The First Hunger",
-    "hp": 4200,
+    "hp": 2400,
     "speed": 78,
     "contact_damage": 31,
     "radius": 46,
     "experience_reward": 400,
     "reward_currency": 60,
     "color": [180, 40, 70],
-    "tags": ["boss"],
+    "tags": ["boss", "flying"],
     "sprite": "giant_bat",
     "patterns": [
       {

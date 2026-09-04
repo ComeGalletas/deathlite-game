@@ -44,6 +44,12 @@ class Boss:
         self.reward_currency = int(definition.get("reward_currency", 50))
         self.color = tuple(definition.get("color", (180, 40, 70)))
         self.tags = tuple(definition.get("tags", ("boss",)))
+        # `flying`: over the world rather than on it. The collider drops the
+        # terrace margin, the elevation rule and every obstacle for it
+        # (`GameMap.is_walkable(flying=True)`), and `_seek` beelines instead
+        # of following the flow field -- a field that rounds walls and climbs
+        # stairs is routing for a body that has to walk.
+        self.flying = "flying" in self.tags
         self.is_elite = True
         self.weight = float("inf")            # CB-3: immovable; only shoves others
 
@@ -139,8 +145,7 @@ class Boss:
 
         if not self._patterns:
             self.vel = self._seek(ctx) * self.speed
-            self.pos = ctx.resolve_movement(self.pos, self.pos + self.vel * dt * chill,
-                                            self.radius)
+            self.pos = self._move(ctx, self.vel * dt * chill)
             return
 
         self.phase_t -= dt
@@ -151,8 +156,12 @@ class Boss:
         # Chill does not slow the committed charge dash.
         scale = (1.0 if self.pattern.get("id") == "charge" and self.phase == "active"
                  else chill)
-        self.pos = ctx.resolve_movement(self.pos, self.pos + self.vel * dt * scale,
-                                        self.radius)
+        self.pos = self._move(ctx, self.vel * dt * scale)
+
+    def _move(self, ctx, step: pygame.Vector2) -> pygame.Vector2:
+        """One step through the collider, flying or not."""
+        return ctx.resolve_movement(self.pos, self.pos + step, self.radius,
+                                    flying=self.flying)
 
     def _status_damage(self, amount: float, ctx) -> None:
         if not self.alive:
@@ -167,8 +176,9 @@ class Boss:
         """Unit heading toward the player: the shared flow field (so the boss
         rounds walls and climbs stairs after the player -- LD-1 decision 2),
         straight line when the field has no route from here. Committed dash
-        patterns bypass this and beeline."""
-        nav = getattr(ctx, "nav_dir", None)
+        patterns bypass this and beeline, and so does a `flying` boss --
+        the field routes for a body that walks."""
+        nav = None if self.flying else getattr(ctx, "nav_dir", None)
         if nav is not None:
             d = nav(self.pos, self.radius)
             if d.length_squared() > 1e-6:
