@@ -33,12 +33,24 @@ def _key(game, k):
     game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k))
 
 
+def _settle(game, limit=5000):
+    """Drive the loading screen, if that is where the game is, until the run
+    has started."""
+    from game.states.loading_state import LoadingState
+    for _ in range(limit):
+        if not isinstance(game.state_machine.current, LoadingState):
+            break
+        game.state_machine.update(1 / 60)
+        game._render()
+    return game.state_machine.current
+
+
 def _start_dev_run(game):
     game.state_machine.change(MenuState(game))
     _key(game, pygame.K_DOWN)        # -> "Start new developer mode game"
     _key(game, pygame.K_RETURN)      # -> character select (dev)
-    _key(game, pygame.K_RETURN)      # -> playing (dev)
-    return game.state_machine.current
+    _key(game, pygame.K_RETURN)      # -> loading (dev) -> playing (dev)
+    return _settle(game)
 
 
 class DevFlagPropagationTests(unittest.TestCase):
@@ -50,7 +62,7 @@ class DevFlagPropagationTests(unittest.TestCase):
         self.assertIsInstance(game.state_machine.current, CharacterSelectState)
         self.assertTrue(game.state_machine.current._dev)
         _key(game, pygame.K_RETURN)
-        playing = game.state_machine.current
+        playing = _settle(game)
         self.assertIsInstance(playing, PlayingState)
         self.assertTrue(playing.dev_mode)
 
@@ -59,7 +71,7 @@ class DevFlagPropagationTests(unittest.TestCase):
         game.state_machine.change(MenuState(game))
         _key(game, pygame.K_RETURN)      # Start new game
         _key(game, pygame.K_RETURN)      # pick hero
-        self.assertFalse(game.state_machine.current.dev_mode)
+        self.assertFalse(_settle(game).dev_mode)
 
 
 class DevRunDoesNotSaveTests(unittest.TestCase):
@@ -107,7 +119,7 @@ class DevRunDoesNotSaveTests(unittest.TestCase):
             if game.state_machine.current is not playing:
                 break
 
-        fresh = game.state_machine.current
+        fresh = _settle(game)                            # the restart loads first
         self.assertIsInstance(fresh, PlayingState)
         self.assertIsNot(fresh, playing)
         self.assertTrue(fresh.dev_mode)
@@ -122,8 +134,9 @@ class DevRunDoesNotSaveTests(unittest.TestCase):
         game = _game()
         playing = _start_dev_run(game)
         playing._end_run(victory=True)                  # e.g. a dev boss kill
-        self.assertIsInstance(game.state_machine.current, PlayingState)
-        self.assertTrue(game.state_machine.current.dev_mode)
+        fresh = _settle(game)                            # restarts through the loader
+        self.assertIsInstance(fresh, PlayingState)
+        self.assertTrue(fresh.dev_mode)
 
 
 class DevRunExitPathsTests(unittest.TestCase):
@@ -153,7 +166,7 @@ class DevMenuTests(unittest.TestCase):
         game.state_machine.change(MenuState(game))
         _key(game, pygame.K_RETURN)
         _key(game, pygame.K_RETURN)
-        playing = game.state_machine.current
+        playing = _settle(game)
         _key(game, pygame.K_BACKQUOTE)
         self.assertIs(game.state_machine.current, playing)
         # dev run -- it opens as an overlay
@@ -236,7 +249,7 @@ class DevMenuTests(unittest.TestCase):
         seed = playing.run_seed
         playing.player.weapons.append(playing.player.weapons[0])
         menu._activate("reset")
-        fresh = game.state_machine.current
+        fresh = _settle(game)                            # the restart loads first
         self.assertIsInstance(fresh, PlayingState)
         self.assertIsNot(fresh, playing)
         self.assertTrue(fresh.dev_mode)
@@ -304,7 +317,7 @@ class DevMenuTests(unittest.TestCase):
         game.state_machine.change(MenuState(game))
         _key(game, pygame.K_RETURN)
         _key(game, pygame.K_RETURN)
-        regular = game.state_machine.current
+        regular = _settle(game)
         self.assertIsInstance(regular, PlayingState)
         self.assertFalse(game._handle_debug_key(pygame.K_F7))   # not consumed
         self.assertFalse(regular._dev_show_colliders)
@@ -315,6 +328,91 @@ class DevMenuTests(unittest.TestCase):
         self.assertTrue(dev._dev_show_colliders)
         game2._handle_debug_key(pygame.K_F7)
         self.assertFalse(dev._dev_show_colliders)
+
+    def test_spawn_points_row_toggles_the_dev_overlay(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        self.assertFalse(playing._dev_show_spawn_points)
+        menu._activate("spawn_points")
+        self.assertTrue(playing._dev_show_spawn_points)
+        self.assertIn("[ON]", menu._row_label("spawn_points"))
+        _key(game, pygame.K_BACKQUOTE)                  # close, resume
+        self.assertTrue(playing.game_map.layout.spawn_points)   # something to draw
+        playing.draw(game.screen)                       # overlay path must not raise
+        menu._activate("spawn_points")                  # via the menu again
+        self.assertFalse(playing._dev_show_spawn_points)
+
+    def test_all_rooms_and_freeze_rows_drive_the_spawn_master(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        m = playing.spawn.master
+        self.assertFalse(m.all_active)
+        menu._activate("all_rooms")
+        self.assertTrue(m.all_active)
+        self.assertIn("[ON]", menu._row_label("all_rooms"))
+        menu._activate("freeze")
+        self.assertTrue(m.frozen)
+        self.assertIn("[ON]", menu._row_label("freeze"))
+        _key(game, pygame.K_BACKQUOTE)
+        for _ in range(5):
+            playing.update(1 / 60)                          # every island active, nothing spawns
+        self.assertEqual(m.active, set(m.index.rooms()))
+        self.assertEqual(m.spawned, 0)
+        menu._activate("all_rooms")
+        menu._activate("freeze")
+        self.assertFalse(m.all_active or m.frozen)
+
+    def test_menu_spawns_are_not_bound_by_the_live_cap(self):
+        """Sixty spawns at the start of a run, where the director's cap is
+        forty: every one lands, and the status counts what landed."""
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        cap = playing.director.enemy_count_cap(playing.stats["time"])
+        for _ in range(cap + 20):
+            menu._spawn("chaser")
+        self.assertEqual(len(playing.enemies), cap + 20)
+        self.assertIn(f"spawned {cap + 20} x chaser", menu._status)
+        self.assertTrue(all(e.spawn_owner == "dev" for e in playing.enemies))
+        # F2 goes the same way
+        n = len(playing.enemies)
+        playing.handle_debug_key(pygame.K_F2)
+        self.assertEqual(len(playing.enemies), n + 1)
+        self.assertEqual(playing.enemies[-1].spawn_owner, "dev")
+
+    def test_pressure_row_cycles_the_dev_modifier(self):
+        from game.states.dev_menu_state import _PRESSURE_STEPS
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        m = playing.spawn.master
+        self.assertEqual(m.modifiers, {})
+        self.assertIn("[x1]", menu._row_label("pressure"))
+        seen = []
+        for _ in range(len(_PRESSURE_STEPS)):
+            menu._activate("pressure")
+            seen.append(m.modifiers.get("dev_menu", 1.0))
+        self.assertEqual(seen, list(_PRESSURE_STEPS[1:]) + [1.0])
+        self.assertEqual(m.modifiers, {})                    # x1 clears it
+        menu._activate("pressure")
+        self.assertAlmostEqual(m.pressure, m.pacing.base * m.pacing.value * 2.0)
+        _key(game, pygame.K_BACKQUOTE)
+        playing.update(1 / 60)
+        playing._report_debug()                              # the pressure line renders
+
+    def test_f8_toggles_the_spawn_overlay_only_in_a_dev_run(self):
+        game = _game()
+        game.state_machine.change(MenuState(game))
+        _key(game, pygame.K_RETURN)
+        _key(game, pygame.K_RETURN)
+        regular = _settle(game)
+        self.assertIsInstance(regular, PlayingState)
+        self.assertFalse(game._handle_debug_key(pygame.K_F8))   # not consumed
+        self.assertFalse(regular._dev_show_spawn_points)
+        game2 = _game()
+        dev = _start_dev_run(game2)
+        self.assertTrue(game2._handle_debug_key(pygame.K_F8))   # consumed
+        self.assertTrue(dev._dev_show_spawn_points)
+        game2._handle_debug_key(pygame.K_F8)
+        self.assertFalse(dev._dev_show_spawn_points)
 
     def test_draw_runs_headless_on_every_page(self):
         from game.states.dev_menu_state import _ROOT_ROWS

@@ -125,7 +125,8 @@ class MainWeaponAttackAnimTests(unittest.TestCase):
         for _ in range(2):
             g.state_machine.handle_event(
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        p = g.state_machine.current
+        from tests.boot import settle
+        p = settle(g)                  # through the loading screen
         assert isinstance(p, PlayingState)
         p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(60, 0))
         return g, p

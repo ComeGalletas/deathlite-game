@@ -118,9 +118,11 @@ class TransientFx:
         ps.hostiles.sweep()
 
     # --- ground hazards (spec 5.6) --------------------------
-    def spawn_hazard(self, pos, radius, dps, duration, tick_interval=None) -> None:
+    def spawn_hazard(self, pos, radius, dps, duration, tick_interval=None,
+                     sprite=None) -> None:
         self.ps.hazards.append(
-            Hazard(pos.x, pos.y, radius, dps, duration, tick_interval=tick_interval))
+            Hazard(pos.x, pos.y, radius, dps, duration,
+                   tick_interval=tick_interval, sprite=sprite))
 
     def update_hazards(self, dt: float) -> None:
         ps = self.ps

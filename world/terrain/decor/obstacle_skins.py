@@ -112,6 +112,12 @@ def build_obstacle_decor(store, a) -> None:
             else:
                 phase = 0
             store.decos[i] = (ax, ay, fps, frs, phase)
+            # Where `_draw_one_obstacle` will put the art, in world px: the
+            # ghost pass tests characters against these rectangles.
+            fw_s, fh_s = frs[0].get_size()
+            drop = store.sprite_drop.get(o.kind, config.SPRITE_ANCHOR_DROP) * o.radius
+            store.art_rects[i] = (o.pos.x - ax, o.pos.y - ay + drop, fw_s, fh_s)
+    store.ghost = dict(conf.get("ghost", {}))
 
     if config.TERRAIN_SHADOWS:
         build_tree_shadows(store, conf)

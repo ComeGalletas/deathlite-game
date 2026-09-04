@@ -181,6 +181,11 @@ def _seals(grid, open_, killers, start, dead):
                 j = r * cols + c
                 if not open_[j]:
                     continue
+                # A diagonal through a blocked corner is not a route the
+                # field will take, so it cannot be a route the repair opens
+                # by paying for the cell at its end.
+                if _corner_clips(open_, killers, cols, col, row, dc, dr):
+                    continue
                 nd = d + len(killers[j])
                 if nd < dist[j]:
                     dist[j] = nd
@@ -190,6 +195,21 @@ def _seals(grid, open_, killers, start, dead):
                     buckets[nd].append(j)
         d += 1
     return sorted(out)
+
+
+def _corner_clips(open_, killers, cols, col, row, dc, dr) -> bool:
+    """Would a diagonal step from (col, row) cut a blocked corner? The flow
+    field refuses such a step (`FlowField.step`: both orthogonal neighbours
+    of the move must be traversable), and a body cannot squeeze through it
+    either, so the repair must not count it as a way in. It did, until a
+    collider trim made more gaps that were open only corner to corner: the
+    field then found islands sealed that this pass had passed as reachable,
+    and removed nothing."""
+    if not (dc and dr):
+        return False
+    a = row * cols + col + dc
+    b = (row + dr) * cols + col
+    return (not open_[a] or killers[a]) or (not open_[b] or killers[b])
 
 
 def _reachable(grid, open_, killers, start):
@@ -213,6 +233,8 @@ def _reachable(grid, open_, killers, start):
                 continue
             j = r * cols + c
             if seen[j] or not open_[j] or killers[j]:
+                continue
+            if _corner_clips(open_, killers, cols, col, row, dc, dr):
                 continue
             seen[j] = 1
             stack.append(j)

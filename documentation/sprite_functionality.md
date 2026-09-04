@@ -352,3 +352,349 @@ When adding a new animated sprite:
 11. Run the asset and animation tests.
 
 No code changes are required for a new asset that fits an existing consumer and rig format. New animation behavior, draw layering, or special transformations may require Python changes.
+
+## Seeing Characters Behind Obstacles (proposed and implemented, 2026-09-03)
+
+> Implemented the same day as written, as laid out below; the journal
+> entry with the measurements is in `journals/journal.md`. Originally: The hero and the enemies vanish behind a tree
+> crown, a house or a pillar the moment their ground-contact Y sorts below
+> the obstacle's, because the depth pass paints the obstacle's art over
+> them. The ask: keep them visible through the obstacle as a translucent
+> silhouette, and only there -- a character in the open is drawn as today.
+
+### What the effect is
+
+Two things could be made translucent, and they read very differently:
+
+- **The obstacle** goes see-through where it covers a character. Common in
+  top-down games, but it changes the prop's look every time someone walks
+  past it, the canopy flickers as bodies cross it, and a tree that four
+  enemies are walking behind becomes a ghost of itself.
+- **The character** is drawn again *through* the obstacle at reduced alpha.
+  The obstacle stays as painted, the covered part of the body shows as a
+  tinted silhouette on top of it, and the uncovered part is unchanged.
+
+The second is what the ask describes ("an alpha transparency to
+characters ... when going behind obstacles only"), and it is the cheaper
+one: nothing about the obstacle draw changes, and only the covered
+characters get a second, clipped blit.
+
+### Where it plugs in
+
+`PlayingState._draw_world` paints the world one terrace band at a time:
+the ground, the flat effects, then the band's depth-sorted items (obstacle
+skins, decor, tree shades and the characters standing on that terrace) in
+ground-contact-Y order. A character is hidden when an obstacle whose Y is
+greater than the character's (drawn later) has art that covers the
+character's frame.
+
+Every character blit already goes through one place,
+`WorldRenderer._blit_character(surface, frame, dest, character_y)` (which
+is also where the tree shades are applied). The proposal adds one record
+there and one pass afterwards:
+
+1. **Record.** `_blit_character` appends `(frame, dest, character_y)` to a
+   per-frame list on the renderer. That is the exact surface and screen
+   position just drawn -- shaded, tinted, flipped -- so the ghost matches
+   the body pixel for pixel. The list is cleared at the top of
+   `_draw_world`.
+2. **Ghost pass.** At the end of `_draw_world`, after every band, one
+   pass walks the recorded characters, finds the obstacle art that covers
+   each one and sorts in front of it, and blits the frame again at the
+   ghost alpha, **clipped to the covering art's rectangle** so the
+   uncovered part of the body is not drawn twice.
+
+The pass runs after all bands rather than per band on purpose: a
+character on a low terrace is also covered by an obstacle standing on the
+terrace above (painted in a later band), and one pass at the end sees
+both.
+
+### Finding the occluders cheaply
+
+The obstacle skins are static once baked (`obstacle_skins.py` fills
+`GameMap._decos[i] = (ax, ay, fps, frames, phase)`), so their art
+rectangles in world space are known at bake: anchor-relative, from the
+frame size and the same `sprite_drop` seat `_draw_one_obstacle` uses.
+Bucket them in a coarse world grid exactly as the tree shadows are
+(`TerrainRenderer._shadow_index`, 256 px cells), keyed by obstacle index,
+and query the character's world footprint. This is the same shape as the
+shade index and costs the same: a handful of rectangle tests per drawn
+character, no per-frame allocation.
+
+For each candidate obstacle `i` with position `o`:
+
+- it occludes only if `o.pos.y > character_y` (it was painted after the
+  body) -- the ordering rule the depth pass already uses, so a character
+  standing in *front* of a tree is never ghosted through its trunk;
+- its screen art rect (from the index, transformed by the camera the way
+  `_draw_one_obstacle` does) must intersect the character's frame rect;
+- its kind must be in the data's list -- trees, houses, rocks and pillars
+  cover bodies; signs and scarecrows are too thin to hide anyone and
+  should not ghost.
+
+Animated skins (the routine trees) change frame but not rectangle, so the
+index needs no per-frame update.
+
+### The ghost blit
+
+A ghost is the character's frame with its alpha scaled. Do not call
+`set_alpha` on the animation frame: it is the asset cache's own object and
+every other user would inherit the alpha. Make a copy with the alpha
+multiplied in (`BLEND_RGBA_MULT` with `(255, 255, 255, alpha)` on an
+SRCALPHA copy, so the silhouette's own edges stay soft) and cache it by
+`id(frame)` the way `hit_tinted` caches the red flash: a 0.26 s hurt
+window is a few frames, and a walk cycle is a handful, so the cache stays
+small and the copy is made once per frame object.
+
+Then, per covering obstacle:
+
+    surface.set_clip(art_rect.clip(frame_rect))
+    surface.blit(ghost, dest)
+    surface.set_clip(None)
+
+Two obstacles covering one body give two clipped blits; they can overlap
+where the obstacles overlap, which double-ghosts a sliver -- acceptable,
+or union the rects first if it shows. The tint of the ghost is a data
+choice: plain alpha reads as "the same body, through the leaves"; a light
+colour wash (blend the ghost toward the hero's accent colour, or a fixed
+outline colour for enemies) reads as an X-ray. Start with plain alpha.
+
+### Data
+
+One block in `data/terrain.json` under `obstacle_decor`, since it is a
+property of the obstacle art:
+
+    "ghost": {
+      "alpha": 110,
+      "kinds": ["tree", "house", "rock", "pillar"]
+    }
+
+`alpha` 0 switches the pass off. Per the project's rule there is no
+default in code: a missing block means no ghosting.
+
+Who gets ghosted: the hero, the enemies, the boss and the death poofs all
+go through `_blit_character`, so all of them, for free. The hero's own
+summons draw through `draw_summon`, not `_blit_character`; leave them out
+unless it shows in play.
+
+### Cost
+
+Per drawn character: one index query (a few dict reads) and up to a
+couple of rectangle tests. Per covered character: one cached copy the
+first time its frame is seen and one clipped blit per covering obstacle.
+The render pass today is ~3.5 ms for the world plus ~0.1 ms per body in
+view (after the culling and shade-index work in `fluidity_plan.md`
+section 7); this adds well under a millisecond with a crowd under the
+trees and nothing when no one is covered.
+
+### Tests
+
+- A character behind a tree (Y below the tree's, frame under its crown)
+  produces exactly one extra blit, clipped to the crown's rectangle; the
+  pixels of the body outside the crown are unchanged.
+- A character in front of the same tree (Y above) produces none.
+- A character under a sign produces none (kind not listed).
+- The ghost is the shaded / tinted frame, not the raw one (a hurt enemy
+  ghosts red).
+- `alpha` 0 in the data disables the pass; a missing block disables it.
+- The frame digest (`tests/world/test_digest.py`) is unaffected: the digest
+  frame has no characters.
+
+### Order of work
+
+1. Bake the obstacle art index next to the tree-shadow index
+   (`obstacle_skins.py` knows every rectangle it draws).
+2. Record character blits in `_blit_character`; the ghost pass at the end
+   of `_draw_world`.
+3. The cached alpha copy, the data block, the kind filter.
+4. Tests, then a screenshot with the hero under a crown for the journal.
+
+About a day.
+
+## The Warlock's Spell Art (checked, proposed, then built -- 2026-09-03)
+
+> Built the same day; what shipped differs from the proposal where the
+> owner steered it, and the differences are recorded at the end. Asked: how the warlock renders its attack, how
+> the circle indicator is drawn, and what it would take to use
+> `hex_shaman_explosion_spell` as the attack's animation.
+
+### What renders today, in three parts
+
+**1. The caster animates already.** `warlock` wears the `hex_shaman` rig,
+and `Enemy._anim_name()` returns `"attack"` for the whole
+`telegraph` + `attack` window (`Enemy._attacking`). Traced in a run: the
+warlock leaves `chase` at t = 3.20 s, enters `telegraph`, and plays
+`enemies/hex_shaman/attack.png` -- 10 frames at 14 fps, 0.714 s -- against
+a `cast_telegraph` of 0.8 s. The strip very nearly fills the wind-up, so
+nothing needs doing to the caster itself.
+
+**2. The pool is drawn procedurally -- there is no art in it at all.**
+`WorldRenderer.hazards` is the whole indicator:
+
+    frac = hz.life / hz.max_life
+    rr   = hz.radius * zoom
+    disc  = circle(hz.color + alpha(70 * frac + 20), rr)   # translucent fill
+    ring  = circle(hz.color, rr, width=2)                  # hard edge
+
+`hz.color` defaults to `(200, 90, 220)` -- `Hazard` takes a `color`
+argument and `TransientFx.spawn_hazard` never passes one, so every pool in
+the game is the same purple. The fill fades as the pool expires; the ring
+does not. It is drawn in the flat-effects layer, filtered per terrace
+band, so it sits under the characters standing on its own floor.
+
+`Hazard.__slots__` is `pos, radius, dps, life, max_life, color,
+tick_interval, _tick_accum`. **There is no sprite, animator or frame index
+anywhere on it**, and `spawn_hazard(pos, radius, dps, duration,
+tick_interval)` has nowhere to pass one.
+
+**3. The wind-up shows nothing on the ground.** The only telegraph
+indicator in the enemy painter is
+
+    if e.telegraphing and "slam_radius" in e.cfg:      # rendering.py:261
+
+which is the brute's slam. The warlock's key is `hazard_radius`, so the
+condition is false and **nothing marks where the pool will land** during
+the 0.8 s wind-up. Worse for reading it: the landing spot is snapshotted
+from the player's position at wind-up *start* (`fsm_warlock`'s
+`on_windup_start`), so the player who walks away is already safe and the
+player who stands still gets no warning. The caster's own animation is the
+only cue, and it is on the caster, not on the ground.
+
+### The art that exists
+
+| file | size | frames | referenced by |
+|---|---|---|---|
+| `hex_shaman/attack.png` | 1920x192 | 10 @ 192 | the `hex_shaman` rig |
+| `hex_shaman/hex_shaman_explosion_spell.png` | 1920x192 | 10 @ 192 | **nothing** |
+| `hex_shaman/explosion.png` | 1152x128 | 9 @ 128 | nothing |
+| `hex_shaman/projectile.png` | 384x128 | 3 @ 128 | nothing |
+| `hex_shaman/hex_shaman_transformation_spell.png` | -- | -- | nothing |
+
+The spell sheet is laid out exactly like the shaman's own attack strip,
+so it needs no special slicing. One number is a happy accident worth
+keeping: `hazard_radius` is 92, so the damage circle is **184 px** across,
+and a spell frame is **192 px**. Drawn at its native size the art lands
+within 4 % of the circle it is meant to represent.
+
+### Proposal
+
+Give the hazard an optional rig and let the renderer animate it. Three
+small pieces, in the project's usual order (data -> entity -> painter).
+
+**1. A rig entry** in `data/enemy_sprites.json`, alongside `hex_shaman`:
+
+    "hex_shaman_explosion_spell": {
+      "frame": [192, 192],
+      "anchor": [96, 96],          // centre: a pool is placed by its middle
+      "scale": [184, 184],         // == 2 * hazard_radius
+      "anims": { "loop": { "file": "enemies/hex_shaman/hex_shaman_explosion_spell.png",
+                           "frames": 10, "fps": 14, "loop": false } }
+    }
+
+`anchor` at the centre rather than at the feet, because a hazard is placed
+by its centre, not seated on the ground like a character. `scale` is the
+damage diameter, so the art can never disagree with the circle: if
+`hazard_radius` is retuned, this follows it (and a test should pin that
+the two agree).
+
+**2. One data key and one parameter.** `data/enemies.json` `warlock`
+gains `"hazard_sprite": "hex_shaman_explosion_spell"`; `fsm_warlock`
+passes it in the `haz` tuple it already builds; `spawn_hazard` and
+`Hazard.__init__` take a `sprite=None`; `Hazard.__slots__` gains
+`sprite` and `spawned_at`. No per-entity default in code -- a hazard with
+no `hazard_sprite` keeps today's bare circle, which is what the boss's own
+pools should keep unless someone gives them art too.
+
+**3. The painter.** `WorldRenderer.hazards` picks the frame from the
+pool's age rather than an `Animator`, the way the obstacle skins do
+(`_draw_one_obstacle` indexes `frames[(seconds * fps + phase) % len]`):
+the hazard is not an actor and does not need per-instance animation
+state. Roughly
+
+    age   = hz.max_life - hz.life
+    i     = min(len(frames) - 1, int(age * fps))   # one-shot: hold the last
+    blit(frames[i], centred on hz.pos, scaled by zoom)
+
+then the existing ring on top.
+
+### The three decisions this needs
+
+- **One-shot or looping.** The strip is 10 frames at 14 fps = 0.71 s; the
+  pool lives 3.5 s. An explosion reads as a one-shot, so the proposal
+  holds the final frame for the remaining 2.8 s. If the last frame is not
+  a stable "lingering" pose, the alternatives are to loop the whole strip
+  (reads as a pulsing pool) or to loop a tail slice (frames 6-9, say).
+  **Look at the sheet before choosing**; this is an art question, not a
+  code one.
+- **Does the art replace the ring or join it?** Keep the ring. The filled
+  disc can go -- the art is the fill now -- but the hard 2 px edge is the
+  only thing that states the damage radius exactly, and a player standing
+  one pixel outside a soft explosion needs to know they are safe. I would
+  drop the translucent disc, keep the ring, and let the ring keep
+  `hz.color`.
+- **The fade.** The disc currently fades with `life`, which is the only
+  cue that a pool is about to expire. A held final frame does not fade. I
+  would fade the sprite's alpha over the last ~0.5 s so the pool still
+  announces its own end.
+
+### Worth doing at the same time, separately
+
+**The wind-up should mark the ground.** The same rig, drawn at the
+snapshotted `cast_at` during the `telegraph` state at low alpha and
+growing, would turn an invisible 0.8 s into a readable one, and it needs
+no new art. That is a gameplay change rather than a rendering one, so it
+belongs in its own pass with its own before/after -- but it is the thing
+that would most improve the fight, more than the pool's own art.
+
+### Effort
+
+The three pieces above are perhaps two hours, most of it in the painter,
+plus tests: the rig loads and slices to 10 frames, `scale` equals
+`2 * hazard_radius`, a hazard with no `hazard_sprite` still draws the bare
+circle, and the frame index is clamped at the end of the strip rather
+than wrapping. The frame digest is unaffected -- it draws no hazards.
+
+### What shipped, and where it differs from the proposal above
+
+The owner set the rules: **the ring stays untouched** as the reference for
+the attack's true range; **the disc stays too, fainter**, so the area is
+still readable without competing; **the art is flair only**; and it plays
+**in the pool's last 0.7 s** rather than across its whole life, so it reads
+as the blast going off rather than as the pool simmering.
+
+That last point is the one real departure from the proposal, and it is
+better. Stretching 10 frames over 3.5 s would have been 2.9 fps -- a
+slideshow. Played at its own 14 fps against the tail of the pool, the
+strip runs at the speed it was drawn for and lands its final frame exactly
+as the pool expires.
+
+| piece | what |
+|---|---|
+| `data/enemy_sprites.json` | rig `hex_shaman_explosion_spell`: 10 frames of 192, `content` `[34, 13, 130, 138]`, `anchor` centre, `scale` `[184, 184]` |
+| `data/enemies.json` | `warlock.hazard_sprite` names the rig |
+| `entities/hazard.py` | `Hazard.sprite`, carried, never read by the damage path |
+| `melee.py` / `effects.py` / `context.py` | `hazard_sprite` threaded from the cast to the pool |
+| `rendering.py` | `_hazard_sprite`, and the fill alpha halved to `35 * life_fraction + 10` |
+
+Two numbers worth keeping honest. **`scale` is `2 * hazard_radius`**, so
+the flair can never disagree with the circle a player is reading; a test
+pins the two together, and retuning the radius moves the art with it.
+**`content` crops the sheet's transparent margin** -- the ink is 130x138
+inside a 192 frame, so without the crop the burst drew at about two thirds
+of the ring and read as a smaller, weaker explosion than the area it
+represents. Measured from the sheet, not guessed.
+
+The frame is picked from the pool's remaining life rather than an
+`Animator`, the way obstacle skins are: a hazard is not an actor and does
+not need per-instance animation state. The index is clamped, not wrapped,
+so a pool that outlives its strip holds the last frame instead of
+restarting.
+
+### Still open
+
+The 0.8 s wind-up still marks nothing on the ground -- the telegraph ring
+in `one_enemy` is gated on `slam_radius`, which only the brute has. The
+owner has said the wind-up flag would help and that it belongs before the
+disc appears. Not built here; it is a gameplay change with its own
+before/after, and it wants the same rig drawn at the snapshotted `cast_at`
+during the `telegraph` state.

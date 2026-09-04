@@ -102,8 +102,13 @@ class SealTests(unittest.TestCase):
         before = [len(W.layout(s, HEIGHTMAP_UNSEAL=False).obstacles)
                   for s in W.SEEDS]
         after = [len(W.layout(s).obstacles) for s in W.SEEDS]
+        # About one obstacle in twelve. It was one in twenty until the repair
+        # learned the field's corner rule (a diagonal through two blocked
+        # corners is not a way in): it then found the corner-only chokes the
+        # field had always refused, and takes back 4-6 % of the obstacles on
+        # the pinned seeds instead of 1-2 %. Still nowhere near clearing.
         for s, (b, a) in zip(W.SEEDS, zip(before, after)):
-            self.assertLessEqual(b - a, max(4, b // 20),
+            self.assertLessEqual(b - a, max(6, b // 12),
                                  f"seed {s}: removed {b - a} of {b}")
 
 

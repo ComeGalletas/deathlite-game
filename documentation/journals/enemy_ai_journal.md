@@ -429,3 +429,136 @@ JSON; a new *kind* of move is one component file + one line in a builder.
 - Port `Boss` onto the same components (its phase FSM is the last bespoke AI).
 - `push_radius` enemy-vs-enemy crowd-collision pass as its own system.
 - `data/behaviors.json` so behaviour *shape* is data too, not just numbers.
+
+---
+
+## The elite and the tank can actually fight (2026-09-03)
+
+**Asked:** attack animations and behaviour for the elite and the tank,
+with the chaser as the reference and 15 % more wind-up before the attack
+collision ring appears.
+
+**What was wrong.** Both carried `contact_damage_enabled: false` -- the
+flag that says "a melee hitbox deals my damage instead of a passive body
+bite" -- while their `behavior` was plain `path_chase`, which has no
+attack. So neither of them dealt **any** damage. Measured before the
+change, ten seconds glued to the hero: chaser 160 -> 145 HP, elite
+160 -> 160, tank 160 -> 160.
+
+**Done**, in `data/enemies.json` only -- both already had an unused
+`attack` strip in their rig:
+
+| | behaviour | wind-up | swing | attack strip |
+|---|---|---|---|---|
+| chaser (reference) | `path_chase_attack` | 0.2875 | 0.4375 | skull, 7f @ 14 = 0.50 s |
+| elite | `path_chase_attack` | **0.3306** | 0.4194 | bear, 9f @ 12 = 0.75 s |
+| tank | `path_chase_attack` | **0.3306** | 0.6694 | turtle, 10f @ 10 = 1.00 s |
+
+The wind-up is the chaser's x 1.15, as asked. The swing is then sized so
+wind-up + swing equals the rig's own attack strip, which the chaser does
+not do (its 0.5 s strip finishes inside a 0.725 s beat and holds the last
+frame). Sizing it that way keeps the bear's and the turtle's longer
+animations from being cut back to `walk` mid-swing. A longer swing is a
+wider window to connect, not more damage: `MeleeHitbox` spends itself on
+the first frame it catches the player.
+
+**After**, ten seconds with the enemy walking in from 26 px and the hero
+still: elite 160 -> 120 (3 hits), tank 160 -> 96 (6 hits), and both cycle
+`walk` / `attack` / `idle`. The tank lands more than the elite because it
+is slow enough to stay in reach between swings; the elite drifts.
+
+**`shielded` had the identical defect** -- contact damage disabled,
+`path_chase`, no attack, and a `panda` rig with an attack strip going
+spare -- found by the invariant test below and verified harmless over ten
+seconds at point-blank. Fixed on the owner's call in the same pass, but
+**on the chaser's timing exactly** (0.2875 / 0.4375), not the elite's and
+the tank's longer wind-up: asked for by name, and the bulwark is a
+light 16 px body that should read like the husk, not like a heavy. Its
+panda strip is 0.93 s against a 0.725 s beat, so the animation holds its
+last frame the way the chaser's does. After: 160 -> 134 HP, 4 hits in
+ten seconds.
+
+Tests: `tests/ai/test_melee_enemies.py` (7) -- all four melee enemies run
+the attack beat, **no enemy disables its contact damage without an
+attacking behaviour** (the invariant that caught all three, and now holds
+with no exemptions), the shielded one keeping the chaser's beat, the 15 %
+wind-up on the other two, the swing matching the strip, the art existing,
+and the built state machine.
+
+### Suite
+
+1,029 tests, 1,028 passed and 1 skipped (9 min 58 s).
+
+---
+
+## The First Hunger flies (2026-09-03)
+
+**Asked:** a `flying` tag on the one boss so it ignores obstacles and
+elevation checks. It is a giant bat, so it was overdue.
+
+**The tag.** `data/bosses.json` `tags: ["boss", "flying"]`, read once in
+`Boss.__init__` as `self.flying`. Two things follow from it.
+
+- **The collider.** `GameMap.is_walkable` takes `flying=False`; when true
+  it returns after the floor test and skips the terrace margin, the
+  elevation rule, the radius probes and every obstacle.
+  `resolve_movement` carries the flag through its own walkability
+  questions (the move, both axis slides, the eight escape hops), so a
+  flyer takes the whole step instead of sliding along a trunk.
+- **The steering.** `Boss._seek` skips the flow field when flying and
+  beelines. The field routes for a body that has to walk -- round the
+  wall, along to the stairs -- which is exactly the path a bat should not
+  take.
+
+**What it still may not do: leave the floor.** The floor test stays. A
+boss out over the sea is a boss the player cannot reach, and the arena
+has to stay a fight; the tag buys passage over the terrain, not off it.
+
+**Measured** (seed 35, dev): placed 200 px west of a tree with the hero
+200 px east, the boss crosses the trunk and closes to 96 px. Placed on a
+level-0 terrace with the hero on level 2 of the same island, it arrives
+on level 2 without touching a staircase, still over floor.
+
+### Left deliberately
+
+The flag is plumbed through `GameMap`, so it is general, but only the
+boss reads it. A flying *enemy* would also need the steering side --
+`SeekTarget(via="nav")` in `entities/ai` would keep routing it round
+walls -- so `"flying"` in an enemy's tags does nothing today. That is a
+behaviour change to the AI components, not a data edit, and nobody asked
+for it.
+
+Tests: `tests/ai/test_flying.py` (7) -- the shipped boss carries the tag
+and the tag is what decides it; a flyer passes every obstacle that blocks
+a walker (50+ on the seed) and crosses every terrace step the elevation
+rule refuses; it still cannot leave the floor; `resolve_movement` carries
+the flag; and the seek beelines instead of following the field. The
+`resolve_movement` protocol, the perception and six test doubles learned
+the keyword.
+
+### Suite
+
+1,036 tests, 1,035 passed and 1 skipped (9 min 44 s).
+
+### If the sea is ever wanted too
+
+Asked how the reachability would be solved. Two halves, different risk:
+
+- **Lakes yes, open sea no** -- a lake is a cell *inside* an island's grid
+  (`Cell.kind == LAKE`, 18 of them on seed 35's boss island, 57 world-wide);
+  the sea is `VOID`, outside every island. The floor test asks
+  `room.cells` (the walkable subset) and so refuses both. Accepting any
+  cell that belongs to a room's grid would let a flyer cross its own
+  island's pond -- which it visibly should -- with no reachability risk at
+  all, since the player can always walk around a lake and stay in range.
+  Five lines and a test.
+- **Open sea needs a leash, not a reachability test.** Clamp the flyer to
+  its arena (the boss room's rect inflated by a margin) and let it use the
+  whole coastline inside that box. A per-frame "can the player still reach
+  it" query is the wrong shape: it costs a path search per move and fails
+  *late*, after the boss is already somewhere bad, which reads as a
+  teleport when it corrects. A rectangle prevents the state instead. The
+  margin wants sizing against `radial_barrage`'s reach, since that is the
+  pattern a melee hero has no answer to from offshore -- only `charge`
+  brings the boss back.
+

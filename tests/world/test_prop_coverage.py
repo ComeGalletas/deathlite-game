@@ -104,10 +104,13 @@ class PostObstacleTests(unittest.TestCase):
         for kind in POST_KINDS:
             self.assertFalse(KINDS[kind][1], f"{kind} blocks projectiles")
 
-    def test_posts_are_drawn_at_their_authored_size(self):
-        """The point of `render_scale`: the art keeps the size it was painted
-        at instead of being fitted to the collider."""
+    def test_posts_are_drawn_at_their_render_scale(self):
+        """The point of `render_scale`: the art keeps a size chosen for it
+        (the authored frame times the scale -- 0.75 since the owner asked
+        for the posts a quarter smaller) instead of being fitted to the
+        collider."""
         terrain = get_content().terrain
+        conf = terrain["obstacle_decor"]
         seen = set()
         for seed in SEEDS:
             gm = _map(seed)
@@ -116,22 +119,23 @@ class PostObstacleTests(unittest.TestCase):
                     continue
                 seen.add(o.kind)
                 _ax, _ay, _fps, frs, _phase = gm._decos[i]
-                rigs = terrain["obstacle_decor"]["rigs"][o.kind]
-                authored = {tuple(terrain["rigs"][r]["frame"]) for r in rigs}
-                self.assertIn(frs[0].get_size(), authored,
+                scale = float(conf["render_scale"][o.kind])
+                expected = {tuple(max(1, round(v * scale)) for v in terrain["rigs"][r]["frame"])
+                            for r in conf["rigs"][o.kind]}
+                self.assertIn(frs[0].get_size(), expected,
                               f"{o.kind} drawn at {frs[0].get_size()}, "
-                              f"authored {sorted(authored)}")
+                              f"expected {sorted(expected)}")
         self.assertEqual(seen, set(POST_KINDS), "a post kind never placed")
 
     def test_render_scale_overrides_the_collider_fit(self):
         terrain = get_content().terrain
         conf = terrain["obstacle_decor"]
         for kind in POST_KINDS:
-            self.assertEqual(conf["render_scale"][kind], 1.0)
+            self.assertEqual(conf["render_scale"][kind], 0.75)      # a quarter smaller (2026-09-03)
             meta = terrain["rigs"][conf["rigs"][kind][0]]
             radius = float(terrain["obstacles"][kind]["radius"])
             boost = float(conf["size_boost"])
-            self.assertEqual(F.rig_scale(meta, radius, boost, 1.0), 1.0)
+            self.assertEqual(F.rig_scale(meta, radius, boost, 0.75), 0.75)
             # ...and without the override it would have been shrunk badly.
             self.assertLess(F.rig_scale(meta, radius, boost), 0.5)
 

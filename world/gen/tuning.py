@@ -51,6 +51,40 @@ _VILLAGE_EXTRA = (1, 3)                 # extra buildings beyond the first
 _VILLAGE_RADIUS = (3, 5)               # cluster spread, in tiles, from the first
 
 
+# --- spawn points (`world/gen/spawnpoints.py`) ------------------------------
+#
+# How many per terrace is `config.SPAWN_POINTS_PER_FLOOR` (a `GenSettings`
+# field); these are the geometry rules every candidate has to pass.
+#
+# Clear of an obstacle by this much beyond "the two discs do not touch", so a
+# body that materialises on the point is not already shoving a rock.
+_SPAWN_OBSTACLE_GAP = 8.0
+# Two points on one floor are never closer than this many tiles. The
+# farthest-point pick spreads them much wider than that on a normal terrace;
+# the floor is only a guard for a cramped one.
+_SPAWN_MIN_SPACING_TILES = 2
+# The start island keeps this many tiles around the hero's first position
+# free of spawn points, so the opening seconds are calm.
+_SPAWN_START_CLEAR_TILES = 8
+# A floor that seats fewer than this at the full margin gets one retry at the
+# bare body inset before it is left short.
+_SPAWN_RELAX_BELOW = 3
+# Tag distances, in tiles: `edge` within this of the coast, `bridge` within
+# this of a bridge-mouth keep-clear rect.
+_SPAWN_EDGE_TILES = 4
+_SPAWN_BRIDGE_TILES = 6
+# Resource anchors per island, the kinds they are dealt, and the weights.
+# `ambient` outnumbers `chest` on purpose: a chest is an event, a gem is not.
+_RESOURCE_POINTS_PER_ISLAND = 8
+_RESOURCE_KINDS = ("chest", "breakable", "ambient")
+_RESOURCE_WEIGHTS = (2, 3, 5)
+# A resource anchor keeps this many tiles off the straight line between two
+# bridge mouths -- the path a player is most likely to walk -- so loot is
+# found by looking around, not by walking through.
+_RESOURCE_OFF_PATH_TILES = 2
+# ...and this many off any enemy spawn point, so a chest is not a spawn pad.
+_RESOURCE_OFF_SPAWN_TILES = 2
+
 # --- obstacle density ------------------------------------------------------
 #
 # Attempts scale with floor area. An island is 700-1000 cells, and a per-room
