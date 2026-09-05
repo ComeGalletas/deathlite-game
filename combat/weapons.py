@@ -16,6 +16,14 @@ inside that ring; with the ring empty the hero drops to idle (the polling
 `self._cd = 0.1` path keeps checking). Melee sizes the ring from its own cone
 tip (`_area`); every other category reads an explicit `reach` field. The ring
 scales with `area_multiplier` and `bonus["area"]`, so area blessings widen it.
+
+CB-5: a manual aim (`FireContext.aim`, see `game/states/playing/aim.py`)
+overrides all of that for the straight / chain / cone weapons: the attack goes
+off in the aimed direction as soon as the cooldown allows, ring empty or not
+(it may whiff), targeting the closest enemy inside an assist cone around the
+aim if there is one. `FireContext.auto_attack` off + no manual aim = those
+weapons hold. Orbit and summon take no direction; the orbiters do form while a
+click is held so the ring is up whenever the player is actively attacking.
 """
 from __future__ import annotations
 
@@ -27,6 +35,7 @@ import pygame
 
 from combat import targeting
 from combat.damage import outgoing_damage
+from game import config
 
 # --- weapon taxonomy (the only fixed weapon data that stays in code) ---------
 # Every `data/weapons.json` entry names one `category` and one `special_effect`
@@ -52,6 +61,19 @@ class FireContext:
     crit_multiplier: float = 2.0
     rng: object | None = None
     spawn_summon: Callable[..., object] = lambda **kw: None
+    # CB-5: this frame's manual aim (`AimInput`, or None) and the `Q` toggle.
+    aim: object | None = None
+    auto_attack: bool = True
+
+    @property
+    def manual_fire(self) -> bool:
+        """A manual attack is wanted this frame (held click / key, or a tap)."""
+        return self.aim is not None and self.aim.wants_fire
+
+    @property
+    def click_held(self) -> bool:
+        return (self.aim is not None and self.aim.source == "mouse"
+                and self.aim.held)
 
 
 @dataclass
@@ -144,11 +166,25 @@ class Weapon:
         self._cd -= dt
         if self._cd > 0.0:
             return False
+        if ctx.manual_fire:
+            # CB-5: attack where the player points, ring empty or not.
+            self._fire(ctx, forced=True)
+            self._cd = self._cooldown(ctx.attack_speed_multiplier)
+            return True
+        if not ctx.auto_attack:
+            self._cd = 0.0  # hold, ready: the next manual attack is instant
+            return False
         if self._fire(ctx):
             self._cd = self._cooldown(ctx.attack_speed_multiplier)
             return True
         self._cd = 0.1  # nothing to shoot yet; retry soon
         return False
+
+    def _assist_half_angle(self) -> float:
+        """Radians. The global `config.MANUAL_AIM_ASSIST_DEG` unless the
+        weapon's data carries its own `aim_assist_deg`."""
+        deg = self.definition.get("aim_assist_deg", config.MANUAL_AIM_ASSIST_DEG)
+        return math.radians(float(deg))
 
     # --- summon --------------------------------------------
     def _maintain_summons(self, dt: float, ctx: FireContext) -> None:
@@ -181,20 +217,31 @@ class Weapon:
         self._cd = self._cooldown(ctx.attack_speed_multiplier)
 
     # --- straight / chain / cone ----------------------------
-    def _fire(self, ctx: FireContext) -> bool:
-        # CB-2: gate on the reach ring. The trigger is a cheap "anything in the
-        # ring" test (decision 4); we then aim at the nearest enemy *within* it,
-        # and a projectile still flies on past the ring as before.
-        in_reach = self._within_reach(ctx.enemies, ctx.origin,
-                                      self._reach(ctx.area_multiplier))
-        if not in_reach:
-            return False           # ring empty -> hero idles; caller polls (_cd = 0.1)
-
-        aim = targeting.aim_direction(
-            self.definition["targeting_mode"],
-            ctx.origin, in_reach, ctx.fallback_dir)
-        if aim is None:
-            return False
+    def _fire(self, ctx: FireContext, forced: bool = False) -> bool:
+        reach = self._reach(ctx.area_multiplier)
+        if forced:
+            # CB-5 manual attack: always goes off. The shot homes on the
+            # closest enemy inside the assist cone around the aim, else flies
+            # straight along it. Melee points the cone at the raw aim.
+            manual = ctx.aim.direction
+            in_cone = targeting.enemies_in_cone(
+                ctx.origin, manual, ctx.enemies, self._assist_half_angle(), reach)
+            aim = targeting.aim_direction(
+                self.definition["targeting_mode"], ctx.origin, in_cone, manual)
+            cone_dir = manual
+        else:
+            # CB-2: gate on the reach ring. The trigger is a cheap "anything in
+            # the ring" test (decision 4); we then aim at the nearest enemy
+            # *within* it, and a projectile still flies on past the ring.
+            in_reach = self._within_reach(ctx.enemies, ctx.origin, reach)
+            if not in_reach:
+                return False       # ring empty -> hero idles; caller polls (_cd = 0.1)
+            aim = targeting.aim_direction(
+                self.definition["targeting_mode"],
+                ctx.origin, in_reach, ctx.fallback_dir)
+            if aim is None:
+                return False
+            cone_dir = aim
 
         area = self._area(ctx.area_multiplier)
         src_weight = float(self.definition["weight"])   # CB-3 hit knockback
@@ -208,7 +255,7 @@ class Weapon:
                 lifetime=float(self.definition["projectile_lifetime"]),
                 pierce=self._pierce(), src_weight=src_weight,
                 weapon_id=self.weapon_id, source_tags=self.tags,
-                is_crit=dmg.is_crit, cone_dir=aim,
+                is_crit=dmg.is_crit, cone_dir=cone_dir,
                 cone_half_angle=math.radians(self.definition["cone_half_angle"]))
             return True
 
@@ -244,9 +291,11 @@ class Weapon:
         desired = self._projectile_count()
         # CB-2 decision 6: the embers orbit only while a foe is inside `reach`.
         # With the ring empty the hero lowers it -- the orbiters are dropped and
-        # re-form, evenly spaced, the moment a target returns.
-        if not self._within_reach(ctx.enemies, ctx.origin,
-                                  self._reach(ctx.area_multiplier)):
+        # re-form, evenly spaced, the moment a target returns. CB-5: a held
+        # click raises them too, so the ring spins whenever the player is
+        # actively attacking (a held aim key alone does not).
+        if not ctx.click_held and not self._within_reach(
+                ctx.enemies, ctx.origin, self._reach(ctx.area_multiplier)):
             desired = 0
         radius = float(self.definition["orbit_radius"])
         orbit_speed = float(self.definition["orbit_speed"])

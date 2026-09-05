@@ -31,6 +31,11 @@ _STARTER_CHARACTERS = ["aegis", "kestrel", "nihil"]
 _RECORD_DIFFICULTIES = ("normal", "fast", "super_fast")
 _RECORD_KEYS = ("time", "level", "kills", "damage_dealt")
 
+# Mirror config.KEY_LAYOUTS / DEFAULT_KEY_LAYOUT, local for the same reason.
+# An unknown layout name in the file falls back to the default (CB-5).
+_KEY_LAYOUTS = ("wasd_move", "arrows_move")
+_DEFAULT_KEY_LAYOUT = "wasd_move"
+
 
 @dataclass
 class SaveData:
@@ -46,7 +51,8 @@ class SaveData:
     stash: list[dict] = field(default_factory=list)               # serialised Items
     equipped: dict[str, str | None] = field(default_factory=lambda: {
         "weapon": None, "armor": None, "accessory": None})
-    settings: dict = field(default_factory=lambda: {"muted": False, "volume": 0.7})
+    settings: dict = field(default_factory=lambda: {
+        "muted": False, "volume": 0.7, "key_layout": _DEFAULT_KEY_LAYOUT})
 
     # --- helpers -------------------------------------------------
     def record_best(self, stats: dict, difficulty: str = "normal") -> None:
@@ -100,6 +106,8 @@ def _coerce(raw: dict) -> SaveData:
             d.equipped[slot] = str(v) if v else None
     if isinstance(raw.get("settings"), dict):
         d.settings.update(raw["settings"])
+    if d.settings.get("key_layout") not in _KEY_LAYOUTS:
+        d.settings["key_layout"] = _DEFAULT_KEY_LAYOUT
     return d
 
 

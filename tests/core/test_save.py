@@ -52,6 +52,26 @@ class SaveLoadTests(unittest.TestCase):
         self.assertEqual(data.currency, 0)
         self.assertTrue((self.dir / "save.json.corrupt").exists())
 
+    def test_default_key_layout_and_round_trip(self):
+        # CB-5: the controls layout lives in settings and survives a save.
+        self.assertEqual(SaveData().settings["key_layout"], "wasd_move")
+        d = SaveData()
+        d.settings["key_layout"] = "arrows_move"
+        save(d, self.path)
+        self.assertEqual(load(self.path).settings["key_layout"], "arrows_move")
+
+    def test_unknown_key_layout_falls_back_to_default(self):
+        for junk in ("dvorak", 7, None):
+            self.path.write_text(json.dumps({"settings": {"key_layout": junk}}),
+                                 encoding="utf-8")
+            self.assertEqual(load(self.path).settings["key_layout"], "wasd_move")
+        # A settings dict with no layout key at all also gets the default.
+        self.path.write_text(json.dumps({"settings": {"muted": True}}),
+                             encoding="utf-8")
+        back = load(self.path)
+        self.assertTrue(back.settings["muted"])
+        self.assertEqual(back.settings["key_layout"], "wasd_move")
+
     def test_partial_dict_fills_defaults(self):
         self.path.write_text(json.dumps({"currency": 99}), encoding="utf-8")
         data = load(self.path)

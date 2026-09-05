@@ -15,6 +15,11 @@ Any page longer than `MAX_VISIBLE` scrolls: the visible window follows the
 selection and "N more" markers show what's clipped, so the panel never outgrows
 the screen no matter how much content is added -- every list is built from the
 data files, so it grows / shrinks with the content.
+
+Mouse (journal: "Mouse support in menus and UI", group E): the rows in the
+visible window are click targets -- hover selects, a click activates exactly
+as ENTER would on any page; the wheel scrolls the window (the selection is
+kept inside it); right click is ESC's twin (back to the root, or close).
 """
 from __future__ import annotations
 
@@ -25,13 +30,14 @@ import pygame
 from game import config, fonts
 from game.content import get_content
 from game.state import State
+from ui.mouse import MouseNav
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 # The "Spawn pressure" row cycles the master's `dev_menu` modifier through these.
 _PRESSURE_STEPS = (1.0, 2.0, 4.0, 0.0, 0.5)
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
-              "all_rooms", "freeze", "pressure", "difficulty",
+              "aim_line", "all_rooms", "freeze", "pressure", "difficulty",
               "spawn", "blessings", "items", "reset", "exit", "close")
 
 _LABELS = {
@@ -40,6 +46,7 @@ _LABELS = {
     "no_damage":    "Attacks deal 0 damage",
     "colliders":    "Collision shapes",
     "spawn_points": "Spawn points",
+    "aim_line":     "Aim line",
     "all_rooms":    "Activate all rooms",
     "freeze":       "Freeze spawns",
     "pressure":     "Spawn pressure",
@@ -96,6 +103,7 @@ class DevMenuState(State):
         self._title_font = fonts.mono(28, bold=True)
         self._row_font = fonts.mono(22)
         self._hint_font = fonts.mono(15)
+        self._mouse = MouseNav()     # visible rows registered in draw()
 
     def _rows(self) -> tuple | list:
         return {"root": _ROOT_ROWS, "enemies": self._enemy_ids,
@@ -122,29 +130,57 @@ class DevMenuState(State):
             self.scroll = self.sel - window + 1
         self.scroll = max(0, min(self.scroll, max(0, n - window)))
 
+    def _scroll_by(self, delta: int) -> None:
+        """Wheel: move the window, then pull the selection inside it (the
+        keyboard rule is the reverse -- the window follows the selection)."""
+        n = len(self._rows())
+        window = min(MAX_VISIBLE, n)
+        self.scroll = max(0, min(self.scroll + delta, max(0, n - window)))
+        self.sel = max(self.scroll, min(self.sel, self.scroll + max(0, window - 1)))
+
     # --- input ---------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.MOUSEWHEEL:
+            self._scroll_by(-event.y)          # wheel up (y > 0) shows earlier rows
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            self._back()                       # right click: ESC's twin
+            return
+        act = self._mouse.event(event)
+        if act is not None:
+            kind, i = act
+            self.sel = i                       # a registered row is always visible
+            if kind == "click":
+                self._activate_selected()
+            return
         if event.type != pygame.KEYDOWN:
             return
         k = event.key
         if k in (pygame.K_ESCAPE, pygame.K_BACKQUOTE):
-            if self.page != "root":
-                self._goto("root")
-            else:
-                self.game.state_machine.pop()
+            self._back()
         elif k in (pygame.K_UP, pygame.K_w):
             self._move(-1)
         elif k in (pygame.K_DOWN, pygame.K_s):
             self._move(1)
         elif k in (pygame.K_RETURN, pygame.K_SPACE):
-            if self.page == "root":
-                self._activate(_ROOT_ROWS[self.sel])
-            elif self.page == "enemies":
-                self._spawn(self._enemy_ids[self.sel])
-            elif self.page == "blessings":
-                self._grant(self._blessing_ids[self.sel])
-            elif self.page == "items":
-                self._give_item(self._item_rows[self.sel])
+            self._activate_selected()
+
+    def _back(self) -> None:
+        if self.page != "root":
+            self._goto("root")
+        else:
+            self.game.state_machine.pop()
+
+    def _activate_selected(self) -> None:
+        """ENTER / click on the selected row, whatever the page."""
+        if self.page == "root":
+            self._activate(_ROOT_ROWS[self.sel])
+        elif self.page == "enemies":
+            self._spawn(self._enemy_ids[self.sel])
+        elif self.page == "blessings":
+            self._grant(self._blessing_ids[self.sel])
+        elif self.page == "items":
+            self._give_item(self._item_rows[self.sel])
 
     def _activate(self, rid: str) -> None:
         p = self._playing
@@ -170,6 +206,9 @@ class DevMenuState(State):
         elif rid == "spawn_points":
             p._dev_show_spawn_points = not p._dev_show_spawn_points
             self._status = f"Spawn points {'ON' if p._dev_show_spawn_points else 'off'}"
+        elif rid == "aim_line":
+            p._dev_show_aim = not p._dev_show_aim
+            self._status = f"Aim line {'ON' if p._dev_show_aim else 'off'}"
         elif rid == "all_rooms":
             m = p.spawn.master
             m.all_active = not m.all_active
@@ -296,12 +335,16 @@ class DevMenuState(State):
                                             True, _DIM), (x, y))
         y += 18
 
+        hits = self._mouse.hits
+        hits.clear()
         for i in range(self.scroll, self.scroll + window):
             selected = i == self.sel
             surface.blit(
                 self._row_font.render(("> " if selected else "  ")
                                       + self._row_label(rows[i]),
                                       True, _FG if selected else _DIM), (x, y))
+            # The row's band inside the panel, keyed by its absolute index.
+            hits.add(pygame.Rect(panel.left + 16, y - 3, panel.width - 32, 34), i)
             y += 34
 
         surface.blit(self._hint_font.render(f"v  {below} more" if below > 0 else "",
@@ -345,6 +388,8 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_show_colliders else "   [  ]"
         elif rid == "spawn_points" and p is not None:
             label += "   [ON]" if p._dev_show_spawn_points else "   [  ]"
+        elif rid == "aim_line" and p is not None:
+            label += "   [ON]" if p._dev_show_aim else "   [  ]"
         elif rid == "all_rooms" and p is not None:
             label += "   [ON]" if p.spawn.master.all_active else "   [  ]"
         elif rid == "freeze" and p is not None:

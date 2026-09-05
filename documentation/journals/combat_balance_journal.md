@@ -821,3 +821,283 @@ is exact and deterministic.
   `telegraph + active` (~0.625 s). Same for any future `path_chase_attack` rig.
 - If more systems need it, promote `MELEE_REACT_SCALE` to `game/config.py` and
   fold it into the difficulty multipliers.
+
+---
+
+## CB-5 · Manual aim, mouse attacks and the auto-attack toggle
+
+**Status:** **DONE** 2026-09-04 (groups A–F shipped the same day; the dev-mode
+aim-line overlay is a separate `dev_mode_journal.md` entry). Not committed.
+Verification at the end of this entry.
+
+### Why
+
+Every attack is auto-aimed. `combat/targeting.py — aim_direction` picks the
+nearest (or a random) enemy for each weapon, `FireContext.fallback_dir`
+(`_last_move_dir`) is only consulted when that returns `None`, and the CB-2
+reach ring silences a weapon whose ring is empty before aim is ever computed.
+There is no mouse handling anywhere in the game, and the sprite's `_facing`
+follows horizontal *movement* only. The user wants the hero to attack where
+the player points, with auto-aim as the fallback.
+
+### Requirements (confirmed)
+
+Aim priority, highest first:
+
+1. **Left click** — attack in the direction of the cursor. Works with auto
+   attack on or off; while on, it takes over from auto-aim. A tap fires once;
+   holding keeps attacking at the weapon's normal cooldown.
+2. **Held aim key** — attack that way for as long as it is held, auto attack
+   on or off. Beats auto-aim whenever any aim key is down.
+3. **Auto-aim** — only with auto attack on and neither of the above active.
+   Unchanged behaviour: nearest enemy, reach ring gates firing.
+4. **Nothing** — auto attack off, no click, no aim key: the hero does not
+   attack.
+
+Controls:
+
+- `Q` toggles auto attack. **On by default.** No HUD element; the player
+  reads the state from the hero's behaviour.
+- Aim keys are the arrow keys; movement is WASD. A **layout swap** option
+  (arrows move, WASD aims) lives in the Options screen *and* the pause menu,
+  persisted in `save.settings`.
+- The mouse cursor is inert unless clicked. Auto-aim never follows it.
+
+Per weapon:
+
+- **Melee** (`soul_scythe`): the cone is swung in the aim direction.
+- **Ranged / magic** (`arcane_bolt`, `frost_shards`, `thunder_orb`): the shot
+  goes in the aim direction. Multishot fans around it as now.
+- **Orbit** (`ember_ring`) and **summons** (`grave_totem`, `spirit_wolf`) have
+  no direction and take no aim. With auto attack off they keep working
+  (they are not "attacks" in the swing sense).
+- **Orbit ring while clicking.** CB-2 decision 6 forms the orbiters only
+  while an enemy is inside the reach ring. New condition: they also form
+  while **left click is held** (a manual mouse attack). The ring is spinning
+  when the player is actively attacking, empty ring or not. A held aim key
+  does *not* raise them — click only.
+
+Fire-time target pick for a manual attack (the "tracking"):
+
+- No projectile homes today; what reads as tracking is the nearest pick at
+  fire time. So: at the instant a manual attack fires, gather enemies inside a
+  cone around the aim direction, out to the weapon's reach; if any, aim at the
+  **closest**; otherwise fire straight along the aim. Chain lightning then
+  chains as normal (`chain_to_next` is a post-hit re-target, untouched).
+- **Manual attacks can whiff.** The reach-ring gate applies to auto-aim only;
+  a manual attack always fires (with the attack animation) even into empty
+  space.
+
+Facing: while a manual aim is active the sprite faces the aim; otherwise it
+follows movement as now.
+
+Click and aim key at the same time: click wins.
+
+### Design notes
+
+- `aim_direction` stays the single resolution point. A manual aim reaches it
+  as a **new targeting source**, not as `fallback_dir`: the cone-filtered
+  enemy list + the aim vector as the fallback. `fallback_dir` is then the only
+  thing auto-aim needs and the dead "fire into open space" branch goes away.
+- The cone half-angle for the fire-time pick is one global
+  `config.MANUAL_AIM_ASSIST_DEG` (start ~25°); a weapon may override it with
+  an optional `aim_assist_deg` in `data/weapons.json`. Per the data-driven
+  rule, no per-weapon value default in code beyond the global.
+- Input lives in one small module (`game/states/playing/aim.py`) that turns
+  the frame's key state + mouse into an `AimInput(direction: Vector2 | None,
+  source: "mouse"|"keys"|None, fire: bool)`. `PlayingState._phase_input`
+  reads it; `_phase_combat` hands it to `FireContext`. Nothing else touches
+  pygame's mouse.
+- `Weapon.update` gains a "forced fire" path: with a manual aim present and
+  the cooldown ready, `_fire` skips the ring gate. Summons ignore the aim
+  entirely; orbit ignores its *direction* but reads `aim.source == "mouse"`
+  (a held click) as "ring wanted" in `_maintain_orbit`, alongside the
+  existing enemy-in-reach test. Auto attack off + no manual aim → straight/chain/cone weapons
+  hold (their cooldown still ticks down so the first manual attack is
+  instant).
+- Key layouts are two named pairs (`move`, `aim`) of raw SDL keycodes in
+  `game/config.py` (the same raw-int convention as `_LEFT_KEYS` in
+  `entities/player.py` and `DEBUG_KEYS`, for pygbag). `Player.input_vector`
+  takes the key tuple set instead of hard-coding it.
+- The pause menu's **`Q` = quit to menu** clashes in spirit with `Q` = toggle
+  auto attack (a run-long habit followed by ESC → Q loses the run). The plan
+  first said "move it to `M`", but `M` is the global mute key, consumed in
+  `Game._process_input` before any state sees it. So the pause screen became
+  a **cursor menu** (Resume / Key layout / Quit to menu; ENTER picks) with no
+  single-letter quit at all; `Q` does nothing there.
+- Mouse → world is `Camera.screen_to_world`; screen-shake offsets the camera
+  only inside `draw`, so `camera.pos` is un-shaken during input.
+- **A tap is one volley, not one projectile.** The queued click is spent on
+  the frame *any* directional weapon fires from it (`_phase_combat` calls
+  `consume_tap()`); a weapon still mid-cooldown on that frame does not get
+  its own later shot. Multishot fires its full fan from the one tap.
+- **Only a *held* click raises the orbit ring** (`FireContext.click_held`:
+  source `"mouse"` and `held`). A tap is a single attack and leaves the ring
+  down; so does a held aim key.
+
+### Checklist
+
+#### A · Config + settings — done 2026-09-04
+- [x] `game/config.py`: `AUTO_ATTACK_DEFAULT = True`; `MANUAL_AIM_ASSIST_DEG`
+      (25°); `KEY_LAYOUTS = {"wasd_move", "arrows_move"}` as raw SDL keycode
+      tuples for `move` / `aim` in each of the four directions (the swapped
+      layout is the exact mirror); `KEY_TOGGLE_AUTO_ATTACK` (K_q);
+      `DEFAULT_KEY_LAYOUT`; `KEY_LAYOUT_LABELS` for the option rows.
+- [x] `game/save.py`: `settings["key_layout"]` (default `"wasd_move"`),
+      coerced against a local mirror of the layout names (the module stays
+      dependency-free, like `_RECORD_DIFFICULTIES`); junk or a missing key
+      reads as the default.
+- [x] `game/game.py`: `Game.key_layout` (name, never an unknown one),
+      `Game.keys` (the layout's `move` / `aim` tuples), `set_key_layout`
+      (persists at once) and `cycle_key_layout` (the toggle the pause /
+      options rows will call).
+- [x] Tests: `tests/core/test_save.py` (+2: default + round-trip, junk
+      fallback), new `tests/core/test_controls.py` (+9: keycodes pinned
+      against `pygame.K_*`, move / aim disjoint per layout, mirror, labels;
+      `Game` accessors, persist, refusal, cycle wrap, junk-in-save).
+
+#### B · Aim input — done 2026-09-04
+- [x] New module `game/states/playing/aim.py`: `AimInput(direction, source,
+      held, tap)` (frozen dataclass; `active`, `wants_fire`, `none()`),
+      `mouse_direction` (cursor → world through the camera; a cursor on the
+      hero falls back to the last move direction, then +x) and
+      `read_aim(pressed, mouse_buttons, mouse_pos, camera, origin, aim_keys,
+      fallback, tap_pending)`. A held click *or a queued tap* wins outright
+      (source `"mouse"`); otherwise a held aim key (source `"keys"`,
+      `held=True`); otherwise `AimInput.none()`.
+- [x] `entities/player.py`: `input_vector(pressed, keyset)` reads one
+      direction table from `config.KEY_LAYOUTS` (the old merged WASD+arrows
+      constants are gone); `handle_input(pressed, move_keys)`;
+      `face(direction)` sets `_facing` from the aim's x sign (a vertical aim
+      keeps it) and raises `_face_override`, which `update()` honours once
+      instead of the movement rule, then clears.
+- [x] `PlayingState`: `auto_attack` (from `config.AUTO_ATTACK_DEFAULT`),
+      `_aim`, `_tap_pending` in `_init_run`. `_phase_input` walks with
+      `game.keys["move"]`, keeps `_last_move_dir`, builds the frame's
+      `AimInput` with `game.keys["aim"]` and faces the hero when it is
+      active. `consume_tap()` clears the queue — **group C calls it** on the
+      frame a directional weapon fires from the tap.
+- [x] `PlayingState.handle_event`: left `MOUSEBUTTONDOWN` queues the tap
+      (other buttons ignored); `config.KEY_TOGGLE_AUTO_ATTACK` flips
+      `auto_attack`. Mouse events no longer fall out of the early return.
+- [x] Tests: `tests/characters/test_movement.py` updated for the keyset
+      argument (arrows no longer walk under the default layout; the swap is
+      checked); new `tests/combat/test_manual_aim.py` — `ReadAimTests` (+12:
+      ladder, tap, swap, cursor-on-hero fallback, camera zoom, inert cursor),
+      `FacingOverrideTests` (+2), `ManualAimStateTests` (+6, one shared
+      headless run: `Q` toggle, tap queue until `consume_tap`, frame aim,
+      facing, run-camera click, layout-driven movement).
+
+#### C · Targeting + weapons — done 2026-09-04
+- [x] `combat/targeting.py`: `enemies_in_cone(origin, direction, enemies,
+      half_angle, reach)` (an enemy on the origin counts as inside);
+      `aim_direction` unchanged in signature.
+- [x] `combat/weapons.py`: `FireContext.aim` and `auto_attack`, plus the
+      `manual_fire` / `click_held` properties the weapon reads. In `update`:
+      orbit / summon paths first, unchanged; then cooldown; then manual aim →
+      `_fire(ctx, forced=True)` and restart the cooldown; else auto attack
+      off → hold with `_cd = 0.0` so the next manual attack is instant; else
+      the CB-2 auto path exactly as before.
+- [x] `Weapon._fire(ctx, forced)`: forced skips the reach-ring return,
+      filters `ctx.enemies` through `enemies_in_cone` with
+      `_assist_half_angle()` (`aim_assist_deg` in the weapon's data, else
+      `config.MANUAL_AIM_ASSIST_DEG`) and the weapon's reach, then
+      `aim_direction(mode, origin, in_cone, fallback=aim.direction)`; the
+      melee cone gets the *raw* aim. Multishot spread and chain params ride
+      the resulting direction untouched.
+- [x] `data/weapons.json`: `aim_assist_deg` is read as an optional override;
+      no weapon sets it (the global applies). Documented with the aim
+      section in `combat_calculations.md` (group F).
+- [x] `Weapon._maintain_orbit`: `desired = 0` only when the reach ring is
+      empty **and** `not ctx.click_held`. Respacing / trimming unchanged.
+- [x] `PlayingState._phase_combat`: passes `aim=self._aim,
+      auto_attack=self.auto_attack`; spends the tap on the frame any weapon
+      fires from it. The whiff plays the attack animation (forced fire
+      returns `True` from the main weapon).
+- [x] Tests (`tests/combat/test_manual_aim.py`, +23): `ConeTests` (angle,
+      reach, on-origin), `WeaponAimTests` (forced fire vs empty ring, closest-
+      in-cone homing, empty cone → straight, nearest-but-outside ignored,
+      per-weapon `aim_assist_deg`, melee raw-aim cone, melee whiff, auto-off
+      hold keeps `_cd == 0` and the first tap is instant and a full volley,
+      auto-off + held key fires, multishot centred on the aim, chain opens
+      along the aim, summons ignore the aim), `OrbitOnClickTests` (held click
+      raises with an empty ring, release drops, held key / tap alone do not,
+      enemy in reach still does), `TapConsumptionTests` (one shared run: a
+      tap fires once and animates the whiff, waits out a cooldown then fires
+      once, auto-off + no aim never fires). Whole `tests/combat`: 157 green.
+
+#### D · Pause + options — done 2026-09-04
+- [x] `game/states/paused_state.py`: a cursor menu — Resume, Key layout
+      (ENTER or Left / Right cycle; shows the `config.KEY_LAYOUT_LABELS`
+      text), Quit to menu (ENTER on the row). ESC / P still resume from any
+      row. `Q` does nothing here; there is no single-key quit (see the design
+      note on `M`).
+- [x] `game/states/options_state.py`: `key_layout` row between Mute and
+      Sanctuary; ENTER or Left / Right cycle via `Game.cycle_key_layout`
+      (persists at once); the row shows the layout label; the footer hint
+      reads "Left / Right adjust".
+- [x] Controls text: `README.md` controls table (WASD, arrows = aim, left
+      click, `Q`, the pause rows) and the "weapons attack automatically"
+      paragraph now describe manual aim and the toggle.
+- [x] Tests: new `tests/rendering/test_pause.py` (+8, one shared paused run:
+      ESC / P resume, the Resume row, `Q` inert, wrap, layout row cycles and
+      persists, Left / Right inert off the row, draw, Quit row → menu);
+      `tests/rendering/test_options.py` `KeyLayoutRowTests` (+4: ENTER
+      cycles + persists, Left / Right on the row only, reload into a fresh
+      `Game`, draw); `tests/core/test_dev_mode.py` pause-quit path walks to
+      the Quit row instead of pressing `Q`.
+
+#### E · Tests — done 2026-09-04 (audit of A–D plus the gaps)
+- [x] `tests/combat/test_manual_aim.py` (52): `read_aim` priority ladder
+      (click > keys > none; layout swap); cone pick chooses the closest
+      inside the cone and falls back to the raw aim when empty; forced fire
+      ignores the reach ring; auto-attack-off + no aim → no projectile while
+      orbit (`test_auto_attack_off_does_not_lower_the_ring`) and summons
+      still run; tap fires once, hold keeps firing
+      (`HoldKeepsFiringTests`: one volley per cooldown, click and key at the
+      same cadence, and the pin that an *unconsumed* tap keeps firing — the
+      run must spend it); orbiters form with an empty reach ring while click
+      is held and drop on release (held key / tap alone do not).
+      `FullFrameTests` (+5) drive real mocked snapshots through
+      `PlayingState.update`: `Q` off + held arrow attacks that way; auto off
+      + enemy in reach stays silent over 30 frames; a held arrow beats
+      auto-aim on an enemy and faces the hero; a click tap fires once at the
+      cursor and is spent; the swapped layout aims with WASD and does not
+      walk.
+- [x] `tests/characters/test_movement.py`: `input_vector` with both layouts.
+- [x] `tests/core` / `tests/rendering`: save round-trip for `key_layout`
+      (`test_save.py`, `test_controls.py`); the pause Quit row quits and `Q`
+      does not (`test_pause.py`).
+
+#### F · Docs — done 2026-09-04
+- [x] `documentation/combat_calculations.md`: §1c's `FireContext` snippet now
+      shows `aim` / `auto_attack` and the tap spend; new **§1c·i · Aim
+      resolution** — the `read_aim` priority ladder, the tap queue, the
+      `Weapon.update` branch order, `_fire(forced=True)` with the assist
+      cone (`aim_assist_deg` else `config.MANUAL_AIM_ASSIST_DEG`), melee raw
+      aim, whiffs, orbit-on-click, facing.
+- [x] This entry: status DONE, verification below.
+
+### Verification (CB-5)
+
+- Full default suite after group C: **1101 passed, 1 skipped** (from 1078
+  before CB-5). **Final run after groups D–F: 1122 passed, 1 skipped**, exit
+  0 (10:54). Every addition is a CB-5 test.
+- `tests/combat/test_manual_aim.py` — 52; `tests/core/test_controls.py` —
+  9; `tests/rendering/test_pause.py` — 8; `tests/rendering/test_options.py`
+  `KeyLayoutRowTests` — 4; `tests/core/test_save.py` — +2;
+  `tests/characters/test_movement.py` reworked for the keyset argument.
+- Whole `tests/combat`: 157 → 166 with group E. `tests/core/test_smoke.py`
+  walks ESC → pause → ESC → resume through the new menu.
+- Behavioural pins worth knowing: a held key fires one volley per cooldown
+  with the first shot instant; auto off leaves `_cd == 0` so the first manual
+  attack after any wait is instant; a tap is spent by the run, not the
+  weapon (an unconsumed tap keeps firing at the weapon level — pinned on
+  purpose).
+
+### Open follow-ups (not blocking)
+
+- An aim line is **dev-mode only**, behind its own dev-menu toggle. Planned
+  in `dev_mode_journal.md` ("Aim line" entry), not here; nothing about it
+  ships to normal gameplay.
+- Gamepad right-stick aim would slot into `read_aim` as a third source.

@@ -1,9 +1,12 @@
-"""OPTIONS: audio settings and the entry point into the Sanctuary.
+"""OPTIONS: audio settings, the key layout, and the entry point into the
+Sanctuary.
 
 Start-screen milestone M2. Reached from the menu's "Options" entry. Up / Down
-(also W / S) move the cursor; Left / Right adjust the master volume; ENTER
-toggles mute or opens the selected screen; ESC (or the "Back" row) returns to
-the menu. Every change is persisted immediately, the same as the `M` mute key.
+(also W / S) move the cursor; Left / Right adjust the master volume or cycle
+the key layout (CB-5: WASD move / arrows aim, or the swap); ENTER toggles
+mute, cycles the layout, or opens the selected screen; ESC (or the "Back" row)
+returns to the menu. Every change is persisted immediately, the same as the
+`M` mute key.
 """
 from __future__ import annotations
 
@@ -12,14 +15,14 @@ import pygame
 from game import config, fonts
 from game.state import State
 
-_LABELS = {"volume": "Master volume", "mute": "Mute",
+_LABELS = {"volume": "Master volume", "mute": "Mute", "key_layout": "Key layout",
            "sanctuary": "Sanctuary", "back": "Back"}
 
 
 class OptionsState(State):
     def enter(self, **kwargs) -> None:
         self.audio = self.game.audio
-        self._rows = ("volume", "mute", "sanctuary", "back")
+        self._rows = ("volume", "mute", "key_layout", "sanctuary", "back")
         self.sel = 0
         self._title = fonts.heading(40)
         self._row = fonts.body(26)
@@ -37,17 +40,23 @@ class OptionsState(State):
         elif k in (pygame.K_DOWN, pygame.K_s):
             self.sel = (self.sel + 1) % len(self._rows)
         elif k in (pygame.K_LEFT, pygame.K_a):
-            self._nudge_volume(-1)
+            self._nudge(-1)
         elif k in (pygame.K_RIGHT, pygame.K_d):
-            self._nudge_volume(+1)
+            self._nudge(+1)
         elif k in (pygame.K_RETURN, pygame.K_SPACE):
             self._activate()
 
     def _row_id(self) -> str:
         return self._rows[self.sel]
 
-    def _nudge_volume(self, direction: int) -> None:
-        if self._row_id() != "volume":
+    def _nudge(self, direction: int) -> None:
+        """Left / Right: the volume slider, or the layout cycle (either way
+        round -- there are two layouts)."""
+        rid = self._row_id()
+        if rid == "key_layout":
+            self.game.cycle_key_layout()
+            return
+        if rid != "volume":
             return
         step = config.VOLUME_STEP
         stepped = round(self.audio.volume / step + direction) * step
@@ -60,6 +69,8 @@ class OptionsState(State):
         if rid == "mute":
             self.audio.toggle_mute()
             self.game.persist()
+        elif rid == "key_layout":
+            self.game.cycle_key_layout()
         elif rid == "sanctuary":
             from game.states.meta_state import MetaState
             self.game.state_machine.change(MetaState(self.game))
@@ -107,8 +118,12 @@ class OptionsState(State):
                 val = self._row.render("On" if self.audio.muted else "Off",
                                        True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
+            elif rid == "key_layout":
+                val = self._row.render(
+                    config.KEY_LAYOUT_LABELS[self.game.key_layout], True, colour)
+                surface.blit(val, val.get_rect(midleft=(vx, y)))
 
         hint = self._hint.render(
-            "Up / Down select    -    Left / Right adjust volume    -    "
+            "Up / Down select    -    Left / Right adjust    -    "
             "ENTER toggle / open    -    ESC back", True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - 40)))

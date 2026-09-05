@@ -105,15 +105,19 @@ the interactables.
 
 | Key | Action |
 |-----|--------|
-| WASD / Arrow keys | Move; also navigate menus |
+| WASD | Move (menus: navigate). **Key layout** in Options / pause swaps this with the arrows |
+| Arrow keys | **Aim** while held: the hero attacks that way, auto attack on or off (menus: navigate) |
+| Left click | In a run: attack toward the cursor — tap for one attack, hold to keep attacking; beats auto-aim and a held aim key |
+| Mouse (menus) | Hover to highlight, click to pick, on every menu — start, hero select, pause, level-up, dev menu (wheel scrolls, right click backs out). On the hero select the first click on a card selects it and a second click begins; or click **Begin** |
+| Q | Toggle **auto attack** (on by default). No indicator: read it from the hero |
 | ENTER or SPACE | Confirm / start / select a menu entry / buy / equip |
-| ← → (hero select) | Choose the hero · ↑ ↓ choose the **difficulty** (Normal / Fast / Super Fast) |
+| ← → (hero select) | Choose the hero · ↑ ↓ choose the **difficulty** (Normal / Fast / Super Fast), or click the difficulty ribbon to step it |
 | ← → (Options) | Adjust the master volume |
 | E | Use a special location you're standing on (shrine, chest, fountain, altar, merchant) |
-| ESC | Pause (in game) / back / quit (from the start menu) |
+| ESC | Pause (in game) / back / quit (from the start menu) · the pause menu has Resume / Key layout / Quit to menu |
 | S (run summary) | Open the **Sanctuary** (meta upgrades + item stash) — from the start menu it's under **Options** |
 | TAB (Sanctuary) | Switch between Upgrades and Stash · U unequips |
-| 1 / 2 / 3 or ← → + ENTER | Choose a level-up upgrade / blessing |
+| 1 / 2 / 3 or ← → + ENTER | Choose a level-up upgrade / blessing (or click the card) |
 | M | Mute / unmute audio (persisted); also an **Options** toggle |
 | F1 | Toggle debug overlay (FPS, per-system counts, run seed, hero, timings) |
 | F2–F6 | Spawn enemy / grant XP / force level / spawn boss / toggle invuln |
@@ -121,8 +125,12 @@ the interactables.
 
 Debug keys are never required for normal play.
 
-Weapons attack automatically — you only move, pick upgrades/blessings, use
-special locations, and choose a hero and difficulty. The world is a procedural
+Weapons attack automatically by default — you move, pick upgrades/blessings,
+use special locations, and choose a hero and difficulty. Hold an aim key or
+click to attack where you point instead (the shot homes on the closest enemy
+inside a cone around your aim, else flies straight; melee swings that way);
+`Q` turns auto attack off so the hero only attacks on your input. Orbit and
+summon weapons take no aim. The world is a procedural
 graph of rooms and corridors with obstacles; explore it, survive the escalating
 waves, and the boss (**The First Hunger**) appears in its arena near the end of
 the run and drops an item. Salvage and loot carry over between runs via the

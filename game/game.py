@@ -23,6 +23,7 @@ from game.state import StateMachine
 from progression.meta import MetaCatalog
 from systems.audio import AudioManager
 from systems.debug_overlay import DebugOverlay
+from ui.mouse import install_cursor
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ class Game:
         # Sprite/image cache. Lazy -- no disk read until a draw asks for a frame,
         # and a missing file degrades to primitive drawing (never raises).
         self.assets = get_assets()
+        # The arrow from assets/ui/pointers as the hardware cursor; a missing
+        # file or a refusing build keeps the system arrow (see ui/mouse.py).
+        self.cursor_installed = install_cursor(self.assets)
         self.save_path = save_path or save_mod.DEFAULT_PATH
         self.save = (save_mod.load(self.save_path) if config.SAVE_ENABLED
                      else save_mod.SaveData())
@@ -60,6 +64,33 @@ class Game:
     # --- lifecycle --------------------------------------------------
     def quit(self) -> None:
         self.running = False
+
+    # --- controls (CB-5) ----------------------------------------------
+    @property
+    def key_layout(self) -> str:
+        """Name of the active `config.KEY_LAYOUTS` entry, from the save."""
+        name = self.save.settings.get("key_layout")
+        return name if name in config.KEY_LAYOUTS else config.DEFAULT_KEY_LAYOUT
+
+    @property
+    def keys(self) -> dict:
+        """The active layout's `{"move": {...}, "aim": {...}}` key tuples."""
+        return config.KEY_LAYOUTS[self.key_layout]
+
+    def set_key_layout(self, name: str) -> None:
+        """Switch layouts and persist at once, like mute / volume."""
+        if name not in config.KEY_LAYOUTS:
+            raise ValueError(f"unknown key layout: {name!r}")
+        self.save.settings["key_layout"] = name
+        self.persist()
+
+    def cycle_key_layout(self) -> str:
+        """Advance to the next layout (the pause / options toggle). Returns
+        the new name."""
+        names = list(config.KEY_LAYOUTS)
+        nxt = names[(names.index(self.key_layout) + 1) % len(names)]
+        self.set_key_layout(nxt)
+        return nxt
 
     def persist(self) -> None:
         if not config.SAVE_ENABLED:

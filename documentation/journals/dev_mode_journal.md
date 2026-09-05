@@ -121,3 +121,46 @@ tank's `hp` is untouched; toggling it off, damage accrues again. Suite 647 → 6
   `progression/items.py` (`base_id=` arg — D5, not `rarity=`), `README.md`,
   `journal.md`, `transcript.md`.
 - **No** new dependencies. **Nothing** committed.
+
+### "Aim line" toggle — done 2026-09-04 (with CB-5 manual aim)
+
+A dev-only overlay for the CB-5 manual-aim work
+(`combat_balance_journal.md`, CB-5): while a manual aim is active, a line
+from the hero's centre along the aim out to the main weapon's reach, plus
+the two edges of the cone that decides the fire-time target pick, so the
+pick can be read on screen. Nothing draws when no aim is active. Normal
+gameplay never shows it — the user was explicit that aiming and the
+auto-attack state carry no HUD element.
+
+Root toggle **"Aim line"**, after **Spawn points**: `_ROOT_ROWS` gains
+`"aim_line"`, `_LABELS["aim_line"] = "Aim line"`, `_activate` / `_row_label`
+flip `PlayingState._dev_show_aim` and show `[ON]`/`[  ]` like the collider
+and spawn-point rows. No F-key — the menu row is enough.
+
+Hook: `WorldRenderer.aim_overlay(surface)` in `game/states/playing/rendering.py`,
+same shape as `collider_overlay` (early-out unless
+`ps.dev_mode and ps._dev_show_aim`, then unless `ps._aim.active`), called
+from `PlayingState.draw` in the dev-only overlay group after
+`spawn_point_overlay`. Reads the frame's `AimInput` (`ps._aim`, stored by
+`_phase_input`) and the main weapon:
+
+- **length** = `main._reach(area_multiplier)`; a main weapon with no finite
+  reach falls back to `_AIM_LINE_PX = 160` world px.
+- **cone** = the swing cone (`cone_half_angle`) for a melee main weapon,
+  which takes no assist; otherwise `main._assist_half_angle()` (the
+  weapon's `aim_assist_deg`, else `config.MANUAL_AIM_ASSIST_DEG`). With no
+  weapon at all, the config angle.
+- **colour** = `config.COLOR_DEBUG_AIM_MOUSE` (yellow) for a click / tap,
+  `COLOR_DEBUG_AIM_KEYS` (cyan) for a held key, so the priority ladder
+  (click beats key) is visible while testing; the edges are the half-tint.
+
+`PlayingState._init_run`: `self._dev_show_aim = False`; a fresh dev run
+clears it via `__init__` like the other flags.
+
+**Tests** (`tests/core/test_dev_mode.py::DevMenuTests`, +2):
+`test_aim_line_row_toggles_the_dev_overlay` — the row flips the flag, shows
+`[ON]`, and `PlayingState.draw` survives a key aim, a mouse aim and no aim;
+`test_aim_overlay_draws_only_in_dev_with_the_flag_and_an_aim` — counts
+`pygame.draw.line` calls: 0 with the flag off, exactly 3 (aim + two edges)
+with a held key or a tap, 0 with no aim, and 0 in a regular run even with
+the flag forced on.

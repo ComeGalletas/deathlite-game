@@ -128,3 +128,40 @@ class NavigationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KeyLayoutRowTests(unittest.TestCase):
+    """CB-5: the key-layout row cycles the layouts and persists at once."""
+
+    def test_enter_cycles_and_persists(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("key_layout")
+        self.assertEqual(game.key_layout, config.DEFAULT_KEY_LAYOUT)
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(game.key_layout, "arrows_move")
+        self.assertEqual(save_mod.load(game.save_path).settings["key_layout"],
+                         "arrows_move")
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(game.key_layout, config.DEFAULT_KEY_LAYOUT)
+
+    def test_left_right_cycle_on_the_row_only(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("key_layout")
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.key_layout, "arrows_move")
+        _key(game, pygame.K_LEFT)
+        self.assertEqual(game.key_layout, config.DEFAULT_KEY_LAYOUT)
+        opt.sel = opt._rows.index("mute")
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.key_layout, config.DEFAULT_KEY_LAYOUT)
+
+    def test_layout_survives_reload_into_a_fresh_game(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("key_layout")
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(Game(save_path=game.save_path).key_layout, "arrows_move")
+
+    def test_row_draws_the_layout_label(self):
+        game, opt = _options()
+        opt.draw(game.screen)            # must not raise; the label is looked up
+        self.assertIn(game.key_layout, config.KEY_LAYOUT_LABELS)

@@ -15,20 +15,18 @@ import pygame
 from game import config
 from progression.stats import Modifier, StatSet
 
-# Raw SDL2 keycodes (== pygame.K_a / K_LEFT / ...). Hardcoded because these are
-# read at import time, before `pygame.init()`; the pygbag/browser build does not
-# expose `pygame.K_*` (nor the `pygame.constants` submodule) that early. SDLK
-# values are fixed by SDL. `pressed` below is indexed by these ints.
-_LEFT_KEYS = (97, 1073741904)    # K_a, K_LEFT
-_RIGHT_KEYS = (100, 1073741903)  # K_d, K_RIGHT
-_UP_KEYS = (119, 1073741906)     # K_w, K_UP
-_DOWN_KEYS = (115, 1073741905)   # K_s, K_DOWN
+def _any(pressed, keys) -> bool:
+    return any(pressed[k] for k in keys)
 
 
-def input_vector(pressed) -> pygame.Vector2:
-    """Unit direction from a key-state sequence. Pure; diagonals normalised."""
-    x = float(any(pressed[k] for k in _RIGHT_KEYS)) - float(any(pressed[k] for k in _LEFT_KEYS))
-    y = float(any(pressed[k] for k in _DOWN_KEYS)) - float(any(pressed[k] for k in _UP_KEYS))
+def input_vector(pressed, keyset: dict) -> pygame.Vector2:
+    """Unit direction from a key-state sequence. Pure; diagonals normalised.
+
+    `keyset` is one direction table from `config.KEY_LAYOUTS` -- the layout's
+    `"move"` table for walking, its `"aim"` table for manual aim (CB-5) --
+    mapping `left / right / up / down` to tuples of raw SDL keycodes."""
+    x = float(_any(pressed, keyset["right"])) - float(_any(pressed, keyset["left"]))
+    y = float(_any(pressed, keyset["down"])) - float(_any(pressed, keyset["up"]))
     vec = pygame.Vector2(x, y)
     if vec.length_squared() > 0:
         vec.normalize_ip()
@@ -76,6 +74,9 @@ class Player:
         self._hurt_t: float = 0.0
         self._attack_t: float = 0.0
         self._facing: int = 1
+        # CB-5: a manual aim faces the hero for this frame; `update` then
+        # skips the movement-facing rule once and clears the flag.
+        self._face_override: bool = False
 
     # --- stats -----------------------------------------------------
     def recompute(self) -> None:
@@ -115,8 +116,17 @@ class Player:
         return 1.0
 
     # --- per-frame ---------------------------------------------
-    def handle_input(self, pressed) -> None:
-        self._move_dir = input_vector(pressed)
+    def handle_input(self, pressed, move_keys: dict) -> None:
+        self._move_dir = input_vector(pressed, move_keys)
+
+    def face(self, direction: pygame.Vector2) -> None:
+        """CB-5: face along a manual aim for this frame, overriding the
+        movement rule. A vertical aim keeps the current facing."""
+        if direction.x > 0.01:
+            self._facing = 1
+        elif direction.x < -0.01:
+            self._facing = -1
+        self._face_override = True
 
     def trigger_attack_anim(self, duration: float = 0.38) -> None:
         """Called by PlayingState when a weapon fires -- drives the attack
@@ -145,7 +155,9 @@ class Player:
             self.momentum = (min(5.0, self.momentum + dt * 2.5) if moving
                              else max(0.0, self.momentum - dt * 3.5))
 
-        if self._move_dir.x > 0.01:
+        if self._face_override:
+            self._face_override = False       # `face()` already set it this frame
+        elif self._move_dir.x > 0.01:
             self._facing = 1
         elif self._move_dir.x < -0.01:
             self._facing = -1
