@@ -1,5 +1,18 @@
 {
-  "ui_banner_cap_left":  {"file": "ui/banners/banner_connection_left.png",  "frame": [192, 192], "content": [0, 0, 96, 192]},
-  "ui_banner_cap_right": {"file": "ui/banners/banner_connection_right.png", "frame": [192, 192], "content": [96, 0, 96, 192]},
-  "ui_banner_mid":       {"file": "ui/banners/banner_middle.png",       "frame": [192, 192]}
+  "ui_banner_cap_left":  {"file": "ui/banners/scroll_left.png",  "frame": [192, 192], "content": [0, 0, 96, 192]},
+  "ui_banner_cap_right": {"file": "ui/banners/scroll_right.png", "frame": [192, 192], "content": [96, 0, 96, 192]},
+  "ui_banner_mid":       {"file": "ui/banners/scroll_middle.png",       "frame": [192, 192]},
+
+  "btn_blue_wide":          {"file": "ui/buttons/blue_wide.png",          "frame": [192, 64]},
+  "btn_blue_wide_pressed":  {"file": "ui/buttons/blue_wide_pressed.png",  "frame": [192, 64]},
+  "btn_gold_wide":          {"file": "ui/buttons/gold_wide.png",          "frame": [192, 64]},
+  "btn_red_wide":           {"file": "ui/buttons/red_wide.png",           "frame": [192, 64]},
+  "btn_red_wide_pressed":   {"file": "ui/buttons/red_wide_pressed.png",   "frame": [192, 64]},
+  "btn_blue_panel":         {"file": "ui/buttons/blue_panel.png",         "frame": [192, 192]},
+  "btn_blue_panel_pressed": {"file": "ui/buttons/blue_panel_pressed.png", "frame": [192, 192]},
+  "btn_gold_panel":         {"file": "ui/buttons/gold_panel.png",         "frame": [192, 192]},
+
+  "ribbon_blue":   {"file": "ui/ribbons/blue_ribbon.png",   "frame": [192, 64]},
+  "ribbon_yellow": {"file": "ui/ribbons/yellow_ribbon.png", "frame": [192, 64]},
+  "ribbon_red":    {"file": "ui/ribbons/red_ribbon.png",    "frame": [192, 64]}
 }

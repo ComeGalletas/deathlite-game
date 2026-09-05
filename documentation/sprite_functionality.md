@@ -698,3 +698,127 @@ owner has said the wind-up flag would help and that it belongs before the
 disc appears. Not built here; it is a gameplay change with its own
 before/after, and it wants the same rig drawn at the snapshotted `cast_at`
 during the `telegraph` state.
+
+## The UI sheets: buttons, ribbons and the slicer (2026-09-04)
+
+The menus draw their chrome from the Tiny Swords UI pack under
+`assets/ui/`. Every file there carries a lowercase name that says what the
+picture is (the rename and its full map are in `journals/journal.md`, "UI
+asset rename"); the pieces the game uses are listed in `data/ui_sprites.json`
+as plain rigs (`file` + `frame`, no `anims`), so the code never names a file.
+
+### The 64-px grid
+
+The pack is authored on 64-px tiles:
+
+| Sheet | Size | Tiles | Cut as |
+|---|---|---|---|
+| `buttons/<colour>.png`, `icons/*`, `ribbons/<colour>_tab_*` | `64x64` | 1x1 | plainly scaled |
+| `buttons/<colour>_wide[_pressed].png`, `ribbons/<colour>_ribbon.png`, `banners/parchment_wide.png` | `192x64` | 3x1 | **3-slice**: two caps kept, the middle stretched |
+| `buttons/<colour>_panel[_pressed].png`, `banners/parchment_panel.png` | `192x192` | 3x3 | **9-slice**: four corners kept, edges stretched one way, the centre both |
+
+The `_pressed` sheets are the same button drawn 4 px lower with the top
+bevel removed -- the press is baked into the art. So a pressed button is an
+image swap plus a 4-px shift of whatever sits on it (`ui.widgets.PRESSED_DY`),
+never a computed offset. Only blue and red have pressed art; a pressed gold
+button shows its base colour's pressed sheet.
+
+The transparent margins around the ink (7 px left / right, 8 px below on a
+button) are part of the look and are kept: the rigs declare the full frame,
+no `content` crop.
+
+### The slicer -- `ui.panels.slice(assets, rig, size, tile=64)`
+
+Cuts one sheet on its grid and rebuilds it at `size`:
+
+1. **Grid.** An axis with three tiles is sliced; one tile is scaled whole.
+2. **Pre-scale.** A sliced axis needs two tiles of room (its caps), a plain
+   axis one. If the target is smaller than that on either axis the *whole
+   sheet* is scaled first by one shared factor
+   (`min(1, w / need_w, h / need_h)`), so a short button keeps its
+   proportions instead of squashing its caps. At the native 64 px the
+   factor is 1 and nothing is resampled.
+3. **Compose.** Caps / corners are copied 1:1 (post pre-scale); the
+   middle cells are stretched to what is left. Nearest-neighbour throughout
+   -- pixel art.
+4. **Cache** per `(rig, size, tile)`, cleared by `panels.clear_cache()`.
+   `None` for a missing rig or a non-positive size.
+
+`three_slice_h` (the start-menu parchment scroll) is the older builder: it
+composes a bar from three *separate* rig images and stays for that panel.
+
+### The widgets -- `ui/widgets.py`
+
+`draw_button(surface, assets, rect, label, *, state, shape, variant, font)`
+paints one button and returns the label's rect (or `None` with no label, so
+a caller can lay its own content on the art):
+
+| | `normal` | `hover` | `pressed` |
+|---|---|---|---|
+| `shape="wide"`, `variant="primary"` | `btn_blue_wide` | `btn_gold_wide` | `btn_blue_wide_pressed` |
+| `shape="wide"`, `variant="danger"` | `btn_red_wide` | `btn_gold_wide` | `btn_red_wide_pressed` |
+| `shape="panel"`, `variant="primary"` | `btn_blue_panel` | `btn_gold_panel` | `btn_blue_panel_pressed` |
+
+`hover` is the one highlighted look -- the cursor over a button, the
+keyboard cursor on a row, the selected hero or card. `danger` is for
+leaving actions (Exit, Quit to menu). `draw_ribbon(surface, assets, rect,
+label, *, colour, font)` paints `ribbon_<colour>` (`blue` / `yellow` /
+`red`) with the label centred.
+
+Both fall back to the flat rounded rectangle the screens drew before the art
+when the sheet is missing or `assets` is `None`, so an empty `assets/` still
+plays.
+
+### Who draws what
+
+| Screen | Element | Shape | State source |
+|---|---|---|---|
+| Start menu | each option, `64` tall on a 72-px step | wide | selected row → hover; `MouseNav.pressed_on` → pressed; Exit → danger |
+| Hero select | Begin, `256x64` | wide | `MouseNav.hover` → hover; `pressed_on` → pressed |
+| Hero select | hero cards, `340x340` | panel | selected hero → hover; **armed** (first click landed) or held → pressed -- the card sinks to say "click again to begin" |
+| Hero select | difficulty, `64` tall | ribbon | colour from `config.DIFFICULTY_RIBBON` (blue / yellow / red); the ribbon is a switch -- a click steps the difficulty (no hover / pressed art exists for ribbons) |
+| Level-up | the cards, `340x200` | panel | selected → hover; held → pressed |
+| Pause | each row, `560x64` | wide | selected → hover; held → pressed; Quit → danger; the Key layout value on the right half |
+
+Card content (names, rows, badges, tags) starts 16 px in, inside the flat
+centre of the 9-slice art, and shifts `PRESSED_DY` on a sunk card.
+
+### Text on the sheets (2026-09-04)
+
+Two bundled faces, asked for by *role* in `game/fonts.py`, never by file:
+`heading()` is **NunitoSans** -- every title: screen titles, hero and trait
+names, card names, the Begin label, "Difficulty:", "Paused", "Level Up",
+the summary titles; `body()` is **Fredoka** -- everything else, including
+the difficulty *type*; `mono()` is the dev overlay's monospace. A missing
+file degrades to SysFont as before.
+
+The sheets are light, so text drawn on them uses its own pair:
+`config.COLOR_ON_BUTTON` (`(28, 28, 34)`, a near-black -- the owner asked for a
+shade clearer than pure black) for titles and labels,
+`COLOR_ON_BUTTON_DIM` (`(60, 62, 72)`, judged in a real window) for the
+secondary lines -- identity and description text, the difficulty type,
+badges, tags, the pause screen's Key layout value. The light `COLOR_TEXT`
+pair stays for the dark background (HUD, summaries, Options, dev menu).
+
+Labels sit on a button's *visual* centre: the wide sheet's ink is 56 px in
+its 64 px frame with the empty 8 px at the bottom, so `draw_button` centres
+its label on `rect.centery + LABEL_DY` (`-6`: the 4-px ink offset plus a
+2-px optical nudge) and the hand-blitted pause labels apply the same
+constant. A sunk button adds `PRESSED_DY` on top. The ribbon fills its frame
+and takes no lift.
+
+### The mouse side
+
+`ui.mouse.MouseNav` gives a screen `hover` (the key under the cursor as of
+the last motion, `None` off everything) and `pressed_on` (the key the
+current left press landed on). Screens pick a button's state from those two
+plus their own selection; picks still happen on the release.
+
+### Tests
+
+`tests/rendering/test_ui_panels.py — SliceTests` pins caps and corners
+against the source sheet pixel-for-pixel (including the pre-scaled case
+against a hand-scaled reference). `test_widgets.py` pins state / shape /
+variant → sheet, the 4-px label shift and the fallbacks. Each screen's art
+tests spy on `draw_button` / `draw_ribbon` for the state per element and
+sample one cap or corner pixel against the sheet.

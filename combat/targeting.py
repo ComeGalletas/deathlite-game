@@ -2,9 +2,13 @@
 
 A targeting function takes the firing origin and the candidate enemies and
 returns an aim direction (unit vector) or None if there is nothing to shoot.
-Basic weapons never require the player to aim (spec 3.2).
+Basic weapons never require the player to aim (spec 3.2); with CB-5 a manual
+aim narrows the candidates to a cone first (`enemies_in_cone`) and hands the
+aim itself in as the fallback, so the same strategy serves both.
 """
 from __future__ import annotations
+
+import math
 
 import pygame
 
@@ -43,3 +47,21 @@ def aim_direction(mode: str, origin: pygame.Vector2, enemies,
     if fallback is not None and fallback.length_squared() > 0:
         return fallback.normalize()
     return None
+
+
+def enemies_in_cone(origin: pygame.Vector2, direction: pygame.Vector2, enemies,
+                    half_angle: float, reach: float) -> list:
+    """CB-5 aim assist: the enemies within `reach` of `origin` whose bearing
+    is within `half_angle` (radians) of `direction`. An enemy sitting on the
+    origin has no bearing and counts as inside. `direction` must be unit."""
+    cos_limit = math.cos(half_angle)
+    r2 = reach * reach
+    out = []
+    for e in enemies:
+        to = e.pos - origin
+        d2 = to.length_squared()
+        if d2 > r2:
+            continue
+        if d2 <= 1e-6 or to.dot(direction) >= cos_limit * math.sqrt(d2):
+            out.append(e)
+    return out

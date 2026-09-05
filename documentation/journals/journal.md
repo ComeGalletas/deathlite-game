@@ -2972,3 +2972,788 @@ telegraph ring in `one_enemy` is gated on `slam_radius`, which only the
 brute carries.
 
 Suite: 1,048 tests, 1,047 passed and 1 skipped (9 min 13 s).
+
+## Planned -- Mouse support in menus and UI (2026-09-04)
+
+**Status:** **DONE** 2026-09-04 (groups A–F shipped the same day). Not
+committed. Verification at the end of this entry.
+
+### Goal
+
+Every screen the keyboard drives today also answers the mouse: hover moves
+the highlight, a click activates. In scope, in this order: the **start
+menu**, the **character select**, the **pause screen**, the **level-up /
+blessing screen**, and last -- if the budget allows -- the **developer
+menu**. The keyboard keeps working unchanged everywhere; the two input
+devices converge on the same selection index, so nothing about the
+screens' logic forks.
+
+### Where things stand
+
+- The main loop already routes every event to the top-of-stack state
+  (`Game._process_input` → `state_machine.handle_event`), and CB-5 added the
+  first mouse handling in the codebase (`PlayingState.handle_event` queues a
+  left click as an attack tap; `game/states/playing/aim.py` reads the cursor
+  through the camera). No menu reads the mouse; every `handle_event` starts
+  with `if event.type != pygame.KEYDOWN: return`.
+- The window is `pygame.SCALED`, so `event.pos` / `pygame.mouse.get_pos()`
+  are already in the `SCREEN_WIDTH x SCREEN_HEIGHT` logical space the
+  screens lay out in. The web build renders at its canvas size with the same
+  coordinates. No conversion needed for UI (the camera transform is only
+  for in-world aim).
+- Each screen lays its rows out with fixed numbers inside `draw`
+  (`MenuState`: rows at `top=550, step=44` centred on `cx`; character cards
+  `340x340` from `y=170`; level-up cards `340x200` centred; the pause menu's
+  three rows at `330 + i*48`; the dev menu's `34 px` rows inside a `480`-wide
+  panel with a scroll window). The rects exist on screen but are never kept.
+
+### Design
+
+**One small helper, `ui/mouse.py`** (per the one-module-per-concern rule):
+
+```python
+class HitMap:
+    def clear(self): ...
+    def add(self, rect: pygame.Rect, key) -> pygame.Rect: ...   # returns rect
+    def at(self, pos) -> key | None: ...                        # topmost match
+```
+
+A screen calls `hits.clear()` at the top of `draw`, registers each row /
+card / button rect as it paints it (`hits.add(rect.inflate(24, 8), i)`), and
+in `handle_event`:
+
+- `MOUSEMOTION` → `key = hits.at(event.pos)`; if not None and different from
+  the current selection, move the selection there. Hover *selects*, exactly
+  as Up / Down would, so the keyboard highlight and the mouse highlight are
+  one thing.
+- `MOUSEBUTTONUP` button 1 → if `hits.at(event.pos)` is the current
+  selection, activate it (the same `_activate` the keyboard calls). A press
+  that lands on nothing, or a release over a different row than the press,
+  does nothing.
+
+Activating on **release**, not press, is deliberate: the level-up and pause
+overlays sit on top of `PlayingState`, and CB-5 reads `pygame.mouse.
+get_pressed()` every frame. If a card were picked on the press, the very
+next frame -- back in the run, button still down -- `read_aim` would see a
+held click and fire an attack toward wherever the card was. Picking on
+release means the button is already up when the run resumes. Belt and
+braces: `PlayingState` gains a `_mouse_armed` latch, cleared whenever a
+state is pushed over it or it is re-entered, and set again on the first
+frame with no button held; `read_aim` treats a held click as "none" until
+armed. A tap queued *during* an overlay cannot happen (the overlay owns the
+events).
+
+Draw happens after input in a frame, so the hit map a click is tested
+against is last frame's. Every screen here is static (nothing moves under
+the cursor between frames), so that is exact enough. Hover-highlight
+redraws the same rects.
+
+**Cursor art.** `assets/ui/pointers/` holds one arrow (`01.png`) and five
+selection-bracket pieces (`02.png` a full frame, `03`-`06` the four corners).
+Only the arrow is used, as the **hardware cursor** everywhere
+(`pygame.mouse.set_cursor(pygame.cursors.Cursor(hotspot, surface))`, set
+once at boot in `Game.__init__`). The image is a 64x64 frame with the arrow
+ink at `(22, 17, 22, 30)`; crop to the ink, scale to a sensible on-screen
+size (the ink is 22x30 at 1x -- try 1x first, 1.5x if it reads small), and
+put the hotspot at the ink's top-left pixel (the arrow tip). The bracket
+pieces are **not** wired to anything (no hover frame around cards / rows)
+-- the owner asked for the cursor only and nothing else changed. A boot
+without the file, or the web build refusing a surface cursor, falls back to
+the system arrow silently.
+
+### Todo
+
+#### A · Helper, cursor, start menu — done 2026-09-04
+- [x] `config.py`: `UI_CURSOR_IMAGE = "ui/pointers/01.png"`,
+      `UI_CURSOR_SCALE = 1.0` (the ink is 22x30 at 1x; the owner accepted
+      1x first, 1.5x if it reads small in the real window).
+- [x] `ui/mouse.py — install_cursor(assets)`: loads the arrow through the
+      asset cache, crops to `get_bounding_rect()`, scales, hotspot `(0, 0)`
+      of the crop = the arrow tip, `pygame.mouse.set_cursor(Cursor(...))`
+      inside a try. Returns False (system arrow stays) for a missing image
+      or a refusing driver -- the headless dummy driver *does* refuse
+      ("Cursors are not currently supported"), so the suite runs with the
+      system cursor and pins the surface path with `set_cursor` mocked.
+      `Game.__init__` calls it right after the assets; `game.cursor_installed`.
+- [x] `ui/mouse.py — HitMap` (`clear` / `add` / `at` / `rect_of`, last-added
+      wins on overlap) and **`MouseNav`** (rather than two free functions):
+      owns a `HitMap` and the press bookkeeping; `event(e)` returns
+      `("hover", key)` on motion over a rect, `("click", key)` on a left
+      release over the rect the press landed on, else None. A press or
+      release off every rect drops the press; other buttons are ignored.
+- [x] `game/states/menu_state.py`: `self._mouse = MouseNav()`; `draw`
+      clears the map and registers one band per option -- `step` (44 px)
+      tall, the panel's width minus 40 px each side, so bands touch but
+      never overlap. `handle_event` feeds the mouse first: hover sets
+      `_index`; click sets it *and* activates (a click with no prior hover
+      still works). Keyboard path untouched.
+- [x] Tests: new `tests/rendering/test_mouse.py` (13: `HitMap` x3,
+      `MouseNav` x6, cursor x4 -- boot survives + asset loads, ink-crop
+      size and `(0, 0)` hotspot with `set_cursor` mocked, missing file
+      boots with `cursor_installed False`, a refusing driver is survived);
+      `tests/rendering/test_menu.py — MenuMouseTests` (+8: bands per
+      option and non-overlapping, hover selects, hover between rows inert,
+      click opens Options, click without hover activates, release on
+      another row inert, click off every row inert, keyboard and mouse
+      share the index). Mouse + menu + smoke: 54 green.
+
+#### B · Character select — done 2026-09-04
+- [x] Hero cards: hover selects (`index`). "Already selected before the
+      press" cannot be the arming rule -- hover has always selected the card
+      by the time you press, so that would start on the first click. The
+      rule is **the last *clicked* card**: `_armed_hero` is set by the first
+      click on a card (which also selects it); a second click on the same
+      card begins. Hovering or arrowing to another card disarms
+      (`_select_hero`). A click on a different card re-arms that one.
+- [x] **Begin** button (`220x40`, `_BEGIN_GAP = 22` under the difficulty
+      line's centre), one click begins with the selected hero, difficulty
+      and the dev flag. ENTER / SPACE go through the same `_begin()`; the
+      hint reads "ENTER / Begin".
+- [x] Difficulty line untouched: keyboard only, no rect registered, a click
+      on it does nothing (pinned).
+- [x] Instructions now start `_INSTR_GAP = 26` under the button; the hint
+      under them; everything still clears the bottom of the screen. The
+      layout is exposed as `cs._layout` (`diff_y`, `begin`, `instr_top`,
+      `instr_bottom`) so tests pin order, not pixels.
+- [x] **Back** target bottom-left (`"<  Back"`, ESC's twin, `_back()`).
+- [x] `config.MENU_INSTRUCTIONS` was stale since CB-5 ("Move · WASD /
+      Arrows", "Weapons fire on their own"); the rows now read Move · WASD,
+      Aim · Arrows / Click, Auto attack · Q, Pause · ESC, Mute · M, and the
+      note says weapons fire on their own and can be aimed.
+- [x] **Rule for the groups that follow:** `HitMap.add` *copies* the rect,
+      so a rect must be positioned *before* it is registered. The Begin
+      button was registered at the origin and then centred -- the layout
+      test caught the clickable area sitting at `(0, 0)` while the button
+      drew in place. Register last.
+- [x] Tests (`tests/rendering/test_menu.py`): the instruction-band test now
+      pins the order difficulty → Begin → instructions and that the hint
+      still fits; `CharacterSelectMouseTests` (+9: hover selects without
+      arming; first click arms, second begins; hovering away and the
+      keyboard both disarm; Begin starts with the chosen hero + difficulty
+      all the way into `PlayingState`; Begin forwards the dev flag; Back →
+      menu; the difficulty line ignores the mouse; Begin sits between
+      difficulty and instructions; a click off everything is inert). Menu +
+      mouse + smoke: 63 green. Group A's wider regression (`tests/core` +
+      `tests/rendering`): 404 passed.
+- [ ] Tests: hover moves `index`; first release selects, second begins
+      (`LoadingState` on the stack with the right `character_id` /
+      `difficulty` / `dev`); the glyphs step the difficulty both ways and
+      wrap.
+
+#### C · Pause screen — done 2026-09-04
+- [x] `game/states/paused_state.py`: `MouseNav`; `draw` registers one
+      `48 px` band per row from the label column through the value column
+      (positioned first, then registered); hover selects, click picks via
+      the same `_activate` the keyboard uses. No wheel on the layout row.
+- [x] `PlayingState._suspend_mouse()`: drops any queued tap and clears
+      `_mouse_armed`. Called at the run's **three overlay push sites**, all
+      inside `PlayingState` so no cross-state call is needed: ESC → pause,
+      `` ` `` → dev menu, `_open_level_up` → level-up. `_phase_input` re-arms
+      on the first frame with no button held. `read_aim(..., armed=)` treats
+      a held button as nothing while disarmed (a queued tap cannot exist
+      then -- the overlay owns the events).
+- [x] Tests (`tests/rendering/test_pause.py`): `PauseMouseTests` (+7: bands
+      registered without overlap, hover selects without picking, click
+      Resume / Key layout (persists) / Quit, click off rows inert, release
+      on another row inert); `MouseArmingTests` (+4: pause disarms → click
+      Resume → button still reported down for 3 frames spawns nothing and
+      queues no tap → one up frame re-arms → a held click fires; a tap
+      queued before the overlay is dropped; level-up and the dev menu
+      disarm too; armed by default). Pause suite 19 green; manual-aim +
+      smoke green with the new `read_aim` argument.
+
+#### D · Level-up / blessing screen — done 2026-09-04
+- [x] `ui/level_up.py — LevelUpPanel`: owns a `HitMap` (`panel.hits`),
+      cleared and refilled with the card rects on every `draw` (the rects are
+      built in place, then registered). The hint line mentions clicking.
+- [x] `game/states/level_up_state.py`: `MouseNav(self.panel.hits)` -- the
+      state shares the panel's map rather than knowing the geometry. Hover
+      sets `selected`; **one click picks** (`_pick(i)`, the same path as
+      `1 / 2 / 3`), on the release. Keyboard untouched.
+- [x] The group C latch covers the resume frame: `_open_level_up` disarmed
+      the mouse before the push, and the pick does not re-arm it.
+- [x] Tests: new `tests/rendering/test_level_up.py` (+8, one shared run,
+      a fresh overlay forced per test with `levels.add_xp` +
+      `_open_level_up()`): cards registered side by side, hover selects
+      without picking, one click applies that upgrade and pops, a click
+      without a prior hover picks that card, release on another card inert,
+      click in the gap inert, the run comes back disarmed with no tap
+      queued, the keyboard still picks. Level-up + smoke: 9 green.
+
+#### E · Developer menu — done 2026-09-04
+- [x] `game/states/dev_menu_state.py`: `draw` registers the visible
+      window's rows (`self.scroll .. self.scroll + window`) keyed by their
+      **absolute index** -- the sub-pages hold ids / tuples, not row names,
+      so the index is the one key that works on every page. Hover sets
+      `sel`; a click goes through the new `_activate_selected()`, which is
+      also what ENTER / SPACE now call (one dispatcher per page: `_activate`
+      / `_spawn` / `_grant` / `_give_item`). ESC, `` ` `` and **right click**
+      share `_back()` (sub-page → root, root → close).
+- [x] Wheel: `_scroll_by(-event.y)` moves the window and then pulls the
+      selection *inside* it -- the reverse of the keyboard rule, where the
+      window follows the selection (`_clamp_scroll`). Clamped to
+      `[0, n - window]`.
+- [x] Tests (`tests/core/test_dev_mode.py — DevMenuMouseTests`, +8): only
+      the visible window is registered; hover selects and a click toggles a
+      root row; a click opens a sub-page and its rows work (spawns an
+      enemy, page stays open); the wheel scrolls, clamps both ways and keeps
+      the selection visible; a click on the "N more" markers is inert; right
+      click backs out then closes; a click off the rows is inert; the
+      keyboard paths are unchanged. Note for anyone reusing these: the root
+      page shows 12 rows and "items" is row 12, so a test must scroll it
+      into view (`sel` + `_clamp_scroll` + redraw) before clicking it.
+
+#### F · Docs — done 2026-09-04
+- [x] `README.md` controls table: the left-click row now says "in a run";
+      a **Mouse (menus)** row covers hover / click on every menu, the wheel
+      and right click on the dev menu, and the two-click hero card / Begin
+      button; the level-up row says "(or click the card)".
+- [x] Module docstrings: `menu_state`, `character_select_state`,
+      `paused_state`, `level_up_state`, `dev_menu_state` and `ui/level_up`
+      each carry their mouse line (added as each was touched); `ui/mouse.py`
+      documents the helper and the release-to-activate rule.
+- [x] Verification: see below.
+
+### Verification
+
+- Per group: mouse + menu + smoke 54 (A) → 63 (B); pause 19 (C); level-up +
+  smoke 9 (D); dev-menu mouse 8 (E). Wider regressions along the way:
+  `tests/core` + `tests/rendering` 404 (after A); `tests/core` +
+  `tests/rendering` + `tests/combat` 590 (after C).
+- Final full default suite: **1181 passed, 1 skipped**, exit 0 (7:52). A
+  first run that overlapped the UI asset rename had ended 1 failed / 1180
+  passed with the name not captured; the clean re-run settles it.
+- Not verifiable headless: the arrow cursor at 1x in a real window (the
+  dummy driver refuses surface cursors), and the feel of hover-select. Both
+  are one config value / one look away.
+
+### Not in scope (a later entry if wanted)
+
+Options, Rankings, the Sanctuary, the run-summary screens (game over /
+victory) and the loading screen are keyboard-only after this; they follow
+the same recipe and would be group G. The volume bar in Options would be
+the one screen that wants *drag* (set volume from the click x), which the
+helper above does not need for anything in scope, so it is left out on
+purpose.
+
+### Decisions (owner, 2026-09-04)
+
+1. Hero card: **both** -- two clicks on a card begins, *and* a **Begin**
+   button below the difficulty line. The control instructions move further
+   down to make room. Difficulty selection stays as it is. *(Reversed later
+   the same day: the difficulty ribbon became a click-to-step switch -- see
+   "Clickable difficulty ribbon".)*
+2. Level-up: **one click picks.**
+3. Cursor: the arrow in `assets/ui/pointers/01.png` becomes the hardware
+   cursor, everywhere, and **nothing else changes** -- the bracket pieces
+   stay unused for now.
+
+## UI asset rename (2026-09-04)
+
+**Status:** DONE. The owner asked for every file under `assets/ui/` to carry a
+lowercase, simple name that says what the picture is. 91 files renamed; the
+four `start_screen/` files already did and were left alone. Only the banners
+and pointers were git-tracked (`git mv`); the buttons, icons and ribbons had
+never been committed and were renamed on disk. Every reference moved with
+the files (`data/ui_sprites.json`, `config.UI_CURSOR_IMAGE`, two tests) and
+a sweep over `game/`, `ui/`, `data/`, `tests/` and the README found no
+stale name. Menu + mouse + smoke suites: 63 green afterwards.
+
+The pack (Tiny Swords UI) is authored on a **64-px tile grid**: singles are
+`64x64`, the 3-slice strips `192x64` (three tiles: cap, middle, cap), the
+9-slice sheets `192x192` (3x3 tiles). "Pressed" variants are the same art
+shifted 4 px down with the top bevel removed -- the press offset is baked
+into the picture, so a pressed button just swaps the image.
+
+| Folder | Old → new | Notes |
+|---|---|---|
+| `icons/` | `Regular_NN` → `<symbol>`, `Pressed_NN` → `<symbol>_pressed`, `Disable_NN` → `<symbol>_disabled` | symbols by number: 01 `close` (x), 02 `settings` (gear), 03 `sound` (speaker), 04–06 `one` / `two` / `three`, 07 `cart`, 08 `plus`, 09 `minus`, 10 `unlock` (open padlock) |
+| `buttons/` | `Button_<Colour>[_3Slides\|_9Slides][_Pressed]` → `<colour>[_wide\|_panel][_pressed]` | colours by look: `Blue` → `blue` (teal), `Red` → `red`, `Hover` → `gold`, `Disable` → `grey`. `_wide` = the 192x64 3-slice strip, `_panel` = the 192x192 9-slice. Only blue and red have pressed art |
+| `ribbons/` | `Ribbon_<Colour>_3Slides` → `<colour>_ribbon`; `Ribbon_<Colour>_Connection_<Dir>[_Pressed]` → `<colour>_tab_<dir>[_pressed]` | `blue`, `red`, `yellow`. The ribbon is the forked banner strip; a tab is the 64x64 connector piece whose named side joins a panel |
+| `banners/` | `banner_connection_<left\|right\|up\|down>` → `scroll_<left\|right\|top\|bottom>`; `banner_horizontal` / `_vertical` / `_middle` → `scroll_horizontal` / `scroll_vertical` / `scroll_middle`; `carved_regular` / `_3slides` / `_9slides` → `parchment` / `parchment_wide` / `parchment_panel` | they are parchment scrolls -- the direction names where the roll is. `scroll_left` + `scroll_middle` + `scroll_right` is the start-menu panel (`ui_sprites.json`) |
+| `pointers/` | `01` → `arrow`, `02` → `frame`, `03`–`06` → `corner_top_left`, `corner_top_right`, `corner_bottom_left`, `corner_bottom_right` | `arrow` is the hardware cursor (`config.UI_CURSOR_IMAGE`); the rest stay unused |
+
+---
+
+## Planned -- Buttons and ribbons as real UI art (2026-09-04)
+
+**Status:** **DONE** 2026-09-04 (groups A–G shipped the same day). Not
+committed. Verification at the end of this entry.
+
+### Goal
+
+Use the pack's **buttons** for the character select's Begin button, the
+hero cards, the level-up / blessing cards and -- added by the owner -- the
+**start-menu and pause rows**, and its **ribbons** for the difficulty line
+-- replacing the flat rounded rectangles and bare text those screens draw
+today. Selection, hover and the two-click arming become *pictures* (a
+different button state) instead of a border colour.
+
+### Where things stand
+
+- Every one of those elements is a `pygame.draw.rect` pair (fill + border,
+  `border_radius`) with text blitted over it: the hero cards
+  (`character_select_state.py`, `340x340`), the Begin button (`220x40`),
+  the level-up cards (`ui/level_up.py`, `340x200`), and the difficulty line
+  is bare text. Their *hit rects* are already registered with the mouse
+  helper, so the art only changes what is painted inside them.
+- `ui/panels.py — three_slice_h` composes a bar from three **separate rig
+  images** (cap, mid, cap) and caches per size. The buttons and ribbons are
+  single sheets on the 64-px grid, so they need a slicer that cuts one
+  image, not a compositor of three.
+- The pack has three button looks that map onto the states these screens
+  already have: `blue` = normal, `gold` (the pack's "Hover") = highlighted,
+  `blue_pressed` = pressed / armed; `grey` = disabled (no use yet); `red` =
+  destructive (Quit, later). Ribbons come in `blue` / `yellow` / `red` --
+  exactly one per difficulty (`Normal` / `Fast` / `Super Fast`).
+
+### Design
+
+**One slicer, `ui/panels.py — slice(surface, size, *, tile=64)`.** Cuts a
+sheet on its tile grid and rebuilds it at `size`: a `192x64` sheet becomes a
+3-slice (caps kept, middle stretched), a `192x192` sheet a 9-slice (corners
+kept, edges stretched one way, centre both). Cached per `(sheet, size)` like
+the panels today. When the target is *smaller* than two tiles in a
+dimension (a 40-px-tall button from 64-px tiles) the whole sheet is scaled
+first so the caps fit, then sliced -- so the Begin button can stay 40 px
+tall, or grow to the native 64 (recommended: the art is drawn for it).
+
+**Rigs in `data/ui_sprites.json`**, one per sheet, so the code never names
+a file: `btn_blue_wide`, `btn_gold_wide`, `btn_blue_wide_pressed`,
+`btn_blue_panel`, `btn_gold_panel`, `btn_blue_panel_pressed`,
+`ribbon_blue`, `ribbon_yellow`, `ribbon_red`. A small `ui/widgets.py`
+(one module per concern) draws a **button** -- `draw_button(surface, assets,
+rect, label, state)` with `state` in `normal / hover / pressed` picking the
+sheet -- and a **ribbon** -- `draw_ribbon(surface, assets, rect, label,
+colour)`. Labels sit 4 px lower in the pressed state to follow the baked
+offset. A missing sheet falls back to today's rounded rectangle (the same
+degrade contract as everything in `game.assets`).
+
+**State mapping per element:**
+
+| Element | normal | highlighted (hover / keyboard focus) | pressed |
+|---|---|---|---|
+| Begin button | `blue_wide` | `gold_wide` | `blue_wide_pressed` while the left button is down on it |
+| Hero card | `blue_panel` | `gold_panel` when it is the selected hero | `blue_panel_pressed` while **armed** (after the first click) -- the card visibly sinks, telling the player the next click begins |
+| Level-up card | `blue_panel` | `gold_panel` for the selected card | `blue_panel_pressed` while the button is down on it |
+| Difficulty | `ribbon_blue` for Normal, `ribbon_yellow` for Fast, `ribbon_red` for Super Fast, the label on the ribbon | -- (keyboard only; no hover) | -- |
+
+Pressed feedback needs to know the button is *down*: `MouseNav` gains a
+`pressed_on` read-only view of the key the current press landed on, so a
+screen can paint that element pressed. No other behaviour changes -- picks
+still happen on the release.
+
+**Card content stays where it is.** The 9-slice panel has a 64-px frame;
+the text layouts already start 16 px in, which sits inside the flat centre
+of the art. The hero-card preview, trait text and level-up description are
+untouched.
+
+### Todo
+
+#### A · Slicer + rigs + widgets — done 2026-09-04
+- [x] `ui/panels.py — slice(assets, rig, size, tile=64)`: reads the sheet's
+      grid (3 tiles on an axis → sliced, 1 → plainly scaled), pre-scales the
+      whole sheet by one factor when a target is under what the caps need
+      (two tiles on a sliced axis, one on a plain axis), then copies caps /
+      corners 1:1 and stretches the rest. Nearest-neighbour throughout;
+      cached per `(rig, size, tile)`; `None` for a missing rig or a
+      non-positive size. Tests (`SliceTests`, +7): cap pixels of a 500-wide
+      strip equal the sheet's; the four corners of a 340 panel equal the
+      sheet's; a 40-px-tall strip scales its caps to 40 (checked against a
+      hand-scaled reference); a single tile scales plainly; missing / bad
+      size → None; cache identity; every declared UI rig slices.
+- [x] `data/ui_sprites.json`: eleven rigs -- `btn_{blue,red}_wide[_pressed]`,
+      `btn_gold_wide`, `btn_blue_panel[_pressed]`, `btn_gold_panel`,
+      `ribbon_{blue,yellow,red}` (full frames; the transparent margins are
+      part of the look and the pressed offset is baked in).
+- [x] `ui/widgets.py`: `draw_button(surface, assets, rect, label, state,
+      shape, variant, font)` with `BUTTON_SHEETS[(shape, variant)][state]`
+      (gold has no pressed art, so a pressed button always shows its base
+      colour's pressed sheet), `PRESSED_DY = 4` on the label, and the flat
+      rounded-rect fallback; `draw_ribbon(..., colour)`. Both return the
+      label rect. Tests (`test_widgets.py`, +11): state / shape / variant →
+      sheet, unknown state / colour refused, pressed label 4 px lower, no
+      label still paints, fallback paints, the art lands pixel-exact.
+- [x] `ui/mouse.py — MouseNav.pressed_on` (read-only; None when up or when
+      the press missed every rect). Test: tracks a press through motion to
+      the release.
+
+#### B · Begin button — done 2026-09-04
+- [x] `character_select_state.py`: `256x64` (four tiles, native height;
+      `_BEGIN_GAP = 18`, `_INSTR_GAP = 22` keep the instructions and hint on
+      screen), drawn with `widgets.draw_button(..., shape="wide")`.
+      `_button_state(key)`: `pressed` while `MouseNav.pressed_on == key`,
+      `hover` while `MouseNav.hover == key`, else `normal`. "Hover when
+      ENTER would fire it" was dropped: ENTER *always* fires Begin here, so
+      it would have been permanently gold -- the cursor alone highlights it.
+- [x] `ui/mouse.py — MouseNav.hover`: the key under the cursor as of the
+      last motion, `None` off every rect (the `("hover", key)` event cannot
+      report the cursor *leaving*; this can). Test added.
+- [x] Tests (`tests/rendering/test_menu.py — BeginButtonArtTests`, +4): the
+      art rect is 64 tall, `wide`, and identical to the registered hit
+      rect; normal → hover → pressed → (dragged off, still pressed) →
+      released off: no start, normal again; the layout still fits; a cap
+      pixel of the drawn button equals the sheet's. Menu + mouse + widgets
+      + smoke: 79 green.
+
+#### C · Hero cards — done 2026-09-04
+- [x] `character_select_state.py`: each card is `draw_button(rect, None,
+      shape="panel")` with `_card_state(i)`: `pressed` while armed
+      (`_armed_hero == i`) **or** while the button is held on it
+      (`pressed_on == ("hero", i)`), `hover` (gold) for the selected hero,
+      else `normal`. Hover selects, so a hovered card *is* the selected one
+      and needs no state of its own. The fill + border-colour focus ring is
+      gone. Name and rows shift `PRESSED_DY` (4 px) with the sunk art.
+- [x] Tests (`tests/rendering/test_menu.py — HeroCardArtTests`, +6):
+      selected gold / rest blue, and it follows the keyboard; the first
+      click sinks the card and moving away lifts it; the keyboard never
+      sinks a card; a held button sinks the card under it and a release off
+      it arms nothing; the armed card's name blits 4 px lower (found by its
+      rendered size and card-centred x -- `Surface.blit` and `Font.render`
+      are C attributes and cannot be patched); a corner pixel of the
+      selected card equals the gold sheet's. Menu + smoke: 60 green.
+
+#### D · Level-up cards — done 2026-09-04
+- [x] `ui/level_up.py — LevelUpPanel.draw(surface, choices, selected, *,
+      assets=None, pressed=None)`: each card is `draw_button(rect, None,
+      shape="panel")` -- `pressed` for the card the button is held on,
+      `hover` (gold) for the selected card, else blue; badge, title,
+      description and tags shift `PRESSED_DY` with the sunk art. Without
+      `assets` the flat cards of old are drawn (the panel is built standalone
+      in places), so `widgets.draw_button` / `draw_ribbon` gained an
+      `assets is None → fallback` guard. `LevelUpState.draw` passes
+      `game.assets` and `MouseNav.pressed_on`.
+- [x] Tests (`tests/rendering/test_level_up.py — LevelUpCardArtTests`, +4):
+      selected gold / rest blue and it follows hover with exactly one gold
+      card; a held button presses the card under it without picking, and a
+      release off it presses nothing; a panel with no assets falls back and
+      still registers the cards; a corner pixel of the selected card equals
+      the gold sheet's. Level-up + widgets + smoke: 24 green.
+
+#### E · Difficulty ribbon — done 2026-09-04
+- [x] `config.DIFFICULTY_RIBBON = {normal: blue, fast: yellow, super_fast:
+      red}` beside the labels. `character_select_state.py` draws
+      "Difficulty:  <label>" with `widgets.draw_ribbon` on a `64`-tall strip
+      at least `320` wide, or the text plus one cap tile (64) each side so
+      the forked ends stay clear of the letters, centred where the bare
+      text sat (`diff_y`). No hit rect: Up / Down only. `_BEGIN_GAP` grew
+      to 40 so the Begin button clears the ribbon's bottom; `_INSTR_GAP`
+      shrank to 18 so the hint still fits. `cs._layout["ribbon"]` exposed.
+- [x] Tests (`tests/rendering/test_menu.py — DifficultyRibbonTests`, +5):
+      the config map covers every difficulty with a pack colour in that
+      order; colour and label follow Up / Down through all three; geometry
+      (64 tall, centred on `diff_y` and the screen, above Begin, wider than
+      text + 128, hint fits); the ribbon takes no mouse; a cap pixel equals
+      the blue sheet's. Menu + smoke: 65 green.
+
+#### F · Start-menu and pause rows as buttons — done 2026-09-04
+- [x] `menu_state.py`: one `wide` button per option, **64 px tall** on a
+      72-px step from `y = 550`, inset 60 px from the parchment panel's
+      edges (the last row ends at 870, inside the 890 panel bottom); the
+      selected row is gold (that *is* the cursor -- the `>` marker and the
+      dim / bright text colours are gone, labels are `COLOR_TEXT` on every
+      sheet), a held row is sunk, and **Exit is on the red sheet** (a
+      leaving action, like Quit). The button rect is the registered hit
+      rect. The long-commented nav hint was deleted.
+- [x] `paused_state.py`: the three rows the same way (`560x64`, step 72);
+      the button is drawn without a label, the label blitted on its left
+      half and the Key layout value on its right half, both shifting with a
+      sunk row; **Quit to menu on red**. The hint sits 30 px under the last
+      button.
+- [x] Options keeps text rows (not in this plan).
+- [x] Tests: `tests/rendering/test_menu.py — MenuButtonArtTests` (+4: one
+      native button per row with a gap, inside the panel, hit rect == art
+      rect, labels in order; selected gold and it follows the keyboard; a
+      held row sinks and Exit is `danger`; a cap pixel equals the blue
+      sheet's); `tests/rendering/test_pause.py — PauseButtonArtTests` (+3:
+      native buttons matching the hit rects; selected gold / Quit red /
+      held sinks; the layout value is blitted inside the row's right half).
+      Menu + pause + smoke + dev-exit path: 92 green.
+
+#### G · Docs — done 2026-09-04
+- [x] `documentation/sprite_functionality.md`: "The UI sheets: buttons,
+      ribbons and the slicer" -- the 64-px grid and which sheet is cut how,
+      the baked 4-px press, the slicer's four rules, the state → sheet
+      table, who draws what per screen, the mouse side, and the tests.
+- [x] Verification: below.
+
+### Decisions (owner, 2026-09-04)
+
+1. **Begin button at the native 64 px** (`_BEGIN_H = 64`; the gaps around
+   it grow by the same 24 px so the instructions and hint still fit).
+2. **Difficulty ribbons blue / yellow / red** for Normal / Fast / Super
+   Fast.
+3. **Start-menu and pause rows become buttons too** (group F above).
+4. **The armed hero card sinks** (pressed art after the first click) --
+   chosen over the caption alternative.
+
+### Verification
+
+- Per group: panels + widgets + mouse + menu 83 (A); menu + mouse + widgets
+  + smoke 79 (B); menu + smoke 60 (C); level-up + widgets + smoke 24 (D);
+  menu + smoke 65 (E); menu + pause + smoke + dev-exit 92 (F).
+- Final full default suite: **1226 passed, 1 skipped, 7 deselected, 13 warnings, 53 subtests passed in 476.41s (0:07:56)**, exit 0.
+- Not verifiable headless: how the art reads at 1x in a real window (cap
+  bevels, the sunk card, the ribbon's forked ends against the text). The
+  sizes are module constants on each screen.
+
+### Design note kept for the record
+
+- **Armed hero card = pressed art.** The pack's pressed sheet is the same
+  button drawn 4 px lower with its top bevel gone -- it reads as a key held
+  down. The proposal draws the *armed* card (after the first click) with
+  that sheet, text shifted 4 px along, so "click again to begin" is visible
+  as the card sitting pushed in; hovering or arrowing away pops it back up
+  to blue / gold; the keyboard never arms, so ENTER never sinks a card.
+  Alternative if the sink reads wrong on a 340-px card: keep the armed card
+  gold and add a one-line "click again to begin" caption under its name.
+
+## Planned -- Title font and button-text contrast (2026-09-04)
+
+**Status:** **DONE** 2026-09-04 (groups A–G shipped the same day). Not
+committed. Verification at the end of the todo.
+
+### What the owner asked for
+
+- `assets/fonts/NunitoSans-VariableFont_YTLC,opsz,wdth,wght.ttf` is new and
+  is the **title** face. Fredoka stays for everything else.
+- Text on the new buttons must be **black** -- the sheets are light and
+  the old light-on-dark palette has no contrast on them.
+- **Start menu:** the row text sits slightly below the middle of its
+  button -- raise it 5–10 px; make it black.
+- **Character select:** hero names, the trait name, the "Difficulty:"
+  *label* (not the type) and the Begin text in NunitoSans; titles black,
+  the rest of the card text a slightly darker grey.
+- **Pause:** same as the start menu -- raise the text, make it black.
+
+### Where things stand
+
+- `game/fonts.py` has one bundled face (Fredoka) behind three roles:
+  `heading()` (titles, bold), `body()`, `mono()`. Every title in the game
+  already asks for `heading()` -- screen titles, hero names, card titles,
+  the Begin label, "Paused". So NunitoSans-for-titles is a second bundled
+  face bound to that role; nothing per screen. The two character-select
+  lines that are *not* titles today (the trait name is a `body()` line,
+  "Difficulty:" shares one `heading()` render with the type) are the only
+  per-screen font work.
+- The low text is the art: a wide button's ink is `56` px tall in its
+  `64` px frame (8 transparent px at the bottom), so the rect centre sits
+  4 px under the visual centre, and `draw_button` centres the label on the
+  rect. One offset in `draw_button` raises every button label -- start
+  menu, pause, Begin -- and the pause screen's hand-blitted labels take the
+  same constant.
+- Colours today: `COLOR_TEXT (230,230,238)`, `COLOR_TEXT_DIM (150,150,165)`
+  -- light, for the dark background. Text on the light sheets needs its own
+  pair.
+
+### Design
+
+- **Fonts.** `_FILES["title"] = "NunitoSans-…ttf"`; `heading()` loads the
+  `title` role (SysFont fallback unchanged); `body()` / `mono()` untouched.
+  A variable font renders at its default instance in pygame, as Fredoka
+  does; bold stays the synthetic `set_bold`.
+- **Colours.** `config.COLOR_ON_BUTTON = (0, 0, 0)` and
+  `COLOR_ON_BUTTON_DIM = (60, 62, 72)` (the "slightly darker grey" -- a
+  proposal, one number to retune in the real window). `draw_button` and
+  `draw_ribbon` default their label colour to `COLOR_ON_BUTTON`; the
+  screens stop passing `COLOR_TEXT`.
+- **Label placement.** `widgets.LABEL_DY = -6`: labels centre on
+  `rect.centery + LABEL_DY` (the 4-px ink offset plus a 2-px optical
+  nudge, inside the owner's 5–10 range; retune there). Pressed adds its
+  `PRESSED_DY` on top as now.
+- **Character select.** Hero name: `heading()` (→ NunitoSans), black.
+  Trait line: the whole "Trait - <name>" in a smaller `heading()`
+  (NunitoSans), black. Identity, trait description, "Starts with": `body()`
+  in `COLOR_ON_BUTTON_DIM`. Difficulty: two runs on the ribbon --
+  "Difficulty:" in `heading()` black, the type in `body()` dark grey --
+  centred together (`draw_ribbon` with `label=None`, the state blits the
+  pair). Begin: `heading()` → NunitoSans, black via the default.
+- **Level-up cards** get the same treatment (owner): the name in
+  NunitoSans black, description / badge / tags dark grey, and the card 15
+  px taller downwards so the bottom text clears the bevel.
+- **Not touched:** the HUD, the run-summary screens, Options, the
+  Sanctuary, the dev menu -- all still draw on the dark background with the
+  light palette. The pause title "Paused" and "Choose your hero" become
+  NunitoSans through `heading()` and keep their accent colour.
+
+### Todo
+
+#### A · Title font — done 2026-09-04
+- [x] `game/fonts.py`: `_FILES["title"]` = the NunitoSans variable font,
+      `_SYS_FALLBACK["title"] = "georgia"`; `heading()` loads the `title`
+      role; `body()` / `mono()` untouched. Module docstring names the two
+      faces and their roles.
+- [x] Tests (`tests/rendering/test_fonts.py`): both bundled files present;
+      `heading()` sets a probe string at a different width than `body()`
+      and at exactly the width of the Nunito file loaded directly; a
+      missing title file degrades to SysFont without raising. Fonts +
+      widgets + menu + pause + level-up + smoke: 121 green.
+
+#### B · Contrast pair + label offset — done 2026-09-04
+- [x] `config.py`: `COLOR_ON_BUTTON = (28, 28, 34)` (was `(0, 0, 0)`; the
+      owner asked for a shade clearer than pure black after seeing it),
+      `COLOR_ON_BUTTON_DIM = (60, 62, 72)` beside `COLOR_ACCENT`, with the note that the light
+      `COLOR_TEXT` pair is for the dark background only.
+- [x] `ui/widgets.py`: `LABEL_DY = -6`; `draw_button` centres its label on
+      `rect.centery + LABEL_DY (+ PRESSED_DY when pressed)` and defaults
+      `text_colour` to `COLOR_ON_BUTTON`; `draw_ribbon` defaults to black
+      too but takes **no lift** -- the ribbon ink fills its frame (no
+      bottom gap), so its label was never low. Every existing caller that
+      passed `COLOR_TEXT` explicitly still overrides (groups C–F remove
+      those).
+- [x] Tests (`tests/rendering/test_widgets.py`, +3): the label rect is
+      `LABEL_DY` above the rect centre and the constant is within the
+      owner's 5..10 px; a black glyph pixel exists inside a default label;
+      the ribbon label is black and centred. Widgets + menu + pause +
+      level-up: 116 green.
+
+#### C · Start menu — done 2026-09-04
+- [x] `menu_state.py`: the explicit `text_colour=COLOR_TEXT` is gone; the
+      rows take the black default and the `LABEL_DY` lift from B. Nothing
+      else changed.
+- [x] Test (`MenuButtonArtTests.test_labels_are_black_and_lifted`): no row
+      passes a colour, every returned label rect sits `LABEL_DY` above its
+      button's centre, and a black glyph pixel exists on the selected
+      (gold) row. Menu suite: 69 green.
+
+#### D · Character select — done 2026-09-04
+- [x] `character_select_state.py`: two new fonts -- `_trait =
+      heading(20)` (title face for the trait line) and `_diff_type =
+      body(26)` (the difficulty type). Hero name and the "Trait - <name>"
+      line in `COLOR_ON_BUTTON`; identity, trait description and "Starts
+      with" in `COLOR_ON_BUTTON_DIM`.
+- [x] Difficulty: `draw_ribbon(..., label=None)` and the state blits two
+      runs -- "Difficulty:  " in `_name` black, the type in `_diff_type`
+      dark grey -- adjacent and centred as a pair on the ribbon; the ribbon
+      width now comes from the pair. `cs._layout["diff_runs"]` exposes the
+      two rects.
+- [x] Begin passes no colour and is black via the default (from B).
+- [x] Later the same day: the pair is lifted **5 px** off the ribbon's centre
+      (`_RIBBON_TEXT_DY = -5`, an optical nudge -- the ribbon ink fills its
+      frame, so unlike the buttons there is no baked offset to correct);
+      the ribbon and everything below it stay put. Pinned by
+      `test_difficulty_pair_is_lifted_off_the_ribbon_centre`. The owner then
+      retuned in the real window: `_RIBBON_TEXT_DY = -10` and `_BEGIN_GAP =
+      5`, which tucks the Begin button 27 px under the ribbon's lower edge
+      on purpose -- the stacking test now pins order, not non-overlap.
+- [x] Later still: the **Begin label alone** rises another 10 px
+      (`_BEGIN_TEXT_DY = 10`, passed as `label_dy=LABEL_DY - 10` to a new
+      per-call override on `widgets.draw_button`; the shared `LABEL_DY` and
+      every other button are untouched, the press shift still adds on top).
+      Pinned in `test_widgets.py` and `BeginButtonArtTests`.
+- [x] Tests (`CharacterSelectTextTests`, +5; two ribbon tests reworked for
+      the pair): the fonts per run compared by rendered size against
+      `heading()` / `body()`; black in the name band and dark grey in the
+      rows band of an unselected card, with **no** `COLOR_TEXT` /
+      `COLOR_TEXT_DIM` pixel left on the card; the pair is adjacent,
+      centred on the ribbon within 1 px and inside it, the label in the
+      title face; the pair's colours; Begin's label black. Menu + smoke:
+      75 green.
+
+#### E · Pause — done 2026-09-04
+- [x] `paused_state.py`: the row label in `COLOR_ON_BUTTON`, the Key
+      layout value in `COLOR_ON_BUTTON_DIM`, both centred on
+      `rect.centery + LABEL_DY (+ PRESSED_DY when sunk)` -- the hand-blitted
+      twin of what `draw_button` does for its own labels.
+- [x] Tests (`tests/rendering/test_pause.py — PauseTextTests`, +2): black
+      in the label half and dark grey in the value half of the Key layout
+      row, black on the gold row, no `COLOR_TEXT` pixel on any row; every
+      label and the value blit `LABEL_DY` above its row's centre (blits
+      recorded through a `Surface` subclass). Pause + smoke: 25 green.
+
+#### F · Level-up cards — done 2026-09-04
+- [x] `ui/level_up.py`: the name in `COLOR_ON_BUTTON` (already a
+      `heading()` render, so the title face follows A); badge, description
+      and tags in `COLOR_ON_BUTTON_DIM` (the tags' one-off `(120, 130, 160)`
+      is gone).
+- [x] `_CARD_H = 215`, `_CARD_TOP_H = 200`: the card is 15 px taller and
+      the top edge still centres as the 200-tall card did, so all of the
+      growth is at the bottom; the tag line is anchored to the bottom and
+      follows, the hint moves with `card_h`.
+- [x] Tests (`tests/rendering/test_level_up.py — LevelUpTextTests`, +3):
+      every card is 215 tall with its top at `h // 2 - 100`; the title font
+      matches `heading(24)` and not `body(24)`; black in the title band,
+      dark grey in the description band, and no `COLOR_TEXT` /
+      `COLOR_TEXT_DIM` / old-tag-colour pixel left on a card. Level-up +
+      smoke: 16 green.
+
+#### G · Docs + close-out — done 2026-09-04
+- [x] `game/fonts.py` docstring names the two faces and their roles (A);
+      `sprite_functionality.md` gained "Text on the sheets" under the
+      UI-sheets section -- roles, the contrast pair and where each colour
+      goes, `LABEL_DY` and why, the ribbon's no-lift.
+- [x] Verification: below.
+
+### Verification
+
+- Per group: fonts + widgets + all screens 121 (A); widgets + screens 116
+  (B); menu 69 (C); menu + smoke 75 (D); pause + smoke 25 (E); level-up +
+  smoke 16 (F).
+- Final full default suite: **1243 passed, 1 skipped, 7 deselected, 13 warnings, 53 subtests passed in 562.88s (0:09:22)**, exit 0 (a first attempt died
+  with pytest exit 4 before collecting; the re-run is the record).
+- Not verifiable headless: how NunitoSans reads at each size, whether
+  `(60, 62, 72)` is the right grey, and whether `LABEL_DY = -6` lands the
+  labels where the eye wants them. Each is one constant.
+
+### Decisions (owner, 2026-09-04)
+
+1. **Try `(60, 62, 72)`** for the darker grey; judged later in a real
+   window.
+2. **Level-up cards get the same treatment** (group F): the item /
+   blessing name in NunitoSans as a title, black; the text in the dark grey.
+3. **`heading()` → NunitoSans everywhere** it is used: every screen title,
+   the summary screens, "Paused", "Level Up" -- all titles change face.
+
+## Pixel-measured card text wrap (2026-09-04)
+
+The hero-card body (identity, trait description) and the level-up card
+description wrapped by **character count** -- 34 and 30 characters -- which
+only approximated the 340-px cards: a line of wide glyphs could run past the
+9-slice frame, a line of narrow ones stopped short. Both copies of that
+helper are gone; `ui/text.py — wrap(font, text, max_width)` measures each
+candidate line with `Font.size` and breaks greedily by word, so a line
+always fits `card_w - 2 * _CARD_TEXT_INSET` (16 px each side) in the font
+that draws it. A single overlong word gets its own line; there is still no
+vertical clamp (Kestrel's nine lines end 82 px above the card bottom).
+
+Tests: `tests/rendering/test_text.py` (every line fits and the wrap is
+greedy, wide glyphs wrap sooner than narrow ones, an overlong word, empty /
+single-word input); `test_menu.py — CardTextFitsTests` records every blit on
+each hero card and checks no body line is wider than the inset.
+
+Alongside, the character-select layout pins were loosened to what matters
+after the owner's live tuning of `_BEGIN_GAP` / `_BEGIN_TEXT_DY` in the real
+window: the Begin label is pinned to *use* `_BEGIN_TEXT_DY` (not to a value),
+and the fit checks now assert the hint's bottom (`cs._layout["hint_bottom"]`)
+stays on screen instead of a fixed 40-px margin under the instructions.
+Menu + text + level-up + smoke: 97 green.
+
+## Planned -- Clickable difficulty ribbon (2026-09-04)
+
+**Status:** DONE 2026-09-04.
+
+The owner reversed the earlier "difficulty stays keyboard-only" decision:
+the ribbon on the hero select becomes a **switch** -- one click advances
+the difficulty (Normal → Fast → Super Fast), the same step the Down key
+takes, and after Super Fast it wraps to Normal exactly as Down does. Up /
+Down keep working. The ribbon has no hover / pressed art (the pack ships
+only the three colours), so the feedback is the colour and label changing
+on the click.
+
+### Changes
+
+- [x] `character_select_state.py — draw`: the ribbon rect is registered as
+      `"difficulty"` right after it is positioned.
+- [x] `_step_difficulty(delta)` now serves Up (`-1`), Down (`+1`) and the
+      ribbon click (`+1`), wrapping at both ends. Hover on the ribbon changes
+      nothing; press-on / release-off is inert as everywhere.
+- [x] Hint: "Up / Down or click difficulty"; docstring updated.
+- [x] Tests (`test_menu.py`): `test_difficulty_ribbon_is_a_switch` (hover
+      inert, three clicks walk Fast → Super Fast → Normal),
+      `test_ribbon_is_registered_and_a_click_recolours_it` (hit rect == the
+      drawn ribbon; the next draw uses the next colour),
+      `test_press_on_the_ribbon_released_elsewhere_is_inert`,
+      `test_keys_still_cycle_both_ways` (Up wraps to Super Fast).
+- [x] Docs: README difficulty row; `sprite_functionality.md` "Who draws
+      what" row; and the mouse-support entry's decision 1 carries a note
+      below.

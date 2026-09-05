@@ -29,6 +29,7 @@ from entities.hazard import Hazard
 from entities.melee_hitbox import MeleeHitbox
 from combat.weapons import Weapon, FireContext
 from progression.experience import LevelTracker, xp_for_level
+from game.states.playing.aim import AimInput, read_aim
 from progression.upgrades import roll_choices
 from progression.blessings import BlessingLibrary, roll_blessing_choices, rebuild as rebuild_blessings
 from progression.items import Item, generate_item
@@ -87,6 +88,16 @@ class PlayingState(State):
         self._dev_hp_floor = 0.0
         self._dev_show_colliders = False  # F7 / dev menu: true collider overlay
         self._dev_show_spawn_points = False  # F8 / dev menu: generated spawn points
+        self._dev_show_aim = False           # dev menu: CB-5 manual-aim line
+        # CB-5 manual aim. `auto_attack` is the `Q` toggle; `_aim` is this
+        # frame's `AimInput` (see aim.py); `_tap_pending` is a queued left
+        # click that the combat phase consumes when a weapon fires from it.
+        self.auto_attack = config.AUTO_ATTACK_DEFAULT
+        self._aim = AimInput.none()
+        self._tap_pending = False
+        # Mouse-in-menus: a held button is ignored from the moment an overlay
+        # covers the run until it has been released once (`_suspend_mouse`).
+        self._mouse_armed = True
         self.run_seed = seed if seed is not None else random.randrange(1 << 30)
         self.rng = random.Random(self.run_seed)
 
@@ -235,16 +246,32 @@ class PlayingState(State):
 
     # --- events -------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                self._tap_pending = True      # one click-attack, consumed on fire
+            return
         if event.type != pygame.KEYDOWN:
             return
-        if event.key == pygame.K_ESCAPE:
+        if event.key == config.KEY_TOGGLE_AUTO_ATTACK:
+            self.auto_attack = not self.auto_attack
+            log.info("auto attack %s", "on" if self.auto_attack else "off")
+        elif event.key == pygame.K_ESCAPE:
             from game.states.paused_state import PausedState
+            self._suspend_mouse()
             self.game.state_machine.push(PausedState(self.game))
         elif event.key == pygame.K_e:
             self.locations.activate_nearby()
         elif event.key == pygame.K_BACKQUOTE and self.dev_mode:
             from game.states.dev_menu_state import DevMenuState
+            self._suspend_mouse()
             self.game.state_machine.push(DevMenuState(self.game), playing=self)
+
+    def _suspend_mouse(self) -> None:
+        """An overlay is about to cover the run: forget any queued tap and
+        ignore the button until it has been up for a frame, so the click that
+        closes the overlay cannot land as an attack."""
+        self._tap_pending = False
+        self._mouse_armed = False
 
     def handle_debug_key(self, key: int) -> bool:
         keys = config.DEBUG_KEYS
@@ -352,9 +379,26 @@ class PlayingState(State):
         self._hero_anim.update(dt)
 
     def _phase_input(self) -> None:
-        self.player.handle_input(pygame.key.get_pressed())
+        pressed = pygame.key.get_pressed()
+        keys = self.game.keys
+        self.player.handle_input(pressed, keys["move"])
         if self.player._move_dir.length_squared() > 0:
             self._last_move_dir = self.player._move_dir.copy()
+        buttons = pygame.mouse.get_pressed()
+        if not self._mouse_armed and not any(buttons):
+            self._mouse_armed = True          # released once since the overlay
+        # CB-5: this frame's manual aim, if any. It faces the hero; the combat
+        # phase decides what to do with it.
+        self._aim = read_aim(pressed, buttons,
+                             pygame.mouse.get_pos(), self.camera, self.player.pos,
+                             keys["aim"], self._last_move_dir,
+                             tap_pending=self._tap_pending, armed=self._mouse_armed)
+        if self._aim.active:
+            self.player.face(self._aim.direction)
+
+    def consume_tap(self) -> None:
+        """The queued click-attack went off (called by the combat phase)."""
+        self._tap_pending = False
 
     def _phase_update(self, dt: float) -> None:
         self.player.update(dt, self.game_map)
@@ -418,13 +462,20 @@ class PlayingState(State):
             spawn_projectile=self._spawn_projectile, anchor=self.player.pos,
             crit_chance=min(0.75, 0.02 * s["luck"] + s["crit_chance"]),
             crit_multiplier=2.0 + s["crit_damage"],
-            rng=self.rng, spawn_summon=self._spawn_summon)
+            rng=self.rng, spawn_summon=self._spawn_summon,
+            aim=self._aim, auto_attack=self.auto_attack)
         if not (self.dev_mode and self._dev_no_attack):
             main = self.player.weapons[0] if self.player.weapons else None
+            tap_fired = False
             for weapon in self.player.weapons:
                 fired = weapon.update(dt, ctx)
                 if fired and weapon is main:
                     self.player.trigger_attack_anim()   # anim syncs to the main weapon only
+                tap_fired = tap_fired or fired
+            # CB-5: a queued click is one attack -- spent on the frame any
+            # directional weapon fires from it.
+            if tap_fired and self._aim.tap:
+                self.consume_tap()
 
         self.combat.resolve()
 
@@ -617,6 +668,7 @@ class PlayingState(State):
             return
         self.game.events.publish(Events.PLAYER_LEVELED, level=self.levels.level)
         self._awaiting_level_up = True
+        self._suspend_mouse()
         from game.states.level_up_state import LevelUpState
         self.game.state_machine.push(LevelUpState(self.game), player=self.player,
                                      choices=choices, on_done=self._on_level_up_chosen)
@@ -752,6 +804,7 @@ class PlayingState(State):
             self.damage_numbers.draw(surface, self.camera)
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
+            self.renderer.aim_overlay(surface)          # dev-only, same layer
         finally:
             self.camera.pos += offset
 

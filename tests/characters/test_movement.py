@@ -8,6 +8,11 @@ from entities.player import Player, input_vector
 from game import config
 
 
+# The default layout's tables (CB-5): WASD walks, the arrows aim.
+WASD = config.KEY_LAYOUTS["wasd_move"]["move"]
+ARROWS = config.KEY_LAYOUTS["wasd_move"]["aim"]
+
+
 def keys(*pressed):
     """Build a dict usable as a pygame key-state sequence for the given keys."""
     return {k: (k in pressed) for k in (
@@ -18,22 +23,28 @@ def keys(*pressed):
 
 class InputVectorTests(unittest.TestCase):
     def test_no_keys_is_zero(self):
-        self.assertEqual(input_vector(keys()).length_squared(), 0.0)
+        self.assertEqual(input_vector(keys(), WASD).length_squared(), 0.0)
 
     def test_cardinal_is_unit(self):
-        self.assertAlmostEqual(input_vector(keys(pygame.K_d)).x, 1.0)
-        self.assertAlmostEqual(input_vector(keys(pygame.K_w)).y, -1.0)
+        self.assertAlmostEqual(input_vector(keys(pygame.K_d), WASD).x, 1.0)
+        self.assertAlmostEqual(input_vector(keys(pygame.K_w), WASD).y, -1.0)
 
     def test_diagonal_is_normalised(self):
-        v = input_vector(keys(pygame.K_d, pygame.K_s))
+        v = input_vector(keys(pygame.K_d, pygame.K_s), WASD)
         self.assertAlmostEqual(v.length(), 1.0, places=6)
 
     def test_opposite_keys_cancel(self):
-        self.assertEqual(input_vector(keys(pygame.K_a, pygame.K_d)).x, 0.0)
+        self.assertEqual(input_vector(keys(pygame.K_a, pygame.K_d), WASD).x, 0.0)
 
-    def test_arrows_equivalent_to_wasd(self):
-        self.assertEqual(input_vector(keys(pygame.K_LEFT)),
-                         input_vector(keys(pygame.K_a)))
+    def test_only_the_given_keyset_moves(self):
+        # CB-5: the arrows belong to the aim table, so they no longer walk the
+        # hero under the default layout -- and vice versa under the swap.
+        self.assertEqual(input_vector(keys(pygame.K_LEFT), WASD).length_squared(), 0.0)
+        self.assertAlmostEqual(input_vector(keys(pygame.K_LEFT), ARROWS).x, -1.0)
+        swapped = config.KEY_LAYOUTS["arrows_move"]
+        self.assertAlmostEqual(input_vector(keys(pygame.K_LEFT), swapped["move"]).x, -1.0)
+        self.assertEqual(input_vector(keys(pygame.K_a), swapped["move"]).length_squared(), 0.0)
+        self.assertAlmostEqual(input_vector(keys(pygame.K_a), swapped["aim"]).x, -1.0)
 
 
 class _RectWorld:
@@ -54,7 +65,7 @@ class MovementTests(unittest.TestCase):
 
         def travel(fps):
             p = Player(1000, 1000)
-            p.handle_input(keys(pygame.K_d))
+            p.handle_input(keys(pygame.K_d), WASD)
             dt = 1.0 / fps
             for _ in range(fps):
                 p.update(dt, world)
@@ -67,7 +78,7 @@ class MovementTests(unittest.TestCase):
     def test_clamped_inside_world(self):
         world = _RectWorld(config.WORLD_WIDTH, config.WORLD_HEIGHT)
         p = Player(5, 5)
-        p.handle_input(keys(pygame.K_a, pygame.K_w))
+        p.handle_input(keys(pygame.K_a, pygame.K_w), WASD)
         for _ in range(600):
             p.update(1 / 60, world)
         self.assertGreaterEqual(p.pos.x, p.radius)
@@ -125,13 +136,13 @@ class AnimStateTests(unittest.TestCase):
 
     def test_facing_follows_horizontal_input_and_persists_when_still(self):
         p = Player(1000, 1000)
-        p.handle_input(keys(pygame.K_d))
+        p.handle_input(keys(pygame.K_d), WASD)
         p.update(1 / 60, self._world())
         self.assertEqual(p._facing, 1)
-        p.handle_input(keys(pygame.K_a))
+        p.handle_input(keys(pygame.K_a), WASD)
         p.update(1 / 60, self._world())
         self.assertEqual(p._facing, -1)
-        p.handle_input(keys())                    # released -> keep last facing
+        p.handle_input(keys(), WASD)                    # released -> keep last facing
         p.update(1 / 60, self._world())
         self.assertEqual(p._facing, -1)
 

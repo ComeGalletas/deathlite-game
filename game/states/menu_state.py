@@ -2,7 +2,10 @@
 
 A keyboard-navigated option list sits under the title. ENTER / SPACE activates
 the highlighted entry; Up / Down (also W / S and the arrow keys) move the cursor
-and wrap; ESC quits.
+and wrap; ESC quits. The mouse drives the same cursor: hovering a row selects
+it, a click (press and release on one row) activates it (`ui.mouse`). Each row
+is one of the pack's wide buttons (`ui.widgets`): the selected row is the gold
+one -- that is the cursor -- a held row sinks, and Exit is red.
 
 Start-screen milestones: M1 gave the list its navigation; M2 wired "Options" to
 the Options screen; M3 gave this screen its own black / white palette and an
@@ -19,7 +22,14 @@ import pygame
 
 from game import config, fonts
 from game.state import State
+from ui import widgets
+from ui.mouse import MouseNav
 from ui.panels import three_slice_h
+
+# The option rows: 64-px `wide` buttons (the pack's native height) on a
+# 72-px step, inset from the parchment panel's edges.
+_ROW_TOP, _ROW_STEP, _ROW_H, _ROW_INSET = 550, 72, 64, 60
+_DANGER = {"exit"}          # drawn on the red sheet
 
 
 class MenuState(State):
@@ -39,9 +49,17 @@ class MenuState(State):
             ("Exit", "exit"),
         ]
         self._index = 0
+        self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
 
     # --- input ---------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
+        act = self._mouse.event(event)
+        if act is not None:
+            kind, i = act
+            self._index = i
+            if kind == "click":
+                self._activate(self._options[i][1])
+            return
         if event.type != pygame.KEYDOWN:
             return
         if event.key in (pygame.K_UP, pygame.K_w):
@@ -105,21 +123,19 @@ class MenuState(State):
             pygame.draw.rect(scrim, config.MENU_SCRIM, scrim.get_rect(), border_radius=16)
             surface.blit(scrim, band.topleft)
 
-        # --- option list, centred ---
-        top, step = 550, 44
-        for i, (label, _action) in enumerate(self._options):
-            selected = i == self._index
-            colour = config.MENU_FG if selected else config.MENU_FG_DIM
-            text = self._font.render(label, True, colour)
-            rect = text.get_rect(center=(cx, top + i * step))
-            surface.blit(text, rect)
-            if selected:
-                mark = self._font.render(">", True, config.MENU_FG)
-                surface.blit(mark, mark.get_rect(midright=(rect.left - 16, rect.centery)))
-
-        #nav = self._small.render("Up / Down    -    ENTER select    -    ESC quit",
-        #                         True, config.MENU_FG_DIM)
-        #surface.blit(nav, nav.get_rect(center=(cx, top + len(self._options) * step + 25)))
+        # --- option list: one button per row, the selected one gold ---
+        hits = self._mouse.hits
+        hits.clear()
+        for i, (label, action) in enumerate(self._options):
+            rect = pygame.Rect(band.left + _ROW_INSET, 0, band.width - 2 * _ROW_INSET, _ROW_H)
+            rect.centery = _ROW_TOP + i * _ROW_STEP
+            hits.add(rect, i)                 # the button *is* the mouse target
+            state = ("pressed" if self._mouse.pressed_on == i
+                     else "hover" if i == self._index else "normal")
+            widgets.draw_button(surface, self.game.assets, rect, label, state=state,
+                                shape="wide",
+                                variant="danger" if action in _DANGER else "primary",
+                                font=self._font)          # black, lifted (ui.widgets)
 
         # --- save summary, bottom centre ---
         save = self.game.save

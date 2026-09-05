@@ -111,10 +111,16 @@ ctx = FireContext(
     spawn_projectile=self._spawn_projectile, anchor=self.player.pos,
     crit_chance=min(0.75, 0.02 * s["luck"] + s["crit_chance"]),
     crit_multiplier=2.0 + s["crit_damage"],
-    rng=self.rng, spawn_summon=self._spawn_summon)
+    rng=self.rng, spawn_summon=self._spawn_summon,
+    aim=self._aim, auto_attack=self.auto_attack)          # CB-5, see §1c·i
 if not (self.dev_mode and self._dev_no_attack):
+    tap_fired = False
     for weapon in self.player.weapons:
-        weapon.update(dt, ctx)
+        fired = weapon.update(dt, ctx)
+        ...
+        tap_fired = tap_fired or fired
+    if tap_fired and self._aim.tap:
+        self.consume_tap()                                # a click is one volley
 ```
 
 - `damage_multiplier` = `stats["damage_multiplier"] · player.outgoing_damage_multiplier()`
@@ -136,6 +142,78 @@ ctx.crit_chance, ctx.crit_multiplier, ctx.rng)` per projectile
 (`combat/weapons.py — Weapon._fire`). Orbit weapons refresh `damage` every frame
 but skip the crit roll (`Weapon._maintain_orbit`:
 `dmg = outgoing_damage(self._damage(), ctx.damage_multiplier).amount`).
+
+### 1c·i · Aim resolution — where the attack goes (CB-5)
+
+Damage is direction-blind; this step decides only the vector a shot (or the
+melee cone) is spawned with. Two inputs on the context: `ctx.aim`, this
+frame's `AimInput` from `game/states/playing/aim.py — read_aim` (or
+`AimInput.none()`), and `ctx.auto_attack`, the in-run `Q` toggle
+(`config.AUTO_ATTACK_DEFAULT = True`).
+
+`read_aim` builds the `AimInput` once per frame from the raw pygame
+snapshots, highest priority first:
+
+```
+left click held, or a queued tap  -> direction = hero -> cursor (world space,
+                                     Camera.screen_to_world), source "mouse"
+any held aim key                  -> direction = key vector, source "keys"
+neither                           -> AimInput.none()
+```
+
+A click is queued on `MOUSEBUTTONDOWN` (`PlayingState._tap_pending`) and
+stays queued until a directional weapon fires from it, so a tap landing
+mid-cooldown still produces exactly one volley. The cursor is inert unless
+clicked; auto-aim never follows it. The aim keys are the active layout's
+`"aim"` table (`config.KEY_LAYOUTS`, chosen in Options / pause).
+
+`combat/weapons.py — Weapon.update`, for straight / chain / cone weapons
+(orbit and summon branch off before this and take no direction):
+
+```python
+self._cd -= dt
+if self._cd > 0.0:
+    return False
+if ctx.manual_fire:                      # aim.active and (held or tap)
+    self._fire(ctx, forced=True)         # always goes off -- may whiff
+    self._cd = self._cooldown(ctx.attack_speed_multiplier)
+    return True
+if not ctx.auto_attack:
+    self._cd = 0.0                       # hold, ready: next manual attack is instant
+    return False
+if self._fire(ctx):                      # CB-2 auto path, unchanged
+    ...
+```
+
+`Weapon._fire(ctx, forced=True)`:
+
+```python
+manual = ctx.aim.direction
+in_cone = targeting.enemies_in_cone(ctx.origin, manual, ctx.enemies,
+                                    self._assist_half_angle(), reach)
+aim = targeting.aim_direction(mode, ctx.origin, in_cone, manual)   # fallback = the raw aim
+cone_dir = manual                                                  # melee: raw aim, no assist
+```
+
+- **Assist cone.** `enemies_in_cone` keeps the enemies within the weapon's
+  reach whose bearing is within the half-angle of the aim (an enemy on the
+  origin counts). The half-angle is the weapon's `aim_assist_deg`
+  (`data/weapons.json`, optional) else `config.MANUAL_AIM_ASSIST_DEG` (25°).
+  `aim_direction` then picks per the weapon's `targeting_mode` (`nearest`
+  for every shipped weapon) among those, and returns the raw aim when the
+  cone is empty — so a manual shot homes on the closest enemy in the cone,
+  or flies straight. Multishot fans around the result exactly as it fans
+  around an auto-aim; chain lightning opens along it and chains normally.
+- **Melee** (`special_effect: cone`) ignores the assist: the swing's
+  `cone_dir` is the raw aim.
+- **Whiffs.** Forced fire skips the CB-2 reach-ring gate, so with nothing in
+  range the attack still happens (animation included).
+- **Orbit** (`ember_ring`) reads `ctx.click_held` (source `"mouse"` and
+  `held`): the ring forms while a click is held even with the reach ring
+  empty. A tap or a held aim key leaves it down; `Q` off leaves it alone.
+- **Facing.** `PlayingState._phase_input` calls `Player.face(aim.direction)`
+  when an aim is active; `Player.update` honours that for the frame instead
+  of the movement rule.
 
 ### 1d · Hit resolution — the per-target multiplier
 

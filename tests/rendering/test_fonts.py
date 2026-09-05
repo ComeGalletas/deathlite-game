@@ -1,4 +1,5 @@
-"""game/fonts.py -- the bundled cartoonish face (Fredoka) plus its degrade path.
+"""game/fonts.py -- the bundled faces (NunitoSans for titles, Fredoka for
+body text) plus their degrade path.
 
 These prove the helper returns a usable `pygame.font.Font` whether or not the
 bundled `.ttf` is present, and that it never caches across a display teardown
@@ -26,10 +27,33 @@ class FontHelperTests(unittest.TestCase):
     def setUpClass(cls):
         _display()
 
-    def test_bundled_face_is_present(self):
-        self.assertTrue(
-            (fonts.FONTS_DIR / fonts._FILES["sans"]).is_file(),
-            "assets/fonts/Fredoka-VariableFont_wdth,wght.ttf is missing")
+    def test_bundled_faces_are_present(self):
+        for role in ("sans", "title"):
+            self.assertTrue((fonts.FONTS_DIR / fonts._FILES[role]).is_file(),
+                            f"assets/fonts/{fonts._FILES[role]} is missing")
+
+    def test_heading_is_the_title_face_and_body_is_not(self):
+        # Two different faces set the same probe at different widths.
+        probe = "Choose your hero 123"
+        title = fonts.heading(30, bold=False).render(probe, True, (0, 0, 0)).get_width()
+        body = fonts.body(30).render(probe, True, (0, 0, 0)).get_width()
+        self.assertNotEqual(title, body)
+        # ...and `heading()` matches the title file loaded directly.
+        direct = pygame.font.Font(str(fonts.FONTS_DIR / fonts._FILES["title"]), 30)
+        self.assertEqual(title, direct.render(probe, True, (0, 0, 0)).get_width())
+
+    def test_missing_title_bundle_falls_back_without_raising(self):
+        original = dict(fonts._FILES)
+        fonts._FILES["title"] = "does-not-exist-98765.ttf"
+        fonts._warned.discard("title")
+        try:
+            f = fonts.heading(24)
+            self.assertIsInstance(f, pygame.font.Font)
+            self.assertGreater(f.render("x", True, (0, 0, 0)).get_width(), 0)
+        finally:
+            fonts._FILES.clear()
+            fonts._FILES.update(original)
+            fonts._warned.discard("title")
 
     def test_helpers_return_usable_fonts(self):
         for make in (fonts.heading, fonts.body, fonts.mono):

@@ -390,9 +390,14 @@ COLOR_GRID = (32, 33, 44)
 COLOR_WORLD_BORDER = (70, 72, 96)
 COLOR_PLAYER = (90, 200, 255)
 COLOR_PLAYER_OUTLINE = (220, 245, 255)
-COLOR_TEXT = (230, 230, 238)
+COLOR_TEXT = (240, 240, 245)
 COLOR_TEXT_DIM = (150, 150, 165)
 COLOR_ACCENT = (255, 205, 90)
+# Text drawn *on* the light UI sheets (buttons, cards, ribbons): black for
+# titles / labels, a dark grey for the secondary lines. The light
+# COLOR_TEXT pair above is for the dark background only.
+COLOR_ON_BUTTON = (28, 28, 34)        # near-black: a shade clearer than pure black
+COLOR_ON_BUTTON_DIM = (80, 80, 70)   # tried first; judge in a real window
 COLOR_DEBUG = (120, 255, 140)         # solid bodies in the dev collider overlay
 COLOR_DEBUG_SOFT = (70, 150, 95)      # pickup / trigger radii in that overlay
 COLOR_DEBUG_HIT = (255, 120, 255)     # projectile hitboxes in that overlay
@@ -401,6 +406,8 @@ COLOR_DEBUG_KNOCK = (120, 200, 255)   # live `_knock` bump/hit impulse vectors (
 COLOR_DEBUG_SPAWN = (255, 230, 90)    # enemy spawn points (large class) in the dev overlay
 COLOR_DEBUG_SPAWN_SMALL = (200, 160, 60)  # ... points only the small class fits
 COLOR_DEBUG_RESOURCE = (120, 220, 255)   # resource anchors in that overlay
+COLOR_DEBUG_AIM_MOUSE = (255, 255, 120)  # CB-5 dev aim line while a click is held
+COLOR_DEBUG_AIM_KEYS = (120, 255, 255)   # ... while an aim key is held
 COLOR_DAMAGE_IN = (235, 70, 70)      # damage the hero takes -- floating red numbers
 
 # --- Start menu ----------------------------------------------------------
@@ -418,6 +425,15 @@ MENU_TITLE_IMAGE: str = "ui/start_screen/title.png"
 MENU_BACKGROUND_IMAGE: str = "ui/start_screen/menu_background.png"
 # The game logo, drawn above the options panel; falls back to rendered text.
 MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
+
+# --- Mouse in menus ----------------------------------------------------
+# The hardware cursor, everywhere: the arrow in `assets/ui/pointers/` (the
+# other files there -- `frame` and the four `corner_*` brackets -- are
+# selection pieces and stay unused). The image is cropped to its ink and the
+# hotspot sits on the arrow tip. A missing file, or a build that refuses a
+# surface cursor, keeps the system arrow.
+UI_CURSOR_IMAGE: str = "ui/pointers/arrow.png"
+UI_CURSOR_SCALE: float = 1.0      # the ink is 22x30 px at 1x; 1.5 if it reads small
 MENU_SCRIM = (0, 0, 0, 185)
 
 # Game instructions, surfaced on the character-select screen (they lived on the
@@ -426,13 +442,14 @@ MENU_SCRIM = (0, 0, 0, 185)
 # difficulty line and the nav hint.
 MENU_INSTRUCTIONS: dict = {
     "rows": [
-        ("Move", "WASD / Arrows"),
+        ("Move", "WASD"),
+        ("Aim", "Arrows / Click"),
+        ("Auto attack", "Q"),
         ("Pause", "ESC"),
         ("Mute", "M"),
-        ("Debug overlay", "F1"),
     ],
     "notes": [
-        "Weapons fire on their own.",
+        "Weapons fire on their own; hold a direction or click to aim them.",
         "Survive, level up, beat the boss.",
     ],
 }
@@ -513,6 +530,10 @@ DIFFICULTY_ORDER: tuple[str, ...] = ("normal", "fast", "super_fast")
 DIFFICULTY_DEFAULT: str = "normal"
 DIFFICULTY_LABELS: dict[str, str] = {
     "normal": "Normal", "fast": "Fast", "super_fast": "Super Fast"}
+# The ribbon the hero select draws the difficulty on: one of the pack's
+# `ribbon_<colour>` sheets per difficulty, so the colour reads the danger.
+DIFFICULTY_RIBBON: dict[str, str] = {
+    "normal": "blue", "fast": "yellow", "super_fast": "red"}
 
 # --- Player defaults -----------------------------------------------------
 # Mirrors the stat list in spec section 3.1. Concrete hero data will move to
@@ -602,6 +623,40 @@ DEBUG_KEYS = {
 # Start with the debug overlay hidden; F1 toggles it. Debug tools are never
 # required for normal play.
 DEBUG_OVERLAY_DEFAULT: bool = False
+
+
+# --- Controls (CB-5 manual aim) ------------------------------------------
+# The hero attacks where the player points; auto-aim is the fallback. See
+# `documentation/journals/combat_balance_journal.md` CB-5 for the priority
+# ladder (left click > held aim key > auto-aim > nothing).
+#
+# Raw SDL2 keycodes again (same reason as DEBUG_KEYS above). Each direction is
+# a tuple so a layout may bind more than one key to it.
+AUTO_ATTACK_DEFAULT: bool = True      # `Q` toggles it in-run; no HUD element
+KEY_TOGGLE_AUTO_ATTACK: int = 113     # K_q
+
+# Half-angle of the fire-time aim-assist cone: a manual attack targets the
+# closest enemy inside this cone (out to the weapon's reach) and fires
+# straight along the aim when the cone is empty. A weapon may override it
+# with `aim_assist_deg` in data/weapons.json.
+MANUAL_AIM_ASSIST_DEG: float = 25.0
+
+_KEYS_WASD = {"left": (97,), "right": (100,), "up": (119,), "down": (115,)}
+_KEYS_ARROWS = {"left": (1073741904,), "right": (1073741903,),
+                "up": (1073741906,), "down": (1073741905,)}
+
+# Two named layouts, each a `move` / `aim` pair. The player picks one in the
+# Options screen or the pause menu; the choice persists in the save's
+# `settings["key_layout"]`.
+KEY_LAYOUTS: dict[str, dict[str, dict[str, tuple[int, ...]]]] = {
+    "wasd_move":   {"move": _KEYS_WASD,   "aim": _KEYS_ARROWS},
+    "arrows_move": {"move": _KEYS_ARROWS, "aim": _KEYS_WASD},
+}
+DEFAULT_KEY_LAYOUT: str = "wasd_move"
+KEY_LAYOUT_LABELS = {
+    "wasd_move":   "WASD move / Arrows aim",
+    "arrows_move": "Arrows move / WASD aim",
+}
 
 
 # --- Browser (pygbag) profile ---------------------------------------------

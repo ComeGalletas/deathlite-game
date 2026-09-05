@@ -1,6 +1,13 @@
 """LEVEL_UP: overlay that pauses the run and presents 3 weighted upgrade
 choices (spec 3.5). Pushed by PlayingState when a level-up is pending; pops
 itself once a choice is applied.
+
+Mouse (journal: "Mouse support in menus and UI"): hovering a card selects
+it, one click (press and release on the same card) picks it -- a mis-pick
+here is cheap and the keyboard already picks with a single key. The pick
+lands on the *release*, so the run underneath, which polls the held button
+every frame, never sees the click as an attack (and `PlayingState` disarms
+the mouse while this overlay is up regardless).
 """
 from __future__ import annotations
 
@@ -9,6 +16,7 @@ import pygame
 from game.state import State
 from progression.upgrades import apply_choice
 from ui.level_up import LevelUpPanel
+from ui.mouse import MouseNav
 
 
 class LevelUpState(State):
@@ -21,9 +29,19 @@ class LevelUpState(State):
         self.on_done = on_done
         self.selected = 0
         self.panel = LevelUpPanel()
+        self._mouse = MouseNav(self.panel.hits)   # the panel records the cards
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        if event.type != pygame.KEYDOWN or not self.choices:
+        if not self.choices:
+            return
+        act = self._mouse.event(event)
+        if act is not None:
+            kind, i = act
+            self.selected = i
+            if kind == "click":
+                self._pick(i)
+            return
+        if event.type != pygame.KEYDOWN:
             return
         key = event.key
         if key in (pygame.K_LEFT, pygame.K_a):
@@ -45,4 +63,5 @@ class LevelUpState(State):
         self.game.state_machine.pop()
 
     def draw(self, surface: pygame.Surface) -> None:
-        self.panel.draw(surface, self.choices, self.selected)
+        self.panel.draw(surface, self.choices, self.selected,
+                        assets=self.game.assets, pressed=self._mouse.pressed_on)

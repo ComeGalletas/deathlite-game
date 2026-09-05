@@ -1,9 +1,14 @@
-"""Text fonts -- one bundled cartoonish face (Fredoka) with a graceful degrade.
+"""Text fonts -- two bundled faces with a graceful degrade.
+
+* **NunitoSans** is the title face: `heading()` -- screen titles, hero and
+  trait names, card titles, the Begin label, "Paused", "Level Up".
+* **Fredoka**, the cartoonish face, is everything else: `body()`.
 
 Every `pygame.font.SysFont("georgia" / "arialrounded" / "consolas", ...)` call
 site goes through `heading()` / `body()` / `mono()` here instead, so the game
 ships a consistent look and the browser build -- which has no system fonts --
-renders in the intended face rather than the pygame default.
+renders in the intended face rather than the pygame default. Screens ask for
+a *role*, never a file.
 
 Degrade contract (same as `game/assets.py` and `game/save.py`): a missing or
 unreadable font file falls back to `SysFont`, which itself falls back to the
@@ -26,15 +31,17 @@ log = logging.getLogger(__name__)
 
 FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 
-# Bundled faces, by role. Fredoka is a variable font -- pygame renders it at its
-# default instance; emphasis is a synthetic bold via `Font.set_bold`.
+# Bundled faces, by role. Both are variable fonts -- pygame renders them at
+# their default instance; emphasis is a synthetic bold via `Font.set_bold`.
 _FILES = {
+    "title": "NunitoSans-VariableFont_YTLC,opsz,wdth,wght.ttf",
     "sans": "Fredoka-VariableFont_wdth,wght.ttf",
 }
 
 # SysFont names tried when the bundled file is absent (desktop only -- in the
 # browser SysFont yields the default face anyway).
 _SYS_FALLBACK = {
+    "title": "georgia",
     "sans": "georgia",
     "mono": "consolas",
 }
@@ -67,8 +74,9 @@ def _load(role: str, px: int, bold: bool) -> pygame.font.Font:
 
 
 def heading(px: int, *, bold: bool = True) -> pygame.font.Font:
-    """Titles, banners, hero names -- the bundled cartoonish face, bold."""
-    return _load("sans", px, bold)
+    """Titles, banners, hero names -- the bundled title face (NunitoSans),
+    bold."""
+    return _load("title", px, bold)
 
 
 def body(px: int, *, bold: bool = False) -> pygame.font.Font:

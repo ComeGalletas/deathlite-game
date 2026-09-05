@@ -22,6 +22,7 @@ from game.game import Game
 from game.states.character_select_state import CharacterSelectState
 from game.states.menu_state import MenuState
 from game.states.paused_state import PausedState
+from game.states.dev_menu_state import DevMenuState, _ROOT_ROWS
 from game.states.playing_state import PlayingState
 
 
@@ -147,7 +148,8 @@ class DevRunExitPathsTests(unittest.TestCase):
         _start_dev_run(game)
         _key(game, pygame.K_ESCAPE)                     # -> paused
         self.assertIsInstance(game.state_machine.current, PausedState)
-        _key(game, pygame.K_q)                          # -> main menu
+        _key(game, pygame.K_UP)                         # wrap -> "Quit to menu"
+        _key(game, pygame.K_RETURN)                     # -> main menu
         self.assertIsInstance(game.state_machine.current, MenuState)
         self.assertEqual(called, [])
 
@@ -341,6 +343,53 @@ class DevMenuTests(unittest.TestCase):
         playing.draw(game.screen)                       # overlay path must not raise
         menu._activate("spawn_points")                  # via the menu again
         self.assertFalse(playing._dev_show_spawn_points)
+
+    def test_aim_line_row_toggles_the_dev_overlay(self):
+        from game.states.playing.aim import AimInput
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        self.assertFalse(playing._dev_show_aim)
+        menu._activate("aim_line")
+        self.assertTrue(playing._dev_show_aim)
+        self.assertIn("[ON]", menu._row_label("aim_line"))
+        _key(game, pygame.K_BACKQUOTE)                  # close, resume
+        for aim in (AimInput(pygame.Vector2(1, 0), "keys", held=True),
+                    AimInput(pygame.Vector2(0, 1), "mouse", held=True),
+                    AimInput.none()):
+            playing._aim = aim
+            playing.draw(game.screen)                   # overlay path must not raise
+        menu._activate("aim_line")                      # via the menu again
+        self.assertFalse(playing._dev_show_aim)
+
+    def test_aim_overlay_draws_only_in_dev_with_the_flag_and_an_aim(self):
+        from unittest import mock
+        from game.states.playing.aim import AimInput
+
+        def lines(game, ps):
+            with mock.patch.object(pygame.draw, "line", wraps=pygame.draw.line) as m:
+                ps.renderer.aim_overlay(game.screen)
+            return m.call_count
+
+        game = _game()
+        dev = _start_dev_run(game)
+        dev._aim = AimInput(pygame.Vector2(1, 0), "keys", held=True)
+        self.assertEqual(lines(game, dev), 0)           # flag off
+        dev._dev_show_aim = True
+        self.assertEqual(lines(game, dev), 3)           # the aim + two cone edges
+        dev._aim = AimInput(pygame.Vector2(0, -1), "mouse", tap=True)
+        self.assertEqual(lines(game, dev), 3)           # a tap counts as an aim
+        dev._aim = AimInput.none()
+        self.assertEqual(lines(game, dev), 0)           # nothing aimed, nothing drawn
+        # A regular run never draws it, whatever the flag says.
+        game2 = _game()
+        game2.state_machine.change(MenuState(game2))
+        _key(game2, pygame.K_RETURN)
+        _key(game2, pygame.K_RETURN)
+        regular = _settle(game2)
+        self.assertIsInstance(regular, PlayingState)
+        regular._dev_show_aim = True
+        regular._aim = AimInput(pygame.Vector2(1, 0), "keys", held=True)
+        self.assertEqual(lines(game2, regular), 0)
 
     def test_all_rooms_and_freeze_rows_drive_the_spawn_master(self):
         game = _game()
@@ -610,3 +659,129 @@ class DevMenuScrollTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _mouse_ev(game, event_type, pos=(0, 0), **extra):
+    kw = {"pos": pos}
+    if event_type == pygame.MOUSEMOTION:
+        kw.update(rel=(0, 0), buttons=(0, 0, 0))
+    elif event_type == pygame.MOUSEWHEEL:
+        kw = {"x": 0, "flipped": False}
+    else:
+        kw["button"] = extra.pop("button", 1)
+    kw.update(extra)
+    game.state_machine.handle_event(pygame.event.Event(event_type, **kw))
+
+
+def _click_at(game, pos, button=1):
+    _mouse_ev(game, pygame.MOUSEBUTTONDOWN, pos, button=button)
+    _mouse_ev(game, pygame.MOUSEBUTTONUP, pos, button=button)
+
+
+class DevMenuMouseTests(unittest.TestCase):
+    """Mouse support, group E: visible rows are click targets on every page,
+    the wheel scrolls the window, right click is ESC's twin."""
+
+    def _open(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu.draw(game.screen)
+        return game, playing, menu
+
+    def _row(self, menu, i):
+        r = menu._mouse.hits.rect_of(i)
+        self.assertIsNotNone(r, f"row {i} is not registered (not visible?)")
+        return r.center
+
+    def _open_items(self, game, menu):
+        # "items" is row 12 of the root page -- just past the 12-row window,
+        # so it has to be scrolled into view (the window follows the
+        # selection) and redrawn before it can be clicked.
+        menu.sel = _ROOT_ROWS.index("items")
+        menu._clamp_scroll()
+        menu.draw(game.screen)
+        _click_at(game, self._row(menu, menu.sel))
+        self.assertEqual(menu.page, "items")
+
+    def test_only_the_visible_window_is_registered(self):
+        game, _, menu = self._open()
+        from game.states.dev_menu_state import MAX_VISIBLE
+        n = len(menu._rows())
+        window = min(MAX_VISIBLE, n)
+        self.assertEqual(len(menu._mouse.hits), window)
+        self.assertIsNone(menu._mouse.hits.rect_of(window))       # clipped row
+
+    def test_hover_selects_and_click_toggles_a_root_row(self):
+        game, playing, menu = self._open()
+        i = _ROOT_ROWS.index("colliders")
+        _mouse_ev(game, pygame.MOUSEMOTION, self._row(menu, i))
+        self.assertEqual(menu.sel, i)
+        self.assertFalse(playing._dev_show_colliders)
+        _click_at(game, self._row(menu, i))
+        self.assertTrue(playing._dev_show_colliders)
+        _click_at(game, self._row(menu, i))
+        self.assertFalse(playing._dev_show_colliders)
+
+    def test_click_opens_a_sub_page_and_its_rows_work(self):
+        game, playing, menu = self._open()
+        _click_at(game, self._row(menu, _ROOT_ROWS.index("spawn")))
+        self.assertEqual(menu.page, "enemies")
+        menu.draw(game.screen)                                     # new rows
+        before = len(playing.enemies)
+        _click_at(game, self._row(menu, 0))
+        self.assertEqual(len(playing.enemies), before + 1)
+        self.assertEqual(menu.page, "enemies")                     # stays open
+
+    def test_wheel_scrolls_and_clamps_and_keeps_the_selection_visible(self):
+        game, _, menu = self._open()
+        from game.states.dev_menu_state import MAX_VISIBLE
+        self._open_items(game, menu)
+        n = len(menu._rows())
+        self.assertGreater(n, MAX_VISIBLE, "items page must scroll for this test")
+        _mouse_ev(game, pygame.MOUSEWHEEL, y=-1)                   # wheel down
+        self.assertEqual(menu.scroll, 1)
+        self.assertGreaterEqual(menu.sel, menu.scroll)             # pulled into view
+        for _ in range(100):
+            _mouse_ev(game, pygame.MOUSEWHEEL, y=-1)
+        self.assertEqual(menu.scroll, n - MAX_VISIBLE)             # clamped
+        self.assertLess(menu.sel, menu.scroll + MAX_VISIBLE)
+        for _ in range(100):
+            _mouse_ev(game, pygame.MOUSEWHEEL, y=1)                # wheel up
+        self.assertEqual(menu.scroll, 0)
+        menu.draw(game.screen)
+        self.assertEqual(len(menu._mouse.hits), MAX_VISIBLE)
+
+    def test_a_click_on_the_more_markers_is_inert(self):
+        game, playing, menu = self._open()
+        self._open_items(game, menu)
+        menu.draw(game.screen)
+        first = menu._mouse.hits.rect_of(menu.scroll)
+        above = (first.centerx, first.top - 12)                    # the "^ N more" line
+        _click_at(game, above)
+        self.assertEqual(menu.page, "items")
+        self.assertEqual(menu.sel, 0)
+
+    def test_right_click_backs_out_then_closes(self):
+        game, playing, menu = self._open()
+        _click_at(game, self._row(menu, _ROOT_ROWS.index("blessings")))
+        self.assertEqual(menu.page, "blessings")
+        _mouse_ev(game, pygame.MOUSEBUTTONDOWN, (5, 5), button=3)
+        self.assertEqual(menu.page, "root")
+        _mouse_ev(game, pygame.MOUSEBUTTONDOWN, (5, 5), button=3)
+        self.assertIs(game.state_machine.current, playing)
+
+    def test_click_off_the_rows_is_inert(self):
+        game, _, menu = self._open()
+        _click_at(game, (5, 5))
+        self.assertEqual(menu.page, "root")
+        self.assertEqual(menu.sel, 0)
+        self.assertIsInstance(game.state_machine.current, DevMenuState)
+
+    def test_keyboard_paths_unchanged(self):
+        game, playing, menu = self._open()
+        for _ in range(_ROOT_ROWS.index("colliders")):
+            _key(game, pygame.K_DOWN)
+        _key(game, pygame.K_RETURN)
+        self.assertTrue(playing._dev_show_colliders)
+        _key(game, pygame.K_ESCAPE)
+        self.assertIs(game.state_machine.current, playing)

@@ -21,6 +21,9 @@ from entities.pickup import XP_TIER_COLORS
 from game.states.playing.drawctx import DrawCtx
 from game.states.playing.projectiles import draw_projectile
 from game.states.playing.summons import draw_summon
+
+# CB-5 dev aim line: length for a main weapon with no finite reach.
+_AIM_LINE_PX = 160.0
 # Re-exported so `PlayingState._draw_cone` (a `test_depth_sort` entry point) and
 # `_rendering.draw_cone` keep resolving after the move to the projectiles pkg.
 from game.states.playing.projectiles.cone import draw_cone  # noqa: F401
@@ -486,6 +489,45 @@ class WorldRenderer:
             pygame.draw.rect(surface, col,
                              pygame.Rect(sx - half, sy - half, 2 * half, 2 * half), 2)
             label(sx, sy, f"{p.floor} {p.kind[0]}", col)
+
+    def aim_overlay(self, surface) -> None:
+        """Dev-mode (CB-5): the manual aim, drawn only while one is active --
+        a line from the hero along the aim out to the main weapon's reach,
+        plus the edges of the cone that decides the fire-time target pick
+        (the assist cone for a shot; the swing cone itself for melee, which
+        takes no assist). Mouse and key sources are tinted apart so the
+        priority ladder is visible. Toggle with the dev menu's 'Aim line'
+        row; no F-key. Same shape as `collider_overlay`."""
+        ps = self.ps
+        if not (ps.dev_mode and ps._dev_show_aim):
+            return
+        aim = ps._aim
+        if not aim.active:
+            return
+        cam = ps.camera
+        origin = ps.player.pos
+        main = ps.player.weapons[0] if ps.player.weapons else None
+        reach = _AIM_LINE_PX
+        half = math.radians(config.MANUAL_AIM_ASSIST_DEG)
+        if main is not None:
+            r = main._reach(ps.player.stats.get("area_multiplier", 1.0))
+            if math.isfinite(r):
+                reach = r
+            if main.special == "cone":
+                half = math.radians(float(main.definition["cone_half_angle"]))
+            else:
+                half = main._assist_half_angle()
+        col = (config.COLOR_DEBUG_AIM_MOUSE if aim.source == "mouse"
+               else config.COLOR_DEBUG_AIM_KEYS)
+        edge = tuple(c // 2 for c in col)
+
+        def seg(direction, colour, width):
+            pygame.draw.line(surface, colour, cam.world_to_screen(origin),
+                             cam.world_to_screen(origin + direction * reach), width)
+
+        seg(aim.direction, col, 2)
+        for sign in (1, -1):
+            seg(aim.direction.rotate(math.degrees(half) * sign), edge, 1)
 
     def collider_overlay(self, surface) -> None:
         """Dev-mode: every true circular collider / hitbox in one pass, read
