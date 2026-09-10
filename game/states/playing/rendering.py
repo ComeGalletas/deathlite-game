@@ -76,6 +76,19 @@ class WorldRenderer:
         below the collider centre -- see config.SPRITE_ANCHOR_DROP. Render-only."""
         return config.SPRITE_ANCHOR_DROP * radius * self.ps.camera.zoom
 
+    def anchor_for(self, rig: str, flip: bool) -> tuple[int, int]:
+        """A rig's feet anchor in its (unscaled) frame, mirrored when the
+        frame is. The content crops are asymmetric -- a wide swing or thrust
+        is kept on the facing side -- so the anchor is off-centre, and a
+        mirrored frame has to mirror it too or the body lands `bw - 2*ax`
+        px off the collider (42 px for the turtle at zoom 1)."""
+        assets = self.ps.game.assets
+        ax, ay = assets.anchor(rig)
+        if flip:
+            bw = (assets.scale_for(rig) or (0, 0))[0]
+            ax = bw - ax
+        return ax, ay
+
     def _blit_character(self, surface, frame, dest, character_y: float) -> None:
         r = self.ps.game_map.renderer
         drawn = r.shade_character_frame(frame, dest, self.ps.camera, character_y)
@@ -310,11 +323,11 @@ class WorldRenderer:
         assets = ps.game.assets
         bw, bh = assets.scale_for("dead")
         size = (max(1, round(bw * scale)), max(1, round(bh * scale)))
-        frame = anim.frame(size=size,
-                           flip=(facing < 0 and assets.face("dead") == "right"))
+        flip = facing < 0 and assets.face("dead") == "right"
+        frame = anim.frame(size=size, flip=flip)
         if frame is None:
             return
-        ax, ay = assets.anchor("dead")
+        ax, ay = self.anchor_for("dead", flip)
         sx, sy = ps.camera.world_to_screen(pos)
         drop = self.sprite_drop(radius)     # match the sprite this poof replaced
         self._blit_character(
@@ -336,7 +349,7 @@ class WorldRenderer:
             return
         if e._hurt_t > 0.0:
             frame = hit_tinted(frame)           # red flash, no pop to a circle
-        ax, ay = assets.anchor(rig)
+        ax, ay = self.anchor_for(rig, flip)
         self._blit_character(
             surface, frame,
             (sx - ax * z, sy - ay * z + self.sprite_drop(e.radius)), e.pos.y)
@@ -353,13 +366,14 @@ class WorldRenderer:
         frame = None
         if b.anim is not None:
             rig = b.anim.rig
+            flip = b._facing < 0 and assets.face(rig) == "right"
             bw, bh = assets.scale_for(rig)
             frame = b.anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))),
-                                 flip=(b._facing < 0 and assets.face(rig) == "right"))
+                                 flip=flip)
         if frame is not None:
             if b._hurt_t > 0.0:
                 frame = hit_tinted(frame)
-            ax, ay = assets.anchor(rig)
+            ax, ay = self.anchor_for(rig, flip)
             self._blit_character(
                 surface, frame,
                 (sx - ax * z, sy - ay * z + self.sprite_drop(b.radius)), b.pos.y)
@@ -397,7 +411,7 @@ class WorldRenderer:
             # `anchor` is the pixel in the final sprite that sits on the world
             # position (bottom-centre-ish -- the art is bottom-heavy); the drop
             # then seats it below the collider centre (config.SPRITE_ANCHOR_DROP).
-            ax, ay = ps.game.assets.anchor(ps._hero_anim.rig)
+            ax, ay = self.anchor_for(ps._hero_anim.rig, self._hero_flip())
             if ps.player._hurt_t > 0.0:
                 frame = hit_tinted(frame)
             self._blit_character(
@@ -413,17 +427,20 @@ class WorldRenderer:
             pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
                                round(pr), width=2)
 
+    def _hero_flip(self) -> bool:
+        ps = self.ps
+        return ps.player._facing < 0 and ps.game.assets.face(ps._hero_anim.rig) == "right"
+
     def hero_sprite_frame(self):
         ps = self.ps
         if ps._hero_anim is None:
             return None
-        assets = ps.game.assets
         rig = ps._hero_anim.rig
-        flip = ps.player._facing < 0 and assets.face(rig) == "right"
         z = ps.camera.zoom
-        bw, bh = assets.scale_for(rig)
+        bw, bh = ps.game.assets.scale_for(rig)
         return ps._hero_anim.frame(
-            size=(max(1, round(bw * z)), max(1, round(bh * z))), flip=flip)
+            size=(max(1, round(bw * z)), max(1, round(bh * z))),
+            flip=self._hero_flip())
 
     # --- projectiles / summons (per-family draw in the sub-packages) ---
     def _draw_ctx(self) -> DrawCtx:
