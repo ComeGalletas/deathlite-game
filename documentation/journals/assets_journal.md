@@ -2784,3 +2784,17 @@ out. The Bomb's detonation was the expanding ring every explosion shares.
   the `explosion` burst for exactly the strip's length, it advances and is
   culled when it ends, and the rendered frame is centred on the blast and
   spans its diameter (ring fallback when the sheet is gone).
+
+## Forge sprite keyed out (2026-09-09)
+
+The regenerated forge (`assets/terrain/facilities/forge.png`) arrived as a
+2048 px, 24-bit image with a fake checkerboard (64 px cells, greys 253 and
+215, not a regular parity pattern) and a soft bluish drop shadow baked in.
+A scratch script flood-filled from the border through checker-grey and
+shadow-grey pixels (the dark outline is the wall, so enclosed interior greys
+survive), zeroed their alpha, and box-filtered the result 8x with
+premultiplied alpha down to the 256 px frame the `forge` rig declares. The
+baked shadow was dropped to match the previous sprite; a variant keeping it
+as translucent black was produced but not shipped. Opaque bbox is
+(37, 64, 162 x 138), so the rig's anchor (118, 202) already sits at the
+bottom centre and was left alone.

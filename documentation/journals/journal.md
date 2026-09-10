@@ -3953,3 +3953,39 @@ split. The lancer rig's crop widened to take in the lance's full thrust,
 and the NPC draw mirrors the anchor on a flipped frame so the feet stay
 put. Tests: a lancer charges a tank placed 70 px off its post, lands a
 hit and walks back to idle at the post; one beyond the radius is ignored.
+
+## Fixed -- Flipped sprites drifted off their collider (2026-09-09)
+
+**Status:** DONE 2026-09-09.
+
+Every character rig faces right and is mirrored with `pygame.transform.flip`
+when its `_facing` is -1 -- the default for enemies, so the mirrored frame is
+what the player mostly sees. The content crops are deliberately asymmetric
+(the swing / lance / bite is kept on the facing side), which puts the feet
+anchor off-centre; the draws kept blitting the mirrored frame at the
+*unmirrored* anchor, so a left-facing body landed `bw - 2*ax` px to the right
+of its collider: 42 px for the turtle (`tank`) at zoom 1, 24 px for the
+minotaur, 21 px for the gnome, 16 px for the skull. Right-facing frames were
+never wrong.
+
+### Changes
+
+- [x] `rendering.py -- WorldRenderer.anchor_for(rig, flip)`: the rig's anchor,
+      with `ax` mirrored to `bw - ax` (bw from `assets.scale_for`) when the
+      frame is flipped. `enemy_sprite`, `boss`, `player` (via `_hero_flip`)
+      and `death_fx` all go through it; the hero (2-5 px) and the poof (1 px)
+      had the same drift on a smaller scale.
+- [x] Anchor audit: a scratch script booted a run, spawned one enemy per rig
+      plus the boss and the hero at the hero's position, drew each through the
+      real renderer facing right and left, and measured the silhouette centre
+      against the collider. Before: right-facing bodies within 2 px of centre
+      for every rig, left-facing off by exactly `(bw - 2*ax) * zoom`. After:
+      left and right within 1 px of each other for all 13 enemy rigs, the
+      giant bat and Aegis. So no anchor had been hand-tuned to compensate --
+      they describe the unflipped frame correctly and none were changed.
+- [x] Tests: `test_enemy_sprite.py -- MirroredAnchorTests` (turtle mirrors
+      across the frame width; every enemy rig's mirrored anchor lands on the
+      same point seen from the other edge). `tests/rendering`: 354 green, the
+      51 failures in terrain / ghost / depth-sort / cull / biome are identical
+      at HEAD and come from tile sheets missing from the repo
+      (`terrain/tiles/tilemap_*.png`).
