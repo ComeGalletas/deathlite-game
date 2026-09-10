@@ -401,5 +401,38 @@ class EnemyStateRingsTests(unittest.TestCase):
         pygame.quit()
 
 
+class MirroredAnchorTests(unittest.TestCase):
+    """A flipped frame mirrors its feet anchor. The content crops are
+    asymmetric (the swing / thrust stays on the facing side), so blitting a
+    mirrored frame with the unmirrored anchor put the body `bw - 2*ax` px off
+    the collider -- 42 px for the turtle at zoom 1 -- whenever an enemy faced
+    left, which is its default."""
+
+    def _renderer(self):
+        from types import SimpleNamespace
+        from game.assets import get_assets
+        from game.states.playing.rendering import WorldRenderer
+        ps = SimpleNamespace(game=SimpleNamespace(assets=get_assets()))
+        return WorldRenderer(ps), get_assets()
+
+    def test_turtle_anchor_is_mirrored_across_the_frame_width(self):
+        r, assets = self._renderer()
+        self.assertEqual(r.anchor_for("turtle", False), assets.anchor("turtle"))
+        ax, ay = assets.anchor("turtle")
+        bw, _ = assets.scale_for("turtle")
+        self.assertEqual(r.anchor_for("turtle", True), (bw - ax, ay))
+        self.assertNotEqual(bw - ax, ax)            # the crop really is asymmetric
+
+    def test_every_enemy_rig_mirrors_to_the_same_body_centre(self):
+        r, assets = self._renderer()
+        for eid in ALL_ENEMIES:
+            rig = make(eid).anim.rig
+            ax, ay = r.anchor_for(rig, False)
+            fx, fy = r.anchor_for(rig, True)
+            bw, _ = assets.scale_for(rig)
+            self.assertEqual(fy, ay, rig)
+            self.assertEqual(ax + fx, bw, rig)      # same point, seen from either edge
+
+
 if __name__ == "__main__":
     unittest.main()
