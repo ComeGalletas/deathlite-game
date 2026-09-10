@@ -163,14 +163,6 @@ class GameMap:
             return self._rects[0].collidepoint(x, y)
         return floor_rules.point_on_floor(self.layout, x, y)
 
-    def _over_island(self, x: float, y: float) -> bool:
-        """The flying floor test: any cell of an island's grid, or a bridge.
-        `world/rules/floor.py` is the one body of this rule."""
-        if self.layout is None:
-            return self._rects[0].collidepoint(x, y)
-        return (floor_rules.over_island(self.layout, x, y)
-                or floor_rules.in_corridor(self.layout, x, y))
-
     def _room_of(self, x: float, y: float):
         """The island whose floor the point actually stands on, or `None`."""
         if self.layout is None:
@@ -249,14 +241,14 @@ class GameMap:
         ends -- may still move, as long as it does not go *deeper*. "Cannot
         enter, may leave" is what stops the rule wedging anything; refusing
         outright would freeze a body the moment anything put it there."""
-        # A flyer (`flying` tag, `The First Hunger`) is over the world, not on
-        # it: no terrace margin, no elevation rule, no obstacle, and no radius
-        # probe -- it passes above a boulder and across a cliff in one line,
-        # and over its own island's lake, which is a cell of the height map
-        # like any other. It still may not leave the island: the sea is where
-        # a body goes to become unreachable, and the arena has to stay a fight.
+        # A flyer (`flying` tag: The First Hunger and its brood) is over the
+        # world, not on it: no terrace margin, no elevation rule, no obstacle,
+        # no radius probe, and no floor -- it passes above a boulder, across a
+        # cliff, over a lake and out over the sea between islands in one line.
+        # The only wall is the edge of the world; a flyer hunts the player, so
+        # one out over the water is one on its way back.
         if flying:
-            return self._over_island(pos.x, pos.y)
+            return 0.0 <= pos.x <= self.width and 0.0 <= pos.y <= self.height
         if not self._point_ok(pos.x, pos.y):
             return False
         if self._body_inset > 0.0 and not self.inset_ok(pos.x, pos.y):
@@ -402,6 +394,7 @@ class GameMap:
     _water_tile = _baked("water_tile", lambda: 0)
     _grid_surfs = _baked("grid_surfs", list)
     _corr_surfs = _baked("corr_surfs", list)
+    _corr_shadows = _baked("corr_shadows", list)
     _shore = _baked("shore", list)
     _shadow = _baked("shadow", lambda: None)
     _foam = _baked("foam", lambda: None)

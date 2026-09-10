@@ -8,6 +8,7 @@ summary. Leaving via the pause menu also persists nothing.
 import copy
 import os
 import tempfile
+import types
 import unittest
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -114,6 +115,7 @@ class DevRunDoesNotSaveTests(unittest.TestCase):
         playing.player.weapons.append(playing.player.weapons[0])
         playing.stats["time"] = 5.0
 
+        playing.player.rng = types.SimpleNamespace(random=lambda: 1.0)  # no evasion
         playing.player.take_damage(10 ** 9)             # lethal
         for _ in range(120):
             game.state_machine.update(1 / 60)

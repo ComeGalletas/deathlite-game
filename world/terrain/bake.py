@@ -53,8 +53,11 @@ def bake_steps(layout):
         t.shore.extend(grid_paint.grid_shore(r))
         yield f"painting island {r.id + 1} of {len(layout.rooms)}"
     for c in layout.corridors:
+        lvl = layout.room(c.a).floor
+        sh = grid_paint.paint_bridge_shadow(sheets, c)
+        t.corr_shadows.append((sh[0], sh[1], lvl))
         rc = grid_paint.paint_bridge(sheets, c)
-        t.corr_surfs.append((rc[0], rc[1], layout.room(c.a).floor))
+        t.corr_surfs.append((rc[0], rc[1], lvl))
     yield "bridges"
 
     # The water buffer, drop shadow, foam frames and scenery scatter.

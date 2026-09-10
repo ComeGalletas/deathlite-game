@@ -19,6 +19,7 @@ import pygame
 from game import config, fonts
 from entities.pickup import XP_TIER_COLORS
 from game.states.playing.drawctx import DrawCtx
+from game.states.playing.glow import GlowCache
 from game.states.playing.projectiles import draw_projectile
 from game.states.playing.summons import draw_summon
 
@@ -30,8 +31,10 @@ from game.states.playing.projectiles.cone import draw_cone  # noqa: F401
 
 
 _ORB_RIGS = {0: "xp_orb_small", 1: "xp_orb_medium", 2: "xp_orb_large"}
+_GEM_CULL_PAD = 64          # world px past the view a gem (and its glow) still draws
 _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
-                "shock": (255, 230, 120)}
+                "shock": (255, 230, 120), "stun": (240, 240, 255),
+                "mark": (210, 170, 255)}
 _HIT_TINT = (150, 30, 30)
 _KNOCK_VEC_SCALE = 0.15     # dev overlay: `_knock` px/s -> screen px line length
 _SPAWN_MARK_PX = 6          # dev overlay: half-size of a spawn-point mark, world px
@@ -69,6 +72,7 @@ def hit_tinted(frame):
 class WorldRenderer:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self._glow = GlowCache()      # XP orb glow discs, pre-rendered per size / alpha
 
     # --- geometry helper --------------------------------------------
     def sprite_drop(self, radius: float) -> float:
@@ -117,6 +121,11 @@ class WorldRenderer:
                     f"{ps._boss_name} APPROACHES", True, (255, 90, 90))
                 surface.blit(text, text.get_rect(center=(w // 2, 120)))
 
+        # P3: a transient notice (the Forge's answer), bottom centre.
+        if ps._notice_t > 0.0 and ps._notice_text:
+            text = ps._hud._font.render(ps._notice_text, True, config.COLOR_ACCENT)
+            surface.blit(text, text.get_rect(center=(w // 2, h - 96)))
+
         # Interaction prompt when stood on a usable special location.
         it = ps.locations.nearby()
         if it is not None:
@@ -134,12 +143,40 @@ class WorldRenderer:
             return False
         return self.ps.game_map.renderer.level_at(pos[0], pos[1]) != level
 
+    def _heal_frames(self, z: float):
+        """The sanctuary's looping heal effect at this zoom, or `None`
+        without the art (the ring below is then the placeholder)."""
+        from game.assets import get_assets
+        a = get_assets()
+        meta = a.rig("fx_heal")
+        if not meta:
+            return None
+        fw, fh = meta["frame"]
+        size = (max(1, round(fw * z)), max(1, round(fh * z)))
+        frs = a.frames("fx_heal", "loop", size=size)
+        if not frs:
+            return None
+        ax, ay = a.anchor("fx_heal")
+        return frs, a.fps("fx_heal", "loop"), ax * z, ay * z
+
     def interactables(self, surface, level=None) -> None:
         ps = self.ps
         z = ps.camera.zoom
         for it in ps.interactables:
             if self._off_band(level, it.pos):
                 continue
+            if it.kind == "forge" and self._forge_skinned():
+                continue        # the forge obstacle carries the art
+            if it.kind == "fountain":
+                heal = self._heal_frames(z)
+                if heal is not None:
+                    if it.used:
+                        continue        # healed once: the prop is gone
+                    frs, fps, ax, ay = heal
+                    sx, sy = ps.camera.world_to_screen(it.pos)
+                    idx = int(ps.stats["time"] * fps) % len(frs)
+                    surface.blit(frs[idx], (round(sx - ax), round(sy - ay)))
+                    continue
             sx, sy = ps.camera.world_to_screen(it.pos)
             done = it.used or it.state == "done"
             col = (90, 90, 100) if done else it.colour
@@ -149,6 +186,19 @@ class WorldRenderer:
             if it.kind == "elite_arena" and it.state == "active":
                 pygame.draw.circle(surface, (255, 120, 120), (int(sx), int(sy)),
                                    round((it.radius + 120) * z), 1)
+
+    def _forge_skinned(self) -> bool:
+        """Did the bake skin a forge obstacle? Then the interactable draws
+        nothing of its own; without the art the ring is the placeholder."""
+        cached = getattr(self, "_forge_skin_cache", None)
+        gm = self.ps.game_map
+        key = id(getattr(gm, "_decos", None))
+        if cached is None or cached[0] != key:
+            decos = getattr(gm, "_decos", {}) or {}
+            skinned = any(o.kind == "forge" and i in decos
+                          for i, o in enumerate(getattr(gm, "obstacles", ())))
+            self._forge_skin_cache = cached = (key, skinned)
+        return cached[1]
 
     def hazards(self, surface, level=None) -> None:
         ps = self.ps
@@ -200,12 +250,21 @@ class WorldRenderer:
         draw_summon(surface, sx, sy, s, self._draw_ctx(), default="disc")
 
     def gems(self, surface, level=None) -> None:
+        """XP orbs, each over its breathing glow (journal: "Breathing glow
+        under the XP orbs"). The glow is blitted first so the orb's colour
+        sits on top of it; it breathes on the gem's own `age`, so a field of
+        orbs shimmers out of phase and freezes with the run. Cached discs --
+        one lookup and one blit per orb. Off-screen gems draw nothing."""
         ps = self.ps
         z = ps.camera.zoom
         assets = ps.game.assets
+        view = ps.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+        glow = self._glow
 
         for gem in ps.gems:
             if self._off_band(level, gem.pos):
+                continue
+            if not view.collidepoint(gem.pos.x, gem.pos.y):
                 continue
             sx, sy = ps.camera.world_to_screen(gem.pos)
             rig = _ORB_RIGS.get(gem.tier, "xp_orb_small")
@@ -214,6 +273,10 @@ class WorldRenderer:
                 max(1, round(base_size[0] * z)),
                 max(1, round(base_size[1] * z)),
             )
+
+            halo = glow.pulsed(base_size[0], z, gem.age)
+            if halo is not None:
+                surface.blit(halo, halo.get_rect(center=(int(sx), int(sy))))
 
             orb = assets.image(rig, size=size)
 
@@ -231,15 +294,37 @@ class WorldRenderer:
                 )
 
     def explosions(self, surface, level=None) -> None:
+        """Blast visuals: an entry carrying an `anim` (the Bomb's `explosion`
+        burst) blits its current frame scaled so the rig's `fireball` width
+        spans the blast diameter, centred on the blast; the rest, and any
+        burst whose sheet is missing, draw the expanding ring."""
         ps = self.ps
         z = ps.camera.zoom
         for ex in ps._explosions:
             if self._off_band(level, ex["pos"]):
                 continue
-            frac = ex["t"] / ex["dur"]
             sx, sy = ps.camera.world_to_screen(ex["pos"])
+            anim = ex.get("anim")
+            if anim is not None and self._blit_burst(surface, anim, sx, sy, ex["radius"] * z):
+                continue
+            frac = ex["t"] / ex["dur"]
             pygame.draw.circle(surface, (255, 180, 90),
                                (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
+
+    def _blit_burst(self, surface, anim, sx, sy, radius_px: float) -> bool:
+        assets = self.ps.game.assets
+        rig = assets.rig(anim.rig) or {}
+        bw, bh = assets.scale_for(anim.rig) or (0, 0)
+        fireball = float(rig.get("fireball") or bw)
+        if not bw or not fireball:
+            return False
+        k = 2.0 * radius_px / fireball          # rig px -> screen px
+        frame = anim.frame(size=(max(1, round(bw * k)), max(1, round(bh * k))))
+        if frame is None:
+            return False
+        ax, ay = assets.anchor(anim.rig)
+        surface.blit(frame, (sx - ax * k, sy - ay * k))
+        return True
 
     def trail_fx(self, surface, level=None) -> None:
         """Projectile dust trails -- each `[Animator, pos, size, tint, fade]`
@@ -368,7 +453,7 @@ class WorldRenderer:
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
             pygame.draw.circle(surface, (255, 210, 210), (int(sx), int(sy)),
                                round(br), 3)
-        if b.phase == "telegraph":
+        if b.phase == "telegraph" and not b.closing:
             pid = b.pattern.get("id")
             frac = b.telegraph_fraction
             if pid == "radial_barrage":
@@ -439,9 +524,25 @@ class WorldRenderer:
             draw_projectile(surface, sx, sy, p, ctx, default="bolt")
 
     def hostile_projectiles(self, surface) -> None:
+        """Enemy and boss shots, each over a faint steady glow (journal:
+        "Breathing glow under the XP orbs", group D): the same cached disc
+        as the orbs at one constant alpha, sized from the shot's collider,
+        blitted before the arrow. Off-screen shots draw nothing."""
         cam, ctx = self.ps.camera, self._draw_ctx()
+        z = cam.zoom
+        view = cam.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+        cfg = config.HOSTILE_GLOW
+        scale, alpha, colour = float(cfg["scale"]), int(cfg["alpha"]), cfg["colour"]
+        glow = self._glow
         for p in self.ps.hostiles:
+            if not view.collidepoint(p.pos.x, p.pos.y):
+                continue
             sx, sy = cam.world_to_screen(p.pos)
+            if scale > 0.0 and alpha > 0:
+                d = max(2, int(round(p.radius * 2 * scale * z)))
+                halo = glow.surface(d, alpha, colour)
+                if halo is not None:
+                    surface.blit(halo, halo.get_rect(center=(int(sx), int(sy))))
             draw_projectile(surface, sx, sy, p, ctx, default="arrow")
 
     # --- dev overlay -------------------------------------------

@@ -9,7 +9,13 @@ Movement modes:
 Extra hit filters:
   * cone_half_angle > 0  -- Soul Scythe; the collision resolver also requires
                  the target to lie within this angle of `cone_dir`.
-  * chain_left > 0        -- Thunder Orb; resolver redirects instead of despawning.
+  * chain_left > 0        -- chain upgrades; resolver redirects instead of despawning.
+  * inert                 -- Bomb (P1); never scores a direct hit. `stop_after`
+                 seconds after the throw it halts; when it expires (or is
+                 blocked) `TransientFx.detonate` spawns a blast of
+                 `blast_radius` that lasts `blast_lifetime`.
+  * stun_chance > 0       -- Hammer (P1); the resolver rolls a stun on hit.
+`weapon_id` names the weapon that fired it (synergies read it later).
 
 `fire_level` carries the terrain elevation the shot was fired from, for the
 LD-9 D10 rule; see `TransientFx.block_on_terrain`.
@@ -32,6 +38,9 @@ class Projectile:
         "rehit_interval", "rehit_timer",
         "cone_dir", "cone_half_angle", "style", "fx", "trail_shed",
         "fire_level",
+        "weapon_id", "age", "stop_after", "inert", "blast_radius",
+        "blast_lifetime", "detonated", "stun_chance", "stun_duration",
+        "no_block", "mine", "arm_delay",
     )
 
     def __init__(self) -> None:
@@ -68,6 +77,18 @@ class Projectile:
         # wrong tile. `NONE` disables the rule, which is what a flat world and
         # every unit test that builds a projectile directly get.
         self.fire_level = _NO_LEVEL
+        self.weapon_id = ""
+        self.age = 0.0
+        self.stop_after = 0.0        # > 0: halt after this many seconds
+        self.inert = False           # no direct hits (a fused bomb)
+        self.blast_radius = 0.0      # > 0: detonate on expiry / block
+        self.blast_lifetime = 0.0
+        self.detonated = False
+        self.stun_chance = 0.0
+        self.stun_duration = 0.0
+        self.no_block = False        # a stationary blast: walls cannot stop it
+        self.mine = False            # P3 Minefield: detonates when an enemy steps on it
+        self.arm_delay = 0.0         # ...once this old
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
               pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
@@ -76,7 +97,12 @@ class Projectile:
               anchor=None, orbit_angle: float = 0.0, orbit_radius: float = 0.0,
               orbit_speed: float = 0.0, rehit_interval: float = 0.0,
               cone_dir=None, cone_half_angle: float = 0.0, style: str = "",
-              fx: dict | None = None) -> None:
+              fx: dict | None = None, weapon_id: str = "",
+              stop_after: float = 0.0, inert: bool = False,
+              blast_radius: float = 0.0, blast_lifetime: float = 0.0,
+              stun_chance: float = 0.0, stun_duration: float = 0.0,
+              no_block: bool = False, mine: bool = False,
+              arm_delay: float = 0.0) -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
@@ -104,6 +130,18 @@ class Projectile:
         self.trail_shed = 0.0
         # Pooled: a recycled projectile must not inherit the last shot's level.
         self.fire_level = _NO_LEVEL
+        self.weapon_id = weapon_id
+        self.age = 0.0
+        self.stop_after = stop_after
+        self.inert = inert
+        self.blast_radius = blast_radius
+        self.blast_lifetime = blast_lifetime
+        self.detonated = False
+        self.stun_chance = stun_chance
+        self.stun_duration = stun_duration
+        self.no_block = no_block
+        self.mine = mine
+        self.arm_delay = arm_delay
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:
@@ -118,6 +156,9 @@ class Projectile:
                     self.hit_ids.clear()
             return  # orbiters are persistent: no lifetime countdown
 
+        self.age += dt
+        if self.stop_after > 0.0 and self.age >= self.stop_after:
+            self.vel.update(0, 0)        # a thrown bomb has landed
         self.pos += self.vel * dt
         self.lifetime -= dt
         if self.lifetime <= 0.0:

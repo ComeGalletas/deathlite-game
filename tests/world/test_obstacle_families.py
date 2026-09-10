@@ -41,8 +41,12 @@ class ShrubRetiredTests(unittest.TestCase):
         seen = set()
         for seed in W.SEEDS:
             seen.update(o.kind for o in W.layout(seed).obstacles)
+        # ... and the village pass (HI-2) added the buildings, the forge and
+        # the fence, which stand only on a village island (`test_village`).
         self.assertTrue(seen.issubset(
-            {"tree", "rock", "pillar", "house", "sign", "scarecrow"}), seen)
+            {"tree", "rock", "pillar", "house", "sign", "scarecrow",
+             "forge", "barracks", "tower", "archery", "monastery", "castle",
+             "fence"}), seen)
 
 
 class TreeColliderTests(unittest.TestCase):

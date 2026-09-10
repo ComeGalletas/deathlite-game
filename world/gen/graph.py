@@ -6,7 +6,7 @@ from collections import deque
 
 from world.layout import Room
 from world.gen.settings import settings_or_config
-from world.gen.tuning import SPECIAL_KINDS
+from world.gen.tuning import SPECIAL_KINDS, VILLAGE_KIND
 
 
 def _adjacency(rooms, edges) -> dict:
@@ -88,14 +88,43 @@ def assign_topography(rooms, rng, boss_id, settings=None) -> None:
     for room in rooms:
         if room.id == boss_id:
             room.topography = settings.boss_topography
+        elif room.kind == VILLAGE_KIND:
+            # The other fixed assignment (HI-1): a village is flat and small
+            # whatever it would have drawn, and it draws nothing.
+            room.topography = settings.village_topography
         else:
             room.topography = rng.choices(names, weights=weights, k=1)[0]
 
 
-def _assign_kinds(rooms, rng, start_id, boss_id, dist) -> None:
+def _pick_villages(rooms, rng, start_id, boss_id, dist, settings=None) -> list:
+    """Which islands are villages (HI-1): between `settings.villages[0]` and
+    `[1]` of them, drawn from the islands at a tree distance from the start
+    inside `settings.village_distance`, never the boss.
+
+    A hard floor of one: the forge has to exist somewhere. With three or
+    more islands the start always has a non-boss neighbour -- the boss is
+    the farthest island, so it can only be adjacent to the start when nothing
+    else is -- but should the band ever come up empty the draw falls back to
+    any island that is neither start nor boss rather than to none."""
+    s = settings_or_config(settings)
+    lo, hi = s.village_distance
+    cands = sorted(r.id for r in rooms
+                   if r.id not in (start_id, boss_id)
+                   and lo <= dist.get(r.id, -1) <= hi)
+    if not cands:
+        cands = sorted(r.id for r in rooms if r.id not in (start_id, boss_id))
+    n = min(rng.randint(*s.villages), len(cands))
+    return sorted(rng.sample(cands, n))
+
+
+def _assign_kinds(rooms, rng, start_id, boss_id, dist, settings=None) -> None:
     rooms[start_id].kind = "start"
     rooms[boss_id].kind = "boss"
-    others = [r.id for r in rooms if r.id not in (start_id, boss_id)]
+    villages = _pick_villages(rooms, rng, start_id, boss_id, dist, settings)
+    for rid in villages:
+        rooms[rid].kind = VILLAGE_KIND
+    others = [r.id for r in rooms
+              if r.id not in (start_id, boss_id) and r.id not in villages]
     rng.shuffle(others)
     # One of each special where room budget allows; the rest stay "combat".
     for kind, rid in zip(SPECIAL_KINDS, others):

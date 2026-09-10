@@ -19,6 +19,7 @@ from game.states.playing.projectiles import cone as cone_mod
 from game.states.playing.projectiles.orbit import orbit
 from game.states.playing.projectiles.thunder import thunder
 from game.states.playing.projectiles.arcane import arcane
+from game.states.playing.projectiles import bomb as bomb_mod
 
 
 def _display():
@@ -31,7 +32,7 @@ class RegistryTests(unittest.TestCase):
     def test_every_family_is_registered(self):
         self.assertEqual(set(registered()),
                          {"bolt", "arrow", "cone", "orbit", "melee", "thunder",
-                          "arcane"})
+                          "arcane", "blast", "bomb", "hidden"})
 
     def test_classify_routes_by_the_projectile_fields(self):
         cone = SimpleNamespace(style="", cone_half_angle=0.5, orbit_speed=0.0, anchor=None)
@@ -238,6 +239,62 @@ class ConeSlashTests(unittest.TestCase):
         self.a.frame_rotated = lambda rig, an, idx, deg, **kw: got.append(idx)
         cone_mod.cone(self.surf, 120, 120, self.p, DrawCtx(self.a, now=0.5, zoom=1.0))
         self.assertEqual(got, [want])
+
+
+
+class BombTests(unittest.TestCase):
+    """The thrown Bomb: `spin` strip in flight, `fuse` strip once landed, both
+    from the `bomb` rig on the run clock; the disc when the sheets are gone."""
+
+    @classmethod
+    def setUpClass(cls):
+        _display()
+
+    def setUp(self):
+        reset_assets()
+        self.a = Assets()
+        self.surf = pygame.Surface((200, 200), pygame.SRCALPHA)
+        self.ctx = DrawCtx(self.a, now=0.7, zoom=1.0)
+
+    def _bomb(self, vx):
+        return SimpleNamespace(color=(70, 60, 60), radius=8, fx={},
+                               vel=pygame.Vector2(vx, 0))
+
+    def test_rig_uses_both_sheets_and_not_the_idle(self):
+        self.assertEqual(set(self.a.rig("bomb")["anims"]), {"spin", "fuse"})
+        for anim in ("spin", "fuse"):
+            self.assertEqual(self.a.frame_count("bomb", anim), 4, anim)
+
+    def test_spins_in_flight_and_burns_its_fuse_once_landed(self):
+        self.assertEqual(bomb_mod.anim_for(self._bomb(300)), "spin")
+        self.assertEqual(bomb_mod.anim_for(self._bomb(0)), "fuse")
+        got = []
+        self.a.frame = lambda rig, an, idx, **kw: (got.append((rig, an)), None)[1]
+        bomb_mod.bomb(self.surf, 100, 100, self._bomb(300), self.ctx)
+        bomb_mod.bomb(self.surf, 100, 100, self._bomb(0), self.ctx)
+        self.assertEqual(got, [("bomb", "spin"), ("bomb", "fuse")])
+
+    def test_frame_index_follows_the_run_clock(self):
+        want = int(0.7 * self.a.fps("bomb", "fuse")) % self.a.frame_count("bomb", "fuse")
+        got = []
+        self.a.frame = lambda rig, an, idx, **kw: got.append(idx)
+        bomb_mod.bomb(self.surf, 100, 100, self._bomb(0), self.ctx)
+        self.assertEqual(got, [want])
+
+    def test_blits_by_the_ball_anchor_and_falls_back_to_a_disc(self):
+        bomb_mod.bomb(self.surf, 100, 100, self._bomb(0), self.ctx)
+        bb = self.surf.get_bounding_rect(min_alpha=1)
+        self.assertTrue(bb.collidepoint(100, 100))          # the ball sits on the position
+        self.assertGreater(100 - bb.top, bb.bottom - 100)   # more sprite above than below: the fuse
+        self.a.frame = lambda *a, **k: None
+        circles = []
+        real = pygame.draw.circle
+        pygame.draw.circle = lambda *a, **k: circles.append(a[:3])
+        try:
+            bomb_mod.bomb(self.surf, 100, 100, self._bomb(0), self.ctx)
+        finally:
+            pygame.draw.circle = real
+        self.assertTrue(circles, "disc fallback not drawn")
 
 
 if __name__ == "__main__":

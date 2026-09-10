@@ -81,6 +81,8 @@ class PoolDataTests(unittest.TestCase):
         made every terrace boundary on a small island green-on-green."""
         fams = self.t["sheet_biomes"]
         for name, spec in config.HEIGHTMAP_TOPOGRAPHIES.items():
+            if spec["tiers"][1] == 0:
+                continue        # one terrace, no boundary: `human` is meadow only
             got = {fams[x] for x in spec["sheets"]}
             self.assertGreaterEqual(len(got), 2,
                                     f"{name} owns only {got}")

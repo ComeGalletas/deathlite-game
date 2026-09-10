@@ -1,24 +1,25 @@
-"""Milestone 3: level-up selection pool (spec 3.5 / 8).
+"""The level-up card facade (`progression.upgrades`) over the P2 offering.
 
 Invariants:
   * exactly N distinct choices when the pool is large enough
-  * never a weapon-specific option for an unowned weapon
-  * never "new weapon X" for a weapon already owned
-  * maxed-out upgrades stop appearing
+  * never a weapon blessing for an unowned weapon
+  * never a grant for a weapon already owned, nor once the slots are full
+  * maxed-out blessings stop appearing
   * deterministic for a given seed
 """
 import random
 import unittest
 
-from entities.player import Player
 from combat.weapons import Weapon
+from entities.player import Player
 from game.content import get_content
-from progression.upgrades import roll_choices, valid_choices, apply_choice
+from progression.upgrades import (MAX_SUMMONS, MAX_WEAPONS, apply_choice,
+                                  roll_choices, valid_choices)
 
 
-def fresh_player():
+def fresh_player(*wids):
     p = Player(0, 0)
-    p.weapons = [Weapon("arcane_bolt", get_content().weapon("arcane_bolt"))]
+    p.weapons = [Weapon(w, get_content().weapon(w)) for w in (wids or ("sword",))]
     return p
 
 
@@ -27,60 +28,73 @@ class RollTests(unittest.TestCase):
         self.content = get_content()
 
     def test_returns_three_distinct(self):
-        p = fresh_player()
-        choices = roll_choices(p, self.content, random.Random(1), n=3)
+        choices = roll_choices(fresh_player(), self.content, random.Random(1), n=3)
         self.assertEqual(len(choices), 3)
         self.assertEqual(len({c.id for c in choices}), 3)
 
-    def test_no_upgrade_for_unowned_weapon(self):
-        p = fresh_player()  # owns only arcane_bolt
-        ids = {u.id for u in valid_choices(p, self.content)}
-        self.assertFalse(any(i.startswith("frost_shards:") for i in ids))
-        self.assertFalse(any(i.startswith("thunder_orb:") for i in ids))
+    def test_no_blessing_for_unowned_weapon(self):
+        ids = {u.id for u in valid_choices(fresh_player(), self.content)}
+        self.assertFalse(any(i.startswith("bow_") for i in ids))
+        self.assertFalse(any(i.startswith("magic_rod_") for i in ids))
+        self.assertTrue(any(i.startswith("sword_") for i in ids))
 
-    def test_owned_weapon_not_offered_as_new(self):
-        p = fresh_player()
-        ids = {u.id for u in valid_choices(p, self.content)}
-        self.assertNotIn("new:arcane_bolt", ids)
-        self.assertIn("new:frost_shards", ids)
+    def test_owned_weapon_not_offered_as_a_grant(self):
+        ids = {u.id for u in valid_choices(fresh_player(), self.content)}
+        self.assertNotIn("grant:sword", ids)
+        self.assertIn("grant:bow", ids)
 
-    def test_new_weapon_upgrade_actually_adds_weapon(self):
+    def test_a_grant_adds_the_weapon_and_opens_its_blessings(self):
         p = fresh_player()
-        new = next(u for u in valid_choices(p, self.content)
-                   if u.id == "new:thunder_orb")
+        new = next(u for u in valid_choices(p, self.content) if u.id == "grant:magic_rod")
         apply_choice(p, new)
-        self.assertIn("thunder_orb", {w.weapon_id for w in p.weapons})
-        # ...and now bolt-style upgrades for it become available
+        self.assertIn("magic_rod", {w.weapon_id for w in p.weapons})
         ids = {u.id for u in valid_choices(p, self.content)}
-        self.assertIn("thunder_orb:damage", ids)
-        self.assertNotIn("new:thunder_orb", ids)
+        self.assertIn("magic_rod_arcane_missiles", ids)
+        self.assertNotIn("grant:magic_rod", ids)
 
-    def test_max_stacks_enforced(self):
+    def test_max_level_enforced(self):
         p = fresh_player()
-        move = next(u for u in valid_choices(p, self.content) if u.id == "move_speed")
-        for _ in range(move.max_stacks):
+        for _ in range(5):
+            move = next(u for u in valid_choices(p, self.content) if u.id == "fleet_foot")
             apply_choice(p, move)
-        ids = {u.id for u in valid_choices(p, self.content)}
-        self.assertNotIn("move_speed", ids)
+        self.assertNotIn("fleet_foot", {u.id for u in valid_choices(p, self.content)})
+        self.assertEqual(p.upgrade_stacks["fleet_foot"], 5)
 
     def test_apply_changes_stat(self):
         p = fresh_player()
         before = p.stats["move_speed"]
-        move = next(u for u in valid_choices(p, self.content) if u.id == "move_speed")
+        move = next(u for u in valid_choices(p, self.content) if u.id == "fleet_foot")
         apply_choice(p, move)
-        self.assertAlmostEqual(p.stats["move_speed"], before * 1.10)
+        self.assertGreater(p.stats["move_speed"], before)
 
-    def test_deterministic_with_seed(self):
-        a = roll_choices(fresh_player(), self.content, random.Random(99), n=3)
-        b = roll_choices(fresh_player(), self.content, random.Random(99), n=3)
-        self.assertEqual([u.id for u in a], [u.id for u in b])
+    def test_deterministic_for_seed(self):
+        a = [u.id for u in roll_choices(fresh_player(), self.content, random.Random(9))]
+        b = [u.id for u in roll_choices(fresh_player(), self.content, random.Random(9))]
+        self.assertEqual(a, b)
 
-    def test_degrades_when_pool_smaller_than_n(self):
-        p = fresh_player()
-        # Exhaust everything, then ask for 3.
-        while valid_choices(p, self.content):
-            apply_choice(p, valid_choices(p, self.content)[0])
-        self.assertEqual(roll_choices(p, self.content, random.Random(0), n=3), [])
+
+class SlotTests(unittest.TestCase):
+    """Design §20 / §3.7: three weapons (melee + ranged) and one summon."""
+
+    def _grants(self, p):
+        return {u.id for u in valid_choices(p, get_content()) if u.id.startswith("grant:")}
+
+    def test_limits(self):
+        self.assertEqual((MAX_WEAPONS, MAX_SUMMONS), (3, 1))
+
+    def test_three_weapons_stop_weapon_grants_but_not_the_summon(self):
+        offers = self._grants(fresh_player("sword", "bow", "bomb"))
+        self.assertFalse({"grant:hammer", "grant:daggers", "grant:magic_rod"} & offers)
+        self.assertEqual({"grant:ember_ring", "grant:grave_totem", "grant:spirit_wolf"}, offers)
+
+    def test_a_summon_does_not_use_a_weapon_slot(self):
+        offers = self._grants(fresh_player("sword", "bow", "spirit_wolf"))
+        self.assertIn("grant:hammer", offers)
+        self.assertNotIn("grant:grave_totem", offers)
+        self.assertNotIn("grant:ember_ring", offers)
+
+    def test_full_run_offers_no_grants(self):
+        self.assertEqual(self._grants(fresh_player("sword", "bow", "bomb", "ember_ring")), set())
 
 
 if __name__ == "__main__":

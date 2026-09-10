@@ -7,9 +7,9 @@ import math
 
 import pygame
 
+from game import config
 from game.states.playing.projectiles import style
 
-_HOSTILE_ARROW_TINT = (150, 26, 12)
 
 
 @style("bolt")
@@ -25,9 +25,10 @@ def arrow(surface, sx, sy, p, ctx) -> None:
     z = ctx.zoom
     aw, ah = ctx.assets.scale_for("arrow")
     size = (max(1, round(aw * z)), max(1, round(ah * z)))
+    tint = p.fx.get("tint")                 # P1: the hero's Bow is not hostile red
     spr = ctx.assets.rotated(
         "arrow", math.degrees(math.atan2(p.vel.y, p.vel.x)),
-        size=size, tint=_HOSTILE_ARROW_TINT)
+        size=size, tint=tuple(tint) if tint else config.HOSTILE_ARROW_TINT)
     if spr is not None:
         surface.blit(spr, spr.get_rect(center=(int(sx), int(sy))))
     else:

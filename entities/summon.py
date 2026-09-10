@@ -32,10 +32,12 @@ def _nearest(pos, enemies):
 class Summon:
     __slots__ = ("active", "kind", "pos", "vel", "life", "attack_cd", "radius",
                  "color", "damage", "speed", "attack_range", "attack_interval",
-                 "tags", "_t", "anim", "_bite_t", "_side", "reach", "fx")
+                 "tags", "_t", "anim", "_bite_t", "_side", "reach", "fx",
+                 "weapon_id")
 
     def __init__(self) -> None:
         self.active = False
+        self.weapon_id = ""
         self.kind = "totem"
         self.pos = pygame.Vector2()
         self.vel = pygame.Vector2()
@@ -57,8 +59,10 @@ class Summon:
 
     def reset(self, *, kind, pos, damage, lifetime, color, tags,
               speed=0.0, attack_range=320.0, attack_interval=0.7,
-              radius=12.0, reach=float("inf"), fx: dict | None = None) -> None:
+              radius=12.0, reach=float("inf"), fx: dict | None = None,
+              weapon_id: str = "") -> None:
         self.kind = kind
+        self.weapon_id = weapon_id
         self.pos.update(pos)
         self.vel.update(0, 0)
         self.damage = damage

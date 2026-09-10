@@ -21,6 +21,9 @@ from __future__ import annotations
 
 import math
 
+import pygame
+
+from combat import synergy
 from combat.knockback import knock_split
 from entities.projectile import Projectile
 from game import config
@@ -28,6 +31,9 @@ from game.events import Events
 from systems.collision import circles_overlap
 
 _ENEMY_DEATH_FX_SCALE = 0.55        # enemy death poof at 55% (hero stays 1.0)
+_SHOVED_SPEED_SQ = 30.0 ** 2        # P2 Demolitionist: `_knock` faster than this counts as shoved
+_SPLIT_DEG = 25.0                   # P2 Split Arrow: fan step between children
+_SPLIT_LIFE = 0.6                   # ...and how long a child flies
 
 
 class CombatResolver:
@@ -51,6 +57,10 @@ class CombatResolver:
         for proj in ps.projectiles:
             if not proj.active:
                 continue
+            if proj.inert:
+                if proj.mine and proj.age >= proj.arm_delay:
+                    self.trip_mine(proj, targets)
+                continue              # a fused bomb waits for its blast (P1)
             near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
             if ps.boss is not None and ps.boss.alive:
                 near = near + [ps.boss]
@@ -65,6 +75,9 @@ class CombatResolver:
 
                 amount = 0.0 if no_dmg else proj.damage * self.damage_multiplier(proj, enemy)
                 dealt = enemy.take_damage(amount)
+                if not enemy.alive:
+                    enemy.killed_by = proj.weapon_id     # P2: Bloodletting etc.
+                self.remember_hit(proj, enemy)           # P4: after the multiplier
                 proj.hit_ids.add(id(enemy))
                 ps.stats["damage_dealt"] += dealt
                 ps.damage_numbers.add(enemy.pos, dealt, proj.is_crit)
@@ -76,8 +89,11 @@ class CombatResolver:
                     _, push = knock_split(proj.src_weight, enemy.weight,
                                           config.HIT_KNOCK_GAIN * proj.src_weight)
                     enemy.apply_knockback(enemy.pos - proj.pos, push)
+                self.crowd_cleaner(proj, enemy)          # P4: the Sword's pull
                 if not no_dmg:
                     self.apply_on_hit_effects(proj, enemy)
+                    self.apply_stun(proj, enemy)
+                    self.split(proj, enemy)
                 ps.game.events.publish(Events.DAMAGE_DEALT, amount=dealt)
                 if proj.chain_left > 0 and self.chain_to_next(proj, targets):
                     continue
@@ -86,12 +102,93 @@ class CombatResolver:
                     break
 
     def damage_multiplier(self, proj: Projectile, enemy) -> float:
-        """Blessing tag bonuses + Shock + status-vulnerability synergy."""
+        """Item tag bonuses + Shock + status-vulnerability synergy, times the
+        firing weapon's conditional blessings (P2) and its weapon synergies
+        (P4)."""
         fx = self.ps.player.blessing_fx
         mult = 1.0 + fx.tag_bonus(proj.source_tags, getattr(enemy, "is_elite", False))
         mult *= enemy.status.damage_taken_multiplier()
         mult += fx.vuln_bonus(proj.source_tags, enemy.status)
+        mult *= self.weapon_effect_multiplier(proj, enemy)
+        mult *= synergy.synergy_multiplier(
+            self.ps.player, self._weapon(proj), enemy, self.now())
         return mult
+
+    def now(self) -> float:
+        return float(self.ps.stats.get("time", 0.0))
+
+    def _weapon(self, proj: Projectile):
+        return self.ps.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
+
+    def remember_hit(self, proj: Projectile, enemy) -> None:
+        """P4: the enemy remembers who hit it and when; a marking weapon (the
+        Rod, `mark_on_hit` in its data) also leaves the `mark` status for one
+        window."""
+        if not hasattr(enemy, "recent_hits"):
+            return
+        synergy.record_hit(enemy, proj.weapon_id, self.now())
+        w = self._weapon(proj)
+        if w is not None and w.definition.get("mark_on_hit"):
+            enemy.status.apply(synergy.MARK, synergy.window(), 1.0)
+
+    def crowd_cleaner(self, proj: Projectile, enemy) -> None:
+        w = self._weapon(proj)
+        if w is not None:
+            synergy.pull(enemy, proj, w.effect("pull_strength"))
+
+    def _effects(self, proj: Projectile) -> dict:
+        """The firing weapon's `effects` (P2), or `{}` for a shot that no owned
+        weapon fired (a summon's bolt, a stray)."""
+        w = self.ps.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
+        return w.effects if w is not None else {}
+
+    def weapon_effect_multiplier(self, proj: Projectile, enemy) -> float:
+        """Conditional damage blessings, all additive with each other:
+        Executioner (target under a health fraction), Weak Point (target
+        already wounded), Demolitionist (target stunned or being shoved)."""
+        fx = self._effects(proj)
+        if not fx:
+            return 1.0
+        bonus = 0.0
+        max_hp = float(getattr(enemy, "max_hp", 0.0)) or float(enemy.hp)
+        if "executioner_mult" in fx and enemy.hp <= max_hp * fx.get("executioner_threshold", 0.0):
+            bonus += fx["executioner_mult"]
+        if "weak_point_mult" in fx and enemy.hp < max_hp:
+            bonus += fx["weak_point_mult"]
+        if "demolition_mult" in fx:
+            knock = getattr(enemy, "_knock", None)
+            shoved = knock is not None and knock.length_squared() > _SHOVED_SPEED_SQ
+            if enemy.status.is_stunned() or shoved:
+                bonus += fx["demolition_mult"]
+        return 1.0 + bonus
+
+    def split(self, proj: Projectile, enemy) -> None:
+        """Split Arrow (P2): a moving shot that lands spawns `split_count`
+        children fanned around its heading at `split_damage_mult` damage.
+        Children carry the `split` tag and never split again; they skip the
+        enemy that was just hit."""
+        fx = self._effects(proj)
+        n = int(fx.get("split_count", 0))
+        if n <= 0 or "split" in proj.source_tags or proj.vel.length_squared() < 1.0:
+            return
+        ps = self.ps
+        mult = float(fx.get("split_damage_mult", 0.5))
+        speed = proj.vel.length()
+        heading = math.atan2(proj.vel.y, proj.vel.x)
+        # Fan: 1 -> +25deg; 2 -> +-25; 3 -> -25, 0(+ small), +25 ... symmetric.
+        angles = [(_SPLIT_DEG * (i - (n - 1) / 2.0)) for i in range(n)]
+        if n % 2 == 1:
+            angles = [a + _SPLIT_DEG / 2.0 for a in angles]
+        for a in angles:
+            rad = heading + math.radians(a)
+            child = ps._spawn_projectile(
+                pos=proj.pos, vel=pygame.Vector2(math.cos(rad), math.sin(rad)) * speed,
+                damage=proj.damage * mult, radius=proj.radius, lifetime=_SPLIT_LIFE,
+                pierce=0, src_weight=proj.src_weight, weapon_id=proj.weapon_id,
+                source_tags=tuple(proj.source_tags) + ("split",), is_crit=proj.is_crit)
+            if child is not None:
+                child.hit_ids.add(id(enemy))
+                child.fire_level = proj.fire_level
 
     def apply_on_hit_effects(self, proj: Projectile, enemy) -> None:
         ps = self.ps
@@ -105,10 +202,27 @@ class CombatResolver:
                     dur * (1.0 + fx.tuned(status, "duration")),
                     potency * (1.0 + fx.tuned(status, "potency")),
                     bonus_max_stacks=int(fx.tuned(status, "max_stacks")))
-        # Nihil / Cursebrand: first hit on each enemy applies Shock.
-        if ps.player.trait == "cursebrand" and id(enemy) not in ps.player._hexed:
-            ps.player._hexed.add(id(enemy))
-            enemy.status.apply("shock", 4.0, 0.10)
+
+    def trip_mine(self, proj: Projectile, targets) -> None:
+        """P3 Minefield: an armed mine goes off the moment an enemy body
+        overlaps it."""
+        ps = self.ps
+        near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
+        if ps.boss is not None and ps.boss.alive:
+            near = near + [ps.boss]
+        for enemy in near:
+            if enemy.alive and circles_overlap(proj.pos.x, proj.pos.y, proj.radius,
+                                               enemy.pos.x, enemy.pos.y, enemy.radius):
+                proj.active = False
+                ps.fx.detonate(proj)
+                return
+
+    def apply_stun(self, proj: Projectile, enemy) -> None:
+        """P1: the Hammer's `stun_chance` roll. Bosses are immune."""
+        if proj.stun_chance <= 0.0 or getattr(enemy, "stun_immune", False):
+            return
+        if self.ps.rng.random() < proj.stun_chance:
+            enemy.status.apply("stun", proj.stun_duration, 1.0)
 
     @staticmethod
     def in_cone(proj: Projectile, enemy) -> bool:

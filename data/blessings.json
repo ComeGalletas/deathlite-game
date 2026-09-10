@@ -1,37 +1,431 @@
 {
-  "ember_kindling":       {"source": "ember", "name": "Kindling",       "description": "+18% damage with fire attacks.",                 "tags": ["fire"],  "max_stacks": 5, "effects": [{"kind": "tag_damage", "tag": "fire", "value": 0.18}]},
-  "ember_ignite":         {"source": "ember", "name": "Ignite",         "description": "Fire hits have a 30% chance to Burn.",            "tags": ["fire", "status"], "max_stacks": 3, "effects": [{"kind": "on_hit_status", "status": "burn", "tag": "fire", "chance": 0.30, "duration": 4.0, "potency": 3.0}]},
-  "ember_conflagration":  {"source": "ember", "name": "Conflagration",  "description": "Area attacks deal +25% to Burning enemies.",      "tags": ["fire", "area"], "max_stacks": 3, "effects": [{"kind": "status_vuln", "status": "burn", "attack_tag": "area", "value": 0.25}]},
-  "ember_immolation":     {"source": "ember", "name": "Immolation",     "description": "All attacks deal +18% to Burning enemies.",       "tags": ["fire"], "max_stacks": 3, "effects": [{"kind": "status_vuln", "status": "burn", "attack_tag": null, "value": 0.18}]},
-  "ember_emberheart":     {"source": "ember", "name": "Emberheart",     "description": "+7% attack speed.",                              "tags": ["fire"], "max_stacks": 5, "effects": [{"kind": "stat_mod", "stat": "attack_speed_multiplier", "op": "mult", "value": 0.07}]},
-  "ember_pyre":           {"source": "ember", "name": "Pyre",           "description": "Burn deals +50% damage per tick.",               "tags": ["fire", "status"], "max_stacks": 4, "effects": [{"kind": "status_tune", "status": "burn", "field": "potency", "value": 0.50}]},
-  "ember_wildfire":       {"source": "ember", "name": "Wildfire",       "description": "Burn can stack 2 higher.",                       "tags": ["fire", "status"], "max_stacks": 1, "effects": [{"kind": "status_tune", "status": "burn", "field": "max_stacks", "value": 2}]},
-  "ember_cinders":        {"source": "ember", "name": "Cinders",        "description": "Burning enemies burst into flame on death.",     "tags": ["fire", "area"], "max_stacks": 1, "effects": [{"kind": "on_kill", "effect": "fire_nova", "chance": 1.0, "amount": 16}]},
-
-  "tide_rime":            {"source": "tide", "name": "Rime",            "description": "+18% damage with frost attacks.",                "tags": ["frost"], "max_stacks": 5, "effects": [{"kind": "tag_damage", "tag": "frost", "value": 0.18}]},
-  "tide_frostbite":       {"source": "tide", "name": "Frostbite",       "description": "Frost hits have a 40% chance to Chill (slow).",   "tags": ["frost", "status"], "max_stacks": 3, "effects": [{"kind": "on_hit_status", "status": "chill", "tag": "frost", "chance": 0.40, "duration": 2.5, "potency": 0.30}]},
-  "tide_glacier":         {"source": "tide", "name": "Glacier",         "description": "All attacks deal +30% to Chilled enemies.",       "tags": ["frost"], "max_stacks": 3, "effects": [{"kind": "status_vuln", "status": "chill", "attack_tag": null, "value": 0.30}]},
-  "tide_riptide":         {"source": "tide", "name": "Riptide",         "description": "Area attacks deal +22% to Chilled enemies.",      "tags": ["frost", "area"], "max_stacks": 3, "effects": [{"kind": "status_vuln", "status": "chill", "attack_tag": "area", "value": 0.22}]},
-  "tide_bulwark":         {"source": "tide", "name": "Bulwark",         "description": "+18% max HP.",                                   "tags": ["defense"], "max_stacks": 4, "effects": [{"kind": "stat_mod", "stat": "max_hp", "op": "pct", "value": 0.18}]},
-  "tide_carapace":        {"source": "tide", "name": "Carapace",        "description": "+10 armor.",                                     "tags": ["defense"], "max_stacks": 4, "effects": [{"kind": "stat_mod", "stat": "armor", "op": "flat", "value": 10}]},
-  "tide_wellspring":      {"source": "tide", "name": "Wellspring",      "description": "Kills have a 10% chance to heal you for 2.",      "tags": ["defense"], "max_stacks": 3, "effects": [{"kind": "on_kill", "effect": "heal", "chance": 0.10, "amount": 2}]},
-  "tide_deepfreeze":      {"source": "tide", "name": "Deep Freeze",     "description": "Chill slows 15% harder and lasts longer.",       "tags": ["frost", "status"], "max_stacks": 3, "effects": [{"kind": "status_tune", "status": "chill", "field": "potency", "value": 0.15}, {"kind": "status_tune", "status": "chill", "field": "duration", "value": 0.25}]},
-
-  "storm_charge":         {"source": "storm", "name": "Charge",         "description": "+18% damage with lightning attacks.",            "tags": ["lightning"], "max_stacks": 5, "effects": [{"kind": "tag_damage", "tag": "lightning", "value": 0.18}]},
-  "storm_static":         {"source": "storm", "name": "Static",         "description": "Lightning hits have a 35% chance to Shock.",      "tags": ["lightning", "status"], "max_stacks": 3, "effects": [{"kind": "on_hit_status", "status": "shock", "tag": "lightning", "chance": 0.35, "duration": 4.0, "potency": 0.15}]},
-  "storm_overload":       {"source": "storm", "name": "Overload",       "description": "All attacks deal +25% to Shocked enemies.",       "tags": ["lightning"], "max_stacks": 3, "effects": [{"kind": "status_vuln", "status": "shock", "attack_tag": null, "value": 0.25}]},
-  "storm_tailwind":       {"source": "storm", "name": "Tailwind",       "description": "+10% attack speed.",                             "tags": ["lightning"], "max_stacks": 5, "effects": [{"kind": "stat_mod", "stat": "attack_speed_multiplier", "op": "mult", "value": 0.10}]},
-  "storm_precision":      {"source": "storm", "name": "Precision",      "description": "+8% critical strike chance.",                    "tags": ["critical"], "max_stacks": 5, "effects": [{"kind": "stat_mod", "stat": "crit_chance", "op": "flat", "value": 0.08}]},
-  "storm_thunderclap":    {"source": "storm", "name": "Thunderclap",    "description": "+40% critical strike damage.",                   "tags": ["critical"], "max_stacks": 4, "effects": [{"kind": "stat_mod", "stat": "crit_damage", "op": "flat", "value": 0.40}]},
-  "storm_gale":           {"source": "storm", "name": "Gale",           "description": "+10% movement and projectile speed.",            "tags": ["utility"], "max_stacks": 4, "effects": [{"kind": "stat_mod", "stat": "move_speed", "op": "mult", "value": 0.10}, {"kind": "stat_mod", "stat": "projectile_speed_multiplier", "op": "mult", "value": 0.10}]},
-  "storm_conduction":     {"source": "storm", "name": "Conduction",     "description": "A Shocked enemy's death spreads Shock to a nearby foe.", "tags": ["lightning", "status"], "max_stacks": 1, "effects": [{"kind": "on_kill", "effect": "shock_spread", "chance": 1.0, "amount": 0}]},
-
-  "grave_harvest":        {"source": "grave", "name": "Harvest",        "description": "+12% XP from gems.",                             "tags": ["utility"], "max_stacks": 5, "effects": [{"kind": "stat_mod", "stat": "xp_gain", "op": "flat", "value": 0.12}]},
-  "grave_soulfire":       {"source": "grave", "name": "Soulfire",       "description": "Kills have a 15% chance to release a homing Soul.", "tags": ["summon"], "max_stacks": 3, "effects": [{"kind": "on_kill", "effect": "soul", "chance": 0.15, "amount": 3}]},
-  "grave_dominion":       {"source": "grave", "name": "Dominion",       "description": "+20% area size for all weapons.",                "tags": ["area"], "max_stacks": 4, "effects": [{"kind": "stat_mod", "stat": "area_multiplier", "op": "pct", "value": 0.20}]},
-  "grave_reaping":        {"source": "grave", "name": "Reaping",        "description": "+15% damage with area attacks.",                 "tags": ["area"], "max_stacks": 5, "effects": [{"kind": "tag_damage", "tag": "area", "value": 0.15}]},
-  "grave_endurance":      {"source": "grave", "name": "Endurance",      "description": "+15 max HP and +2 armor.",                       "tags": ["defense"], "max_stacks": 5, "effects": [{"kind": "stat_mod", "stat": "max_hp", "op": "flat", "value": 15}, {"kind": "stat_mod", "stat": "armor", "op": "flat", "value": 2}]},
-  "grave_grim_toll":      {"source": "grave", "name": "Grim Toll",      "description": "+25% damage to elites.",                         "tags": ["elite"], "max_stacks": 3, "effects": [{"kind": "tag_damage", "tag": "elite", "value": 0.25}]},
-  "grave_lingering":      {"source": "grave", "name": "Lingering",      "description": "Your status effects last 40% longer.",           "tags": ["status"], "max_stacks": 3, "effects": [{"kind": "status_tune", "status": "*", "field": "duration", "value": 0.40}]},
-  "grave_soulharvest":    {"source": "grave", "name": "Soul Harvest",   "description": "Collecting a Soul also heals you for 1.",         "tags": ["summon"], "max_stacks": 1, "effects": [{"kind": "on_kill", "effect": "soul_heal", "chance": 1.0, "amount": 1}]}
+  "vitality": { "name": "Vitality", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} max HP.",
+    "effects": [
+      {"type": "stat", "stat": "max_hp", "op": "flat", "levels": [20, 40, 60, 80, 100], "display": "flat", "heal": true}
+    ]
+  },
+  "fleet_foot": { "name": "Fleet Foot", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} movement speed.",
+    "effects": [
+      {"type": "stat", "stat": "move_speed", "op": "pct", "levels": [0.06, 0.12, 0.18, 0.25, 0.32], "display": "pct"}
+    ]
+  },
+  "scholar": { "name": "Scholar", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} experience from gems.",
+    "effects": [
+      {"type": "stat", "stat": "xp_gain", "op": "flat", "levels": [0.1, 0.2, 0.3, 0.4, 0.5], "display": "pct"}
+    ]
+  },
+  "gold_rush": { "name": "Gold Rush", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} gold from kills.",
+    "effects": [
+      {"type": "stat", "stat": "gold_gain", "op": "flat", "levels": [0.15, 0.3, 0.45, 0.6, 0.8], "display": "pct"}
+    ]
+  },
+  "iron_arm": { "name": "Iron Arm", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} damage with melee weapons.",
+    "effects": [
+      {"type": "stat", "stat": "melee_damage", "op": "flat", "levels": [0.08, 0.16, 0.24, 0.32, 0.4], "display": "pct"}
+    ]
+  },
+  "keen_eye": { "name": "Keen Eye", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} damage with ranged weapons.",
+    "effects": [
+      {"type": "stat", "stat": "ranged_damage", "op": "flat", "levels": [0.08, 0.16, 0.24, 0.32, 0.4], "display": "pct"}
+    ]
+  },
+  "haste": { "name": "Haste", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} attack speed with every weapon.",
+    "effects": [
+      {"type": "stat", "stat": "attack_speed_multiplier", "op": "flat", "levels": [0.06, 0.12, 0.18, 0.25, 0.32], "display": "pct"}
+    ]
+  },
+  "iron_skin": { "name": "Iron Skin", "kind": "stat", "category": "power", "rarity": "common",
+    "description": "{0} armour: every hit is reduced by that much.",
+    "effects": [
+      {"type": "stat", "stat": "armor", "op": "flat", "levels": [1, 2, 3, 4, 5], "display": "flat"}
+    ]
+  },
+  "magnet": { "name": "Magnet", "kind": "stat", "category": "coverage", "rarity": "common",
+    "description": "{0} pickup radius.",
+    "effects": [
+      {"type": "stat", "stat": "pickup_radius", "op": "flat", "levels": [20, 40, 60, 80, 100], "display": "flat"}
+    ]
+  },
+  "shield_arm": { "name": "Shield Arm", "kind": "stat", "category": "power", "rarity": "uncommon",
+    "description": "{0} chance to block a hit.",
+    "effects": [
+      {"type": "stat", "stat": "block_chance", "op": "flat", "levels": [0.05, 0.1, 0.15, 0.2, 0.25], "display": "pct"}
+    ]
+  },
+  "shield_wall": { "name": "Shield Wall", "kind": "stat", "category": "power", "rarity": "uncommon",
+    "description": "A blocked hit is reduced by {0} more.",
+    "effects": [
+      {"type": "stat", "stat": "block_strength", "op": "flat", "levels": [0.08, 0.16, 0.24, 0.32, 0.4], "display": "pct"}
+    ]
+  },
+  "nimble": { "name": "Nimble", "kind": "stat", "category": "power", "rarity": "uncommon",
+    "description": "{0} chance to evade a hit entirely.",
+    "effects": [
+      {"type": "stat", "stat": "evasion_chance", "op": "flat", "levels": [0.03, 0.06, 0.09, 0.12, 0.15], "display": "pct"}
+    ]
+  },
+  "lucky_strike": { "name": "Lucky Strike", "kind": "stat", "category": "power", "rarity": "uncommon",
+    "description": "{0} critical hit chance with every weapon.",
+    "effects": [
+      {"type": "stat", "stat": "crit_chance", "op": "flat", "levels": [0.03, 0.06, 0.09, 0.12, 0.15], "display": "pct"}
+    ]
+  },
+  "fortune": { "name": "Fortune", "kind": "stat", "category": "power", "rarity": "uncommon",
+    "description": "{0} luck: better item rolls and a touch more crit.",
+    "effects": [
+      {"type": "stat", "stat": "luck", "op": "flat", "levels": [1, 2, 3, 4, 5], "display": "flat"}
+    ]
+  },
+  "sword_sharpened_edge": { "name": "Sharpened Edge", "kind": "weapon", "weapon": "sword", "category": "power", "rarity": "common",
+    "description": "{0} Sword damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [3, 6, 9, 13, 17], "display": "flat"}
+    ]
+  },
+  "sword_wide_cleave": { "name": "Wide Cleave", "kind": "weapon", "weapon": "sword", "category": "coverage", "rarity": "uncommon",
+    "description": "The sweep reaches {0} further and {1} wider.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "area", "mode": "add", "levels": [8, 16, 24, 32, 40], "display": "flat"},
+      {"type": "weapon_bonus", "field": "cone_half_angle", "mode": "add", "levels": [5, 10, 15, 20, 25], "display": "degrees"}
+    ]
+  },
+  "sword_heavy_blade": { "name": "Heavy Blade", "kind": "weapon", "weapon": "sword", "category": "behavior", "rarity": "rare",
+    "description": "Swings 15% slower, hits for {0} more and shoves {1} harder.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [6, 12, 18, 24, 32], "display": "flat"},
+      {"type": "weapon_bonus", "field": "weight", "mode": "add", "levels": [10, 20, 30, 40, 50], "display": "flat"},
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [1.15, 1.15, 1.15, 1.15, 1.15], "display": "hidden"}
+    ]
+  },
+  "sword_bloodletting": { "name": "Bloodletting", "kind": "weapon", "weapon": "sword", "category": "behavior", "rarity": "rare",
+    "description": "Every kill with the Sword restores {0} HP.",
+    "effects": [
+      {"type": "weapon_effect", "key": "on_kill_heal", "levels": [1, 2, 3, 4, 5], "display": "flat"}
+    ]
+  },
+  "sword_critical_edge": { "name": "Critical Edge", "kind": "weapon", "weapon": "sword", "category": "power", "rarity": "uncommon",
+    "description": "{0} critical hit chance with the Sword.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "crit_chance", "mode": "add", "levels": [0.04, 0.08, 0.12, 0.16, 0.2], "display": "pct"}
+    ]
+  },
+  "hammer_crushing_blow": { "name": "Crushing Blow", "kind": "weapon", "weapon": "hammer", "category": "power", "rarity": "common",
+    "description": "{0} Hammer damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [6, 12, 18, 25, 33], "display": "flat"}
+    ]
+  },
+  "hammer_titans_grip": { "name": "Titan's Grip", "kind": "weapon", "weapon": "hammer", "category": "behavior", "rarity": "uncommon",
+    "description": "Hammer hits shove {0} harder.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "weight", "mode": "add", "levels": [15, 30, 45, 60, 80], "display": "flat"}
+    ]
+  },
+  "hammer_staggering_strike": { "name": "Staggering Strike", "kind": "weapon", "weapon": "hammer", "category": "behavior", "rarity": "uncommon",
+    "description": "{0} stun chance and {1} longer stuns.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "stun_chance", "mode": "add", "levels": [0.08, 0.16, 0.24, 0.32, 0.4], "display": "pct"},
+      {"type": "weapon_bonus", "field": "stun_duration", "mode": "add", "levels": [0.1, 0.2, 0.3, 0.4, 0.5], "display": "seconds"}
+    ]
+  },
+  "hammer_heavy_impact": { "name": "Heavy Impact", "kind": "weapon", "weapon": "hammer", "category": "coverage", "rarity": "uncommon",
+    "description": "The impact reaches {0} further.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "area", "mode": "add", "levels": [10, 20, 30, 40, 50], "display": "flat"}
+    ]
+  },
+  "hammer_executioner": { "name": "Executioner", "kind": "weapon", "weapon": "hammer", "category": "behavior", "rarity": "rare",
+    "description": "{0} Hammer damage against enemies below {1} health.",
+    "effects": [
+      {"type": "weapon_effect", "key": "executioner_mult", "levels": [0.25, 0.45, 0.65, 0.85, 1.1], "display": "pct"},
+      {"type": "weapon_effect", "key": "executioner_threshold", "levels": [0.35, 0.35, 0.35, 0.35, 0.35], "display": "pct"}
+    ]
+  },
+  "daggers_sharpened_blades": { "name": "Sharpened Blades", "kind": "weapon", "weapon": "daggers", "category": "power", "rarity": "common",
+    "description": "{0} Dagger damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [2, 4, 6, 8, 11], "display": "flat"}
+    ]
+  },
+  "daggers_quick_hands": { "name": "Quick Hands", "kind": "weapon", "weapon": "daggers", "category": "power", "rarity": "common",
+    "description": "Daggers strike {0} faster.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [0.92, 0.84, 0.75, 0.65, 0.5], "display": "pct_drop"}
+    ]
+  },
+  "daggers_extended_reach": { "name": "Extended Reach", "kind": "weapon", "weapon": "daggers", "category": "coverage", "rarity": "uncommon",
+    "description": "Daggers reach {0} further.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "area", "mode": "add", "levels": [6, 12, 18, 24, 30], "display": "flat"}
+    ]
+  },
+  "daggers_weak_point": { "name": "Weak Point", "kind": "weapon", "weapon": "daggers", "category": "synergy", "rarity": "rare",
+    "description": "{0} Dagger damage against enemies already wounded.",
+    "effects": [
+      {"type": "weapon_effect", "key": "weak_point_mult", "levels": [0.15, 0.3, 0.45, 0.6, 0.8], "display": "pct"}
+    ]
+  },
+  "bow_piercing_arrow": { "name": "Piercing Arrow", "kind": "weapon", "weapon": "bow", "category": "coverage", "rarity": "uncommon",
+    "description": "Arrows pierce {0} more enemies.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "pierce", "mode": "add", "levels": [1, 2, 3, 4, 6], "display": "flat"}
+    ]
+  },
+  "bow_heavy_draw": { "name": "Heavy Draw", "kind": "weapon", "weapon": "bow", "category": "behavior", "rarity": "rare",
+    "description": "Draws 15% slower and hits for {0} more.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [5, 10, 15, 21, 28], "display": "flat"},
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [1.15, 1.15, 1.15, 1.15, 1.15], "display": "hidden"}
+    ]
+  },
+  "bow_rapid_draw": { "name": "Rapid Draw", "kind": "weapon", "weapon": "bow", "category": "power", "rarity": "common",
+    "description": "The Bow fires {0} faster.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [0.92, 0.84, 0.75, 0.65, 0.55], "display": "pct_drop"}
+    ]
+  },
+  "bow_split_arrow": { "name": "Split Arrow", "kind": "weapon", "weapon": "bow", "category": "behavior", "rarity": "rare",
+    "description": "An arrow that hits splits into {0} more at {1} damage.",
+    "effects": [
+      {"type": "weapon_effect", "key": "split_count", "levels": [1, 1, 2, 2, 3], "display": "flat"},
+      {"type": "weapon_effect", "key": "split_damage_mult", "levels": [0.5, 0.6, 0.6, 0.7, 0.7], "display": "pct"}
+    ]
+  },
+  "magic_rod_arcane_missiles": { "name": "Arcane Missiles", "kind": "weapon", "weapon": "magic_rod", "category": "coverage", "rarity": "uncommon",
+    "description": "The Rod casts {0} more bolts.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 1, 2, 2, 3], "display": "flat"}
+    ]
+  },
+  "magic_rod_seeking": { "name": "Seeking", "kind": "weapon", "weapon": "magic_rod", "category": "behavior", "rarity": "common",
+    "description": "A manual cast finds targets in a {0} wider area.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "aim_assist_deg", "mode": "add", "levels": [10, 20, 30, 40, 55], "display": "degrees"}
+    ]
+  },
+  "magic_rod_chain": { "name": "Chain", "kind": "weapon", "weapon": "magic_rod", "category": "behavior", "rarity": "rare",
+    "description": "Bolts leap to {0} more enemies after a hit.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "chain_count", "mode": "add", "levels": [1, 2, 3, 4, 5], "display": "flat"},
+      {"type": "weapon_bonus", "field": "chain_range", "mode": "add", "levels": [200, 200, 200, 200, 200], "display": "hidden"}
+    ]
+  },
+  "magic_rod_overcharge": { "name": "Overcharge", "kind": "weapon", "weapon": "magic_rod", "category": "behavior", "rarity": "rare",
+    "description": "Every 5th cast is an overcharged bolt at {0} damage.",
+    "effects": [
+      {"type": "weapon_effect", "key": "overcharge_mult", "levels": [1.6, 1.9, 2.2, 2.6, 3.0], "display": "mult"},
+      {"type": "weapon_effect", "key": "overcharge_every", "levels": [5, 5, 5, 5, 5], "display": "flat"}
+    ]
+  },
+  "bomb_bigger_explosion": { "name": "Bigger Explosion", "kind": "weapon", "weapon": "bomb", "category": "coverage", "rarity": "uncommon",
+    "description": "The blast reaches {0} further.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "blast_radius", "mode": "add", "levels": [12, 24, 36, 48, 60], "display": "flat"}
+    ]
+  },
+  "bomb_explosive_force": { "name": "Explosive Force", "kind": "weapon", "weapon": "bomb", "category": "power", "rarity": "common",
+    "description": "{0} Bomb damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [7, 14, 21, 29, 38], "display": "flat"}
+    ]
+  },
+  "bomb_demolitionist": { "name": "Demolitionist", "kind": "weapon", "weapon": "bomb", "category": "synergy", "rarity": "rare",
+    "description": "{0} Bomb damage against stunned or knocked-back enemies.",
+    "effects": [
+      {"type": "weapon_effect", "key": "demolition_mult", "levels": [0.2, 0.4, 0.6, 0.8, 1.0], "display": "pct"}
+    ]
+  },
+  "ember_ring_ember_heat": { "name": "Ember Heat", "kind": "weapon", "weapon": "ember_ring", "category": "power", "rarity": "common",
+    "description": "{0} ember damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [2, 4, 6, 8, 10], "display": "flat"}
+    ]
+  },
+  "ember_ring_more_embers": { "name": "More Embers", "kind": "weapon", "weapon": "ember_ring", "category": "coverage", "rarity": "uncommon",
+    "description": "{0} more embers in the ring.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 2, 3, 4, 5], "display": "flat"}
+    ]
+  },
+  "ember_ring_wide_orbit": { "name": "Wide Orbit", "kind": "weapon", "weapon": "ember_ring", "category": "coverage", "rarity": "common",
+    "description": "Embers are {0} bigger.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "area", "mode": "add", "levels": [3, 6, 9, 12, 15], "display": "flat"}
+    ]
+  },
+  "grave_totem_spectral_bolts": { "name": "Spectral Bolts", "kind": "weapon", "weapon": "grave_totem", "category": "power", "rarity": "common",
+    "description": "{0} totem bolt damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [3, 6, 9, 12, 15], "display": "flat"}
+    ]
+  },
+  "grave_totem_twin_totems": { "name": "Twin Totems", "kind": "weapon", "weapon": "grave_totem", "category": "coverage", "rarity": "uncommon",
+    "description": "{0} more totems can stand at once.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 1, 2, 2, 3], "display": "flat"}
+    ]
+  },
+  "grave_totem_long_watch": { "name": "Long Watch", "kind": "weapon", "weapon": "grave_totem", "category": "coverage", "rarity": "common",
+    "description": "Totems stand {0} longer.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "summon_lifetime", "mode": "add", "levels": [2, 4, 6, 8, 10], "display": "seconds"}
+    ]
+  },
+  "grave_totem_quick_plant": { "name": "Quick Plant", "kind": "weapon", "weapon": "grave_totem", "category": "power", "rarity": "common",
+    "description": "Totems are planted {0} sooner.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [0.9, 0.8, 0.7, 0.6, 0.5], "display": "pct_drop"}
+    ]
+  },
+  "spirit_wolf_savage_bite": { "name": "Savage Bite", "kind": "weapon", "weapon": "spirit_wolf", "category": "power", "rarity": "common",
+    "description": "{0} wolf bite damage.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [4, 8, 12, 16, 20], "display": "flat"}
+    ]
+  },
+  "spirit_wolf_pack": { "name": "Pack", "kind": "weapon", "weapon": "spirit_wolf", "category": "coverage", "rarity": "uncommon",
+    "description": "{0} more wolves run with you.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 1, 2, 2, 3], "display": "flat"}
+    ]
+  },
+  "spirit_wolf_swift": { "name": "Swift", "kind": "weapon", "weapon": "spirit_wolf", "category": "power", "rarity": "common",
+    "description": "A fallen wolf returns {0} sooner.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [0.9, 0.8, 0.7, 0.6, 0.5], "display": "pct_drop"}
+    ]
+  },
+  "twin_daggers_dual_wield": { "name": "Dual Wield", "kind": "weapon", "weapon": "daggers", "category": "power", "rarity": "common", "requires": {"forge": "twin_daggers"},
+    "description": "Both daggers hit for {0} more.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [2, 4, 6, 8, 10], "display": "flat"}
+    ]
+  },
+  "twin_daggers_cross_cut": { "name": "Cross Cut", "kind": "weapon", "weapon": "daggers", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "twin_daggers"},
+    "description": "The two blades fan {0} further apart.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "twin_offset_deg", "mode": "add", "levels": [4, 8, 12, 16, 20], "display": "degrees"}
+    ]
+  },
+  "whirlwind_cyclone": { "name": "Cyclone", "kind": "weapon", "weapon": "sword", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "whirlwind"},
+    "description": "The whirl reaches {0} further.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "area", "mode": "add", "levels": [8, 16, 24, 32, 40], "display": "flat"}
+    ]
+  },
+  "greatsword_cleaver": { "name": "Cleaver", "kind": "weapon", "weapon": "sword", "category": "power", "rarity": "uncommon", "requires": {"forge": "greatsword"},
+    "description": "{0} Greatsword damage and it shoves {1} harder.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [8, 16, 24, 32, 42], "display": "flat"},
+      {"type": "weapon_bonus", "field": "weight", "mode": "add", "levels": [10, 20, 30, 40, 50], "display": "flat"}
+    ]
+  },
+  "earthshaker_aftershock": { "name": "Aftershock", "kind": "weapon", "weapon": "hammer", "category": "power", "rarity": "uncommon", "requires": {"forge": "earthshaker"},
+    "description": "The shockwave reaches {0} further.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "shockwave_radius", "mode": "add", "levels": [12, 24, 36, 48, 60], "display": "flat"}
+    ]
+  },
+  "meteor_hammer_crater": { "name": "Crater", "kind": "weapon", "weapon": "hammer", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "meteor_hammer"},
+    "description": "Craters are {0} wider and burn {1} longer.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "hazard_radius", "mode": "add", "levels": [10, 20, 30, 40, 50], "display": "flat"},
+      {"type": "weapon_bonus", "field": "hazard_duration", "mode": "add", "levels": [0.5, 1.0, 1.5, 2.0, 2.5], "display": "seconds"}
+    ]
+  },
+  "fan_of_blades_more_blades": { "name": "More Blades", "kind": "weapon", "weapon": "daggers", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "fan_of_blades"},
+    "description": "{0} more blades in the fan.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 1, 2, 2, 3], "display": "flat"}
+    ]
+  },
+  "multishot_wide_volley": { "name": "Wide Volley", "kind": "weapon", "weapon": "bow", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "multishot"},
+    "description": "{0} more arrows per volley.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 1, 2, 2, 3], "display": "flat"}
+    ]
+  },
+  "ballista_siege_bolt": { "name": "Siege Bolt", "kind": "weapon", "weapon": "bow", "category": "power", "rarity": "uncommon", "requires": {"forge": "ballista"},
+    "description": "The bolt hits for {0} more and pierces {1} more.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [10, 20, 30, 40, 55], "display": "flat"},
+      {"type": "weapon_bonus", "field": "pierce", "mode": "add", "levels": [2, 4, 6, 8, 10], "display": "flat"}
+    ]
+  },
+  "arcane_storm_tempest": { "name": "Tempest", "kind": "weapon", "weapon": "magic_rod", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "arcane_storm"},
+    "description": "{0} more motes in the storm.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "projectile_count", "mode": "add", "levels": [1, 2, 3, 4, 5], "display": "flat"}
+    ]
+  },
+  "arcane_lance_impale": { "name": "Impale", "kind": "weapon", "weapon": "magic_rod", "category": "power", "rarity": "uncommon", "requires": {"forge": "arcane_lance"},
+    "description": "The lance hits for {0} more and pierces {1} more.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "damage", "mode": "add", "levels": [8, 16, 24, 32, 42], "display": "flat"},
+      {"type": "weapon_bonus", "field": "pierce", "mode": "add", "levels": [1, 2, 3, 4, 6], "display": "flat"}
+    ]
+  },
+  "cluster_bomb_bomblets": { "name": "Bomblets", "kind": "weapon", "weapon": "bomb", "category": "coverage", "rarity": "uncommon", "requires": {"forge": "cluster_bomb"},
+    "description": "{0} more bomblets per blast.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "cluster_count", "mode": "add", "levels": [1, 1, 2, 2, 3], "display": "flat"}
+    ]
+  },
+  "minefield_dense_field": { "name": "Dense Field", "kind": "weapon", "weapon": "bomb", "category": "power", "rarity": "common", "requires": {"forge": "minefield"},
+    "description": "Mines are laid {0} faster.",
+    "effects": [
+      {"type": "weapon_bonus", "field": "cooldown_mult", "mode": "mult", "levels": [0.9, 0.8, 0.7, 0.6, 0.5], "display": "pct_drop"}
+    ]
+  },
+  "daggers_blood_in_the_water": { "name": "Blood in the Water", "kind": "weapon", "weapon": "daggers", "category": "synergy", "rarity": "rare", "requires": {"weapons": ["sword"]},
+    "description": "{0} Dagger damage against enemies the Sword hit in the last 1.5 s.",
+    "effects": [
+      {"type": "weapon_effect", "key": "syn_after_sword", "levels": [0.25, 0.4, 0.55, 0.75, 1.0], "display": "pct"}
+    ]
+  },
+  "bow_linebreaker": { "name": "Linebreaker", "kind": "weapon", "weapon": "bow", "category": "synergy", "rarity": "rare", "requires": {"weapons": ["hammer"]},
+    "description": "{0} Bow damage against enemies the Hammer struck in the last 1.5 s.",
+    "effects": [
+      {"type": "weapon_effect", "key": "syn_after_hammer", "levels": [0.25, 0.4, 0.55, 0.75, 1.0], "display": "pct"}
+    ]
+  },
+  "bomb_demolition": { "name": "Demolition", "kind": "weapon", "weapon": "bomb", "category": "synergy", "rarity": "rare", "requires": {"weapons": ["hammer"]},
+    "description": "{0} Bomb damage against enemies the Hammer struck in the last 1.5 s.",
+    "effects": [
+      {"type": "weapon_effect", "key": "syn_after_hammer", "levels": [0.25, 0.4, 0.55, 0.75, 1.0], "display": "pct"}
+    ]
+  },
+  "daggers_marked_prey": { "name": "Marked Prey", "kind": "weapon", "weapon": "daggers", "category": "synergy", "rarity": "rare", "requires": {"weapons": ["magic_rod"]},
+    "description": "{0} Dagger damage against enemies the Rod marked (its mark lasts 1.5 s).",
+    "effects": [
+      {"type": "weapon_effect", "key": "syn_vs_marked", "levels": [0.3, 0.45, 0.6, 0.8, 1.0], "display": "pct"}
+    ]
+  },
+  "sword_crowd_cleaner": { "name": "Crowd Cleaner", "kind": "weapon", "weapon": "sword", "category": "synergy", "rarity": "rare", "requires": {"weapons": ["bomb"]},
+    "description": "Sword hits drag enemies {0} toward the blow, bunching them for the Bomb.",
+    "effects": [
+      {"type": "weapon_effect", "key": "pull_strength", "levels": [60, 90, 120, 150, 180], "display": "flat"}
+    ]
+  },
+  "bow_crossfire": { "name": "Crossfire", "kind": "weapon", "weapon": "bow", "category": "synergy", "rarity": "rare", "requires": {"weapons": ["magic_rod"]},
+    "description": "{0} Bow damage against Rod-marked enemies, and {1} Rod damage against enemies the Bow hit in the last 1.5 s.",
+    "effects": [
+      {"type": "weapon_effect", "key": "syn_vs_marked", "levels": [0.2, 0.3, 0.4, 0.55, 0.7], "display": "pct"},
+      {"type": "weapon_effect", "key": "crossfire_rod_bonus", "levels": [0.2, 0.3, 0.4, 0.55, 0.7], "display": "pct"}
+    ]
+  },
+  "bow_hunters_mark": { "name": "Hunter's Mark", "kind": "weapon", "weapon": "bow", "category": "behavior", "rarity": "rare",
+    "description": "Each arrow into the same enemy within 1.5 s adds {0} damage, up to {1} stacks.",
+    "effects": [
+      {"type": "weapon_effect", "key": "hunters_mark_per_hit", "levels": [0.06, 0.09, 0.12, 0.15, 0.2], "display": "pct"},
+      {"type": "weapon_effect", "key": "hunters_mark_max", "levels": [5, 5, 5, 5, 5], "display": "raw"}
+    ]
+  }
 }

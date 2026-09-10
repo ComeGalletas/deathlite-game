@@ -65,6 +65,10 @@ def build_decor_scatter(store, a) -> None:
     # for, or a rejecting neighbour could sit outside the nine cells searched.
     prop_cell = max((float(e.get("min_gap", 40)) for e in room_reg), default=40.0)
 
+    # A village (HI-2) is designed round its forge: clutter, like the trees,
+    # keeps outside the settlement's radius (`Village.radius`), spread round it.
+    villages = {v.room_id: v for v in getattr(store.layout, "villages", ())}
+
     # --- room interiors: clutter on interior cells, clear of the centre ---
     for room in store.layout.rooms:
         rng = random.Random(f"{seed}:{room.id}:decor")
@@ -81,6 +85,9 @@ def build_decor_scatter(store, a) -> None:
         # out of the middle of every island -- no amount of raising the biome
         # rates would have shown through it.
         clear_sq = float(place.get("centre_clear", 0.0)) ** 2
+        if room.id in villages:
+            cx, cy = villages[room.id].forge
+            clear_sq = float(villages[room.id].radius) ** 2
         placed: list[tuple] = []
         # Separations live in the index rather than in a list parallel to
         # `placed`: at ground-cover densities the old pairwise scan was the

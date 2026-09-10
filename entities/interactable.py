@@ -13,7 +13,11 @@ import pygame
 KINDS = {
     "shrine":      (26, (120, 160, 240), "E  Shrine - gain a blessing"),
     "treasure":    (24, (230, 200, 90),  "E  Chest - claim an item"),
-    "fountain":    (26, (110, 210, 230), "E  Fountain - heal to full"),
+    # HI-2: the village's sanctuary prop, skinned with the heal effect.
+    "fountain":    (26, (110, 210, 230), "E  Sanctuary - heal to full"),
+    # HI-2: the forge stands on the village island; the handler is a stub
+    # until weapon forging (six_weapon_system_design.md 7) lands.
+    "forge":       (44, (230, 150, 80),  "E  Forge - reforge a weapon (soon)"),
     "altar":       (26, (210, 110, 210), "E  Altar - trade 25% max HP for a blessing"),
     "merchant":    (26, (220, 190, 120), "E  Merchant - buy an item ({cost} gold)"),
     "elite_arena": (30, (230, 110, 120), "Elite arena - clear it for a rare item"),

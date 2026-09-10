@@ -23,10 +23,15 @@ class LevelUpState(State):
     draw_below = True      # show the frozen battlefield behind the panel
     update_below = False   # ...frozen: no simulation while choosing
 
-    def enter(self, *, player, choices, on_done=None, **kwargs) -> None:
+    def enter(self, *, player, choices, on_done=None, title=None,
+              cancelable=False, **kwargs) -> None:
         self.player = player
         self.choices = list(choices)
         self.on_done = on_done
+        # P3: the Forge reuses this overlay with its own title, and lets the
+        # player walk away (ESC) without choosing.
+        self.title = title
+        self.cancelable = cancelable
         self.selected = 0
         self.panel = LevelUpPanel()
         self._mouse = MouseNav(self.panel.hits)   # the panel records the cards
@@ -44,6 +49,9 @@ class LevelUpState(State):
         if event.type != pygame.KEYDOWN:
             return
         key = event.key
+        if key == pygame.K_ESCAPE and self.cancelable:
+            self.game.state_machine.pop()
+            return
         if key in (pygame.K_LEFT, pygame.K_a):
             self.selected = (self.selected - 1) % len(self.choices)
         elif key in (pygame.K_RIGHT, pygame.K_d):
@@ -64,4 +72,7 @@ class LevelUpState(State):
 
     def draw(self, surface: pygame.Surface) -> None:
         self.panel.draw(surface, self.choices, self.selected,
-                        assets=self.game.assets, pressed=self._mouse.pressed_on)
+                        assets=self.game.assets, pressed=self._mouse.pressed_on,
+                        title=self.title,
+                        hint=("1/2/3 or Left/Right + Enter to pick    -    "
+                              "ESC to leave the Forge") if self.cancelable else None)

@@ -21,7 +21,7 @@ from tests import worlds as W
 from world import digest
 from world.gen.scatter import _blocks, _corridor_doorways, _flight_keepouts
 from world.gen.spawnpoints import body_radii
-from world.gen.tuning import (_GRID_BOSS_CLEAR_RADIUS, _RESOURCE_KINDS,
+from world.gen.tuning import (VILLAGE_KIND, _GRID_BOSS_CLEAR_RADIUS, _RESOURCE_KINDS,
                               _RESOURCE_OFF_SPAWN_TILES,
                               _RESOURCE_POINTS_PER_ISLAND,
                               _SPAWN_MIN_SPACING_TILES, _SPAWN_OBSTACLE_GAP,
@@ -147,6 +147,8 @@ class SpawnPointCountTests(unittest.TestCase):
             for (rid, floor), pts in idx.by_floor.items():
                 self.assertLessEqual(len(pts), target, f"seed {seed}: island {rid} floor {floor}")
             for room in W.layout(seed).rooms:
+                if room.kind == VILLAGE_KIND:
+                    continue        # HI-1: a sanctuary carries no points
                 self.assertEqual(len(idx.by_floor.get((room.id, 0), ())), target,
                                  f"seed {seed}: island {room.id} shore terrace short")
 
@@ -155,6 +157,8 @@ class SpawnPointCountTests(unittest.TestCase):
             lay = W.layout(seed)
             idx = PointIndex(lay)
             for room in lay.rooms:
+                if room.kind == VILLAGE_KIND:
+                    continue        # HI-1: a sanctuary carries no points
                 levels = {c.level for c in room.grid.values() if c.kind == GROUND}
                 for level in levels:
                     self.assertTrue(idx.by_floor.get((room.id, level)),
@@ -207,7 +211,8 @@ class IndexAndValidatorTests(unittest.TestCase):
         self.assertEqual(len(idx), len(lay.spawn_points))
         self.assertEqual(sum(len(v) for v in idx.by_room.values()), len(idx))
         self.assertEqual(sum(len(v) for v in idx.by_floor.values()), len(idx))
-        self.assertEqual(idx.rooms(), sorted(r.id for r in lay.rooms))
+        self.assertEqual(idx.rooms(), sorted(r.id for r in lay.rooms
+                                             if r.kind != VILLAGE_KIND))
         two = idx.in_rooms([lay.start_id, lay.boss_id])
         self.assertEqual({p.room_id for p in two}, {lay.start_id, lay.boss_id})
 

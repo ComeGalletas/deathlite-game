@@ -111,6 +111,10 @@ class Game:
         self.save.record_best(stats, difficulty=stats.get("difficulty", "normal"))
         for item in stats.get("dropped_items", ()):
             self.save.add_item(item)
+        # P5 (design §20): the first boss kill with a hero unlocks that hero's
+        # main-weapon choice.
+        if victory and stats.get("character_id"):
+            self.save.mark_cleared(stats["character_id"])
         self.persist()
 
     @staticmethod

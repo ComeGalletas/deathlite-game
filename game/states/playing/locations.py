@@ -17,7 +17,7 @@ from __future__ import annotations
 import pygame
 
 from entities.interactable import Interactable
-from progression.blessings import roll_blessing_choices
+from progression.blessings import roll_offering
 from world.procedural import SPECIAL_KINDS
 
 MERCHANT_COST = 30            # in-run gold
@@ -37,6 +37,11 @@ class SpecialLocations:
             if room.kind in SPECIAL_KINDS:
                 ps.interactables.append(Interactable(
                     room.kind, room.center.x, room.center.y, cost=MERCHANT_COST))
+        # HI-2: every village carries the forge and the sanctuary heal, where
+        # the village pass put them.
+        for v in getattr(ps.game_map.layout, "villages", ()):
+            ps.interactables.append(Interactable("forge", v.forge.x, v.forge.y))
+            ps.interactables.append(Interactable("fountain", v.heal.x, v.heal.y))
 
     def nearby(self):
         ps = self.ps
@@ -55,7 +60,10 @@ class SpecialLocations:
 
     def grant_random_blessing(self) -> bool:
         ps = self.ps
-        choices = roll_blessing_choices(ps.player, ps.blessing_lib, ps.rng, n=1)
+        # P2: one blessing, never a weapon grant (a shrine does not hand out
+        # weapons; the level-up does).
+        choices = roll_offering(ps.player, ps.content, ps.rng, 1,
+                                kinds=("stat", "weapon"))
         if not choices:
             return False
         choices[0].apply(ps.player)
@@ -90,6 +98,45 @@ class SpecialLocations:
         it.used = True
         if not self.grant_random_blessing():
             ps.player.heal(cost)  # refund if nothing to grant
+
+    def use_forge(self, it: Interactable) -> None:
+        """P3 (design §7): offer the two Forgings of the first eligible owned
+        weapon -- one weapon at a time, the Forge is never consumed. With
+        nothing eligible, say what is missing instead of doing nothing."""
+        ps = self.ps
+        from combat.weapons.forge import blessing_levels, forge_eligible
+        from progression.blessings import get_rules
+        from progression.blessings.offer import forge_offers_for
+        need = get_rules(ps.content).forge_requires_levels
+        ps.particles.burst(it.pos, it.colour, count=16, speed=160, life=0.5)
+        eligible = [w for w in ps.player.weapons if forge_eligible(w, need)]
+        if not eligible:
+            ps.notice(self.forge_requirements(need))
+            return
+        weapon = eligible[0]
+        choices = forge_offers_for(ps.player, ps.content, weapon)
+        if not choices:
+            ps.notice(f"The Forge has nothing for the {weapon.name}.")
+            return
+        ps._suspend_mouse()
+        from game.states.level_up_state import LevelUpState
+        ps.game.state_machine.push(
+            LevelUpState(ps.game), player=ps.player, choices=choices,
+            on_done=lambda u: ps.notice(f"The {weapon.weapon_id.replace('_', ' ')} "
+                                        f"is reforged: {weapon.name}."),
+            title=f"The Forge  -  reforge the {weapon.name}", cancelable=True)
+
+    def forge_requirements(self, need: int) -> str:
+        """The message for a Forge with nothing to work on."""
+        from combat.weapons.forge import blessing_levels
+        ps = self.ps
+        unforged = [w for w in ps.player.weapons if w.forge is None and not w.is_summon]
+        if not unforged:
+            return "Every weapon is already forged."
+        w = min(unforged, key=lambda w: need - blessing_levels(w))
+        missing = need - blessing_levels(w)
+        return (f"The Forge needs a weapon with {need} blessings: "
+                f"the {w.name} needs {missing} more.")
 
     def use_merchant(self, it: Interactable) -> None:
         ps = self.ps

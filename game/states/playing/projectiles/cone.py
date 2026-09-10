@@ -66,6 +66,9 @@ def draw_cone(surface, cx: float, cy: float, p, zoom: float = 1.0) -> None:
 def cone(surface, sx, sy, p, ctx) -> None:
     draw_cone(surface, sx, sy, p, ctx.zoom)          # the (dimmed) damage sector
 
+    fx = getattr(p, "fx", None)
+    if fx and not fx.get("slash", True):
+        return                                       # P1: only the Sword swings the slash rig
     assets = ctx.assets
     z = ctx.zoom
     bw, bh = assets.scale_for(_SLASH_RIG) or (0, 0)

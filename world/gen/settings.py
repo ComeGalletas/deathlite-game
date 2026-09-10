@@ -48,6 +48,10 @@ _KEYS = {
     "canyon_width": "HEIGHTMAP_CANYON_WIDTH",
     "topographies": "HEIGHTMAP_TOPOGRAPHIES",
     "boss_topography": "HEIGHTMAP_BOSS_TOPOGRAPHY",
+    "village_topography": "HEIGHTMAP_VILLAGE_TOPOGRAPHY",
+    "villages": "HEIGHTMAP_VILLAGES",
+    "village_distance": "HEIGHTMAP_VILLAGE_DISTANCE",
+    "town_hall": "HEIGHTMAP_VILLAGE_TOWN_HALL",
     "bridge_min_gap": "HEIGHTMAP_BRIDGE_MIN_GAP",
     "bridge_max": "HEIGHTMAP_BRIDGE_MAX",
     "shortcuts": "HEIGHTMAP_SHORTCUTS",
@@ -85,6 +89,10 @@ class GenSettings:
     canyon_width: tuple
     topographies: dict
     boss_topography: str
+    village_topography: str
+    villages: tuple
+    village_distance: tuple
+    town_hall: bool
     bridge_min_gap: int
     bridge_max: int
     shortcuts: bool

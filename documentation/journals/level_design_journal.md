@@ -890,7 +890,7 @@ tileset's **ramp** pieces: a slope cut into the existing south-facing cliff
 band, with the lower ground brought up against the cliff foot so the height
 change is *beside* the ground floor rather than across a gap.
 
-### The asset (already in `assets/terrain/tiles/tilemap_*.png`)
+### The asset (already in `assets/terrain/tiles/tilemaps/tilemap_*.png`)
 
 Slots **36 + 45** and **39 + 48** -- the four "unmapped but drawn" slots in
 every sheet. Not literal steps: a rough model of the geography, a diagonal
@@ -2040,7 +2040,7 @@ styles**, chosen per link:
 **Part B — the rock overlay sprite**
 - `utilities/prep_vstairs.py` — one-shot: colour-keys the opaque backdrop of the
   user's re-crop (`vertical_stairs.png`, 582×595), crops the lower flight + both
-  foliage wings, `smoothscale` → `assets/terrain/tiles/vstairs.png` (**192×128**,
+  foliage wings, `smoothscale` → `assets/terrain/tiles/tilemaps/vstairs.png` (**192×128**,
   ~1-tile stone core + a foliage wing each side, SRCALPHA).
 - `data/terrain.json` — `"vstair"` block simplified to `{ sheet, core_cols 1 }`.
 - `world/terrain/sheets.py` — `vstair_overlay(band_tiles)`: the sheet scaled to

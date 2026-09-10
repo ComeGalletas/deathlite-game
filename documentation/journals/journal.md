@@ -3669,7 +3669,9 @@ committed. Verification at the end of the todo.
 - [x] `_CARD_H = 215`, `_CARD_TOP_H = 200`: the card is 15 px taller and
       the top edge still centres as the 200-tall card did, so all of the
       growth is at the bottom; the tag line is anchored to the bottom and
-      follows, the hint moves with `card_h`.
+      follows, the hint moves with `card_h`. Later the same day the owner
+      asked for **30 px more, downward again**: `_CARD_H = 245`; the height
+      test now reads the constant and checks the hint still fits below.
 - [x] Tests (`tests/rendering/test_level_up.py — LevelUpTextTests`, +3):
       every card is 215 tall with its top at `h // 2 - 100`; the title font
       matches `heading(24)` and not `body(24)`; black in the title band,
@@ -3757,3 +3759,197 @@ on the click.
 - [x] Docs: README difficulty row; `sprite_functionality.md` "Who draws
       what" row; and the mouse-support entry's decision 1 carries a note
       below.
+
+## Planned -- Breathing glow under the XP orbs (2026-09-04)
+
+**Status:** **DONE** 2026-09-04 (A–D shipped the same day). Not committed.
+Regression counts under each group; the rendering + combat run after D is
+recorded at the end.
+
+### What the owner asked for
+
+A white, pulsing / breathing alpha glow **behind** each experience orb --
+drawn first so the orb's colour pops -- cheap enough for many on screen,
+noticeable enough to read.
+
+### Where things stand
+
+- `WorldRenderer.gems` (`game/states/playing/rendering.py`) draws each gem
+  as one blit: the tier's orb rig (`xp_orb_small / medium / large`,
+  `prop_sprites.json`, 8 / 10 / 12 world px, scaled by the camera zoom) or a
+  primitive disc when the art is missing. It runs inside
+  `_draw_flat_effects` per terrace band, after hazards and before
+  explosions / trails / the hero's shots, so a glow painted inside that
+  loop, just before its orb, sits under the orb and under everything drawn
+  after gems on that band.
+- Gems are pooled (`Pool(XPGem, MAX_PROJECTILES=800, prefill=64)`) and each
+  carries `age` (seconds since it dropped; frozen while paused) and `tier`.
+  Souls (`is_soul`) are gems that home; they draw the same.
+- The one alpha effect nearby, the hazard fill, allocates a fresh
+  `SRCALPHA` surface **every frame per hazard**. That is fine for a handful
+  of pools and exactly what a glow on 100+ orbs must not do.
+
+### Design
+
+**One small module, `game/states/playing/glow.py`**, a `GlowCache`:
+
+- **Pre-rendered sprites, looked up, never built per frame.** A glow is a
+  soft white disc: three or four concentric circles with stepped alpha
+  (`draw.circle` on one `SRCALPHA` surface), diameter = the orb's diameter x
+  `scale` (~2.25: small 8 → 18 world px, large 12 → 27). Built once per
+  `(tier, zoom, alpha_step)` and kept in a dict; the zoom is constant for a
+  run, so the whole set is ~3 tiers x 8 steps = 24 surfaces of at most ~40
+  px, built lazily on first use.
+- **The pulse is the alpha, quantised.** `a = a_min + (a_max - a_min) *
+  (0.5 + 0.5 * sin(2 * pi * age / period))`, snapped to `steps` levels so
+  every value hits a cached surface. Using each gem's own `age` as the clock
+  (not the run time) desynchronises the field for free -- orbs dropped at
+  different moments breathe out of phase, so a carpet of them shimmers
+  instead of blinking in lockstep -- and pauses with the run.
+- **Per gem per frame: one sine, one dict lookup, one blit** of a ~30-px
+  alpha surface. Against the orb blit already there this is well under a
+  millisecond for 200 orbs. A view cull (`camera.visible_rect`, padded)
+  skips both blits for gems off screen -- gems are band-filtered today but
+  not view-culled, so this is a small win on its own.
+- **Tuning lives in `config.XP_GLOW`** (`scale`, `alpha_min`, `alpha_max`,
+  `period`, `steps`, `colour`); starting values `2.25`, `40`, `110`, `1.1 s`,
+  `8`, white. The whole effect is off with `scale = 0`.
+- The glow draws whether the orb is art or the primitive fallback disc.
+
+### Todo
+
+#### A · Glow cache — done 2026-09-04
+- [x] `config.XP_GLOW` (`scale 2.25`, alpha `40..110`, period `1.1 s`,
+      `8` steps, white) after `MAX_PROJECTILES`.
+- [x] `game/states/playing/glow.py`: `pulse_alpha(age, cfg)` (a sine over
+      the period: mid at 0, peak at a quarter, trough at three quarters; a
+      non-positive period holds the max), `quantise(alpha, cfg)` (snaps to
+      `steps` levels, both ends inclusive, clamped), and `GlowCache` --
+      `diameter(orb_px, zoom)`, `surface(diameter, alpha, colour)` (lazy
+      dict keyed on all three; four concentric discs from the rim in, each
+      a step more opaque, so the centre carries the full alpha and the rim
+      fades), `pulsed(orb_px, zoom, age)`, `clear`, `len`. Keyed on
+      `(diameter, alpha)` rather than orb tier so the enemy-projectile glow
+      (D) can use the same cache with a constant alpha.
+- [x] Tests (`tests/rendering/test_glow.py`, 12): range / start / peak /
+      trough / once-per-period / half-period-opposite / period 0; quantise
+      hits exactly `steps` levels with both ends and clamps; diameter
+      maths and off = 0; one surface per key reused and cleared; centre
+      alpha = request, corner 0, rim between, colour white; a whole breath
+      touches at most `steps` surfaces; off / zero alpha give None; the
+      default config is `config.XP_GLOW`.
+
+#### B · Wire into the gem pass — done 2026-09-04
+- [x] `WorldRenderer` owns one `GlowCache`; `gems()` culls each gem to the
+      view padded by `_GEM_CULL_PAD = 64` world px (gems were band-filtered
+      but never view-culled), then blits `glow.pulsed(orb_px, zoom,
+      gem.age)` centred on the orb *before* the orb itself. Souls draw the
+      same (decision 2).
+- [x] Tests (`tests/rendering/test_gem_glow.py`, 5, one shared run with
+      the gem pool cleared per test): the glow is the first of the two
+      blits, bigger than the orb, centred on it, sized by `diameter(8,
+      zoom)` for a tier-0 orb and carrying the age-0 alpha; two gems a
+      half-period apart show the min and max alphas; an off-screen gem
+      draws nothing; `scale = 0` leaves only the orb; forty orbs at forty
+      ages touch at most `steps` cached surfaces. Gem-glow + glow + smoke:
+      18 green.
+
+#### C · Docs — done 2026-09-04
+- [x] `sprite_functionality.md`: "XP orb glow" -- where it draws, the
+      cache and its cost, the per-gem clock, the config block, the reuse
+      for a steady glow, and the tests.
+- [x] Verification: glow + gem-glow + smoke 18 green (B); rendering-suite
+      regression recorded under D when it lands.
+
+#### D · A faint, steady glow under enemy projectiles — done 2026-09-04
+- [x] Inventory first: every hostile shot goes through `fire_hostile` with
+      no style and the hostile pass draws `default="arrow"`, so there are
+      exactly two sources and both *are* the arrow on screen -- the
+      `ranged` enemy's aimed shot (`FireProjectile`, radius 6, every 2 s)
+      and the boss's `radial_barrage` (20 "bullets", radius 7). The owner
+      applied the glow to both.
+- [x] `config.HOSTILE_GLOW = {scale 2.0, alpha 35, white}` -- `scale` is a
+      multiple of the shot's collider *diameter*; faint on purpose because a
+      volley puts 20 on screen at once.
+- [x] `WorldRenderer.hostile_projectiles`: the same padded view cull as
+      the gems (hostiles were never culled), then `GlowCache.surface(d,
+      alpha, colour)` at the constant alpha blitted centred before
+      `draw_projectile`. One cached surface per shot size for the whole
+      run -- a barrage shares one.
+- [x] Tests (`tests/rendering/test_hostile_glow.py`, 6, one shared run):
+      glow first, centred, sized `radius * 2 * scale * zoom`, centre alpha
+      = config; the alpha is steady over a flight (same surface object
+      later); a 20-shot ring makes 40 blits and touches one cached
+      surface; off-screen shots draw nothing; `scale = 0` and `alpha = 0`
+      each leave only the arrow; the hostile alpha is below the orbs'
+      minimum. Glow suites + smoke: 24 green.
+- [x] Later: the arrow's tint left `projectiles/simple.py` for
+      `config.HOSTILE_ARROW_TINT = (150, 26, 12)`, and
+      `HOSTILE_GLOW["colour"]` now *is* that constant, so the halo reads as
+      the shot's own colour (owner's request). Pinned: the glow's centre
+      pixel is the tint. Note the tint is a dark red and the arrow on screen
+      is the sprite *brightened toward* it, so the halo is darker than the
+      arrow looks; at alpha 35 it may read as a soft shadow on dark ground
+      -- `HOSTILE_GLOW["alpha"]` is the knob. The owner then raised it to
+      **60**; the "fainter than the orbs' minimum" pin became "under the
+      orbs' peak". Then the colour was split off the tint again: measured
+      on screen the arrow averages (214, 115, 99) / median (255, 130, 99),
+      and the owner picked **`HOSTILE_GLOW_COLOUR = (255, 120, 90)`** -- the
+      arrow's visible red a shade deeper -- so faintness comes from the
+      alpha, not a dark colour. Pinned: bright, red, not the tint.
+
+### Decisions (owner, 2026-09-04)
+
+1. **Alpha only** -- the size does not breathe.
+2. **Souls get the same glow** for now.
+3. **Enemy projectiles get a similar but faint, non-pulsing glow**, tried
+   on the enemy arrow first (group D above).
+4. Diameter ratio `2.25` and alpha `40..110` are starting points, judged in
+   the real window.
+
+### Verification
+
+- Rendering suite + smoke after B: 429 passed. Glow / gem-glow / hostile-glow
+  / smoke after D: 24. Rendering + combat + smoke after D: **601 passed, 5 deselected, 11 subtests passed in 176.23s (0:02:56)**,
+  exit 0.
+
+
+---
+
+## Human island (2026-09-09)
+
+A new island type: the village. One or two per world, near the start,
+flat and a bit under half a volcanic island, with no enemy spawns. It
+carries the Forge the six-weapon update needs (a stub until forging
+lands), the sanctuary heal (the fountain moved here and hides once used),
+houses, a monastery, an archery, a barracks and a tower at every bridge, a
+fenced sheep pen, and villagers -- pawns, a smith, lancers on patrol and
+sheep -- that wander with idle and walk animations and never block anyone.
+Milestones HI-0 to HI-4 and every decision are in
+`journals/human_island_journal.md`; the generation is documented in
+`documentation/level_design.md` §1.2 and §1.7. Digests re-pinned.
+
+
+---
+
+## Lancers fight back (2026-09-09)
+
+The village garrison (four or five lancers a village, dealt round the
+guard posts) now defends it. `entities/npc.py` gains three states on top
+of the wander: an enemy inside a lancer's aggro radius (`aggro`, 4 tiles)
+is **chased** at `charge` speed, **attacked** with the pack's directional
+thrust strips (right / up-right / up / down-right / down, mirrored for
+west; the blow lands on `hit_frame`, `cooldown` apart) while the foe's edge
+is within `reach`, and once the foe dies or gets away -- or the chase
+would take the lancer more than `chase` tiles from its post, or a second
+passes without the chase getting any nearer (sliding round a building
+corner) -- the lancer **returns** to that post and the patrol resumes.
+Lancers sharing a post all answer the same foe. Every number is in
+`data/npcs.json` under the lancer. The manager (`game/states/playing/
+npcs.py`) supplies the two hooks: `_foes` reads the frame's spatial grid,
+`_hit` runs the enemy's own `take_damage` (so it provokes and flashes like
+any hit), a damage number, sparks and a knockback through the usual weight
+split. The lancer rig's crop widened to take in the lance's full thrust,
+and the NPC draw mirrors the anchor on a flipped frame so the feet stay
+put. Tests: a lancer charges a tank placed 70 px off its post, lands a
+hit and walks back to idle at the post; one beyond the radius is ignored.

@@ -217,11 +217,20 @@ class ObstacleDecorTests(unittest.TestCase):
         gm = self._map()
         px = config.TILE_PX
         self.assertTrue(gm._shore)
-        # Every anchor stands on ground. Which ground -- a cell with sea or a
-        # lake beside it, and every such cell -- is the test below. (A bridge
-        # rect makes the sea under it "walkable", so the floor test cannot
-        # tell a beach at a bridge mouth from an interior cell.)
+        from world.layout import CLIFF
+        feet = set()
+        for room in gm.layout.rooms:
+            for (col, row), cell in room.grid.items():
+                if cell.kind == CLIFF and cell.row == cell.drop - 1:
+                    feet.add((room.rect.x + col * px, room.rect.y + row * px))
+        # Every anchor stands on ground or on the foot of a wall. Which ground
+        # -- a cell with sea or a lake beside it, and every such cell -- is the
+        # test below. (A bridge rect makes the sea under it "walkable", so the
+        # floor test cannot tell a beach at a bridge mouth from an interior
+        # cell.)
         for x, y in gm._shore:
+            if (x, y) in feet:
+                continue
             cx, cy = x + px / 2, y + px / 2
             self.assertTrue(gm._point_ok(cx, cy), "foam anchor is not under ground")
 
@@ -230,11 +239,20 @@ class ObstacleDecorTests(unittest.TestCase):
         gm = self._map()
         px = config.TILE_PX
         expected = set()
-        from world.layout import GROUND, LAKE
+        from world.layout import GROUND, CLIFF, LAKE
         # Any ground cell, on any terrace, with open sea or a lake beside
-        # it: a pool ringed by a raised terrace still gets its foam.
+        # it: a pool ringed by a raised terrace still gets its foam. And the
+        # foot of any wall standing in the water -- the one shore that used
+        # to have none.
         for room in gm.layout.rooms:
             for (col, row), cell in room.grid.items():
+                south = room.grid.get((col, row + 1))
+                if cell.kind == CLIFF:
+                    if (cell.row == cell.drop - 1
+                            and (south is None or south.kind == LAKE)):
+                        expected.add((room.rect.x + col * px,
+                                      room.rect.y + row * px))
+                    continue
                 if cell.kind != GROUND:
                     continue
                 nbs = [room.grid.get(n) for n in ((col + 1, row), (col - 1, row),
@@ -244,12 +262,38 @@ class ObstacleDecorTests(unittest.TestCase):
         self.assertTrue(expected)
         self.assertEqual(expected, set(gm._shore))
 
+    def test_cliff_feet_standing_in_the_sea_are_foam_anchors(self):
+        """A wall whose foot hangs over open water is painted with the pale
+        scalloped `bottom` face; the animated foam has to lap against it like
+        any beach. Seeds 35 and 1234 both have such feet (8 and 2). A foot
+        that lands on a lower floor is stone sunk into ground and takes no
+        foam."""
+        from game import config
+        from world.layout import CLIFF
+        px = config.TILE_PX
+        wet, dry = [], []
+        for seed in (35, 1234):
+            gm = self._map(seed)
+            shore = set(gm._shore)
+            for room in gm.layout.rooms:
+                for (col, row), cell in room.grid.items():
+                    if cell.kind != CLIFF or cell.row != cell.drop - 1:
+                        continue
+                    at = (room.rect.x + col * px, room.rect.y + row * px)
+                    (wet if room.grid.get((col, row + 1)) is None else dry).append(at)
+                    self.assertEqual(at in shore,
+                                     room.grid.get((col, row + 1)) is None,
+                                     f"seed {seed}: cliff foot at {at}")
+        self.assertTrue(wet, "no cliff foot over open sea in the sample seeds")
+        self.assertTrue(dry)
+
     def test_every_obstacle_is_skinned_and_keys_are_obstacle_indices(self):
         gm = self._map()
         self.assertTrue(gm.obstacles)
-        # every obstacle kind is mapped -> every obstacle gets a sprite
-        self.assertEqual(len(gm._decos), len(gm.obstacles))
-        self.assertTrue(set(gm._decos).issubset(range(len(gm.obstacles))))
+        # every obstacle kind is mapped -> every obstacle gets a sprite,
+        # except a compound's satellites (HI-2), which collide only
+        skinned = {i for i, o in enumerate(gm.obstacles) if o.skin}
+        self.assertEqual(set(gm._decos), skinned)
 
     def test_sprite_width_matches_the_scaling_formula(self):
         gm = self._map()
@@ -295,10 +339,12 @@ class ObstacleDecorTests(unittest.TestCase):
     def test_obstacle_variants_in_range(self):
         # Small obstacles carry a 1..4 cosmetic variant; a `house` encodes its
         # colour band + type as 1..15 (see world/procedural._scatter_houses).
-        from world.procedural import generate_world
+        # A village building (HI-2) indexes its colour, a fence tile its
+        # slot: the bound is its kind's rig list.
+        rigs = get_content().terrain["obstacle_decor"]["rigs"]
         for seed in (1, 2, 3, 1234):
             for o in W.layout(seed).obstacles:
-                hi = 15 if o.kind == "house" else 4
+                hi = 15 if o.kind == "house" else max(4, len(rigs.get(o.kind, ())))
                 self.assertIn(o.variant, range(1, hi + 1),
                               msg=f"{o.kind} variant {o.variant}")
 
@@ -473,12 +519,14 @@ class BridgeCorridorTests(unittest.TestCase):
         for _r, s, _f in gm._corr_surfs:
             self.assertTrue(s.get_flags() & pygame.SRCALPHA)
         px = get_content().terrain["tile_px"]
-        ground_cells = {
+        from world.layout import CLIFF
+        room_cells = {
             (room.rect.x + col * px, room.rect.y + row * px)
             for room in gm.layout.rooms if room.floor == 0
-            for col, row in room.cells
+            for (col, row), cell in room.grid.items()
+            if (col, row) in room.cells or cell.kind == CLIFF
         }
-        self.assertTrue(set(gm._shore).issubset(ground_cells),
+        self.assertTrue(set(gm._shore).issubset(room_cells),
                         "a corridor-only cell seeded shoreline foam")
 
     def test_corridor_carries_bridge_edge_properties(self):
@@ -527,6 +575,94 @@ class BridgeCorridorTests(unittest.TestCase):
             self.assertEqual(pygame.image.tostring(last, "RGBA"), want[hi_name],
                              f"corridor {c.a}-{c.b}: wrong high-end cap")
         self.assertTrue(checked_h and checked_v, "need both axes in the sample")
+
+    # --- the shadow under the planks -------------------------------
+    def test_bridge_sheet_names_its_shadow_slot(self):
+        b = self.t["bridge"]
+        self.assertIn("shadow", b["slots"])
+        tile = Assets().tile(b["sheet"], b["slots"]["shadow"], cols=b["grid"][0])
+        self.assertIsInstance(tile, pygame.Surface)
+        # One flat block, full width, dropped below the planks' top edge.
+        bb = tile.get_bounding_rect()
+        self.assertEqual((bb.x, bb.width), (0, self.t["tile_px"]))
+        self.assertGreater(bb.y, 0)
+
+    def test_every_bridge_bakes_a_shadow_at_its_own_rect(self):
+        gm = W.baked(1234)
+        self.assertTrue(gm._corr_surfs)
+        self.assertEqual(len(gm._corr_shadows), len(gm._corr_surfs))
+        for (srect, ssurf, slvl), (brect, bsurf, blvl) in zip(gm._corr_shadows,
+                                                              gm._corr_surfs):
+            self.assertEqual(srect, brect)
+            self.assertEqual(slvl, blvl)
+            self.assertEqual(ssurf.get_size(), bsurf.get_size())
+            self.assertTrue(ssurf.get_flags() & pygame.SRCALPHA)
+            self.assertGreater(ssurf.get_bounding_rect().width, 0, "empty shadow")
+
+    def test_bridge_shadow_tiles_the_shadow_block_along_each_axis(self):
+        """Every cell between the two caps is the shadow block as authored
+        (turned a quarter turn on a vertical run so the strip spans the cell
+        top to bottom and stays continuous); the two end cells are cut back
+        to the caps' own footprint, so no shadow pokes past the posts onto
+        the beach."""
+        reset_assets()
+        a = Assets()
+        b = self.t["bridge"]
+        px = self.t["tile_px"]
+        cols = b["grid"][0]
+        block = a.tile(b["sheet"], b["slots"]["shadow"], cols=cols)
+        want = {"h": pygame.image.tostring(block, "RGBA"),
+                "v": pygame.image.tostring(pygame.transform.rotate(block, 90), "RGBA")}
+        cap = {name: a.tile(b["sheet"], b["slots"][name], cols=cols).get_bounding_rect()
+               for name in ("h_left", "h_right", "v_top", "v_bot")}
+        gm = W.baked(1234)
+        seen = set()
+        for c, (rect, surf, _f) in zip(gm.layout.corridors, gm._corr_shadows):
+            n = (rect.height if c.axis == "v" else rect.width) // px
+            if n < 3:
+                continue
+            for i in range(1, n - 1):
+                cell = (surf.subsurface((0, i * px, px, px)) if c.axis == "v"
+                        else surf.subsurface((i * px, 0, px, px)))
+                self.assertEqual(pygame.image.tostring(cell, "RGBA"), want[c.axis],
+                                 f"corridor {c.a}-{c.b} cell {i}")
+            bb = surf.get_bounding_rect()
+            if c.axis == "h":
+                self.assertEqual(bb.x, cap["h_left"].x, f"{c.a}-{c.b} west mouth")
+                self.assertEqual(bb.right, rect.width - px + cap["h_right"].right,
+                                 f"{c.a}-{c.b} east mouth")
+            else:
+                self.assertGreaterEqual(bb.y, cap["v_top"].y, f"{c.a}-{c.b} north mouth")
+                self.assertLessEqual(bb.bottom, rect.height, f"{c.a}-{c.b} south mouth")
+                self.assertGreater(bb.bottom, rect.height - px + cap["v_bot"].bottom - 1,
+                                   f"{c.a}-{c.b} south mouth lost its drop")
+            seen.add(c.axis)
+        self.assertEqual(seen, {"h", "v"}, "need both axes in the sample")
+
+    def test_bridge_shadows_are_blitted_before_the_bridges(self):
+        """Both draw paths: all shadows first, then all planks, so no shadow
+        lands on a neighbouring bridge's boards."""
+        from systems.camera import Camera
+        gm = W.baked(1234)
+        shadows = {id(s) for _r, s, _f in gm._corr_shadows}
+        planks = {id(s) for _r, s, _f in gm._corr_surfs}
+        camera = Camera(gm.width, gm.height)
+        camera.snap_to(pygame.Vector2(gm.layout.corridors[0].rect.center))
+        r = gm.renderer
+        r._prepare(pygame.Surface((8, 8)), camera)
+        for draw in (lambda s: r._draw_tiled(s, camera),
+                     lambda s: r.draw_ground_band(s, camera, r.ground_levels()[0])):
+            order = []
+
+            class Rec(pygame.Surface):
+                def blit(self, src, *a, **k):
+                    order.append(id(src))
+                    return super().blit(src, *a, **k)
+            draw(Rec((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
+            s_at = [i for i, o in enumerate(order) if o in shadows]
+            p_at = [i for i, o in enumerate(order) if o in planks]
+            self.assertTrue(s_at and p_at, "bridge in view expected")
+            self.assertLess(max(s_at), min(p_at))
 
 
 class DecorationScatterTests(unittest.TestCase):

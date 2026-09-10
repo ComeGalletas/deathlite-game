@@ -562,3 +562,115 @@ Asked how the reachability would be solved. Two halves, different risk:
   pattern a melee hero has no answer to from offshore -- only `charge`
   brings the boss back.
 
+
+## The First Hunger roams free (2026-09-10)
+
+**Asked:** the boss and the brood it summons ignore terrain entirely --
+no obstacles, no elevation, no flow field, no island edge -- and the boss
+spawns beside the hero instead of in the boss room. Plan and ticks:
+`documentation/boss_free_roam_todo.md`. Three decisions taken by the owner
+first: the sea is air; the mites fly by the same tag in data; the spawn
+distance is "just off-screen".
+
+**R1 -- the flying floor is the world.** `GameMap.is_walkable(flying=True)`
+now answers "inside the world rect" and nothing else. The island-only
+helpers (`GameMap._over_island`, `floor.over_island`) had no other caller
+and are gone. This reverses the 2026-09-03 "what it still may not do:
+leave the floor" paragraph above, and the leash idea under it: a flyer
+hunts the hero, so one out over the water is one on its way back, and the
+charge pattern that carries it offshore is the same pattern that brings it
+in. The world edge is the one wall.
+
+**R2 -- the brood flies.** `swarm` carries `"flying"` in `data/enemies.json`;
+`Enemy.flying` mirrors `Boss.flying` and `Enemy.update` passes it to
+`resolve_movement`. The behaviour side: `_pursuit_stack` in
+`entities/ai/behaviors/simple.py` builds `SeekTarget(via="straight")` +
+`Separation` for a flying enemy -- no field, no `AvoidObstacles`, no
+`Unstick` -- and `path_chase`, `swarm` and `path_chase_attack` all build
+from it. The spawn master's watchdog used to recycle any body over no
+island or off the floor at once, which would have sent a mite home the
+moment it crossed a cliff; `_judge` now judges a `flying` body by the
+flying floor (`host.is_walkable(..., flying=True)`, the keyword added to
+the host protocol, the playing host and the fake). Hibernation already
+skipped bodies over no room.
+
+**R3 -- what else read the floor.** Drawing: `_actor_items` banded every
+body by `level_at`, which answers 0 over a cliff wall (no floor there), so
+a bat over the face of a terrace would have been painted under its rim.
+`TerrainRenderer.top_level_at` (the elevation of whatever stands under the
+point, walls included) is the band for a `flying` body now. Combat needed
+nothing: the contact bite is elevation-blind; `stamp_fire_level` over the
+sea records `NONE`, which `block_on_terrain` exempts, so the barrage from
+offshore lands, and the hero's answer from the beach crosses the void as
+LD-9 D10 already allowed. The hero's targeting has no elevation filter.
+A shoved mite may cross water through the same collider; fine.
+
+**R4 -- the boss spawns beside the hero.** `config.BOSS_SPAWN_DISTANCE = 680`
+px: half the visible diagonal is ~612 px at zoom 1.5 on 1600x900, so the
+spot is just past the edge whichever side the random angle picks.
+`spawning.boss_spawn_point(player_pos, rng, width, height)` clamps to the
+world rect and consults no room; `EnemyControl.boss_spawn_point` is the
+run's wrapper and `boss_arena_point` is gone (no other caller). The boss
+room keeps its topography and its `boss`-tagged points for the spawn
+master.
+
+**Measured**, three fresh runs, hero idle at the start point, boss forced
+in with `_spawn_boss`:
+
+| run seed  | distance to the boss room | new spawn distance | on screen after | first contact after |
+|-----------|---------------------------|--------------------|-----------------|---------------------|
+| 515707074 | 12224 px                  | 680 px             | 5.6 s           | 8.5 s               |
+| 26846614  | 6480 px                   | 680 px             | 5.7 s           | 8.5 s               |
+| 928361007 | 3650 px                   | 680 px             | 4.0 s           | 8.5 s               |
+
+The 4-6 s to the screen edge is the intro phase drifting in at 0.3 speed
+(23 px/s); the knob is the first thing to turn if it should be on screen
+before the 2.6 s warning ends.
+
+**Tests** (`tests/ai/test_flying.py`, 20): the shipped boss and mite fly and
+the tag decides; a flyer passes every obstacle that blocks a walker,
+crosses every refused terrace step, the lake, and the sea; the flying floor
+is the world rect and one px past any edge is not; a flying pursuit stack
+is seek-straight + separation and a walker keeps the field and the
+avoidance; a flying mite moves through the flying collider and heads
+straight at the player across a field that says otherwise; the flyer band
+over a cliff wall is the wall's top; shots from the beach reach a bat over
+the sea and a barrage fired from over the sea is never blocked; the spawn
+point is the configured distance from the hero, clamped inside the world,
+and not in the boss room. `tests/spawn/test_watchdog.py`: a flyer is judged
+by the world edge only. Suites: ai, spawn, combat, characters, core smoke
+and the depth-sort render tests green.
+
+## The boss sees the whole screen, and closes in when it does not (2026-09-10)
+
+**Asked:** a vision range for the boss big enough to cover the camera; a
+player outside it makes the boss do nothing but move closer, and inside it
+the normal behaviour resumes.
+
+**The range.** `data/bosses.json -- vision_range: 720` px, read once as
+`Boss.vision_range`. Half the visible diagonal is ~612 px at zoom 1.5 on
+the 1600x900 window, so anything on screen is inside it with a margin;
+the test pins that the range covers the view at the config's numbers.
+
+**Closing in.** `Boss.update` checks the distance before the pattern
+clock ticks. Beyond the range, and not mid-charge, the boss is `closing`:
+it seeks at full `speed` (`_seek`, which beelines for the flying boss) and
+returns before the phase handler runs, so `phase` and `phase_t` hold where
+they are -- a telegraph that was half done resumes half done, a recover
+finishes its remaining seconds, the intro drifts in as before. No bullet,
+no charge and no brood while closing. `active` is exempt: a charge is
+already a dash at the player and runs its course, then the recover that
+follows is what holds.
+
+**What it reads as.** `_anim_name` plays `walk` while closing (not the
+`attack` wind-up the held telegraph would otherwise show), and
+`WorldRenderer.boss` skips the telegraph ring / charge line / brood ring
+while `closing`, so the player sees a bat flying at them and nothing else
+until it is in view.
+
+**Tests** (`tests/ai/test_boss.py -- BossVisionTests`): the range covers the
+view; out of sight for 20 s the boss fires nothing, summons nothing, keeps
+`intro` and its clock untouched, moves at full speed straight at the
+player and animates `walk`; back in range a held radial telegraph resumes
+from its held value and animates `attack`; a committed charge is not
+interrupted. The existing boss, flying and smoke suites are unchanged.

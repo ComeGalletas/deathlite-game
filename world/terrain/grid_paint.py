@@ -625,20 +625,86 @@ def paint_bridge(sheets, corridor):
     return rect, surf
 
 
+def paint_bridge_shadow(sheets, corridor):
+    """`(blit_rect, surface)` for the shadow one plank bridge lays on the
+    water: the bridge sheet's `shadow` block tiled cell by cell along the
+    corridor's rect -- the same rect `paint_bridge` fills, so the two are
+    blitted at one position, shadow first. The surface stays empty (fully
+    transparent) when the sheet carries no shadow slot.
+
+    The block is a full cell along the run, but the end caps are not: the
+    posts start part-way into their cell, and a bridge's rect reaches onto
+    the beach at both mouths. Left as is, the strip pokes out past the posts
+    as a dark square on the sand. So it is cut back to the caps' own
+    footprint along the run -- read off the cap tiles' opaque extent, not
+    hard-coded, so a redrawn cap moves the cut with it. A vertical run also
+    gets the same downward drop the horizontal block bakes in (its shadow
+    sits `drop` px lower than the planks), since the quarter turn loses it.
+    """
+    px = sheets.px
+    rect = corridor.rect
+    surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    tile = sheets.bridge_shadow(corridor.axis)
+    if tile is None:
+        return rect, surf
+    vertical = corridor.axis == "v"
+    n = max(1, (rect.height if vertical else rect.width) // px)
+    for i in range(n):
+        surf.blit(tile, (0, i * px) if vertical else (i * px, 0))
+    if n < 2:
+        return rect, surf                # a one-cell run is all `mid`: no caps to cut to
+
+    def _bbox(name):
+        return sheets.cell(str(sheets.b_sheet),
+                           sheets.b_slots.get(name, sheets.b_slots["h_mid"]),
+                           sheets.b_cols).get_bounding_rect()
+
+    clear = (0, 0, 0, 0)
+    if vertical:
+        drop = max(0, sheets.bridge_shadow("h").get_bounding_rect().y
+                   - _bbox("h_mid").y)
+        start = _bbox("v_top").y + drop
+        end = min(rect.height, rect.height - px + _bbox("v_bot").bottom + drop)
+        surf.fill(clear, (0, 0, rect.width, start))
+        surf.fill(clear, (0, end, rect.width, rect.height - end))
+    else:
+        start = _bbox("h_left").x
+        end = rect.width - px + _bbox("h_right").right
+        surf.fill(clear, (0, 0, start, rect.height))
+        surf.fill(clear, (end, 0, rect.width - end, rect.height))
+    return rect, surf
+
+
 def grid_shore(room) -> list:
     """Top-left world pixels of this room's cells that face open water or a
     lake -- the anchors the animated foam laps against.
 
-    Any floor counts, not only sea level. An inland pool can sit in a hollow
-    ringed entirely by a raised terrace, and restricting this to level 0 left
-    exactly those with no moving water at their edge at all."""
+    Two kinds of cell qualify:
+
+    * **Ground** with sea or lake on any side, at any floor. An inland pool
+      can sit in a hollow ringed entirely by a raised terrace, and
+      restricting this to level 0 left exactly those with no moving water at
+      their edge at all.
+    * **A cliff foot standing in the water** -- the bottom cell of a wall
+      whose south neighbour is open sea (or a lake). Such a foot is painted
+      with the `bottom` face, the pale scalloped foot art, and without an
+      anchor here that foot was the one shore in the world nothing lapped
+      against: the retired painter seeded a `_cliff_foam` point at every one,
+      and the height-map painter had only carried the ground rule over. The
+      foam is blitted in the water band, under every terrace, so the part of
+      the sprite that lands on the stone is covered by the face and only the
+      surf around the transparent foot margin shows -- the same composite the
+      old per-floor pass produced."""
     from game import config
     px = config.TILE_PX
     out = []
     for (col, row), c in room.grid.items():
-        if c.kind != GROUND:
-            continue
-        if any((room.grid.get((col + dx, row + dy)) or _NONE).kind in ("", LAKE)
-               for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))):
+        if c.kind == GROUND:
+            if any((room.grid.get((col + dx, row + dy)) or _NONE).kind
+                   in ("", LAKE)
+                   for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))):
+                out.append((room.rect.x + col * px, room.rect.y + row * px))
+        elif (c.kind == CLIFF and c.row == c.drop - 1
+              and (room.grid.get((col, row + 1)) or _NONE).kind in ("", LAKE)):
             out.append((room.rect.x + col * px, room.rect.y + row * px))
     return out

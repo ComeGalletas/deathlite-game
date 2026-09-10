@@ -55,8 +55,8 @@ class CategoryTests(unittest.TestCase):
 
     def test_expected_category_per_weapon(self):
         want = {
-            "arcane_bolt": "projectile", "frost_shards": "projectile",
-            "thunder_orb": "projectile", "soul_scythe": "melee",
+            "sword": "melee", "hammer": "melee", "daggers": "melee",
+            "bow": "projectile", "magic_rod": "projectile", "bomb": "projectile",
             "ember_ring": "orbit", "grave_totem": "summon",
             "spirit_wolf": "summon",
         }
@@ -67,15 +67,15 @@ class CategoryTests(unittest.TestCase):
         # weapons.json carries every field now -- a def with no `category`
         # (validated against the CATEGORIES constant) is bad data, not a
         # fall-through.
-        d = dict(get_content().weapon("arcane_bolt"))
+        d = dict(get_content().weapon("magic_rod"))
         d.pop("category", None)
         with self.assertRaises(ValueError):
-            Weapon("arcane_bolt", d)
+            Weapon("magic_rod", d)
 
 
 class ReachTests(unittest.TestCase):
     def test_melee_reach_tracks_the_cone_tip(self):
-        s = w("soul_scythe")                       # area 74, no `reach` field
+        s = w("sword")                       # area 74, no `reach` field
         self.assertEqual(s._reach(1.0), s._area(1.0))
         self.assertEqual(s._reach(1.7), s._area(1.7))
         s.bonus["area"] = 20.0
@@ -83,15 +83,15 @@ class ReachTests(unittest.TestCase):
         self.assertEqual(s._reach(2.0), (74 + 20) * 2.0)
 
     def test_projectile_reach_is_field_plus_area_bonus_times_mult(self):
-        f = w("frost_shards")                      # reach 400
-        self.assertEqual(f._reach(1.0), 400.0)
-        self.assertEqual(f._reach(1.5), 600.0)
+        f = w("bow")                               # reach 460
+        self.assertEqual(f._reach(1.0), 460.0)
+        self.assertEqual(f._reach(1.5), 690.0)
         f.bonus["area"] = 50.0
-        self.assertEqual(f._reach(1.0), 450.0)
-        self.assertEqual(f._reach(2.0), 900.0)
+        self.assertEqual(f._reach(1.0), 510.0)
+        self.assertEqual(f._reach(2.0), 1020.0)
 
     def test_a_non_melee_def_without_a_reach_field_is_unbounded(self):
-        d = dict(get_content().weapon("frost_shards"))
+        d = dict(get_content().weapon("bow"))
         d.pop("reach", None)
         self.assertEqual(Weapon("x", d)._reach(1.0), float("inf"))
 
@@ -104,7 +104,7 @@ class ReachTests(unittest.TestCase):
 
 class MeleeGateTests(unittest.TestCase):
     def test_fires_just_inside_the_ring_not_just_outside(self):
-        s = w("soul_scythe")
+        s = w("sword")
         reach = s._reach(1.0)                      # == area 74
         shots = []
         self.assertFalse(s.update(0.016, ctx([FakeEnemy(reach + 1, 0)], shots)))
@@ -114,14 +114,14 @@ class MeleeGateTests(unittest.TestCase):
         self.assertEqual(len(shots), 1)
 
     def test_cooldown_stays_small_while_gated(self):
-        s = w("soul_scythe")
+        s = w("sword")
         s.update(0.016, ctx([FakeEnemy(999, 0)], []))
         self.assertLessEqual(s._cd, 0.11)          # polling, not the full 1.0s cooldown
 
 
 class ProjectileGateTests(unittest.TestCase):
     def test_out_of_ring_enemy_does_not_trigger(self):
-        f = w("frost_shards")
+        f = w("bow")
         shots = []
         self.assertFalse(f.update(0.016, ctx([FakeEnemy(1000, 0)], shots)))
         self.assertEqual(shots, [])
@@ -129,7 +129,7 @@ class ProjectileGateTests(unittest.TestCase):
     def test_random_targeting_only_picks_from_inside_the_ring(self):
         # `random` mode would otherwise sometimes aim at a foe outside the ring;
         # `_fire` filters the candidate list first.
-        d = dict(get_content().weapon("frost_shards"))
+        d = dict(get_content().weapon("bow"))
         d["targeting_mode"] = "random"
         d["projectile_count"] = 1
         rnd = Weapon("rnd", d)
@@ -144,7 +144,7 @@ class ProjectileGateTests(unittest.TestCase):
 
 class AreaScalingTests(unittest.TestCase):
     def test_area_multiplier_widens_the_ring_enough_to_trigger(self):
-        s = w("soul_scythe")
+        s = w("sword")
         e = FakeEnemy(s._reach(1.0) + 20, 0)       # just outside at x1.0
         self.assertFalse(s.update(0.016, ctx([e], [])))
         s._cd = 0.0
@@ -153,11 +153,11 @@ class AreaScalingTests(unittest.TestCase):
         self.assertEqual(len(shots), 1)
 
     def test_area_bonus_also_widens_the_ring(self):
-        f = w("frost_shards")
-        e = FakeEnemy(430, 0)                      # outside reach 400
+        f = w("bow")
+        e = FakeEnemy(490, 0)                      # outside reach 460
         self.assertFalse(f.update(0.016, ctx([e], [])))
         f._cd = 0.0
-        f.bonus["area"] = 50.0                     # reach -> 450
+        f.bonus["area"] = 50.0                     # reach -> 510
         shots = []
         self.assertTrue(f.update(0.016, ctx([e], shots)))
         self.assertTrue(shots)
@@ -183,8 +183,8 @@ class OrbitGateTests(unittest.TestCase):
 class RegressionTests(unittest.TestCase):
     """A foe well inside reach -> CB-2 must not change cadence or aim."""
 
-    def test_arcane_bolt_cadence_and_aim_unchanged(self):
-        b = w("arcane_bolt")                       # cooldown 0.9, reach 400
+    def test_rod_cadence_and_aim_unchanged(self):
+        b = w("magic_rod")                         # cooldown 0.85, reach 400
         e = FakeEnemy(80, 0)
         shots = []
         self.assertTrue(b.update(0.016, ctx([e], shots)))     # fires at once
@@ -194,8 +194,9 @@ class RegressionTests(unittest.TestCase):
         for s in shots:
             self.assertAlmostEqual(s.vel.normalize().x, 1.0, places=3)
 
-    def test_frost_fan_still_three_and_all_head_toward_the_target(self):
-        f = w("frost_shards")
+    def test_bow_fan_all_head_toward_the_target(self):
+        f = w("bow")
+        f.bonus["projectile_count"] += 2                      # a three-arrow fan
         shots = []
         f.update(0.016, ctx([FakeEnemy(0, 200)], shots))      # target on +y
         self.assertEqual(len(shots), 3)

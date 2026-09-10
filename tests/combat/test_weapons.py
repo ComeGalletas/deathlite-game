@@ -34,7 +34,8 @@ BOLT = {
     "name": "Test Bolt", "damage": 10, "cooldown": 1.0, "projectile_count": 1,
     "projectile_speed": 400, "projectile_lifetime": 1.5, "spread_deg": 12,
     "area": 5, "weight": 0, "targeting_mode": "nearest", "pierce": 0,
-    "special_effect": None, "category": "projectile", "tags": ["projectile"],
+    "special_effect": None, "category": "projectile", "class": "ranged",
+    "tags": ["projectile"],
 }
 
 
@@ -114,7 +115,7 @@ class ProjectileSpreadDataTests(unittest.TestCase):
     `spread_deg` with a hard subscript at that point -- deliberately, since a
     default in code would be per-weapon tuning living outside the data -- so a
     weapon missing the field crashes the run the moment the player takes its
-    Multishot. `arcane_bolt` and `thunder_orb` both shipped without it.
+    projectile upgrade. Two of the retired weapons once shipped without it.
     """
 
     def test_every_projectile_weapon_declares_a_spread(self):

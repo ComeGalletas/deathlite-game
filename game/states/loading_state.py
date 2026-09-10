@@ -43,14 +43,16 @@ _BUDGET_S = 0.030
 
 class LoadingState(State):
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
-              dev: bool = False, difficulty: str | None = None, **kwargs) -> None:
+              dev: bool = False, difficulty: str | None = None,
+              main_weapon: str | None = None, **kwargs) -> None:
         # The seed is decided here, not in the run, so the world built here
         # is the run's world.
         self.run_seed = seed if seed is not None else random.randrange(1 << 30)
         content = get_content()
         self.character_id = character_id or next(iter(content.characters))
         self._run_kwargs = dict(seed=self.run_seed, character_id=self.character_id,
-                                dev=dev, difficulty=difficulty)
+                                dev=dev, difficulty=difficulty,
+                                main_weapon=main_weapon)      # P5
 
         cdef = content.character(self.character_id)
         rig = cdef.get("sprite")

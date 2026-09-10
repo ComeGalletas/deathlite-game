@@ -92,6 +92,19 @@ class VerdictTests(unittest.TestCase):
         reasons = {id(x.enemy): x.reason for x in v}
         self.assertEqual(reasons, {id(wall): "off_floor", id(lost): "off_world"})
 
+    def test_a_flyer_is_judged_by_the_world_edge_only(self):
+        """The boss's brood flies: over a wall it is where it means to be,
+        and only leaving the world itself is a verdict."""
+        host, dog = FakeHost(), _dog()
+        wall = _off_screen(host, 300, 300)
+        wall.flying = True
+        host.blocked = [(pygame.Vector2(300, 300), 50.0)]
+        lost = _off_screen(host, -500, -500)
+        lost.flying = True
+        v = _sample(dog, host, 2)
+        reasons = {id(x.enemy): x.reason for x in v}
+        self.assertEqual(reasons, {id(lost): "off_world"})
+
     def test_a_bridge_is_floor(self):
         host, dog = FakeHost(), _dog()
         host.blocked = [(pygame.Vector2(BRIDGE.center), 30.0)]   # the fake floor test says no

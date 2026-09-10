@@ -1,0 +1,25 @@
+{
+  "choices": 3,
+  "kind_weights": {
+    "stat": 10,
+    "weapon": 7,
+    "grant": 10,
+    "forge": 8
+  },
+  "summon_factor": 0.6,
+  "level_falloff": [
+    1.0,
+    0.85,
+    0.7,
+    0.55,
+    0.4
+  ],
+  "rarity_weights": {
+    "common": 1.0,
+    "uncommon": 0.55,
+    "rare": 0.28,
+    "forge": 0.08
+  },
+  "grant_bundle_level": 1,
+  "forge_requires_levels": 2
+}

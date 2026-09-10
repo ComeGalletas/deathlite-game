@@ -23,9 +23,10 @@ from tests import worlds as W
 from world.gen.bridges import _seat_corridors
 from world.gen.placement import _toward_neighbours
 from world.gen.rooms import _cell_rect
-from world.gen.tuning import (_GRID_BOSS_CLEAR_RADIUS,
+from world.gen.tuning import (VILLAGE_KIND, _GRID_BOSS_CLEAR_RADIUS,
                              _GRID_SPAWN_CLEAR)
-from world.gen.repair import _killers, _reachable, _start_cell, _widest_class
+from world.gen.repair import (_exempt_pens, _killers, _open_villages, _reachable,
+                              _start_cell, _widest_class)
 from world.gen.height.coast import _walk
 from world.gen.height.graph import check_grid
 from world.gen.height.water import _trim_lake_stubs
@@ -56,11 +57,13 @@ def _sealed(layout, obstacles=None) -> int:
     n = grid.cols * grid.rows
     open_ = bytearray(1 if (grid.walkable[i] and grid.clearance[i] >= radius)
                       else 0 for i in range(n))
+    _exempt_pens(grid, layout, open_)       # HI-2: the sheep pen is not enemy ground
     start = _start_cell(grid, layout, open_)
     if start is None:
         return 0
     obs = layout.obstacles if obstacles is None else obstacles
     killers = _killers(grid, obs, radius)
+    _open_villages(grid, layout, killers)   # HI-2: the square is walked through
     seen = _reachable(grid, open_, killers, start)
     return sum(1 for i in range(n)
                if open_[i] and not killers[i] and not seen[i])
@@ -361,7 +364,11 @@ class TopographyTests(unittest.TestCase):
         seen = {(r.topography, r.kind) for _s, r in self._rooms()}
         shapes = {t for t, _k in seen}
         self.assertGreater(len(shapes), 1)
-        for shape in shapes - {config.HEIGHTMAP_BOSS_TOPOGRAPHY}:
+        # A shape assigned by role (weight 0: the boss, the village) is
+        # tied to its kind by construction and is not what this pins.
+        by_role = {t for t, spec in config.HEIGHTMAP_TOPOGRAPHIES.items()
+                   if not spec.get("weight")}
+        for shape in shapes - by_role:
             kinds = {k for t, k in seen if t == shape}
             self.assertGreater(len(kinds), 1,
                                f"every {shape} island has the same room kind")
@@ -773,8 +780,8 @@ class EveryIslandIsScatteredTests(unittest.TestCase):
         for seed in self.SEEDS:
             layout = W.layout(seed)
             for room in layout.rooms:
-                if not room.grid:
-                    continue
+                if not room.grid or room.kind == VILLAGE_KIND:
+                    continue        # HI-1: the village pass owns its island
                 got = self._on(layout, room)
                 self.assertGreater(
                     len(got) * 1000 / len(room.cells), 20,

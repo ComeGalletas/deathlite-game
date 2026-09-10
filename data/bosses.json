@@ -5,6 +5,7 @@
     "speed": 78,
     "contact_damage": 31,
     "radius": 46,
+    "vision_range": 720,
     "experience_reward": 400,
     "reward_currency": 60,
     "color": [180, 40, 70],

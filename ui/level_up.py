@@ -23,7 +23,7 @@ from ui.text import wrap
 # last line and the tag line sit inside the art's flat centre, not on its
 # bottom bevel: the top edge still centres as a 200-tall card did.
 _CARD_TOP_H = 200
-_CARD_H = 215
+_CARD_H = 245               # 200 + 15 (2026-09-04) + 30 (later the same day), all downward
 _CARD_TEXT_INSET = 19       # description wraps to the card width minus this each side (16 + 3 px)
 
 
@@ -36,13 +36,14 @@ class LevelUpPanel:
         self.hits = HitMap()          # card index -> rect, rebuilt every draw
 
     def draw(self, surface: pygame.Surface, choices, selected: int, *,
-             assets=None, pressed=None) -> None:
+             assets=None, pressed=None, title=None, hint=None) -> None:
         w, h = surface.get_size()
         dim = pygame.Surface((w, h), pygame.SRCALPHA)
         dim.fill((8, 6, 16, 200))
         surface.blit(dim, (0, 0))
 
-        title = self._title.render("Level Up  -  choose one", True, config.COLOR_ACCENT)
+        title = self._title.render(title or "Level Up  -  choose one", True,
+                                   config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(w // 2, 110)))
 
         n = len(choices)
@@ -69,6 +70,14 @@ class LevelUpPanel:
             name = self._name.render(up.title, True, config.COLOR_ON_BUTTON)
             surface.blit(name, name.get_rect(midtop=(rect.centerx, y + 46 + dy)))
 
+            # P2: the rarity, top-right, in its colour (the level is in the
+            # title's roman numeral).
+            rarity = getattr(up, "rarity", "")
+            if rarity:
+                r = self._hint.render(rarity.upper(), True,
+                                      config.RARITY_COLOURS.get(rarity, config.COLOR_ON_BUTTON_DIM))
+                surface.blit(r, r.get_rect(topright=(x + card_w - 24, y + 14 + dy)))
+
             for j, line in enumerate(wrap(self._desc, up.description,
                                           card_w - 2 * _CARD_TEXT_INSET)):
                 d = self._desc.render(line, True, config.COLOR_ON_BUTTON_DIM)
@@ -79,7 +88,7 @@ class LevelUpPanel:
                 surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - 14 + dy)))
 
         hint = self._hint.render(
-            "1/2/3 or Left/Right + Enter to pick    -    or click a card",
+            hint or "1/2/3 or Left/Right + Enter to pick    -    or click a card",
             True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(w // 2, y + card_h + 60)))
 

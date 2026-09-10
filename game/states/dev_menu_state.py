@@ -84,9 +84,10 @@ class DevMenuState(State):
         c = get_content()
         self._enemy_ids = sorted(c.enemies)
         self._spawn_counts: dict[str, int] = {}
-        lib = getattr(playing, "blessing_lib", None)
+        lib = getattr(playing, "blessing_lib", None)       # the P2 catalog
         self._blessing_ids = sorted(
-            lib.by_id, key=lambda b: (lib.by_id[b].source, lib.by_id[b].name)
+            lib.by_id, key=lambda b: (lib.by_id[b].kind, lib.by_id[b].weapon or "",
+                                      lib.by_id[b].name)
         ) if lib is not None else []
 
         # Items page: every weapon + every item base, straight off the data.
@@ -265,10 +266,18 @@ class DevMenuState(State):
         p = self._playing
         if p is None:
             return
+        from combat.weapons import Weapon
         from progression.blessings import apply_blessing
         b = p.blessing_lib.by_id[bid]
+        if p.player.blessings.get(bid, 0) >= b.max_level:
+            self._status = f"{b.name}  at max level"
+            return
+        if b.weapon is not None and p.player.weapon_by_id(b.weapon) is None:
+            # Dev convenience: a weapon blessing for a weapon the hero lacks
+            # hands the weapon over first.
+            p.player.weapons.append(Weapon(b.weapon, p.content.weapon(b.weapon)))
         apply_blessing(p.player, b)
-        self._status = f"{b.name}  x{p.player.blessings.get(bid, 0)}"
+        self._status = f"{b.name}  L{p.player.blessings.get(bid, 0)}"
 
     def _give_item(self, row: tuple) -> None:
         p = self._playing
@@ -363,8 +372,9 @@ class DevMenuState(State):
         if self.page == "blessings":
             b = p.blessing_lib.by_id[rid]
             owned = p.player.blessings.get(rid, 0)
-            tag = f"   x{owned}" if owned else ""
-            return f"{b.source[0].upper()}-{b.name}{tag}"
+            tag = f"   L{owned}" if owned else ""
+            head = p.content.weapon(b.weapon)["name"] if b.weapon else "Hero"
+            return f"{head}: {b.name}{tag}"
         if self.page == "items":
             # plain `weapon` = one of the auto-fire weapons (added to the hand);
             # `[slot]` = an equipment base for that slot (rolled + dev-equipped).

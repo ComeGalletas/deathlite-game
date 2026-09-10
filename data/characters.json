@@ -3,46 +3,51 @@
     "name": "Aegis",
     "identity": "Slow, armoured, holds ground. Rewards standing still.",
     "trait_name": "Bulwark",
-    "trait_desc": "After 0.4s without moving, take 30% less damage.",
+    "trait_desc": "After 0.4s without moving, take 30% less damage. Blocks 30% of hits.",
     "trait": "bulwark",
-    "starting_weapon": "soul_scythe",
+    "trait_params": { "still_after": 0.4, "damage_taken_mult": 0.7 },
+    "starting_weapon": "sword",
     "sprite": "hero_aegis",
     "color": [70, 130, 210],
     "base_stats": {
       "max_hp": 160,
-      "move_speed": 240,
+      "move_speed": 200,
       "armor": 4,
-      "pickup_radius": 80
+      "pickup_radius": 80,
+      "block_chance": 0.30
     }
   },
   "kestrel": {
     "name": "Kestrel",
-    "identity": "Fast and fragile. Damage scales with staying in motion.",
-    "trait_name": "Windborne",
-    "trait_desc": "Moving builds Momentum (max 5); each stack is +7% damage. Standing still bleeds it away.",
-    "trait": "windborne",
-    "starting_weapon": "frost_shards",
+    "identity": "Fast and fragile. Two arrows for every draw.",
+    "trait_name": "Double Shot",
+    "trait_desc": "The Bow fires two arrows per attack, each at 65% damage. 10% evasion.",
+    "trait": "double_shot",
+    "trait_params": { "weapon": "bow", "extra_projectiles": 1, "damage_mult": 0.65 },
+    "starting_weapon": "bow",
     "sprite": "hero_kestrel",
     "color": [230, 200, 90],
     "base_stats": {
       "max_hp": 92,
-      "move_speed": 280,
+      "move_speed": 240,
       "armor": 0,
-      "pickup_radius": 110
+      "pickup_radius": 110,
+      "evasion_chance": 0.10
     }
   },
   "nihil": {
     "name": "Nihil",
-    "identity": "Fragile status caster. Every enemy meets a curse first.",
-    "trait_name": "Cursebrand",
-    "trait_desc": "Your first hit on each enemy applies Shock (they take +10% damage for 4s).",
-    "trait": "cursebrand",
-    "starting_weapon": "thunder_orb",
+    "identity": "Fragile caster. Keeps the Rod humming.",
+    "trait_name": "Quick Cast",
+    "trait_desc": "The Magic Rod casts 15% faster.",
+    "trait": "quick_cast",
+    "trait_params": { "weapon": "magic_rod", "cooldown_mult": 0.85 },
+    "starting_weapon": "magic_rod",
     "sprite": "hero_nihil",
     "color": [170, 110, 210],
     "base_stats": {
       "max_hp": 96,
-      "move_speed": 225,
+      "move_speed": 190,
       "armor": 0,
       "pickup_radius": 100,
       "luck": 2

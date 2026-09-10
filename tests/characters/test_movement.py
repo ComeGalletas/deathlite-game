@@ -85,9 +85,17 @@ class MovementTests(unittest.TestCase):
         self.assertGreaterEqual(p.pos.y, p.radius)
 
 
+class _NoRolls:
+    """P1 gave every hero 5 % evasion; these tests measure the arithmetic."""
+    @staticmethod
+    def random():
+        return 1.0
+
+
 class DamageTests(unittest.TestCase):
     def test_armor_reduces_damage(self):
         p = Player(0, 0)
+        p.rng = _NoRolls()
         p.stats["armor"] = 3.0
         taken = p.take_damage(10.0)
         self.assertEqual(taken, 7.0)
@@ -95,6 +103,7 @@ class DamageTests(unittest.TestCase):
 
     def test_death_sets_flag_and_floors_hp(self):
         p = Player(0, 0)
+        p.rng = _NoRolls()
         p.take_damage(9999.0)
         self.assertFalse(p.alive)
         self.assertEqual(p.hp, 0.0)
@@ -114,6 +123,7 @@ class AnimStateTests(unittest.TestCase):
 
     def test_hurt_timer_set_on_damage_and_decays(self):
         p = Player(100, 100)
+        p.rng = _NoRolls()
         p.take_damage(10.0)
         self.assertGreater(p._hurt_t, 0.0)
         for _ in range(30):                       # 0.5 s

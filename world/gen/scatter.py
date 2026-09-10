@@ -12,7 +12,7 @@ from world.gen.height.graph import walk_links
 from world.gen.settings import settings_or_config
 from world.layout import VSTAIR, EWSTAIR
 from world.gen.tuning import (
-    SPECIAL_KINDS, _OBSTACLE_GAP, _TREE_DENSITY_BOOST,
+    SPECIAL_KINDS, VILLAGE_KIND, _OBSTACLE_GAP, _TREE_DENSITY_BOOST,
     _TREE_TREE_GAP_GRID, _TREE_THICKET_MIN_GRID, _TREE_THICKET_MAX_GRID,
     _HOUSE_RADIUS, _HOUSE_ROOM_CHANCE,
     _HOUSE_MIN_ROOM_CELLS, _HOUSE_GLOBAL_CAP, _VILLAGE_MIN_ROOM_CELLS,
@@ -255,6 +255,8 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
         _scatter_houses(rooms, all_doors, rng, boss_id, out, reach)
 
     for room in rooms:
+        if room.kind == VILLAGE_KIND:
+            continue        # HI-1: the village pass owns everything on it
         # The start and boss islands scatter like any other. Skipping them
         # outright -- a safe spawn, a clear arena -- left two of nine islands
         # as bare slabs, a fifth of all the land. Each keeps a clear disc
@@ -424,7 +426,7 @@ def _scatter_houses(rooms, all_doors, rng, boss_id, out, reach) -> None:
     for room in rooms:
         if placed >= _HOUSE_GLOBAL_CAP:
             break
-        if room.id == boss_id or not room.cells:
+        if room.id == boss_id or room.kind == VILLAGE_KIND or not room.cells:
             continue
         rr = room.rect
         if min(rr.width, rr.height) < 6 * px or len(room.cells) < _HOUSE_MIN_ROOM_CELLS:

@@ -10,7 +10,7 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
 
 ---
 
-## 1 · The asset — `assets/terrain/tiles/tilemap_1.png`
+## 1 · The asset — `assets/terrain/tiles/tilemaps/tilemap_1.png`
 
 - **`576 × 384` px**, loaded once via `pygame.image.load(...).convert_alpha()`
   → a **32-bit surface with a real alpha channel** (`game/assets.py —
@@ -32,7 +32,7 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
 {
   "tile_px": 64,
   "grid": [9, 6],
-  "floor_sheet": "terrain/tiles/tilemap_1.png",
+  "floor_sheet": "terrain/tiles/tilemaps/tilemap_1.png",
   "slots": {
     "interior": 10,
     "edge_n": 1, "edge_s": 19, "edge_w": 9, "edge_e": 11,
@@ -40,11 +40,11 @@ level). Source: `data/terrain.json`, `game/assets.py — Assets.tile`,
     "strip_v": [3, 12, 21], "strip_h": [27, 28, 29], "single": 30
   },
   "room_palettes": {
-    "default": "terrain/tiles/tilemap_1.png",
-    "boss": "terrain/tiles/tilemap_4.png",
-    "treasure": "terrain/tiles/tilemap_2.png",
-    "shrine": "terrain/tiles/tilemap_3.png",
-    "fountain": "terrain/tiles/tilemap_5.png"
+    "default": "terrain/tiles/tilemaps/tilemap_1.png",
+    "boss": "terrain/tiles/tilemaps/tilemap_4.png",
+    "treasure": "terrain/tiles/tilemaps/tilemap_2.png",
+    "shrine": "terrain/tiles/tilemaps/tilemap_3.png",
+    "fountain": "terrain/tiles/tilemaps/tilemap_5.png"
   }
 }
 ```
@@ -195,7 +195,7 @@ A cell in a room's **leftmost column** (not a corner):
 
 1. `_slot_for(row, col=0, rows, cols)` → `w` is true, `n/s` false →
    returns `slots["edge_w"]` → **`9`**.
-2. `Assets.tile("terrain/tiles/tilemap_1.png", 9)`:
+2. `Assets.tile("terrain/tiles/tilemaps/tilemap_1.png", 9)`:
    `col = 9 % 9 = 0`, `row = 9 // 9 = 1` → `rect = (0, 64, 64, 64)` →
    `sheet.subsurface((0, 64, 64, 64)).copy()` — grass on the right ~90 %,
    pixel-art shore fringe + transparent water on the **left** ~10 %.

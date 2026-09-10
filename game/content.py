@@ -60,6 +60,8 @@ class Content:
         self.bosses: dict[str, dict] = _load("bosses.json")
         self.characters: dict[str, dict] = _load("characters.json")
         self.blessings: dict[str, dict] = _load("blessings.json")
+        self.offering: dict = _load("offering.json")        # P2 weights
+        self.forges: dict[str, dict] = _load("forges.json")   # P3 Forgings
         self.items: dict = _load("items.json")
         self.meta_upgrades: dict[str, dict] = _load("meta_upgrades.json")
         # Sprite rigs are split by domain; a rig shared by two domains (e.g.
@@ -70,6 +72,8 @@ class Content:
             "weapon_sprites.json", "prop_sprites.json")
         self.terrain: dict = _load("terrain.json")
         self.ui_sprites: dict[str, dict] = _load("ui_sprites.json")
+        # Village NPC tuning (HI-3): speeds, idle bands, leashes, counts.
+        self.npcs: dict = _load("npcs.json")
         # The spawn schedule (spawn master S2). Checked here, against the
         # enemies just loaded, so a phase that names an enemy that does not
         # exist fails at boot rather than at minute eight.

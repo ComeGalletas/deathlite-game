@@ -5,13 +5,19 @@ chosen character, level-up upgrades, blessings, items and meta-progression).
 `self.stats` is a cached plain dict rebuilt by `recompute()` whenever modifiers
 change, so the hot combat loop reads a dict, not a solver.
 
-Character identity lives in `self.trait` plus a few small hooks
-(`incoming_damage_multiplier`, momentum) driven by `PlayingState`.
+Character identity lives in `self.trait` + `self.trait_params` (both from
+`data/characters.json`) and three small hooks: `incoming_damage_multiplier`
+(Bulwark), `weapon_mods` (Double Shot, Quick Cast -- handed to weapons through
+`FireContext.weapon_mods`) and the evasion / block rolls in `take_damage`
+(six-weapon system P1, design §20).
 """
 from __future__ import annotations
 
+import random
+
 import pygame
 
+from combat.weapons import NO_MODS, WeaponMods
 from game import config
 from progression.stats import Modifier, StatSet
 
@@ -35,11 +41,16 @@ def input_vector(pressed, keyset: dict) -> pygame.Vector2:
 
 class Player:
     def __init__(self, x: float, y: float, *, base_stats: dict | None = None,
-                 trait: str = "", character_id: str = "") -> None:
+                 trait: str = "", character_id: str = "",
+                 trait_params: dict | None = None, rng=None) -> None:
         self.pos = pygame.Vector2(x, y)
         self.radius = config.PLAYER_RADIUS
         self.character_id = character_id
         self.trait = trait
+        self.trait_params: dict = dict(trait_params or {})
+        # Evasion / block rolls. `PlayingState` hands in the run's seeded RNG;
+        # a bare `Player` (tests, menus) gets its own.
+        self.rng = rng if rng is not None else random.Random()
 
         # CB-3 physics: the hero has mass and can be shoved. `_knock` is an
         # extra velocity (px/s) that decays each frame, mirroring `Enemy`.
@@ -64,15 +75,16 @@ class Player:
         self.blessing_fx = None  # set by progression.blessings.rebuild
 
         # Trait runtime state.
-        self.momentum: float = 0.0      # Kestrel / Windborne
         self.still_time: float = 0.0     # Aegis / Bulwark
-        self._hexed: set[int] = set()    # Nihil / Cursebrand -- enemies already cursed
+        # What the last `take_damage` did, for feedback: "evaded" / "blocked" / "".
+        self.last_defense: str = ""
 
         # Sprite-animation state (read by PlayingState's animator; harmless when
         # the hero has no sprite rig). `_facing` is +1 right / -1 left, kept
         # from the last non-zero horizontal input.
         self._hurt_t: float = 0.0
         self._attack_t: float = 0.0
+        self._attack_cycle: int = 0      # P5: odd -> the second attack sheet
         self._facing: int = 1
         # CB-5: a manual aim faces the hero for this frame; `update` then
         # skips the movement-facing rule once and clears the flag.
@@ -105,15 +117,42 @@ class Player:
         return self.stats["pickup_radius"]
 
     # --- trait hooks --------------------------------------------
+    @property
+    def bulwark_active(self) -> bool:
+        """Aegis: the guard is up after `still_after` seconds without moving.
+        Read by the sprite animator too (the guard sheet, P5)."""
+        return (self.trait == "bulwark"
+                and self.still_time >= float(self.trait_params["still_after"]))
+
     def incoming_damage_multiplier(self) -> float:
-        if self.trait == "bulwark" and self.still_time >= 0.4:
-            return 0.7
+        if self.bulwark_active:
+            return float(self.trait_params["damage_taken_mult"])
         return 1.0
 
     def outgoing_damage_multiplier(self) -> float:
-        if self.trait == "windborne":
-            return 1.0 + 0.07 * self.momentum
         return 1.0
+
+    def weapon_by_id(self, weapon_id: str):
+        """The owned `Weapon` with this id, or None (P2: the hit resolver and
+        the on-kill hook look the firing weapon up by the projectile's id)."""
+        if not weapon_id:
+            return None
+        for w in self.weapons:
+            if w.weapon_id == weapon_id:
+                return w
+        return None
+
+    def weapon_mods(self, weapon) -> WeaponMods:
+        """Per-weapon trait modifiers (P1). Double Shot: extra Bow arrows at a
+        damage split. Quick Cast: a Rod cooldown multiplier. Every number is
+        the hero's `trait_params`; a trait that names no weapon does nothing."""
+        tp = self.trait_params
+        if not tp or tp.get("weapon") != weapon.weapon_id:
+            return NO_MODS
+        return WeaponMods(
+            extra_projectiles=int(tp.get("extra_projectiles", 0)),
+            cooldown_mult=float(tp.get("cooldown_mult", 1.0)),
+            damage_mult=float(tp.get("damage_mult", 1.0)))
 
     # --- per-frame ---------------------------------------------
     def handle_input(self, pressed, move_keys: dict) -> None:
@@ -130,7 +169,10 @@ class Player:
 
     def trigger_attack_anim(self, duration: float = 0.38) -> None:
         """Called by PlayingState when a weapon fires -- drives the attack
-        animation. No gameplay effect."""
+        animation. No gameplay effect. A fresh attack (the previous one had
+        played out) advances `_attack_cycle`, which picks the sheet (P5)."""
+        if self._attack_t <= 0.0:
+            self._attack_cycle += 1
         self._attack_t = max(self._attack_t, duration)
 
     def apply_knockback(self, direction: pygame.Vector2, strength: float) -> None:
@@ -151,9 +193,6 @@ class Player:
 
         moving = self._move_dir.length_squared() > 0
         self.still_time = 0.0 if moving else self.still_time + dt
-        if self.trait == "windborne":
-            self.momentum = (min(5.0, self.momentum + dt * 2.5) if moving
-                             else max(0.0, self.momentum - dt * 3.5))
 
         if self._face_override:
             self._face_override = False       # `face()` already set it this frame
@@ -165,8 +204,17 @@ class Player:
         self._attack_t = max(0.0, self._attack_t - dt)
 
     def take_damage(self, amount: float) -> float:
+        """Incoming hit (design §20): evasion negates it, a block removes
+        `block_strength` of it, then the trait multiplier, then flat armour."""
         if self.invulnerable or not self.alive:
             return 0.0
+        self.last_defense = ""
+        if self.rng.random() < self.stats["evasion_chance"]:
+            self.last_defense = "evaded"
+            return 0.0
+        if self.rng.random() < self.stats["block_chance"]:
+            self.last_defense = "blocked"
+            amount *= max(0.0, 1.0 - self.stats["block_strength"])
         amount *= self.incoming_damage_multiplier()
         dealt = max(0.0, amount - self.stats["armor"])
         self.hp -= dealt

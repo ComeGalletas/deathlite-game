@@ -165,6 +165,15 @@ HEIGHTMAP_COAST_PRESET: str = "rugged"
 HEIGHTMAP_COAST_PRESETS: dict = {
     "rugged": {"margin": 6, "north_delta": 0, "hold": (2, 3), "run_cap": 4,
                "mask_keep": 0.34, "grid_keep": 0.26},
+    # HI-1: the human island. A lower margin and a longer hold is the "more
+    # squared" castle coast the comment above promised: the inset has less
+    # room to wander and holds each value for a stretch, so the shore reads
+    # as straight runs rather than headlands. Swept over five seeds by how
+    # much of its bounding box a village fills: margin 3 gave 0.93-0.96, a
+    # slab; this gives 0.82-0.93, square with a few bites, at 558 walkable
+    # tiles against a volcanic island's 923.
+    "square": {"margin": 4, "north_delta": 0, "hold": (4, 6), "run_cap": 6,
+               "mask_keep": 0.34, "grid_keep": 0.26},
 }
 # Rings of sea-level ground around the island before the terraces start, so it
 # reads as land rising out of the water instead of a slab floating in it.
@@ -255,24 +264,26 @@ HEIGHTMAP_LAKE_SIZE: tuple = (10, 34)
 #            landing somewhere silly.
 #   weight   relative chance of being drawn; 0 means never drawn at random,
 #            only assigned by role
+#   lakes    how many inland lakes to try (HI-1); omitted, the global
+#            `HEIGHTMAP_LAKES`. A village wants its ground whole.
 HEIGHTMAP_TOPOGRAPHIES: dict = {
     "volcanic": {"tiers": (1, 2), "size": 1.0,  "coast": "rugged",
                  "bridges": 2, "weight": 3,
-                 "sheets": ["terrain/tiles/tilemap_1.png",
-                            "terrain/tiles/tilemap_2.png",
-                            "terrain/tiles/tilemap_3.png",
-                            "terrain/tiles/tilemap_4.png",
-                            "terrain/tiles/tilemap_5.png",
-                            "terrain/tiles/tilemap_6.png",
-                            "terrain/tiles/tilemap_7.png",
-                            "terrain/tiles/tilemap_8.png"]},
+                 "sheets": ["terrain/tiles/tilemaps/tilemap_1.png",
+                            "terrain/tiles/tilemaps/tilemap_2.png",
+                            "terrain/tiles/tilemaps/tilemap_3.png",
+                            "terrain/tiles/tilemaps/tilemap_4.png",
+                            "terrain/tiles/tilemaps/tilemap_5.png",
+                            "terrain/tiles/tilemaps/tilemap_6.png",
+                            "terrain/tiles/tilemaps/tilemap_7.png",
+                            "terrain/tiles/tilemaps/tilemap_8.png"]},
     "small":    {"tiers": (0, 1), "size": 0.76, "coast": "rugged",
                  "bridges": 1, "weight": 2,
-                 "sheets": ["terrain/tiles/tilemap_1.png",
-                            "terrain/tiles/tilemap_2.png",
-                            "terrain/tiles/tilemap_3.png",
-                            "terrain/tiles/tilemap_4.png",
-                            "terrain/tiles/tilemap_5.png"]},
+                 "sheets": ["terrain/tiles/tilemaps/tilemap_1.png",
+                            "terrain/tiles/tilemaps/tilemap_2.png",
+                            "terrain/tiles/tilemaps/tilemap_3.png",
+                            "terrain/tiles/tilemaps/tilemap_4.png",
+                            "terrain/tiles/tilemaps/tilemap_5.png"]},
     "boss":     {"tiers": (0, 0), "size": 1.0,  "coast": "rugged",
                  "bridges": 1, "weight": 0,
                  # Deliberately includes a sheet with no surf block, to see
@@ -280,11 +291,36 @@ HEIGHTMAP_TOPOGRAPHIES: dict = {
                  # flat, so its *whole* shore is drawn that way -- an
                  # all-or-nothing look rather than a subtle one.
                  "allow_beachless_shore": True,
-                 "sheets": ["terrain/tiles/tilemap_4.png",
-                            "terrain/tiles/tilemap_5.png",
-                            "terrain/tiles/tilemap_6.png"]},
+                 "sheets": ["terrain/tiles/tilemaps/tilemap_4.png",
+                            "terrain/tiles/tilemaps/tilemap_5.png",
+                            "terrain/tiles/tilemaps/tilemap_6.png"]},
+    # HI-1: the human island (`journals/human_island_journal.md`). Flat, one
+    # bridge a side, no lakes, and only the meadow sheets so a village stands
+    # on open grass. Never drawn at random: the village rooms are chosen by
+    # role in `_assign_kinds` and get this shape. A flat island spends
+    # nothing on cliffs, so the linear scale lands higher than `size` says
+    # above: 0.76 measured 549 walkable tiles (0.59 of a volcanic island);
+    # the owner asked for a quarter less (HI-3): 0.67 measured ~380-410;
+    # then another third less: 0.56 measures ~250, about 0.27 of volcanic.
+    "human":    {"tiers": (0, 0), "size": 0.56, "coast": "square",
+                 "bridges": 1, "weight": 0, "lakes": 0,
+                 "sheets": ["terrain/tiles/tilemaps/tilemap_1.png",
+                            "terrain/tiles/tilemaps/tilemap_7.png"]},
 }
 HEIGHTMAP_BOSS_TOPOGRAPHY: str = "boss"
+# HI-1: the village islands. Every world has between `HEIGHTMAP_VILLAGES[0]`
+# and `[1]` of them (a hard floor of one and a ceiling of two), each at a tree
+# distance from the start island inside `HEIGHTMAP_VILLAGE_DISTANCE`, never the
+# boss island. They wear `HEIGHTMAP_VILLAGE_TOPOGRAPHY`, carry no obstacle
+# scatter, no spawn points and no residents; `world/gen/village.py` (HI-2)
+# owns what stands on them.
+HEIGHTMAP_VILLAGE_TOPOGRAPHY: str = "human"
+HEIGHTMAP_VILLAGES: tuple = (1, 2)
+HEIGHTMAP_VILLAGE_DISTANCE: tuple = (1, 2)
+# The town hall (the pack's monastery, drawn at 0.84) stands due north of
+# the forge, above the heal zone; the village is designed round that axis.
+# Off leaves the north of the axis empty.
+HEIGHTMAP_VILLAGE_TOWN_HALL: bool = True
 # The shape of the mountain. Each plateau is the one below it eroded inward by
 # these amounts, per side. **South is the one that matters**: it is the only
 # face the camera sees, so pulling each cap back from the south rim is what
@@ -502,6 +538,37 @@ ENEMY_COUNT_BASE: int = 100
 ENEMY_COUNT_STEP: int = 5
 ENEMY_COUNT_STEP_PERIOD: float = 20.0
 MAX_PROJECTILES: int = 800
+
+# --- XP orb glow (journal: "Breathing glow under the XP orbs") ----------
+# A soft white disc under every orb, breathing in alpha on each orb's own
+# clock (`XPGem.age`), so a field of orbs shimmers out of phase. Surfaces
+# are pre-rendered per (diameter, alpha step) and looked up -- see
+# `game/states/playing/glow.py`. `scale` is the glow's diameter as a multiple
+# of the orb's; 0 turns the effect off.
+XP_GLOW: dict = {
+    "scale": 2.25,
+    "alpha_min": 40, "alpha_max": 110,   # 0..255
+    "period": 1.1,                       # seconds per breath
+    "steps": 8,                          # alpha levels cached between min and max
+    "colour": (255, 255, 255),
+}
+# A fainter, *steady* glow under every hostile shot (the ranged enemy's arrow
+# and the boss's radial barrage -- both draw as the arrow). Same cache, one
+# constant alpha, so a 20-bullet volley shares a single surface. `scale` is
+# the glow's diameter as a multiple of the shot's collider diameter; 0 = off.
+# The tint added to the enemy arrow sprite (`Assets.rotated(..., tint=)`
+# brightens a grey sprite toward it; the arrow on screen averages about
+# (214, 115, 99), median (255, 130, 99)).
+HOSTILE_ARROW_TINT = (150, 26, 12)
+# The halo's own colour, deliberately *not* the tint: the tint is a dark red
+# and a halo in it read as a shadow. This is the arrow's visible median red a
+# shade deeper, so "faint" comes from the alpha, not from a dark colour.
+HOSTILE_GLOW_COLOUR = (255, 120, 90)
+HOSTILE_GLOW: dict = {
+    "scale": 2.0,
+    "alpha": 60,                         # 35 read too faint in the window (owner, 2026-09-04)
+    "colour": HOSTILE_GLOW_COLOUR,
+}
 MAX_PARTICLES: int = 1200
 MAX_DAMAGE_NUMBERS: int = 200
 
@@ -551,6 +618,24 @@ PLAYER_DEFAULTS = {
     "crit_chance": 0.0,            # 0..1, added on top of luck
     "crit_damage": 0.0,            # added to the base 2.0x crit multiplier
     "xp_gain": 0.0,                # +fraction of XP from gems
+    # Six-weapon system P1 (design §20): every hero evades 5 % of hits; only
+    # Aegis blocks by default (characters.json); a block removes 50 %.
+    "evasion_chance": 0.05,
+    "block_chance": 0.0,
+    "block_strength": 0.5,
+    # P2 stat blessings (design §21): fractions added to gold from kills and
+    # to the damage of every melee / ranged weapon (summons excluded).
+    "gold_gain": 0.0,
+    "melee_damage": 0.0,
+    "ranged_damage": 0.0,
+}
+
+# Level-up card rarity label colours (P2), on the light button art.
+RARITY_COLOURS: dict[str, tuple[int, int, int]] = {
+    "common": (96, 96, 88),
+    "uncommon": (36, 120, 60),
+    "rare": (56, 72, 176),
+    "forge": (176, 112, 20),
 }
 PLAYER_RADIUS: int = 10
 
@@ -569,6 +654,13 @@ SPRITE_ANCHOR_DROP: float = 0.83
 # competent run actually finishes the loop; the boss still lands near the end.
 RUN_DURATION_SECONDS: float = 600.0
 BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
+# Where the boss appears: this far from the hero, on a random side, clamped
+# to the world rect. It flies, so nothing under the spot matters and no room
+# is consulted. Sized to sit just past the edge of the view whichever side
+# it picks: half the visible diagonal is ~612 px at CAMERA_ZOOM 1.5 on the
+# 1600x900 window (1067x600 world px), so the "APPROACHES" warning plays
+# while it crosses onto the screen instead of while it is an island away.
+BOSS_SPAWN_DISTANCE: float = 680.0
 
 # --- Combat: incoming damage -----------------------------------------
 # Contact and hazard damage land as discrete "bites" this many seconds apart,
@@ -602,6 +694,12 @@ BUMP_GAIN: float = 12.0          # penetration px -> bump impulse
 BUMP_DIFF_GAIN: float = 2.0      # how hard a weight mismatch amplifies the shove
 BUMP_DECAY: float = 0.001        # `_knock *= pow(BUMP_DECAY, dt)` per frame (~0.7 s fade)
 HIT_KNOCK_GAIN: float = 2.5      # weapon weight -> hit impulse base
+# Six-weapon system P4 (design §10): every "recently hit" / "marked" synergy
+# shares this window, and every synergy card states it.
+SYNERGY_WINDOW_S: float = 1.5
+# CR1: the Hammer's pending-swing circle, alpha at the start and at the
+# landing of the swing (a straight ramp between them).
+SLAM_INDICATOR_ALPHA: tuple[int, int] = (45, 170)
 
 # --- Debug key bindings (see spec section 9) ---------------------------
 # Raw SDL2 keycodes (== pygame.K_F1 .. pygame.K_F7). Hardcoded rather than read

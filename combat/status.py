@@ -2,7 +2,8 @@
 
 A `StatusType` is pure data: an id, a `family` that says how it acts
 (`dot` = damage over time, `slow` = movement multiplier, `amp` = extra damage
-taken), stacking rules and a tick interval. `StatusState.update` has **one**
+taken, `stun` = frozen: no movement, no behaviour, no contact damage),
+stacking rules and a tick interval. `StatusState.update` has **one**
 loop over active effects and dispatches by family -- there is no per-effect
 hardcoded update (spec 5.7: "Avoid creating a separate hardcoded update system
 for every effect"). Adding poison / bleed is just another table row.
@@ -11,6 +12,7 @@ for every effect"). Adding poison / bleed is just another table row.
   * dot  -- damage per tick, multiplied by stack count
   * slow -- fraction of speed removed (0.3 => 70% speed)
   * amp  -- fraction of extra damage taken (0.15 => x1.15)
+  * stun -- unused (a stun is all-or-nothing); the Hammer applies it (P1)
 """
 from __future__ import annotations
 
@@ -34,8 +36,12 @@ POISON = StatusType("poison", "dot", STACK, max_stacks=8, tick_interval=0.75)
 BLEED = StatusType("bleed", "dot", STACK, max_stacks=6, tick_interval=0.4)
 CHILL = StatusType("chill", "slow", REFRESH, max_stacks=1)
 SHOCK = StatusType("shock", "amp", REFRESH, max_stacks=1)
+STUN = StatusType("stun", "stun", REFRESH, max_stacks=1)
+# P4: the Rod's mark -- a flag the synergies read (design decision 2); no
+# family behaviour of its own.
+MARK = StatusType("mark", "mark", REFRESH, max_stacks=1)
 
-REGISTRY = {s.id: s for s in (BURN, POISON, BLEED, CHILL, SHOCK)}
+REGISTRY = {s.id: s for s in (BURN, POISON, BLEED, CHILL, SHOCK, STUN, MARK)}
 
 
 @dataclass
@@ -100,9 +106,14 @@ class StatusState:
     def speed_multiplier(self) -> float:
         m = 1.0
         for a in self._active.values():
+            if a.kind.family == "stun":
+                return 0.0
             if a.kind.family == "slow":
                 m *= (1.0 - a.potency)
         return max(0.1, m)
+
+    def is_stunned(self) -> bool:
+        return any(a.kind.family == "stun" for a in self._active.values())
 
     def damage_taken_multiplier(self) -> float:
         m = 1.0

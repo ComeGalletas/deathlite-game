@@ -265,6 +265,17 @@ def weapon(wid):
     return w
 
 
+
+def chain_weapon():
+    """Chain is an upgrade now (design §3.5), so the chain path is exercised
+    on an inline definition: the Rod with the Thunder Orb's old chain fields."""
+    d = dict(get_content().weapon("magic_rod"))
+    d.update(special_effect="chain", chain_count=3, chain_range=220)
+    w = Weapon("chain_rod", d)
+    w._cd = 0.0
+    return w
+
+
 def fire_ctx(enemies, sink, *, aim=None, auto_attack=True, origin=(0, 0)):
     o = pygame.Vector2(*origin)
     return FireContext(
@@ -319,7 +330,7 @@ class ConeTests(unittest.TestCase):
 class WeaponAimTests(unittest.TestCase):
     def test_forced_fire_ignores_the_empty_reach_ring(self):
         sink = []
-        w = weapon("arcane_bolt")
+        w = weapon("magic_rod")
         self.assertFalse(w.update(1 / 60, fire_ctx([], sink)))          # auto: ring empty
         self.assertEqual(sink, [])
         w._cd = 0.0
@@ -330,7 +341,7 @@ class WeaponAimTests(unittest.TestCase):
 
     def test_manual_shot_homes_on_the_closest_enemy_in_the_cone(self):
         sink = []
-        w = weapon("arcane_bolt")                                        # reach 400
+        w = weapon("magic_rod")                                        # reach 400
         near_in = FakeEnemy(200, 40)                                     # ~11 deg, d=204
         far_in = FakeEnemy(300, -20)                                     # ~4 deg,  d=301
         off_axis = FakeEnemy(100, 150)                                   # ~56 deg, nearer
@@ -339,20 +350,20 @@ class WeaponAimTests(unittest.TestCase):
 
     def test_manual_shot_goes_straight_when_the_cone_is_empty(self):
         sink = []
-        w = weapon("arcane_bolt")
+        w = weapon("magic_rod")
         w.update(1 / 60, fire_ctx([FakeEnemy(100, 150)], sink, aim=held_keys((1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), 0.0)
 
     def test_enemy_in_reach_but_outside_the_cone_is_ignored_even_when_nearest(self):
         sink = []
-        w = weapon("arcane_bolt")
+        w = weapon("magic_rod")
         w.update(1 / 60, fire_ctx([FakeEnemy(0, 60)], sink, aim=held_click((1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), 0.0)
 
     def test_per_weapon_aim_assist_override(self):
-        d = dict(get_content().weapon("arcane_bolt"))
+        d = dict(get_content().weapon("magic_rod"))
         d["aim_assist_deg"] = 70
-        w = Weapon("arcane_bolt", d); w._cd = 0.0
+        w = Weapon("magic_rod", d); w._cd = 0.0
         sink = []
         e = FakeEnemy(30, 52)                                            # ~60 deg off the aim
         w.update(1 / 60, fire_ctx([e], sink, aim=held_click((1, 0))))
@@ -360,7 +371,7 @@ class WeaponAimTests(unittest.TestCase):
 
     def test_melee_cone_points_at_the_raw_aim(self):
         sink = []
-        w = weapon("soul_scythe")
+        w = weapon("sword")
         # An enemy inside the assist cone but off-axis must not bend the swing.
         w.update(1 / 60, fire_ctx([FakeEnemy(40, 15)], sink, aim=held_keys((1, 0))))
         self.assertEqual(len(sink), 1)
@@ -369,13 +380,13 @@ class WeaponAimTests(unittest.TestCase):
 
     def test_melee_whiffs_into_empty_space(self):
         sink = []
-        w = weapon("soul_scythe")
+        w = weapon("sword")
         self.assertTrue(w.update(1 / 60, fire_ctx([], sink, aim=held_click((-1, 0)))))
         self.assertAlmostEqual(bearing(sink[0].cone_dir), 180.0)
 
     def test_auto_attack_off_holds_but_keeps_the_weapon_ready(self):
         sink = []
-        w = weapon("frost_shards")
+        w = weapon("bow")
         enemies = [FakeEnemy(100, 0)]
         for _ in range(30):
             self.assertFalse(w.update(1 / 60, fire_ctx(enemies, sink, auto_attack=False)))
@@ -388,13 +399,13 @@ class WeaponAimTests(unittest.TestCase):
 
     def test_auto_attack_off_still_fires_on_a_held_aim_key(self):
         sink = []
-        w = weapon("frost_shards")
+        w = weapon("bow")
         self.assertTrue(w.update(1 / 60, fire_ctx([], sink, aim=held_keys((0, 1)),
                                                   auto_attack=False)))
 
     def test_multishot_fans_around_the_manual_aim(self):
         sink = []
-        w = weapon("frost_shards")
+        w = weapon("bow")
         w.bonus["projectile_count"] += 2
         w.update(1 / 60, fire_ctx([], sink, aim=held_keys((0, -1))))
         angles = sorted(bearing(p.vel) for p in sink)
@@ -405,7 +416,7 @@ class WeaponAimTests(unittest.TestCase):
 
     def test_chain_lightning_opens_along_the_aim(self):
         sink = []
-        w = weapon("thunder_orb")
+        w = chain_weapon()
         w.update(1 / 60, fire_ctx([], sink, aim=held_keys((-1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), 180.0)
         self.assertGreater(sink[0].chain_left, 0)                       # still chains after the hit
@@ -462,7 +473,7 @@ class OrbitOnClickTests(unittest.TestCase):
 class HoldKeepsFiringTests(unittest.TestCase):
     def _volleys(self, aim, seconds=2.0, auto_attack=True):
         sink = []
-        w = weapon("arcane_bolt")
+        w = weapon("magic_rod")
         fires = 0
         for _ in range(int(seconds * 60)):
             fires += w.update(1 / 60, fire_ctx([], sink, aim=aim, auto_attack=auto_attack))

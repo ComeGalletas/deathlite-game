@@ -1,16 +1,16 @@
 {
   "tile_px": 64,
-  "floor_sheet": "terrain/tiles/tilemap_1.png",
+  "floor_sheet": "terrain/tiles/tilemaps/tilemap_1.png",
   "floor_sheets": {
-    "1": "terrain/tiles/tilemap_2.png",
-    "2": "terrain/tiles/tilemap_3.png",
-    "3": "terrain/tiles/tilemap_5.png"
+    "1": "terrain/tiles/tilemaps/tilemap_2.png",
+    "2": "terrain/tiles/tilemaps/tilemap_3.png",
+    "3": "terrain/tiles/tilemaps/tilemap_5.png"
   },
   "grid": [
     9,
     6
   ],
-  "water_tile": "terrain/tiles/water_background.png",
+  "water_tile": "terrain/tiles/tilemaps/water_background.png",
   "tree_routines": [
     {
       "fps": 4,
@@ -114,7 +114,7 @@
     }
   },
   "bridge": {
-    "sheet": "terrain/bridge/bridge_all.png",
+    "sheet": "terrain/tiles/bridge/bridge_all.png",
     "grid": [
       3,
       4
@@ -125,23 +125,24 @@
       "h_right": 2,
       "v_top": 3,
       "v_mid": 6,
-      "v_bot": 9
+      "v_bot": 9,
+      "shadow": 11
     }
   },
   "vstair": {
-    "sheet": "terrain/tiles/vstairs.png",
+    "sheet": "terrain/tiles/tilemaps/vstairs.png",
     "core_cols": 1,
     "sheets": {
-      "1": "terrain/tiles/vstairs_1.png",
-      "2": "terrain/tiles/vstairs_2.png"
+      "1": "terrain/tiles/tilemaps/vstairs_1.png",
+      "2": "terrain/tiles/tilemaps/vstairs_2.png"
     }
   },
   "room_palettes": {
-    "default": "terrain/tiles/tilemap_1.png",
-    "boss": "terrain/tiles/tilemap_4.png",
-    "treasure": "terrain/tiles/tilemap_2.png",
-    "shrine": "terrain/tiles/tilemap_3.png",
-    "fountain": "terrain/tiles/tilemap_5.png"
+    "default": "terrain/tiles/tilemaps/tilemap_1.png",
+    "boss": "terrain/tiles/tilemaps/tilemap_4.png",
+    "treasure": "terrain/tiles/tilemaps/tilemap_2.png",
+    "shrine": "terrain/tiles/tilemaps/tilemap_3.png",
+    "fountain": "terrain/tiles/tilemaps/tilemap_5.png"
   },
   "decor_placement": {
     "edge_inset": 8,
@@ -958,23 +959,23 @@
     }
   },
   "sheet_biomes": {
-    "terrain/tiles/tilemap_1.png": "meadow",
-    "terrain/tiles/tilemap_2.png": "forest",
-    "terrain/tiles/tilemap_3.png": "forest",
-    "terrain/tiles/tilemap_4.png": "drab",
-    "terrain/tiles/tilemap_5.png": "wetland",
-    "terrain/tiles/tilemap_6.png": "rock",
-    "terrain/tiles/tilemap_7.png": "meadow",
-    "terrain/tiles/tilemap_8.png": "sand"
+    "terrain/tiles/tilemaps/tilemap_1.png": "meadow",
+    "terrain/tiles/tilemaps/tilemap_2.png": "forest",
+    "terrain/tiles/tilemaps/tilemap_3.png": "forest",
+    "terrain/tiles/tilemaps/tilemap_4.png": "drab",
+    "terrain/tiles/tilemaps/tilemap_5.png": "wetland",
+    "terrain/tiles/tilemaps/tilemap_6.png": "rock",
+    "terrain/tiles/tilemaps/tilemap_7.png": "meadow",
+    "terrain/tiles/tilemaps/tilemap_8.png": "sand"
   },
   "sheet_flags": {
-    "terrain/tiles/tilemap_6.png": {
+    "terrain/tiles/tilemaps/tilemap_6.png": {
       "shoreline": false
     },
-    "terrain/tiles/tilemap_7.png": {
+    "terrain/tiles/tilemaps/tilemap_7.png": {
       "shoreline": false
     },
-    "terrain/tiles/tilemap_8.png": {
+    "terrain/tiles/tilemaps/tilemap_8.png": {
       "shoreline": false
     }
   },
@@ -1007,7 +1008,7 @@
       ]
     },
     "house": {
-      "radius": 34,
+      "radius": 41,
       "blocks_projectiles": true,
       "color": [
         150,
@@ -1032,6 +1033,117 @@
         128,
         74
       ]
+    },
+    "forge": {
+      "radius": 24,
+      "blocks_projectiles": true,
+      "color": [
+        88,
+        70,
+        66
+      ]
+    },
+    "barracks": {
+      "radius": 36,
+      "blocks_projectiles": true,
+      "color": [
+        150,
+        120,
+        90
+      ],
+      "satellites": [
+        [
+          -39,
+          0,
+          22
+        ],
+        [
+          39,
+          0,
+          22
+        ]
+      ]
+    },
+    "tower": {
+      "radius": 25,
+      "blocks_projectiles": true,
+      "color": [
+        150,
+        120,
+        90
+      ]
+    },
+    "archery": {
+      "radius": 38,
+      "blocks_projectiles": true,
+      "color": [
+        150,
+        120,
+        90
+      ],
+      "satellites": [
+        [
+          -44,
+          0,
+          22
+        ],
+        [
+          44,
+          0,
+          22
+        ]
+      ]
+    },
+    "monastery": {
+      "radius": 41,
+      "blocks_projectiles": true,
+      "color": [
+        150,
+        120,
+        90
+      ],
+      "satellites": [
+        [
+          -43,
+          0,
+          25
+        ],
+        [
+          43,
+          0,
+          25
+        ]
+      ]
+    },
+    "castle": {
+      "radius": 38,
+      "blocks_projectiles": true,
+      "color": [
+        150,
+        120,
+        90
+      ],
+      "satellites": [
+        [
+          -55,
+          0,
+          24
+        ],
+        [
+          55,
+          0,
+          24
+        ]
+      ]
+    },
+    "fence": {
+      "radius": 14,
+      "blocks_projectiles": false,
+      "color": [
+        160,
+        120,
+        70
+      ]
     }
   },
   "obstacle_decor": {
@@ -1040,15 +1152,29 @@
       "tree": 22
     },
     "sprite_drop": {
-      "house": 1.35
+      "house": 1.35,
+      "barracks": 1.0,
+      "tower": 1.0,
+      "archery": 1.0,
+      "monastery": 1.0,
+      "castle": 1.0,
+      "forge": 0.8,
+      "fence": 0.0
     },
     "render_scale": {
       "sign": 0.75,
-      "scarecrow": 0.75
+      "scarecrow": 0.75,
+      "barracks": 0.75,
+      "tower": 0.75,
+      "archery": 0.75,
+      "monastery": 0.84,
+      "castle": 0.6,
+      "forge": 0.6,
+      "fence": 0.6
     },
     "ghost": {
       "alpha": 70,
-      "kinds": ["tree", "house", "rock", "pillar"]
+      "kinds": ["tree", "house", "rock", "pillar", "barracks", "tower", "archery", "monastery", "castle", "forge"]
     },
     "tree_shadow": {
       "radius_scale": 1.9,
@@ -1103,6 +1229,56 @@
         "house_black_1",
         "house_black_2",
         "house_black_3"
+      ],
+      "barracks": [
+        "barracks_blue",
+        "barracks_red",
+        "barracks_yellow",
+        "barracks_purple",
+        "barracks_black"
+      ],
+      "tower": [
+        "tower_blue",
+        "tower_red",
+        "tower_yellow",
+        "tower_purple",
+        "tower_black"
+      ],
+      "archery": [
+        "archery_blue",
+        "archery_red",
+        "archery_yellow",
+        "archery_purple",
+        "archery_black"
+      ],
+      "monastery": [
+        "monastery_blue",
+        "monastery_red",
+        "monastery_yellow",
+        "monastery_purple",
+        "monastery_black"
+      ],
+      "castle": [
+        "castle_blue",
+        "castle_red",
+        "castle_yellow",
+        "castle_purple",
+        "castle_black"
+      ],
+      "forge": [
+        "forge"
+      ],
+      "fence": [
+        "fence_nw",
+        "fence_n1",
+        "fence_n2",
+        "fence_ne",
+        "fence_w",
+        "fence_e",
+        "fence_sw",
+        "fence_s_gate_l",
+        "fence_s_gate_r",
+        "fence_se"
       ]
     }
   },
@@ -1119,7 +1295,7 @@
       "footprint": 73,
       "anims": {
         "loop": {
-          "file": "terrain/props/bush_1.png",
+          "file": "terrain/props/bushes/bush_1.png",
           "frames": 8,
           "fps": 6,
           "loop": true
@@ -1138,7 +1314,7 @@
       "footprint": 46,
       "anims": {
         "loop": {
-          "file": "terrain/props/bush_2.png",
+          "file": "terrain/props/bushes/bush_2.png",
           "frames": 8,
           "fps": 6,
           "loop": true
@@ -1157,7 +1333,7 @@
       "footprint": 81,
       "anims": {
         "loop": {
-          "file": "terrain/props/bush_3.png",
+          "file": "terrain/props/bushes/bush_3.png",
           "frames": 8,
           "fps": 6,
           "loop": true
@@ -1176,7 +1352,7 @@
       "footprint": 46,
       "anims": {
         "loop": {
-          "file": "terrain/props/bush_4.png",
+          "file": "terrain/props/bushes/bush_4.png",
           "frames": 8,
           "fps": 6,
           "loop": true
@@ -1195,7 +1371,7 @@
       "footprint": 32,
       "anims": {
         "loop": {
-          "file": "terrain/props/rock_1.png",
+          "file": "terrain/props/rocks/rock_1.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1214,7 +1390,7 @@
       "footprint": 50,
       "anims": {
         "loop": {
-          "file": "terrain/props/rock_2.png",
+          "file": "terrain/props/rocks/rock_2.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1233,7 +1409,7 @@
       "footprint": 39,
       "anims": {
         "loop": {
-          "file": "terrain/props/rock_3.png",
+          "file": "terrain/props/rocks/rock_3.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1252,7 +1428,7 @@
       "footprint": 59,
       "anims": {
         "loop": {
-          "file": "terrain/props/rock_4.png",
+          "file": "terrain/props/rocks/rock_4.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1271,7 +1447,7 @@
       "footprint": 59,
       "anims": {
         "loop": {
-          "file": "terrain/props/tree_1.png",
+          "file": "terrain/props/trees/tree_1.png",
           "frames": 8,
           "fps": 5,
           "loop": true
@@ -1290,7 +1466,7 @@
       "footprint": 63,
       "anims": {
         "loop": {
-          "file": "terrain/props/tree_2.png",
+          "file": "terrain/props/trees/tree_2.png",
           "frames": 8,
           "fps": 5,
           "loop": true
@@ -1309,7 +1485,7 @@
       "footprint": 43,
       "anims": {
         "loop": {
-          "file": "terrain/props/tree_3.png",
+          "file": "terrain/props/trees/tree_3.png",
           "frames": 8,
           "fps": 5,
           "loop": true
@@ -1328,7 +1504,7 @@
       "footprint": 32,
       "anims": {
         "loop": {
-          "file": "terrain/props/tree_4.png",
+          "file": "terrain/props/trees/tree_4.png",
           "frames": 8,
           "fps": 5,
           "loop": true
@@ -1347,7 +1523,7 @@
       "footprint": 46,
       "anims": {
         "loop": {
-          "file": "terrain/props/tree_5.png",
+          "file": "terrain/props/trees/tree_5.png",
           "frames": 6,
           "fps": 5,
           "loop": true
@@ -1365,7 +1541,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/water_rock_1.png",
+          "file": "terrain/props/rocks/water_rock_1.png",
           "frames": 16,
           "fps": 10,
           "loop": true
@@ -1383,7 +1559,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/water_rock_2.png",
+          "file": "terrain/props/rocks/water_rock_2.png",
           "frames": 16,
           "fps": 10,
           "loop": true
@@ -1401,7 +1577,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/water_rock_3.png",
+          "file": "terrain/props/rocks/water_rock_3.png",
           "frames": 16,
           "fps": 10,
           "loop": true
@@ -1419,7 +1595,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/water_rock_4.png",
+          "file": "terrain/props/rocks/water_rock_4.png",
           "frames": 16,
           "fps": 10,
           "loop": true
@@ -1437,7 +1613,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/duck.png",
+          "file": "terrain/props/animals/duck.png",
           "frames": 3,
           "fps": 5,
           "loop": true
@@ -1455,7 +1631,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_1.png",
+          "file": "terrain/props/decorations/deco_1.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1473,7 +1649,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_2.png",
+          "file": "terrain/props/decorations/deco_2.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1491,7 +1667,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_3.png",
+          "file": "terrain/props/decorations/deco_3.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1509,7 +1685,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_4.png",
+          "file": "terrain/props/decorations/deco_4.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1527,7 +1703,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_5.png",
+          "file": "terrain/props/decorations/deco_5.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1545,7 +1721,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_6.png",
+          "file": "terrain/props/decorations/deco_6.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1563,7 +1739,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_7.png",
+          "file": "terrain/props/decorations/deco_7.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1581,7 +1757,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_8.png",
+          "file": "terrain/props/decorations/deco_8.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1599,7 +1775,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_9.png",
+          "file": "terrain/props/decorations/deco_9.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1617,7 +1793,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_10.png",
+          "file": "terrain/props/decorations/deco_10.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1635,7 +1811,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_11.png",
+          "file": "terrain/props/decorations/deco_11.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1653,7 +1829,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_12.png",
+          "file": "terrain/props/decorations/deco_12.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1671,7 +1847,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_13.png",
+          "file": "terrain/props/decorations/deco_13.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1689,7 +1865,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_14.png",
+          "file": "terrain/props/decorations/deco_14.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1707,7 +1883,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_15.png",
+          "file": "terrain/props/decorations/deco_15.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1726,7 +1902,7 @@
       "footprint": 52,
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_16.png",
+          "file": "terrain/props/decorations/deco_16.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1745,7 +1921,7 @@
       "footprint": 59,
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_17.png",
+          "file": "terrain/props/decorations/deco_17.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1764,7 +1940,7 @@
       "footprint": 87,
       "anims": {
         "loop": {
-          "file": "terrain/props/deco_18.png",
+          "file": "terrain/props/decorations/deco_18.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1782,7 +1958,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/stump_1.png",
+          "file": "terrain/props/stumps/stump_1.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1800,7 +1976,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/stump_2.png",
+          "file": "terrain/props/stumps/stump_2.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1818,7 +1994,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/stump_3.png",
+          "file": "terrain/props/stumps/stump_3.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1836,7 +2012,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/stump_4.png",
+          "file": "terrain/props/stumps/stump_4.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1854,7 +2030,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/stump_5.png",
+          "file": "terrain/props/stumps/stump_5.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1872,7 +2048,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_1.png",
+          "file": "terrain/props/clouds/cloud_1.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1890,7 +2066,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_2.png",
+          "file": "terrain/props/clouds/cloud_2.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1908,7 +2084,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_3.png",
+          "file": "terrain/props/clouds/cloud_3.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1926,7 +2102,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_4.png",
+          "file": "terrain/props/clouds/cloud_4.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1944,7 +2120,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_5.png",
+          "file": "terrain/props/clouds/cloud_5.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1962,7 +2138,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_6.png",
+          "file": "terrain/props/clouds/cloud_6.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1980,7 +2156,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_7.png",
+          "file": "terrain/props/clouds/cloud_7.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -1998,7 +2174,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/props/cloud_8.png",
+          "file": "terrain/props/clouds/cloud_8.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -2012,7 +2188,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/tiles/water_foam.png",
+          "file": "terrain/tiles/animations/water_foam.png",
           "frames": 16,
           "fps": 12,
           "loop": true
@@ -2026,7 +2202,7 @@
       ],
       "anims": {
         "loop": {
-          "file": "terrain/tiles/shadow.png",
+          "file": "terrain/tiles/tilemaps/shadow.png",
           "frames": 1,
           "fps": 0,
           "loop": false
@@ -2315,6 +2491,708 @@
           "frames": 1,
           "fps": 0,
           "loop": false
+        }
+      }
+    },
+    "barracks_blue": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        96,
+        234
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/barracks.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "barracks_red": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        96,
+        234
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/barracks.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "barracks_yellow": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        96,
+        234
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/barracks.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "barracks_purple": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        96,
+        234
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/barracks.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "barracks_black": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        96,
+        234
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/barracks.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "tower_blue": {
+      "frame": [
+        128,
+        256
+      ],
+      "anchor": [
+        64,
+        222
+      ],
+      "footprint": 86,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/tower.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "tower_red": {
+      "frame": [
+        128,
+        256
+      ],
+      "anchor": [
+        64,
+        222
+      ],
+      "footprint": 86,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/tower.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "tower_yellow": {
+      "frame": [
+        128,
+        256
+      ],
+      "anchor": [
+        64,
+        222
+      ],
+      "footprint": 86,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/tower.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "tower_purple": {
+      "frame": [
+        128,
+        256
+      ],
+      "anchor": [
+        64,
+        222
+      ],
+      "footprint": 86,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/tower.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "tower_black": {
+      "frame": [
+        128,
+        256
+      ],
+      "anchor": [
+        64,
+        222
+      ],
+      "footprint": 86,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/tower.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "archery_blue": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        232
+      ],
+      "footprint": 174,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/archery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "archery_red": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        232
+      ],
+      "footprint": 174,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/archery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "archery_yellow": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        232
+      ],
+      "footprint": 174,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/archery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "archery_purple": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        232
+      ],
+      "footprint": 174,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/archery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "archery_black": {
+      "frame": [
+        192,
+        256
+      ],
+      "anchor": [
+        94,
+        232
+      ],
+      "footprint": 174,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/archery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "monastery_blue": {
+      "frame": [
+        192,
+        320
+      ],
+      "anchor": [
+        96,
+        301
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/monastery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "monastery_red": {
+      "frame": [
+        192,
+        320
+      ],
+      "anchor": [
+        96,
+        301
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/monastery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "monastery_yellow": {
+      "frame": [
+        192,
+        320
+      ],
+      "anchor": [
+        96,
+        301
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/monastery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "monastery_purple": {
+      "frame": [
+        192,
+        320
+      ],
+      "anchor": [
+        96,
+        301
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/monastery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "monastery_black": {
+      "frame": [
+        192,
+        320
+      ],
+      "anchor": [
+        96,
+        301
+      ],
+      "footprint": 160,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/monastery.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "castle_blue": {
+      "frame": [
+        320,
+        256
+      ],
+      "anchor": [
+        160,
+        249
+      ],
+      "footprint": 264,
+      "anims": {
+        "loop": {
+          "file": "buildings/blue/castle.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "castle_red": {
+      "frame": [
+        320,
+        256
+      ],
+      "anchor": [
+        160,
+        249
+      ],
+      "footprint": 264,
+      "anims": {
+        "loop": {
+          "file": "buildings/red/castle.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "castle_yellow": {
+      "frame": [
+        320,
+        256
+      ],
+      "anchor": [
+        160,
+        249
+      ],
+      "footprint": 264,
+      "anims": {
+        "loop": {
+          "file": "buildings/yellow/castle.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "castle_purple": {
+      "frame": [
+        320,
+        256
+      ],
+      "anchor": [
+        160,
+        249
+      ],
+      "footprint": 264,
+      "anims": {
+        "loop": {
+          "file": "buildings/purple/castle.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "castle_black": {
+      "frame": [
+        320,
+        256
+      ],
+      "anchor": [
+        160,
+        249
+      ],
+      "footprint": 264,
+      "anims": {
+        "loop": {
+          "file": "buildings/black/castle.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "forge": {
+      "frame": [
+        256,
+        256
+      ],
+      "anchor": [
+        118,
+        202
+      ],
+      "footprint": 123,
+      "anims": {
+        "loop": {
+          "file": "terrain/facilities/forge.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_nw": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_nw.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_n1": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_n1.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_n2": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_n2.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_ne": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_ne.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_w": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_w.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_e": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_e.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_sw": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_sw.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_s_gate_l": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_s_gate_l.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_s_gate_r": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_s_gate_r.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fence_se": {
+      "frame": [
+        64,
+        64
+      ],
+      "anchor": [
+        32,
+        32
+      ],
+      "footprint": 64,
+      "anims": {
+        "loop": {
+          "file": "buildings/wooden_fence/fence_se.png",
+          "frames": 1,
+          "fps": 0,
+          "loop": false
+        }
+      }
+    },
+    "fx_heal": {
+      "frame": [
+        192,
+        192
+      ],
+      "anchor": [
+        96,
+        140
+      ],
+      "anims": {
+        "loop": {
+          "file": "terrain/facilities/heal_effect.png",
+          "frames": 11,
+          "fps": 12,
+          "loop": true
         }
       }
     }
