@@ -12,7 +12,9 @@ on one frame. Two verdicts:
 
 **Off floor** -- the spot under the body is not floor (`host.is_walkable`
 at its radius) and not a bridge, or no island and no bridge holds it at
-all (off the world). Recycled at once.
+all (off the world). Recycled at once. A **flying** body (`enemy.flying`,
+the `flying` tag) is judged by the flying floor instead -- the world rect
+-- so a bat over a cliff or the sea is left alone.
 
 **Stuck** -- the body is in pursuit (`host.is_pursuing`) and wants to
 move (`host.wants_to_move`), is not in an attack (`host.is_attacking`),
@@ -110,11 +112,17 @@ class Watchdog:
         return out
 
     def _judge(self, e, tr: _Track, host) -> str | None:
-        on_bridge = host.corridor_at(e.pos) is not None
-        if not on_bridge and host.room_at(e.pos) is None:
-            return "off_world"
-        if not on_bridge and not host.is_walkable(e.pos, e.radius):
-            return "off_floor"
+        if getattr(e, "flying", False):
+            # A flyer's floor is the world (`GameMap.is_walkable(flying=True)`):
+            # over a cliff, a lake or the sea it is exactly where it means to be.
+            if not host.is_walkable(e.pos, e.radius, flying=True):
+                return "off_world"
+        else:
+            on_bridge = host.corridor_at(e.pos) is not None
+            if not on_bridge and host.room_at(e.pos) is None:
+                return "off_world"
+            if not on_bridge and not host.is_walkable(e.pos, e.radius):
+                return "off_floor"
         tr.samples.append(pygame.Vector2(e.pos))
         if len(tr.samples) > self.window:
             del tr.samples[0]

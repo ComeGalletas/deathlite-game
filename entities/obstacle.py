@@ -21,15 +21,23 @@ class _Kinds:
     so this module stays importable without the asset layer, and exposed as a
     mapping so `from entities.obstacle import KINDS` keeps working."""
 
-    __slots__ = ("_d",)
+    __slots__ = ("_d", "_raw")
 
     def __init__(self) -> None:
         self._d: dict | None = None
+        self._raw: dict = {}
+
+    def spec(self, k) -> dict:
+        """The kind's whole `terrain.json` entry, for the keys beyond the
+        three every obstacle carries (a building's `satellites`)."""
+        self._load()
+        return self._raw.get(k, {})
 
     def _load(self) -> dict:
         if self._d is None:
             from game.assets import get_assets
             block = get_assets().terrain.get("obstacles", {})
+            self._raw = block
             self._d = {k: (float(v["radius"]),
                            bool(v.get("blocks_projectiles", True)),
                            tuple(v.get("color", (92, 92, 100))))
@@ -63,9 +71,19 @@ class _Kinds:
 KINDS = _Kinds()
 
 
+def satellites_of(kind: str) -> tuple:
+    """`((dx, dy, radius), ...)`: the extra collision circles a wide building
+    stands on besides its primary, offsets in world px from the primary. A
+    compound obstacle (HI-2) is the primary, which carries the art, plus
+    these, which collide only -- see `Obstacle.skin`. Empty for every kind
+    that declares none."""
+    return tuple((float(dx), float(dy), float(r))
+                 for dx, dy, r in KINDS.spec(kind).get("satellites", ()))
+
+
 class Obstacle:
     __slots__ = ("pos", "radius", "kind", "blocks_projectiles", "color",
-                 "variant", "biome")
+                 "variant", "biome", "skin")
 
     def __init__(self, kind: str, x: float, y: float, variant: int = 1) -> None:
         radius, blocks_proj, color = KINDS.get(kind, KINDS["rock"])
@@ -82,3 +100,7 @@ class Obstacle:
         # stands on the wetland and an autumn crown on the sand. Empty on the
         # legacy worlds, which have no biomes and keep the one global set.
         self.biome = ""
+        # HI-2: does this circle carry the decoration skin? A wide building
+        # is one primary (`True`) plus satellite circles (`False`) that
+        # collide, keep clutter and spawns off, and are never drawn.
+        self.skin = True

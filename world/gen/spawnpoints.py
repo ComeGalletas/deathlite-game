@@ -60,7 +60,7 @@ from world.gen.scatter import (_blocks, _clear_radius, _corridor_doorways,
                                _doors_near, _flight_keepouts, _keep_clear_pad)
 from world.gen.settings import settings_or_config
 from world.gen.tuning import (
-    SPECIAL_KINDS, _RESOURCE_KINDS, _RESOURCE_OFF_PATH_TILES,
+    SPECIAL_KINDS, VILLAGE_KIND, _RESOURCE_KINDS, _RESOURCE_OFF_PATH_TILES,
     _RESOURCE_OFF_SPAWN_TILES, _RESOURCE_POINTS_PER_ISLAND, _RESOURCE_WEIGHTS,
     _SPAWN_BRIDGE_TILES, _SPAWN_EDGE_TILES, _SPAWN_MIN_SPACING_TILES,
     _SPAWN_OBSTACLE_GAP, _SPAWN_RELAX_BELOW, _SPAWN_START_CLEAR_TILES,
@@ -342,6 +342,12 @@ def place_points(layout, settings=None):
     keepouts = _flight_keepouts(layout.rooms)
     pad = _keep_clear_pad()
     for room in layout.rooms:
+        if room.kind == VILLAGE_KIND:
+            # HI-1: a sanctuary. No enemy point and no resource anchor, so
+            # the director has nothing to draw from here; enemies may still
+            # follow the hero over a bridge.
+            yield room
+            continue
         island = _Island(layout, room, grid, doors, keepouts, pad, px)
         spawns = _island_spawn_points(layout, island, target, small, large, body)
         rng = random.Random(layout.seed * 7919 + room.id)

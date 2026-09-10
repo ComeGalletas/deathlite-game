@@ -929,8 +929,8 @@ primitive-fallback / HUD accent `color` — `aegis (70,130,210)`,
 - `data/characters.json` — the 3 `sprite` keys + a `color` per hero.
 - `data/terrain.json` — every `"file"`, `floor_sheet`, `water_tile`,
   `bridge.sheet` → new `terrain/tiles|bridge|props/` paths + renamed files
-  (`Tilemap_color1.png` → `terrain/tiles/tilemap_1.png`, `Bushe1.png` →
-  `terrain/props/bush_1.png`, `Tree1.png` → `terrain/props/tree_1.png`, …).
+  (`Tilemap_color1.png` → `terrain/tiles/tilemaps/tilemap_1.png`, `Bushe1.png` →
+  `terrain/props/bushes/bush_1.png`, `Tree1.png` → `terrain/props/trees/tree_1.png`, …).
 - `game/config.py` — `MENU_TITLE_IMAGE = "ui/title.png"`.
 - `game/states/playing_state.py` / `entities/player.py` — use the hero's
   `color` for the `_draw_player` primitive fallback + HUD accent instead of the
@@ -946,7 +946,7 @@ primitive-fallback / HUD accent `color` — `aegis (70,130,210)`,
 - Docs — `README.md` (Assets section + the `assets/` tree),
   `documentation/level_design.md` §3.3 / §3.4 / §4 (paths + rig names),
   `documentation/terrain_tile_slots_formula.md`
-  (`Tilemap_color1.png` → `terrain/tiles/tilemap_1.png`),
+  (`Tilemap_color1.png` → `terrain/tiles/tilemaps/tilemap_1.png`),
   `assets/CREDITS.md` (rewrite the file lists; add `Units/` as "Pack 3"; note
   the enemy / buildings / fx packs are filed for future use),
   `journals/journal.md` pointer, this section → a completion note.
@@ -988,7 +988,7 @@ terrain unchanged), and a headless screenshot per hero.
   units + a reserve-enemy note); `README.md` Assets section + project tree +
   "currently sprited" (3 heroes now); `documentation/level_design.md` +
   `terrain_tile_slots_formula.md` paths (`Tilemap_color1.png` →
-  `terrain/tiles/tilemap_1.png`).
+  `terrain/tiles/tilemaps/tilemap_1.png`).
 - Screenshots: each hero renders as its distinct coloured unit
   (blue Warrior / yellow Archer / purple Monk), HUD trait + HP correct per hero;
   chaser renders the orc; menu title loads from the new path; terrain unchanged.
@@ -2575,3 +2575,212 @@ while saying nothing about whether any of them were usable. It now asserts the
 constraint that actually matters: every rig in the pool exists, animates, and
 its sheet is `frames x frame width` across and `frame height` tall. That is
 precisely the check the original grid sheet would have failed.
+
+## Terrain art sorted into folders (2026-09-09)
+
+The owner moved the terrain sheets by hand -- the bridge sheet, the tilemaps,
+the water sheets and the stairs -- and asked for the tree to be sorted: art
+in use where it belongs, art not in use under an `extras/` folder, and the
+code pointed at the new places.
+
+**Audit first.** Every `.png` string in `data/*.json` and the code was
+checked against disk (146 of 161 resolved), and every file under `assets/`
+was checked for a reference. Inside `assets/terrain/` fifteen references
+were broken by the move and a further 27 files were never referenced.
+
+**Relinked** (43 substitutions, no code logic touched):
+
+| was | now |
+|---|---|
+| `terrain/tiles/tilemap_N.png` | `terrain/tiles/tilemaps/tilemap_N.png` |
+| `terrain/tiles/shadow.png`, `water_background.png`, `vstairs*.png` | `terrain/tiles/tilemaps/…` |
+| `terrain/tiles/water_foam.png` | `terrain/tiles/animations/water_foam.png` |
+| `terrain/bridge/bridge_all.png` | `terrain/tiles/bridge/bridge_all.png` |
+
+in `data/terrain.json` (values *and* the `sheet_biomes` / `sheet_flags`
+keys, which are sheet paths), `game/config.py` (`HEIGHTMAP_TOPOGRAPHIES`
+sheet lists) and three docs. The world digests carry no paths, so the
+cached worlds are unchanged.
+
+**Restored:** `vstairs_2.png` -- the 2-tile stone flight -- was referenced
+(`vstair.sheets["2"]`) but had vanished from disk during the move (no file
+matched its hash; it was in HEAD). `Sheets.vstair_sprite(2)` would have
+returned `None` silently. Written back into `tiles/tilemaps/`.
+
+**Parked under `assets/terrain/extras/`** (unreferenced today, kept intact
+to pull back later): `resources/` (gold, meat, tools, wood -- 23 files),
+`npcs/sheep/` (3), `facilities/forge.png`; and `rocky_shadow.png` joined the
+owner's `tiles/extras/` next to the six unused tile sheets. `tree_sheet.png`
+was removed by the owner and was unreferenced.
+
+**Result:** `assets/terrain/` is `props/` (49, all referenced), `tiles/
+{tilemaps 13, animations 1, bridge 1, extras 7}`, and `extras/`. Zero
+missing references, zero unreferenced files outside an `extras/` folder.
+Git sees the whole thing as 42 renames. Terrain + biome + smoke: 105 green.
+World suite: 234 passed, **4 digest mismatches that pre-date this sort** --
+`test_digest.py` hashes baked pixels and a drawn frame, never paths, and the
+four fail identically with the restored `vstairs_2.png` set aside; they
+belong to the in-flight bridge-shadow work (`world/terrain/*` modified,
+`digests.json` partly re-pinned). Left for that work to re-pin with
+`python -m world.digest --write` once it is finished.
+
+**Not touched, for the record:** the rest of `assets/` has many
+unreferenced files by the same audit -- the whole `buildings/` set except
+the houses, every `characters/` colour but the three heroes' rigs, the
+`lancer` / `pawn` families, all wolf colourways but `spectral`, the
+`effects/` frame folders, every `enemies/*/avatar.png`, `enemies/extra/`
+(already the enemies' own parking folder), `orbs/orb_red|yellow`,
+`items/chests.png`. Those are a separate sort if wanted.
+
+### Props sorted by type (same day)
+
+The owner then asked for `props/` itself to be split by what the art is.
+49 files moved, all via `git mv`, into `props/bushes/` (4), `rocks/` (8 --
+the four rocks and the four water rocks), `trees/` (5), `stumps/` (5),
+`clouds/` (8), `decorations/` (18, the `deco_*` ground cover, pumpkins, signs
+and scarecrow) and `animals/` (the duck). The 49 rig `file` paths in
+`data/terrain.json` were relinked (exact whole-path substitutions, longest
+first); nothing in code names a prop by path. Audit after: zero missing
+references, no loose file left in `props/`. Git: 49 renames. Terrain +
+biome + smoke: 105 green.
+
+### The whole tree: used stays, unused parks under `assets/unused/` (same day)
+
+The owner extended the rule to every folder: art no data file, code or test
+references moves to `assets/unused/<its old path>`, so anything can be
+pulled back by path alone. The reference set is every `.png` string in
+`data/*.json` and in `game/ world/ ui/ entities/ systems/ spawn/ tests/`;
+nothing in the code scans an assets directory at runtime, so the set is
+complete.
+
+**710 of 872 PNGs were unreferenced** and moved (430 via `git mv`, 280
+were never tracked); 65 emptied folders were removed. The two `extras/`
+parking folders from earlier in the day folded into `unused/` at their
+pre-extras paths (`unused/terrain/resources/`, `unused/terrain/tiles/…`), so
+there is one parking place, not three.
+
+What is left live, by folder: `buildings/<colour>/` (the three houses each),
+`characters/` (the three hero rigs, `dead`, the spectral wolf),
+`effects/` (`dust_2`, `flame_loop`, `weapons/`), `enemies/<name>/` (the
+three or four strips each enemy actually plays -- every `avatar.png`, the
+unused attack variants, `troll`'s club parts and `enemies/extra/` are
+parked), `orbs/` (green, blue, purple), `projectiles/arrow.png`,
+`terrain/` as sorted above, and `ui/` (the buttons, banners, ribbons and
+the arrow the menus draw -- the icon set, the grey buttons, the tab pieces,
+the bracket pointers and `menu_background_long` are parked). The
+`unordered-effects/` dump (180) went whole.
+
+Audit after: zero real missing references (the scan's only misses are the
+tests' deliberately non-existent fixture names), zero unused files outside
+`unused/`. Git: 698 renames, 76 adds, 1 delete. Rendering + smoke + summons:
+451 green.
+
+### Buildings: the second drop was a duplicate (same day)
+
+The owner re-added the pack's five `<Colour> Buildings/` folders (with their
+`.DS_Store` files) next to the sorted ones. Every one of the 40 PNGs hashed
+identical to a file already in place -- the three houses live in
+`buildings/<colour>/`, the archery / barracks / castle / monastery / tower
+parked in `unused/buildings/<colour>/` -- so the five folders were removed
+as duplicates and nothing merged. No building in the pack is colourless;
+the one colourless building the repo has, the gold mine, now sits under
+`unused/buildings/general/gold_mine/` so the `general/` rule the owner set
+has its place.
+
+## Village art pulled back from `unused/` (2026-09-09)
+
+For the human island (`journals/human_island_journal.md`, HI-0): the five
+building types in all five colours, the wooden fence (sliced into ten
+64 px cell files, the sheet stays parked), `forge.png` and the root
+`heal_effect.png` under `terrain/facilities/`, the two HappySheep strips
+under `terrain/npcs/sheep/`, and the pawn (idle / run / hammer set) and
+lancer (idle / run) strips for blue, red, yellow, purple. Every file is
+referenced by a rig; the audit is clean both ways.
+
+## Shoreline foam at cliff feet standing in the sea (2026-09-09)
+
+**Reported:** the walls that stand in the water of a bay cut into a terrace
+(the "north tiles" of what reads as an inland lake) had the pale scalloped
+`bottom` face but no moving foam against it, while the grass shore of the
+same water did.
+
+**Cause:** the animated foam anchors (`GameMap._shore`) come from
+`grid_paint.grid_shore`, which anchored only `GROUND` cells with sea or
+lake beside them. The retired LD-8 painter seeded a `_cliff_foam` point at
+every void-facing cliff foot; the height-map painter (commit `814cb6c`)
+carried only the ground rule over, so no cliff foot anywhere lapped. The
+water in the report is open sea, not a `LAKE` cell -- `_carve_lakes` never
+lets a lake touch a wall, and across 40 seeds none did -- which is also why
+the foot wears the `bottom` face: that variant is only picked over the sea.
+
+**What changed:** `grid_shore` also anchors the bottom cell of a wall
+(`CLIFF`, `row == drop - 1`) whose south neighbour is open sea or a lake.
+The foam is blitted in the water band under every terrace, so the face
+covers the part of the sprite that lands on the stone and only the surf
+around the transparent foot margin shows. A foot that lands on a lower
+floor is unchanged: no anchor, plain `body` face.
+
+**Tests:** `tests/rendering/test_terrain.py` -- the anchor-placement test
+now accepts wall feet, the "every water-facing ground tile and nothing
+else" test expects the sea-facing feet as well, the corridor test's
+"room cells" include cliff cells, and a new
+`test_cliff_feet_standing_in_the_sea_are_foam_anchors` checks seeds 35 and
+1234 (8 and 2 such feet) anchor exactly the feet over open sea. The world
+digests were re-pinned (`python -m world.digest --write`); the `layout`
+digests moved too, from the uncommitted village generator work already in
+the tree, not from this change, which only touches the bake.
+
+## The Bomb gets its sprite (2026-09-09)
+
+`assets/projectiles/bomb/` holds three 128 px strips from the bomb-fish pack:
+`bomb_spinning.png` (4 frames, the ball tumbling), `bomb_fuse_lit.png`
+(4 frames, sparks off the fuse) and `bomb_idle.png` (1 frame). The Bomb
+weapon was still drawn as the `bolt` disc.
+
+**What changed:**
+
+- `data/weapon_sprites.json -- bomb`: frame 128x128, content `[40, 20, 48, 72]`
+  (the union of both strips' opaque bounds), scale `[24, 36]`, anchor
+  `[12, 22]` = the centre of the ball. Two anims: `spin` (spinning strip,
+  12 fps) and `fuse` (fuse-lit strip, 10 fps), both looping. The idle frame
+  is deliberately not bound -- nothing shows a bomb at rest yet.
+- `game/states/playing/projectiles/bomb.py`: the `bomb` draw family. `spin`
+  while the projectile still has velocity, `fuse` once `Projectile.update`
+  has zeroed it at `stop_after` (the landing). Frames come off the run
+  clock like `orbit` / `thunder`; the blit is placed by the anchor so the
+  lit fuse rises above the projectile position. `fx.scale` in
+  `weapon_visuals.json` can resize it; missing sheets fall back to the disc.
+- `data/weapon_visuals.json -- bomb`: `"style": "bomb"` (was `bolt`).
+- `tests/rendering/test_projectiles.py -- BombTests`: both anims and no
+  idle on the rig, spin-vs-fuse picked by velocity, the frame index follows
+  the clock, the anchor puts more sprite above the position than below, the
+  disc fallback. The registry pin also gains `bomb`.
+
+## The Bomb's explosion (2026-09-10)
+
+`assets/effects/explosion_2.png` is a 1920x192 strip: ten 192 px frames of a
+radial burst -- a spark, the fireball swelling over frames 1-6 (up to 108 px
+across, centred on (96, 93) of the frame), then three frames of it thinning
+out. The Bomb's detonation was the expanding ring every explosion shares.
+
+**What changed:**
+
+- `data/weapon_sprites.json -- explosion`: frame 192x192, content
+  `[40, 18, 112, 142]` (the union of the frames' opaque bounds), scale
+  `[112, 140]` (1:1 with the crop), anchor `[56, 75]` = the burst's centre.
+  One one-shot anim, `burst`, 10 frames at 20 fps (0.5 s). A `fireball`
+  key (108) records how wide the biggest fireball is in scale px.
+- `effects.py -- TransientFx.burst_visual`: `detonate` now appends an
+  `_explosions` entry that also carries an `Animator` on the `burst`, and
+  whose `dur` is the strip's length, so the entry is culled when the last
+  frame has shown. `update_explosions` advances the animator. Without the
+  rig it is the old 0.35 s ring entry.
+- `rendering.py -- WorldRenderer.explosions / _blit_burst`: an entry with
+  an `anim` blits its frame scaled so `fireball` spans the blast diameter
+  (`2 * blast_radius`), centred on the blast; entries without one, and a
+  burst whose sheet is missing, draw the ring as before. The exploder
+  enemy's and the blessing procs' explosions are unchanged.
+- `tests/combat/test_bomb.py -- BurstVisualTests`: the detonation carries
+  the `explosion` burst for exactly the strip's length, it advances and is
+  culled when it ends, and the rendered frame is centred on the blast and
+  spans its diameter (ring fallback when the sheet is gone).

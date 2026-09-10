@@ -822,3 +822,40 @@ against a hand-scaled reference). `test_widgets.py` pins state / shape /
 variant → sheet, the 4-px label shift and the fallbacks. Each screen's art
 tests spy on `draw_button` / `draw_ribbon` for the state per element and
 sample one cap or corner pixel against the sheet.
+
+## XP orb glow (2026-09-04)
+
+Every experience orb sits on a soft white disc that breathes in alpha
+(journal: "Breathing glow under the XP orbs"). It is drawn inside
+`WorldRenderer.gems`, just before the orb itself, so the orb's colour sits
+on top and everything painted after gems on that terrace band covers both.
+
+- **Cost.** `game/states/playing/glow.py — GlowCache` pre-renders one disc
+  per `(diameter, alpha, colour)` -- four concentric fills from the rim in,
+  each a step more opaque, so the centre carries the full alpha and the rim
+  fades -- and hands the same Surface back every time. The breathing alpha is
+  quantised to `steps` levels first, so a whole breath touches at most
+  `steps` surfaces per orb size (about 3 x 8 for a run). Per orb per frame:
+  one sine, one dict lookup, one blit. Gems are also culled to the view
+  (`_GEM_CULL_PAD`), which they were not before.
+- **Clock.** The breath runs on each gem's own `age`, not the run time:
+  orbs dropped at different moments breathe out of phase, so a field of them
+  shimmers instead of blinking together, and it freezes with the pause.
+  `pulse_alpha` is a sine over `period` -- mid-way at 0, peak at a quarter,
+  trough at three quarters.
+- **Tuning.** `config.XP_GLOW`: `scale` (glow diameter as a multiple of the
+  orb's; `0` turns it off), `alpha_min` / `alpha_max`, `period`, `steps`,
+  `colour`. Souls (the homing Grave gems) use the same glow.
+- **Hostile shots.** The same cache, keyed on diameter and alpha rather
+  than orb tier, gives every enemy and boss shot a fainter *steady* glow:
+  `WorldRenderer.hostile_projectiles` blits `surface(d, alpha)` at the
+  constant `config.HOSTILE_GLOW["alpha"]` (35) under the arrow, `d` being
+  the shot's collider diameter times `HOSTILE_GLOW["scale"]` (2.0). Both
+  hostile sources today -- the `ranged` enemy's arrow and the boss's
+  20-bullet radial barrage -- draw as the arrow and get it; a whole barrage
+  shares one cached surface. Hostiles are view-culled with it.
+
+Tests: `tests/rendering/test_glow.py` (curve, quantisation, cache, disc
+alpha profile) and `tests/rendering/test_gem_glow.py` (blit order and
+geometry in the world pass, out-of-phase breathing, cull, off switch, cache
+size under a field of orbs).

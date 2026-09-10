@@ -45,7 +45,10 @@ def _run(hero_index=0):
     assert isinstance(p, PlayingState)
     p.player.weapons = []                     # silence the hero's own attacks
     p.player.invulnerable = False
-    p.player.trait = "none"                   # drop Bulwark / Windborne hooks
+    p.player.trait = "none"                   # drop the Bulwark hook
+    # P1: evasion / block rolls would make a bite land or not by seed; these
+    # tests measure the bite arithmetic, so the hero never rolls a defence.
+    p.player.rng = types.SimpleNamespace(random=lambda: 1.0)
     p.director = types.SimpleNamespace(       # freeze the spawn director
         should_spawn_boss=lambda e: False,
         update=lambda dt, e, n: [],
@@ -93,6 +96,7 @@ class HazardDueDamageTests(unittest.TestCase):
 class PlayerTakeDamageUnchangedTests(unittest.TestCase):
     def test_flat_armor_still_subtracts_from_a_single_hit(self):
         p = Player(0, 0)
+        p.rng = types.SimpleNamespace(random=lambda: 1.0)   # no evasion roll
         p.stats["armor"] = 3.0
         self.assertEqual(p.take_damage(10.0), 7.0)
 

@@ -6,7 +6,13 @@
 # brief retired it -- but the feature's own code (the interactable kind,
 # `locations.update_elite_arenas`, its render branch) stays in place and
 # dormant rather than being ripped out.
-SPECIAL_KINDS = ("shrine", "treasure", "fountain", "altar", "merchant")
+# `fountain` left this tuple with HI-1: the heal is the village's sanctuary
+# prop now (`journals/human_island_journal.md`), not an island of its own.
+SPECIAL_KINDS = ("shrine", "treasure", "altar", "merchant")
+# HI-1: the human island. Not a special kind -- nothing sits at its centre
+# by the special-room rule, no obstacle scatters on it, no enemy spawns
+# there. `world/gen/village.py` decides what stands on it.
+VILLAGE_KIND = "village"
 
 # _DIRS is the four orthogonal neighbor offsets — ((1,0), (-1,0), (0,1), (0,-1)) 
 # (east, west, south, north) defined once in tuning.py:11 so every world.gen stage 
@@ -49,6 +55,42 @@ _HOUSE_GLOBAL_CAP = 7
 _VILLAGE_MIN_ROOM_CELLS = 100
 _VILLAGE_EXTRA = (1, 3)                 # extra buildings beyond the first
 _VILLAGE_RADIUS = (3, 5)               # cluster spread, in tiles, from the first
+
+# --- the village pass (`world/gen/village.py`, HI-2) -------------------------
+#
+# Distances are in tiles from the forge unless said otherwise. A village
+# island is ~34 x 18 tiles of ground, so the rings are tight: the outer ring
+# only fits east and west, and the search fans out until something does.
+# The settlement is designed round the forge on a north axis: the heal
+# zone directly above the forge, the town hall (the monastery) directly
+# above the heal. The houses cluster on adjacent slots of the ring, the
+# military buildings group beside each bridge road, and everything loose
+# -- trees, rocks, clutter -- stays outside `_V_CLUSTER_RADIUS`, spread
+# round the centre.
+_V_HOUSES = (3, 4)                      # houses, on adjacent slots of the ring
+_V_SLOTS = 8                            # angular slots round the forge; N, NE, NW are the axis's
+_V_RING = (2.0, 4.0)                    # the house ring, min..max distance from the forge
+_V_HOUSE_LINK = 3.0                     # a house stands within this of the one before it
+_V_HEAL_NORTH = 2.0                     # the heal zone, tiles due north of the forge
+_V_HALL_ABOVE = (2.0, 3.5)              # the town hall, tiles straight above the heal (same x)
+_V_CLUSTER_RADIUS = 5.5                 # the settlement's extent; props stay outside it
+_V_HEAL_RADIUS = 26.0                   # the disc it reserves (its interactable radius)
+_V_MILITARY_INLAND = 3.0                # the military group: tiles in from the bridge mouth
+_V_MILITARY_FLANK = 1.8                 # ... and off the road, the first building
+_V_MILITARY_PITCH = 1.4                 # ... then this much further off, per building
+_V_PEN_DIST = (4.5, 10.0)               # pen centre, away from the bridges
+_V_PEN_W = (6, 7)                       # pen size in fence tiles, ring included
+_V_PEN_H = (4, 5)                       # ... so the interior is 4-5 x 2-3 fence tiles
+_V_PEN_SCALE = 0.6                      # a fence tile's pitch and art, as a fraction of a world tile
+_V_LANE_HALF = 1.0                      # half-width kept clear on each road, tiles
+_V_GAP = 12.0                           # px between any two village circles
+_V_COAST_PAD = 16.0                     # px of ground a circle keeps to the coast
+# The village's own scatter, after the buildings: the island's biome mix at
+# this fraction of the biome's density, and this many px between a tree or
+# rock and a building, so a canopy never covers a door.
+_V_SCATTER_SCALE = 2.5                  # over the whole island's cells, placed in the band outside the cluster
+_V_SCATTER_TREES = 2.0                  # the biome's tree weight, multiplied: a village stands among trees
+_V_SCATTER_GAP = 40.0
 
 
 # --- spawn points (`world/gen/spawnpoints.py`) ------------------------------

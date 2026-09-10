@@ -77,6 +77,28 @@ class TileSheets:
             self._cell_cache[key] = self._a.tile(sheet, idx, cols=cols) or self.probe
         return self._cell_cache[key]
 
+    def bridge_shadow(self, axis: str) -> pygame.Surface | None:
+        """The flat drop shadow a plank bridge lays on the water under it --
+        the `shadow` slot of the bridge sheet, one tile-sized block in the
+        outline colour at low alpha.
+
+        The block is drawn for a horizontal run: full width, so cells tile
+        into one continuous strip, and dropped a few px below the planks. A
+        vertical run gets the same block turned a quarter turn so it spans
+        the full height instead and tiles just as seamlessly -- turned the way
+        that lands the strip on the planks' right-hand side, away from the
+        top-left light the horizontal block's downward drop implies. `None`
+        when the sheet has no `shadow` slot; callers skip the pass."""
+        key = ("bridge-shadow", axis)
+        if key not in self._cell_cache:
+            idx = self.b_slots.get("shadow")
+            tile = (self._a.tile(str(self.b_sheet), int(idx), cols=self.b_cols)
+                    if self.bridge_ok and idx is not None else None)
+            if tile is not None and axis == "v":
+                tile = pygame.transform.rotate(tile, 90)
+            self._cell_cache[key] = tile
+        return self._cell_cache[key]
+
     def biome_of(self, sheet: str) -> str:
         """This tileset's biome. Unlisted sheets are their own biome."""
         return biomes.biome_of(sheet)

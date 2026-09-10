@@ -39,7 +39,8 @@ PINNED = Path(__file__).resolve().parent.parent / "tests" / "world" / "digests.j
 # container that is deleted once nothing fills it leaves the digest unchanged.
 _BAKE_FIELDS = (
     "_tiles_ok", "_water_tile", "_water_buf", "_shadow", "_foam",
-    "_foam_routines", "_grid_surfs", "_corr_surfs", "_shore", "_decos",
+    "_foam_routines", "_grid_surfs", "_corr_shadows", "_corr_surfs", "_shore",
+    "_decos",
     "_sprite_drop", "_tree_shadows", "_room_decor", "_void_decor",
 )
 

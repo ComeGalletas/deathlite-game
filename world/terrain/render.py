@@ -21,6 +21,7 @@ _SPECIAL_FLOORS = {
     "shrine": (30, 34, 48), "treasure": (44, 40, 24),
     "fountain": (22, 38, 44), "altar": (40, 24, 40),
     "merchant": (40, 36, 28), "elite_arena": (46, 26, 30),
+    "village": (34, 40, 26),
 }
 
 
@@ -146,6 +147,17 @@ class TerrainRenderer:
         got = ix.level_at_point(wx, wy)
         return 0 if got < 0 else got
 
+    def top_level_at(self, wx: float, wy: float) -> int:
+        """The band for a body that flies: the elevation of whatever terrain
+        stands under it, cliff walls included, so a bat over the face of a
+        terrace is painted with that terrace and not under its rim. 0 over
+        the sea and in a world with no elevation index."""
+        ix = self.gm._levels
+        if ix is None:
+            return 0
+        got = ix.top_at_point(wx, wy)
+        return 0 if got < 0 else got
+
     def ground_levels(self) -> list:
         """Every terrace level the baked world holds, ascending."""
         return sorted({lvl for _b, _s, lvl in self.gm._grid_surfs}) or [0]
@@ -173,7 +185,9 @@ class TerrainRenderer:
                 surface.blit(self._z_surf(surf),
                              ((blit.x - ox) * z, (blit.y - oy) * z))
         if level == self.ground_levels()[0]:
-            for rect, surf, _lvl in gm._corr_surfs:
+            # Every bridge's shadow, then every bridge: a shadow drawn after
+            # a neighbouring bridge would darken its planks.
+            for rect, surf, _lvl in (*gm._corr_shadows, *gm._corr_surfs):
                 if rect.colliderect(view):
                     surface.blit(self._z_surf(surf),
                                  ((rect.x - ox) * z, (rect.y - oy) * z))
@@ -203,6 +217,8 @@ class TerrainRenderer:
                                 lambda s, c=camera, it=inst:
                                 self._blit_one_decor(s, c, it)))
         for i, o in enumerate(self.gm.obstacles):
+            if not getattr(o, "skin", True):
+                continue                # a compound's satellite: collides only
             if cull.collidepoint(o.pos.x, o.pos.y):
                 lvl = self.level_at(o.pos.x, o.pos.y)
                 shadow = self.gm._tree_shadows.get(i)
@@ -241,7 +257,7 @@ class TerrainRenderer:
         for blit, surf, _lvl in sorted(gm._grid_surfs,
                                        key=lambda t: (t[2], t[0].y)):
             _blit(blit, surf)
-        for rect, surf, _lvl in gm._corr_surfs:
+        for rect, surf, _lvl in (*gm._corr_shadows, *gm._corr_surfs):
             _blit(rect, surf)
         # Interior clutter is NOT drawn here -- it is depth-sorted with the
         # obstacles and the characters (see `scenery_drawables`).
@@ -282,6 +298,8 @@ class TerrainRenderer:
         the skin sits inside the collision circle), or a fallback circle if no
         rig resolved. Tree shades are separate depth drawables on the same world
         anchor, sorted immediately before their owning tree."""
+        if not getattr(o, "skin", True):
+            return                      # a compound's satellite: collides only
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         sx, sy = (o.pos.x - ox) * z, (o.pos.y - oy) * z

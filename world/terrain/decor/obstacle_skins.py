@@ -81,6 +81,8 @@ def build_obstacle_decor(store, a) -> None:
                    if spec.get("trees")}
 
     for i, o in enumerate(store.obstacles):
+        if not getattr(o, "skin", True):
+            continue                    # a compound's satellite: collides only
         choices = rig_map.get(o.kind)
         if o.kind == "tree":
             choices = biome_trees.get(getattr(o, "biome", ""), choices)

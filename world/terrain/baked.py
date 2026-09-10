@@ -34,6 +34,9 @@ class BakedTerrain:
     grid_surfs: list = field(default_factory=list)
     # `(blit_rect, surf, level)` -- one baked plank bridge each, at sea level.
     corr_surfs: list = field(default_factory=list)
+    # `(blit_rect, surf, level)` -- the shadow under each of those bridges,
+    # same rect and order as `corr_surfs`; drawn just before its bridge.
+    corr_shadows: list = field(default_factory=list)
     shore: list = field(default_factory=list)      # top-left world px of shoreline tiles
     shadow: pygame.Surface | None = None
     foam: list | None = None

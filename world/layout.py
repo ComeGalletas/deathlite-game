@@ -173,6 +173,25 @@ class ResourcePoint(NamedTuple):
 
 
 @dataclass
+class Village:
+    """What the village pass (`world/gen/village.py`, HI-2) put on a human
+    island, for the run to read: the interactables stand at `forge` and
+    `heal`, the guards (HI-3) post at each pair in `posts`, the sheep are
+    leashed inside `pen`. `buildings` is `(kind, x, y)` per primary
+    building, houses included; `mouths` the bridge-mouth centres."""
+    room_id: int
+    forge: pygame.Vector2
+    heal: pygame.Vector2
+    buildings: list = field(default_factory=list)
+    posts: list = field(default_factory=list)
+    pen: object = None                  # pygame.Rect of the interior, or None
+    mouths: list = field(default_factory=list)
+    # The settlement's extent round the forge, world px: the village pass
+    # keeps its trees outside it and the bake's clutter pass keeps out too.
+    radius: float = 0.0
+
+
+@dataclass
 class WorldLayout:
     seed: int
     rooms: list[Room]
@@ -184,6 +203,8 @@ class WorldLayout:
     # Decided last, once the obstacles are final (`world/gen/spawnpoints.py`).
     spawn_points: list = field(default_factory=list)
     resource_points: list = field(default_factory=list)
+    # One `Village` per human island (HI-2), in island order.
+    villages: list = field(default_factory=list)
 
     def room(self, rid: int) -> Room:
         return self.rooms[rid]

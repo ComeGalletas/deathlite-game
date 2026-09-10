@@ -12,6 +12,7 @@ Reads `ps.director`, `ps.content`, `ps.game_map`, `ps.camera`, `ps.rng`,
 from __future__ import annotations
 
 import logging
+import math
 
 import pygame
 
@@ -26,6 +27,19 @@ from spawn.master import SpawnMaster
 from spawn.population import DormantEnemy
 
 log = logging.getLogger(__name__)
+
+
+def boss_spawn_point(player_pos, rng, width: float, height: float,
+                     distance: float | None = None) -> pygame.Vector2:
+    """Where the boss appears: `distance` (`config.BOSS_SPAWN_DISTANCE`) from
+    the hero on a random side, clamped to the world rect. The boss flies,
+    so what is under the spot -- floor, cliff, lake, sea -- does not matter,
+    and no room is consulted: the boss room stays the spawn master's."""
+    d = float(config.BOSS_SPAWN_DISTANCE if distance is None else distance)
+    ang = rng.uniform(0.0, math.tau)
+    return pygame.Vector2(
+        min(max(player_pos.x + math.cos(ang) * d, 0.0), float(width)),
+        min(max(player_pos.y + math.sin(ang) * d, 0.0), float(height)))
 
 
 class PlayingHost:
@@ -66,8 +80,8 @@ class PlayingHost:
     def visible_rect(self) -> pygame.Rect:
         return self.ps.camera.visible_rect()
 
-    def is_walkable(self, pos, radius: float) -> bool:
-        return self.ps.game_map.is_walkable(pos, radius)
+    def is_walkable(self, pos, radius: float, flying: bool = False) -> bool:
+        return self.ps.game_map.is_walkable(pos, radius, flying=flying)
 
     def floor_at(self, pos) -> int:
         layout = self.layout
@@ -231,16 +245,15 @@ class EnemyControl:
             return
         ps.director.mark_boss_spawned()
         boss_id = next(iter(ps.content.bosses))
-        pos = self.boss_arena_point()
+        pos = self.boss_spawn_point()
         ps.boss = Boss(boss_id, ps.content.boss(boss_id), pos.x, pos.y)
         ps.shake.add(0.7)
         ps.game.events.publish(Events.BOSS_SPAWNED, name=ps.boss.name)
         log.info("boss spawned: %s", ps.boss.name)
 
-    def boss_arena_point(self) -> pygame.Vector2:
-        """Centre of the boss room if there is a layout, else just off-screen."""
+    def boss_spawn_point(self) -> pygame.Vector2:
+        """`boss_spawn_point()` for this run: beside the hero, not in the
+        boss room."""
         ps = self.ps
-        if ps.game_map.layout is not None:
-            room = ps.game_map.layout.room(ps.game_map.layout.boss_id)
-            return room.center
-        return ps.game_map.offscreen_spawn_point(ps.camera, ps.rng)
+        return boss_spawn_point(ps.player.pos, ps.rng,
+                                ps.game_map.width, ps.game_map.height)

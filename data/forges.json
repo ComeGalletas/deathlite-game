@@ -1,0 +1,74 @@
+{
+  "whirlwind": {
+    "name": "Whirlwind", "weapon": "sword", "identity": "Defensive AoE",
+    "description": "The Sword spins without pause: a fast, full-circle sweep for far less per hit. Strong when surrounded, weak on a single target.",
+    "overrides": { "name": "Whirlwind", "cooldown": 0.24, "projectile_lifetime": 0.2, "cone_half_angle": 180, "damage": 6, "weight": 12, "area": 70 },
+    "effects": {}
+  },
+  "greatsword": {
+    "name": "Greatsword", "weapon": "sword", "identity": "Crowd breaker",
+    "description": "A slow, enormous blade: huge damage, a wide arc and a shove that scatters a crowd. Every swing has to count.",
+    "overrides": { "name": "Greatsword", "cooldown": 1.8, "damage": 42, "area": 112, "cone_half_angle": 75, "weight": 75 },
+    "effects": {}
+  },
+  "earthshaker": {
+    "name": "Earthshaker", "weapon": "hammer", "identity": "Area control",
+    "description": "Every blow sends a shockwave rolling out past the impact at half damage. Slower swings.",
+    "overrides": { "name": "Earthshaker", "cooldown": 1.95 },
+    "effects": { "shockwave_radius": 90, "shockwave_damage_mult": 0.5 }
+  },
+  "meteor_hammer": {
+    "name": "Meteor Hammer", "weapon": "hammer", "identity": "Area denial",
+    "description": "Each impact leaves a burning crater that keeps hurting whatever stands in it. The blow itself lands lighter.",
+    "overrides": { "name": "Meteor Hammer", "damage": 27 },
+    "effects": { "hazard_radius": 64, "hazard_dps_mult": 0.35, "hazard_duration": 2.5 }
+  },
+  "twin_daggers": {
+    "name": "Twin Daggers", "weapon": "daggers", "identity": "Sustained DPS, wider",
+    "description": "Two blades strike at once, fanned apart. Each hits for less, the pair covers more.",
+    "overrides": { "name": "Twin Daggers", "damage": 4, "cone_half_angle": 32, "area": 44 },
+    "effects": { "twin_offset_deg": 22 }
+  },
+  "fan_of_blades": {
+    "name": "Fan of Blades", "weapon": "daggers", "identity": "Crowd-clearing assassin",
+    "description": "The daggers are thrown in a spread of four. Groups suffer; precision is gone.",
+    "overrides": { "name": "Fan of Blades", "special_effect": null, "category": "projectile", "projectile_count": 4, "spread_deg": 13, "projectile_speed": 540, "projectile_lifetime": 0.42, "reach": 240, "damage": 5, "pierce": 0, "cooldown": 0.5, "tags": ["melee", "projectile"] },
+    "effects": {}
+  },
+  "multishot": {
+    "name": "Multishot", "weapon": "bow", "identity": "Coverage",
+    "description": "Three arrows in a spread, each lighter and piercing less. Many targets over one.",
+    "overrides": { "name": "Multishot", "projectile_count": 3, "spread_deg": 14, "damage": 8, "pierce": 1 },
+    "effects": {}
+  },
+  "ballista": {
+    "name": "Ballista", "weapon": "bow", "identity": "Elite and boss killer",
+    "description": "One slow, enormous bolt: very high damage, huge penetration, very long range. Fires seldom.",
+    "overrides": { "name": "Ballista", "damage": 50, "cooldown": 2.4, "pierce": 8, "projectile_speed": 760, "projectile_lifetime": 1.6, "reach": 640, "area": 7, "weight": 30 },
+    "effects": {}
+  },
+  "arcane_storm": {
+    "name": "Arcane Storm", "weapon": "magic_rod", "identity": "Battlefield coverage",
+    "description": "The Rod no longer fires: four arcane motes circle you and burn whatever they touch.",
+    "overrides": { "name": "Arcane Storm", "special_effect": "orbit", "category": "orbit", "projectile_count": 4, "orbit_radius": 120, "orbit_speed": 2.6, "rehit_interval": 0.5, "damage": 5, "projectile_lifetime": 999, "reach": 160, "targeting_mode": "none", "cooldown": 0.45 },
+    "effects": {}
+  },
+  "arcane_lance": {
+    "name": "Arcane Lance", "weapon": "magic_rod", "identity": "Single-target destruction",
+    "description": "A focused lance of power: high damage, long reach, pierces a line. Casts slowly.",
+    "overrides": { "name": "Arcane Lance", "damage": 34, "cooldown": 1.6, "pierce": 6, "projectile_speed": 900, "area": 9, "reach": 460, "projectile_lifetime": 1.0 },
+    "effects": {}
+  },
+  "cluster_bomb": {
+    "name": "Cluster Bomb", "weapon": "bomb", "identity": "Chain-reaction AoE",
+    "description": "The blast scatters three bomblets that go off a moment later. The first blast is lighter.",
+    "overrides": { "name": "Cluster Bomb", "damage": 24 },
+    "effects": { "cluster_count": 3, "cluster_damage_mult": 0.4, "cluster_radius_mult": 0.6, "cluster_fuse": 0.55, "cluster_speed": 180 }
+  },
+  "minefield": {
+    "name": "Minefield", "weapon": "bomb", "identity": "Battlefield control",
+    "description": "Bombs become mines: thrown, armed, and waiting until an enemy steps on them. Thrown faster, a little lighter.",
+    "overrides": { "name": "Minefield", "cooldown": 1.3, "damage": 26, "blast_radius": 62 },
+    "effects": { "mine": 1, "mine_arm_delay": 0.6, "mine_lifetime": 25 }
+  }
+}

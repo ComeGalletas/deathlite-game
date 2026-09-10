@@ -48,6 +48,10 @@ class Enemy:
         self.behavior = definition.get("behavior", "chase")
         self.color = tuple(definition.get("color", (200, 90, 90)))
         self.tags = tuple(definition.get("tags", ()))
+        # `flying`: over the world rather than on it, the same tag and the
+        # same collider as the boss (`GameMap.is_walkable(flying=True)`); the
+        # behaviour side reads it in `entities/ai/behaviors/simple.py`.
+        self.flying = "flying" in self.tags
         self.is_elite = bool(definition.get("is_elite", False))
 
         self.shield_hp = float(definition.get("shield_hp", 0.0))
@@ -57,6 +61,11 @@ class Enemy:
         self.pos = pygame.Vector2(x, y)
         self.vel = pygame.Vector2()
         self.alive = True
+        self.killed_by = ""            # P2: weapon id of the killing hit
+        # P4 synergies: run-clock time of the last hit per weapon, and the
+        # consecutive-hit streak per weapon (`combat/synergy.py`).
+        self.recent_hits: dict[str, float] = {}
+        self.hit_streak: dict[str, int] = {}
         self.hit_flash = 0.0
         self._knock = pygame.Vector2()
         # Per-enemy transient behaviour state, in namespaced blackboard slots.
@@ -109,14 +118,21 @@ class Enemy:
         whose `ctx.dt` spans the frames this enemy sat out."""
         self.contact_damage = self._base_contact
         self.contact_cd = max(0.0, self.contact_cd - ctx.dt)
-        self._behavior.tick(self, ctx, ctx)          # ctx satisfies Perception + Combat
+        if self.status.is_stunned():
+            # P1 stun: frozen in place -- no steering, no wind-up, no bite.
+            # The behaviour machine simply does not advance this frame.
+            self.vel.update(0, 0)
+            self.contact_damage = 0.0
+        else:
+            self._behavior.tick(self, ctx, ctx)      # ctx satisfies Perception + Combat
 
         dt = ctx.dt
         # Status DoT (burn) is dealt straight to HP and reported for stats.
         self.status.update(dt, lambda amt: self._status_damage(amt, ctx))
         # Chill scales movement; knockback is unaffected.
         step = (self.vel * self.status.speed_multiplier() + self._knock) * dt
-        self.pos = ctx.resolve_movement(self.pos, self.pos + step, self.radius)
+        self.pos = ctx.resolve_movement(self.pos, self.pos + step, self.radius,
+                                        flying=self.flying)
         self._knock *= pow(config.BUMP_DECAY, dt)
         if self._knock.length_squared() < 1.0:
             self._knock.update(0, 0)

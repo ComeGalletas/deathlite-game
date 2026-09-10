@@ -241,6 +241,73 @@ def _reachable(grid, open_, killers, start):
     return seen
 
 
+def _exempt_pens(grid, layout, open_) -> None:
+    """A village's sheep pen (HI-2) leaves the required set.
+
+    The ring of fence posts encloses it on purpose: the hero fits through
+    the gate, the sheep are leashed inside, and no enemy ever spawns on the
+    island. Judged as enemy ground it failed anyway -- the 48 px lattice at
+    the widest body read even a two-tile gate as sealed whenever a column
+    landed off its middle, and the repair pulled a post out of the far side
+    of the pen (seed 35, island 8; seed 7, island 5). So the pen's cells,
+    fence ring included, are closed here before the flood: neither required
+    nor walked through.
+
+    One tile beyond the ring as well. A house may stand a body's width from
+    the fence, and the sliver between them holds a cell or two that nothing
+    kills yet nothing reaches -- the same false seal, one tile out."""
+    from game import config
+    px = config.TILE_PX
+    pens = [v.pen.inflate(4 * px, 4 * px)
+            for v in getattr(layout, "villages", ()) if v.pen is not None]
+    if not pens:
+        return
+    ox, oy = grid.origin
+    half = grid.cell * 0.5
+    for pen in pens:
+        c0 = max(0, int((pen.left - ox) // grid.cell))
+        c1 = min(grid.cols - 1, int((pen.right - ox) // grid.cell))
+        r0 = max(0, int((pen.top - oy) // grid.cell))
+        r1 = min(grid.rows - 1, int((pen.bottom - oy) // grid.cell))
+        for row in range(r0, r1 + 1):
+            cy = oy + row * grid.cell + half
+            for col in range(c0, c1 + 1):
+                cx = ox + col * grid.cell + half
+                if pen.collidepoint(cx, cy):
+                    open_[row * grid.cols + col] = 0
+
+
+def _open_villages(grid, layout, killers) -> None:
+    """Inside a village's settlement disc (`Village.radius` round the forge)
+    no obstacle kills a cell: the flood walks the square as open ground.
+
+    The houses cluster a few px apart on purpose, and the slivers between
+    them are cells the widest body can stand on but never reach -- the
+    same false seal as the pen's, and the repair answered it by pulling a
+    house out of the cluster (seeds 1, 2, 6). The village is not enemy
+    ground: nothing spawns there, the hero fits the roads by construction
+    (a tile of lane from every bridge to the forge), and an enemy in
+    pursuit takes the road too. So the square is walked through rather
+    than judged, which also keeps the flood connected across the island."""
+    discs = [(v.forge.x, v.forge.y, float(v.radius))
+             for v in getattr(layout, "villages", ()) if float(v.radius) > 0]
+    if not discs:
+        return
+    ox, oy = grid.origin
+    half = grid.cell * 0.5
+    for fx, fy, r in discs:
+        c0 = max(0, int((fx - r - ox) // grid.cell))
+        c1 = min(grid.cols - 1, int((fx + r - ox) // grid.cell))
+        r0 = max(0, int((fy - r - oy) // grid.cell))
+        r1 = min(grid.rows - 1, int((fy + r - oy) // grid.cell))
+        for row in range(r0, r1 + 1):
+            cy = oy + row * grid.cell + half
+            for col in range(c0, c1 + 1):
+                cx = ox + col * grid.cell + half
+                if (cx - fx) ** 2 + (cy - fy) ** 2 <= r * r:
+                    killers[row * grid.cols + col] = ()
+
+
 def unseal(layout, rounds: int = 40):
     """Drop the obstacles that cut part of `layout` off, in place.
 
@@ -267,6 +334,7 @@ def unseal(layout, rounds: int = 40):
     # enough from the terrain edge for this body.
     open_ = bytearray(1 if (grid.walkable[i] and grid.clearance[i] >= radius)
                       else 0 for i in range(n))
+    _exempt_pens(grid, layout, open_)
 
     start = _start_cell(grid, layout, open_)
     if start is None:
@@ -275,6 +343,7 @@ def unseal(layout, rounds: int = 40):
     removed = []
     for _ in range(rounds):
         killers = _killers(grid, obstacles, radius)
+        _open_villages(grid, layout, killers)
         if killers[start]:
             # An obstacle landed on the only cell we can flood from; it has to
             # go before anything else can be judged.

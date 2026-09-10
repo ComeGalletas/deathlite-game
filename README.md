@@ -238,10 +238,11 @@ deathlite-game/
 
 ## Content
 
-- **3 heroes**, each with a distinct trait (hold-ground damage reduction /
-  momentum stacking / status-on-first-hit) and starting weapon
-- **7 weapons**: single-target bolt, piercing fan, chain lightning, orbiting
-  embers, reaping cone, summon totem, summon wolf
+- **3 heroes**, each with a distinct trait (hold-ground damage reduction and
+  block / a double-shot Bow / a quick-cast Rod) and starting weapon
+- **6 weapons** (Sword, Hammer, Daggers, Bow, Magic Rod, Bomb; three per
+  run) plus **3 summons** (Ember Ring, Grave Totem, Spirit Wolf; one per run)
+  -- see `six_weapon_system_design.md`
 - **13 enemy variants** (incl. 3 FSM-driven: charger, teleporter, area-denial
   warlock) + **1 boss** with 3 telegraphed attack patterns and a health bar
 - **32 blessings** across 4 sources, interacting through tags and status effects

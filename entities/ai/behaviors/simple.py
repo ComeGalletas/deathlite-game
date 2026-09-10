@@ -36,7 +36,20 @@ MELEE_ATTACK_COOLDOWN = 0.6
 
 def _pursuit_stack(cfg: dict) -> list:
     """Flow-field seek + the local-avoidance stack (separation, obstacle push,
-    unstick), ordered so `Unstick` reads the accumulated heading last."""
+    unstick), ordered so `Unstick` reads the accumulated heading last.
+
+    A `flying` enemy (the tag, as on the boss) seeks in a straight line and
+    keeps only the separation: the field routes round walls and up stairs
+    for a body that has to walk, there is no obstacle to push off, and a
+    body that passes through everything is never stuck."""
+    if "flying" in cfg.get("tags", ()):
+        return [
+            SeekTarget(via="straight",
+                       slew=cfg.get("nav_slew", 9.0),
+                       weight=cfg.get("seek_weight", 1.0)),
+            Separation(radius_mult=cfg.get("separation_mult", 1.6),
+                       cap=cfg.get("separation_cap", 0.6)),
+        ]
     return [
         SeekTarget(via="nav",
                    slew=cfg.get("nav_slew", 9.0),

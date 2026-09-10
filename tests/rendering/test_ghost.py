@@ -107,10 +107,23 @@ class GhostPassTests(unittest.TestCase):
     def test_a_kind_the_data_does_not_list_never_ghosts(self):
         kinds = get_content().terrain["obstacle_decor"]["ghost"]["kinds"]
         self.assertNotIn("sign", kinds)
-        try:
-            i, o, (ax, ay, aw, ah) = _tree(self.gm, "sign")
-        except AssertionError:
-            self.skipTest("no skinned sign on this seed")
+        # A sign whose art no *listed* kind's art overlaps: the probe frame is
+        # placed over the sign, and a tree or a house standing behind it would
+        # ghost on its own account and say nothing about the sign.
+        gm = self.gm
+        pick = None
+        for i, o in enumerate(gm.obstacles):
+            if o.kind != "sign" or i not in gm._art_rects:
+                continue
+            mine = pygame.Rect(*(round(v) for v in gm._art_rects[i]))
+            if not any(gm.obstacles[j].kind in kinds
+                       and mine.colliderect(pygame.Rect(*(round(v) for v in r)))
+                       for j, r in gm._art_rects.items() if j != i):
+                pick = (i, o, gm._art_rects[i])
+                break
+        if pick is None:
+            self.skipTest("no skinned sign standing clear on this seed")
+        i, o, (ax, ay, aw, ah) = pick
         self.cam.pos = pygame.Vector2(ax - 40, ay - 40)
         dest = (40 + aw // 2 - 10, 40 + ah - 30)
         self.assertEqual(self._run(_character_frame(20, 40), dest, o.pos.y - 5.0), 0)

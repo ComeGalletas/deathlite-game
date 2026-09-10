@@ -70,6 +70,16 @@ class CharacterSelectState(State):
         # card the last click landed on (a second click on it begins).
         self._mouse = MouseNav()
         self._armed_hero: int | None = None
+        # P5 (design §20): the main weapon per hero. Free once the hero has
+        # cleared the boss; until then the data's starting weapon. Q / E (or
+        # the arrows on the card) cycle the six weapons; summons never.
+        self._weapon_ids = [w for w, d in self.content.weapons.items()
+                            if d["class"] != "summon"]
+        self._main_weapon: dict[str, str] = {}
+        for cid, c in self.content.characters.items():
+            saved = self.game.save.main_weapon(cid)
+            self._main_weapon[cid] = (saved if saved in self._weapon_ids
+                                      else c["starting_weapon"])
 
         # Hero animation preview -- one Animator, rebuilt when the pick changes.
         self._preview: Animator | None = None
@@ -125,6 +135,10 @@ class CharacterSelectState(State):
             self._begin()
         elif event.key == pygame.K_ESCAPE:
             self._back()
+        elif event.key == pygame.K_q:
+            self._step_weapon(-1)
+        elif event.key == pygame.K_e:
+            self._step_weapon(+1)
 
     def _mouse_action(self, kind: str, key) -> None:
         if isinstance(key, tuple) and key[0] == "hero":
@@ -142,6 +156,10 @@ class CharacterSelectState(State):
             self._back()
         elif kind == "click" and key == "difficulty":
             self._step_difficulty(+1)         # the ribbon is a switch: Down's step
+        elif kind == "click" and key == "weapon_prev":
+            self._step_weapon(-1)
+        elif kind == "click" and key == "weapon_next":
+            self._step_weapon(+1)
 
     def _card_state(self, i: int) -> str:
         """Armed (first click landed) or held down -> `pressed`; the selected
@@ -167,6 +185,26 @@ class CharacterSelectState(State):
         click step forward, Up steps back)."""
         self.diff_index = (self.diff_index + delta) % len(config.DIFFICULTY_ORDER)
 
+    # --- main weapon (P5) -------------------------------------
+    @property
+    def hero_id(self) -> str:
+        return self.ids[self.index]
+
+    def weapon_unlocked(self, cid: str | None = None) -> bool:
+        return self.game.save.hero_cleared(cid or self.hero_id)
+
+    def main_weapon(self, cid: str | None = None) -> str:
+        return self._main_weapon[cid or self.hero_id]
+
+    def _step_weapon(self, delta: int) -> None:
+        """Cycle the selected hero's main weapon; a no-op until the hero has
+        cleared the boss."""
+        cid = self.hero_id
+        if not self.weapon_unlocked(cid):
+            return
+        i = self._weapon_ids.index(self._main_weapon[cid])
+        self._main_weapon[cid] = self._weapon_ids[(i + delta) % len(self._weapon_ids)]
+
     def _select_hero(self, i: int) -> None:
         """Move the selection; leaving the armed card disarms it."""
         if i != self.index:
@@ -175,10 +213,17 @@ class CharacterSelectState(State):
 
     def _begin(self) -> None:
         from game.states.loading_state import LoadingState
+        cid = self.hero_id
+        main = self.main_weapon(cid)
+        if self.weapon_unlocked(cid):
+            # Remembered for next time (P5); a dev run never persists.
+            self.game.save.set_main_weapon(cid, main)
+            if not self._dev:
+                self.game.persist()
         self.game.state_machine.change(LoadingState(self.game),
-                                       character_id=self.ids[self.index],
+                                       character_id=cid,
                                        difficulty=self.difficulty,
-                                       dev=self._dev)
+                                       dev=self._dev, main_weapon=main)
 
     def _back(self) -> None:
         from game.states.menu_state import MenuState
@@ -218,17 +263,28 @@ class CharacterSelectState(State):
 
             trait_line = f"Trait - {c['trait_name']}"
             text_w = card_w - 2 * _CARD_TEXT_INSET      # pixel-measured wrap
+            unlocked = self.weapon_unlocked(cid)
+            weapon_line = (f"<  {self._weapon_name(self._main_weapon[cid])}  >" if unlocked
+                           else f"Starts with: {self._weapon_name(c['starting_weapon'])}")
             rows = wrap(self._body, c["identity"], text_w) + [
                 "", trait_line,
             ] + wrap(self._body, c["trait_desc"], text_w) + [
-                "", f"Starts with: {self._weapon_name(c['starting_weapon'])}",
-            ]
+                "", "Main weapon:" if unlocked else weapon_line,
+            ] + ([weapon_line] if unlocked else [])
             for j, line in enumerate(rows):
                 if line == trait_line:
                     surf = self._trait.render(line, True, config.COLOR_ON_BUTTON)
                 else:
                     surf = self._body.render(line, True, config.COLOR_ON_BUTTON_DIM)
-                surface.blit(surf, surf.get_rect(midtop=(rect.centerx, y + 66 + j * 24 + dy)))
+                r = surf.get_rect(midtop=(rect.centerx, y + 66 + j * 24 + dy))
+                surface.blit(surf, r)
+                if unlocked and line == weapon_line and i == self.index:
+                    # The arrows are click targets (P5): each takes its half
+                    # of the line, so a slip still lands on an arrow.
+                    half = pygame.Rect(r.left - 12, r.top - 4, r.width // 2 + 12, r.height + 8)
+                    hits.add(half, "weapon_prev")
+                    hits.add(pygame.Rect(r.centerx, r.top - 4, r.width // 2 + 12, r.height + 8),
+                             "weapon_next")
 
         self._draw_preview(surface, cx, y + card_h + 12)
 
@@ -266,8 +322,10 @@ class CharacterSelectState(State):
         # Instructions sit under the button now; the hint under them.
         instr_bottom = self._draw_instructions(surface, cx, begin.bottom + _INSTR_GAP)
 
+        weapon_hint = ("    -    Q / E main weapon" if self.weapon_unlocked() else "")
         hint = self._hint.render(
-            "Left / Right hero    -    Up / Down or click difficulty    -    ENTER / Begin    -    ESC back",
+            "Left / Right hero    -    Up / Down or click difficulty" + weapon_hint
+            + "    -    ENTER / Begin    -    ESC back",
             True, config.COLOR_TEXT_DIM)
         hint_rect = hint.get_rect(center=(cx, instr_bottom + 18))
         surface.blit(hint, hint_rect)

@@ -26,6 +26,9 @@ from systems.animation import Animator
 
 
 class Boss:
+    stun_immune = True      # P1: the Hammer's stun never lands on a boss
+    killed_by = ""          # P2: set by the resolver on the killing hit
+
     def __init__(self, boss_id: str, definition: dict, x: float, y: float) -> None:
         self.boss_id = boss_id
         self.cfg = definition
@@ -40,6 +43,13 @@ class Boss:
             definition.get("contact_interval", config.INCOMING_TICK_INTERVAL))
         self.contact_cd = 0.0
         self.radius = float(definition["radius"])
+        # How far the boss sees (world px). Beyond it the boss does nothing
+        # but close in on the player at full speed -- no telegraph, no
+        # pattern, the pattern clock held -- and picks its cycle back up the
+        # moment the player is inside again. Sized in the data to cover the
+        # whole view, so a boss the player can see is a boss that fights.
+        self.vision_range = float(definition["vision_range"])
+        self.closing = False
         self.xp_reward = int(definition.get("experience_reward", 200))
         self.reward_currency = int(definition.get("reward_currency", 50))
         self.color = tuple(definition.get("color", (180, 40, 70)))
@@ -58,6 +68,8 @@ class Boss:
         self.alive = True
         self.hit_flash = 0.0
         self.status = StatusState()
+        self.recent_hits: dict[str, float] = {}   # P4 synergies
+        self.hit_streak: dict[str, int] = {}
         # Duck-typed to satisfy the shared combat loop / draw code.
         self.shield_hp = 0.0
         self.explode_radius = 0.0
@@ -121,7 +133,7 @@ class Boss:
             return "death"
         if self._hurt_t > 0.0 and self._has_hurt:
             return "hurt"
-        if self.phase in ("telegraph", "active"):
+        if self.phase in ("telegraph", "active") and not self.closing:
             return "attack"                    # wind-up + the dangerous frames
         return "walk" if self.vel.length_squared() > 1.0 else "idle"
 
@@ -144,6 +156,17 @@ class Boss:
         chill = self.status.speed_multiplier()
 
         if not self._patterns:
+            self.vel = self._seek(ctx) * self.speed
+            self.pos = self._move(ctx, self.vel * dt * chill)
+            return
+
+        # Out of sight: close in, and nothing else. The pattern clock holds
+        # where it is, so a telegraph that was half done resumes half done.
+        # A committed charge (`active`) runs its course first -- it is the
+        # one phase that is already a dash at the player.
+        far = (ctx.player_pos - self.pos).length_squared() > self.vision_range ** 2
+        self.closing = far and self.phase != "active"
+        if self.closing:
             self.vel = self._seek(ctx) * self.speed
             self.pos = self._move(ctx, self.vel * dt * chill)
             return

@@ -26,6 +26,7 @@ _OPS = (FLAT, PCT, MULT)
 _NON_NEGATIVE = {
     "max_hp", "move_speed", "armor", "pickup_radius",
     "damage_multiplier", "attack_speed_multiplier", "projectile_speed_multiplier",
+    "evasion_chance", "block_chance", "block_strength",
 }
 
 

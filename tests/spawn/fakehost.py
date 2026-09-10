@@ -80,9 +80,11 @@ class FakeHost:
     def visible_rect(self):
         return self.view.copy()
 
-    def is_walkable(self, pos, radius) -> bool:
+    def is_walkable(self, pos, radius, flying=False) -> bool:
         if not (0 <= pos.x <= W and 0 <= pos.y <= W):
             return False
+        if flying:
+            return True                   # the flying floor is the world
         return not any((pos - c).length() < r + radius for c, r in self.blocked)
 
     def floor_at(self, pos) -> int:

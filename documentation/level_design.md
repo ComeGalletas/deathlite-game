@@ -64,16 +64,28 @@ ends. Every island rect is tile-aligned and tile-sized; `LevelIndex` and the
 navigation grid depend on it, and `gen/validate.py` checks it.
 
 Roles: `start_id = 0`; `boss_id` is the island farthest from the start by
-tree distance; the rest are shuffled and the first few become one each of
-`SPECIAL_KINDS = (shrine, treasure, fountain, altar, merchant)`; the
-remainder stay `combat`.
+tree distance -- it shapes that island (the `boss` topography, the
+`boss`-tagged spawn points) but the boss itself no longer appears there:
+it flies, and spawns `config.BOSS_SPAWN_DISTANCE` from the hero wherever
+the hero is (`documentation/boss_free_roam_todo.md`); then one or two
+**villages** (`HEIGHTMAP_VILLAGES`, a hard
+floor of one) are drawn from the islands one or two bridges from the start
+(`HEIGHTMAP_VILLAGE_DISTANCE`), never the boss; the rest are shuffled and
+the first few become one each of `SPECIAL_KINDS = (shrine, treasure, altar,
+merchant)`; the remainder stay `combat`. A village is not a special kind:
+nothing sits at its centre by that rule, nothing scatters on it, no enemy
+spawns there (`journals/human_island_journal.md`). The fountain is the
+village's sanctuary heal now, not an island of its own.
 
 **Topography** (`gen/graph.py — assign_topography`) is what *shape* an island
 is, separate from `kind`, which is what happens on it: a shrine can stand on
-a small island. The boss island is the one fixed assignment
-(`HEIGHTMAP_BOSS_TOPOGRAPHY`); the rest are drawn by weight from
-`HEIGHTMAP_TOPOGRAPHIES`, whose entries carry the island's size scale, coast
-preset, terrace count range, bridge allowance per side and tileset pool.
+a small island. Two assignments are fixed: the boss island
+(`HEIGHTMAP_BOSS_TOPOGRAPHY`) and the villages (`HEIGHTMAP_VILLAGE_TOPOGRAPHY`,
+the flat, lake-free, meadow-only `human` shape on the `square` coast preset,
+about 0.44 of a volcanic island's walkable area); the rest are drawn by
+weight from `HEIGHTMAP_TOPOGRAPHIES`, whose entries carry the island's size
+scale, coast preset, terrace count range, bridge allowance per side, tileset
+pool and, optionally, a `lakes` count of their own.
 `gen/placement.py` then resizes each island to its topography and slides it
 within its chunk toward its neighbours, so islands are not all centred.
 
@@ -157,20 +169,37 @@ centre, `_GRID_SPAWN_CLEAR` round the hero's spawn pixel,
 a terrace above that its art does not reach onto it (`rules/frontier.py`),
 and spaced off every other obstacle (trees space their canopies, 55 px).
 Houses go first, then a tree **top-up** thickens the groves already there.
+The scatter passes over a village island.
+
+**The village pass** — `gen/village.py — place_villages` — then puts the
+settlement on each village island: the forge at the walkable centroid, the
+sanctuary heal a few tiles out, a ring of houses, the monastery and the
+archery a ring further, a barracks and a tower flanking the road in from
+every bridge mouth, a fenced sheep pen on the side away from the bridges,
+and a castle only when `HEIGHTMAP_VILLAGE_CASTLE` asks. Every building is an
+`Obstacle` of its own kind; a wide one is a **compound** — the primary
+circle carries the art and the `satellites` its `terrain.json` entry
+declares collide without being drawn (`Obstacle.skin`). Colours cycle from
+a shuffled bag, never one per village. What stands where comes back as a
+`Village` record on the layout for the interactables and the villagers
+(`game/states/playing/npcs.py`).
 
 Then `gen/repair.py — unseal`: can the widest navigating body still reach
 everywhere bare terrain allows? Where not, the fewest obstacles that reopen
 the region are taken back. The keep-clear rules protect the chokes we knew
-about; this catches the ones nobody predicted.
+about; this catches the ones nobody predicted. The sheep pen and one tile
+round it are exempt (`_exempt_pens`): it is fenced on purpose and no enemy
+needs it.
 
 ### 1.8 What comes out
 
 `islands._grid_tile_meta` projects the grids into `Room.tile_meta`
 (`TileMeta(floor, surface, foam, room_id, ramp)`) for the renderer and any
 later system. `WorldLayout(seed, rooms, corridors, bounds, start_id,
-boss_id, obstacles)` is the seam: the camera clamps to `bounds`, the collider
-reads rooms and bridges, the spawn director reads rooms, the bake reads
-everything.
+boss_id, obstacles, spawn_points, resource_points, villages)` is the seam:
+the camera clamps to `bounds`, the collider reads rooms and bridges, the
+spawn director reads rooms and points, the run's interactables and
+villagers read `villages`, the bake reads everything.
 
 `gen/validate.py — validate(layout)` reads every promise above back off a
 finished world as a list of sentences; the tests run it on every cached

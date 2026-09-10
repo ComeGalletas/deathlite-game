@@ -62,8 +62,7 @@ class HUD:
         y = 88
         trait = getattr(player, "trait", "")
         if trait:
-            momentum = getattr(player, "momentum", 0.0)
-            extra = f"  x{momentum:.1f}" if trait == "windborne" and momentum else ""
+            extra = "  [guard]" if getattr(player, "bulwark_active", False) else ""
             t = self._font.render(f"Trait: {trait}{extra}", True, (150, 200, 255))
             surface.blit(t, t.get_rect(topright=(w - 16, y)))
             y += 24

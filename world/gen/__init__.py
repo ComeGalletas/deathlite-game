@@ -39,6 +39,7 @@ from world.gen.biomes import assign_palettes
 from world.gen.scatter import _scatter_obstacles
 from world.gen.settings import GenSettings, settings_or_config
 from world.gen.spawnpoints import place_points
+from world.gen.village import place_villages
 from world.rules.inset import build as build_inset
 
 __all__ = ["generate_world", "generate_world_steps"]
@@ -152,7 +153,7 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     start_id = 0
     dist = _distances(rooms, start_id)
     boss_id = max(dist, key=dist.get)
-    _assign_kinds(rooms, rng, start_id, boss_id, dist)
+    _assign_kinds(rooms, rng, start_id, boss_id, dist, settings)
     assign_topography(rooms, rng, boss_id, settings)
     _resize_by_topography(rooms, settings)
     _offset_in_chunk(rooms, chunk, rng)
@@ -202,13 +203,19 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     obstacles = _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
                                    settings)
     yield "obstacles"
+    # The village islands (HI-2): the scatter passed over them, this puts
+    # the forge, the buildings and the pen there. Same coordinate space, and
+    # before the repair so a building that seals a road is taken back too.
+    extra, villages = place_villages(rooms, corridors, seed, settings)
+    obstacles.extend(extra)
+    yield "villages"
 
     # Per-tile classification, a straight projection of the finished grids.
     # Reads only finalised geometry and draws no RNG.
     _grid_tile_meta(rooms)
 
     layout = WorldLayout(seed, rooms, corridors, union, start_id, boss_id,
-                         obstacles)
+                         obstacles, villages=villages)
     # The keep-clear rectangles protect the chokes we knew about. This checks
     # the one that matters -- can the widest body still reach everywhere bare
     # terrain allows -- and takes back the few obstacles that say no. See

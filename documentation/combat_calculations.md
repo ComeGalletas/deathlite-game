@@ -1,5 +1,14 @@
 # Combat damage — full calculation reference
 
+> **Six-weapon system (2026-09-09/10).** The weapon layer was rebuilt in
+> five phases (`weapon_system_plan.md`). The map of where each rule now
+> lives: weapons and Forgings — `combat/weapons/` (`core.py`, `bomb.py`,
+> `forge.py`); blessings and the offering — `progression/blessings/`;
+> synergies — `combat/synergy.py`; the hit pipeline —
+> `game/states/playing/combat.py`; the hero's evasion / block / traits —
+> `entities/player.py`; per-hero save state — `game/save.py`. The bullets
+> at the end of §4 summarise each phase's additions to the pipeline.
+
 How a number travels from a weapon (or an enemy) all the way to an HP bar, with
 the exact code at every step. Two pipelines:
 
@@ -127,15 +136,14 @@ if not (self.dev_mode and self._dev_no_attack):
 - `crit_chance` = `min(0.75, 0.02·luck + stats["crit_chance"])`
 - `crit_multiplier` = `2.0 + stats["crit_damage"]`
 
-`entities/player.py — Player.outgoing_damage_multiplier` (Kestrel / Windborne
-only):
-
-```python
-def outgoing_damage_multiplier(self) -> float:
-    if self.trait == "windborne":
-        return 1.0 + 0.07 * self.momentum      # momentum 0..5
-    return 1.0
-```
+`entities/player.py — Player.outgoing_damage_multiplier` is `1.0` for every
+hero since the six-weapon system (P1, 2026-09-09). Hero traits reach a weapon
+through `FireContext.weapon_mods` → `Player.weapon_mods(weapon)` instead: a
+`WeaponMods(extra_projectiles, cooldown_mult, damage_mult)` read by
+`Weapon._projectile_count / _cooldown / _damage`, with every number in the
+hero's `trait_params` (`data/characters.json`). Kestrel's Double Shot is one
+extra Bow arrow at a damage split; Nihil's Quick Cast is a Rod cooldown
+multiplier; Aegis's Bulwark is on the incoming side (§2).
 
 The weapon then calls `outgoing_damage(self._damage(), ctx.damage_multiplier,
 ctx.crit_chance, ctx.crit_multiplier, ctx.rng)` per projectile
@@ -345,11 +353,21 @@ def _apply_on_hit_effects(self, proj, enemy) -> None:
                 dur * (1.0 + fx.tuned(status, "duration")),
                 potency * (1.0 + fx.tuned(status, "potency")),
                 bonus_max_stacks=int(fx.tuned(status, "max_stacks")))
-    # Nihil / Cursebrand: first hit on each enemy applies Shock.
-    if self.player.trait == "cursebrand" and id(enemy) not in self.player._hexed:
-        self.player._hexed.add(id(enemy))
-        enemy.status.apply("shock", 4.0, 0.10)
+
+def apply_stun(self, proj, enemy) -> None:
+    """P1: the Hammer's `stun_chance` roll. Bosses are immune."""
+    if proj.stun_chance <= 0.0 or getattr(enemy, "stun_immune", False):
+        return
+    if self.ps.rng.random() < proj.stun_chance:
+        enemy.status.apply("stun", proj.stun_duration, 1.0)
 ```
+
+A stunned enemy (`combat/status.py`, family `stun`) has `speed_multiplier()
+== 0`, skips its behaviour tick and deals no contact damage
+(`Enemy.update`). The Bomb never scores a direct hit: its projectile is
+`inert` and the resolver skips it; `TransientFx.detonate` spawns the blast
+(a stationary projectile, pierce 999, `no_block`) that comes back through
+this same pass.
 
 **Chain** — `game/states/playing_state.py — _chain_to_next` redirects the
 projectile to the nearest un-hit target, decrements `chain_left`, keeps it alive.
@@ -668,9 +686,67 @@ def take_damage(self, amount: float, armor: float = 0.0) -> float:
 - **Outgoing crit is rolled once at spawn** and frozen onto the projectile;
   in-flight buffs do not retro-apply (except orbit weapons, which refresh
   `damage`/`radius` live but never crit).
-- **`damage_multiplier` from `player.stats` and the Windborne momentum factor are
-  the only global scalars**; there is no separate "melee vs ranged" or
-  elemental-resistance layer.
+- **`damage_multiplier` from `player.stats` is the only global outgoing
+  scalar**; per-weapon trait modifiers come in through `weapon_mods`. There
+  is no elemental-resistance layer; the melee / ranged stat blessings land in
+  P2 of `weapon_system_plan.md`.
+- **Incoming (P1):** `Player.take_damage` rolls `evasion_chance` (hit
+  negated), then `block_chance` (hit × `1 − block_strength`), then the trait
+  multiplier, then flat armour.
+- **Blessings (P2):** every level-up card is a blessing from
+  `data/blessings.json` (`progression/blessings/`). A *stat* blessing is a
+  StatSet modifier; a *weapon* blessing adds to `Weapon.bonus` (damage,
+  cooldown_mult, area, pierce, projectile_count, crit_chance, weight,
+  stun_chance / duration, blast_radius, aim_assist_deg, chain_count / range,
+  cone_half_angle, summon_lifetime) or sets a `Weapon.effects` key the
+  resolver reads: `CombatResolver.weapon_effect_multiplier` adds Executioner
+  (target under a health fraction), Weak Point (target wounded) and
+  Demolitionist (target stunned or shoved) on top of the multiplier above;
+  `CombatResolver.split` spawns Split Arrow children on a moving hit;
+  `Weapon._begin_attack` applies Overcharge every Nth attack; the killing
+  weapon's `on_kill_heal` (Bloodletting) heals in `_apply_on_kill_effects`
+  via `enemy.killed_by`. The melee / ranged stat blessings reach
+  `Weapon._damage` through `FireContext.class_damage_mult`; summons are
+  excluded.
+- **Forging (P3):** `combat/weapons/forge.py` merges a Forging's `overrides`
+  over `Weapon.definition` (numbers, `special_effect`, even `category`) and
+  copies its `effects`; `Weapon.effect(key)` is `effects[key] + bonus[key]`
+  so a post-Forge blessing can grow a Forge value. Fire-path extras in
+  `Weapon._fire_cones`: Twin Daggers (two cones at ±`twin_offset_deg`),
+  Earthshaker (a `blast` projectile past the impact at
+  `shockwave_damage_mult`), Meteor Hammer (`FireContext.spawn_hazard` -> a
+  hero-owned `Hazard`; `TransientFx.hero_hazard_tick` spawns a `hidden`,
+  weightless one-frame projectile per tick so the bite goes through the
+  resolver and never hurts the hero). `TransientFx.scatter_bomblets` (Cluster
+  Bomb) and `CombatResolver.trip_mine` (Minefield: an `inert` `mine` older
+  than `arm_delay` detonates on enemy overlap) close the loop.
+- **Synergies (P4):** `combat/synergy.py`. Every enemy remembers
+  `recent_hits[weapon_id]` (run-clock time of the last hit) and
+  `hit_streak[weapon_id]`, written by `CombatResolver.remember_hit` *after*
+  the multiplier of that hit is computed; the Rod (`mark_on_hit` in its data)
+  also leaves the `mark` status for `config.SYNERGY_WINDOW_S` (1.5 s).
+  `synergy_multiplier` multiplies the damage multiplier by `1 + Σ` of the
+  firing weapon's synergy effects: `syn_after_<weapon>` (partner hit inside
+  the window), `syn_vs_marked`, Crossfire's `crossfire_rod_bonus` (read off
+  the Bow when the Rod fires) and Hunter's Mark (`hunters_mark_per_hit` ×
+  the warm streak, capped). Crowd Cleaner is not a multiplier: after the
+  knockback, `crowd_cleaner` drags the target toward the swing's centre by
+  `pull_strength`.
+- **Heroes (P5):** the run's first weapon is `PlayingState._main_weapon_for`:
+  the data's `starting_weapon` unless the save says the hero has cleared
+  the boss (`SaveData.hero_cleared`, set by `Game._on_run_ended` on a
+  victory) and names a non-summon `main_weapon` (chosen on the hero select,
+  Q / E or the arrows on the card). Presentation only: attacks alternate
+  the `attack` / `attack2` sheets by `Player._attack_cycle`, and Aegis plays
+  `guard` while `bulwark_active` and standing still.
+- **Hammer slam (change request 1):** the Hammer's `special_effect` is
+  `slam`. `Weapon._update_slam` starts a swing where a shot would have
+  fired, locking the direction; `swing_time / attack_speed_multiplier` later
+  `combat/weapons/slam.py — land` spawns one stationary hit of radius `area`
+  centred `impact_offset` ahead of the hero (Haste shortens the swing;
+  cooldown bonuses shorten the cooldown, which runs from the impact and is
+  *not* divided by attack speed). The hit goes through `projectile_hits`
+  like any other; the Forge shockwave / crater land at the same centre.
 
 ---
 

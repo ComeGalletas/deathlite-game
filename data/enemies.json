@@ -31,7 +31,7 @@
     "pursuit_seconds": 5.0, "contact_damage": 9, "radius": 7,
     "weight": 3,
     "experience_reward": 1, "behavior": "path_chase", "color": [180, 200, 110],
-    "tags": ["swarm"], "sprite": "bumblebee"
+    "tags": ["swarm", "flying"], "sprite": "bumblebee"
   },
   "ranged": {
     "name": "Spitter", "hp": 14, "speed": 70,

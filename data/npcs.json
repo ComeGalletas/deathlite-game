@@ -1,0 +1,50 @@
+{
+  "_note": "Village NPCs (HI-3, journals/human_island_journal.md). Tuning per kind: `speed` px/s, `idle` seconds between walks (min, max), `leash` tiles from home a wander target may stray (a sheep's is clamped to its pen as well), `radius` px for the walkability probe. `rigs` name the character rigs by colour; `work` is the smith's one-shot flourish (chance per idle). A kind with `aggro` fights: it charges an enemy within `aggro` tiles at `charge` px/s, keeps within `chase` tiles of home, thrusts for `damage` when the foe's edge is inside `reach` px (landing on `hit_frame` of the attack strip, `cooldown` s apart, pushing `knock` through the weight split at `weight`) and walks back when the foe dies or gets away. Counts per village are the placement's (`lancers` is the garrison, dealt round the guard posts); colours are drawn per NPC from a shuffled cycle, never one colour per village.",
+  "colours": ["blue", "red", "yellow", "purple"],
+  "kinds": {
+    "pawn": {
+      "rigs": "npc_pawn_{colour}",
+      "speed": 55,
+      "idle": [1.5, 4.0],
+      "leash": 2.5,
+      "radius": 10
+    },
+    "smith": {
+      "rigs": "npc_smith_{colour}",
+      "speed": 45,
+      "idle": [2.0, 5.0],
+      "leash": 1.2,
+      "radius": 10,
+      "work": 0.45
+    },
+    "lancer": {
+      "rigs": "npc_lancer_{colour}",
+      "speed": 60,
+      "idle": [2.0, 6.0],
+      "leash": 1.0,
+      "radius": 11,
+      "aggro": 4.0,
+      "chase": 7.0,
+      "charge": 95,
+      "reach": 34,
+      "damage": 5,
+      "hit_frame": 1,
+      "cooldown": 0.45,
+      "knock": 60,
+      "weight": 8
+    },
+    "sheep": {
+      "rigs": "npc_sheep",
+      "speed": 22,
+      "idle": [2.0, 7.0],
+      "leash": 0.6,
+      "radius": 8
+    }
+  },
+  "placement": {
+    "pawns_per_house": [0, 1],
+    "extra_pawns": [1, 2],
+    "lancers": [4, 5],
+    "sheep": [2, 4]
+  }
+}

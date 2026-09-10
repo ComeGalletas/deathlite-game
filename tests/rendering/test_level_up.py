@@ -239,11 +239,14 @@ class LevelUpTextTests(unittest.TestCase):
 
     def test_cards_grew_downwards_only(self):
         from game import config
+        from ui.level_up import _CARD_H, _CARD_TOP_H
         h = config.SCREEN_HEIGHT
+        self.assertGreater(_CARD_H, _CARD_TOP_H)                      # growth, not a re-centre
         for i in range(len(self.lu.choices)):
             r = self.lu.panel.hits.rect_of(i)
-            self.assertEqual(r.height, 215)
-            self.assertEqual(r.top, h // 2 - 100)                     # where a 200-tall card sat
+            self.assertEqual(r.height, _CARD_H)
+            self.assertEqual(r.top, h // 2 - _CARD_TOP_H // 2)        # where a 200-tall card sat
+            self.assertLess(r.bottom + 60 + 20, h)                    # the hint still fits under it
 
     def test_title_is_the_title_face(self):
         from game import fonts

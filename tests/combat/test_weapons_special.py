@@ -35,9 +35,17 @@ def ctx(enemies, sink, anchor=None):
         anchor=anchor or pygame.Vector2(0, 0))
 
 
+def chain_weapon():
+    """Chain is an upgrade now (design §3.5): the chain path is exercised on
+    the Rod with the old Thunder Orb's chain fields."""
+    d = dict(get_content().weapon("magic_rod"))
+    d.update(special_effect="chain", chain_count=3, chain_range=220)
+    return Weapon("chain_rod", d), d
+
+
 class ConeTests(unittest.TestCase):
-    def test_scythe_spawns_a_cone_shaped_hit(self):
-        w = Weapon("soul_scythe", get_content().weapon("soul_scythe"))
+    def test_sword_spawns_a_cone_shaped_hit(self):
+        w = Weapon("sword", get_content().weapon("sword"))
         shots = []
         # CB-2: the scythe only swings at a foe inside its reach ring (== the
         # cone tip, area 74), so the target has to sit within that.
@@ -84,30 +92,32 @@ class OrbitTests(unittest.TestCase):
 
 
 class ChainTests(unittest.TestCase):
-    def test_thunder_orb_tags_projectile_with_chain_charges(self):
-        w = Weapon("thunder_orb", get_content().weapon("thunder_orb"))
+    def test_chain_weapon_tags_projectile_with_chain_charges(self):
+        w, d = chain_weapon()
         shots = []
         w.update(0.016, ctx([FakeEnemy(200, 0)], shots))
-        self.assertEqual(shots[0].chain_left,
-                         get_content().weapon("thunder_orb")["chain_count"])
+        self.assertEqual(shots[0].chain_left, d["chain_count"])
         self.assertGreater(shots[0].chain_range, 0)
 
     def test_fire_tags_the_projectile_with_its_weapon_id_not_a_look(self):
         # the logic layer forwards identity only; colour / style are resolved
         # from data/weapon_visuals.json on the spawn side.
-        w = Weapon("thunder_orb", get_content().weapon("thunder_orb"))
+        w = Weapon("magic_rod", get_content().weapon("magic_rod"))
         shots = []
         w.update(0.016, ctx([FakeEnemy(200, 0)], shots))
-        self.assertEqual(shots[0].weapon_id, "thunder_orb")
+        self.assertEqual(shots[0].weapon_id, "magic_rod")
         self.assertNotIn("color", shots[0].__dict__)
         self.assertNotIn("style", shots[0].__dict__)
 
     def test_weapon_visuals_carry_the_look(self):
         c = get_content()
-        self.assertEqual(c.weapon_visual("thunder_orb").style, "thunder")
-        self.assertEqual(tuple(c.weapon_visual("thunder_orb").color), (255, 230, 120))
-        self.assertEqual(c.weapon_visual("frost_shards").style, "")
-        av = c.weapon_visual("arcane_bolt")
+        self.assertEqual(c.weapon_visual("bow").style, "arrow")
+        self.assertEqual(c.weapon_visual("sword").style, "cone")
+        self.assertTrue(c.weapon_visual("sword").fx["slash"])
+        self.assertFalse(c.weapon_visual("daggers").fx["slash"])
+        self.assertEqual(c.weapon_visual("hammer").style, "")      # CR1: the blow is hidden
+        self.assertEqual(c.weapon_visual("ember_ring").style, "")
+        av = c.weapon_visual("magic_rod")
         self.assertEqual(av.style, "arcane")
         self.assertEqual(av.fx["dust_tint"], [90, 140, 255])
 
@@ -142,7 +152,7 @@ class MainWeaponAttackAnimTests(unittest.TestCase):
         g, p = self._playing()
         p.player.weapons[0]._cd = 999.0             # main weapon parked
         p.player.weapons.append(
-            Weapon("arcane_bolt", get_content().weapon("arcane_bolt")))
+            Weapon("magic_rod", get_content().weapon("magic_rod")))
         p.player._attack_t = 0.0
         before = len(p.projectiles)
         p._phase_combat(0.5)

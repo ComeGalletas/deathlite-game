@@ -17,12 +17,19 @@ from game import config
 
 class Hazard:
     __slots__ = ("pos", "radius", "dps", "life", "max_life", "color",
-                 "tick_interval", "_tick_accum", "sprite")
+                 "tick_interval", "_tick_accum", "sprite", "owner", "weapon_id",
+                 "source_tags")
 
     def __init__(self, x: float, y: float, radius: float, dps: float,
                  duration: float, color=(200, 90, 220),
                  tick_interval: float | None = None,
-                 sprite: str | None = None) -> None:
+                 sprite: str | None = None, owner: str = "enemy",
+                 weapon_id: str = "", source_tags: tuple = ()) -> None:
+        # P3: `owner` "enemy" hurts the hero (the Warlock's pool); "player"
+        # hurts enemies through the hit resolver (Meteor Hammer's crater).
+        self.owner = owner
+        self.weapon_id = weapon_id
+        self.source_tags = tuple(source_tags)
         self.pos = pygame.Vector2(x, y)
         self.radius = radius
         self.dps = dps

@@ -75,7 +75,7 @@ ROOM_ACTIVATED = "room_activated"
 ROOM_DORMANT = "room_dormant"
 ENEMY_RECYCLED = "enemy_recycled"
 _MAX_DEBT = 20
-_RESIDENT_KINDS = ("start", "boss", "combat")
+_RESIDENT_KINDS = ("start", "boss", "combat", "village")
 
 
 class SpawnMaster:

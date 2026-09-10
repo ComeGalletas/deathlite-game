@@ -150,3 +150,53 @@ class DifficultyRecordsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeroStateTests(unittest.TestCase):
+    """Six-weapon system P5 (design §20): per-hero boss-clear + main weapon."""
+
+    def setUp(self):
+        self.path = Path(tempfile.mkdtemp()) / "save.json"
+
+    def test_defaults_are_locked_with_no_choice(self):
+        d = SaveData()
+        self.assertEqual(d.heroes, {})
+        self.assertFalse(d.hero_cleared("aegis"))
+        self.assertIsNone(d.main_weapon("aegis"))
+
+    def test_a_choice_counts_only_once_cleared(self):
+        d = SaveData()
+        d.set_main_weapon("aegis", "hammer")
+        self.assertIsNone(d.main_weapon("aegis"))
+        d.mark_cleared("aegis")
+        self.assertEqual(d.main_weapon("aegis"), "hammer")
+        d.set_main_weapon("aegis", None)
+        self.assertIsNone(d.main_weapon("aegis"))
+        self.assertTrue(d.hero_cleared("aegis"))
+
+    def test_round_trip_and_version(self):
+        d = SaveData()
+        d.mark_cleared("kestrel")
+        d.set_main_weapon("kestrel", "daggers")
+        save(d, self.path)
+        raw = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertEqual(raw["version"], 2)
+        back = load(self.path)
+        self.assertTrue(back.hero_cleared("kestrel"))
+        self.assertEqual(back.main_weapon("kestrel"), "daggers")
+        self.assertFalse(back.hero_cleared("aegis"))
+
+    def test_an_old_file_without_heroes_still_loads(self):
+        self.path.write_text(json.dumps({"version": 1, "currency": 12}), encoding="utf-8")
+        back = load(self.path)
+        self.assertEqual(back.currency, 12)
+        self.assertEqual(back.heroes, {})
+
+    def test_junk_hero_entries_are_ignored(self):
+        self.path.write_text(json.dumps({"heroes": {"aegis": "yes", "nihil": {"cleared": 1,
+                                                                            "main_weapon": 5}}}),
+                             encoding="utf-8")
+        back = load(self.path)
+        self.assertNotIn("aegis", back.heroes)
+        self.assertTrue(back.hero_cleared("nihil"))
+        self.assertEqual(back.main_weapon("nihil"), "5")

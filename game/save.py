@@ -19,7 +19,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-SAVE_VERSION = 1
+SAVE_VERSION = 2      # 2: per-hero `heroes` state (six-weapon system P5)
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "save.json"
 
 # Characters available from the very first launch.
@@ -53,6 +53,29 @@ class SaveData:
         "weapon": None, "armor": None, "accessory": None})
     settings: dict = field(default_factory=lambda: {
         "muted": False, "volume": 0.7, "key_layout": _DEFAULT_KEY_LAYOUT})
+    # P5 (design §20): per hero, whether the boss has been cleared with that
+    # hero (which unlocks the main-weapon choice) and the chosen main weapon.
+    heroes: dict[str, dict] = field(default_factory=dict)
+
+    # --- per-hero state (P5) -------------------------------------
+    def hero(self, cid: str) -> dict:
+        return self.heroes.setdefault(str(cid), {"cleared": False, "main_weapon": None})
+
+    def hero_cleared(self, cid: str) -> bool:
+        return bool(self.heroes.get(str(cid), {}).get("cleared", False))
+
+    def mark_cleared(self, cid: str) -> None:
+        self.hero(cid)["cleared"] = True
+
+    def main_weapon(self, cid: str) -> str | None:
+        """The chosen main weapon, only once the hero has cleared the boss."""
+        h = self.heroes.get(str(cid))
+        if not h or not h.get("cleared"):
+            return None
+        return h.get("main_weapon") or None
+
+    def set_main_weapon(self, cid: str, weapon_id: str | None) -> None:
+        self.hero(cid)["main_weapon"] = str(weapon_id) if weapon_id else None
 
     # --- helpers -------------------------------------------------
     def record_best(self, stats: dict, difficulty: str = "normal") -> None:
@@ -104,6 +127,13 @@ def _coerce(raw: dict) -> SaveData:
         for slot in ("weapon", "armor", "accessory"):
             v = raw["equipped"].get(slot)
             d.equipped[slot] = str(v) if v else None
+    if isinstance(raw.get("heroes"), dict):
+        for cid, h in raw["heroes"].items():
+            if not isinstance(h, dict):
+                continue
+            mw = h.get("main_weapon")
+            d.heroes[str(cid)] = {"cleared": bool(h.get("cleared", False)),
+                                  "main_weapon": str(mw) if mw else None}
     if isinstance(raw.get("settings"), dict):
         d.settings.update(raw["settings"])
     if d.settings.get("key_layout") not in _KEY_LAYOUTS:

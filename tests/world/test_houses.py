@@ -12,6 +12,7 @@ import pygame
 
 from game import config
 from tests import worlds as W
+from world.gen.tuning import VILLAGE_KIND
 from world.procedural import (
     _HOUSE_RADIUS, _VILLAGE_MIN_ROOM_CELLS, _VILLAGE_RADIUS,
     _corridor_doorways,
@@ -21,7 +22,11 @@ PX = config.TILE_PX
 
 
 def _houses(w):
-    return [o for o in w.obstacles if o.kind == "house"]
+    """The scatter's houses: a village island's (HI-2) follow their own
+    rules and are tested in `test_village.py`."""
+    villages = [r.rect for r in w.rooms if r.kind == VILLAGE_KIND]
+    return [o for o in w.obstacles if o.kind == "house"
+            and not any(rr.collidepoint(o.pos.x, o.pos.y) for rr in villages)]
 
 
 def _room_of(w, o):

@@ -30,8 +30,7 @@ from entities.melee_hitbox import MeleeHitbox
 from combat.weapons import Weapon, FireContext
 from progression.experience import LevelTracker, xp_for_level
 from game.states.playing.aim import AimInput, read_aim
-from progression.upgrades import roll_choices
-from progression.blessings import BlessingLibrary, roll_blessing_choices, rebuild as rebuild_blessings
+from progression.blessings import get_catalog, rebuild as rebuild_blessings, roll_offering
 from progression.items import Item, generate_item
 from progression.stats import FLAT, MULT, PCT, Modifier
 from systems.animation import Animator
@@ -50,20 +49,23 @@ from game.states.playing.rendering import WorldRenderer
 from game.states.playing.combat import CombatResolver
 from game.states.playing.physics import BumpResolver
 from game.states.playing.locations import SpecialLocations
+from game.states.playing.npcs import Npcs
 from game.states.playing.effects import TransientFx
+from game.states.playing import slam_fx
 from game.states.playing.navigation import NavCoordinator
 from game.states.playing.spawning import EnemyControl
 from game.states.playing.perception import PlayingPerception
 
 log = logging.getLogger(__name__)
 
-STARTING_WEAPON = "arcane_bolt"
+STARTING_WEAPON = "sword"
 
 
 class PlayingState(State):
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
               dev: bool = False, difficulty: str | None = None,
-              prebuilt=None, **kwargs) -> None:
+              prebuilt=None, main_weapon: str | None = None, **kwargs) -> None:
+        self._chosen_main_weapon = main_weapon      # P5: from the hero select
         # `prebuilt` is the loading screen's world -- a baked `GameMap` and a
         # `NavField` built a slice at a time under this same seed. Without it
         # the run builds everything here, as the tests and any other caller do.
@@ -107,6 +109,9 @@ class PlayingState(State):
                          else GameMap(seed=self.run_seed))
         self.locations = SpecialLocations(self)
         self.locations.build()
+        # The villagers (HI-3): scenery that moves, from the village records.
+        self.npc_manager = Npcs(self)
+        self.npc_manager.build()
         self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng,
                                       difficulty=self.difficulty)
         self.spawn = EnemyControl(self)
@@ -120,8 +125,9 @@ class PlayingState(State):
         self.player = Player(start.x, start.y,
                              base_stats=cdef.get("base_stats"),
                              trait=cdef.get("trait", ""),
-                             character_id=self.character_id)
-        weapon_id = cdef.get("starting_weapon", STARTING_WEAPON)
+                             trait_params=cdef.get("trait_params"),
+                             character_id=self.character_id, rng=self.rng)
+        weapon_id = self._main_weapon_for(cdef)
         self.player.weapons = [Weapon(weapon_id, self.content.weapon(weapon_id))]
 
         # Hero sprite: only the characters that declare a rig get one; the rest
@@ -138,10 +144,11 @@ class PlayingState(State):
         # Meta-progression + equipped items applied before the run starts.
         self._apply_persistent_bonuses()
 
-        # Blessing library is stashed on the player so apply_blessing can reach it.
-        self.blessing_lib = BlessingLibrary(self.content.blessings)
-        self.player._blessing_library = self.blessing_lib
-        rebuild_blessings(self.player, self.blessing_lib)
+        # The blessing catalog (P2). `blessing_lib` is the older name the dev
+        # menu and its tests use for the same object.
+        self.catalog = get_catalog(self.content)
+        self.blessing_lib = self.catalog
+        rebuild_blessings(self.player)
 
         # The world is drawn straight to the screen; `Camera.zoom` magnifies at
         # draw time (config.CAMERA_ZOOM), so sprites stay crisp. HUD is unscaled.
@@ -169,6 +176,7 @@ class PlayingState(State):
         self.levels = LevelTracker()
 
         self._explosions: list[dict] = []   # transient blast visuals
+        self._impacts: list[dict] = []      # CR1: the Hammer's impact sheets
         # One-shot death poofs: [Animator("dead"), world_pos, facing]. Any entity
         # (hero or enemy) that dies pushes one; drawn in the depth layer, dropped
         # when the animation finishes.
@@ -184,6 +192,9 @@ class PlayingState(State):
         self._boss_warning_t = 0.0
         self._boss_name = ""
         self._banner_font = fonts.heading(40)
+        # P3: a short on-screen notice (the Forge's requirements, a reforge).
+        self._notice_t = 0.0
+        self._notice_text = ""
         self._prompt_font = fonts.heading(20)
 
         # World-layer painter. Read-only view of this state (see rendering.py).
@@ -362,6 +373,25 @@ class PlayingState(State):
             self._death_seq_t = None
             self._end_run(victory=False)
 
+    def _main_weapon_for(self, cdef: dict) -> str:
+        """The hero's starting weapon (P5, design §20): the data's default,
+        or the weapon chosen on the hero select once the hero has cleared
+        the boss -- the choice comes with the run (`main_weapon` kwarg) or
+        from the save. A summon or an unknown id falls back to the default."""
+        default = cdef.get("starting_weapon", STARTING_WEAPON)
+        chosen = self._chosen_main_weapon
+        if chosen is None:
+            chosen = self.game.save.main_weapon(self.character_id)
+        if (chosen and chosen in self.content.weapons
+                and self.content.weapon(chosen)["class"] != "summon"
+                and self.game.save.hero_cleared(self.character_id)):
+            return chosen
+        return default
+
+    def _hero_has_anim(self, name: str) -> bool:
+        return (self._hero_anim is not None
+                and self.game.assets.frame_count(self._hero_anim.rig, name) > 0)
+
     def _hero_anim_name(self) -> str:
         p = self.player
         if not p.alive:
@@ -369,8 +399,17 @@ class PlayingState(State):
         if p._hurt_t > 0.0 and self._hero_has_hurt:
             return "hurt"
         if p._attack_t > 0.0:
+            # P5: attacks alternate between the two attack sheets when the
+            # rig has a second one -- the 1st, 3rd, 5th ... swing on sheet 1,
+            # the 2nd, 4th ... on sheet 2 (`_attack_cycle` counts swings).
+            if (p._attack_cycle > 0 and p._attack_cycle % 2 == 0
+                    and self._hero_has_anim("attack2")):
+                return "attack2"
             return "attack"
-        return "walk" if p._move_dir.length_squared() > 0 else "idle"
+        moving = p._move_dir.length_squared() > 0
+        if not moving and p.bulwark_active and self._hero_has_anim("guard"):
+            return "guard"                   # P5: Aegis's guard is up
+        return "walk" if moving else "idle"
 
     def _update_hero_anim(self, dt: float) -> None:
         if self._hero_anim is None:
@@ -437,6 +476,7 @@ class PlayingState(State):
         self.fx.update_projectiles(dt)
 
         self._update_summons(dt)
+        self.npc_manager.update(dt)
         self.fx.update_hazards(dt)
         self.fx.update_melee_hitboxes(dt)
         self.locations.update_elite_arenas()
@@ -446,8 +486,15 @@ class PlayingState(State):
         self.damage_numbers.update(dt)
         self.shake.update(dt)
         self.fx.update_explosions(dt)
+        slam_fx.update_impacts(self, dt)
         self._hurt_flash_t = max(0.0, self._hurt_flash_t - dt)
         self._boss_warning_t = max(0.0, self._boss_warning_t - dt)
+        self._notice_t = max(0.0, self._notice_t - dt)
+
+    def notice(self, text: str, seconds: float = 2.5) -> None:
+        """Show `text` at the bottom of the screen for a moment (P3)."""
+        self._notice_text = text
+        self._notice_t = float(seconds)
 
     def _phase_combat(self, dt: float) -> None:
         self.grid.rebuild(self.enemies)
@@ -463,7 +510,12 @@ class PlayingState(State):
             crit_chance=min(0.75, 0.02 * s["luck"] + s["crit_chance"]),
             crit_multiplier=2.0 + s["crit_damage"],
             rng=self.rng, spawn_summon=self._spawn_summon,
-            aim=self._aim, auto_attack=self.auto_attack)
+            aim=self._aim, auto_attack=self.auto_attack,
+            weapon_mods=self.player.weapon_mods,
+            melee_damage_mult=1.0 + s["melee_damage"],
+            ranged_damage_mult=1.0 + s["ranged_damage"],
+            spawn_hazard=self._spawn_hero_hazard,
+            spawn_impact=self._spawn_impact)
         if not (self.dev_mode and self._dev_no_attack):
             main = self.player.weapons[0] if self.player.weapons else None
             tap_fired = False
@@ -566,6 +618,7 @@ class PlayingState(State):
     def _use_shrine(self, it):    self.locations.use_shrine(it)
     def _use_treasure(self, it):  self.locations.use_treasure(it)
     def _use_fountain(self, it):  self.locations.use_fountain(it)
+    def _use_forge(self, it):     self.locations.use_forge(it)
     def _use_altar(self, it):     self.locations.use_altar(it)
     def _use_merchant(self, it):  self.locations.use_merchant(it)
 
@@ -576,10 +629,16 @@ class PlayingState(State):
         """Fill `color` / `style` / `fx` from `data/weapon_visuals.json` for a
         spawn that named its `weapon_id`. An explicit value in `kw` (e.g. the
         wolf's bite) wins; a spawn with no `weapon_id` keeps the pool default."""
-        wid = kw.pop("weapon_id", "")
-        if not wid:
+        wid = kw.get("weapon_id", "")
+        # P3: a forged weapon may name its Forge's look (`visual`); it falls
+        # back to the base weapon's entry when the Forge has none.
+        vid = kw.pop("visual", None)
+        if not wid and not vid:
             return
-        vis = self.content.weapon_visual(wid)
+        if vid and vid in self.content.weapon_visuals:
+            vis = self.content.weapon_visual(vid)
+        else:
+            vis = self.content.weapon_visual(wid)
         kw.setdefault("color", vis.color)
         kw.setdefault("style", vis.style)
         kw.setdefault("fx", vis.fx)
@@ -618,6 +677,16 @@ class PlayingState(State):
     def _spawn_hazard(self, *a, **kw):    # tests call this one
         self.fx.spawn_hazard(*a, **kw)
 
+    def _spawn_impact(self, *, pos, radius, rig, weapon_id="") -> None:
+        """CR1: the Hammer's impact sheet at the blow."""
+        slam_fx.spawn_impact(self, pos=pos, radius=radius, rig=rig, weapon_id=weapon_id)
+
+    def _spawn_hero_hazard(self, *, pos, radius, dps, duration, weapon_id="",
+                           source_tags=()) -> None:
+        """P3: a hero-owned ground hazard (Meteor Hammer's crater)."""
+        self.fx.spawn_hazard(pos, radius, dps, duration, owner="player",
+                             weapon_id=weapon_id, source_tags=source_tags)
+
     def _update_death_fx(self, dt: float) -> None:  # tests call this one
         self.fx.update_death_fx(dt)
 
@@ -626,6 +695,12 @@ class PlayingState(State):
         self.combat.cull_dead_enemies()
 
     def _apply_on_kill_effects(self, enemy) -> None:
+        # P2 Bloodletting: the weapon that landed the killing hit may heal.
+        killer = self.player.weapon_by_id(getattr(enemy, "killed_by", ""))
+        if killer is not None:
+            heal = float(killer.effects.get("on_kill_heal", 0.0))
+            if heal > 0.0:
+                self.player.heal(heal)
         for effect, chance, amount in self.player.blessing_fx.on_kill:
             if self.rng.random() >= chance:
                 continue
@@ -654,15 +729,10 @@ class PlayingState(State):
 
     # --- level-up flow --------------------------------
     def _open_level_up(self) -> None:
-        # Every 3rd level is a blessing offering ("a god's attention"); other
-        # levels draw from the weapon / stat / new-weapon pool.
-        if self.levels.level % 3 == 0:
-            choices = roll_blessing_choices(self.player, self.blessing_lib,
-                                            self.rng, n=3)
-        else:
-            choices = roll_choices(self.player, self.content, self.rng, n=3)
-        if not choices:
-            choices = roll_choices(self.player, self.content, self.rng, n=3)
+        # P2: every level-up is a blessing offering (design §21) -- stat and
+        # weapon blessings for what the hero owns, plus weapon grants while
+        # the slots are open, rolled by the data's weights.
+        choices = roll_offering(self.player, self.content, self.rng)
         if not choices:
             self.levels.consume_pending()
             return
@@ -682,7 +752,13 @@ class PlayingState(State):
     def _on_enemy_killed(self, *, pos, color, xp, tags, elite=False) -> None:
         self.particles.burst(pos, color, count=16 if elite else 10,
                              speed=200 if elite else 160, life=0.5)
-        self.stats["gold"] += 2 if elite else 1   # in-run gold for the Merchant
+        # In-run gold for the Merchant, scaled by the Gold Rush blessing (P2);
+        # fractions carry over so a +15 % bonus is not rounded away.
+        self._gold_carry = (getattr(self, "_gold_carry", 0.0)
+                            + (2 if elite else 1) * (1.0 + self.player.stats["gold_gain"]))
+        whole = int(self._gold_carry)
+        self.stats["gold"] += whole
+        self._gold_carry -= whole
         if elite:
             self.shake.add(0.18)
             if self.rng.random() < 0.18:
@@ -730,6 +806,7 @@ class PlayingState(State):
         summary["seed"] = self.run_seed
         summary["difficulty"] = self.difficulty
         summary["character"] = self.content.character(self.character_id)["name"]
+        summary["character_id"] = self.character_id
         summary["blessings"] = dict(self.player.blessings)
         self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
                                  dev=self.dev_mode)
@@ -877,8 +954,10 @@ class PlayingState(State):
         """
         self.renderer.interactables(surface, level)
         self.renderer.hazards(surface, level)
+        slam_fx.draw_indicators(surface, self, level)   # CR1: the pending swing
         self.renderer.gems(surface, level)
         self.renderer.explosions(surface, level)
+        slam_fx.draw_impacts(surface, self, level)      # CR1: the blow
         self.renderer.trail_fx(surface, level)
         self._draw_player_projectiles(surface, level)
 
@@ -886,11 +965,21 @@ class PlayingState(State):
         """`(level, depth_y, draw_fn)` for the characters -- hero, enemies,
         boss, summons and the one-shot death poofs."""
         lvl = self.game_map.renderer.level_at
+        top = self.game_map.renderer.top_level_at
+
+        def band(body) -> int:
+            # A flyer is over the terrain, so it sits in the band of whatever
+            # stands under it (a cliff wall included); a walker in the band
+            # of the floor it stands on.
+            if getattr(body, "flying", False):
+                return top(body.pos.x, body.pos.y)
+            return lvl(body.pos.x, body.pos.y)
+
         # Only what can be seen: every live body used to be listed, drawn and
         # shaded whether or not it was anywhere near the view.
         pad = config.RENDER_ACTOR_CULL_PAD
         view = self.camera.visible_rect().inflate(2 * pad, 2 * pad)
-        out = [(lvl(e.pos.x, e.pos.y), e.pos.y,
+        out = [(band(e), e.pos.y,
                 lambda s, e=e: self._draw_one_enemy(s, e)) for e in self.enemies
                if view.collidepoint(e.pos.x, e.pos.y)]
         for fx in self._death_fx:
@@ -899,12 +988,12 @@ class PlayingState(State):
                             lambda s, fx=fx: self._draw_death_fx(s, fx)))
         if (self.boss is not None and self.boss.alive
                 and view.inflate(2 * pad, 2 * pad).collidepoint(self.boss.pos.x, self.boss.pos.y)):
-            out.append((lvl(self.boss.pos.x, self.boss.pos.y),
-                        self.boss.pos.y, self._draw_boss))
+            out.append((band(self.boss), self.boss.pos.y, self._draw_boss))
         for sm in self.summons:
             if view.collidepoint(sm.pos.x, sm.pos.y):
                 out.append((lvl(sm.pos.x, sm.pos.y), sm.pos.y,
                             lambda s, sm=sm: self._draw_one_summon(s, sm)))
+        out.extend(self.npc_manager.actor_items(view, lvl))
         out.append((lvl(self.player.pos.x, self.player.pos.y),
                     self.player.pos.y, self._draw_player))
         return out

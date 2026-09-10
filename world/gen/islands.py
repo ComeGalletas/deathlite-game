@@ -71,7 +71,8 @@ def build_island(room, rng, cap: int, settings=None) -> None:
                                      keep=s.coast_keep, shape=coast)
         grid = build_grid(shape, cols, rows, rng, base=0,
                           stairs_per_wall=s.stairs_per_region,
-                          lakes=s.lakes, lake_size=s.lake_size,
+                          lakes=spec.get("lakes", s.lakes),
+                          lake_size=s.lake_size,
                           top=cap, shore=s.shore_ring,
                           tiers=tiers, cap_inset=s.cap_inset,
                           cap_roughness=s.cap_roughness,

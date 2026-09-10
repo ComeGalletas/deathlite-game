@@ -31,13 +31,19 @@ def fresh_playing():
 class PlacementTests(unittest.TestCase):
     def test_one_interactable_per_special_room_at_its_centre(self):
         _, p = fresh_playing()
-        specials = [r for r in p.game_map.layout.rooms if r.kind in SPECIAL_KINDS]
-        self.assertEqual(len(p.interactables), len(specials))
+        lay = p.game_map.layout
+        specials = [r for r in lay.rooms if r.kind in SPECIAL_KINDS]
+        # HI-2: plus a forge and a sanctuary heal per village.
+        self.assertEqual(len(p.interactables), len(specials) + 2 * len(lay.villages))
         by_kind = {it.kind: it for it in p.interactables}
         for room in specials:
             it = by_kind[room.kind]
             self.assertAlmostEqual(it.pos.x, room.center.x)
             self.assertAlmostEqual(it.pos.y, room.center.y)
+        forges = {(it.pos.x, it.pos.y) for it in p.interactables if it.kind == "forge"}
+        heals = {(it.pos.x, it.pos.y) for it in p.interactables if it.kind == "fountain"}
+        self.assertEqual(forges, {(v.forge.x, v.forge.y) for v in lay.villages})
+        self.assertEqual(heals, {(v.heal.x, v.heal.y) for v in lay.villages})
         pygame.quit()
 
 
@@ -64,6 +70,42 @@ class EffectTests(unittest.TestCase):
         p.player.hp = 1
         p._use_fountain(it)
         self.assertEqual(p.player.hp, p.player.max_hp)
+        pygame.quit()
+
+    def test_forge_with_nothing_eligible_explains_and_is_never_consumed(self):
+        _, p = fresh_playing()
+        it = self._get(p, "forge")
+        self.assertIsNotNone(it, "every world has a village, so a forge")
+        p._use_forge(it)
+        self.assertFalse(it.used)
+        self.assertGreater(p._notice_t, 0.0)
+        self.assertIn("needs", p._notice_text)
+        self.assertIn("2 more", p._notice_text)             # sword at 0 of 2
+        pygame.quit()
+
+    def test_forge_offers_the_two_forgings_of_an_eligible_weapon(self):
+        from game.states.level_up_state import LevelUpState
+        game, p = fresh_playing()
+        it = self._get(p, "forge")
+        p.player.weapons[0].level = 3                     # two blessing levels
+        p._use_forge(it)
+        top = game.state_machine.current
+        self.assertIsInstance(top, LevelUpState)
+        self.assertEqual({u.id for u in top.choices}, {"forge:whirlwind", "forge:greatsword"})
+        self.assertIn("Forge", top.title)
+        self.assertTrue(top.cancelable)
+        top.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertIs(game.state_machine.current, p)      # walked away, nothing forged
+        self.assertIsNone(p.player.weapons[0].forge)
+        p._use_forge(it)
+        game.state_machine.current.handle_event(
+            pygame.event.Event(pygame.KEYDOWN, key=pygame.K_1))
+        self.assertEqual(p.player.weapons[0].forge, "whirlwind")
+        self.assertIs(game.state_machine.current, p)
+        self.assertIn("reforged", p._notice_text)
+        self.assertFalse(it.used)
+        p._use_forge(it)                                  # nothing eligible now
+        self.assertIn("already forged", p._notice_text)
         pygame.quit()
 
     def test_treasure_adds_an_item_to_the_run_drops(self):
