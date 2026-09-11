@@ -3989,3 +3989,93 @@ never wrong.
       51 failures in terrain / ghost / depth-sort / cull / biome are identical
       at HEAD and come from tile sheets missing from the repo
       (`terrain/tiles/tilemap_*.png`).
+
+## Body text white (2026-09-10)
+
+Owner: "change the color of the normal text, not titles, to a white
+color." `config.COLOR_TEXT_DIM` (the body text on dark grounds: hints,
+instructions, HUD labels, list rows) went from grey (150, 150, 165) to white
+(235, 235, 240). Titles keep `COLOR_ACCENT` gold; text on the light button
+art keeps the black / dark-grey rule (`COLOR_ON_BUTTON*`).
+Same day, "the card descriptions too": `COLOR_ON_BUTTON_DIM` (descriptions,
+tag lines and badges on the light card / button art) went from dark grey
+(80, 80, 70) to white (240, 240, 245); card names and titles keep
+`COLOR_ON_BUTTON`.
+Then, "too clear": card titles (hero names, trait lines, level-up card
+names) became the heading gold `COLOR_ACCENT` and the descriptions went to
+the near-black (28, 28, 34); button labels unchanged.
+Same day: the level-up card's number badge moved 25 px in from the corner
+(`x + 39`), and card titles (hero names, trait lines, level-up card names)
+draw through `ui.text.shadowed` -- the gold over a near-black copy offset
+2 px down-right -- so they lift off the light card art.
+
+### 2026-09-10 — level-up card category line
+
+Owner: raise the bottom category line ("Sword power", "hero power") 25 px
+and capitalise every word. `ui/level_up.py` now renders it with each tag
+word capitalised ("Sword Power", "Hero Power") at `card_h - 39` instead of
+`card_h - 14`; `tests/rendering/test_level_up.py::CategoryLineTests` pins
+both. Suite: 18 passed.
+
+Owner follow-up: the card number badge now reads "#1", "#2", "#3" (a `#`
+before the number, same badge position).
+
+- **2026-09-10 — LD-Z, the village tidy pass.** Nothing paints over the
+  forge, the heal or the town hall; no building over another; the heal
+  has a house on each flank; roads bend onto the street; the corral at
+  0.45. See `journals/level_design_journal.md` § Z.
+
+### 2026-09-10 — Forge notice crash
+
+Owner report: using the village Forge raised `AttributeError: 'PlayingState'
+object has no attribute '_hud'`. The P3 notice draw in
+`game/states/playing/rendering.py` reached for `ps._hud._font`; the state's
+HUD is `ps.hud`. Fixed, and the notice now sits one line above the
+interaction prompt (`h - 124` instead of sharing its `h - 96`), since it
+appears while the hero still stands on the Forge. The forge test in
+`tests/world/test_interactables.py` renders a frame after the notice, which
+reproduced the crash before the fix.
+Polish on the same frame: the notice is drawn with the prompt's heading
+face and the card-title drop shadow (`ui.text.shadowed`) so gold reads on
+grass, and the Forge prompt lost its stub "(soon)"
+(`entities/interactable.py`) now that Forging is in.
+
+### 2026-09-11 — start-menu tidy: tighter rows, no scroll panel
+
+Owner review of the start screen: the five option buttons sat ~8 px apart,
+they hung low enough to crowd the save-summary line, and the parchment
+"scroll" texture behind them fought the ocean backdrop. The backdrop art
+(`ui/start_screen/menu_background.png`) stays; the scroll is gone and the
+buttons draw straight over the ocean. Owner also approved deleting the
+scroll art itself.
+
+- [x] **Rows closer.** `_ROW_STEP` in `game/states/menu_state.py` 72 -> 68,
+      so the 64-px `wide` buttons keep a 4-px gap instead of 8.
+- [x] **Rows up 25 px.** `_ROW_TOP` 550 -> 525; the last row's bottom lands
+      at 829 and the save summary (`h - 40`) is fully clear. The logo and
+      its `band` anchor did not move.
+- [x] **Scroll panel out of the menu.** The `three_slice_h` call, its import
+      and the `MENU_SCRIM` fallback rect left `MenuState.draw`; `band`
+      survives only as layout geometry (logo anchor, row inset and width).
+      Keeping the scrim was considered and rejected -- it only ever drew
+      when the scroll art failed to load, so it would have *added* a black
+      box that was never visible.
+- [x] **The code behind it.** `ui/panels.py` lost `three_slice_h` and its
+      `_native_size` helper (docstring now describes `slice` alone, the
+      Tiny Swords button/ribbon slicer, which is untouched);
+      `data/ui_sprites.json` lost `ui_banner_cap_left`, `ui_banner_mid`,
+      `ui_banner_cap_right`; `game/config.py` lost `MENU_SCRIM`.
+      `documentation/sprite_functionality.md` no longer documents the
+      builder or the parchment sheets.
+- [x] **Art.** `assets/ui/banners/scroll_{left,middle,right}.png` deleted
+      (`git rm`); the directory is gone.
+- [x] **Tests.** `tests/rendering/test_ui_panels.py` lost `ThreeSliceHTests`
+      (all three cases named the banner rigs) and is retitled to the
+      slicer. `test_menu.py` gained
+      `MenuButtonArtTests::test_rows_are_tight_and_clear_the_save_summary`
+      (first row centre 525, a 4-px gap per pair, last row clear of the
+      summary) and `MenuHasNoScrollPanelTests` (draw asks for no banner rig,
+      no banner rig is declared, `panels` has no `three_slice_h`, `config`
+      has no `MENU_SCRIM`).
+- [x] **Verified.** `tests/rendering/test_menu.py` + `test_ui_panels.py`:
+      91 passed, 11 subtests. Start screen re-rendered for the owner.

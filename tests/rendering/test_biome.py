@@ -33,7 +33,6 @@ import pygame
 from game import config
 from game.assets import ASSETS_DIR, get_assets
 from tests import worlds as W
-from world.map import GameMap
 from world.layout import GROUND
 from world.gen import biomes
 from world.terrain import decor
@@ -436,10 +435,9 @@ class DecorBiomeTests(unittest.TestCase):
                 self.assertEqual(fam_of.get(cell), fam)
         self.assertEqual(seen, set(floor), "a cell fell out of every terrace")
 
-    def test_a_room_with_no_height_map_stays_one_group(self):
-        """The legacy world has no palette, so it keeps the single unfiltered
-        pass it has always had rather than being split against biomes it
-        cannot have."""
+    def test_a_room_with_no_palette_stays_one_group(self):
+        """Nothing to key a biome on, so the room keeps a single unfiltered
+        pass rather than being split against biomes it cannot have."""
         room = self.layout.rooms[0]
         bare = type(room)(99, (0, 0), room.rect.copy(), "combat",
                           cells=room.cells)
@@ -448,9 +446,8 @@ class DecorBiomeTests(unittest.TestCase):
         self.assertEqual(decor._terraces(bare, floor), [(None, floor)])
 
     def test_a_terrace_that_declares_no_rate_keeps_the_authored_counts(self):
-        """No rates means no scaling: an unrated biome -- and every legacy
-        room, which has no biome at all -- uses `per_room` exactly as written.
-        The caller reads a missing tier out of this as 1.0."""
+        """No rates means no scaling: an unrated biome uses `per_room` exactly
+        as written. The caller reads a missing tier out of this as 1.0."""
         legal = [{"per_room": [0, 2], "tier": decor.FEATURE}] * 4
         self.assertEqual(decor._tier_scales({}, None, 500, legal), {})
         self.assertEqual(

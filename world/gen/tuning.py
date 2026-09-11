@@ -72,16 +72,16 @@ _V_SLOTS = 8                            # angular slots round the forge; N, NE, 
 _V_RING = (2.0, 4.0)                    # the house ring, min..max distance from the forge
 _V_HOUSE_LINK = 3.0                     # a house stands within this of the one before it
 _V_HEAL_NORTH = 2.0                     # the heal zone, tiles due north of the forge
-_V_HALL_ABOVE = (2.0, 3.5)              # the town hall, tiles straight above the heal (same x)
+_V_HALL_ABOVE = (3.0, 4.0)              # the town hall, tiles straight above the heal (same x); 3 keeps its foot clear of the heal effect's column
 _V_CLUSTER_RADIUS = 5.5                 # the settlement's extent; props stay outside it
 _V_HEAL_RADIUS = 26.0                   # the disc it reserves (its interactable radius)
 _V_MILITARY_INLAND = 3.0                # the military group: tiles in from the bridge mouth
 _V_MILITARY_FLANK = 1.8                 # ... and off the road, the first building
 _V_MILITARY_PITCH = 1.4                 # ... then this much further off, per building
-_V_PEN_DIST = (4.5, 10.0)               # pen centre, away from the bridges
+_V_PEN_DIST = (4.5, 12.0)               # pen centre, away from the bridges (10 → 12 with the street, LD-Z)
 _V_PEN_W = (6, 7)                       # pen size in fence tiles, ring included
 _V_PEN_H = (4, 5)                       # ... so the interior is 4-5 x 2-3 fence tiles
-_V_PEN_SCALE = 0.6                      # a fence tile's pitch and art, as a fraction of a world tile
+_V_PEN_SCALE = 0.45                     # a fence tile's pitch and art, as a fraction of a world tile (0.6, then 25% less)
 _V_LANE_HALF = 1.0                      # half-width kept clear on each road, tiles
 _V_GAP = 12.0                           # px between any two village circles
 _V_COAST_PAD = 16.0                     # px of ground a circle keeps to the coast
@@ -91,6 +91,14 @@ _V_COAST_PAD = 16.0                     # px of ground a circle keeps to the coa
 _V_SCATTER_SCALE = 2.5                  # over the whole island's cells, placed in the band outside the cluster
 _V_SCATTER_TREES = 2.0                  # the biome's tree weight, multiplied: a village stands among trees
 _V_SCATTER_GAP = 40.0
+# LD-Z, the tidy pass (`world/gen/village_tidy.py`): art clear of art.
+_V_ART_TOL = 6.0                        # px two painted boxes may overlap both ways before it is a clip
+_V_HEAL_NEAR = 3.5                      # tiles: a building this close keeps the heal company
+_V_HEAL_COMPANY = 2                     # buildings (besides the forge and the hall) the heal wants near it
+_V_HEAL_FLANK = (2.0, 3.0)              # tiles east / west of the heal a house is pulled in to (whole tiles: the spot snaps)
+_V_MILITARY_REACH = 8.0                 # tiles from its bridge mouth a relocated military building may stand
+_V_CLUSTER_MAX = 4.0                    # tiles: no house stands farther than this from every other building
+_V_STREET_REACH = 4.5                   # tiles: a road bends onto the street (the forge's row) no nearer the axis than this
 
 
 # --- spawn points (`world/gen/spawnpoints.py`) ------------------------------

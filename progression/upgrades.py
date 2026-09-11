@@ -35,7 +35,6 @@ class Upgrade:
     rarity: str = "common"      # common | uncommon | rare | forge
     level: int = 1              # the level this card would reach
     weapon: str | None = None   # the weapon it belongs to / grants
-    bundle: str | None = None   # grant: the bundled level-I blessing id
 
 
 def weapon_slots_full(player) -> bool:

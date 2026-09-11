@@ -6,7 +6,7 @@ down without ever spiking unfairly.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 BASE_XP = 5
 LINEAR = 4      # extra xp per level

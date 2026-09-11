@@ -207,7 +207,6 @@ class OfferingRules:
     summon_factor: float
     level_falloff: tuple[float, ...]
     rarity_weights: dict
-    grant_bundle_level: int
     forge_requires_levels: int = 2
 
     @classmethod
@@ -224,7 +223,7 @@ class OfferingRules:
         if not falloff:
             raise ValueError("offering.json: level_falloff is empty")
         return cls(int(d["choices"]), kw, float(d["summon_factor"]), falloff, rw,
-                   int(d["grant_bundle_level"]), int(d["forge_requires_levels"]))
+                   int(d["forge_requires_levels"]))
 
     def falloff(self, level: int) -> float:
         """Multiplier for a blessing that would reach `level`; past the table

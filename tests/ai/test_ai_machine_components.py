@@ -7,10 +7,11 @@ from types import SimpleNamespace
 
 import pygame
 
-from entities.ai import (ATTACK_SLOT, Behavior, Blackboard, Blink, CastHazard,
-                         Charge, Cooldown, Explode, Explosion, FireProjectile,
-                         OnEnter, SeekTarget, SummonBrood, Transition, after,
-                         in_range, ready)
+from entities.ai import (
+    ATTACK_SLOT, Behavior, Blackboard, Blink, Cooldown, Explode,
+    Explosion, FireProjectile, SeekTarget, SummonBrood, Transition, after,
+    in_range,
+)
 
 
 def _actor(pos=(0.0, 0.0), speed=100.0, radius=10.0, hp=10.0):

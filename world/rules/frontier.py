@@ -44,9 +44,6 @@ def interior_cells(room):
     """
     if not room.cells:
         return None
-    if not room.grid:
-        return [c for c in sorted(room.cells)
-                if all((c[0] + dc, c[1] + dr) in room.cells for dc, dr in ORTHO)]
     out = []
     for c in sorted(room.cells):
         level = cell_level(room, c)
@@ -175,4 +172,54 @@ def obstacle_reach(terrain: dict) -> dict:
             west = max(west, ax * scale)
             east = max(east, (fw - ax) * scale)
         out[kind] = (north, west, east)
+    return out
+
+
+def paint_box(meta: dict, scale: float, drop: float = 0.0) -> tuple:
+    """`(north, south, west, east)`: how far the **painted** pixels of one
+    rig reach from its anchor, in world px, drawn at `scale` and shifted
+    down by `drop` px (what `sprite_drop` does at draw time).
+
+    Reads the rig's measured `paint` box -- the bounding box of its opaque
+    pixels inside the frame, as `[x, y, w, h]` -- and falls back to the
+    whole frame where a rig declares none. `obstacle_reach` above bounds
+    the *frame*, which is what a terrace overhang needs; this bounds what
+    the eye sees, which is what "one building paints over another" needs
+    (`world/gen/village_tidy.py`).
+    """
+    fw, fh = meta["frame"]
+    ax, ay = meta.get("anchor", (fw * 0.5, fh))
+    x, y, w, h = meta.get("paint") or (0, 0, fw, fh)
+    return ((ay - y) * scale - drop, (y + h - ay) * scale + drop,
+            (ax - x) * scale, (x + w - ax) * scale)
+
+
+def paint_reach(terrain: dict, default_drop: float) -> dict:
+    """`kind -> (north, south, west, east)`: the painted reach of the
+    *largest* rig an obstacle kind can wear, from the obstacle's position,
+    in world px -- `paint_box` over every rig in the kind's list, at the
+    scale `rig_scale` will draw it and with the `sprite_drop` it will get
+    (`default_drop` is `config.SPRITE_ANCHOR_DROP`, times the collider
+    radius, as `obstacle_skins` applies it). Worst case per side, since the
+    variant is drawn later than the placement, like `obstacle_reach`."""
+    conf = terrain.get("obstacle_decor", {})
+    rigs = terrain.get("rigs", {})
+    obstacles = terrain.get("obstacles", {})
+    boost = float(conf.get("size_boost", 1.25))
+    render_radius = conf.get("render_radius", {})
+    render_scale = conf.get("render_scale", {})
+    drops = conf.get("sprite_drop", {})
+    out: dict = {}
+    for kind, names in conf.get("rigs", {}).items():
+        collider = float(obstacles.get(kind, {}).get("radius", 0.0))
+        radius = float(render_radius.get(kind, collider))
+        drop = float(drops.get(kind, default_drop)) * collider
+        reach = [0.0, 0.0, 0.0, 0.0]
+        for rig in names:
+            meta = rigs.get(rig)
+            if not meta:
+                continue
+            scale = rig_scale(meta, radius, boost, render_scale.get(kind))
+            reach = [max(a, b) for a, b in zip(reach, paint_box(meta, scale, drop))]
+        out[kind] = tuple(reach)
     return out

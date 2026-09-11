@@ -620,6 +620,206 @@ class DevItemMenuTests(unittest.TestCase):
         self.assertIs(game.state_machine.current, menu)
 
 
+class DevForgeMenuTests(unittest.TestCase):
+    """The Forges page: every Forging in the data, applied through the real
+    `apply_forge` with the dev conveniences (weapon granted first, level
+    requirement waived) and the one-Forge-per-weapon rule kept."""
+
+    def _forge_page(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate("forges")
+        return game, playing, menu
+
+    def test_forges_row_opens_the_page_listing_every_forging(self):
+        game, playing, menu = self._forge_page()
+        self.assertEqual(menu.page, "forges")
+        self.assertEqual(set(menu._forge_ids), set(playing.content.forges))
+        self.assertIs(game.state_machine.current, menu)
+
+    def test_enter_forges_the_owned_weapon_without_the_level_requirement(self):
+        game, playing, menu = self._forge_page()
+        w = playing.player.weapons[0]
+        fid = next(f for f in menu._forge_ids
+                   if playing.content.forges[f]["weapon"] == w.weapon_id)
+        fdef = playing.content.forges[fid]
+        self.assertEqual(w.level, 1)                      # nothing taken yet
+        self.assertIsNone(w.forge)
+        menu.sel = menu._forge_ids.index(fid)
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(w.forge, fid)
+        self.assertEqual(w.name, fdef["name"])
+        self.assertEqual(w.visual_id, fid)
+        for k, v in fdef["overrides"].items():
+            self.assertEqual(w.definition[k], v)
+        self.assertEqual(menu.page, "forges")             # stays open
+        self.assertIn("(forged)", menu._row_label(fid))
+
+    def test_a_forging_for_a_missing_weapon_grants_it_first(self):
+        game, playing, menu = self._forge_page()
+        owned = {w.weapon_id for w in playing.player.weapons}
+        fid = next(f for f in menu._forge_ids
+                   if playing.content.forges[f]["weapon"] not in owned)
+        wid = playing.content.forges[fid]["weapon"]
+        n0 = len(playing.player.weapons)
+        menu.sel = menu._forge_ids.index(fid)
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(len(playing.player.weapons), n0 + 1)
+        w = playing.player.weapon_by_id(wid)
+        self.assertIsNotNone(w)
+        self.assertEqual(w.forge, fid)
+
+    def test_a_second_forging_on_the_same_weapon_is_refused(self):
+        game, playing, menu = self._forge_page()
+        w = playing.player.weapons[0]
+        both = [f for f in menu._forge_ids
+                if playing.content.forges[f]["weapon"] == w.weapon_id]
+        self.assertGreaterEqual(len(both), 2)
+        menu.sel = menu._forge_ids.index(both[0])
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(w.forge, both[0])
+        definition = dict(w.definition)
+        n0 = len(playing.player.weapons)
+        menu.sel = menu._forge_ids.index(both[1])
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(w.forge, both[0])                # unchanged
+        self.assertEqual(w.definition, definition)
+        self.assertEqual(len(playing.player.weapons), n0)  # no duplicate granted
+        self.assertIn("already forged", menu._status)
+
+    def test_escape_returns_to_root_and_draw_is_headless(self):
+        game, playing, menu = self._forge_page()
+        for i in range(len(menu._forge_ids)):
+            menu.sel = i
+            menu.draw(game.screen)
+        _key(game, pygame.K_ESCAPE)
+        self.assertEqual(menu.page, "root")
+        self.assertIs(game.state_machine.current, menu)
+
+
+class DevRemoveWeaponMenuTests(unittest.TestCase):
+    """The Remove weapon page: the hero's owned instances plus "All weapons";
+    removal unwinds orbiters, summons and the weapon-blessing stacks."""
+
+    def _weapon_page(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate("remove_weapon")
+        return game, playing, menu
+
+    def test_remove_weapon_row_opens_the_page_listing_owned_instances(self):
+        game, playing, menu = self._weapon_page()
+        self.assertEqual(menu.page, "weapons")
+        rows = menu._rows()
+        self.assertEqual(rows[0], ("all",))
+        self.assertEqual(len(rows), 1 + len(playing.player.weapons))
+        self.assertIn("All weapons", menu._row_label(rows[0]))
+        self.assertIn("Lv1", menu._row_label(rows[1]))
+
+    def test_enter_removes_exactly_that_instance(self):
+        game, playing, menu = self._weapon_page()
+        # two extra weapons off the Items page, then back here
+        menu._goto("items")
+        for wid in ("bow", "hammer"):
+            menu.sel = menu._item_rows.index(("weapon", wid))
+            _key(game, pygame.K_RETURN)
+        menu._goto("weapons")
+        ids = [w.weapon_id for w in playing.player.weapons]
+        self.assertEqual(len(ids), 3)
+        menu.sel = 2                                     # second instance
+        _key(game, pygame.K_RETURN)
+        self.assertEqual([w.weapon_id for w in playing.player.weapons],
+                         [ids[0], ids[2]])
+        self.assertEqual(menu.page, "weapons")           # stays open
+        self.assertEqual(len(menu._rows()), 3)           # page tracks the list
+
+    def test_all_weapons_empties_the_list_and_the_run_keeps_going(self):
+        game, playing, menu = self._weapon_page()
+        menu.sel = 0
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(playing.player.weapons, [])
+        self.assertEqual(menu._rows(), [("none",)])
+        self.assertEqual(menu.sel, 0)
+        menu.draw(game.screen)
+        _key(game, pygame.K_RETURN)                      # the empty row is inert
+        self.assertEqual(playing.player.weapons, [])
+        _key(game, pygame.K_BACKQUOTE)                   # -> root
+        _key(game, pygame.K_BACKQUOTE)                   # close: run resumes weaponless
+        self.assertIs(game.state_machine.current, playing)
+        for _ in range(30):
+            game.state_machine.update(1 / 60)
+            game._render()
+        self.assertTrue(playing.player.alive)
+
+    def test_removal_clears_the_weapon_blessing_stacks_of_that_id(self):
+        game, playing, menu = self._weapon_page()
+        w = playing.player.weapons[0]
+        lib = playing.blessing_lib
+        bid = next(b for b in lib.by_id
+                   if lib.by_id[b].kind == "weapon" and lib.by_id[b].weapon == w.weapon_id
+                   and lib.by_id[b].requires_forge is None)
+        hero_bid = next(b for b in lib.by_id if lib.by_id[b].kind == "stat")
+        menu._goto("blessings")
+        for b in (bid, hero_bid):
+            menu.sel = menu._blessing_ids.index(b)
+            _key(game, pygame.K_RETURN)
+        self.assertEqual(playing.player.blessings[bid], 1)
+        self.assertEqual(w.level, 2)
+        menu._goto("weapons")
+        menu.sel = 1
+        _key(game, pygame.K_RETURN)
+        self.assertNotIn(bid, playing.player.blessings)   # weapon stack gone
+        self.assertEqual(playing.player.blessings[hero_bid], 1)  # stat stack kept
+        # a re-granted weapon starts clean
+        menu._goto("items")
+        menu.sel = menu._item_rows.index(("weapon", w.weapon_id))
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(playing.player.weapons[-1].level, 1)
+
+    def test_removal_retires_summons_and_orbiters(self):
+        game, playing, menu = self._weapon_page()
+        menu._goto("items")
+        for wid in ("spirit_wolf", "ember_ring"):
+            menu.sel = menu._item_rows.index(("weapon", wid))
+            _key(game, pygame.K_RETURN)
+        wolf = playing.player.weapon_by_id("spirit_wolf")
+        ring = playing.player.weapon_by_id("ember_ring")
+        _key(game, pygame.K_BACKQUOTE)                   # -> root
+        _key(game, pygame.K_BACKQUOTE)                   # close: let them form
+        self.assertIs(game.state_machine.current, playing)
+        # The ring only orbits with an enemy in reach; the wolf forms anyway.
+        spot = spots_near(playing, want=1, radius=22.0)
+        self.assertTrue(spot, "nowhere beside the hero to stand a tank")
+        playing._spawn_enemy("tank", at=spot[0])
+        playing._dev_unlimited_hp = True
+        playing._dev_hp_floor = playing.player.hp
+        for _ in range(120):
+            game.state_machine.update(1 / 60)
+            if wolf._summons and ring._orbiters:
+                break
+        self.assertTrue(wolf._summons, "the wolf never formed")
+        self.assertTrue(ring._orbiters, "the ring never formed")
+        pets = list(wolf._summons)
+        orbs = list(ring._orbiters)
+        _key(game, pygame.K_BACKQUOTE)                   # reopen the menu
+        menu = game.state_machine.current
+        menu._activate("remove_weapon")
+        menu.sel = 0                                     # all weapons
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(playing.player.weapons, [])
+        self.assertTrue(all(not s.active for s in pets))
+        self.assertTrue(all(not o.active for o in orbs))
+
+    def test_escape_returns_to_root_and_draw_is_headless(self):
+        game, playing, menu = self._weapon_page()
+        for i in range(len(menu._rows())):
+            menu.sel = i
+            menu.draw(game.screen)
+        _key(game, pygame.K_ESCAPE)
+        self.assertEqual(menu.page, "root")
+        self.assertIs(game.state_machine.current, menu)
+
+
 class DevMenuScrollTests(unittest.TestCase):
     def _long_page(self):
         game = _game()

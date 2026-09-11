@@ -431,3 +431,17 @@ buildings closer together, houses clustered, military grouped.
   4 → 7.7, rocks and posts about as before, still outside the cluster and
   two tiles clear of the pen.
 - Digests re-pinned.
+
+---
+
+## The tidy pass, the square and the street (2026-09-10, owner's request)
+
+Buildings painted over one another and over the heal (the art is two to
+four times the collider). Landed as LD-Z in `level_design_journal.md`:
+measured `paint` boxes on every village rig, art-aware `fits`, a tidy pass
+(`world/gen/village_tidy.py`) that relocates or removes what paints over
+the forge, the heal or the hall and pulls a house onto each flank of the
+heal, roads that bend onto the street (the forge's row) instead of cutting
+the square, the hall at 3–4 tiles above the heal, and the corral at 0.45
+with the sheep unchanged. Over 43 villages: no clip, 42 heals with company
+on both flanks, every pen and hall in place.

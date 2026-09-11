@@ -75,12 +75,13 @@ class CategoryTests(unittest.TestCase):
 
 class ReachTests(unittest.TestCase):
     def test_melee_reach_tracks_the_cone_tip(self):
-        s = w("sword")                       # area 74, no `reach` field
+        s = w("sword")                       # no `reach` field: the cone tip
+        area = get_content().weapon("sword")["area"]
         self.assertEqual(s._reach(1.0), s._area(1.0))
         self.assertEqual(s._reach(1.7), s._area(1.7))
         s.bonus["area"] = 20.0
         self.assertEqual(s._reach(1.0), s._area(1.0))
-        self.assertEqual(s._reach(2.0), (74 + 20) * 2.0)
+        self.assertEqual(s._reach(2.0), (area + 20) * 2.0)
 
     def test_projectile_reach_is_field_plus_area_bonus_times_mult(self):
         f = w("bow")                               # reach 460
@@ -105,7 +106,7 @@ class ReachTests(unittest.TestCase):
 class MeleeGateTests(unittest.TestCase):
     def test_fires_just_inside_the_ring_not_just_outside(self):
         s = w("sword")
-        reach = s._reach(1.0)                      # == area 74
+        reach = s._reach(1.0)                      # == the sword's area
         shots = []
         self.assertFalse(s.update(0.016, ctx([FakeEnemy(reach + 1, 0)], shots)))
         self.assertEqual(shots, [])
@@ -145,7 +146,7 @@ class ProjectileGateTests(unittest.TestCase):
 class AreaScalingTests(unittest.TestCase):
     def test_area_multiplier_widens_the_ring_enough_to_trigger(self):
         s = w("sword")
-        e = FakeEnemy(s._reach(1.0) + 20, 0)       # just outside at x1.0
+        e = FakeEnemy(s._reach(1.0) + 8, 0)        # just outside at x1.0, inside at x1.5
         self.assertFalse(s.update(0.016, ctx([e], [])))
         s._cd = 0.0
         shots = []
@@ -205,3 +206,33 @@ class RegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BodyReachTests(unittest.TestCase):
+    """CR2: the reach gate counts the enemy's body, like the hit test does --
+    a tank whose edge is in a short swing's arc is in reach even when its
+    centre is not."""
+
+    class _Body:
+        def __init__(self, x, y, radius):
+            self.pos = pygame.Vector2(x, y)
+            self.radius = radius
+
+    def test_a_big_body_inside_the_arc_counts(self):
+        s = w("sword")
+        reach = s._reach(1.0)
+        tank = self._Body(reach + 10, 0, 18)           # centre 10 px out, body 8 px in
+        shots = []
+        self.assertTrue(s.update(0.016, ctx([tank], shots)))
+        self.assertEqual(len(shots), 1)
+
+    def test_a_body_wholly_outside_still_does_not(self):
+        s = w("sword")
+        reach = s._reach(1.0)
+        far = self._Body(reach + 25, 0, 18)            # edge 7 px out
+        self.assertFalse(s.update(0.016, ctx([far], [])))
+
+    def test_a_stand_in_with_no_radius_counts_its_centre(self):
+        s = w("sword")
+        reach = s._reach(1.0)
+        self.assertFalse(s.update(0.016, ctx([FakeEnemy(reach + 1, 0)], [])))

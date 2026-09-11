@@ -6,6 +6,58 @@ commit / milestone. Newest first.
 
 ---
 
+## #2 · Float blessing value crashes the next volley (`range()` TypeError)
+
+| | |
+|---|---|
+| **Status** | **RESOLVED** 2026-09-10 — int casts on the read side in `combat/weapons/core.py` (`_projectile_count`, `_pierce`); regression tests `tests/progression/test_blessings.py — test_more_blades_still_fires`, `test_pierce_blessing_keeps_pierce_an_int`. Not committed yet. |
+| **Severity** | High — hard crash of the run the moment the weapon fires after the level-up |
+| **Discovered** | 2026-09-10, live run: level 6 took `fan_of_blades_more_blades` (Daggers → Fan of Blades), next attack raised `TypeError: 'float' object cannot be interpreted as an integer` at `core.py — _fire`, `for i in range(count)` |
+| **Area** | `progression/blessings/catalog.py — Effect.value_at / delta`, `progression/blessings/apply.py — weapon_bonus`, `combat/weapons/core.py — _projectile_count, _pierce` |
+| **Not caused by** | Fan of Blades itself, or the Daggers. Any `weapon_bonus` blessing on an integer field triggers it: the seven `projectile_count` blessings crash, the three `pierce` ones leak a float into `Projectile.pierce_left` (worked by accident — only compared and decremented). `chain_count` was already read through `int()`. |
+
+### Symptom
+
+Take any "+N projectiles" blessing (More Blades, Twin Shot, ...). The very next
+volley of that weapon crashes the game with the traceback above.
+
+### Root cause
+
+The blessing catalog normalises every level table to floats —
+`Effect.value_at` returns `float(self.levels[level - 1])` — and `apply.py`
+adds that delta straight into `weapon.bonus[field]`. So after More Blades,
+`bonus["projectile_count"]` is `1.0`, not `1`. `Weapon._projectile_count`
+did `int(definition) + bonus` and returned `2.0`, which `range()` rejects.
+
+The pre-P2 upgrade path wrote `bonus["projectile_count"] += 1` with a literal
+int, so the read side never needed to care about the type. The data-driven
+blessings are the first writer to put a float into an integer-typed bonus
+field, and nothing on the read side cast it back.
+
+### Fix
+
+Cast at the read site, the way `chain_count` already did, so any writer
+(blessing data, dev-mode, tests) may put a number of either type into
+`bonus`:
+
+```python
+n = int(self.definition["projectile_count"]) + int(self.bonus["projectile_count"])
+return int(self.definition["pierce"]) + int(self.bonus["pierce"])
+```
+
+`cluster_count` (Bomblets) was checked and is fine: it is read through
+`Weapon.effect()`, which sums `effects` + `bonus` as floats and is cast by
+the consumer in `game/states/playing/effects.py`.
+
+### Verification
+
+`tests/progression/test_blessings.py` now forges Fan of Blades, applies More
+Blades and fires one volley (expects `base + 1` int-counted shots), and applies
+Piercing Arrow to the Bow and checks every spawned shot's `pierce` is an int.
+Both fail on the pre-fix `core.py` and pass after it.
+
+---
+
 ## #1 · Flat armor nullifies all continuous (per-frame) damage
 
 | | |

@@ -47,14 +47,15 @@ class ConeTests(unittest.TestCase):
     def test_sword_spawns_a_cone_shaped_hit(self):
         w = Weapon("sword", get_content().weapon("sword"))
         shots = []
-        # CB-2: the scythe only swings at a foe inside its reach ring (== the
-        # cone tip, area 74), so the target has to sit within that.
-        w.update(0.016, ctx([FakeEnemy(50, 0)], shots))
+        # CB-2: the sword only swings at a foe inside its reach ring (== the
+        # cone tip, its `area`), so the target has to sit within that.
+        reach = get_content().weapon("sword")["area"]
+        w.update(0.016, ctx([FakeEnemy(reach * 0.6, 0)], shots))
         self.assertEqual(len(shots), 1)
         s = shots[0]
         self.assertGreater(s.cone_half_angle, 0.0)
         self.assertAlmostEqual(s.vel.length(), 0.0)      # stationary arc
-        self.assertGreater(s.radius, 40)                  # wide area
+        self.assertGreater(s.radius, 20)                  # wide area
         # cone points at the target
         self.assertAlmostEqual(s.cone_dir.x, 1.0, places=3)
 
@@ -114,7 +115,7 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(c.weapon_visual("bow").style, "arrow")
         self.assertEqual(c.weapon_visual("sword").style, "cone")
         self.assertTrue(c.weapon_visual("sword").fx["slash"])
-        self.assertFalse(c.weapon_visual("daggers").fx["slash"])
+        self.assertEqual(c.weapon_visual("daggers").fx["slash"], ["daggers_stab"])   # the crescent is parked
         self.assertEqual(c.weapon_visual("hammer").style, "")      # CR1: the blow is hidden
         self.assertEqual(c.weapon_visual("ember_ring").style, "")
         av = c.weapon_visual("magic_rod")
@@ -138,7 +139,7 @@ class MainWeaponAttackAnimTests(unittest.TestCase):
         from tests.boot import settle
         p = settle(g)                  # through the loading screen
         assert isinstance(p, PlayingState)
-        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(60, 0))
+        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(25, 0))   # inside the sword's reach
         return g, p
 
     def test_main_weapon_fire_beat_triggers_the_anim(self):

@@ -1,35 +1,11 @@
 """Pure autotile slot maths -- pick a tile index from a cell's neighbourhood.
 
 W3 of `journals/world_refactor.md`. Moved verbatim off `GameMap`; it holds
-`GameMap._slot_for` / `_mask_slot` / `_bridge_slot` as `staticmethod` aliases so
-existing call sites and `tests/rendering/test_terrain.py` keep working. No
-pygame, no assets -- just ints, strings and a `slots` dict.
+`GameMap._mask_slot` / `_bridge_slot` as `staticmethod` aliases so existing call
+sites and `tests/rendering/test_terrain.py` keep working. No pygame, no assets
+-- just ints, strings and a `slots` dict.
 """
 from __future__ import annotations
-
-
-def slot_for(slots: dict, row: int, col: int, rows: int, cols: int) -> int:
-    """Rectangular-room autotile: pick the slot from the cell's position in the
-    room's bounding grid (currently unused -- `mask_slot` superseded it)."""
-    n, s = row == 0, row == rows - 1
-    w, e = col == 0, col == cols - 1
-    if n and w:
-        return slots["corner_nw"]
-    if n and e:
-        return slots["corner_ne"]
-    if s and w:
-        return slots["corner_sw"]
-    if s and e:
-        return slots["corner_se"]
-    if n:
-        return slots["edge_n"]
-    if s:
-        return slots["edge_s"]
-    if w:
-        return slots["edge_w"]
-    if e:
-        return slots["edge_e"]
-    return slots["interior"]
 
 
 # The ground block's twelve slot names, keyed by which sides are open. The

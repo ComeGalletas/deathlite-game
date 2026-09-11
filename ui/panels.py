@@ -1,13 +1,10 @@
 """Composable UI panels.
 
-Two builders, both cached per (inputs, size) so callers that draw every frame
-never recompose a Surface, and both `None` when a rig / file is missing --
-the same degrade contract as `game.assets`, so callers fall back to their
-own primitive drawing.
+One builder, cached per (rig, size) so callers that draw every frame never
+recompose a Surface, and `None` when a rig / file is missing -- the same
+degrade contract as `game.assets`, so callers fall back to their own
+primitive drawing.
 
-* `three_slice_h` -- a bar from three **separate** rig images (left cap,
-  middle, right cap), the caps at their native aspect scaled to the height.
-  The start-menu parchment panel.
 * `slice` -- one **sheet** cut on its tile grid and rebuilt at a size. The
   Tiny Swords buttons and ribbons: a `192x64` strip is three 64-px tiles
   (cap, middle, cap) and becomes a 3-slice; a `192x192` sheet is 3x3 and
@@ -74,47 +71,6 @@ def slice(assets, rig: str, size: tuple[int, int], *,
             out.blit(cell, (dx, dy))
     _cache[key] = out
     return out
-
-
-def _native_size(meta: dict) -> tuple[int, int]:
-    """Aspect source for a cap: the `content` crop if present, else the full
-    `frame` -- a cropped cap must scale by its own cropped size, not the sheet."""
-    crop = meta.get("content")
-    if crop:
-        return int(crop[2]), int(crop[3])
-    return int(meta["frame"][0]), int(meta["frame"][1])
-
-
-def three_slice_h(assets, *, left: str, mid: str, right: str,
-                  width: int, height: int) -> pygame.Surface | None:
-    key = (left, mid, right, width, height)
-    if key in _cache:
-        return _cache[key]
-
-    meta_l, meta_r = assets.rig(left), assets.rig(right)
-    if not meta_l or not meta_r or not assets.rig(mid):
-        _cache[key] = None
-        return None
-
-    lw, lh = _native_size(meta_l)
-    rw, rh = _native_size(meta_r)
-    cap_l_w = max(1, round(lw * height / lh))
-    cap_r_w = max(1, round(rw * height / rh))
-    mid_w = max(1, width - cap_l_w - cap_r_w)
-
-    cap_l = assets.image(left, size=(cap_l_w, height))
-    cap_r = assets.image(right, size=(cap_r_w, height))
-    strip = assets.image(mid, size=(mid_w, height))
-    if cap_l is None or cap_r is None or strip is None:
-        _cache[key] = None
-        return None
-
-    panel = pygame.Surface((width, height), pygame.SRCALPHA)
-    panel.blit(cap_l, (0, 0))
-    panel.blit(strip, (cap_l_w, 0))
-    panel.blit(cap_r, (cap_l_w + mid_w, 0))
-    _cache[key] = panel
-    return panel
 
 
 def clear_cache() -> None:

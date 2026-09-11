@@ -189,6 +189,9 @@ class Village:
     # The settlement's extent round the forge, world px: the village pass
     # keeps its trees outside it and the bake's clutter pass keeps out too.
     radius: float = 0.0
+    # LD-Z: how many buildings besides the forge and the hall stand within
+    # `_V_HEAL_NEAR` of the heal after the tidy pass (it wants two).
+    company: int = 0
 
 
 @dataclass

@@ -1,8 +1,4 @@
 {
-  "ui_banner_cap_left":  {"file": "ui/banners/scroll_left.png",  "frame": [192, 192], "content": [0, 0, 96, 192]},
-  "ui_banner_cap_right": {"file": "ui/banners/scroll_right.png", "frame": [192, 192], "content": [96, 0, 96, 192]},
-  "ui_banner_mid":       {"file": "ui/banners/scroll_middle.png",       "frame": [192, 192]},
-
   "btn_blue_wide":          {"file": "ui/buttons/blue_wide.png",          "frame": [192, 64]},
   "btn_blue_wide_pressed":  {"file": "ui/buttons/blue_wide_pressed.png",  "frame": [192, 64]},
   "btn_gold_wide":          {"file": "ui/buttons/gold_wide.png",          "frame": [192, 64]},

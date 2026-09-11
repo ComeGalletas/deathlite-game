@@ -5763,3 +5763,216 @@ Two tests: `test_nothing_stands_on_a_bridge_landing` measures the promise off
 the bridge rects directly, and `test_the_doorway_helper_covers_every_bridge_end`
 pins that the helper the scatter reads names the right tiles -- the one that
 would have failed all along.
+
+## Z — the village tidy pass: nothing clips the heal, the hall or the forge; the corral at 0.45 — ✅ DONE (2026-09-10)
+
+The owner sent a screenshot of a village where the tower stands half over
+the monastery, a house stands over the tower's foot, and the heal zone
+glows alone on open grass with nothing round it. Asked for: a pass that
+runs **after** the village generation is done and cleans it up so that the
+heal zone, the monastery (the town hall) and the forge are never clipped by
+another structure, and so that structures stand close to or round the heal
+area. Also (same request, later): the wooden corral 25% smaller again, the
+sheep the size they are now and still inside.
+
+### What the generator does today (`world/gen/village.py`, reviewed)
+
+One private RNG per island (`seed:village:<room>`), seven steps in order:
+the forge at the walkable centroid (slid to a cell that leaves the axis
+room); a road lane from every bridge mouth to the forge; the heal
+`_V_HEAL_NORTH` (2) tiles due north and the monastery `_V_HALL_ABOVE`
+(2–3.5) tiles above the heal on the same x; 3–4 houses walked round the
+ring (2–4 tiles from the forge, off the north three slots); a military row
+beside each road; the pen on the far side; then the island's own scatter
+outside `_V_CLUSTER_RADIUS`. Every test is a **collider** test — circles
+plus `_V_GAP` (12 px), the coast pad, the doorways and the lanes. Nothing
+looks at the **art**: a house collides on a 41 px circle and draws 128 px
+wide and 192 px tall; the monastery collides on 41 + two 25 px satellites
+(136 px across) and draws 161 × 269; the tower collides on 25 px and draws
+86 px wide and 172 px tall; the heal is a 26 px reserved disc whose effect
+is a 192 × 192 frame anchored 140 px up. The repair (`unseal`) never touches
+a village building (`_open_villages`), so what the pass places is what
+ships.
+
+### Measured on the current tree (28 seeds, 43 villages, script in the scratchpad)
+
+| | |
+|---|---|
+| hall placed, on the heal's x | 43 / 43 |
+| heal 2 tiles north of the forge | 43 / 43 |
+| villages with some art box over the **hall** (tower, barracks, archery, house, tree, rock, scarecrow) | 11 / 43 |
+| villages with a house's art over the **forge** | 27 / 43 |
+| villages with pen fence posts under the **heal** effect | 4 / 43 |
+| building pairs whose art boxes intersect (frame rects, > 8 px both ways) | 116 |
+| heal with no building but forge and hall within 3.5 tiles | 25 / 43 |
+
+Two things follow. **The clipping reproduces** and is structural: the art is
+two to four times the collider, so the collider gap lets sprites overlap by
+design, and the y-sort then paints whichever stands lower over the other.
+**The lone heal does not reproduce** on this tree — the heal is always two
+tiles above the forge with the hall above it — so that part of the
+screenshot is most likely from a build before the north-axis change (when
+the heal stood "at random near the centre"), unless the owner has a seed
+that shows it now. Either way the rule asked for (structures round the
+heal) is worth having: on 25 of 43 villages nothing but the forge and the
+hall stands within 3.5 tiles of it.
+
+### Understanding to confirm
+
+1. A **new function, run once the village is laid out** (after step 7, the
+   scatter), not a rewrite of the placement steps. It reads what stands on
+   the island and fixes it: relocate first, remove as the last resort.
+2. "Clipped" means **art over art**, not collider over collider (colliders
+   already never overlap; `test_no_two_village_circles_overlap` pins it).
+   The measure is the art box the game will draw — `obstacle_reach` in
+   `world/rules/frontier.py` is already the generation-time authority for
+   how far a kind's art reaches from its anchor, so the tidy pass reads
+   that, never a rig file.
+3. Protected, never moved or removed: **forge, heal, monastery**. Anything
+   else — houses, military, fence posts, trees, rocks, clutter — that
+   paints over one of them moves or goes. The tolerance is a few px of the
+   sprites' transparent padding, not the frame rect.
+4. "Structures close or around the heal": at least **two buildings besides
+   the forge and the hall** within ~3 tiles of the heal, flanking it east
+   and west, so the sanctuary reads as the village square rather than a
+   glow on a lawn.
+5. The pass keeps everything else the generator promises: same private
+   RNG (the world stream draws nothing), roads still a tile clear, nothing
+   on a bridge landing, every circle on ground with the coast pad, the pen
+   whole. Digests get re-pinned once; determinism is A/B-checked.
+6. The corral: `_V_PEN_SCALE` 0.6 → 0.45 and the fence `render_scale` with
+   it; the sheep keep their rig (`character_sprites.json` scale 24 × 21) and
+   their count (2–4), so the interior must still hold them.
+
+### Todo
+
+**Z-1 — the audit becomes a test.** Move the scratchpad audit into
+`tests/world/test_village_tidy.py` over the shared cached worlds: art boxes
+from `obstacle_reach` (content, not frame), the three protected boxes, the
+heal's neighbour count. Red first, so the pass has something to turn green.
+
+**Z-2 — `world/gen/village_tidy.py`, `tidy(site, village)`.** New module,
+one concern, called at the end of `_lay_out` before the `Village` record
+is built. Steps, in order:
+  a. Build the protected boxes: forge art, monastery art (with satellites'
+     span), heal effect (the `fx_heal` reach, plus its 26 px disc).
+  b. For every other obstacle on the island whose art box intersects a
+     protected box by more than the padding tolerance: try to **relocate**
+     — the same `fits` test the placement used, plus a new *art keep-out*
+     against the protected boxes, searched outward from where it stood
+     (houses along the ring, military along its row, props anywhere
+     outside the cluster). What will not fit anywhere is **removed**,
+     satellites with it, and the `buildings` / `posts` lists are patched
+     to match.
+  c. Fence posts under the heal or the hall: the pen moves as a whole
+     (re-run `_place_pen` with the protected boxes as keep-out), never a
+     post alone.
+  d. **Flank the heal.** If fewer than two non-key buildings stand within
+     3 tiles of the heal, pull the farthest house (or two) into the flank
+     slots at the heal's y, ±2.5–3 tiles in x, off the roads; if no house
+     fits, leave the count short and say so in the record.
+  e. Building-vs-building art clipping among the rest (the 116 pairs): a
+     second, weaker rule — nudge outward along the ring until the art
+     boxes only touch in the way the y-sort intends (a roof may sit
+     behind a lower building's foot by at most a few px). This is the
+     screenshot's tower-over-house case.
+
+**Z-3 — art-aware spacing at placement.** Cheaper than tidying: give
+`_Site.fits` an optional art keep-out against the protected boxes so the
+houses, military and scatter are born clear of the forge, the heal and the
+hall, and the tidy pass only mops up what the ring and the rows still
+leave. Keeps the pass small and the layouts stable.
+
+**Z-4 — the corral at 0.45.** `_V_PEN_SCALE` 0.6 → 0.45, `render_scale.fence`
+0.6 → 0.45, `fence` radius 14 → ~11 (post pitch 28.8 px; the slit stays
+under the hero's 20). Interior of a 6×4 pen goes 154 × 77 → 115 × 58 px;
+with the sheep pad (radius 8 + 4) that still seats four 24 × 21 sheep, but
+tight — raise `_V_PEN_H` to (5, 5) if they stack on screen. `_exempt_pens`
+and the pen test read the pitch, so they follow. Check the gate still
+passes the hero.
+
+**Z-5 — tests and pins.** The tidy test green over the cached seeds; the
+existing village tests unchanged in meaning (axis, cluster, ring, pen,
+circles never overlap); `test_repair` baseline still clean; digests
+re-pinned; the sheep test counts 2–4 inside the smaller interior.
+
+**Z-6 — screenshot.** A rendered village (one of seed 42 island 1 or seed 2
+island 4, the two worst on the audit) before and after, and the corral
+next to a sheep for scale.
+
+Nothing committed until asked.
+
+### What landed (2026-09-10)
+
+**The data.** Every village rig -- forge, the five monasteries, fifteen
+houses, barracks / tower / archery in five colours, the ten fence tiles --
+and the heal effect (`fx_heal`) carries a measured `paint` box in
+`data/terrain.json`: the bounding box of its opaque pixels inside the frame
+(the heal's is the union over its eleven frames, 98 × 128 rising 122 px
+above the anchor). `frontier.paint_box` / `paint_reach` turn that into the
+painted reach per kind at the scale and sprite drop the skins draw with;
+`obstacle_reach` (frame reach, for the terrace rules) is untouched. A test
+re-measures eight sheets and asserts the declared boxes, so the data cannot
+drift from the art.
+
+**Art-aware placement (Z-3).** `_Site` keeps the three protected boxes --
+forge art, heal column plus disc, hall art -- and `fits` now also asks
+`art_ok`: a building or fence post may paint over neither a protected box
+nor any building already standing; a prop may not paint over a protected
+box (a tree before or behind a house is a tree by a house). Tolerance
+`_V_ART_TOL` 6 px both ways. The hall moved from 2–3.5 to `_V_HALL_ABOVE`
+3–4 tiles above the heal: at two tiles the heal's sparkle column overlapped
+the hall's door by 43 px.
+
+**The tidy pass (Z-2), `world/gen/village_tidy.py`.** Runs at the end of
+`_lay_out`, before the record: (1) anything painting over a protected box
+is relocated by the same `fits` -- a house along the ring from where it
+stood, a military building beside its road within `_V_MILITARY_REACH` --
+or removed, satellites with it; (2) building pairs that paint over each
+other, the later one gives way, a key building never; (3) a fence post
+under protected or building art re-places the whole pen; (4) the heal's
+company is counted and a spare house pulled onto an empty flank, nearest
+first. The record is rebuilt off the site afterwards (`buildings`,
+`posts`, `pen`) and carries `Village.company`. Deterministic; no RNG.
+
+**The square and the street.** Two things the placement had to change for
+the heal to have company at all. The houses now go *square first*: one on
+each flank of the heal, `_V_HEAL_FLANK` 2 or 3 whole tiles east and west
+(the spot snaps, so fractional offsets came out asymmetric), then the ring
+walk south of the street as before. And the roads bend (`_road`): a road
+comes in from its mouth to a knee on the forge's row -- the street -- no
+nearer the axis than `_V_STREET_REACH` 4.5 tiles, then along the street to
+the forge. Straight roads from the mouths, which the axis room pushes
+north of the forge, ran through both flanks on most seeds (`lane` was the
+only reason the flank search ever gave). `axis_room` tests the hall
+against the bent roads; the military row sits beside the first leg; a
+village whose rows all fail still gets a barracks and a tower by the broad
+search, once per village so the pen keeps its room. The repair opens a
+three-tile disc round the hall too: at five to six tiles up the axis its
+north half fell outside the settlement disc and seed 21 lost its hall to
+`unseal`.
+
+**The corral (Z-4).** `_V_PEN_SCALE` 0.6 → 0.45, `render_scale.fence` with
+it, `fence` radius 14 → 11 (pitch 28.8 px, slit 6.8). The pen's ground
+margin is half a tile (a whole one outweighed the pen and two islands lost
+theirs) and `_V_PEN_DIST` reaches 12 tiles. Interior of a 6 × 4 pen: 115 ×
+58 px; the sheep keep `npc_sheep` at 24 × 21 and 2–4 a pen.
+
+| over 28 seeds, 43 villages | before | after |
+|---|---|---|
+| art over the hall / the forge / the heal | 11 / 27 / 4 | **0 / 0 / 0** |
+| building pairs painting over each other | 116 | **0** |
+| hall on the heal's x | 43 | 43 |
+| heal with ≥ 2 buildings besides forge and hall within 3.5 tiles | 4 | **42** (seed 2 island 4: a road takes the east flank) |
+| houses / military a village | 2.7 / 3.7 | 3.6 / 2.6 |
+| pens | 43 | 43 |
+
+Tests: `tests/world/test_village_tidy.py` (11) -- the paint boxes match
+the sheets, painted reach ≤ frame reach, nothing over the square, no
+building over another, company on both flanks, one village round its
+square, roads bend onto the street, the protected three never move, the
+corral at 0.45 still seats the sheep. `test_village`'s cluster test reads
+"another building within four tiles" now (the two flank houses are five
+apart). Digests re-pinned. Screenshot delivered (forge, heal, hall on the
+axis; a red and a grey house flanking the heal; the corral with three
+sheep).

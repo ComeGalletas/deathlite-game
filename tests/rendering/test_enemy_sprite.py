@@ -1,7 +1,6 @@
 """Enemy sprite rigs, the hit tint (no `hurt` strip -> red-tint the live frame),
 and the shared one-shot `dead` death poof for every entity."""
 import os
-import random
 import tempfile
 import unittest
 

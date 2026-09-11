@@ -140,10 +140,6 @@ class LevelUpMouseTests(unittest.TestCase):
         self.assertGreater(_taken(self.ps), before)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class LevelUpCardArtTests(unittest.TestCase):
     """UI art, group D: the cards on the panel sheets -- gold for the
     selected card, pressed while the button is held on one."""
@@ -257,11 +253,178 @@ class LevelUpTextTests(unittest.TestCase):
     def test_card_text_colours(self):
         from game import config
         screen = self.game.screen
+        from ui.level_up import _DESC_GAP, _DESC_TOP, _TAG_UP
         card = self.lu.panel.hits.rect_of(1)                            # unselected -> blue art
         title_band = pygame.Rect(card.left + 16, card.top + 44, card.width - 32, 30)
-        desc_band = pygame.Rect(card.left + 16, card.top + 90, card.width - 32, 50)
-        self.assertTrue(self._has_colour(screen, title_band, config.COLOR_ON_BUTTON))
+        # The band the description may occupy. It is centred in that band rather
+        # than pinned to its top (change request 5 option B), so a short card
+        # draws well below `_DESC_TOP` -- this has to be the whole band, not the
+        # old fixed 50 px slice. It still stops short of the category line,
+        # which is drawn in the same dim colour and would pass the check for it.
+        band_bottom = (card.height - _TAG_UP
+                       - self.lu.panel._hint.get_height() - _DESC_GAP)
+        desc_band = pygame.Rect(card.left + 16, card.top + _DESC_TOP,
+                                card.width - 32, band_bottom - _DESC_TOP)
+        self.assertTrue(self._has_colour(screen, title_band, config.COLOR_ACCENT))      # card titles: gold
         self.assertTrue(self._has_colour(screen, desc_band, config.COLOR_ON_BUTTON_DIM))
-        self.assertFalse(self._has_colour(screen, card, config.COLOR_TEXT))
+        # (The descriptions are white again by the owner's 2026-09-10 rule, so the
+        # old "no light text on the card" check no longer applies.)
         self.assertFalse(self._has_colour(screen, card, config.COLOR_TEXT_DIM))
         self.assertFalse(self._has_colour(screen, card, (120, 130, 160)))   # the old tag colour
+
+
+class TitleShadowAndBadgeTests(unittest.TestCase):
+    """Owner (2026-09-10): the card number sits 25 px further in, and card
+    titles carry a dark drop shadow under the gold."""
+
+    def test_shadowed_puts_the_shadow_two_pixels_down_right(self):
+        from game import config, fonts
+        from ui.text import shadowed
+        pygame.init()
+        if pygame.display.get_surface() is None:
+            pygame.display.set_mode((1, 1))
+        font = fonts.heading(24)
+        plain = font.render("Aegis", True, config.COLOR_ACCENT)
+        s = shadowed(font, "Aegis", config.COLOR_ACCENT)
+        self.assertEqual(s.get_size(), (plain.get_width() + 2, plain.get_height() + 2))
+        gold = {(x, y) for x in range(plain.get_width()) for y in range(plain.get_height())
+                if plain.get_at((x, y))[3] == 255}                # fully opaque: no AA blend
+        self.assertTrue(gold)
+        # every opaque gold pixel stays gold on top (anti-aliased edges blend
+        # a little with the shadow beneath, hence the tolerance)
+        for x, y in list(gold)[:200]:
+            got = s.get_at((x, y))[:3]
+            for a, b in zip(got, config.COLOR_ACCENT):
+                self.assertLessEqual(abs(a - b), 24, (x, y, got))
+        # a pixel that is gold in the plain render but empty two px up-left
+        # in it shows the shadow colour in the composite
+        edge = next(((x, y) for x, y in gold
+                     if (x + 2 >= plain.get_width() or y + 2 >= plain.get_height()
+                         or plain.get_at((x + 2, y + 2))[3] < 20)), None)
+        self.assertIsNotNone(edge)
+        self.assertEqual(s.get_at((edge[0] + 2, edge[1] + 2))[:3], (28, 28, 34))
+
+    def test_the_card_number_sits_25px_further_right(self):
+        import inspect
+        from ui import level_up
+        src = inspect.getsource(level_up.LevelUpPanel.draw)
+        self.assertIn("(x + 39, y + 10 + dy)", src)
+        self.assertIn('f"#{i + 1}"', src, "the badge reads #1, #2, #3 (owner, 2026-09-10)")
+
+
+class CategoryLineTests(unittest.TestCase):
+    """Owner (2026-09-10): the category line sits 25 px higher and every
+    word is capitalised ("Sword Power", "Hero Power")."""
+
+    def test_the_line_is_capitalised_and_25px_higher(self):
+        import inspect
+        from ui import level_up
+        src = inspect.getsource(level_up.LevelUpPanel.draw)
+        self.assertIn("y + card_h - 39 + dy", src)
+        self.assertNotIn("y + card_h - 14 + dy", src)
+        words = " ".join(t[:1].upper() + t[1:] for t in ("hero", "power"))
+        self.assertEqual(words, "Hero Power")
+        words = " ".join(t[:1].upper() + t[1:] for t in ("Magic Rod", "behavior"))
+        self.assertEqual(words, "Magic Rod Behavior")
+
+
+class DescriptionCentringTests(unittest.TestCase):
+    """Change request 5 option B (owner, 2026-09-11): the card is 50 px taller
+    and the description is *centred* in the band between the title and the
+    category line, instead of being pinned under the title.
+
+    316 of the catalog's 345 rendered descriptions are one or two lines, so
+    pinning them left the text stranded over an empty half-card once the card
+    grew. A description long enough to fill the band still starts at the band's
+    top, so the longest cards are laid out exactly as they were.
+
+    The panel is driven directly with synthetic choices -- no run and no
+    assets -- so these cost milliseconds. The module still sits in the
+    `integration` tier, because the tier is assigned by path and its other
+    classes boot a real `Game`.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        pygame.display.init()
+        pygame.display.set_mode((64, 64))
+        pygame.font.init()
+
+    def setUp(self):
+        from ui.level_up import LevelUpPanel
+        self.panel = LevelUpPanel()
+
+    def _band(self, card):
+        from ui.level_up import _DESC_GAP, _DESC_TOP, _TAG_UP
+        top = card.top + _DESC_TOP
+        bottom = (card.bottom - _TAG_UP
+                  - self.panel._hint.get_height() - _DESC_GAP)
+        return top, bottom
+
+    def _text_span(self, description):
+        """(top, bottom) of the description's painted pixels, and the band it
+        was laid out in. Drawn without assets so the card is the flat fallback
+        and the only dim-coloured text in the band is the description."""
+        from types import SimpleNamespace
+        from game import config
+        surface = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        choice = SimpleNamespace(title="Probe", description=description,
+                                 tags=("hero", "power"), rarity="common")
+        self.panel.draw(surface, [choice], 0, assets=None)
+        card = self.panel.hits.rect_of(0)
+        band_top, band_bottom = self._band(card)
+        want = tuple(config.COLOR_ON_BUTTON_DIM) + (255,)
+        ys = [y for y in range(band_top, band_bottom)
+              for x in range(card.left + 16, card.right - 16)
+              if tuple(surface.get_at((x, y))) == want]
+        self.assertTrue(ys, "no description text found in the band")
+        return min(ys), max(ys), band_top, band_bottom
+
+    def test_a_one_line_description_is_centred_not_pinned(self):
+        from ui.level_up import _DESC_TOP
+        top, bottom, band_top, band_bottom = self._text_span("+3% critical hit chance.")
+        self.assertGreater(top, band_top + 20,
+                           "a short description is still pinned under the title")
+        self.assertAlmostEqual((top + bottom) // 2, (band_top + band_bottom) // 2,
+                               delta=8)
+
+    def test_the_longest_catalog_description_is_still_centred(self):
+        """`bow_crossfire` is the catalog's worst case at four lines, and the
+        band holds five -- so even it has slack and is centred, not pinned."""
+        crossfire = ("+70% Bow damage against Rod-marked enemies, and +70% Rod "
+                     "damage against enemies the Bow hit in the last 1.5 s.")
+        top, bottom, band_top, band_bottom = self._text_span(crossfire)
+        self.assertGreater(top, band_top)
+        self.assertAlmostEqual((top + bottom) // 2, (band_top + band_bottom) // 2,
+                               delta=8)
+
+    def test_a_description_that_overflows_the_band_starts_at_its_top(self):
+        """Nothing in the catalog is this long, but the clamp is what keeps a
+        future one from riding up over the title instead of down over the tag."""
+        overflowing = ("Every arrow that lands on a Rod-marked enemy within the "
+                       "last 1.5 seconds deals a great deal more damage, and "
+                       "marks spread to any enemy standing close enough to be "
+                       "caught.")
+        top, _bottom, band_top, _bb = self._text_span(overflowing)
+        self.assertLess(top - band_top, 12, "the block rode above the band's top")
+
+    def test_the_description_never_reaches_the_category_line(self):
+        """The band stops short of the category line, which is drawn in the
+        same colour -- so text and tag can never collide."""
+        from ui.level_up import _CARD_H, _DESC_GAP, _TAG_UP
+        for desc in ("+3% critical hit chance.",
+                     "A wide sweeping arc. Reliable when enemies close in.",
+                     "+70% Bow damage against Rod-marked enemies, and +70% Rod "
+                     "damage against enemies the Bow hit in the last 1.5 s."):
+            with self.subTest(lines=desc[:30]):
+                _top, bottom, _bt, band_bottom = self._text_span(desc)
+                self.assertLessEqual(bottom, band_bottom)
+
+    def test_the_card_is_50px_taller_than_it_was(self):
+        from ui.level_up import _CARD_H, _CARD_TOP_H
+        self.assertEqual(_CARD_H, 295)                 # 245 + 50 (2026-09-11)
+        self.assertEqual(_CARD_TOP_H, 200)             # the top edge did not move
+
+
+if __name__ == "__main__":
+    unittest.main()

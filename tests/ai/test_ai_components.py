@@ -1,7 +1,6 @@
 """R2 -- the steering components. Each ticked against a fake `Perception`;
 plus a parity check that the composed baseline equals the old straight `chase`.
 """
-import math
 import random
 import unittest
 from types import SimpleNamespace

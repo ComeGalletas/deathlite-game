@@ -714,8 +714,8 @@ The pack is authored on 64-px tiles:
 | Sheet | Size | Tiles | Cut as |
 |---|---|---|---|
 | `buttons/<colour>.png`, `icons/*`, `ribbons/<colour>_tab_*` | `64x64` | 1x1 | plainly scaled |
-| `buttons/<colour>_wide[_pressed].png`, `ribbons/<colour>_ribbon.png`, `banners/parchment_wide.png` | `192x64` | 3x1 | **3-slice**: two caps kept, the middle stretched |
-| `buttons/<colour>_panel[_pressed].png`, `banners/parchment_panel.png` | `192x192` | 3x3 | **9-slice**: four corners kept, edges stretched one way, the centre both |
+| `buttons/<colour>_wide[_pressed].png`, `ribbons/<colour>_ribbon.png` | `192x64` | 3x1 | **3-slice**: two caps kept, the middle stretched |
+| `buttons/<colour>_panel[_pressed].png` | `192x192` | 3x3 | **9-slice**: four corners kept, edges stretched one way, the centre both |
 
 The `_pressed` sheets are the same button drawn 4 px lower with the top
 bevel removed -- the press is baked into the art. So a pressed button is an
@@ -744,8 +744,9 @@ Cuts one sheet on its grid and rebuilds it at `size`:
 4. **Cache** per `(rig, size, tile)`, cleared by `panels.clear_cache()`.
    `None` for a missing rig or a non-positive size.
 
-`three_slice_h` (the start-menu parchment scroll) is the older builder: it
-composes a bar from three *separate* rig images and stays for that panel.
+`three_slice_h`, an older builder that composed a bar from three *separate*
+rig images, was removed on 2026-09-11 with the start-menu parchment scroll it
+served (`assets/ui/banners/`); `slice` is the only builder left.
 
 ### The widgets -- `ui/widgets.py`
 

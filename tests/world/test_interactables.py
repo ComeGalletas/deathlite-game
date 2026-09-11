@@ -73,7 +73,7 @@ class EffectTests(unittest.TestCase):
         pygame.quit()
 
     def test_forge_with_nothing_eligible_explains_and_is_never_consumed(self):
-        _, p = fresh_playing()
+        game, p = fresh_playing()
         it = self._get(p, "forge")
         self.assertIsNotNone(it, "every world has a village, so a forge")
         p._use_forge(it)
@@ -81,6 +81,7 @@ class EffectTests(unittest.TestCase):
         self.assertGreater(p._notice_t, 0.0)
         self.assertIn("needs", p._notice_text)
         self.assertIn("2 more", p._notice_text)             # sword at 0 of 2
+        game._render()                                      # the notice draws (owner bug: `_hud`)
         pygame.quit()
 
     def test_forge_offers_the_two_forgings_of_an_eligible_weapon(self):

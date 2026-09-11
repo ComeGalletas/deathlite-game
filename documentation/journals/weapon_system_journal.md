@@ -497,3 +497,289 @@ instant it fires:
   radius 42, zoom 1).
 - **Lift again (owner): "5 px more."** Anchor `[37, 41]` -- 8 crop px below
   the centre, about 11 screen px above the blow at radius 42, zoom 1.
+
+---
+
+## Change request 2 — weapon effect sheets moved; new Sword slashes (2026-09-10)
+
+**Requirement (owner).** The weapon effect sheets now live per weapon under
+`assets/effects/weapons/<weapon>/` (`sword/`, `magic_rod/`, `hammer/`) and
+the bomb art under `assets/projectiles/bomb/`. Four rigs point at the old
+paths and no longer load: `arcane_circle`, `thunder_ball`, `thunder_aura`
+(now `magic_rod/`) and `soul_slash` (`circle_cuts.png`, now `sword/`).
+
+The Sword's default slash changes to two strips of
+`assets/effects/weapons/sword/Combat-Sheet.png` (a 10 x 29 grid of 64 px
+cells): the **second strip** for a top-to-bottom swing, **flipped
+vertically** so it reads that way, and the **third strip** for a
+bottom-to-top swing. Both are the Sword's defaults. The Magic Rod's effects
+are to be rewired to the moved sheets.
+
+**Reading to confirm.** Strip 2 = row index 1 (4 frames: the plain grey
+crescent); strip 3 = row index 2 (5 frames: the wedge with cyan sparks).
+The two swings alternate with the hero's attack sheets: swing 1 top-to-
+bottom (strip 2, flipped), swing 2 bottom-to-top (strip 3), swing 3 back.
+
+**Todo.**
+
+- [x] Repoint the four rigs in `data/weapon_sprites.json` to the new
+      folders; add a loader test that every rig's sheet exists on disk so a
+      move can never silently blank an effect again.
+- [x] `game/assets.py`: a `flip_v` option on an anim spec (the loader only
+      flips horizontally today), applied at slice time.
+- [x] Two Sword rigs from `Combat-Sheet.png`: `sword_slash_down` (row 1,
+      4 frames, `flip_v`) and `sword_slash_up` (row 2, 5 frames), one-shot,
+      sized to the swing.
+- [x] `projectiles/cone.py`: the slash rig per swing -- the cone spawn
+      carries the swing's parity (`Weapon._shots`) in its `fx`, the cone
+      style picks down / up from it; `circle_cuts` stays only as the fallback
+      when a rig is absent. Whirlwind / Greatsword follow the same rule
+      unless told otherwise.
+- [x] Magic Rod: `arcane_circle` from `magic_rod/`; `thunder_ball` /
+      `thunder_aura` repointed and kept registered (the `thunder` style)
+      for a Rod Forge's look if wanted.
+- [x] Tests (rigs resolve, `flip_v` flips, the cone picks the strip by
+      parity, the Sword swings alternate in a run); journal; a frame of each
+      swing.
+
+**Done (2026-09-10).**
+
+- `data/weapon_sprites.json`: `soul_slash` -> `sword/circle_cuts.png`,
+  `arcane_circle` / `thunder_ball` / `thunder_aura` -> `magic_rod/`; two new
+  rigs `sword_slash_down` (Combat-Sheet row index 1, 4 frames, 30 fps,
+  `flip_v`) and `sword_slash_up` (row index 2, 5 frames, 36 fps), one-shot,
+  72 px. `game/assets.py`: an anim's `flip_v` flips each frame vertically
+  at slice time. `data/weapon_visuals.json`: the Sword's
+  `fx.slash = ["sword_slash_down", "sword_slash_up"]`.
+- `entities/projectile.py` / `combat/weapons/core.py`: a cone spawn carries
+  `swing` (the attack's ordinal, `Weapon._shots`). `projectiles/cone.py`:
+  `slash_rig(p)` picks from the list by that ordinal (1 -> down, 2 -> up,
+  3 -> down ...), `true` keeps the old rig, `false` draws the sector alone;
+  a one-shot rig plays along the hit's `age` instead of the run clock. The
+  Whirlwind / Greatsword have no visual entry of their own, so they inherit
+  the alternation. The Rod keeps its arcane look on the moved sheet; the
+  thunder rigs stay registered for a Forge look.
+- Tests: `tests/rendering/test_weapon_rigs.py` (12: every rig's sheet on
+  disk, the moved sheets in their folders, the two strips' rows / frames /
+  flip, whole-frame flip equality, the swings fit the hit's lifetime, the
+  rig choice by ordinal and the legacy paths, the forged Swords inherit, the
+  ordinal on each spawn, the cone draw asking the right rig by age).
+- **Owner retuning found on the way** (`data/weapons.json`, respected, the
+  tests now read these from the data): Sword cooldown 0.85 -> 1.2 and area
+  74 -> 32; Hammer swing 1.2 -> 0.8 s, cooldown 1.7 -> 1.5, radius 42 -> 32.
+  Every test that assumed the old Sword reach moved its target inside 32 px.
+- `tests/combat tests/progression tests/characters` + the rig / projectile
+  suites: 479 passed. Frames sent: swing 1 (the grey crescent, strip 2
+  flipped) and swing 2 (the cyan-spark wedge, strip 3) on a tank.
+- **Reach gate fix (found by the retuning).** Two dev-mode tests stand a
+  tank 22-30 px from the hero and expect the Sword to hit it; with a 32 px
+  swing the gate never fired because `_within_reach` measured the enemy's
+  *centre* while the hit test overlaps bodies. The gate now counts the
+  body (centre distance minus the enemy's radius; a stand-in with no radius
+  keeps its centre), so what the arc can hit is what triggers the swing.
+  Three tests in `test_weapons_reach.py`; the wide suites are green again
+  (core + rendering 573, the rest as before).
+- **Separate sheets (owner, same day).** The two effects were cut out of
+  `Combat-Sheet.png` into their own files: `slash_down.png` (strip 2, 4
+  frames, the vertical flip baked in) and `slash_up.png` (strip 3, 5 frames,
+  as authored -- its first cell is blank and kept). The rigs
+  `sword_slash_down` / `sword_slash_up` now load those files with no
+  `row` / `flip_v`; the loader's `flip_v` stays for a sheet authored the
+  other way up (a test proves it still flips). Rig tests updated: each sheet
+  is compared frame-for-frame against the strip it came from.
+- **Slash-up changed (owner, same day):** `slash_up.png` is now row 27 of
+  the combat sheet (third from the bottom, the tan crescent, 6 frames, as
+  authored); the rig plays it at 44 fps over the 0.14 s hit.
+- **One swing, both strips, 50 % bigger (owner, same day).** Both Sword
+  rigs scale 72 -> 108. The Sword's visual is now `slash_mode: "sequence"`:
+  one attack plays the down strip and then the up strip. Together they run
+  about 0.27 s against a 0.14 s hit, so the swing is its own timed visual --
+  `game/states/playing/slash_fx.py`, queued by `_spawn_projectile` for a
+  sequence weapon's cone, updated and drawn with the Hammer impacts; the
+  cone style draws no slash for a sequence weapon. A list without the mode
+  still alternates by swing (kept for other weapons); the Daggers' single
+  strip is unchanged.
+- **-10 % (owner, same day):** both Sword rigs 108 -> 97 px. Verified on
+  request: the Sword's `area` does *not* drive its sprite size -- the Sword
+  has no `slash_size` factor, so the rigs' fixed `scale` is used at every
+  radius (probe: 16 / 32 / 64 / 128 -> 97 each). The Daggers do follow the
+  area (`slash_size` 0.8: radius 23 / 46 / 92 -> 37 / 74 / 147).
+- **Follows the area (owner, same day):** the Sword's visual gained
+  `slash_size: 1.5` -- 1.5 x the cone's diameter, 96 px at reach 32, so
+  area blessings and Forgings (Greatsword 112, Whirlwind 70) size the
+  swing with the hit; the rigs' fixed 97 px `scale` stays as the fallback
+  for a visual without the factor.
+
+## Change request 3 — weapon grants come alone, no bundle (2026-09-10)
+
+**Requirement (owner).** A weapon grant card offers **only the weapon**. The
+level-I blessing that used to ride along ("Comes with Vitality I") goes.
+Everything else about grants stays: they appear at random while the run
+still has open weapon slots (three weapons, one summon), share the stat
+weight (`kind_weights.grant`), summons at the summon factor, and stop once
+the slots are full. This supersedes design decision 7 (§22) and the grant
+paragraph in §21.
+
+**Todo -- DONE (owner's go, same day).**
+
+- [x] `progression/blessings/offer.py`: `grant_offers` builds the card from
+  the weapon alone -- no bundle roll, no "Comes with ..." on the
+  description, `_apply` only appends the `Weapon`. `bundle_candidates` is
+  removed with its export. The `rng` parameter stays on `grant_offers` so
+  the offer roll's signature (and the callers in `offer_choices`) is
+  unchanged.
+- [x] `progression/upgrades.py`: drop the `bundle` field from `Upgrade`
+  (grep: nothing outside `offer.py` and its tests reads it).
+- [x] `progression/blessings/catalog.py` + `data/offering.json`: remove
+  `grant_bundle_level` from `OfferingRules` and the JSON (the rule has no
+  other reader).
+- [x] Tests, `tests/progression/test_blessings.py::GrantTests`: replace the
+  three bundle tests with one asserting a grant adds the weapon and
+  changes no blessing level, and that the description carries no
+  "Comes with"; keep the slot / summon gating tests as they are. Re-run
+  `tests/progression tests/combat tests/characters` and the rendering
+  level-up suite (the card text is what changes on screen).
+- [x] Docs: `six_weapon_system_design.md` §21 "Weapon grants" paragraph and
+  §22 decision 7 rewritten to "weapon only"; `documentation/weapon_system_plan.md`
+  P2 test line ("grant bundles exactly one level-I blessing") amended;
+  this entry closed with the evidence. Memory note updated.
+- [x] Screenshot: a level-up frame with a grant card in the roll (the
+  scratchpad capture forces `grant:bow` into the choices).
+
+**Evidence.** `grant_offers` builds the card from the weapon alone; the
+`bundle` field, `bundle_candidates` and `grant_bundle_level` are gone from
+code and `data/offering.json`. Two grant tests replace the three bundle
+tests (the weapon is added, no blessing level changes, no "Comes with",
+the card is the same whatever the RNG). Suites: progression + combat +
+characters + the level-up rendering = 466 passed. Design §21 / §22-7 and
+the plan's P2 line rewritten. Frame sent: an early offering with
+"New: Ember Ring" reading only the summon's own description.
+
+## Change request 4 — grant cards read "<Type> Weapon Grant" (2026-09-10)
+
+**Requirement (owner).** The category line on a weapon-grant card no longer
+names the weapon. Instead of `<weapon name> <slot> grant` ("Daggers Melee
+Grant", "Ember Ring Summon Grant") it reads `<type> Weapon Grant`, the type
+being the weapon's `class` from `data/weapons.json`: "Melee Weapon Grant",
+"Ranged Weapon Grant", "Summon Weapon Grant". The card title ("New:
+Daggers") still names the weapon. The owner confirmed summons follow the same
+format ("Summon Weapon Grant").
+
+**Todo -- DONE (owner's go, same day).**
+
+- [x] `progression/blessings/offer.py` `grant_offers`: `tags=(d["class"],
+  "weapon", "grant")` -- the panel capitalises each word, so no literal
+  casing in the data or code.
+- [x] Test in `tests/progression/test_blessings.py::GrantTests`: a Daggers
+  grant carries `("melee", "weapon", "grant")`, a Bow grant "ranged", a
+  summon grant "summon"; the rendered line is "Melee Weapon Grant".
+- [x] Re-run progression + level-up rendering suites; capture an early
+  offering with a grant card; log the evidence here.
+
+**Evidence.** `grant_offers` tags a grant `(class, "weapon", "grant")`;
+`GrantTests.test_a_grant_is_tagged_by_class_not_by_name` pins the three
+classes and the rendered line. Progression + level-up rendering: 115
+passed. Frame sent: "New: Daggers" over "Melee Weapon Grant" beside "New:
+Ember Ring" over "Summon Weapon Grant".
+
+## Change request 5 — taller upgrade cards (2026-09-11) — DONE (option B)
+
+**Requirement (owner).** Review how the upgrade cards are drawn and consider
+making them **50 px taller**. Reviewed below; the owner then chose **option B**
+— the extra 50 px, with the description centred rather than pinned.
+
+**How they are drawn today.** `ui/level_up.py`. Three cards, 340 wide, 40 apart,
+each the pack's `btn_*_panel` art through `ui.widgets.draw_button(shape="panel")`.
+Two constants carry the height: `_CARD_TOP_H = 200` fixes the top edge at
+`h // 2 - 100`, and `_CARD_H = 245` is the real height, so every past growth
+(200 -> 215 -> 245) went **downward** and the top edge never moved. Content is
+anchored to both ends: the `#n` badge (`y + 10`), rarity (`y + 14`), title
+(`y + 46`) and the wrapped description (`y + 92`, 24 px a line) hang off the top;
+the category line hangs off the bottom at `y + card_h - 39`, and the keyboard
+hint sits at `y + card_h + 60`. So raising `_CARD_H` moves the category line and
+the hint down and opens space **between the description and the category line** —
+which is exactly where more room is wanted.
+
+**What the review found.**
+
+- *The art takes it cleanly.* The panel is a 192x192 nine-slice, so a taller
+  card stretches the middle band and leaves the 64 px bevels and corners at
+  native size. No distortion, no new asset.
+- *Both display profiles have room.* At 1600x900 the card would run 350->645
+  with the hint at 705 (195 px spare); on the 1280x720 web profile 260->555
+  with the hint at 615 (105 px spare). `apply_web_profile` needs no change.
+- *Nothing clips today, but the margin is zero.* The card fits exactly **four**
+  description lines before the category line; at 295 it would fit **six**.
+  Measured over all 345 rendered blessing descriptions (every blessing at every
+  level, wrapped at 302 px in `fonts.body(18)`): 195 are one line, 121 two,
+  24 three, and 5 are four — all five being `bow_crossfire` at Lv1-5, which uses
+  the last available line with nothing to spare. One more word in that string,
+  or one more blessing written like it, and the text collides with the category
+  line.
+- *The cost is emptiness.* 316 of 345 descriptions are one or two lines, and the
+  card already shows a visible dead band between the description and the
+  category line. Adding 50 px to a fixed height grows that band from roughly
+  90 px to roughly 140 px on the great majority of cards. The before/after
+  captures show this plainly.
+- *Test impact is essentially nil* for a constant-only change.
+  `test_cards_grew_downwards_only` reads `_CARD_H` rather than hard-coding it,
+  and its `r.bottom + 60 + 20 < h` guard still holds on both profiles
+  (725 < 900, 635 < 720). `CategoryLineTests` asserts the source text
+  `"y + card_h - 39 + dy"`, which a height change does not touch.
+
+**The question put to the owner, and the answer.** The headroom is real but
+rare; the emptiness would be constant. Three ways to spend the 50 px were
+offered — **the owner chose B**:
+
+- **A — straight +50.** `_CARD_H = 295`, nothing else. Buys two spare lines,
+  accepts the larger dead band on ~92 % of cards.
+- **B — +50 with the description centred (recommended).** Same height, but
+  block the description vertically between the title and the category line
+  instead of pinning it to `y + 92`. Short cards keep their text visually
+  centred and do not read as bottom-empty; long ones get the full six lines.
+- **C — fit the height to the tallest of the three on offer.** One height for
+  all three cards each roll, sized to the longest description. Headroom only
+  when a roll actually needs it, and no dead band otherwise — the most work,
+  and the card size would change between level-ups.
+
+**Todo — DONE (owner's go, same day).**
+
+- [x] `ui/level_up.py`: `_CARD_H` 245 -> 295, still growing downward only
+  (`_CARD_TOP_H` stays 200, so the top edge does not move). Four named
+  constants replace the magic numbers the block needed — `_DESC_TOP` (92),
+  `_DESC_LINE_H` (24), `_TAG_UP` (39) and `_DESC_GAP` (8).
+- [x] The description block is centred in the band between the title and the
+  category line: `band_bottom = y + card_h - _TAG_UP - hint.get_height() -
+  _DESC_GAP`, and the block's top is `band_top + max(0, slack // 2)`. The
+  `max(0, ...)` is the clamp — a block too tall for the band starts at the
+  band's top rather than riding up over the title.
+- [x] Band arithmetic checked at every line count: the band is 136 px, so one
+  line sits at `y + 148`, two at `y + 136`, four (`bow_crossfire`, the
+  catalog's worst case) at `y + 112`, and five still fit at `y + 100`. Six
+  would eat the 8 px gap, which nothing in the catalog reaches.
+- [x] `tests/rendering/test_level_up.py`: new `DescriptionCentringTests` — five
+  tests driving the panel directly with synthetic choices (no run, no assets),
+  pinning that a one-line description is centred rather than pinned, that
+  `bow_crossfire` is centred too, that an overflowing description clamps to the
+  band's top, that no description reaches the category line, and that the card
+  is 295 with the top edge unmoved.
+- [x] `test_card_text_colours` fixed: it hard-coded the old `y + 90` band as a
+  fixed 50 px slice, which a centred block no longer lands in. It now derives
+  the band the description may occupy from the same constants, and still stops
+  short of the category line — which is drawn in the same dim colour and would
+  otherwise satisfy the check on its own.
+- [x] Tidy in passing: `test_level_up.py` had a stray
+  `if __name__ == "__main__": unittest.main()` in the middle of the file, so
+  running the module directly executed only its first class. Moved to the end.
+- [x] The 1280x720 web profile fits: card 260->555, hint at 615, 105 px spare
+  (1600x900 runs 350->645 with the hint at 705).
+- [x] Screenshots sent: the before/after pair at 245 and 295, and a roll with a
+  forced four-line `bow_crossfire` card beside one- and two-line cards.
+
+**Evidence.** `_CARD_H = 295` with the description centred between the title
+and the category line; the nine-slice panel art stretches its middle band so
+the 64 px bevels are untouched. `tests/rendering/test_level_up.py` 23 passed
+(18 existing plus the five new), `tests/rendering` 496 passed, and the `unit`
+tier is unchanged at 10 s. Nothing in the catalog clips: of the 345 rendered
+blessing descriptions, the longest is `bow_crossfire` at four lines and the
+band holds five.

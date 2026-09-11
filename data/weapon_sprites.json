@@ -63,7 +63,7 @@
     ],
     "anims": {
       "loop": {
-        "file": "effects/weapons/arcane_circle.png",
+        "file": "effects/weapons/magic_rod/arcane_circle.png",
         "frames": 10,
         "fps": 18,
         "loop": true,
@@ -189,7 +189,7 @@
     ],
     "anims": {
       "loop": {
-        "file": "effects/weapons/circle_cuts.png",
+        "file": "effects/weapons/sword/circle_cuts.png",
         "frames": 6,
         "fps": 40,
         "loop": true,
@@ -216,7 +216,7 @@
     ],
     "anims": {
       "loop": {
-        "file": "effects/weapons/thunder_ball.png",
+        "file": "effects/weapons/magic_rod/thunder_ball.png",
         "frames": 23,
         "fps": 24,
         "loop": true,
@@ -243,7 +243,7 @@
     ],
     "anims": {
       "loop": {
-        "file": "effects/weapons/thunder_aura.png",
+        "file": "effects/weapons/magic_rod/thunder_aura.png",
         "frames": 12,
         "fps": 14,
         "loop": true,
@@ -344,5 +344,131 @@
       66
     ],
     "over_circle": 1.25
+  },
+  "sword_slash_down": {
+    "frame": [
+      64,
+      64
+    ],
+    "scale": [
+      97,
+      97
+    ],
+    "anchor": [
+      48,
+      48
+    ],
+    "grid": [
+      4,
+      1
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/weapons/sword/slash_down.png",
+        "frames": 4,
+        "fps": 30,
+        "loop": false
+      }
+    }
+  },
+  "sword_slash_up": {
+    "frame": [
+      64,
+      64
+    ],
+    "scale": [
+      97,
+      97
+    ],
+    "anchor": [
+      48,
+      48
+    ],
+    "grid": [
+      6,
+      1
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/weapons/sword/slash_up.png",
+        "frames": 6,
+        "fps": 44,
+        "loop": false
+      }
+    }
+  },
+  "daggers_slash": {
+    "frame": [
+      64,
+      64
+    ],
+    "scale": [
+      101,
+      101
+    ],
+    "anchor": [
+      50,
+      50
+    ],
+    "grid": [
+      6,
+      1
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/weapons/daggers/slash.png",
+        "frames": 6,
+        "fps": 60,
+        "loop": false
+      }
+    }
+  },
+  "daggers_stab": {
+    "frame": [
+      64,
+      64
+    ],
+    "scale": [
+      101,
+      101
+    ],
+    "anchor": [
+      50,
+      50
+    ],
+    "grid": [
+      5,
+      1
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/weapons/daggers/stab.png",
+        "frames": 5,
+        "fps": 50,
+        "loop": false
+      }
+    }
+  },
+  "throwing_dagger": {
+    "file": "effects/weapons/daggers/throwing_dagger.png",
+    "frame": [
+      32,
+      32
+    ],
+    "content": [
+      6,
+      6,
+      19,
+      19
+    ],
+    "scale": [
+      22,
+      22
+    ],
+    "anchor": [
+      11,
+      11
+    ],
+    "heading_deg": -135
   }
 }

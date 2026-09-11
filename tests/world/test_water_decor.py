@@ -1,7 +1,7 @@
 """Water scenery: the open sea, the shoreline ring and the inland lakes.
 
-The three passes in `world/terrain/decor/scatter_water.py` all feed `_void_decor`, and
-all three only exist on the height-map world, so this module pins that flag on.
+The three passes in `world/terrain/decor/scatter_water.py` all feed
+`_void_decor`.
 
 The bug most of this suite is about: the sea scatter used to stop after 240
 instances while scanning north to south, which made the cap a *horizon* rather

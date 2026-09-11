@@ -16,7 +16,6 @@ import random
 import pygame
 
 from game import config
-from game.assets import get_assets
 from world.elevation import LevelIndex
 from world.rules import floor as floor_rules
 from world.rules import inset as terrain_inset
@@ -353,7 +352,6 @@ class GameMap:
     # --- tiled terrain (built once, on the first draw) ----------
     # The autotile slot maths lives in world/terrain/autotile.py; these
     # aliases keep `GameMap._bridge_slot` (test_terrain) working.
-    _slot_for = staticmethod(autotile.slot_for)
     _mask_slot = staticmethod(autotile.mask_slot)
     _bridge_slot = staticmethod(autotile.bridge_slot)
 

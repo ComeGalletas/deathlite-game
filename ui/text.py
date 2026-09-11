@@ -27,3 +27,18 @@ def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
     if cur:
         lines.append(cur)
     return lines
+
+
+def shadowed(font: pygame.font.Font, text: str, colour, *, shadow=(28, 28, 34),
+             offset=(2, 2)) -> pygame.Surface:
+    """`text` in `colour` over a copy in `shadow` displaced by `offset`: the
+    drop shadow that lifts a light title off light card art (owner,
+    2026-09-10). The result is `offset` larger than the plain render, with
+    the plain text at its top-left."""
+    top = font.render(text, True, colour)
+    under = font.render(text, True, shadow)
+    dx, dy = int(offset[0]), int(offset[1])
+    out = pygame.Surface((top.get_width() + abs(dx), top.get_height() + abs(dy)), pygame.SRCALPHA)
+    out.blit(under, (max(0, dx), max(0, dy)))
+    out.blit(top, (max(0, -dx), max(0, -dy)))
+    return out

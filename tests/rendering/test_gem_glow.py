@@ -84,7 +84,12 @@ class GemGlowTests(unittest.TestCase):
         self._gem((40, 0), age=p / 4)                          # peak
         self._gem((-40, 0), age=3 * p / 4)                     # trough
         blits = self._draw()
-        halos = [b for b in blits if b[1].width > 12]
+        # Pick the halos by the renderer's own diameter, not a pixel threshold:
+        # an orb is 8 world px, so at zoom 1.5 it drew 12 px and any "> 12" rule
+        # separated them by luck. One zoom step later it drew 14 and the orbs
+        # counted as halos.
+        halo_px = self.ps.renderer._glow.diameter(8, self.ps.camera.zoom)
+        halos = [b for b in blits if b[1].width == halo_px]
         self.assertEqual(len(halos), 2)
         a = [h[0].get_at((h[1].width // 2, h[1].width // 2)).a for h in halos]
         self.assertEqual(sorted(a), [config.XP_GLOW["alpha_min"], config.XP_GLOW["alpha_max"]])

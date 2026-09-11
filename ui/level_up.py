@@ -17,14 +17,26 @@ import pygame
 from game import config, fonts
 from ui import widgets
 from ui.mouse import HitMap
-from ui.text import wrap
+from ui.text import shadowed, wrap
 
 # The cards grew 15 px downwards (owner, 2026-09-04) so the description's
 # last line and the tag line sit inside the art's flat centre, not on its
 # bottom bevel: the top edge still centres as a 200-tall card did.
 _CARD_TOP_H = 200
-_CARD_H = 245               # 200 + 15 (2026-09-04) + 30 (later the same day), all downward
+_CARD_H = 295               # 200 + 15 + 30 (2026-09-04) + 50 (2026-09-11), all downward
 _CARD_TEXT_INSET = 19       # description wraps to the card width minus this each side (16 + 3 px)
+
+# The description block is *centred* between the title and the category line
+# rather than pinned under the title (owner, 2026-09-11, change request 5
+# option B). Of the 345 descriptions the catalog renders, 316 are one or two
+# lines, so pinning them to the top of a 295-tall card left them stranded over
+# an empty half-card; centring spends the extra 50 px on the text instead. A
+# description long enough to fill the band still starts at `_DESC_TOP`, so the
+# four-line cards (`bow_crossfire`) are laid out exactly as before.
+_DESC_TOP = 92              # top of the band, and where a full-height block starts
+_DESC_LINE_H = 24
+_TAG_UP = 39                # the category line's midbottom, up from the card's
+_DESC_GAP = 8               # breathing room between the block and the category line
 
 
 class LevelUpPanel:
@@ -64,10 +76,10 @@ class LevelUpPanel:
 
             # Text on the light card: the name is a title (title face, black);
             # badge, description and tags are the dark grey.
-            key_badge = self._name.render(f"{i + 1}", True, config.COLOR_ON_BUTTON_DIM)
-            surface.blit(key_badge, (x + 14, y + 10 + dy))
+            key_badge = self._name.render(f"#{i + 1}", True, config.COLOR_ON_BUTTON_DIM)
+            surface.blit(key_badge, (x + 39, y + 10 + dy))    # 25 px in from the corner (owner)
 
-            name = self._name.render(up.title, True, config.COLOR_ON_BUTTON)
+            name = shadowed(self._name, up.title, config.COLOR_ACCENT)   # gold with a dark drop shadow
             surface.blit(name, name.get_rect(midtop=(rect.centerx, y + 46 + dy)))
 
             # P2: the rarity, top-right, in its colour (the level is in the
@@ -78,14 +90,23 @@ class LevelUpPanel:
                                       config.RARITY_COLOURS.get(rarity, config.COLOR_ON_BUTTON_DIM))
                 surface.blit(r, r.get_rect(topright=(x + card_w - 24, y + 14 + dy)))
 
-            for j, line in enumerate(wrap(self._desc, up.description,
-                                          card_w - 2 * _CARD_TEXT_INSET)):
+            lines = wrap(self._desc, up.description, card_w - 2 * _CARD_TEXT_INSET)
+            band_top = y + _DESC_TOP
+            band_bottom = (y + card_h - _TAG_UP
+                           - self._hint.get_height() - _DESC_GAP)
+            slack = band_bottom - band_top - len(lines) * _DESC_LINE_H
+            top = band_top + max(0, slack // 2)      # never above the band's top
+            for j, line in enumerate(lines):
                 d = self._desc.render(line, True, config.COLOR_ON_BUTTON_DIM)
-                surface.blit(d, d.get_rect(midtop=(rect.centerx, y + 92 + j * 24 + dy)))
+                surface.blit(d, d.get_rect(
+                    midtop=(rect.centerx, top + j * _DESC_LINE_H + dy)))
 
             if up.tags:
-                tag = self._hint.render(" ".join(up.tags), True, config.COLOR_ON_BUTTON_DIM)
-                surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - 14 + dy)))
+                # The category line: each word capitalised, 25 px up from
+                # the bottom bevel (owner, 2026-09-10).
+                words = " ".join(t[:1].upper() + t[1:] for t in up.tags)
+                tag = self._hint.render(words, True, config.COLOR_ON_BUTTON_DIM)
+                surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - 39 + dy)))
 
         hint = self._hint.render(
             hint or "1/2/3 or Left/Right + Enter to pick    -    or click a card",

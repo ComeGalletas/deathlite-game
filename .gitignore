@@ -4,6 +4,11 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
+# Coverage output (config is .coveragerc, which is tracked)
+.coverage
+.coverage.*
+htmlcov/
+
 # Virtual environment
 .venv/
 

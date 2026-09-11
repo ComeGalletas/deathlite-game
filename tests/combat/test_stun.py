@@ -151,7 +151,7 @@ class HammerTests(unittest.TestCase):
             # CR1: the Hammer swings for 1.2 s before its blow lands.
             for _ in range(80):
                 w.update(1 / 60, FireContext(
-                    origin=pygame.Vector2(), enemies=[FakeEnemy(40, 0)],
+                    origin=pygame.Vector2(), enemies=[FakeEnemy(25, 0)],   # inside the sword's reach
                     damage_multiplier=1.0, attack_speed_multiplier=1.0,
                     projectile_speed_multiplier=1.0, area_multiplier=1.0,
                     fallback_dir=pygame.Vector2(1, 0),

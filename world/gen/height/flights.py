@@ -9,11 +9,11 @@ from __future__ import annotations
 from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
 from world.gen.height.const import (
-    MAX_DROP, MIN_TERRACE_ROWS, REGION, STAIR_SPACING,
-    SIDE_STAIRS, SIDE_STAIRS_HIGH, SIDE_STAIRS_HIGH_FROM, SIDE_SPACING,
+    REGION, STAIR_SPACING, SIDE_STAIRS, SIDE_STAIRS_HIGH,
+    SIDE_STAIRS_HIGH_FROM, SIDE_SPACING,
 )
 from world.gen.height.graph import reachable, _components
-from world.gen.height.walls import _raise_walls, _foot_stone_frees
+from world.gen.height.walls import _foot_stone_frees
 
 def _vstair_site(grid, c, r):
     """Is `(c, r)` the head of a straight flight? Needs solid wall in its own
@@ -34,8 +34,6 @@ def _vstair_site(grid, c, r):
             if nb is None or nb.kind != CLIFF:
                 return None
     return d
-
-
 
 
 def _ewstair_site(grid, c, r, side):
@@ -79,8 +77,6 @@ def _ewstair_site(grid, c, r, side):
         if cell is None or cell.kind not in (CLIFF, GROUND):
             return None
     return d
-
-
 
 
 # A lateral crossing carries this tag prefix, so the step rules and the painter
@@ -287,8 +283,6 @@ def _cut_flights(grid, rng, per_region: int, region: int = None,
                                         drop=d, row=k, tag=tag)
             taken.append((c, r))
             cut += 1
-
-
 
 
 def _link_levels(grid, rng) -> None:

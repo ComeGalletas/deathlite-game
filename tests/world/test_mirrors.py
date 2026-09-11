@@ -20,7 +20,6 @@ was trusted.
 import random
 import unittest
 
-from game import config
 from tests import worlds as W
 from world.gen import repair
 from world.map import GameMap

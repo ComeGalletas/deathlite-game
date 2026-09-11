@@ -9,7 +9,7 @@ plus a windowed / headless-screenshot check — before the next.
 
 **Status:** D1–D5 done (D5 2026-08-28). D6 (docs) pending. All assumptions
 confirmed. Post-plan toggles collected under **Later additions** below (latest:
-"Attacks deal 0 damage", 2026-08-29).
+the "Forges..." and "Remove weapon..." pages, 2026-09-10).
 
 ---
 
@@ -164,3 +164,86 @@ clears it via `__init__` like the other flags.
 `pygame.draw.line` calls: 0 with the flag off, exactly 3 (aim + two edges)
 with a held key or a tap, 0 with no aim, and 0 in a regular run even with
 the flag forced on.
+
+### "Forges..." page + "Remove weapon..." page — done 2026-09-10
+
+Two new root rows for the dev menu, requested after P3 (Forging) landed in
+`weapon_system_journal.md`. Both follow the D3-D5 pattern: a root row opens
+a sub-page, the page is built from live data in `enter()`, ENTER acts and
+**stays on the page**, ESC / right click returns to the root, the page
+scrolls past `MAX_VISIBLE` like every other one.
+
+**Root order.** `_ROOT_ROWS` becomes `... "spawn", "blessings", "items",
+"forges", "remove_weapon", "reset", "exit", "close"` -- the two new rows sit
+with the other "..." links, before the run-level actions.
+
+#### Interpretations (confirmed by the user 2026-09-10, built as written)
+
+| # | Assumption |
+|---|-----------|
+| **J** | **"Current forge upgrades" = the Forgings that currently exist in `data/forges.json`** (12 today, two per forgeable weapon), listed the way the Blessings page lists the catalog -- so the page grows and shrinks with the data. It is not a read-only "what is forged" display; that information shows on the rows instead (see L). |
+| **K** | **ENTER on a Forging applies it to the hero's owned weapon of that id** via the real `combat.weapons.forge.apply_forge`, so the dev result is byte-for-byte what the village Forge or a Forge-rarity level-up card produces (overrides merged, `effects` taken, `weapon.forge` set, orbiters dropped, `visual_id` switches to the Forge's look). Two dev conveniences, mirroring the Blessings page: the **`forge_requires_levels` requirement is skipped** (a fresh weapon can be forged at once), and **a Forging for a weapon the hero lacks hands the weapon over first** (a base `Weapon` is appended, then forged). |
+| **L** | **Exclusivity is kept.** A weapon already forged cannot be forged again (`apply_forge` raises; the design says one Forge per weapon, the two options mutually exclusive). The page picks the **first unforged instance** of that weapon id (the Items page stacks duplicates); when every instance is forged the row does nothing and the status line says `<weapon> already forged into <name>`. To try the other Forging: remove the weapon (the new page), re-grant it, forge. Rows read `<weapon name>   <Forge name>` and gain a `*` / `(forged)` marker while an owned weapon of that id carries that Forge, so the current state of the hero is visible on the page. Summons cannot be forged (design §3.7) and never appear in the data, so nothing to gate. |
+| **M** | **"Remove current weapons" = a page listing the hero's owned weapon instances**, one row per `Weapon` in `player.weapons` in slot order (`<name>  Lv<level>` plus the Forge name when forged), with a first row **"All weapons"**. ENTER on a row removes that one instance; ENTER on "All weapons" empties the list. The page is rebuilt on every draw / action so it reflects what the Items and Forges pages add. An empty list shows a single `(no weapons)` row that does nothing. |
+| **N** | **Removal unwinds what the weapon owned.** Its persistent projectiles are dropped (`_orbiters` deactivated and cleared) and its summons dismissed (`_summons` entries set inactive, so the summon system reaps them next frame); the weapon-kind blessing stacks that were taken *on that weapon id* are cleared from `player.blessings` (they lived in `weapon.bonus` / `weapon.effects`, which leave with the weapon; the stack counters would otherwise make a re-granted weapon look levelled and gate the offering wrongly). Stat blessings, items and equipment modifiers are untouched. Nothing is written to `save.json` (dev runs never save; `main_weapon` in the save is the character-select choice, not the run). |
+| **O** | **A hero with no weapons is a legal sandbox state.** Auto-attack, manual aim and the aim-line overlay already tolerate an empty weapon list ("with no weapon at all, the config angle"); the level-up offering simply has no weapon cards to roll. No guard rail prevents removing the last weapon -- that is the point of the option (e.g. test an enemy with a defenceless hero, or rebuild a loadout from scratch with the Items page). |
+
+#### Touch list (anticipated)
+
+- **Changed:** `game/states/dev_menu_state.py` -- two rows, two pages
+  (`"forges"`, `"weapons"`), `_forge()` and `_remove_weapon()` actions,
+  headings `FORGE WEAPON` / `REMOVE WEAPON`, nav hints, `_row_label` cases.
+  No change to `PlayingState`, `combat/weapons/forge.py` or the data.
+- **Tests:** `tests/core/test_dev_mode.py` gains `DevForgeMenuTests` (page
+  lists every `content.forges` id; ENTER forges the owned weapon and the
+  weapon's `forge` / name / `visual_id` change; a missing weapon is granted
+  first; the level requirement is not enforced; a second Forging on the same
+  weapon is refused with a status and the weapon is unchanged; ESC -> root)
+  and `DevRemoveWeaponMenuTests` (page lists the owned instances; ENTER drops
+  exactly that one; "All weapons" empties the list; a removed weapon's
+  weapon-blessing stacks are gone and its summons / orbiters inactive; the
+  run keeps updating and drawing with zero weapons; ESC -> root). The
+  existing `test_draw_runs_headless_on_every_page` and the mouse tests cover
+  the new pages through `_rows()`.
+- **Docs:** this entry ticked, `README.md` dev-mode note gains the two rows.
+
+#### Done — what was built
+
+`game/states/dev_menu_state.py`: `_ROOT_ROWS` gains `"forges"` and
+`"remove_weapon"` after `"items"`; pages `"forges"` (heading `FORGE
+WEAPON`, rows = `sorted(content.forges)` by weapon then name, label
+`<weapon>: <Forge>` + `(forged)` while an owned weapon carries it) and
+`"weapons"` (heading `REMOVE WEAPON`, rows rebuilt on every read by
+`_weapon_rows()`: `("all",)` then `("weapon", i)` per owned instance, or
+`("none",)` when the hand is empty; label `<base name>   Lv<n>   [<Forge
+name>]`). `_forge()` hands over a missing weapon, picks the first unforged
+instance of the id and calls the real `apply_forge` (no level gate);
+every instance already forged -> status `"<weapon> already forged into
+<name>"`, nothing changes. `_remove_weapon()` -> `_retire_weapon()` per
+target: `player.weapons.remove`, orbiters and summons set inactive and
+cleared, and -- once no instance of that id remains -- every `weapon` /
+`grant` blessing stack for that weapon id dropped from `player.blessings`
+followed by `rebuild`. The selection is clamped to the shrunken page.
+`PlayingState`, `combat/weapons/forge.py` and the data are untouched.
+
+**Tests** (`tests/core/test_dev_mode.py`, +11, module 52 -> 63; full suite 1631 green, 2 skipped):
+`DevForgeMenuTests` (5) -- the page lists every `content.forges` id; ENTER
+forges the level-1 starting weapon (`forge`, `name`, `visual_id` and every
+override change, row shows `(forged)`); a Forging for an unowned weapon
+grants it and forges it; the sibling Forging on the same weapon is refused
+with the definition and weapon count unchanged; ESC -> root + headless
+draw on every row. `DevRemoveWeaponMenuTests` (6) -- the page lists "All
+weapons" + one row per instance; ENTER on the second of three removes
+exactly that one and the page shrinks; "All weapons" empties the hand, the
+`(no weapons)` row is inert and the run updates + draws weaponless; a
+weapon blessing taken on the starting weapon is cleared on removal while a
+stat blessing stays, and a re-granted weapon is back at Lv1; a spirit wolf
+and an ember ring (tank in reach so the ring forms) leave their summon /
+orbiters inactive after "All weapons"; ESC -> root + headless draw.
+Two test-side gotchas worth remembering: the backquote from a sub-page
+goes to the root (a second press closes), and the ember ring only orbits
+with an enemy inside its reach or the mouse held.
+
+Screenshots captured headless (Forges page with two `(forged)` rows and
+the status line; Remove weapon page with three instances, two of them
+showing their Forge name) and sent.

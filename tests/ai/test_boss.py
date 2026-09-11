@@ -1,9 +1,7 @@
 """Milestone 4: boss FSM -- pattern cycling, telegraph-before-damage,
 distinct pattern effects, health fraction, death (spec 3.7)."""
-import random
 import unittest
 
-import pygame
 
 from entities.boss import Boss
 from tests.aictx import ai_ctx

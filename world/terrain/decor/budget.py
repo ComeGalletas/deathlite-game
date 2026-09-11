@@ -27,7 +27,7 @@ def _cell_biomes(room, floor) -> dict:
     Empty for a room with no palette (nothing to key on), and the callers
     then treat every entry as universal.
     """
-    if not floor or not room.grid or not room.palette:
+    if not floor or not room.palette:
         return {}
     out = {}
     for pos in floor:

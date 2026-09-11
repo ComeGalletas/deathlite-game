@@ -7,9 +7,7 @@ island; `_grid_tile_meta` is the straight projection of a finished grid into the
 """
 from __future__ import annotations
 
-import pygame
 
-from game import config
 from world.layout import TileMeta, GROUND, VSTAIR, EWSTAIR, WALKABLE_KINDS
 from world.gen import height as heightmap
 from world.gen.height import build_grid

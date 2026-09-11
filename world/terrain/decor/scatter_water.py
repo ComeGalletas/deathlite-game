@@ -154,8 +154,6 @@ def _scatter_tiles(store, entries, place, tiles_of, tag: str) -> None:
     px = config.TILE_PX
     seed = store.layout.seed
     for room in store.layout.rooms:
-        if not room.grid:
-            continue
         rng = random.Random(f"{seed}:{room.id}:{tag}")
         for col, row in tiles_of(room):
             if rng.random() >= total:

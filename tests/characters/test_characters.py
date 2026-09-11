@@ -3,7 +3,6 @@ identities, the re-pointed traits, and the defensive stats."""
 import random
 import unittest
 
-import pygame
 
 from combat.weapons import Weapon
 from entities.player import Player

@@ -7,9 +7,9 @@ so and regenerates the file:
 
     python -m world.digest --write
 
-The determinism test covers what `test_procedural`, `test_obstacles`,
-`test_houses`, `test_repair` and `test_water_decor` each asserted separately
-(two builds of one seed agree), in one place and over the whole model.
+The determinism test covers what `test_obstacles`, `test_houses`, `test_repair`
+and `test_water_decor` each asserted separately (two builds of one seed agree),
+in one place and over the whole model.
 """
 import json
 import unittest

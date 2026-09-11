@@ -150,7 +150,7 @@ and level. `data/items.json` loses the elemental affixes. New stats: `xp_gain`
 **Tests.** Catalog validation (every weapon blessing names an owned-able
 weapon, five levels, rarity), gating (no Hammer blessing without the Hammer),
 weights (stat > weapon by default, grant = stat while slots empty, level
-falloff monotone, summons lower), grant bundles exactly one level-I blessing,
+falloff monotone, summons lower), a grant adds the weapon alone (CR3),
 apply paths per kind. Pure, seeded.
 
 ### P3 — Forging — done 2026-09-10

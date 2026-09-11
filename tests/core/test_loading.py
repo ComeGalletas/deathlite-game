@@ -66,6 +66,13 @@ class LoadingStateTests(unittest.TestCase):
         gm = p.game_map
         before = len(gm._blit_cache)
         self.assertGreater(before, 20, "the loading screen warmed nothing")
+        # Foam and decor pick their frame from `TerrainRenderer.seconds()`, which
+        # falls back to `pygame.time.get_ticks()` -- process uptime. The warm
+        # pass samples `_WARM_FOAM_PHASES`, so whether the first draw lands on a
+        # warmed frame depended on how long the suite had been running: this
+        # passed alone and failed after a few hundred other tests. Pin the clock
+        # to a phase the ring covered, so what is measured is the warming.
+        gm.renderer.clock = lambda: LoadingState._WARM_FOAM_PHASES[0]
         p.draw(game.screen)
         self.assertLessEqual(len(gm._blit_cache) - before, 3,
                              "the run's first frame still filled the cache")

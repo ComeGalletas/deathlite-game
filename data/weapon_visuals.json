@@ -7,7 +7,12 @@
     ],
     "style": "cone",
     "fx": {
-      "slash": true
+      "slash": [
+        "sword_slash_down",
+        "sword_slash_up"
+      ],
+      "slash_mode": "sequence",
+      "slash_size": 1.5
     }
   },
   "hammer": {
@@ -25,7 +30,13 @@
     ],
     "style": "cone",
     "fx": {
-      "slash": false
+      "slash": [
+        "daggers_stab"
+      ],
+      "slash_size": 0.8,
+      "_slash_disabled": [
+        "daggers_slash"
+      ]
     }
   },
   "bow": {
@@ -116,7 +127,10 @@
       235,
       210
     ],
-    "style": "bolt"
+    "style": "thrown",
+    "fx": {
+      "rig": "throwing_dagger"
+    }
   },
   "ballista": {
     "color": [
