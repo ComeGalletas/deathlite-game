@@ -1,5 +1,5 @@
 """Six-weapon system P2 (design §21): the blessing catalog, applying levels,
-gating on owned weapons, the weapon grants and their bundled level-I
+gating on owned weapons, the weapon grants (the weapon alone since CR3)
 blessing, and the offering weights."""
 import random
 import unittest
@@ -7,13 +7,12 @@ import unittest
 from combat.weapons import Weapon
 from entities.player import Player
 from game.content import get_content
-from progression.blessings import (CATEGORIES, KINDS, RARITIES, Catalog,
-                                   OfferingRules, apply_blessing, get_catalog,
-                                   get_rules, grant_offers, roll_offering,
-                                   valid_offers)
+from progression.blessings import (
+    CATEGORIES, KINDS, RARITIES, Catalog, apply_blessing, get_catalog,
+    get_rules, grant_offers, roll_offering, valid_offers,
+)
 from progression.blessings.catalog import format_value, roman
-from progression.blessings.offer import (blessing_offers, blessing_weight,
-                                         bundle_candidates)
+from progression.blessings.offer import (blessing_offers, blessing_weight)
 
 C = get_content()
 CAT = get_catalog(C)
@@ -178,6 +177,44 @@ class ApplyTests(unittest.TestCase):
         apply_blessing(p, CAT.get("vitality"))
         self.assertIsNot(p.blessing_fx, before)
 
+    def _volley(self, w):
+        """One fire of `w` through a minimal FireContext; the spawn kwargs."""
+        import pygame
+        from combat.weapons import FireContext
+        from tests.combat.fakes import FakeEnemy
+        shots = []
+        w._cd = 0.0
+        w.update(1 / 60, FireContext(
+            origin=pygame.Vector2(), enemies=[FakeEnemy(25, 0)],
+            damage_multiplier=1.0, attack_speed_multiplier=1.0,
+            projectile_speed_multiplier=1.0, area_multiplier=1.0,
+            fallback_dir=pygame.Vector2(1, 0),
+            spawn_projectile=lambda **kw: shots.append(kw),
+            anchor=pygame.Vector2()))
+        return shots
+
+    def test_more_blades_still_fires(self):
+        """Bug journal #2: blessing levels are floats, so More Blades left
+        `bonus["projectile_count"] == 1.0` and `range(count)` raised
+        TypeError on the next volley. The read side must cast back to int."""
+        from combat.weapons.forge import apply_forge, get_forges
+        p = hero("daggers")
+        w = weapon(p, "daggers")
+        apply_forge(w, get_forges(C).get("fan_of_blades"))
+        base = w._projectile_count()
+        apply_blessing(p, CAT.get("fan_of_blades_more_blades"))
+        self.assertIsInstance(w._projectile_count(), int)
+        self.assertEqual(w._projectile_count(), base + 1)
+        self.assertEqual(len(self._volley(w)), base + 1)
+
+    def test_pierce_blessing_keeps_pierce_an_int(self):
+        p = hero("bow")
+        w = weapon(p, "bow")
+        apply_blessing(p, CAT.get("bow_piercing_arrow"))
+        self.assertIsInstance(w._pierce(), int)
+        for shot in self._volley(w):
+            self.assertIsInstance(shot["pierce"], int)
+
 
 class GatingTests(unittest.TestCase):
     def _ids(self, p, **kw):
@@ -233,35 +270,35 @@ class GrantTests(unittest.TestCase):
         self.assertIn("grant:hammer", ids)
         self.assertNotIn("grant:grave_totem", ids)
 
-    def test_a_grant_adds_the_weapon_and_exactly_one_level_one_blessing(self):
+    def test_a_grant_adds_the_weapon_and_nothing_else(self):
+        """CR3 (owner, 2026-09-10): the bundled level-I blessing is gone --
+        the card is the weapon, its description the weapon's own."""
         p = hero("sword")
         g = next(u for u in grant_offers(p, C, random.Random(1)) if u.id == "grant:bow")
-        self.assertIsNotNone(g.bundle)
-        self.assertIn(CAT.get(g.bundle).name + " I", g.description)   # named on the card
+        self.assertNotIn("Comes with", g.description)
+        self.assertEqual(g.description, C.weapons["bow"].get("description", ""))
+        self.assertFalse(hasattr(g, "bundle"))
         before = dict(p.blessings)
         g.apply(p)
         self.assertIn("bow", {w.weapon_id for w in p.weapons})
-        gained = {k: v for k, v in p.blessings.items() if before.get(k, 0) != v}
-        self.assertEqual(len(gained), 1)
-        self.assertEqual(list(gained.values()), [1])
-        self.assertEqual(list(gained), [g.bundle])
+        self.assertEqual(p.blessings, before)
 
-    def test_bundle_candidates_are_level_zero_and_valid_after_the_grant(self):
-        p = hero("sword")
-        apply_blessing(p, CAT.get("vitality"))
-        pool = bundle_candidates(p, C, "bow")
-        ids = {b.id for b in pool}
-        self.assertNotIn("vitality", ids)                     # already level I
-        self.assertIn("bow_rapid_draw", ids)                  # the new weapon's own
-        self.assertIn("sword_sharpened_edge", ids)            # an owned weapon's
-        self.assertNotIn("hammer_crushing_blow", ids)         # still unowned
-        self.assertIn("fleet_foot", ids)
+    def test_a_grant_is_tagged_by_class_not_by_name(self):
+        """CR4 (owner, 2026-09-10): "Melee Weapon Grant", not "Daggers Melee
+        Grant"; summons follow the same format."""
+        offers = {u.id: u for u in grant_offers(hero("sword"), C, random.Random(0))}
+        self.assertEqual(offers["grant:daggers"].tags, ("melee", "weapon", "grant"))
+        self.assertEqual(offers["grant:bow"].tags, ("ranged", "weapon", "grant"))
+        self.assertEqual(offers["grant:ember_ring"].tags, ("summon", "weapon", "grant"))
+        line = " ".join(t[:1].upper() + t[1:] for t in offers["grant:daggers"].tags)
+        self.assertEqual(line, "Melee Weapon Grant")
+        self.assertEqual(offers["grant:daggers"].title, "New: Daggers")
 
-    def test_the_bundle_is_the_rngs_pick(self):
+    def test_a_grant_is_the_same_whatever_the_rng(self):
         p = hero("sword")
-        a = next(u for u in grant_offers(p, C, random.Random(7)) if u.id == "grant:bow").bundle
-        b = next(u for u in grant_offers(p, C, random.Random(7)) if u.id == "grant:bow").bundle
-        self.assertEqual(a, b)
+        a = next(u for u in grant_offers(p, C, random.Random(7)) if u.id == "grant:bow")
+        b = next(u for u in grant_offers(p, C, random.Random(8)) if u.id == "grant:bow")
+        self.assertEqual((a.description, a.weight, a.tags), (b.description, b.weight, b.tags))
 
 
 class WeightTests(unittest.TestCase):

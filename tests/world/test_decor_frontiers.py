@@ -209,17 +209,7 @@ class DepthLayerTests(unittest.TestCase):
         self.assertFalse(hasattr(gm.renderer, "draw_room_clutter"))
 
 
-class LegacyPathTests(unittest.TestCase):
-    def test_interior_cells_falls_back_to_membership_without_a_grid(self):
-        """A legacy room has no levels to compare, and keeps the plain
-        `in room.cells` test it always used."""
-        class _FakeRoom:
-            grid: dict = {}
-            cells = frozenset({(c, r) for c in range(4) for r in range(4)})
-
-        got = F.interior_cells(_FakeRoom())
-        self.assertEqual(got, [(1, 1), (1, 2), (2, 1), (2, 2)])
-
+class EmptyRoomTests(unittest.TestCase):
     def test_interior_cells_is_none_for_a_room_with_no_cells(self):
         class _Bare:
             grid: dict = {}

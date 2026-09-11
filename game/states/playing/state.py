@@ -9,7 +9,6 @@ hostile projectiles + explosions that damage the player, two more weapons
 from __future__ import annotations
 
 import logging
-import math
 import random
 from types import SimpleNamespace
 
@@ -35,7 +34,7 @@ from progression.items import Item, generate_item
 from progression.stats import FLAT, MULT, PCT, Modifier
 from systems.animation import Animator
 from systems.camera import Camera
-from systems.collision import SpatialGrid, circles_overlap
+from systems.collision import SpatialGrid
 from systems.object_pool import Pool
 from systems.particles import ParticleSystem
 from systems.screen_shake import ScreenShake
@@ -51,7 +50,7 @@ from game.states.playing.physics import BumpResolver
 from game.states.playing.locations import SpecialLocations
 from game.states.playing.npcs import Npcs
 from game.states.playing.effects import TransientFx
-from game.states.playing import slam_fx
+from game.states.playing import slam_fx, slash_fx
 from game.states.playing.navigation import NavCoordinator
 from game.states.playing.spawning import EnemyControl
 from game.states.playing.perception import PlayingPerception
@@ -177,6 +176,7 @@ class PlayingState(State):
 
         self._explosions: list[dict] = []   # transient blast visuals
         self._impacts: list[dict] = []      # CR1: the Hammer's impact sheets
+        self._slashes: list[dict] = []      # the Sword's two-strip swing (slash_fx)
         # One-shot death poofs: [Animator("dead"), world_pos, facing]. Any entity
         # (hero or enemy) that dies pushes one; drawn in the depth layer, dropped
         # when the animation finishes.
@@ -487,6 +487,7 @@ class PlayingState(State):
         self.shake.update(dt)
         self.fx.update_explosions(dt)
         slam_fx.update_impacts(self, dt)
+        slash_fx.update(self, dt)
         self._hurt_flash_t = max(0.0, self._hurt_flash_t - dt)
         self._boss_warning_t = max(0.0, self._boss_warning_t - dt)
         self._notice_t = max(0.0, self._notice_t - dt)
@@ -652,6 +653,7 @@ class PlayingState(State):
         # LD-9 D10: stamp the floor it leaves from, at the muzzle. See
         # `TransientFx.block_on_terrain`.
         self.fx.stamp_fire_level(proj)
+        slash_fx.spawn_from_cone(self, proj)     # a sequence weapon's swing visual
         self.game.audio.play_shoot()
         return proj
 
@@ -958,6 +960,7 @@ class PlayingState(State):
         self.renderer.gems(surface, level)
         self.renderer.explosions(surface, level)
         slam_fx.draw_impacts(surface, self, level)      # CR1: the blow
+        slash_fx.draw(surface, self, level)             # the Sword's swing sequence
         self.renderer.trail_fx(surface, level)
         self._draw_player_projectiles(surface, level)
 

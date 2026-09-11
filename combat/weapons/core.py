@@ -257,13 +257,15 @@ class Weapon:
         return slam.centre(self, origin, direction)
 
     def _projectile_count(self, ctx: FireContext | None = None) -> int:
-        n = int(self.definition["projectile_count"]) + self.bonus["projectile_count"]
+        # Blessing data lands in `bonus` as floats (bug journal #2); the count
+        # must stay an int because it feeds `range()`.
+        n = int(self.definition["projectile_count"]) + int(self.bonus["projectile_count"])
         if ctx is not None:
             n += ctx.mods_for(self).extra_projectiles
         return max(1, n)
 
     def _pierce(self) -> int:
-        return int(self.definition["pierce"]) + self.bonus["pierce"]
+        return int(self.definition["pierce"]) + int(self.bonus["pierce"])
 
     def _area(self, area_multiplier: float) -> float:
         return (float(self.definition["area"]) + self.bonus["area"]) * area_multiplier
@@ -285,9 +287,18 @@ class Weapon:
 
     @staticmethod
     def _within_reach(enemies, origin, reach: float) -> list:
-        """Enemies whose centre lies within `reach` of `origin` (squared scan)."""
-        r2 = reach * reach
-        return [e for e in enemies if (e.pos - origin).length_squared() <= r2]
+        """Enemies whose *body* reaches within `reach` of `origin`: centre
+        distance minus the enemy's radius (a stand-in with no radius counts
+        its centre). The hit test overlaps circles, so a big enemy whose body
+        already sits in the arc must also count as "in reach" -- with a short
+        swing (the Sword's 32 px) the centre alone never gets close enough
+        to a tank (CR2)."""
+        out = []
+        for e in enemies:
+            d = (e.pos - origin).length() - float(getattr(e, "radius", 0.0) or 0.0)
+            if d <= reach:
+                out.append(e)
+        return out
 
     # --- per-frame ---------------------------------------------
     def update(self, dt: float, ctx: FireContext) -> bool:
@@ -496,7 +507,8 @@ class Weapon:
                 weapon_id=self.weapon_id, visual=self.visual_id,
                 source_tags=self.tags, is_crit=dmg.is_crit, cone_dir=direction,
                 cone_half_angle=math.radians(half),
-                stun_chance=stun_chance, stun_duration=stun_duration)
+                stun_chance=stun_chance, stun_duration=stun_duration,
+                swing=self._shots)                      # CR2: picks the slash
         fx = self.effects
         impact = ctx.origin + cone_dir * (area * 0.55)
         if self.effect("shockwave_radius") > 0.0:

@@ -1456,11 +1456,9 @@ Forge. Forgings themselves are offered here at Forge rarity (§12, §22).
 ### Weapon grants (while under three weapons)
 
 While the run owns fewer than three weapons, an offering can be a **weapon
-grant**: the card adds the weapon **and** one random **level-I** blessing of
-any other kind (a stat blessing, or a weapon blessing for a weapon owned
-after the grant). The bundled blessing is always level I, never a higher
-level, so taking a new weapon never costs the player the progression of that
-level-up.
+grant**: the card adds the weapon and nothing else. (Revised 2026-09-10,
+CR3: the grant used to bundle one random level-I blessing; the owner removed
+the bundle. A grant is the weapon alone.)
 
 Once three weapons are owned, weapon grants stop. A summon grant works the
 same way for the summon slot (§3.7).
@@ -1523,9 +1521,9 @@ Every point the first draft left open, with its resolution. All resolved
 6. **Manual aim.** Every directional weapon (Sword, Hammer, Daggers, Bow,
    Bomb) obeys the mouse aim. The Rod auto-targets like the current Arcane
    Bolt / Thunder Orb; a manual aim only gives it a rough area (§3.5).
-7. **Bundled blessing in a weapon grant.** Exclusively level I, random among
-   the stat and weapon blessings valid after the grant, until the run has
-   three weapons (§21).
+7. **Weapon grant is the weapon alone.** Superseded 2026-09-10 (CR3): the
+   grant no longer bundles a level-I blessing. Grants still appear at random
+   while the run has open weapon or summon slots (§21).
 8. **Summon upgrades.** Power / Coverage blessings specific to each summon
    only; no Behavior, Synergy or Forge (§3.7).
 9. **Summon grant.** Offered like a weapon grant while the slot is empty, at

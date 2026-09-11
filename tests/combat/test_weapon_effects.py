@@ -13,7 +13,6 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from combat.weapons import FireContext, Weapon
-from game import config
 from game.content import get_content
 from game.states.playing.combat import CombatResolver
 from tests.combat.fakes import FakeEnemy, fake_ps
@@ -154,7 +153,7 @@ class KillAttributionTests(unittest.TestCase):
 
 
 class FirePathBonusTests(unittest.TestCase):
-    def _fire(self, w, enemies=(FakeEnemy(60, 0),)):
+    def _fire(self, w, enemies=(FakeEnemy(25, 0),)):
         sink = []
         w._cd = 0.0
         w.update(1 / 60, ctx(enemies, sink))
@@ -185,7 +184,7 @@ class FirePathBonusTests(unittest.TestCase):
         sink = []
         w._cd = 0.0
         for _ in range(90):
-            w.update(1 / 60, ctx([FakeEnemy(60, 0)], sink))
+            w.update(1 / 60, ctx([FakeEnemy(25, 0)], sink))
             if sink:
                 break
         s = sink[0]

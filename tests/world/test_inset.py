@@ -89,9 +89,9 @@ class PresenceTests(unittest.TestCase):
                 self.assertIsNotNone(room.inset,
                                      f"seed {seed} room {room.id}: no field")
 
-    def test_a_room_without_a_grid_answers_clear(self):
-        """The flat LD-8 world has no levels, so it has no boundaries and the
-        rule has nothing to say about it."""
+    def test_a_room_with_no_cells_answers_clear(self):
+        """Nothing walkable is nothing to measure: no field, and every query
+        against it answers "clear"."""
         room = _rooms(SEEDS[0])[0]
         bare = type(room)(id=99, cell=(0, 0), rect=room.rect, kind="normal")
         self.assertIsNone(bare.inset)

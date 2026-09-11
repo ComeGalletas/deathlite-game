@@ -21,10 +21,8 @@ import unittest
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-import pygame
 
 from entities.obstacle import KINDS
-from game import config
 from game.assets import ASSETS_DIR
 from game.content import get_content
 from world.rules import frontier as F
@@ -34,8 +32,6 @@ from world.map import GameMap
 SEEDS = (35, 7, 1234)
 
 POST_KINDS = ("sign", "scarecrow")
-
-
 
 
 def _map(seed: int) -> GameMap:

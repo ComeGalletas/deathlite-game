@@ -10,6 +10,13 @@ Pages:
   blessings  -- (D4) pick a blessing; ENTER grants a stack to the hero
   items      -- (D5) every weapon + every item base, straight off the loaded
                 content; ENTER gives the weapon or dev-equips a rolled item
+  forges     -- every Forging in `data/forges.json`; ENTER forges the owned
+                weapon of that id (granting it first if the hero lacks it,
+                the blessing-level requirement waived; still one Forge per
+                weapon)
+  weapons    -- the hero's owned weapon instances (+ "All weapons"); ENTER
+                removes one, unwinding its orbiters, summons and the
+                weapon-blessing stacks taken on that weapon id
 
 Any page longer than `MAX_VISIBLE` scrolls: the visible window follows the
 selection and "N more" markers show what's clipped, so the panel never outgrows
@@ -38,7 +45,8 @@ _PRESSURE_STEPS = (1.0, 2.0, 4.0, 0.0, 0.5)
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
               "aim_line", "all_rooms", "freeze", "pressure", "difficulty",
-              "spawn", "blessings", "items", "reset", "exit", "close")
+              "spawn", "blessings", "items", "forges", "remove_weapon",
+              "reset", "exit", "close")
 
 _LABELS = {
     "unlimited_hp": "Unlimited HP",
@@ -54,16 +62,25 @@ _LABELS = {
     "spawn":        "Spawn enemy...",
     "blessings":    "Blessings...",
     "items":        "Items...",
+    "forges":       "Forges...",
+    "remove_weapon": "Remove weapon...",
     "reset":        "Reset run",
     "exit":         "Exit to main menu",
     "close":        "Close",
 }
 _HEADINGS = {"root": "DEV MENU", "enemies": "SPAWN ENEMY",
-             "blessings": "GRANT BLESSING", "items": "GRANT ITEM"}
+             "blessings": "GRANT BLESSING", "items": "GRANT ITEM",
+             "forges": "FORGE WEAPON", "weapons": "REMOVE WEAPON"}
 _NAV = {"root": "Up/Down move   ENTER select   ESC / ` close",
         "enemies": "Up/Down   ENTER spawn   ESC back",
         "blessings": "Up/Down   ENTER grant   ESC back",
-        "items": "Up/Down   ENTER grant   ESC back"}
+        "items": "Up/Down   ENTER grant   ESC back",
+        "forges": "Up/Down   ENTER forge   ESC back",
+        "weapons": "Up/Down   ENTER remove   ESC back"}
+# The weapons page's rows: the "remove everything" row, one per owned
+# weapon instance (its index in `player.weapons`), or the empty marker.
+_ROW_ALL = ("all",)
+_ROW_NONE = ("none",)
 
 _FG = (235, 240, 245)
 _DIM = (165, 172, 182)
@@ -101,14 +118,29 @@ class DevMenuState(State):
         self._base_by_id = {b["id"]: b for slot in bases for b in bases[slot]}
         self._item_counts: dict[tuple, int] = {}
         self._dev_item_seed = 0
+        # Forges page: every Forging in the data, grouped by weapon.
+        self._forge_ids = sorted(
+            c.forges, key=lambda f: (c.forges[f]["weapon"], c.forges[f]["name"]))
         self._title_font = fonts.mono(28, bold=True)
         self._row_font = fonts.mono(22)
         self._hint_font = fonts.mono(15)
         self._mouse = MouseNav()     # visible rows registered in draw()
 
     def _rows(self) -> tuple | list:
+        if self.page == "weapons":
+            return self._weapon_rows()
         return {"root": _ROOT_ROWS, "enemies": self._enemy_ids,
-                "blessings": self._blessing_ids, "items": self._item_rows}[self.page]
+                "blessings": self._blessing_ids, "items": self._item_rows,
+                "forges": self._forge_ids}[self.page]
+
+    def _weapon_rows(self) -> list[tuple]:
+        """Rebuilt on every read so the page tracks what the Items / Forges
+        pages add and what this page removes."""
+        p = self._playing
+        n = len(p.player.weapons) if p is not None else 0
+        if n == 0:
+            return [_ROW_NONE]
+        return [_ROW_ALL] + [("weapon", i) for i in range(n)]
 
     def _goto(self, page: str) -> None:
         self.page = page
@@ -182,6 +214,10 @@ class DevMenuState(State):
             self._grant(self._blessing_ids[self.sel])
         elif self.page == "items":
             self._give_item(self._item_rows[self.sel])
+        elif self.page == "forges":
+            self._forge(self._forge_ids[self.sel])
+        elif self.page == "weapons":
+            self._remove_weapon(self._weapon_rows()[self.sel])
 
     def _activate(self, rid: str) -> None:
         p = self._playing
@@ -239,6 +275,10 @@ class DevMenuState(State):
             self._goto("blessings")
         elif rid == "items":
             self._goto("items")
+        elif rid == "forges":
+            self._goto("forges")
+        elif rid == "remove_weapon":
+            self._goto("weapons")
         elif rid == "reset":
             p._restart_dev_run()               # replaces the whole stack
         elif rid == "exit":
@@ -302,6 +342,72 @@ class DevMenuState(State):
             label = item.short()
         self._item_counts[key] = self._item_counts.get(key, 0) + 1
         self._status = f"{label}  (x{self._item_counts[key]})"
+
+    def _forge(self, fid: str) -> None:
+        """Apply a Forging through the real `apply_forge`, so the result is
+        exactly what the village Forge / a Forge card produces. Dev
+        conveniences: the hero is handed the weapon first when they lack
+        it, and the `forge_requires_levels` gate is waived. One Forge per
+        weapon still holds: with every owned instance of the id already
+        forged, refuse and say so."""
+        p = self._playing
+        if p is None:
+            return
+        from combat.weapons import Weapon
+        from combat.weapons.forge import apply_forge, get_forges
+        fdef = get_forges(p.content).get(fid)
+        base_name = p.content.weapon(fdef.weapon).get("name", fdef.weapon)
+        owned = [w for w in p.player.weapons if w.weapon_id == fdef.weapon]
+        if not owned:
+            w = Weapon(fdef.weapon, p.content.weapon(fdef.weapon))
+            p.player.weapons.append(w)
+            owned = [w]
+        target = next((w for w in owned if w.forge is None), None)
+        if target is None:
+            self._status = f"{base_name} already forged into {owned[0].name}"
+            return
+        apply_forge(target, fdef)
+        self._status = f"{base_name} -> {fdef.name}"
+
+    def _remove_weapon(self, row: tuple) -> None:
+        p = self._playing
+        if p is None or row == _ROW_NONE:
+            return
+        if row == _ROW_ALL:
+            targets = list(p.player.weapons)
+        else:
+            targets = [p.player.weapons[row[1]]]
+        for w in targets:
+            self._retire_weapon(w)
+        self._status = (f"removed {len(targets)} weapons" if row == _ROW_ALL
+                        else f"removed {targets[0].name}")
+        self.sel = min(self.sel, len(self._weapon_rows()) - 1)
+
+    def _retire_weapon(self, w) -> None:
+        """Take one weapon instance out of the hero's hands and unwind what
+        it owned: persistent projectiles and summons go inactive (their
+        systems reap them next frame); once no instance of the id remains,
+        the weapon / grant blessing stacks taken on that id are cleared so
+        a re-granted weapon starts clean and the offering is not misled.
+        Stat blessings, items and equipment modifiers are untouched (weapon
+        blessings carry no stat effects -- catalog rule)."""
+        p = self._playing
+        p.player.weapons.remove(w)
+        for o in w._orbiters:
+            o.active = False
+        w._orbiters.clear()
+        w._orbit_count = 0
+        for s in w._summons:
+            s.active = False
+        w._summons.clear()
+        if p.player.weapon_by_id(w.weapon_id) is None:
+            from progression.blessings import rebuild as rebuild_blessings
+            lib = p.blessing_lib
+            for bid in list(p.player.blessings):
+                b = lib.by_id.get(bid)
+                if b is not None and b.kind in ("weapon", "grant") and b.weapon == w.weapon_id:
+                    del p.player.blessings[bid]
+            rebuild_blessings(p.player, lib)
 
     def _dev_equip(self, item) -> None:
         """Mirror `PlayingState._apply_persistent_bonuses`' item handling:
@@ -387,6 +493,20 @@ class DevMenuState(State):
             name = self._base_by_id.get(bid, {}).get("name", bid)
             n = self._item_counts.get(("item", bid), 0)
             return f"[{slot}]   {name}" + (f"   x{n}" if n else "")
+        if self.page == "forges":
+            f = p.content.forges[rid]
+            head = p.content.weapon(f["weapon"]).get("name", f["weapon"])
+            carried = any(w.forge == rid for w in p.player.weapons)
+            return f"{head}: {f['name']}" + ("   (forged)" if carried else "")
+        if self.page == "weapons":
+            if rid == _ROW_NONE:
+                return "(no weapons)"
+            if rid == _ROW_ALL:
+                return f"All weapons   ({len(p.player.weapons)})"
+            w = p.player.weapons[rid[1]]
+            forged = f"   [{w.name}]" if w.forge else ""
+            base = p.content.weapon(w.weapon_id).get("name", w.weapon_id)
+            return f"{base}   Lv{w.level}{forged}"
         label = _LABELS[rid]
         if rid == "unlimited_hp" and p is not None:
             label += "   [ON]" if p._dev_unlimited_hp else "   [  ]"

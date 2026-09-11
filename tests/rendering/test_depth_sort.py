@@ -15,10 +15,6 @@ from game.states.menu_state import MenuState
 from game.states.playing_state import PlayingState
 from tests import worlds as W
 from world.map import GameMap
-from game import config
-
-
-
 
 
 def fresh_playing():

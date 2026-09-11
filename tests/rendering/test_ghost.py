@@ -11,7 +11,6 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-from game import config
 from game.content import get_content
 from tests import worlds as W
 from tests.rendering.test_depth_sort import fresh_playing

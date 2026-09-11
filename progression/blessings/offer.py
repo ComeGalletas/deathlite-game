@@ -7,8 +7,8 @@ Three kinds of card:
   * a **weapon blessing** -- only for a weapon the hero owns (and, for a
     synergy, both weapons; for a post-Forge blessing, the Forge);
   * a **weapon grant** -- while the three weapon slots (or the summon slot)
-    are open: the card adds the weapon *and* one random level-I blessing,
-    pre-rolled so the card can name it.
+    are open: the card adds the weapon, nothing else (CR3, 2026-09-10: the
+    bundled level-I blessing was removed).
 
 Weight = kind weight x level falloff x rarity weight (x summon factor for a
 summon's blessings and the summon grant). Every number is `data/offering.json`.
@@ -81,25 +81,10 @@ def blessing_offers(player, content, *, kinds=None) -> list[Upgrade]:
     return out
 
 
-def bundle_candidates(player, content, new_weapon_id: str) -> list[BlessingDef]:
-    """Level-I blessings a grant of `new_weapon_id` may bundle: any stat or
-    weapon blessing valid once the weapon is owned, at level 0 (decision 7)."""
-    catalog, rules = get_catalog(content), get_rules(content)
-    owned = _owned(player) | {new_weapon_id}
-    want = rules.grant_bundle_level
-    out = []
-    for bdef in catalog.by_id.values():
-        if level_of(player, bdef) != want - 1:
-            continue
-        if not _valid_blessing(bdef, owned, player):
-            continue
-        out.append(bdef)
-    return out
-
-
 def grant_offers(player, content, rng: random.Random) -> list[Upgrade]:
-    """A card per weapon the run can still take, bundled with a pre-rolled
-    level-I blessing. None once the slots are full."""
+    """A card per weapon the run can still take -- the weapon alone (CR3).
+    None once the slots are full. `rng` is kept so the offer roll's callers
+    are unchanged; a grant no longer rolls anything."""
     catalog, rules = get_catalog(content), get_rules(content)
     owned = _owned(player)
     weapons_full = weapon_slots_full(player)
@@ -114,24 +99,18 @@ def grant_offers(player, content, rng: random.Random) -> list[Upgrade]:
         weight = float(rules.kind_weights["grant"])
         if is_summon:
             weight *= rules.summon_factor
-        pool = bundle_candidates(player, content, wid)
-        bundle = rng.choice(pool) if pool else None
         name = d["name"]
         desc = d.get("description", "")
-        if bundle is not None:
-            desc = f"{desc} Comes with {bundle.title(rules.grant_bundle_level)}."
-        slot = "summon" if is_summon else d["class"]
-
-        def _apply(p, _wid=wid, _d=d, _bundle=bundle):
+        def _apply(p, _wid=wid, _d=d):
             p.weapons.append(Weapon(_wid, _d))
-            if _bundle is not None:
-                apply_blessing(p, _bundle)
 
+        # CR4 (owner, 2026-09-10): the category line reads "<Class> Weapon
+        # Grant" -- the class, not the weapon's name (the title has that).
         out.append(Upgrade(
             id=f"grant:{wid}", title=f"New: {name}", description=desc,
             weight=weight, apply=_apply, max_stacks=1,
-            tags=(name, slot, "grant"), kind="grant",
-            rarity="common", level=1, weapon=wid, bundle=bundle.id if bundle else None))
+            tags=(d["class"], "weapon", "grant"), kind="grant",
+            rarity="common", level=1, weapon=wid))
     return out
 
 
@@ -193,5 +172,5 @@ def roll_offering(player, content, rng: random.Random, n: int | None = None,
 
 
 __all__ = ["MAX_SUMMONS", "MAX_WEAPONS", "blessing_offers", "blessing_weight",
-           "bundle_candidates", "forge_offers", "forge_offers_for", "grant_offers",
+           "forge_offers", "forge_offers_for", "grant_offers",
            "roll_offering", "roman", "valid_offers"]

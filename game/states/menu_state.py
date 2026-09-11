@@ -10,9 +10,10 @@ one -- that is the cursor -- a held row sinks, and Exit is red.
 Start-screen milestones: M1 gave the list its navigation; M2 wired "Options" to
 the Options screen; M3 gave this screen its own black / white palette and an
 optional full-screen title image (`config.MENU_TITLE_IMAGE`) drawn over a text
-fallback, with a translucent scrim behind the content so the white text stays
-readable over the art. Developer-mode milestone D1 wired the "developer mode"
-entry to a non-persistent sandbox run. The game instructions that M4 put in a
+fallback. The rows sat on a parchment "scroll" panel until 2026-09-11, when the
+owner asked for it gone: they now draw straight over the ocean backdrop
+(`config.MENU_BACKGROUND_IMAGE`). Developer-mode milestone D1 wired the
+"developer mode" entry to a non-persistent sandbox run. The game instructions that M4 put in a
 left-hand column here later moved to the character-select screen (they read
 better next to the hero preview); see `config.MENU_INSTRUCTIONS`.
 """
@@ -24,11 +25,11 @@ from game import config, fonts
 from game.state import State
 from ui import widgets
 from ui.mouse import MouseNav
-from ui.panels import three_slice_h
 
 # The option rows: 64-px `wide` buttons (the pack's native height) on a
-# 72-px step, inset from the parchment panel's edges.
-_ROW_TOP, _ROW_STEP, _ROW_H, _ROW_INSET = 550, 72, 64, 60
+# 68-px step -- a 4-px gap -- inset from the layout band's edges. The top is
+# high enough that the last row clears the save summary at the screen foot.
+_ROW_TOP, _ROW_STEP, _ROW_H, _ROW_INSET = 525, 68, 64, 60
 _DANGER = {"exit"}          # drawn on the red sheet
 
 
@@ -98,6 +99,8 @@ class MenuState(State):
         if bg is not None:
             surface.blit(bg, (0, 0))
 
+        # Layout band only -- nothing is drawn for it. It anchors the logo above
+        # and gives the rows their x inset and width.
         panel_width, panel_height = 625, 495   # +25% on both axes (was 500x320)
         band = pygame.Rect((w - panel_width) // 2, 890 - panel_height,
                            panel_width, panel_height)  # bottom pinned at 890, clear of the save summary
@@ -112,16 +115,6 @@ class MenuState(State):
             # Fallback: the title as text when the logo art is absent.
             title = self._title_font.render(config.TITLE, True, config.MENU_FG)
             surface.blit(title, title.get_rect(center=(cx, band.top - 60)))
-
-        panel = three_slice_h(self.game.assets, left="ui_banner_cap_left",
-                              mid="ui_banner_mid", right="ui_banner_cap_right",
-                              width=band.width, height=band.height)
-        if panel is not None:
-            surface.blit(panel, band.topleft)
-        else:
-            scrim = pygame.Surface(band.size, pygame.SRCALPHA)
-            pygame.draw.rect(scrim, config.MENU_SCRIM, scrim.get_rect(), border_radius=16)
-            surface.blit(scrim, band.topleft)
 
         # --- option list: one button per row, the selected one gold ---
         hits = self._mouse.hits

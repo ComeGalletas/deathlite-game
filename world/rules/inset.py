@@ -281,7 +281,7 @@ def build(room, px: int, step: int = STEP) -> InsetField | None:
     An island with one terrace and no stone has no level change anywhere,
     so it gets no field and every query against it answers "clear".
     """
-    if not room.grid or not room.cells:
+    if not room.cells:
         return None
     levels = {cell.level for cell in room.grid.values()
               if cell.kind in WALKABLE_KINDS}

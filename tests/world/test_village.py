@@ -223,13 +223,14 @@ class VillageLayoutTests(unittest.TestCase):
         for seed in W.SEEDS:
             for v in W.layout(seed).villages:
                 houses = [pygame.Vector2(x, y) for k, x, y in v.buildings if k == "house"]
-                if len(houses) >= 2:
-                    # every house has another within four tiles: a cluster
-                    # (adjacent ring slots at the outer radius are 2.7 apart)
-                    for h in houses:
-                        self.assertLessEqual(
-                            min(h.distance_to(o) for o in houses if o is not h), 4 * px,
-                            f"seed {seed}: a house stands alone")
+                blds = [pygame.Vector2(x, y) for _k, x, y in v.buildings]
+                # every house has another building within four tiles: one
+                # village round its square (LD-Z: the two houses flanking
+                # the heal are five tiles apart, and both by the forge)
+                for h in houses:
+                    self.assertLessEqual(
+                        min(h.distance_to(o) for o in blds if o is not h), 4 * px,
+                        f"seed {seed}: a house stands alone")
                 mouths = [pygame.Vector2(m) for m in v.mouths]
                 military = [(k, pygame.Vector2(x, y)) for k, x, y in v.buildings
                             if k in ("barracks", "tower", "archery")]

@@ -124,8 +124,9 @@ class IdentityTests(unittest.TestCase):
                            self.d("sword")["area"])
 
     def test_the_sword_sweeps_wider_than_the_daggers(self):
+        # Wider in angle; the owner tuned the Sword's reach down to a short
+        # swing (area 32), so the arc is the identity, not the reach.
         self.assertGreater(self.d("sword")["cone_half_angle"], self.d("daggers")["cone_half_angle"])
-        self.assertGreater(self.d("sword")["area"], self.d("daggers")["area"])
 
     def test_the_bow_pierces_and_reaches_furthest(self):
         self.assertGreater(self.d("bow")["pierce"], 0)

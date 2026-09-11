@@ -6,8 +6,8 @@ satisfy.
 """
 from __future__ import annotations
 
-from world.layout import GROUND, CLIFF, VSTAIR, EWSTAIR, LAKE, VOID, WALKABLE_KINDS
-from world.gen.height.const import MAX_DROP, MAX_LEVEL
+from world.layout import GROUND, CLIFF, VSTAIR, EWSTAIR, LAKE, WALKABLE_KINDS
+from world.gen.height.const import MAX_DROP
 
 # --- connectivity ---------------------------------------------------------
 
@@ -120,8 +120,6 @@ def walk_links(grid, pos) -> list:
     return out
 
 
-
-
 def reachable(grid, start=None) -> set:
     """Every walkable cell reachable from `start` (or the lowest-then-westmost
     walkable cell, which is always on the outer shore)."""
@@ -140,8 +138,6 @@ def reachable(grid, start=None) -> set:
     return seen
 
 
-
-
 def _components(grid) -> list[set]:
     """Walkable cells grouped into connected components, largest first."""
     todo = {p for p, cell in grid.items() if cell.kind in WALKABLE_KINDS}
@@ -152,8 +148,6 @@ def _components(grid) -> list[set]:
         todo -= part
     out.sort(key=len, reverse=True)
     return out
-
-
 
 
 def _prune_unreachable(grid) -> None:
@@ -171,7 +165,6 @@ def _prune_unreachable(grid) -> None:
 
 
 # --- verification ---------------------------------------------------------
-
 
 
 # --- verification ---------------------------------------------------------
@@ -215,8 +208,6 @@ def check_grid(grid) -> list[str]:
 
 
 _GLYPH = {GROUND: "=", CLIFF: "#", VSTAIR: "0", LAKE: "~"}
-
-
 
 
 def to_ascii(grid) -> str:

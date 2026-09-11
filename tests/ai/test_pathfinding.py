@@ -12,23 +12,14 @@ from collections import deque
 
 import pygame
 
-from game import config
 from tests import worlds as W
-from world.map import GameMap
 from world.pathfinding import NavGrid, FlowField, _CLEARANCE_CAP, _INF
-from tests import worlds as W
 
 
 SEEDS = (1, 3, 7, 42, 99)
 
-# These validate the nav algorithm against the flat base layout on pinned seeds;
-# LD-1 verticality changes the RNG stream and adds cliffs/stairs, and gets its
-# own routing coverage in tests/world/test_verticality.py.
-_SAVED_VERT = None
-
-
-
-
+# These validate the nav algorithm against the generated layout on pinned seeds.
+# Routing over cliffs and stairs is `tests/world/test_elevation.py`'s job.
 
 
 def _grid(seed, cell=32):

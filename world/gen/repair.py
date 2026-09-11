@@ -288,9 +288,19 @@ def _open_villages(grid, layout, killers) -> None:
     ground: nothing spawns there, the hero fits the roads by construction
     (a tile of lane from every bridge to the forge), and an enemy in
     pursuit takes the road too. So the square is walked through rather
-    than judged, which also keeps the flood connected across the island."""
+    than judged, which also keeps the flood connected across the island.
+
+    The town hall gets a disc of its own (LD-Z): it stands five to six
+    tiles up the axis, and its north half fell outside the settlement
+    disc -- a hall against the north coast walled off a strip of beach
+    behind it and the repair pulled the hall out (seed 21). Nothing lives
+    behind the hall either."""
+    from game import config
     discs = [(v.forge.x, v.forge.y, float(v.radius))
              for v in getattr(layout, "villages", ()) if float(v.radius) > 0]
+    discs += [(x, y, 3.0 * config.TILE_PX)
+              for v in getattr(layout, "villages", ())
+              for kind, x, y in v.buildings if kind == "monastery"]
     if not discs:
         return
     ox, oy = grid.origin

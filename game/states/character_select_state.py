@@ -24,7 +24,7 @@ from game.state import State
 from systems.animation import Animator
 from ui import widgets
 from ui.mouse import MouseNav
-from ui.text import wrap
+from ui.text import shadowed, wrap
 
 # The preview cycles these; idle / walk are held for a beat, attack plays once.
 _PREVIEW_PHASES = ("idle", "walk", "attack")
@@ -258,7 +258,7 @@ class CharacterSelectState(State):
 
             # Text on the light card: the name and the trait line are titles
             # (title face, black); the rest is body text in the dark grey.
-            name = self._name.render(c["name"], True, config.COLOR_ON_BUTTON)
+            name = shadowed(self._name, c["name"], config.COLOR_ACCENT)   # gold with a dark drop shadow
             surface.blit(name, name.get_rect(midtop=(rect.centerx, y + 16 + dy)))
 
             trait_line = f"Trait - {c['trait_name']}"
@@ -273,7 +273,7 @@ class CharacterSelectState(State):
             ] + ([weapon_line] if unlocked else [])
             for j, line in enumerate(rows):
                 if line == trait_line:
-                    surf = self._trait.render(line, True, config.COLOR_ON_BUTTON)
+                    surf = shadowed(self._trait, line, config.COLOR_ACCENT)
                 else:
                     surf = self._body.render(line, True, config.COLOR_ON_BUTTON_DIM)
                 r = surf.get_rect(midtop=(rect.centerx, y + 66 + j * 24 + dy))

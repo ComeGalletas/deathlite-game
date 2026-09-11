@@ -2798,3 +2798,128 @@ baked shadow was dropped to match the previous sprite; a variant keeping it
 as translucent black was produced but not shipped. Opaque bbox is
 (37, 64, 162 x 138), so the rig's anchor (118, 202) already sits at the
 bottom centre and was left alone.
+
+## Weapons still to wire to a sprite (2026-09-10)
+
+State after the six-weapon system (`weapon_system_journal.md`) and change
+requests 1-2. "Wired" means the weapon's attack draws authored art through a
+rig in `data/weapon_sprites.json`; the rest draw the primitive shape the
+style falls back to.
+
+**Wired.** Sword (`slash_down` / `slash_up`, Whirlwind and Greatsword
+inherit); Hammer impact (`hammer_impact`, Earthshaker and Meteor Hammer
+inherit; the pending-swing circle is a drawn indicator by design); Bow,
+Multishot and Ballista (the `arrow` sprite, tinted); Magic Rod and Arcane
+Lance (`arcane_circle` + `dust_puff` trail); Bomb, Cluster Bomb and
+Minefield (`bomb` rig in flight + `explosion` burst on detonation); Ember
+Ring (`ember` flame); Spirit Wolf (`spirit_wolf` rig).
+
+**Left to wire** (what it draws today -> what it needs):
+
+1. **Daggers** -- the cone sector only (`slash: false`) -> a short stab /
+   slash sheet, two swings to alternate like the Sword's. Twin Daggers
+   inherits.
+2. ~~**Fan of Blades** (Daggers Forge) -- `bolt` discs -> a thrown-dagger
+   sprite, rotated to its heading like the arrow.~~ Done 2026-09-10
+   (`throwing_dagger`, see below).
+3. **Arcane Storm** (Rod Forge) -- the `orbit` style borrows the Ember
+   Ring's flame -> an arcane mote (the `thunder_ball` rig in `magic_rod/` is
+   a candidate; it is loaded and unused).
+4. **Earthshaker shockwave** -- the translucent `blast` disc -> a ring /
+   shockwave sheet, or the `explosion` burst.
+5. **Meteor Hammer crater** -- the hazard disc + ring -> a crater / embers
+   sheet on the hazard's `sprite` slot (the Warlock pool already supports one).
+6. **Minefield** -- a landed mine draws as the bomb at rest -> an armed-mine
+   look (a distinct frame or a blink) so a mine reads as different from a
+   fused bomb.
+7. **Grave Totem** -- a colour disc + core (`summons/totem.py`) and `bolt`
+   discs for its shots -> a totem sprite and a bolt sprite.
+8. **The Rod's mark** -- nothing on the sprite (a status ring only in the
+   primitive fallback / dev rings) -> a small marker overlay above a marked
+   enemy.
+
+Hero-side, not weapons: Kestrel and Nihil have no second attack sheet or
+guard sheet (the alternation and the guard pose are wired and no-ops for
+them); the Hammer's wind-up has no hero pose (the hero idles until the blow).
+
+## Daggers slash -- wiring (2026-09-10, todo)
+
+**Requirement (owner).** Cut the Daggers' slash out of the Sword's
+`Combat-Sheet.png` -- "from bottom to top, the 12th row, multiple small
+slashes" -- into its own sheet under a new `assets/effects/weapons/daggers/`
+folder, wire it to the Daggers' current cones, and draw it 10 % bigger on
+screen than the cone would suggest.
+
+**Row check (owner: row 18).** Counting the sheet's 29 rows of 64 px
+from the bottom, the 12th is row 18 from the top: single crescents, 6
+frames. The rows with *multiple small strokes* are the 11th from the bottom
+(row 19: three short parallel strokes, 3 frames) and the 13th (row 17: a
+fan of strokes, 4 frames). `daggers/slash.png` currently holds row 18
+(384 x 64) and is replaced once the row is confirmed.
+
+**Todo.**
+
+- [x] Cut the confirmed row into `assets/effects/weapons/daggers/slash.png`
+      (64 px cells, one horizontal strip).
+- [x] Rig `daggers_slash` in `data/weapon_sprites.json`: frames from the
+      strip, one-shot, fps so the strip plays out inside the Daggers' hit
+      (0.10 s), `scale` = the cone's diameter x 1.1 (area 46 -> ~101 px)
+      -- the "10 % bigger".
+- [x] `data/weapon_visuals.json`: Daggers `fx.slash = ["daggers_slash"]`
+      (one rig; a second strip can join the list later to alternate like the
+      Sword). Twin Daggers inherits; Fan of Blades keeps its thrown look.
+- [x] Tests: the rig's sheet exists and matches the row it came from; the
+      Daggers' cone asks for `daggers_slash`; the size is 1.1 x the cone's
+      diameter; the strip fits the hit's lifetime.
+- [x] A frame of the stab on a tank; this journal.
+
+**Done.** `daggers/slash.png` = row 18 (6 frames, 384 x 64). Rig
+`daggers_slash`: one-shot, 60 fps (the six frames span the 0.10 s hit).
+`data/weapon_visuals.json`: Daggers `fx.slash = ["daggers_slash"]`,
+`fx.slash_size = 1.1`. `projectiles/cone.py -- slash_size`: a visual's
+`slash_size` sizes the sprite to that multiple of the cone's *diameter*
+(so it follows the reach and its blessings); without it the rig's fixed
+`scale` is used, as the Sword does. Five tests in
+`tests/rendering/test_weapon_rigs.py`. Twin Daggers inherits; Fan of Blades
+still throws `bolt` discs (on the list).
+- **Tighter (owner, same day):** `slash_size` 1.1 -> **0.8** of the cone's
+  diameter (74 px at reach 46).
+- **Second strip (owner, same day, "alternate"):** `daggers/stab.png` = row
+  13 from the top of the combat sheet (the grey forward thrust, 5 frames,
+  the first blank). Rig `daggers_stab`, one-shot, 50 fps. The Daggers'
+  `fx.slash` is now `["daggers_slash", "daggers_stab"]` with no sequence
+  mode, so swings alternate crescent / stab by the attack's ordinal; both
+  follow the area through `slash_size` 0.8.
+- **Crescent parked (owner, same day):** the first strip is "commented
+  out": `fx.slash = ["daggers_stab"]` and the crescent moved to
+  `fx._slash_disabled = ["daggers_slash"]`, a key the game ignores (JSON
+  has no comments); the `daggers_slash` rig and `slash.png` stay. The stab
+  is the Daggers' only animation now; move the id back to re-enable it.
+
+### Throwing dagger sprite received (2026-09-10)
+
+Owner added `assets/effects/weapons/daggers/throwing_dagger.png`: a single
+32 x 32 frame (not a strip), content 19 x 19 px centred at (15, 15), full
+alpha. One steel dagger drawn diagonally: blade tip at the top-left,
+pommel at the bottom-right, so its "forward" is 45° up-left of screen +x.
+Intended for the Fan of Blades (item 2 of the list above), whose thrown
+shots still draw `bolt` discs. When wired it wants the `arrow` treatment
+(one rig, rotated to the shot's velocity through `Assets.rotated`) with a
+base rotation of the art's own diagonal so the tip leads; the base Daggers
+stay on the stab strip. Not wired yet.
+
+**Wired (owner's "start", same day).** Rig `throwing_dagger` in
+`data/weapon_sprites.json`: the single frame, `content [6, 6, 19, 19]`,
+`scale [22, 22]` (the diagonal blade comes out ~31 px long, next to the
+arrow's 26), and `heading_deg: -135` -- the direction the tip points in the
+file, so the draw turns the art by `heading - heading_deg` and the tip
+leads. New style `thrown` (`game/states/playing/projectiles/thrown.py`):
+the rig named by the visual's `fx.rig`, rotated through `Assets.rotated`
+(8° buckets, cached), centred on the shot; a missing rig or sheet falls
+back to the `bolt` disc. `data/weapon_visuals.json`: `fan_of_blades` is
+`style: "thrown"`, `fx.rig: "throwing_dagger"`; the base Daggers stay on
+the stab strip. Six tests in `tests/rendering/test_weapon_rigs.py`
+(`ThrownDaggerTests`): the rig and sheet, the Forge's visual, the turn
+cancelling the art's heading, a right-going dagger lies flat and a
+down-going one stands, the draw's rotation and size, the fallback.
+`test_forge.py::VisualTests` now expects `thrown` for the Forge's look.

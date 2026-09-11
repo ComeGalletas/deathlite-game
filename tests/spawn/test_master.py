@@ -7,7 +7,6 @@ import unittest
 
 import pygame
 
-from game import config
 from game.content import get_content
 from spawn import ENEMY_SPAWNED, SpawnMaster
 from spawn.budget import SpawnDirector

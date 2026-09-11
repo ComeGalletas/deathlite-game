@@ -22,6 +22,7 @@ from game.states.playing.drawctx import DrawCtx
 from game.states.playing.glow import GlowCache
 from game.states.playing.projectiles import draw_projectile
 from game.states.playing.summons import draw_summon
+from ui.text import shadowed
 
 # CB-5 dev aim line: length for a main weapon with no finite reach.
 _AIM_LINE_PX = 160.0
@@ -134,10 +135,11 @@ class WorldRenderer:
                     f"{ps._boss_name} APPROACHES", True, (255, 90, 90))
                 surface.blit(text, text.get_rect(center=(w // 2, 120)))
 
-        # P3: a transient notice (the Forge's answer), bottom centre.
+        # P3: a transient notice (the Forge's answer), bottom centre, one
+        # line above the interaction prompt it usually answers.
         if ps._notice_t > 0.0 and ps._notice_text:
-            text = ps._hud._font.render(ps._notice_text, True, config.COLOR_ACCENT)
-            surface.blit(text, text.get_rect(center=(w // 2, h - 96)))
+            text = shadowed(ps._prompt_font, ps._notice_text, config.COLOR_ACCENT)
+            surface.blit(text, text.get_rect(center=(w // 2, h - 124)))
 
         # Interaction prompt when stood on a usable special location.
         it = ps.locations.nearby()

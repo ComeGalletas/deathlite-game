@@ -1,10 +1,8 @@
 """The shape every generated world has: the structural contract of
 `WorldLayout` on the shared cached seeds.
 
-These are the invariants `test_procedural.py` used to pin for the flat
-generator -- room count, reachability, roles, bounds, tile alignment --
-restated for the height-map world, which is the only one now. Determinism
-is `test_digest.py`'s job.
+Room count, reachability, roles, bounds and tile alignment, on the height-map
+world -- the only generator there is. Determinism is `test_digest.py`'s job.
 """
 import unittest
 

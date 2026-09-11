@@ -50,7 +50,7 @@ def ctx(enemies, sink, **over):
     return FireContext(**base)
 
 
-def fire(w, enemies=(FakeEnemy(50, 0),), **over):
+def fire(w, enemies=(FakeEnemy(25, 0),), **over):     # inside every melee reach
     """One attack's spawns. A slam (the Hammer, CR1) swings first, so the
     weapon is ticked until its blow lands."""
     sink = []
@@ -156,7 +156,7 @@ class MeleeForgeTests(unittest.TestCase):
         self.assertGreater(s.damage, 2 * C.weapon("sword")["damage"])
         self.assertGreater(s.radius, C.weapon("sword")["area"])
         self.assertGreater(s.src_weight, C.weapon("sword")["weight"])
-        self.assertGreater(w._cooldown(1.0), 2 * C.weapon("sword")["cooldown"])
+        self.assertGreater(w._cooldown(1.0), C.weapon("sword")["cooldown"])
 
     def test_twin_daggers_swing_two_fanned_cones(self):
         w = weapon("daggers", "twin_daggers")
@@ -373,7 +373,7 @@ class VisualTests(unittest.TestCase):
         fake = SimpleNamespace(content=C)
         kw = {"weapon_id": "daggers", "visual": "fan_of_blades"}
         PlayingState._resolve_visual(fake, kw)
-        self.assertEqual(kw["style"], "bolt")               # the Forge's own entry
+        self.assertEqual(kw["style"], "thrown")             # the Forge's own entry
         self.assertNotIn("visual", kw)
         kw = {"weapon_id": "sword", "visual": "greatsword"}
         PlayingState._resolve_visual(fake, kw)

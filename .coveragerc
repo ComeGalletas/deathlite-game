@@ -1,0 +1,33 @@
+# Coverage over the shipping game only.
+#
+#     pip install coverage
+#     python -m coverage run -m pytest      # add -m sweep for the wide tier
+#     python -m coverage report
+#     python -m coverage html               # browsable, into htmlcov/
+#
+# `utilities/` and `spawn/stress.py` are developer tooling run by hand
+# (`python -m spawn.stress`, the sprite-sheet lab, the tilemap builders). No
+# runtime module imports them, and counting them put the headline number ~5.5
+# points below what the game's own code actually measures.
+[run]
+source =
+    combat
+    entities
+    game
+    progression
+    spawn
+    systems
+    ui
+    world
+omit =
+    utilities/*
+    spawn/stress.py
+    */__pycache__/*
+
+[report]
+precision = 1
+skip_covered = False
+exclude_also =
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    if __name__ == .__main__.:

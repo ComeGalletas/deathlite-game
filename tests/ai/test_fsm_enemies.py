@@ -1,7 +1,6 @@
 """Milestone 9: FSM advanced enemies -- charger / teleporter / warlock
 (spec 5.6). The cycle chase -> telegraph -> attack -> recover must be visible
 and the dangerous frame must follow a telegraph."""
-import random
 import unittest
 
 import pygame

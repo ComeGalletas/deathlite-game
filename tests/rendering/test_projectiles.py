@@ -13,8 +13,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game.assets import Assets, reset_assets
-from game.states.playing.projectiles import (
-    DrawCtx, classify, draw_projectile, registered)
+from game.states.playing.projectiles import DrawCtx, classify, registered
 from game.states.playing.projectiles import cone as cone_mod
 from game.states.playing.projectiles.orbit import orbit
 from game.states.playing.projectiles.thunder import thunder
@@ -32,7 +31,7 @@ class RegistryTests(unittest.TestCase):
     def test_every_family_is_registered(self):
         self.assertEqual(set(registered()),
                          {"bolt", "arrow", "cone", "orbit", "melee", "thunder",
-                          "arcane", "blast", "bomb", "hidden"})
+                          "arcane", "blast", "bomb", "hidden", "thrown"})
 
     def test_classify_routes_by_the_projectile_fields(self):
         cone = SimpleNamespace(style="", cone_half_angle=0.5, orbit_speed=0.0, anchor=None)
@@ -239,7 +238,6 @@ class ConeSlashTests(unittest.TestCase):
         self.a.frame_rotated = lambda rig, an, idx, deg, **kw: got.append(idx)
         cone_mod.cone(self.surf, 120, 120, self.p, DrawCtx(self.a, now=0.5, zoom=1.0))
         self.assertEqual(got, [want])
-
 
 
 class BombTests(unittest.TestCase):

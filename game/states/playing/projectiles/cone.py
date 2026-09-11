@@ -62,22 +62,61 @@ def draw_cone(surface, cx: float, cy: float, p, zoom: float = 1.0) -> None:
         surface.blit(fill, (0, 0))
 
 
+def slash_rig(p) -> str | None:
+    """Which slash rig this cone swings (CR2). The weapon's visual `fx.slash`
+    is a list of rigs to alternate through by the attack's ordinal
+    (`p.swing`, 1 = the first swing -> the first rig), `true` for the old
+    single rig, `false` / missing `fx` for the sector alone... except that a
+    projectile with no `fx` at all (a test stand-in) keeps the old rig."""
+    fx = getattr(p, "fx", None)
+    if fx is None:
+        return _SLASH_RIG
+    if fx.get("slash_mode") == "sequence":
+        return None                   # drawn by `slash_fx` as one timed sequence
+    slash = fx.get("slash", True)
+    if not slash:
+        return None
+    if isinstance(slash, (list, tuple)):
+        if not slash:
+            return None
+        swing = max(1, int(getattr(p, "swing", 1) or 1))
+        return str(slash[(swing - 1) % len(slash)])
+    return _SLASH_RIG
+
+
+def slash_size(p, assets, rig: str) -> tuple[int, int]:
+    """The slash sprite's size in world px: the rig's own `scale`, or -- when
+    the weapon's visual carries `slash_size` -- that multiple of the cone's
+    diameter, so the sprite follows the reach (the Daggers draw theirs 10 %
+    bigger than the cone). `(0, 0)` when the rig is absent."""
+    fx = getattr(p, "fx", None) or {}
+    factor = fx.get("slash_size")
+    if factor:
+        d = max(2, round(float(p.radius) * 2 * float(factor)))
+        return d, d
+    return assets.scale_for(rig) or (0, 0)
+
+
 @style("cone")
 def cone(surface, sx, sy, p, ctx) -> None:
     draw_cone(surface, sx, sy, p, ctx.zoom)          # the (dimmed) damage sector
 
-    fx = getattr(p, "fx", None)
-    if fx and not fx.get("slash", True):
-        return                                       # P1: only the Sword swings the slash rig
+    rig = slash_rig(p)
+    if rig is None:
+        return                                       # P1: only the Sword swings a slash rig
     assets = ctx.assets
     z = ctx.zoom
-    bw, bh = assets.scale_for(_SLASH_RIG) or (0, 0)
+    bw, bh = slash_size(p, assets, rig)
     if not bw:
         return                                       # rig absent -> sector only
-    n = max(1, assets.frame_count(_SLASH_RIG, _SLASH_ANIM))
-    idx = int(ctx.now * assets.fps(_SLASH_RIG, _SLASH_ANIM)) % n
+    n = max(1, assets.frame_count(rig, _SLASH_ANIM))
+    if assets.loops(rig, _SLASH_ANIM):
+        idx = int(ctx.now * assets.fps(rig, _SLASH_ANIM)) % n
+    else:
+        # CR2: a one-shot swing plays along the hit's own age.
+        idx = min(n - 1, int(float(getattr(p, "age", 0.0)) * assets.fps(rig, _SLASH_ANIM)))
     heading = math.degrees(math.atan2(p.cone_dir.y, p.cone_dir.x))
-    spr = assets.frame_rotated(_SLASH_RIG, _SLASH_ANIM, idx, heading,
+    spr = assets.frame_rotated(rig, _SLASH_ANIM, idx, heading,
                                size=(max(1, round(bw * z)), max(1, round(bh * z))))
     if spr is None:
         return

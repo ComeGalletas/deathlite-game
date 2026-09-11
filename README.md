@@ -64,9 +64,23 @@ See `journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
 python -m pytest
 ```
 
-That is the `unit` and `world` tiers (see `pytest.ini`): hand-built grids,
-plus the four cached worlds in `tests/worlds.py`. The `sweep` tier builds
-many seeds to make statistical claims and runs before a commit:
+That is the `unit`, `world` and `integration` tiers (see `pytest.ini`). While
+you work, the `unit` tier is the one to keep under a keystroke — hand-built
+grids and fakes, nothing generated and no window opened:
+
+```bash
+python -m pytest -m unit
+```
+
+| tier | what it does | tests | time |
+|------|--------------|------:|-----:|
+| `unit` | hand-built grids and fakes | 760 | 10 s |
+| `world` | the four cached worlds in `tests/worlds.py` | 483 | 2 min 45 s |
+| `integration` | boots a real `Game` and drives its states | 380 | 5 min |
+| `sweep` | many seeds, statistical | 7 | — |
+
+The `sweep` tier makes statistical claims over many seeds and runs before a
+commit:
 
 ```bash
 python -m pytest -m sweep
@@ -93,7 +107,7 @@ separately cached build. `tests/world/test_digest.py` pins a fingerprint of
 the layout, the bake and one drawn frame for each cached seed; a change that
 moves the world says so and runs `python -m world.digest --write`.
 
-863 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+1,630 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
 terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
 depth-sorted rendering, the start menu + options + rankings screens, developer
@@ -139,12 +153,14 @@ Sanctuary.
 ### Display
 
 The window is **1600×900** (`config.SCREEN_WIDTH/HEIGHT`). The in-game view is a
-**draw-time camera zoom** (`config.CAMERA_ZOOM`, default 1.5): the world is drawn
+**draw-time camera zoom** (`config.CAMERA_ZOOM`, default 1.75): the world is drawn
 straight to the screen with every sprite, tile and shape scaled by the zoom, so
 the picture is "closer" but stays crisp — sprites scale *down* from their large
 source frames, no upscale blur. The visible world extent is `SCREEN / CAMERA_ZOOM`.
 The HUD and damage feedback are drawn afterwards at full resolution, unscaled.
-`CAMERA_ZOOM = 1.0` disables the zoom entirely.
+`CAMERA_ZOOM = 1.0` disables the zoom entirely. Keep `TILE_PX * CAMERA_ZOOM` a
+whole number of pixels — steps of 0.25 at the 64 px tile — or the tile grid
+lands on fractional boundaries and the seams shimmer.
 
 A **sprited** enemy is just its sprite — the thin elite / shield / status rings
 that used to sit at the collider edge are off by default (`config.SHOW_ENEMY_STATE_RINGS`);
@@ -158,7 +174,9 @@ slam ring) are always shown.
 
 A keyboard-navigated menu: **Start new game** → hero + difficulty select → run;
 **Start new developer mode game** → the same select screen → a non-persistent
-sandbox run with the dev overlay (backtick / tilde); **Rankings**; **Options**;
+sandbox run with the dev overlay (backtick / tilde: HP / attack / overlay
+toggles, spawn any enemy, grant any blessing, item or weapon, apply any
+Forging, remove owned weapons, reset the run); **Rankings**; **Options**;
 **Exit**. Options holds the **master volume** (← → in 5% steps), a **mute**
 toggle, and the entry point into the **Sanctuary** — all persisted to
 `save.json` immediately. If `assets/ui/title.png` exists it fills the screen
@@ -222,7 +240,7 @@ deathlite-game/
 │                       projectiles/, terrain/{tiles,bridge,props,resources}/,
 │                       buildings/, effects/, ui/title.png, CREDITS.md
 │                       (PNG sprites only — see assets/CREDITS.md)
-└── tests/              863 tests: pure logic + headless integration
+└── tests/              1,630 tests: pure logic + headless integration
     ├── ai/             behaviours, FSM enemies, pathfinding, nav, boss
     ├── rendering/      camera, animation, depth sort, terrain, sprites, assets,
     │                   screens

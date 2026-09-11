@@ -268,6 +268,39 @@ def _bright_pixels(surface, rect):
     return n
 
 
+class MenuHasNoScrollPanelTests(unittest.TestCase):
+    """2026-09-11: the parchment "scroll" panel behind the option list is gone
+    -- rows draw straight over the ocean backdrop and no banner rig is left."""
+
+    def test_draw_requests_no_banner_rig(self):
+        from unittest import mock
+        game, menu = _menu()
+        asked = []
+        for name in ("image", "picture"):
+            real = getattr(game.assets, name)
+            def spy(rig, *a, _real=real, **kw):
+                asked.append(rig)
+                return _real(rig, *a, **kw)
+            setattr(game.assets, name, spy)
+        menu.draw(game.screen)
+        self.assertFalse([r for r in asked if "banner" in str(r) or "scroll" in str(r)],
+                         f"menu still reaches for the scroll art: {asked}")
+
+    def test_no_banner_rigs_are_declared(self):
+        _, _ = _menu()
+        from game.assets import Assets
+        meta = Assets().meta
+        self.assertFalse([k for k in meta if "banner" in k])
+
+    def test_panels_module_has_no_three_slice_builder(self):
+        from ui import panels
+        self.assertFalse(hasattr(panels, "three_slice_h"))
+        self.assertFalse(hasattr(panels, "_native_size"))
+
+    def test_config_has_no_menu_scrim(self):
+        self.assertFalse(hasattr(config, "MENU_SCRIM"))
+
+
 class MenuHasNoInstructionsTests(unittest.TestCase):
     """The game instructions moved to the character-select screen (they now sit
     beside the hero preview); the start menu carries no trace of them."""
@@ -670,7 +703,8 @@ class HeroCardArtTests(unittest.TestCase):
 
         # The name blit is found by its rendered size and its centre on card 1
         # (`Font.render` is C-level too and cannot be patched).
-        want = cs._name.render(name, True, config.COLOR_TEXT).get_size()
+        from ui.text import shadowed
+        want = shadowed(cs._name, name, config.COLOR_ACCENT).get_size()   # the name carries a drop shadow
         card = cs._mouse.hits.rect_of(("hero", 1))
 
         def name_y():
@@ -806,6 +840,17 @@ class MenuButtonArtTests(unittest.TestCase):
         self.assertLess(rects[-1].bottom, 890)                     # inside the panel
         self.assertEqual([c.args[3] for c in calls], [l for l, _ in menu._options])
 
+    def test_rows_are_tight_and_clear_the_save_summary(self):
+        """2026-09-11: rows on a 68-px step (a 4-px gap, was 8) and 25 px
+        higher, so the salvage / best-run line at the screen foot stays
+        readable."""
+        game, menu = self._menu_drawn()
+        rects = [c.args[2] for c in self._calls(game, menu)]
+        self.assertEqual(rects[0].centery, 525)
+        for a, b in zip(rects, rects[1:]):
+            self.assertEqual(b.top - a.bottom, 4)
+        self.assertLess(rects[-1].bottom, config.SCREEN_HEIGHT - 60)   # summary sits at h - 40
+
     def test_selected_row_is_gold_and_follows_the_keyboard(self):
         game, menu = self._menu_drawn()
         self.assertEqual([c.kwargs["state"] for c in self._calls(game, menu)],
@@ -887,9 +932,10 @@ class CharacterSelectTextTests(unittest.TestCase):
         card = cs._mouse.hits.rect_of(("hero", 1))                    # not selected -> blue art
         name_band = pygame.Rect(card.left + 16, card.top + 12, card.width - 32, 40)
         rows_band = pygame.Rect(card.left + 16, card.top + 66, card.width - 32, 60)
-        self.assertTrue(self._has_colour(game.screen, name_band, config.COLOR_ON_BUTTON))
+        self.assertTrue(self._has_colour(game.screen, name_band, config.COLOR_ACCENT))    # card titles: gold
         self.assertTrue(self._has_colour(game.screen, rows_band, config.COLOR_ON_BUTTON_DIM))
-        self.assertFalse(self._has_colour(game.screen, card, config.COLOR_TEXT))       # old light text gone
+        # (The descriptions are white again by the owner's 2026-09-10 rule, so the
+        # old "no light text on the card" check no longer applies.)
         self.assertFalse(self._has_colour(game.screen, card, config.COLOR_TEXT_DIM))
 
     def test_difficulty_pair_is_centred_on_the_ribbon(self):

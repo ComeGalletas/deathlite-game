@@ -12,7 +12,7 @@ from __future__ import annotations
 # sprite / tile. 16:9.
 SCREEN_WIDTH: int = 1600
 SCREEN_HEIGHT: int = 900
-FPS: int = 61
+FPS: int = 62
 TITLE: str = "Death Lite Game"
 # Present frames on the display's refresh. The window is created with
 # `pygame.SCALED | pygame.DOUBLEBUF` and `vsync=1`, so `flip()` waits for the
@@ -35,7 +35,12 @@ MAX_DT: float = 1.0 / 20.0
 # their large source frames -- no upscale blur). The HUD and feedback overlays
 # are drawn afterwards at full resolution and are unaffected. 1.0 == no zoom.
 # The visible world extent is therefore SCREEN_* / CAMERA_ZOOM.
-CAMERA_ZOOM: float = 1.5
+#
+# Keep `TILE_PX * CAMERA_ZOOM` a whole number of pixels, or the tile grid lands
+# on fractional boundaries and the seams shimmer. At the 64 px tile that means
+# steps of 0.25: 1.25 -> 80, 1.5 -> 96, 1.75 -> 112, 2.0 -> 128.
+# `tests/rendering/test_camera.py` pins this for the desktop and web profiles.
+CAMERA_ZOOM: float = 1.75
 
 # --- Persistence -----------------------------------------------------------
 # When True the game reads `save.json` at boot and writes it back on every
@@ -422,18 +427,17 @@ ENEMY_NAV_FILL_BUDGET: float | None = 0.003
 
 # --- Colours (RGB) ---------------------------------------------------------
 COLOR_BG = (16, 16, 22)
-COLOR_GRID = (32, 33, 44)
 COLOR_WORLD_BORDER = (70, 72, 96)
 COLOR_PLAYER = (90, 200, 255)
 COLOR_PLAYER_OUTLINE = (220, 245, 255)
 COLOR_TEXT = (240, 240, 245)
-COLOR_TEXT_DIM = (150, 150, 165)
+COLOR_TEXT_DIM = (235, 235, 240)     # body text on dark grounds: white (owner, 2026-09-10); titles keep COLOR_ACCENT
 COLOR_ACCENT = (255, 205, 90)
 # Text drawn *on* the light UI sheets (buttons, cards, ribbons): black for
 # titles / labels, a dark grey for the secondary lines. The light
 # COLOR_TEXT pair above is for the dark background only.
 COLOR_ON_BUTTON = (28, 28, 34)        # near-black: a shade clearer than pure black
-COLOR_ON_BUTTON_DIM = (80, 80, 70)   # tried first; judge in a real window
+COLOR_ON_BUTTON_DIM = (28, 28, 34)     # card descriptions and tags on the light art: the near-black (owner, 2026-09-10); card titles are COLOR_ACCENT
 COLOR_DEBUG = (120, 255, 140)         # solid bodies in the dev collider overlay
 COLOR_DEBUG_SOFT = (70, 150, 95)      # pickup / trigger radii in that overlay
 COLOR_DEBUG_HIT = (255, 120, 255)     # projectile hitboxes in that overlay
@@ -453,13 +457,12 @@ MENU_BG = (0, 0, 0)
 MENU_FG = (170, 170, 170)
 MENU_FG_DIM = (0, 0, 0)
 # Optional full-screen title art, drawn over the fallback title text (the text
-# shows only when this file is missing). MENU_SCRIM is a translucent panel (RGBA)
-# laid over the art behind the option list so the white text stays readable.
+# shows only when this file is missing).
 MENU_TITLE_IMAGE: str = "ui/start_screen/title.png"
 # Full-screen backdrop, drawn under the logo; falls back to MENU_TITLE_IMAGE,
 # then to the flat MENU_BG fill.
 MENU_BACKGROUND_IMAGE: str = "ui/start_screen/menu_background.png"
-# The game logo, drawn above the options panel; falls back to rendered text.
+# The game logo, drawn above the option list; falls back to rendered text.
 MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
 
 # --- Mouse in menus ----------------------------------------------------
@@ -470,7 +473,6 @@ MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
 # surface cursor, keeps the system arrow.
 UI_CURSOR_IMAGE: str = "ui/pointers/arrow.png"
 UI_CURSOR_SCALE: float = 1.0      # the ink is 22x30 px at 1x; 1.5 if it reads small
-MENU_SCRIM = (0, 0, 0, 185)
 
 # Game instructions, surfaced on the character-select screen (they lived on the
 # start menu until the hero-preview rework). A (label, keys) grid plus free

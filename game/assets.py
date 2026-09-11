@@ -128,6 +128,10 @@ class Assets:
                 # (BLEND_RGBA_ADD, used by `rotated()` / `frame_rotated()`,
                 # only brightens and can't recolour white).
                 fr.fill((*tint, 255), special_flags=pygame.BLEND_RGBA_MULT)
+            if spec.get("flip_v"):
+                # CR2: an anim authored the other way up (the Sword's
+                # downward slash is strip 2 of the combat sheet, flipped).
+                fr = pygame.transform.flip(fr, False, True)
             if flip:
                 fr = pygame.transform.flip(fr, True, False)
             if size is not None:

@@ -24,7 +24,6 @@ from game import config
 from world.elevation import NONE
 from world.layout import CLIFF
 from tests import worlds as W
-from world.map import GameMap
 
 SEED = 21
 
@@ -160,8 +159,8 @@ class BlockTests(_World):
 
 class ExemptionTests(_World):
     def test_a_projectile_with_no_recorded_floor_is_left_alone(self):
-        """`NONE` is what a flat world and every unit test that builds a
-        projectile by hand get, so the rule has to be inert for them."""
+        """`NONE` is what every unit test that builds a projectile by hand
+        gets, so the rule has to be inert for them."""
         p = Projectile()
         p.reset(pos=(0, 0), vel=(0, 0), damage=1, radius=4, lifetime=1)
         p.active = True

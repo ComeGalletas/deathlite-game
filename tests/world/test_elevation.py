@@ -19,25 +19,19 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
-from world.elevation import LevelIndex, NONE
 from world.rules.steps import can_cross, can_step, diagonal_blocked
 from world.gen.height.walls import _foot_stone_frees
 from world.gen.height.graph import reachable, walk_links
 from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
 from tests import worlds
-from world.map import GameMap
 from world.pathfinding import NavField, NavGrid, FlowField, NAV_DIRS, _INF
-from world.procedural import generate_world
 
 # Two seeds, not forty. Every case here is structural -- it holds for a
 # neighbourhood, not for a lucky layout -- and each seed costs a world plus a
 # nav build. The exhaustive sweeps below cover tens of thousands of tiles
 # apiece, which is where the confidence comes from.
 SEEDS = (35, 7)
-
-
-
 
 
 def _world(seed):
@@ -110,11 +104,10 @@ class LevelIndexTests(unittest.TestCase):
 
 class PackingTests(unittest.TestCase):
     def test_no_two_rooms_share_a_land_cell(self):
-        """The height-map equivalent of `test_procedural`'s
-        `test_all_geometry_within_bounds_and_nonoverlapping`, which asserts room
-        *rects* never collide.
+        """Room *rects* are allowed to collide -- the invariant a rectangular
+        generator would pin is deliberately false here.
 
-        That invariant is deliberately false here: rects overlap so the islands
+        Rects overlap so the islands
         can sit closer and the bridges between them stay short. What must hold
         instead is the one that actually matters -- no world tile is land in two
         rooms at once. `HEIGHTMAP_COAST_KEEP` is what makes it safe, by
