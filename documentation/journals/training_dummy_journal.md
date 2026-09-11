@@ -69,8 +69,11 @@ Two consequences:
 
 ### 1. The dummy — `data/enemies.json`
 
-A new `training_dummy` entry: no contact damage, no experience, `speed: 0`, its
-own `tags: ["dummy"]`, and a new `invulnerable: true` field.
+A new `training_dummy` entry **copied from `chaser`** (owner's choice: same
+sprite `skull`, same `radius`, same `color`, so it reads as an ordinary enemy),
+then made inert: `contact_damage: 0`, `contact_damage_enabled: false`,
+`experience_reward: 0`, `speed: 0`, `aggro_range: 0`, `behavior: "dummy"`,
+`tags: ["dummy"]`, and a new `invulnerable: true` field.
 
 `Enemy.take_damage` (`entities/enemy.py:94`) must keep **returning the amount
 dealt** — that return is what the meter counts — while not subtracting it from
@@ -106,6 +109,28 @@ holding a `DpsMeter` with
 
 The meter is off unless armed, so a normal run pays nothing but a boolean check.
 
+**It meters one target.** `DpsMeter` holds the dummy, and only damage landing on
+that enemy counts (decision 3). The tap is therefore a single place —
+`Enemy.take_damage` on the metered enemy — rather than four scattered
+`stats["damage_dealt"]` sites, which also means the meter cannot drift out of
+step with those sites later.
+
+Because the tap is the target rather than the shooter, every source has to name
+itself on the way in. `take_damage` grows a `source` argument, defaulting to
+`None` (= unattributed), and the callers pass it:
+
+| caller | source |
+|---|---|
+| `combat.py:77` | `proj.weapon_id` (already on the projectile) |
+| `effects.py:268` | the exploding weapon's id — **new, directive 1** |
+| `state.py:585` `_report_dot` | the weapon that applied the effect — **new, directive 1** |
+| `npcs.py:168` | `"villager"`, which the meter drops — **directive 2** |
+
+Passing a source through explosions and damage-over-time is a change to the game
+itself and outlives the meter: `killed_by` already wants a weapon id for
+Bloodletting-style blessings, and today a kill by explosion or burn attributes
+to nothing.
+
 ### 4. The dev menu option
 
 A `dummy` row in `_ROOT_ROWS` labelled "Training dummy", toggling on:
@@ -119,61 +144,126 @@ Toggling off despawns the dummy and disarms the meter.
 
 ---
 
-## Open questions for the owner
+## Decisions (owner, 2026-09-11)
 
-1. **Rolling window length.** 5 s reacts fast but swings wildly with a slow
-   weapon like the Hammer; 10 s is steadier. Proposing **10 s** with the
-   cumulative figure shown beside it.
-2. **Does the dummy fight back?** Proposing **no** — `contact_damage: 0`, so a
-   measurement is never cut short by the hero dying. Say if you want a variant
-   that hits back for testing survivability.
-3. **One dummy or several?** Proposing **one**, because several would make
-   area weapons (Bomb, Hammer, Ember Ring) read much higher than single-target
-   ones and the number would stop being comparable. A "spawn three" option
-   would measure cleave separately, if that is wanted.
-4. **Should the dummy take knockback?** Proposing **no** (very high `weight`),
-   so it stays in place and the hero keeps hitting it. Otherwise Hammer and
-   Bomb push it out of range and under-report.
-5. **Where does the readout live?** Proposing the **debug overlay (F1)**, which
-   needs no new UI. A dedicated panel would look better but is more work.
+All five questions answered, plus three directives that change the design above.
+
+1. **Rolling window: 10 s**, with the cumulative figure beside it.
+2. **The dummy never fights back**, and it is **the chaser** — the dummy is the
+   existing `chaser` made invulnerable and inert, not a new creature with its
+   own art. One dummy shape is enough; no per-enemy-type variants.
+3. **One dummy, and the damage *that dummy* receives is what the meter
+   records.** This is the important one: the meter is not a global tally of
+   `stats["damage_dealt"]`, it is the damage landing on one known target. Any
+   other enemy in the world is ignored, so the reading cannot be inflated by a
+   stray hit on something else.
+4. **No knockback.** This is a numbers test — the dummy stays where it is put.
+5. **The readout lives in the F1 debug overlay.**
+
+And three directives:
+
+- **Explosions and damage-over-time must carry the source of the damage**,
+  which is normally a weapon. This is a change to the game's own damage paths,
+  not just to the meter.
+- **Villagers are never counted.** A village lancer that wanders over and hits
+  the dummy contributes nothing.
+- **Knockback is out of scope entirely.**
+
+### What decision 3 changes
+
+The first draft tapped the four `stats["damage_dealt"]` sites and summed them.
+Measuring *the dummy's* intake instead is both simpler and stricter: the tap is
+whatever lands on that one enemy, so damage to other enemies can never leak in,
+and the "is this actually my DPS?" question has a single, checkable answer.
+
+It does **not** remove the need for source ids. The meter still has to say
+*which weapon* did the damage, so the explosion and damage-over-time paths must
+still be given a source — directive 1 above — otherwise the dummy's intake is a
+correct total with an unattributable half.
+
+It also does not remove the villager exclusion. A lancer's
+`foe.take_damage(npc.damage)` (`game/states/playing/npcs.py:168`) would land on
+the dummy like anything else, so that path has to be tagged as a non-hero source
+and dropped by the meter rather than merely being "not the hero's projectile".
 
 ---
 
-## Todo — not started, pending the answers above
+## Todo — ready to build (owner's go on all five, 2026-09-11)
 
-- [ ] `data/enemies.json`: a `training_dummy` entry — `hp` nominal,
-      `invulnerable: true`, `speed: 0`, `contact_damage: 0`,
-      `experience_reward: 0`, a high `weight`, `behavior: "dummy"`,
-      `tags: ["dummy"]`. No code-side defaults for any of it.
-- [ ] `entities/enemy.py`: honour `invulnerable` in `take_damage` — still
-      compute and return the dealt amount, skip the `hp` subtraction, leave
-      armour / shield / hit-flash behaviour untouched.
+**The damage paths first**, because the meter is only as honest as its sources.
+
+- [ ] `entities/enemy.py` `take_damage(amount, armor=0.0)` grows a `source`
+      argument (default `None` = unattributed). It changes nothing for existing
+      callers and is what every tap below hangs off.
+- [ ] `game/states/playing/effects.py:268`: explosions pass the exploding
+      weapon's id. The Bomb's blast currently attributes to nothing, so this
+      also fixes `killed_by` for an explosion kill.
+- [ ] `game/states/playing/state.py:585` `_report_dot`: damage over time passes
+      the weapon that applied the effect.
+- [ ] `game/states/playing/combat.py:77`: pass the `proj.weapon_id` it already
+      holds.
+- [ ] `game/states/playing/npcs.py:168`: village lancers pass `"villager"`, a
+      source the meter drops — villagers are never part of the number.
+
+**Then the dummy.**
+
+- [ ] `data/enemies.json`: a `training_dummy` entry copied from `chaser` (same
+      `sprite`, `radius`, `color`) then made inert — `invulnerable: true`,
+      `speed: 0`, `aggro_range: 0`, `contact_damage: 0`,
+      `contact_damage_enabled: false`, `experience_reward: 0`,
+      `behavior: "dummy"`, `tags: ["dummy"]`. No code-side defaults for any of
+      it.
+- [ ] `entities/enemy.py`: honour `invulnerable` — still compute and **return**
+      the dealt amount (that return is what the meter counts), skip the `hp`
+      subtraction, leave armour, shields and the hit flash exactly as they are
+      so the measurement reflects a real hit.
+- [ ] Knockback: the dummy ignores it. `apply_knockback` is a no-op for an
+      invulnerable enemy, which is simpler and more honest than a huge `weight`
+      that merely makes the push small.
 - [ ] `entities/ai/behaviors/simple.py`: register a `dummy` behaviour that does
-      nothing, so the dummy neither steers nor attacks.
-- [ ] `game/states/playing/dps_meter.py` (new): `DpsMeter` — arm / disarm /
-      reset, `add(amount, source)`, cumulative total and elapsed, rolling
-      window, per-source breakdown.
-- [ ] Tap the damage sinks: `combat.py:77` (source `proj.weapon_id`),
-      `effects.py:268` and `state.py:585` — both of which need a source id
-      threaded through to attribute explosions and damage-over-time. Exclude
-      `npcs.py:168` so village lancers never count toward the hero's DPS.
+      nothing — no steering, no attack, no aggro. None of the twelve existing
+      behaviours is inert, and `speed: 0` alone still runs an attack beat.
+
+**Then the meter.**
+
+- [ ] `game/states/playing/dps_meter.py` (new module — this does not go into the
+      1,034-line `state.py`): `DpsMeter` holding the metered enemy, with
+      `arm(enemy)` / `disarm()` / `reset()`, `record(amount, source)`, elapsed
+      time, a cumulative total, a **10 s** rolling window, and a per-source
+      breakdown keyed by weapon id. Sources named `"villager"` are dropped.
+- [ ] Only damage landing on the armed enemy is recorded, so a stray hit on any
+      other enemy can never inflate the reading.
+
+**Then the wiring.**
+
 - [ ] `game/states/dev_menu_state.py`: a `dummy` row in `_ROOT_ROWS` and
-      `_LABELS`, and a handler that spawns the dummy through
-      `spawn.spawn_enemy(..., owner="dev")`, arms the meter, and reports through
-      `_status` when the master refuses.
+      `_LABELS` ("Training dummy"), toggling on — spawn one `training_dummy`
+      through `spawn.spawn_enemy(..., owner="dev")` at a fixed offset, arm the
+      meter on it, and report through `_status` when the master refuses.
+      Toggling off despawns it and disarms.
 - [ ] `PlayingState._debug_metrics`: push the meter's numbers through
-      `set_metric` while it is armed.
-- [ ] Tests, `unit` tier where possible:
-      - `DpsMeter` arithmetic on a fake clock — totals, elapsed, the rolling
-        window, per-source split, reset;
-      - `take_damage` on an invulnerable enemy returns the dealt amount and
-        leaves `hp` alone, and still respects armour and shields;
-      - the `dummy` behaviour moves and attacks nothing;
-      - `integration` tier: the dev-menu row spawns exactly one dummy through
-        the spawn master and arms the meter.
-- [ ] Sanity-check the meter against a hand-computed figure: one weapon, no
-      blessings, known cooldown and damage — the measured DPS must match
-      `damage / cooldown` within the window's tolerance. This is what proves
-      the meter rather than the meter proving itself.
-- [ ] Screenshot: the dummy standing in a run with the overlay showing the
-      per-source breakdown.
+      `set_metric` while armed, so the readout rides the existing F1 overlay.
+
+**Tests.**
+
+- [ ] `unit`: `DpsMeter` arithmetic on a fake clock — total, elapsed, the 10 s
+      window rolling off old samples, the per-source split, `"villager"`
+      dropped, reset.
+- [ ] `unit`: `take_damage` on an invulnerable enemy returns the dealt amount
+      and leaves `hp` alone, still respecting armour and shields; and knockback
+      does not move it.
+- [ ] `unit`: the `dummy` behaviour moves nothing and attacks nothing.
+- [ ] `unit`: an explosion and a damage-over-time tick both arrive at
+      `take_damage` carrying their weapon id.
+- [ ] `integration`: the dev-menu row spawns exactly one dummy through the
+      spawn master and arms the meter on it.
+- [ ] **The check that proves the meter rather than the meter proving itself**:
+      one weapon, no blessings, known `damage` and `cooldown` from the data —
+      the measured DPS must match `damage / cooldown` within the window's
+      tolerance.
+
+**Close-out.**
+
+- [ ] Screenshot: the dummy in a run with the F1 overlay showing the per-source
+      breakdown.
+- [ ] Record the evidence here and close the entry.
