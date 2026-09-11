@@ -74,10 +74,13 @@ python -m pytest -m unit
 
 | tier | what it does | tests | time |
 |------|--------------|------:|-----:|
-| `unit` | hand-built grids and fakes | 760 | 10 s |
-| `world` | the four cached worlds in `tests/worlds.py` | 483 | 2 min 45 s |
-| `integration` | boots a real `Game` and drives its states | 380 | 5 min |
-| `sweep` | many seeds, statistical | 7 | — |
+| `unit` | hand-built grids and fakes | 768 | 12 s |
+| `world` | the four cached worlds in `tests/worlds.py` | 485 | 3 min 32 s |
+| `integration` | boots a real `Game` and drives its states | 390 | 6 min 13 s |
+| `sweep` | many seeds, statistical | 7 | 2 min 8 s |
+
+The default `python -m pytest` is the first three together: 1,643 tests in
+8 min 40 s.
 
 The `sweep` tier makes statistical claims over many seeds and runs before a
 commit:
@@ -107,7 +110,7 @@ separately cached build. `tests/world/test_digest.py` pins a fingerprint of
 the layout, the bake and one drawn frame for each cached seed; a change that
 moves the world says so and runs `python -m world.digest --write`.
 
-1,630 tests: pure logic plus headless integration (SDL dummy video/audio driver)
+1,650 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,
 terrain tiling / bridge corridors / the decoration scatter / obstacle skins,
 depth-sorted rendering, the start menu + options + rankings screens, developer
@@ -240,7 +243,7 @@ deathlite-game/
 │                       projectiles/, terrain/{tiles,bridge,props,resources}/,
 │                       buildings/, effects/, ui/title.png, CREDITS.md
 │                       (PNG sprites only — see assets/CREDITS.md)
-└── tests/              1,630 tests: pure logic + headless integration
+└── tests/              1,650 tests: pure logic + headless integration
     ├── ai/             behaviours, FSM enemies, pathfinding, nav, boss
     ├── rendering/      camera, animation, depth sort, terrain, sprites, assets,
     │                   screens
