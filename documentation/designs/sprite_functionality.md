@@ -483,7 +483,7 @@ Per drawn character: one index query (a few dict reads) and up to a
 couple of rectangle tests. Per covered character: one cached copy the
 first time its frame is seen and one clipped blit per covering obstacle.
 The render pass today is ~3.5 ms for the world plus ~0.1 ms per body in
-view (after the culling and shade-index work in `fluidity_plan.md`
+view (after the culling and shade-index work in `plans/fluidity_plan.md`
 section 7); this adds well under a millisecond with a crowd under the
 trees and nothing when no one is covered.
 

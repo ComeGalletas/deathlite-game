@@ -2709,7 +2709,7 @@ before moving world modules or changing ownership boundaries.
 
 ## World generation refactor executed (2026-09-02)
 
-**What was done:** `documentation/worldgen_refactor_plan.md` reconciled the
+**What was done:** `documentation/plans/worldgen_refactor_plan.md` reconciled the
 two modularity todo lists into one plan; every phase of it is now done, with
 the LD-8 flat generator retired. Per-phase evidence lives in
 `journals/world_refactor_plan_journal.md`. In short: a shared world cache and

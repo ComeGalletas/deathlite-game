@@ -1,6 +1,6 @@
 # Spawn master — journal
 
-Evidence for the phases of `documentation/spawn_master_todo.md`, against the
+Evidence for the phases of `documentation/plans/spawn_master_todo.md`, against the
 design in `documentation/spawn_master_design.md`. One entry per phase:
 what landed, what was measured, what was decided on the way, what was left.
 
@@ -535,7 +535,7 @@ decision), or fill incrementally across frames.
 
 ### Addendum: after the commit (2026-09-03)
 
-Two more measurements, on the way to `documentation/fluidity_plan.md`:
+Two more measurements, on the way to `documentation/plans/fluidity_plan.md`:
 
 - `GameMap.is_walkable` ends with a linear scan of every obstacle in the
   world (565 on seed 35), and `resolve_movement` calls it up to three
@@ -577,7 +577,7 @@ the exempt-owner check in `test_master`.
 
 ## The obstacle index in the collider (2026-09-03)
 
-Item 1 of `documentation/fluidity_plan.md`, done.
+Item 1 of `documentation/plans/fluidity_plan.md`, done.
 
 `GameMap.is_walkable` and `blocking_obstacle_hit` ended with a scan of
 every obstacle in the world. `world/map.py` now carries
@@ -618,7 +618,7 @@ floor spot.
 
 ## Render fixes and the sliced flow-field fill (2026-09-03)
 
-Items 3 and 7 of `documentation/fluidity_plan.md`, done.
+Items 3 and 7 of `documentation/plans/fluidity_plan.md`, done.
 
 **Render.** `PlayingState._actor_items` lists only the bodies inside the
 view padded by `config.RENDER_ACTOR_CULL_PAD` (enemies, death poofs,

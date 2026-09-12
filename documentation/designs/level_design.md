@@ -24,7 +24,7 @@ reading the one below and never the one above:
 > Related: `combat_calculations.md` (damage), `terrain_tile_slots_formula.md`
 > (how a tilemap cell is addressed / cut / placed),
 > `../journals/level_design_journal.md` (every design pass, with diagrams),
-> `worldgen_refactor_plan.md` (why the code is shaped as it is).
+> `plans/worldgen_refactor_plan.md` (why the code is shaped as it is).
 
 ---
 
@@ -67,7 +67,7 @@ Roles: `start_id = 0`; `boss_id` is the island farthest from the start by
 tree distance -- it shapes that island (the `boss` topography, the
 `boss`-tagged spawn points) but the boss itself no longer appears there:
 it flies, and spawns `config.BOSS_SPAWN_DISTANCE` from the hero wherever
-the hero is (`documentation/boss_free_roam_todo.md`); then one or two
+the hero is (`documentation/plans/boss_free_roam_todo.md`); then one or two
 **villages** (`HEIGHTMAP_VILLAGES`, a hard
 floor of one) are drawn from the islands one or two bridges from the start
 (`HEIGHTMAP_VILLAGE_DISTANCE`), never the boss; the rest are shuffled and

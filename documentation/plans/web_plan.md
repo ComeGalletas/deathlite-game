@@ -85,7 +85,7 @@ tail.
 
 ## 4. Frame time in the browser
 
-The fluidity plan's two items (`documentation/fluidity_plan.md`) matter
+The fluidity plan's two items (`documentation/plans/fluidity_plan.md`) matter
 more here than on desktop, because everything is 2-4x slower and the
 compositor budget is a hard 16.7 ms at 60 Hz:
 

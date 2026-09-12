@@ -568,7 +568,7 @@ Asked how the reachability would be solved. Two halves, different risk:
 **Asked:** the boss and the brood it summons ignore terrain entirely --
 no obstacles, no elevation, no flow field, no island edge -- and the boss
 spawns beside the hero instead of in the boss room. Plan and ticks:
-`documentation/boss_free_roam_todo.md`. Three decisions taken by the owner
+`documentation/plans/boss_free_roam_todo.md`. Three decisions taken by the owner
 first: the sea is air; the mites fly by the same tag in data; the spawn
 distance is "just off-screen".
 

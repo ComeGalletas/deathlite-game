@@ -56,7 +56,7 @@ First run downloads a CPython-WASM runtime (cached after). Mixer bring-up is
 platform-specific behind `systems/mixer_backend.py` (desktop re-inits at
 22050 Hz; the browser keeps the WebAudio context it was given and resamples).
 Fonts are the bundled **Fredoka** face (`assets/fonts/`, via `game/fonts.py`).
-See `journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
+See `documentation/journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
 
 ## Run the tests
 
@@ -156,7 +156,7 @@ Sanctuary.
 ### Display
 
 The window is **1600×900** (`config.SCREEN_WIDTH/HEIGHT`). The in-game view is a
-**draw-time camera zoom** (`config.CAMERA_ZOOM`, default 1.75): the world is drawn
+**draw-time camera zoom** (`config.CAMERA_ZOOM`, default 1.5): the world is drawn
 straight to the screen with every sprite, tile and shape scaled by the zoom, so
 the picture is "closer" but stays crisp — sprites scale *down* from their large
 source frames, no upscale blur. The visible world extent is `SCREEN / CAMERA_ZOOM`.
@@ -309,7 +309,7 @@ arena, drops an item) → victory / defeat → Salvage & loot banked → Sanctua
 (Normal / Fast / Super Fast) and per-difficulty Rankings.
 
 Not done: balance is a first tuning pass (needs human playtesting); one boss
-(the spec's Phase-1 floor); a few polish items listed in `journals/journal.md`.
+(the spec's Phase-1 floor); a few polish items listed in `documentation/journals/journal.md`.
 
 ## Assets
 
@@ -360,11 +360,24 @@ translucent scrim (`config.MENU_SCRIM`) behind the option list. No file → the
 Every third-party pack (character sprites, terrain, title art) and its licence
 must be confirmed in `assets/CREDITS.md` before distribution.
 
-Project logs live in `journals/`: `journal.md` (full milestone log),
-`transcript.md` (the key decision behind each step), `assets_journal.md`
-(sprite / terrain integration), `dev_mode_journal.md` (developer mode),
-`combat_balance_journal.md` (combat-model / tuning changes) and `BUG_JOURNAL.md`
-(confirmed defects). Design references are under `documentation/`
-(`COMBAT_CALCS.md` — damage; `level_design.md` — world generation & the
-asset-backed vs primitive renderers; `terrain_tile_slots_formula.md` — how a
-tilemap cell is addressed, cut and placed).
+Everything written about the project lives under `documentation/`, in three
+kinds of file:
+
+- **`documentation/journals/`** — what was *done*, in order, with the numbers:
+  `journal.md` (full milestone log), `transcript.md` (the key decision behind
+  each step), `assets_journal.md` (sprite / terrain integration),
+  `dev_mode_journal.md` (developer mode), `combat_balance_journal.md`
+  (combat-model / tuning changes), `bug_journal.md` (confirmed defects) and one
+  journal per workstream (`weapon_system_journal.md`, `spawn_master_journal.md`,
+  `level_design_journal.md`, `human_island_journal.md`, ...).
+- **`documentation/plans/`** — what is *to be done*, and in what order:
+  `weapon_system_plan.md`, `worldgen_refactor_plan.md`, `spawn_master_todo.md`,
+  `boss_free_roam_todo.md`, `fluidity_plan.md`, `web_plan.md` and
+  `test_suite_review.md`. `pending_plans.md` is the standing list of everything
+  designed or built but not yet wired up.
+- **`documentation/` itself** — design references that describe how the game
+  *works*: `death_must_die_lite_game_spec.md` (the spec),
+  `combat_calculations.md` (damage), `level_design.md` (world generation and
+  the asset-backed vs primitive renderers), `spawn_master_design.md`,
+  `sprite_functionality.md` and `terrain_tile_slots_formula.md` (how a tilemap
+  cell is addressed, cut and placed).
