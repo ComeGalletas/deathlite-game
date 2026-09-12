@@ -80,6 +80,13 @@ class SmokeTest(unittest.TestCase):
         # field clear; kills / damage are the meaningful signals.)
         self.assertGreater(playing.stats["damage_dealt"], 0, "weapon dealt no damage")
         self.assertGreaterEqual(playing.stats["kills"], 5, "nothing was killed")
+        # The run ledger (game-over screen) hears every path that counts
+        # toward `damage_dealt`, and every kill lands under its type.
+        self.assertAlmostEqual(playing.ledger.total, playing.stats["damage_dealt"],
+                               places=3, msg="a damage path was counted but not attributed")
+        self.assertTrue({w.weapon_id for w in playing.player.weapons} & set(playing.ledger.damage),
+                        "no held weapon has damage in the ledger")
+        self.assertEqual(playing.ledger.total_kills, playing.stats["kills"])
 
         # PROGRESSION: force another level-up, confirm the choice overlay appears,
         # pick option 1, confirm it applies and control returns to PLAYING.
@@ -118,6 +125,55 @@ class SmokeTest(unittest.TestCase):
         self.assertIsInstance(game.state_machine.current, VictoryState)
         self.assertGreater(game.state_machine.current.stats["currency"], 0)
 
+        pygame.quit()
+
+    def test_a_death_lands_on_the_summary_with_the_ledger_rows(self):
+        """A real run's death: the game-over screen receives the summary
+        `_end_run` builds, with the per-weapon rows, the kills per type and
+        the blessings by name -- and the rows agree with the totals."""
+        game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        game.state_machine.change(MenuState(game))
+
+        def key(k):
+            game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k))
+
+        key(pygame.K_RETURN)
+        key(pygame.K_RETURN)
+        from game.states.loading_state import LoadingState
+        for _ in range(5000):
+            if not isinstance(game.state_machine.current, LoadingState):
+                break
+            game.state_machine.update(1 / 60)
+        playing = game.state_machine.current
+        self.assertIsInstance(playing, PlayingState)
+        for at in spots_near(playing, 5):
+            playing._spawn_enemy("chaser", at=at)
+        for _ in range(600):
+            game.state_machine.update(1 / 60)
+            while isinstance(game.state_machine.current, LevelUpState):
+                key(pygame.K_1)
+        self.assertGreater(playing.ledger.total, 0)
+
+        playing.player.take_damage(10 ** 9)
+        from game.states.game_over_state import GameOverState
+        for _ in range(600):                      # the death poof holds the run open
+            game.state_machine.update(1 / 60)
+            if isinstance(game.state_machine.current, GameOverState):
+                break
+        over = game.state_machine.current
+        self.assertIsInstance(over, GameOverState)
+        stats = over.stats
+        for key_ in ("weapon_rows", "other_rows", "kill_rows", "blessing_rows",
+                     "damage_by_source", "gold", "time", "dropped_items"):
+            self.assertIn(key_, stats)
+        self.assertEqual([r["id"] for r in stats["weapon_rows"]],
+                         [w.weapon_id for w in playing.player.weapons])
+        self.assertAlmostEqual(sum(stats["damage_by_source"].values()),
+                               stats["damage_dealt"], places=3)
+        self.assertEqual(sum(n for _n, n in stats["kill_rows"]), stats["kills"])
+        self.assertTrue(any(r["dps"] > 0 for r in stats["weapon_rows"]))
+        # It draws with the real assets and the real fonts.
+        game._render()
         pygame.quit()
 
 

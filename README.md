@@ -236,7 +236,8 @@ deathlite-game/
 │                       renderer); nav/ (NavGrid, flow field; `pathfinding`
 │                       re-exports); digest (layout / bake / frame
 │                       fingerprints); spawning (director)
-├── ui/                 hud, level-up panel, damage numbers
+├── ui/                 hud, level-up panel, damage numbers, run summary
+│                       (the game-over résumé), mouse, buttons and ribbons
 ├── data/               JSON content (weapons, enemies, bosses, characters,
 │                       blessings, items, meta_upgrades, sprites, terrain)
 ├── assets/             characters/<colour>/<unit>/, enemies/<mob>/,
@@ -307,6 +308,14 @@ upgrade / blessing choices → special locations → escalating waves → boss (
 arena, drops an item) → victory / defeat → Salvage & loot banked → Sanctuary
 (spend, equip) → next run inherits it. Phase 4 adds the per-run difficulty
 (Normal / Fast / Super Fast) and per-difficulty Rankings.
+
+**Game over** shows the run's résumé (`ui/run_summary.py`): time, level,
+kills, gold and Salvage, the items acquired; kills per enemy type and the
+blessings with their levels; and the damage done per weapon with its DPS over
+the time the weapon was held, fed by a run-wide ledger every enemy reports
+to (`game/states/playing/run_ledger.py`). Three buttons — New run, Sanctuary,
+Main menu — take the mouse or ENTER / S / ESC. See
+`documentation/journals/game_over_journal.md`.
 
 Not done: balance is a first tuning pass (needs human playtesting); one boss
 (the spec's Phase-1 floor); a few polish items listed in `documentation/journals/journal.md`.

@@ -51,6 +51,7 @@ from game.states.playing.locations import SpecialLocations
 from game.states.playing.npcs import Npcs
 from game.states.playing.effects import TransientFx
 from game.states.playing.dps_meter import DpsMeter
+from game.states.playing.run_ledger import RunLedger
 from game.states.playing import slam_fx, slash_fx
 from game.states.playing.navigation import NavCoordinator
 from game.states.playing.spawning import EnemyControl
@@ -213,6 +214,10 @@ class PlayingState(State):
         # `gold` = spent in-run at the Merchant only, never banked.
         self.stats = {"time": 0.0, "level": 1, "kills": 0, "damage_dealt": 0.0,
                       "xp": 0, "currency": 0, "gold": 0, "dropped_items": []}
+        # Damage per source and kills per enemy type for the whole run, fed
+        # through every enemy's `ledger` attribute (`run_ledger.py`). Built
+        # before anything can spawn: the spawner hands it to each enemy.
+        self.ledger = RunLedger()
         self._drop_counter = 0
         # Damage-per-second against the dev menu's training dummy. Inert --
         # and free -- until something arms it (`dps_meter.py`).
@@ -326,6 +331,8 @@ class PlayingState(State):
         self._phase_progression(dt)
 
         self.stats["time"] += dt
+        self.ledger.now = self.stats["time"]
+        self.ledger.track_held(w.weapon_id for w in self.player.weapons)
         self.dps.update(dt)
         self._apply_dev_unlimited_hp()
         if not self.player.alive:
@@ -796,6 +803,7 @@ class PlayingState(State):
     def _on_boss_killed(self) -> None:
         reward = getattr(self.boss, "reward_currency", 50)
         self.stats["currency"] += reward
+        self.ledger.kill(self.boss)
         # The boss's "meaningful reward" (spec 3.7): a high-tier item.
         self._drop_item(item_level=max(3, int(1 + self.stats["time"] // 60)))
         self.particles.burst(self.boss.pos, self.boss.color, count=60,
@@ -816,6 +824,21 @@ class PlayingState(State):
         summary["character"] = self.content.character(self.character_id)["name"]
         summary["character_id"] = self.character_id
         summary["blessings"] = dict(self.player.blessings)
+        # The game-over readout (`ui/run_summary.py`): the per-weapon damage
+        # split with DPS over the held span, the proc rows, kills per type,
+        # blessings by name. Nothing above is renamed -- the save, the
+        # rankings and the victory screen read the keys they always did.
+        end = self.stats["time"]
+        held = [w.weapon_id for w in self.player.weapons]
+        names = {wid: d.get("name", wid) for wid, d in self.content.weapons.items()}
+        names.update({bid: b.name for bid, b in self.blessing_lib.by_id.items()})
+        summary["weapon_rows"] = self.ledger.weapon_rows(self.player.weapons, end)
+        summary["other_rows"] = self.ledger.other_rows(held, names, end)
+        summary["kill_rows"] = self.ledger.kill_rows()
+        summary["blessing_rows"] = [
+            (self.blessing_lib.by_id[bid].name if bid in self.blessing_lib.by_id else bid,
+             lvl) for bid, lvl in self.player.blessings.items()]
+        summary["damage_by_source"] = dict(self.ledger.damage)
         self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
                                  dev=self.dev_mode)
         if self.dev_mode:

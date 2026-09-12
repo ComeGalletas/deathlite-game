@@ -150,13 +150,17 @@ class Summon:
             self._bite_t = _BITE_ANIM_S
             self._side = "left" if direction.x < 0 else "right"
             # CB-3: a spirit weighs nothing -> its bite deals no knockback.
+            # `weapon_id`: the bite is the Spirit Wolf's damage -- the run
+            # ledger files it under the weapon, not under a blank source.
             ctx.spawn_projectile(pos=self.pos, vel=direction * 40, damage=self.damage,
                                  radius=22, lifetime=0.12, pierce=2, src_weight=0,
-                                 color=self.color, source_tags=self.tags, style="melee")
+                                 color=self.color, source_tags=self.tags, style="melee",
+                                 weapon_id=self.weapon_id)
         else:  # totem bolt -- a barely-there nudge
             ctx.spawn_projectile(pos=self.pos, vel=direction * 420, damage=self.damage,
                                  radius=6, lifetime=1.4, pierce=0, src_weight=1,
-                                 color=self.color, source_tags=self.tags)
+                                 color=self.color, source_tags=self.tags,
+                                 weapon_id=self.weapon_id)
 
     def _anim_name(self, target) -> str:
         if self._bite_t > 0.0:
