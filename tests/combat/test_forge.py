@@ -386,5 +386,89 @@ class VisualTests(unittest.TestCase):
         self.assertEqual(s[0].visual, "sword")
 
 
+class ForgeWeaponPickerTests(unittest.TestCase):
+    """Change request 6, end to end: the village Forge lets the player pick.
+
+    The case that matters is the one that was impossible before -- two weapons
+    qualify and the player reforges the **second**. `use_forge` took
+    `eligible[0]`, so the second was unreachable however the player approached
+    the anvil.
+
+    Driven on the bench's empty arena (`game.dps_bench`) rather than a
+    generated world: this is about the overlay, and a world would cost seconds
+    per test to prove nothing.
+    """
+
+    def _run_with(self, wids, blessings):
+        from combat.weapons import Weapon
+        from game import dps_bench
+        from progression.blessings import apply_blessing
+        # Called through the module, not stashed on the class: a plain function
+        # assigned to a class attribute becomes a bound method, and `self`
+        # would arrive as the `hero` argument.
+        game, ps = dps_bench._start_dev_run()
+        ps.player.weapons.clear()
+        for wid in wids:
+            ps.player.weapons.append(Weapon(wid, ps.content.weapon(wid)))
+        for bid in blessings:
+            apply_blessing(ps.player, ps.blessing_lib.by_id[bid])
+        return game, ps
+
+    def _open_forge(self, ps):
+        from entities.interactable import Interactable
+        ps.locations.use_forge(Interactable("forge", pygame.Vector2(ps.player.pos), 30))
+
+    def test_the_second_eligible_weapon_can_be_reforged(self):
+        from game.states.level_up_state import LevelUpState
+        game, ps = self._run_with(
+            ("sword", "bow"),
+            ("sword_bloodletting", "sword_crowd_cleaner",
+             "bow_split_arrow", "bow_rapid_draw"))
+        self._open_forge(ps)
+        st = game.state_machine.current
+        self.assertIsInstance(st, LevelUpState)
+        self.assertEqual([r[0].weapon_id for r in st.weapon_rows], ["sword", "bow"])
+        self.assertTrue(all(r[1] for r in st.weapon_rows))
+
+        st.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN))
+        self.assertEqual(st.weapon_rows[st.weapon_sel][0].weapon_id, "bow")
+        st.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_1))
+
+        bow = ps.player.weapon_by_id("bow")
+        sword = ps.player.weapon_by_id("sword")
+        self.assertIsNotNone(bow.forge, "the Bow was not reforged")
+        self.assertIsNone(sword.forge, "the Sword was reforged instead")
+
+    def test_the_cards_belong_to_the_selected_weapon(self):
+        game, ps = self._run_with(
+            ("sword", "bow"),
+            ("sword_bloodletting", "sword_crowd_cleaner",
+             "bow_split_arrow", "bow_rapid_draw"))
+        self._open_forge(ps)
+        st = game.state_machine.current
+        self.assertTrue(all(c.weapon == "sword" for c in st.choices))
+        st.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN))
+        self.assertTrue(all(c.weapon == "bow" for c in st.choices))
+
+    def test_a_weapon_short_of_the_requirement_is_listed_but_not_selectable(self):
+        game, ps = self._run_with(
+            ("sword", "hammer"),
+            ("sword_bloodletting", "sword_crowd_cleaner", "hammer_heavy_impact"))
+        self._open_forge(ps)
+        st = game.state_machine.current
+        rows = {r[0].weapon_id: r for r in st.weapon_rows}
+        self.assertTrue(rows["sword"][1])
+        self.assertFalse(rows["hammer"][1])
+        self.assertIn("needs 1 more", rows["hammer"][2])
+        st.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN))
+        self.assertEqual(st.weapon_rows[st.weapon_sel][0].weapon_id, "sword")
+
+    def test_nothing_eligible_still_just_says_what_is_missing(self):
+        from game.states.playing_state import PlayingState
+        game, ps = self._run_with(("sword", "bow"), ("sword_bloodletting",))
+        self._open_forge(ps)
+        self.assertIsInstance(game.state_machine.current, PlayingState)
+
+
 if __name__ == "__main__":
     unittest.main()

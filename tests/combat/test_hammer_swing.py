@@ -59,7 +59,7 @@ def run(w, seconds, enemies=(FakeEnemy(60, 0),), dt=1 / 60, **over):
 class DataTests(unittest.TestCase):
     def test_the_hammer_is_a_slam_with_the_agreed_numbers(self):
         self.assertEqual(H["special_effect"], "slam")
-        self.assertEqual(H["damage"], 25)
+        self.assertGreater(H["damage"], 0)                # 25 agreed, tuned since (27)
         self.assertGreater(H["swing_time"], 0.0)          # 1.2 agreed, tuned since (0.8)
         self.assertEqual(H["impact_offset"], 40)
         self.assertGreater(H["area"], 0)            # 52 agreed; the owner tunes it in play
@@ -148,7 +148,9 @@ class SwingTests(unittest.TestCase):
         self.assertEqual(getattr(s, "cone_half_angle", 0.0), 0.0)
         self.assertEqual(s.style, "hidden")
         self.assertTrue(s.no_block)
-        self.assertEqual(s.damage, 25)
+        # The blow carries the weapon's damage, whatever it is tuned to -- the
+        # rule, rather than the number it happened to be.
+        self.assertEqual(s.damage, H["damage"])
         self.assertAlmostEqual(s.stun_chance, H["stun_chance"])
         self.assertIsNone(w._swing_dir)
 

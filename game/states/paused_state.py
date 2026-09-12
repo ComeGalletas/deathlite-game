@@ -7,6 +7,8 @@ wide buttons (`ui.widgets`): the selected row is the gold one, a held row
 sinks, and Quit to menu is red.
 
   * Resume        -- back to the run (ESC / P do the same from anywhere here)
+  * Run status    -- the build screen (`run_status_state.py`), pushed on top;
+                     closing it returns here
   * Key layout    -- cycles `config.KEY_LAYOUTS`; persisted at once (also in
                      the Options screen)
   * Quit to menu  -- abandons the run
@@ -24,11 +26,12 @@ from game.state import State
 from ui import widgets
 from ui.mouse import MouseNav
 
-_ROWS = ("resume", "key_layout", "quit")
+_ROWS = ("resume", "status", "key_layout", "quit")
 # 64-px `wide` buttons on a 72-px step; the Quit row on the red sheet.
 _ROW_TOP, _ROW_STEP, _ROW_H, _ROW_W = 330, 72, 64, 560
 _DANGER = {"quit"}
-_LABELS = {"resume": "Resume", "key_layout": "Key layout", "quit": "Quit to menu"}
+_LABELS = {"resume": "Resume", "status": "Run status", "key_layout": "Key layout",
+           "quit": "Quit to menu"}
 
 
 class PausedState(State):
@@ -70,6 +73,9 @@ class PausedState(State):
         rid = _ROWS[self.sel]
         if rid == "resume":
             self._resume()
+        elif rid == "status":
+            from game.states.run_status_state import RunStatusState
+            self.game.state_machine.push(RunStatusState(self.game))
         elif rid == "key_layout":
             self.game.cycle_key_layout()
         elif rid == "quit":

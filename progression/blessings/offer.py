@@ -123,7 +123,10 @@ def forge_offers_for(player, content, weapon: Weapon, *, weighted: bool = True) 
     out = []
     for fdef in get_forges(content).for_weapon(weapon.weapon_id):
         out.append(Upgrade(
-            id=f"forge:{fdef.id}", title=f"Forge: {fdef.name}",
+            # The card's own name, unprefixed (owner, 2026-09-12): the screen
+            # title and the FORGE rarity tag already say it is a Forging, so
+            # "Forge: Whirlwind" said it three times.
+            id=f"forge:{fdef.id}", title=fdef.name,
             description=f"{fdef.description} ({fdef.identity}.)",
             weight=weight if weighted else 1.0,
             apply=lambda p, _w=weapon, _f=fdef: apply_forge(_w, _f),

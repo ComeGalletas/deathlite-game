@@ -134,3 +134,22 @@ def apply_forge(weapon: Weapon, fdef: ForgeDef) -> None:
     weapon._orbiters.clear()
     weapon._orbit_count = 0
     weapon.__post_init__()                    # re-validate category / special
+
+
+# --- readout ---------------------------------------------------------------
+# Text keys a Forging overrides that are not numbers to compare.
+_TEXT_KEYS = frozenset(("name", "description"))
+
+
+def forge_changes(content, weapon: Weapon) -> list[tuple[str, object, object]]:
+    """What a weapon's Forging changed, for the run status screen:
+    `(key, before, after)` for every override against the *base* weapon
+    definition, then `(key, None, value)` for every effect it added. Empty
+    for an unforged weapon."""
+    if weapon.forge is None:
+        return []
+    fdef = get_forges(content).get(weapon.forge)
+    base = content.weapon(weapon.weapon_id)
+    out = [(k, base.get(k), v) for k, v in fdef.overrides.items() if k not in _TEXT_KEYS]
+    out += [(k, None, v) for k, v in fdef.effects.items()]
+    return out

@@ -1,6 +1,6 @@
 {
   "chaser": {
-    "name": "Husk", "hp": 12, "speed": 95,
+    "name": "Husk", "hp": 20, "speed": 95,
     "aggro_range": 420,
     "pursuit_seconds": 6.0, "contact_damage": 13, "radius": 14,
     "weight": 7,
@@ -9,7 +9,7 @@
     "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
   "fast": {
-    "name": "Skitter", "hp": 6, "speed": 190,
+    "name": "Skitter", "hp": 10, "speed": 190,
     "aggro_range": 480,
     "pursuit_seconds": 5.0, "contact_damage": 11, "radius": 10,
     "weight": 5,
@@ -17,7 +17,7 @@
     "tags": ["fast"], "sprite": "spider"
   },
   "tank": {
-    "name": "Lumberer", "hp": 70, "speed": 45,
+    "name": "Lumberer", "hp": 110, "speed": 45,
     "aggro_range": 360,
     "pursuit_seconds": 9.0, "contact_damage": 21, "radius": 24,
     "weight": 14,
@@ -26,7 +26,7 @@
     "attack_telegraph": 0.3306, "attack_active": 0.6694
   },
   "swarm": {
-    "name": "Mite", "hp": 3, "speed": 130,
+    "name": "Mite", "hp": 5, "speed": 130,
     "aggro_range": 400,
     "pursuit_seconds": 5.0, "contact_damage": 9, "radius": 7,
     "weight": 3,
@@ -34,7 +34,7 @@
     "tags": ["swarm", "flying"], "sprite": "bumblebee"
   },
   "ranged": {
-    "name": "Spitter", "hp": 14, "speed": 70,
+    "name": "Spitter", "hp": 23, "speed": 70,
     "aggro_range": 560,
     "pursuit_seconds": 6.0, "contact_damage": 10, "radius": 13,
     "weight": 6,
@@ -44,7 +44,7 @@
     "shot_speed": 230
   },
   "exploder": {
-    "name": "Bloat", "hp": 18, "speed": 85,
+    "name": "Bloat", "hp": 29, "speed": 85,
     "aggro_range": 460,
     "pursuit_seconds": 6.0, "contact_damage": 11, "radius": 16,
     "weight": 8,
@@ -53,17 +53,17 @@
     "explode_radius": 90, "explode_damage": 24, "fuse_range": 34
   },
   "shielded": {
-    "name": "Bulwark", "hp": 20, "speed": 80,
+    "name": "Bulwark", "hp": 33, "speed": 80,
     "aggro_range": 400,
     "pursuit_seconds": 8.0, "contact_damage": 15, "radius": 16,
     "weight": 8,
     "experience_reward": 8, "behavior": "path_chase_attack", "color": [150, 170, 210],
     "tags": ["shielded"], "sprite": "panda", "contact_damage_enabled": false,
-    "shield_hp": 25,
+    "shield_hp": 41,
     "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
   "elite": {
-    "name": "Ravager", "hp": 120, "speed": 90,
+    "name": "Ravager", "hp": 185, "speed": 90,
     "aggro_range": 520,
     "pursuit_seconds": 9.0, "contact_damage": 25, "radius": 22,
     "weight": 30,
@@ -72,7 +72,7 @@
     "attack_telegraph": 0.3306, "attack_active": 0.4194
   },
   "summoner": {
-    "name": "Broodmother", "hp": 55, "speed": 55,
+    "name": "Broodmother", "hp": 87, "speed": 55,
     "aggro_range": 540,
     "pursuit_seconds": 8.0, "contact_damage": 13, "radius": 20,
     "weight": 10,
@@ -81,7 +81,7 @@
     "summon_id": "swarm", "summon_interval": 4.0, "summon_count": 3
   },
   "brute": {
-    "name": "Warden", "hp": 260, "speed": 60,
+    "name": "Warden", "hp": 390, "speed": 60,
     "aggro_range": 420,
     "pursuit_seconds": 10.0, "contact_damage": 29, "radius": 26,
     "weight": 80,
@@ -92,7 +92,7 @@
     "slam_damage": 30, "slam_telegraph": 0.9
   },
   "charger": {
-    "name": "Gorehound", "hp": 34, "speed": 120,
+    "name": "Gorehound", "hp": 55, "speed": 120,
     "aggro_range": 560,
     "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 15,
     "weight": 8,
@@ -103,7 +103,7 @@
     "charge_damage": 31
   },
   "teleporter": {
-    "name": "Blink", "hp": 22, "speed": 95,
+    "name": "Blink", "hp": 36, "speed": 95,
     "aggro_range": 600,
     "pursuit_seconds": 8.0, "contact_damage": 12, "radius": 13,
     "weight": 6,
@@ -114,7 +114,7 @@
     "blink_damage": 20
   },
   "warlock": {
-    "name": "Blight Caller", "hp": 40, "speed": 78,
+    "name": "Blight Caller", "hp": 64, "speed": 78,
     "aggro_range": 560,
     "pursuit_seconds": 8.0, "contact_damage": 11, "radius": 15,
     "weight": 7,

@@ -101,6 +101,22 @@ class SmokeTest(unittest.TestCase):
                    or len(playing.player.weapons) > weapons_before)
         self.assertTrue(applied, "level-up choice was not applied")
 
+        # PLAYING -> RUN STATUS (TAB) -> PLAYING: the build screen freezes the
+        # run beneath it and draws every pane over the real world.
+        from game.states.run_status_state import RunStatusState
+        key(pygame.K_TAB)
+        status = game.state_machine.current
+        self.assertIsInstance(status, RunStatusState)
+        self.assertIs(status.playing, playing)
+        frozen_at = playing.stats["time"]
+        for i in range(3):
+            status.tab = i
+            game.state_machine.update(1 / 60)
+            game._render()
+        self.assertEqual(playing.stats["time"], frozen_at, "the run advanced under the overlay")
+        key(pygame.K_TAB)
+        self.assertIsInstance(game.state_machine.current, PlayingState)
+
         # PLAYING -> PAUSED -> PLAYING
         key(pygame.K_ESCAPE)
         self.assertIsInstance(game.state_machine.current, PausedState)

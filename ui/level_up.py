@@ -38,6 +38,13 @@ _DESC_LINE_H = 24
 _TAG_UP = 39                # the category line's midbottom, up from the card's
 _DESC_GAP = 8               # breathing room between the block and the category line
 
+# The level-up width, and the narrower one the Forge uses so its weapon rail
+# has somewhere to live. Three 260-wide cards and two 40 px gaps come to 860,
+# which leaves 370 px a side at 1600 and 210 at the 1280 web profile -- enough
+# for the rail on both, where the 340 width leaves only 90 on web.
+CARD_W = 340
+CARD_W_NARROW = 260
+
 
 class LevelUpPanel:
     def __init__(self) -> None:
@@ -48,7 +55,12 @@ class LevelUpPanel:
         self.hits = HitMap()          # card index -> rect, rebuilt every draw
 
     def draw(self, surface: pygame.Surface, choices, selected: int, *,
-             assets=None, pressed=None, title=None, hint=None) -> None:
+             assets=None, pressed=None, title=None, hint=None,
+             card_w: int = CARD_W) -> None:
+        """`card_w` narrows the cards so something else can share the screen --
+        the Forge's weapon rail (`ui/forge_rail.py`) sits in the margin the
+        narrower cards free up. The default is the level-up width and that path
+        is unchanged, which `tests/rendering/test_level_up.py` pins."""
         w, h = surface.get_size()
         dim = pygame.Surface((w, h), pygame.SRCALPHA)
         dim.fill((8, 6, 16, 200))
@@ -59,7 +71,7 @@ class LevelUpPanel:
         surface.blit(title, title.get_rect(center=(w // 2, 110)))
 
         n = len(choices)
-        card_w, card_h = 340, _CARD_H
+        card_h = _CARD_H
         gap = 40
         total = n * card_w + (n - 1) * gap
         x0 = (w - total) // 2
