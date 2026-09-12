@@ -170,7 +170,10 @@ class SmokeTest(unittest.TestCase):
                 key(pygame.K_1)
         self.assertGreater(playing.ledger.total, 0)
 
-        playing.player.take_damage(10 ** 9)
+        # Through the real hit path -- and until it lands: every hero evades
+        # 5 % of hits, so one call could be the one that misses.
+        while playing.player.alive:
+            playing.player.take_damage(10 ** 9)
         from game.states.game_over_state import GameOverState
         for _ in range(600):                      # the death poof holds the run open
             game.state_machine.update(1 / 60)
@@ -189,6 +192,55 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(sum(n for _n, n in stats["kill_rows"]), stats["kills"])
         self.assertTrue(any(r["dps"] > 0 for r in stats["weapon_rows"]))
         # It draws with the real assets and the real fonts.
+        game._render()
+        pygame.quit()
+
+
+    def test_an_unarmed_hero_dies_to_enemies_and_sees_the_game_over_screen(self):
+        """The real thing, not a scripted death: no weapons, chasers spawned
+        beside the hero every two seconds, no input. Contact damage has to
+        take the bar to zero, the death window has to run out, and the
+        game-over screen has to come up with the run's summary. Aegis
+        (armour 4, 30 % block) went down in ~14 s when this was written and
+        Kestrel in ~5 s; the cap is generous so a balance change cannot turn
+        this into a timeout."""
+        game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        game.state_machine.change(MenuState(game))
+
+        def key(k):
+            game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k))
+
+        key(pygame.K_RETURN)
+        key(pygame.K_RETURN)
+        from game.states.loading_state import LoadingState
+        for _ in range(5000):
+            if not isinstance(game.state_machine.current, LoadingState):
+                break
+            game.state_machine.update(1 / 60)
+        playing = game.state_machine.current
+        self.assertIsInstance(playing, PlayingState)
+        playing.player.weapons.clear()
+        from game.states.game_over_state import GameOverState
+        died_at = None
+        for frame in range(60 * 120):
+            if frame % 120 == 0 and isinstance(game.state_machine.current, PlayingState):
+                for at in spots_near(playing, 6):
+                    playing._spawn_enemy("chaser", at=at)
+            game.state_machine.update(1 / 60)
+            while isinstance(game.state_machine.current, LevelUpState):
+                key(pygame.K_1)
+            if died_at is None and not playing.player.alive:
+                died_at = playing.stats["time"]
+            if isinstance(game.state_machine.current, GameOverState):
+                break
+        over = game.state_machine.current
+        self.assertIsInstance(over, GameOverState, "the hero never died, or the run never ended")
+        self.assertIsNotNone(died_at)
+        self.assertEqual(playing.player.hp, 0.0)
+        # The summary is the run as it stood at the moment of death.
+        self.assertAlmostEqual(over.stats["time"], died_at, places=3)
+        self.assertIn("weapon_rows", over.stats)
+        self.assertIn("kill_rows", over.stats)
         game._render()
         pygame.quit()
 

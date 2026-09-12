@@ -1101,3 +1101,107 @@ Click and aim key at the same time: click wins.
   in `dev_mode_journal.md` ("Aim line" entry), not here; nothing about it
   ships to normal gameplay.
 - Gamepad right-stick aim would slot into `read_aim` as a third source.
+
+---
+
+## CB-6 · Enemy HP pass: +50 % to +70 %, sliding by bulk
+
+**Status:** **DONE** 2026-09-12. Data-only. Verification at the end of this
+entry.
+
+### Requirement (user, 2026-09-12)
+
+> "check the data folder for the data values for the different elements in the
+> game. increase the health/hp values of all enemies by 50% to 70% depending on
+> their current health. if they have low hp, 70%, if they have more up to 50%"
+
+### Confirmed reading
+
+- **Direction of the slide.** Low-HP enemies get the *larger* raise (+70 %),
+  high-HP enemies the *smaller* one (+50 %). Fodder therefore stops evaporating
+  to a single hit, while the tanks — already the long fights — do not become
+  70 % longer.
+- **Where the values live.** `data/enemies.json` and `data/bosses.json` only;
+  per `data-driven-no-code-defaults` the code carries no per-entity HP
+  fallbacks, so the JSON is the whole change. `entities/enemy.py` reads
+  `definition["hp"]` into `max_hp`, and `spawn/budget.py — stat_multipliers`
+  applies the run-time `hp_mult` *on top* of it, so raising the base value
+  scales the entire difficulty curve proportionally rather than only the
+  opening minutes.
+- **Interpolation, not tiers.** HP spans 3 → 260, roughly two orders of
+  magnitude, so a *linear* slide would hand nearly +70 % to everything below
+  the Lumberer. The multiplier slides on **log(hp)** instead, anchored ×1.70 at
+  hp ≤ 5 and ×1.50 at hp ≥ 260, clamped outside that band:
+
+  ```
+  t    = clamp01( (ln(hp) − ln 5) / (ln 260 − ln 5) )
+  mult = 1.70 + (1.50 − 1.70) · t
+  new  = round(hp · mult)
+  ```
+
+  Every result lands inside the requested 50–70 % window.
+
+### Decisions the request left open
+
+- **`shield_hp` scales with its owner.** The Bulwark's shield is a second
+  health pool in front of `hp` (`tests/ai/test_enemy_ai.py` pins that it
+  absorbs first and spills the overkill). Raising only its `hp` would have
+  given it a smaller effective raise than every other enemy, so the shield
+  takes the Bulwark's own ×1.65 — 25 → 41.
+- **The Training Dummy is untouched.** Its `hp: 1` is a placeholder next to
+  `invulnerable: true`; it exists to be hit forever for the DPS meter, so the
+  number is not a health value to scale.
+- **The boss is included at the floor of the band.** "All enemies" is read to
+  cover `data/bosses.json`. The First Hunger sits far above the top anchor, so
+  it takes exactly ×1.50 — 6660 → 9990. This is the one entry worth a second
+  opinion: it lengthens the only boss fight by half. Reverting it is a
+  one-line change and nothing else in the pass depends on it.
+
+### Result
+
+| Enemy | id | old | new | change |
+| --- | --- | ---: | ---: | ---: |
+| Mite | `swarm` | 3 | 5 | +66.7 % |
+| Skitter | `fast` | 6 | 10 | +66.7 % |
+| Husk | `chaser` | 12 | 20 | +66.7 % |
+| Spitter | `ranged` | 14 | 23 | +64.3 % |
+| Bloat | `exploder` | 18 | 29 | +61.1 % |
+| Bulwark | `shielded` | 20 | 33 | +65.0 % |
+| Bulwark shield | `shielded.shield_hp` | 25 | 41 | +64.0 % |
+| Blink | `teleporter` | 22 | 36 | +63.6 % |
+| Gorehound | `charger` | 34 | 55 | +61.8 % |
+| Blight Caller | `warlock` | 40 | 64 | +60.0 % |
+| Broodmother | `summoner` | 55 | 87 | +58.2 % |
+| Lumberer | `tank` | 70 | 110 | +57.1 % |
+| Ravager | `elite` | 120 | 185 | +54.2 % |
+| Warden | `brute` | 260 | 390 | +50.0 % |
+| The First Hunger | `the_first_hunger` | 6660 | 9990 | +50.0 % |
+| Training Dummy | `training_dummy` | 1 | 1 | — (skipped) |
+
+Nothing else in either file moved: `contact_damage`, `experience_reward`,
+`weight`, and every behaviour timing are unchanged, so this is purely a
+time-to-kill pass and not a threat or economy pass.
+
+### Verification (CB-6)
+
+- Both files re-parse as JSON; the diff touches only `hp` and one `shield_hp`.
+- Full default suite: **1765 passed, 2 skipped, 7 deselected, 92 subtests**,
+  2 failed — **neither caused by this change**:
+  - `tests/rendering/test_menu.py — CharacterSelectInstructionsTests::test_content_comes_from_config`
+    (`743 != 742`) fails identically with the pre-change data restored. It is
+    fallout from `8d9aa98 "Hero select: instruction rows start one line
+    higher"`, which moved the instruction block without updating this
+    assertion's expected line count.
+  - `tests/ai/test_enemy_nav.py — NavRebuildStaggerTests::test_update_nav_advances_a_fill_within_the_budget`
+    asserts a wall-clock slice budget (`_nav_last_ms < 8.0` ms). It passes 3/3
+    in isolation on the new data and only failed inside the loaded 8m48s full
+    run — a machine-speed flake, not a data regression.
+
+### Follow-ups (not blocking)
+
+- The economy was deliberately left alone, so every enemy now pays the same XP
+  for ~60 % more time-to-kill. If levelling feels slow after a playtest,
+  `experience_reward` is the dial, not `hp`.
+- The fixed +50 % floor means anything authored above ~260 HP in future gets
+  the same treatment regardless of how much bigger it is; if a second boss
+  lands, reconsider whether bosses belong on this curve at all.

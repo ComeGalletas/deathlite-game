@@ -275,6 +275,35 @@ python -m pytest tests/combat tests/rendering/test_game_over.py tests/core/test_
 The four failures are the pre-existing hammer / held-key ones listed under
 the first full-suite run. Screenshot v2 (revision) delivered.
 
+## Check: a real death reaches the screen (owner, 2026-09-12)
+
+Asked whether the screen appears on an actual game over -- the health bar
+depleted by enemies -- rather than only on the scripted death the tests
+used. Checked by simulation: a normal run, the hero's weapons removed, six
+chasers spawned beside the hero every two seconds, no input.
+
+| Hero | HP / armour / block | Died at | Screen up at |
+|---|---|---|---|
+| Aegis | 160 / 4 / 30 % | 13.1 s | 14.2 s |
+| Kestrel | 92 / 0 / 0 % | 4.2 s | 5.2 s |
+
+The path: `Player.take_damage` (evasion, block, trait multiplier, armour)
+takes `hp` to 0 and clears `alive`; `PlayingState.update` opens the 1.05 s
+death window for the poof (`_death_seq_t`); `_run_death_sequence` calls
+`_end_run(victory=False)`, which builds the summary and changes to
+`GameOverState`. The summary's clock is the moment of death (the window
+does not advance `stats["time"]`).
+
+Two things done on the back of the check:
+
+- `tests/core/test_smoke.py` gains
+  `test_an_unarmed_hero_dies_to_enemies_and_sees_the_game_over_screen`, the
+  simulation above as a regression test (cap 120 s of run time).
+- The earlier scripted-death test called `take_damage(10 ** 9)` once, and
+  that call goes through the 5 % evasion roll -- one run in twenty would
+  have shrugged the hit off and timed out. It now hits until the hero is
+  down.
+
 ## Revision 2 (owner, 2026-09-12)
 
 The title reads **"Game Over"** instead of "You Died". One string in
