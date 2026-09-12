@@ -363,14 +363,15 @@ class CharacterSelectState(State):
         last line so the caller can place the hint below it."""
         instr = config.MENU_INSTRUCTIONS
         line_h = self._instr.get_linesize()
-        keys = "      ".join(f"{label}  {combo}" for label, combo in instr["rows"])
-        y = top
-        surf = self._instr.render(keys, True, config.COLOR_TEXT_DIM)
-        surface.blit(surf, surf.get_rect(center=(cx, y)))
+        y = top - 20
         for note in instr["notes"]:
             y += line_h
             surf = self._instr.render(note, True, config.COLOR_TEXT_DIM)
             surface.blit(surf, surf.get_rect(center=(cx, y)))
+        y += line_h
+        keys = "      ".join(f"{label}  {combo}" for label, combo in instr["rows"])
+        surf = self._instr.render(keys, True, config.COLOR_TEXT_DIM)
+        surface.blit(surf, surf.get_rect(center=(cx, y)))
         return y
 
     def _weapon_name(self, wid: str) -> str:
