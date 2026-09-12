@@ -152,8 +152,9 @@ class PauseMouseTests(unittest.TestCase):
             self.assertLessEqual(a.bottom, b.top)
 
     def test_hover_selects_without_picking(self):
+        from game.states.paused_state import _ROWS
         _mouse(self.game, pygame.MOUSEMOTION, self._row("quit"))
-        self.assertEqual(self.pause.sel, 2)
+        self.assertEqual(self.pause.sel, _ROWS.index("quit"))
         self.assertIsInstance(self.game.state_machine.current, PausedState)
 
     def test_click_resume_resumes(self):
@@ -292,8 +293,9 @@ class PauseButtonArtTests(unittest.TestCase):
         from ui import widgets
         with mock.patch.object(widgets, "draw_button", wraps=widgets.draw_button) as m:
             self.pause.draw(self.game.screen)
+        from game.states.paused_state import _ROWS
         calls = [c for c in m.call_args_list if c.kwargs.get("shape") == "wide"]
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), len(_ROWS))
         return calls
 
     def test_native_buttons_matching_the_hit_rects(self):
@@ -302,9 +304,12 @@ class PauseButtonArtTests(unittest.TestCase):
             self.assertEqual(self.pause._mouse.hits.rect_of(i), c.args[2])
 
     def test_selected_gold_quit_red_held_sinks(self):
+        from game.states.paused_state import _DANGER, _ROWS
         calls = self._calls()
-        self.assertEqual([c.kwargs["state"] for c in calls], ["hover", "normal", "normal"])
-        self.assertEqual([c.kwargs["variant"] for c in calls], ["primary", "primary", "danger"])
+        self.assertEqual([c.kwargs["state"] for c in calls],
+                         ["hover"] + ["normal"] * (len(_ROWS) - 1))
+        self.assertEqual([c.kwargs["variant"] for c in calls],
+                         ["danger" if r in _DANGER else "primary" for r in _ROWS])
         _mouse(self.game, pygame.MOUSEBUTTONDOWN, self.pause._mouse.hits.rect_of(1).center)
         self.assertEqual(self._calls()[1].kwargs["state"], "pressed")
         _mouse(self.game, pygame.MOUSEBUTTONUP, (5, 5))
@@ -321,9 +326,10 @@ class PauseButtonArtTests(unittest.TestCase):
                 return super().blit(src, dest, *a, **k)
         screen = _Spy(self.game.screen.get_size())
         self.pause.draw(screen)
+        from game.states.paused_state import _ROWS
         want = self.pause._font.render(
             config.KEY_LAYOUT_LABELS[self.game.key_layout], True, config.COLOR_TEXT).get_size()
-        row = self.pause._mouse.hits.rect_of(1)
+        row = self.pause._mouse.hits.rect_of(_ROWS.index("key_layout"))
         hits = [r for size, r in screen.blits if size == want and row.contains(r)]
         self.assertTrue(hits, "layout value not drawn on its row")
         self.assertGreater(hits[0].centerx, row.centerx)
@@ -357,15 +363,16 @@ class PauseTextTests(unittest.TestCase):
         return self.pause._mouse.hits.rect_of(i)
 
     def test_colours_on_the_rows(self):
+        from game.states.paused_state import _ROWS
         screen = self.game.screen
-        r0, r1 = self._row(0), self._row(1)
+        r0, r1 = self._row(0), self._row(_ROWS.index("key_layout"))
         left = pygame.Rect(r1.left + 40, r1.top + 8, r1.width // 2 - 40, r1.height - 16)
         right = pygame.Rect(r1.centerx, r1.top + 8, r1.width // 2 - 40, r1.height - 16)
         self.assertTrue(self._has_colour(screen, left, config.COLOR_ON_BUTTON))       # label
         self.assertTrue(self._has_colour(screen, right, config.COLOR_ON_BUTTON_DIM))  # value
         self.assertTrue(self._has_colour(screen, r0, config.COLOR_ON_BUTTON))         # gold row too
-        for r in (r0, r1, self._row(2)):
-            self.assertFalse(self._has_colour(screen, r, config.COLOR_TEXT))
+        for i in range(len(_ROWS)):
+            self.assertFalse(self._has_colour(screen, self._row(i), config.COLOR_TEXT))
 
     def test_labels_are_lifted_by_label_dy(self):
         from ui import widgets
@@ -380,8 +387,8 @@ class PauseTextTests(unittest.TestCase):
 
         screen = _Spy(self.game.screen.get_size())
         self.pause.draw(screen)
-        for i, rid in enumerate(("resume", "key_layout", "quit")):
-            from game.states.paused_state import _LABELS
+        from game.states.paused_state import _LABELS, _ROWS
+        for i, rid in enumerate(_ROWS):
             want = self.pause._font.render(_LABELS[rid], True, config.COLOR_ON_BUTTON).get_size()
             row = self._row(i)
             hits = [r for size, r in screen.blits if size == want and row.contains(r)]
@@ -389,7 +396,7 @@ class PauseTextTests(unittest.TestCase):
             self.assertEqual(hits[0].centery, row.centery + widgets.LABEL_DY)
         want = self.pause._font.render(
             config.KEY_LAYOUT_LABELS[self.game.key_layout], True, config.COLOR_ON_BUTTON_DIM).get_size()
-        row = self._row(1)
+        row = self._row(_ROWS.index("key_layout"))
         vals = [r for size, r in screen.blits if size == want and row.contains(r)
                 and r.centerx > row.centerx]
         self.assertTrue(vals)

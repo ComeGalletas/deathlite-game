@@ -237,7 +237,8 @@ deathlite-game/
 │                       re-exports); digest (layout / bake / frame
 │                       fingerprints); spawning (director)
 ├── ui/                 hud, level-up panel, damage numbers, run summary
-│                       (the game-over résumé), mouse, buttons and ribbons
+│                       (the game-over résumé), run_status/ (the TAB build
+│                       screen's panes), mouse, buttons and ribbons
 ├── data/               JSON content (weapons, enemies, bosses, characters,
 │                       blessings, items, meta_upgrades, sprites, terrain)
 ├── assets/             characters/<colour>/<unit>/, enemies/<mob>/,
@@ -316,6 +317,15 @@ the time the weapon was held, fed by a run-wide ledger every enemy reports
 to (`game/states/playing/run_ledger.py`). Three buttons — New run, Sanctuary,
 Main menu — take the mouse or ENTER / S / ESC. See
 `documentation/journals/game_over_journal.md`.
+
+**TAB during a run** opens the build screen (`game/states/run_status_state.py`,
+panes in `ui/run_status/`), an overlay that freezes the run: Overview (the
+run line, the hero's resolved stats, the equipped items with what each one
+gives), Build (a card per weapon with its live numbers and Forge gate, the
+selected weapon's Forging with every number it changed, the synergies) and
+Blessings (the owned blessings and the selected one's card text at its
+current level). Also reachable from the pause menu's "Run status" row. See
+`documentation/journals/run_status_journal.md`.
 
 Not done: balance is a first tuning pass (needs human playtesting); one boss
 (the spec's Phase-1 floor); a few polish items listed in `documentation/journals/journal.md`.

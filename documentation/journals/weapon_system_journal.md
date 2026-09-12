@@ -784,7 +784,7 @@ tier is unchanged at 10 s. Nothing in the catalog clips: of the 345 rendered
 blessing descriptions, the longest is `bow_crossfire` at four lines and the
 band holds five.
 
-## Change request 6 — choose which weapon the Forge reforges (2026-09-12) — CONFIRMED, ready to build
+## Change request 6 — choose which weapon the Forge reforges (2026-09-12) — DONE
 
 **Requirement (owner).** The Forge upgrade flow picks the weapon for you. It
 should let the player choose.
@@ -883,29 +883,98 @@ the description of today's behaviour says "two or more", and the code is
 `>= forge_requires_levels` rule stands, and "more than 2" was loose phrasing.
 No data change.
 
-**Todo -- not started, pending the answers above.**
+**Todo -- DONE (owner's go, same day).**
 
-- [ ] `game/states/playing/locations.py` `use_forge`: stop at `eligible[0]`.
-      Pass every non-summon weapon plus an `offers_for` callable into the
-      overlay, and keep the existing `notice` for the case where *no* weapon
-      qualifies.
-- [ ] `game/states/level_up_state.py`: optional `weapons=` / `offers_for=`;
-      rail selection state; Up/Down and the rail's mouse events; rebuild
-      `self.choices` on change. Absent those arguments, behave exactly as now.
-- [ ] `ui/forge_rail.py` (new): draw the rows, their counts and their states,
-      into a `HitMap`. One module per concern, not more of `ui/level_up.py`.
-- [ ] `ui/level_up.py`: accept a left inset so the cards lay out beside the
-      rail (option A), leaving the no-rail path pixel-identical.
-- [ ] A reason string per ineligible weapon, replacing the single
-      `forge_requirements` line -- the rail can show all three states at once,
-      which is the point of it.
-- [ ] Tests, `unit` where possible: the rail lists non-summons only and marks
-      each state; selecting a weapon swaps the cards to that weapon's Forgings;
-      an ineligible row cannot be picked by key or click; the level-up path is
-      unchanged when the new arguments are absent; ESC still leaves.
-- [ ] `integration`: walking a real run into the village Forge with two
-      eligible weapons picks the *second* one and forges it -- the case that is
-      impossible today.
-- [ ] Check both profiles: 1600 and the 1280 web profile, whichever layout
-      option is chosen.
-- [ ] Screenshot the Forge screen with the rail, and close this entry.
+- [x] `game/states/playing/locations.py` `use_forge`: no more `eligible[0]`.
+      It hands the overlay every non-summon weapon and an `offers_for`
+      callable, and keeps the old `notice` for when *nothing* qualifies.
+- [x] `game/states/level_up_state.py`: optional `weapon_rows=` / `offers_for=`.
+      Up/Down (and W/S) move the picker, Left/Right and 1/2/3 stay on the
+      cards, ESC still leaves. Absent those two arguments the overlay is the
+      level-up screen unchanged -- same width, no rail, Up/Down inert.
+- [x] `ui/forge_rail.py` (new): the rows, their counts and their three states,
+      into its own `HitMap`. **Only a selectable row is registered**, so a
+      click on a weapon that cannot be forged does nothing at all.
+- [x] `ui/level_up.py`: a `card_w` argument, defaulting to the level-up width.
+      `CARD_W = 340`, `CARD_W_NARROW = 260`.
+- [x] A reason per ineligible weapon, replacing the single `forge_requirements`
+      line: `2 / 2 blessings`, `1 / 2 - needs 1 more blessing`, or
+      `already forged into Whirlwind`.
+- [x] The picker **skips ineligible rows** rather than landing on one with no
+      cards behind it, and opens on the first weapon that qualifies.
+
+**Layout, measured on both profiles.** The rail is placed relative to the
+cards -- just left of the first one -- rather than at a fixed x, so it stays
+beside them instead of drifting into the corner on the wider screen:
+
+| profile | rail | cards | right margin |
+|---|---|---|---|
+| desktop 1600 | 240-490 | 525-1075 | 525 |
+| web 1280 | 80-330 | 360-920 | 360 |
+
+**Also done, at the owner's request mid-build:** the Forge cards lost their
+`Forge: ` prefix and now read `Whirlwind`, `Greatsword`. The screen title and
+the FORGE rarity tag already said it; saying it a third time on the card was
+noise.
+
+**Tests.** 23 new -- 19 in `tests/rendering/test_forge_rail.py` (unit, 0.3 s,
+fakes and a recording state machine) and 4 in `tests/combat/test_forge.py`
+(integration, 1.25 s on the bench's empty arena rather than a generated world).
+The one that matters is the case that was impossible before: two weapons
+qualify, the player presses Down, and the **second** is reforged while the
+first is untouched. Also pinned: an ineligible row is not a click target, a
+summon is never listed, `2` blessings qualifies and `1` does not, and the
+level-up screen is unchanged when the new arguments are absent.
+
+**Two things caught while building.**
+
+- The rail's weapon names started gold-on-tan, which is barely legible on the
+  selected row's light panel. Now dark, per the standing rule for text drawn on
+  the button art -- the cards' gold titles get away with it because they carry
+  a drop shadow, which a short name in a 62 px row does not.
+- The new `on_done` notice read `Reforged: Whirlwind.` and dropped which weapon
+  it was -- which used to be obvious and no longer is, now that the player
+  picks from a list. Restored to `The sword is reforged: Whirlwind.`
+
+**Evidence.** Driven through the real village Forge in a run: the rail lists
+Sword `2 / 2 blessings`, Bow `2 / 2 blessings` and Hammer
+`1 / 2 - needs 1 more blessing`; the cards show the Sword's two Forgings;
+pressing Down moves to the Bow and the cards become Multishot and Ballista.
+`tests/combat/test_forge.py tests/progression tests/rendering/test_forge_rail.py
+tests/rendering/test_level_up.py` = 177 passed. Screenshots captured at 1600
+and at the 1280 web profile.
+
+## Weapon-tuning pass: the pinned "agreed numbers" relaxed (2026-09-12)
+
+The tuning pass (`17ead73`) raised the Hammer 25 -> 27 and moved the Rod's
+cooldown to 1.0, which broke four tests. None of them were wrong about the
+game; they were pinning numbers that the owner tunes in play.
+
+`test_the_hammer_is_a_slam_with_the_agreed_numbers` had already been half
+relaxed -- `swing_time` and `area` carry `assertGreater` with the agreed figure
+in a comment -- and `damage` had simply not been reached yet. Relaxed the same
+way, on the owner's instruction.
+
+- [x] `test_hammer_swing.py` `DataTests`: `assertGreater(H["damage"], 0)`
+      `# 25 agreed, tuned since (27)`.
+- [x] `test_hammer_swing.py` `SwingTests`: the blow's damage is now asserted
+      against `H["damage"]` rather than `25`. That is the actual rule -- the
+      swing carries the weapon's damage -- and it cannot go stale.
+- [x] `test_weapon_classes.py` `test_the_hammer_hits_hardest_and_heaviest`:
+      the damage line asserted `== 25`, which is a weaker claim than the test's
+      own name. It now asserts the Hammer out-damages the Sword and the
+      Daggers, matching how the same test already handles weight and reach.
+
+**The fourth was not a balance pin at all.**
+`test_held_key_fires_once_per_cooldown` already computed its expectation from
+the weapon's cooldown. It broke because the Rod's cooldown became exactly 1.0:
+120 frames of `1/60` accumulate to 1.9999..., so `int(2.0 / cd) + 1` predicted
+a third shot that lands a hair past the last frame. A latent boundary bug that
+only a cooldown dividing the window exactly could expose. `_volleys` now
+returns the time it actually simulated and the expectation is computed from
+that, which is right for any cooldown.
+
+**Still pinned deliberately.** The hero defence stats
+(`tests/characters/test_characters.py:116-124` -- evasion 0.05 / 0.10, block
+0.30, block strength 0.5) stay exact: they are a contract the design states,
+not a number tuned between playtests. `RULES.choices == 3` likewise.

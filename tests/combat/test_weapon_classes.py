@@ -117,7 +117,10 @@ class IdentityTests(unittest.TestCase):
         self.assertLess(cds["sword"], cds["hammer"])
 
     def test_the_hammer_hits_hardest_and_heaviest(self):
-        self.assertEqual(self.d("hammer")["damage"], 25)                 # CR1: fixed
+        # "Hardest" is the claim, so assert it against the other melee weapons
+        # rather than against a number the owner tunes (25 agreed, 27 since).
+        for other in ("sword", "daggers"):
+            self.assertGreater(self.d("hammer")["damage"], self.d(other)["damage"])
         self.assertGreater(self.d("hammer")["weight"], self.d("sword")["weight"])
         # CR1: a circle 40 px ahead with radius 52 reaches past the Sword's arc.
         self.assertGreater(self.d("hammer")["impact_offset"] + self.d("hammer")["area"],

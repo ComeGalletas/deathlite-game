@@ -475,18 +475,25 @@ class HoldKeepsFiringTests(unittest.TestCase):
         sink = []
         w = weapon("magic_rod")
         fires = 0
+        elapsed = 0.0
         for _ in range(int(seconds * 60)):
             fires += w.update(1 / 60, fire_ctx([], sink, aim=aim, auto_attack=auto_attack))
-        return fires, w
+            elapsed += 1 / 60
+        return fires, w, elapsed
 
     def test_held_key_fires_once_per_cooldown(self):
-        fires, w = self._volleys(held_keys((1, 0)))
-        expected = int(2.0 / w._cooldown(1.0)) + 1          # first shot is instant
+        fires, w, elapsed = self._volleys(held_keys((1, 0)))
+        # Against the time actually simulated, not the nominal `seconds`:
+        # 120 frames of 1/60 accumulate to 1.9999..., so a cooldown that
+        # divides 2.0 exactly (the Rod's, once it was tuned to 1.0) puts the
+        # last shot a hair past the final frame and `int(2.0 / cd) + 1`
+        # predicts one that never fires.
+        expected = int(elapsed / w._cooldown(1.0)) + 1       # first shot is instant
         self.assertEqual(fires, expected)
 
     def test_held_click_fires_at_the_same_cadence_with_auto_off(self):
-        a, _ = self._volleys(held_click((0, 1)), auto_attack=False)
-        b, _ = self._volleys(held_keys((0, 1)), auto_attack=True)
+        a, _w, _e = self._volleys(held_click((0, 1)), auto_attack=False)
+        b, _w, _e = self._volleys(held_keys((0, 1)), auto_attack=True)
         self.assertEqual(a, b)
         self.assertGreater(a, 1)
 
@@ -495,7 +502,7 @@ class HoldKeepsFiringTests(unittest.TestCase):
         # the run (`_phase_combat`) that spends the tap after the first volley.
         # So a stale tap must be consumed -- pinned here so the contract stays
         # visible if the consumption ever moves.
-        fires, _ = self._volleys(tap((1, 0)))
+        fires, _w, _e = self._volleys(tap((1, 0)))
         self.assertGreater(fires, 1)
 
 

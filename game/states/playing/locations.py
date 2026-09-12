@@ -100,31 +100,39 @@ class SpecialLocations:
             ps.player.heal(cost)  # refund if nothing to grant
 
     def use_forge(self, it: Interactable) -> None:
-        """P3 (design §7): offer the two Forgings of the first eligible owned
-        weapon -- one weapon at a time, the Forge is never consumed. With
-        nothing eligible, say what is missing instead of doing nothing."""
+        """P3 (design §7), change request 6: offer the Forgings of *a chosen*
+        weapon. The Forge is never consumed, and with nothing eligible it says
+        what is missing instead of doing nothing.
+
+        It used to take `eligible[0]`, so a player carrying two qualifying
+        weapons could not reforge the second one at all. The overlay now gets
+        every non-summon weapon and a way to build the cards for whichever one
+        the player picks.
+        """
         ps = self.ps
         from combat.weapons.forge import blessing_levels, forge_eligible
         from progression.blessings import get_rules
         from progression.blessings.offer import forge_offers_for
+        from ui.forge_rail import rows_for
         need = get_rules(ps.content).forge_requires_levels
         ps.particles.burst(it.pos, it.colour, count=16, speed=160, life=0.5)
-        eligible = [w for w in ps.player.weapons if forge_eligible(w, need)]
-        if not eligible:
+        if not any(forge_eligible(w, need) for w in ps.player.weapons):
             ps.notice(self.forge_requirements(need))
             return
-        weapon = eligible[0]
-        choices = forge_offers_for(ps.player, ps.content, weapon)
-        if not choices:
-            ps.notice(f"The Forge has nothing for the {weapon.name}.")
-            return
+        rows = rows_for(ps.player.weapons, need, blessing_levels,
+                        forged_name=lambda w: w.name)
+        offers = lambda w: forge_offers_for(ps.player, ps.content, w)
         ps._suspend_mouse()
         from game.states.level_up_state import LevelUpState
         ps.game.state_machine.push(
-            LevelUpState(ps.game), player=ps.player, choices=choices,
-            on_done=lambda u: ps.notice(f"The {weapon.weapon_id.replace('_', ' ')} "
-                                        f"is reforged: {weapon.name}."),
-            title=f"The Forge  -  reforge the {weapon.name}", cancelable=True)
+            LevelUpState(ps.game), player=ps.player,
+            weapon_rows=rows, offers_for=offers,
+            # Names both halves, as it did before the picker: which weapon was
+            # reforged is no longer obvious now that the player chose it from a
+            # list of several.
+            on_done=lambda u: ps.notice(
+                f"The {str(u.weapon).replace('_', ' ')} is reforged: {u.title}."),
+            title="The Forge  -  choose a weapon to reforge", cancelable=True)
 
     def forge_requirements(self, need: int) -> str:
         """The message for a Forge with nothing to work on."""

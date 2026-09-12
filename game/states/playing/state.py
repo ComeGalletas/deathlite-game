@@ -275,6 +275,11 @@ class PlayingState(State):
         if event.key == config.KEY_TOGGLE_AUTO_ATTACK:
             self.auto_attack = not self.auto_attack
             log.info("auto attack %s", "on" if self.auto_attack else "off")
+        elif event.key == pygame.K_TAB:
+            # The build screen: an overlay over the frozen run (journal:
+            # run_status_journal.md). TAB again, or ESC, closes it.
+            from game.states.run_status_state import RunStatusState
+            self.game.state_machine.push(RunStatusState(self.game), playing=self)
         elif event.key == pygame.K_ESCAPE:
             from game.states.paused_state import PausedState
             self._suspend_mouse()
