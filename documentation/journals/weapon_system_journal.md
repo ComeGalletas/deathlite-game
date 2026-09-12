@@ -1,6 +1,6 @@
 # Six-weapon system — execution journal
 
-Progress log for `documentation/weapon_system_plan.md`. One section per
+Progress log for `documentation/plans/weapon_system_plan.md`. One section per
 phase: what was done, what was verified, what was deferred, the next item.
 The design is `six_weapon_system_design.md`; the plan is the *what*; this is
 the *when* and the *evidence*.
@@ -640,7 +640,7 @@ paragraph in §21.
   `tests/progression tests/combat tests/characters` and the rendering
   level-up suite (the card text is what changes on screen).
 - [x] Docs: `six_weapon_system_design.md` §21 "Weapon grants" paragraph and
-  §22 decision 7 rewritten to "weapon only"; `documentation/weapon_system_plan.md`
+  §22 decision 7 rewritten to "weapon only"; `documentation/plans/weapon_system_plan.md`
   P2 test line ("grant bundles exactly one level-I blessing") amended;
   this entry closed with the evidence. Memory note updated.
 - [x] Screenshot: a level-up frame with a grant card in the roll (the
@@ -783,3 +783,129 @@ the 64 px bevels are untouched. `tests/rendering/test_level_up.py` 23 passed
 tier is unchanged at 10 s. Nothing in the catalog clips: of the 345 rendered
 blessing descriptions, the longest is `bow_crossfire` at four lines and the
 band holds five.
+
+## Change request 6 — choose which weapon the Forge reforges (2026-09-12) — CONFIRMED, ready to build
+
+**Requirement (owner).** The Forge upgrade flow picks the weapon for you. It
+should let the player choose.
+
+1. A **weapon list down the left** of the screen showing each weapon and its
+   blessing count against the requirement. Weapons that meet the requirement
+   are highlighted and selectable.
+2. The **middle stays as it is** -- the same upgrade cards -- and re-rolls to
+   the selected weapon's Forgings when the left-hand selection changes.
+
+Reviewed below. The owner has since settled both open questions:
+**option A** for the layout, and **2 or more** is the right threshold.
+Nothing is coded yet.
+
+**What happens today.** `game/states/playing/locations.py:102` `use_forge`:
+
+    eligible = [w for w in ps.player.weapons if forge_eligible(w, need)]
+    if not eligible:
+        ps.notice(self.forge_requirements(need))
+        return
+    weapon = eligible[0]                     # <- no choice at all
+
+It then builds `forge_offers_for(player, content, weapon)` and pushes
+`LevelUpState` with those cards, `cancelable=True` and a Forge title. So the
+overlay, the cards and the mouse handling are all reusable as they stand; what
+is missing is a way to say *which* weapon before the cards are built.
+
+`forge_eligible` (`combat/weapons/forge.py:111`) is three conditions -- not
+already forged, not a summon, and `blessing_levels(weapon) >= required_levels`
+-- and `blessing_levels` is `max(0, weapon.level - 1)`. `required_levels` is
+`forge_requires_levels` in `data/offering.json`, currently **2**. The three
+failure reasons are distinct, which is what the left rail can finally show:
+today they all collapse into one `notice` line naming a single weapon.
+
+### Proposed design
+
+**The rail is a list of every non-summon weapon**, eligible or not, at most
+three of them (`MAX_WEAPONS = 3`; the summon slot is excluded because a summon
+can never be forged). Each row: the weapon's name, its blessing count against
+the requirement (`3 / 2`), and a state --
+
+| state | shown as |
+|---|---|
+| eligible | highlighted, selectable |
+| not enough blessings | dimmed, "needs 1 more" |
+| already forged | dimmed, names the Forge it became |
+
+**Selection rebuilds the middle.** `LevelUpState.enter` gains an optional
+`weapons=` list and an `offers_for=` callable; when they are present it draws
+the rail and rebuilds `self.choices = offers_for(weapon)` whenever the
+selection moves. With them absent the overlay behaves exactly as it does now,
+so the level-up path is untouched.
+
+**A new module** rather than more of `ui/level_up.py`: `ui/forge_rail.py`,
+owning its own `HitMap` so the mouse works the same way the cards do.
+
+**Input.** Up/Down (and W/S) move the weapon selection, Left/Right and 1/2/3
+stay on the cards, ESC still leaves. Hover highlights and a click selects, per
+the standing mouse rules; a click on an ineligible row does nothing.
+
+### The one real obstacle: there is no room on the web build
+
+The cards are 3 x 340 with two 40 px gaps = **1100 px**, centred:
+
+| profile | screen | margin per side |
+|---|---:|---:|
+| desktop | 1600 | **250 px** |
+| web (`apply_web_profile`) | 1280 | **90 px** |
+
+A rail fits comfortably in 250 px and not at all in 90. Requirement 2 says the
+middle does not move, which on the web profile leaves nowhere to put it. Three
+ways out, and this is the decision that blocks the work:
+
+- **A — narrow the cards when the rail is up.** 3 x 260 + gaps = 860, leaving
+  210 px each side on web. The middle changes size, against the letter of
+  requirement 2, but only on the Forge screen.
+- **B — the rail overlays the dimmed backdrop.** The cards do not move on
+  either profile; on web the rail sits over the darkened world at the screen
+  edge, roughly 90-140 px wide, which is enough for a name and a count but not
+  a comfortable one.
+- **C — desktop only.** The rail appears at 1600; the web build keeps today's
+  automatic first-eligible pick. Simplest, and leaves the web build with the
+  behaviour being replaced because it is unsatisfying.
+
+**Owner's decision: A.** The Forge screen is a different screen from the
+level-up screen, and a slightly narrower card there is a smaller cost than a
+cramped rail or a split behaviour between builds. So the cards drop to 260 wide
+*only while the rail is up*; the level-up path keeps its 340 and must stay
+pixel-identical, which `tests/rendering/test_level_up.py` already pins.
+
+### Second question: the requirement wording
+
+The requirement says weapons with "more than 2 upgrades" are selectable, but
+the description of today's behaviour says "two or more", and the code is
+`>= forge_requires_levels` with the value 2 in the data. **Owner's decision: 2 or more is correct** -- the code's existing
+`>= forge_requires_levels` rule stands, and "more than 2" was loose phrasing.
+No data change.
+
+**Todo -- not started, pending the answers above.**
+
+- [ ] `game/states/playing/locations.py` `use_forge`: stop at `eligible[0]`.
+      Pass every non-summon weapon plus an `offers_for` callable into the
+      overlay, and keep the existing `notice` for the case where *no* weapon
+      qualifies.
+- [ ] `game/states/level_up_state.py`: optional `weapons=` / `offers_for=`;
+      rail selection state; Up/Down and the rail's mouse events; rebuild
+      `self.choices` on change. Absent those arguments, behave exactly as now.
+- [ ] `ui/forge_rail.py` (new): draw the rows, their counts and their states,
+      into a `HitMap`. One module per concern, not more of `ui/level_up.py`.
+- [ ] `ui/level_up.py`: accept a left inset so the cards lay out beside the
+      rail (option A), leaving the no-rail path pixel-identical.
+- [ ] A reason string per ineligible weapon, replacing the single
+      `forge_requirements` line -- the rail can show all three states at once,
+      which is the point of it.
+- [ ] Tests, `unit` where possible: the rail lists non-summons only and marks
+      each state; selecting a weapon swaps the cards to that weapon's Forgings;
+      an ineligible row cannot be picked by key or click; the level-up path is
+      unchanged when the new arguments are absent; ESC still leaves.
+- [ ] `integration`: walking a real run into the village Forge with two
+      eligible weapons picks the *second* one and forges it -- the case that is
+      impossible today.
+- [ ] Check both profiles: 1600 and the 1280 web profile, whichever layout
+      option is chosen.
+- [ ] Screenshot the Forge screen with the rail, and close this entry.
