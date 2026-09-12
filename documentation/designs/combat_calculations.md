@@ -1,7 +1,7 @@
 # Combat damage — full calculation reference
 
 > **Six-weapon system (2026-09-09/10).** The weapon layer was rebuilt in
-> five phases (`weapon_system_plan.md`). The map of where each rule now
+> five phases (`plans/weapon_system_plan.md`). The map of where each rule now
 > lives: weapons and Forgings — `combat/weapons/` (`core.py`, `bomb.py`,
 > `forge.py`); blessings and the offering — `progression/blessings/`;
 > synergies — `combat/synergy.py`; the hit pipeline —
@@ -689,7 +689,7 @@ def take_damage(self, amount: float, armor: float = 0.0) -> float:
 - **`damage_multiplier` from `player.stats` is the only global outgoing
   scalar**; per-weapon trait modifiers come in through `weapon_mods`. There
   is no elemental-resistance layer; the melee / ranged stat blessings land in
-  P2 of `weapon_system_plan.md`.
+  P2 of `plans/weapon_system_plan.md`.
 - **Incoming (P1):** `Player.take_damage` rolls `evasion_chance` (hit
   negated), then `block_chance` (hit × `1 − block_strength`), then the trait
   multiplier, then flat armour.

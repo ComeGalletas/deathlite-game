@@ -251,7 +251,7 @@ does not survive a reload.
 
 Rebuilt and served the bundle from a plain static server (not pygbag's)
 and drove it from an embedded browser. Full findings and the plan:
-`documentation/web_plan.md`. In short:
+`documentation/plans/web_plan.md`. In short:
 
 - `web/pygbag.ini` lacked `/.claude`; the worktree copy under it went into
   the bundle (2,103 files / 82 MB). Fixed: 1,083 files / 44.8 MB, with

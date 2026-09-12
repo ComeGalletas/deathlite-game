@@ -2,7 +2,7 @@
 
 Owns where enemies may appear, how many exist at once and in what mix, and
 which of them are simulated this frame. Built up phase by phase
-(`documentation/spawn_master_todo.md`): S1 the point records and their
+(`documentation/plans/spawn_master_todo.md`): S1 the point records and their
 index (`points`), S2 the schedule tables (`tables`) and the budget director
 (`budget`), S3 the `Host` protocol (`host`), placement (`placement`) and
 the `SpawnMaster` facade (`master`), S4 the active zone (`locality`) and

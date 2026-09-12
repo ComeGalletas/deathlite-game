@@ -11,9 +11,9 @@ cooldown (spec 3.2). Behavior differences come from data fields; four
 
 Everything else is a straight auto-aimed shot.
 
-Six-weapon system (P1, `documentation/weapon_system_plan.md`): every weapon
-also names a `class` -- `melee` / `ranged` (the three weapon slots of a run)
-or `summon` (its own single slot). Hero traits reach a weapon through
+Six-weapon system (P1, `documentation/plans/weapon_system_plan.md`): every
+weapon also names a `class` -- `melee` / `ranged` (the three weapon slots of
+a run) or `summon` (its own single slot). Hero traits reach a weapon through
 `FireContext.weapon_mods`, a callable the hero supplies that returns the
 per-weapon `WeaponMods` (extra projectiles, cooldown and damage multipliers)
 so a weapon granted mid-run gets them too.

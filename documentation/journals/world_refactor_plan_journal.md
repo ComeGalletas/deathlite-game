@@ -1,6 +1,6 @@
 # World generation refactor — execution journal
 
-Progress log for `documentation/worldgen_refactor_plan.md`. One section per
+Progress log for `documentation/plans/worldgen_refactor_plan.md`. One section per
 phase: what was done, what was verified, what was deferred, the next item.
 The plan document is the *what*; this is the *when* and the *evidence*.
 
@@ -321,7 +321,7 @@ depth-sort, decor, biome, projectile and layering guards green.
 
 ## Outcome (2026-09-02)
 
-Every phase of `documentation/worldgen_refactor_plan.md` is done, in the
+Every phase of `documentation/plans/worldgen_refactor_plan.md` is done, in the
 reordered sequence P0 → P5 → P1 → P2 → P3 → P4 → P6 → P7 → P8.
 
 | | before (`b0114d6`) | after |

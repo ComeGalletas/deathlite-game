@@ -6,8 +6,11 @@
 > `journals/world_refactor_plan_journal.md`.
 
 This reconciles `journals/worldgen_modularity_todo.md` (R1–R8, test-first,
-measured) and `documentation/world_modularity_todo.md` (Phases 0–7,
-behaviour-preserving, contract-first) into one ordered plan. Everything below
+measured) and the documentation todo (Phases 0–7, behaviour-preserving,
+contract-first) into one ordered plan. That second document,
+`documentation/world_modularity_todo.md`, was **deleted on 2026-09-11**: every
+phase of it that survived the LD-8 retire decision is folded into the plan
+below, so its unchecked boxes had stopped describing work anyone would do. Everything below
 was checked against the tree at `b0114d6` on 2026-09-02; the numbers are
 measured on this machine, not copied from either document.
 
