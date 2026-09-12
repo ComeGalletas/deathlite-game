@@ -50,6 +50,7 @@ from game.states.playing.physics import BumpResolver
 from game.states.playing.locations import SpecialLocations
 from game.states.playing.npcs import Npcs
 from game.states.playing.effects import TransientFx
+from game.states.playing.dps_meter import DpsMeter
 from game.states.playing import slam_fx, slash_fx
 from game.states.playing.navigation import NavCoordinator
 from game.states.playing.spawning import EnemyControl
@@ -213,6 +214,9 @@ class PlayingState(State):
         self.stats = {"time": 0.0, "level": 1, "kills": 0, "damage_dealt": 0.0,
                       "xp": 0, "currency": 0, "gold": 0, "dropped_items": []}
         self._drop_counter = 0
+        # Damage-per-second against the dev menu's training dummy. Inert --
+        # and free -- until something arms it (`dps_meter.py`).
+        self.dps = DpsMeter()
 
     def _init_nav(self) -> None:
         """Enemy flow-field navigation (config.ENEMY_PATHFINDING). Built once from
@@ -322,6 +326,7 @@ class PlayingState(State):
         self._phase_progression(dt)
 
         self.stats["time"] += dt
+        self.dps.update(dt)
         self._apply_dev_unlimited_hp()
         if not self.player.alive:
             # Hold the run open for the shared death poof, then end.
@@ -713,7 +718,8 @@ class PlayingState(State):
             elif effect == "heal":
                 self.player.heal(amount)
             elif effect == "fire_nova" and "burn" in enemy.status:
-                self.fx.enemy_explosion(enemy.pos, 70.0, float(amount) or 16.0)
+                self.fx.enemy_explosion(enemy.pos, 70.0, float(amount) or 16.0,
+                                        source="fire_nova")
             elif effect == "shock_spread" and "shock" in enemy.status:
                 self._spread_status(enemy.pos, "shock", 3.0, 0.12)
 
@@ -841,6 +847,9 @@ class PlayingState(State):
         d.set_metric("hero", self.character_id)
         d.set_metric("blessings", sum(self.player.blessings.values()))
         d.set_metric("run time", f"{self.stats['time']:6.1f}s")
+        if self.dps.armed:                       # only while a dummy is up
+            d.set_metric("dummy dps", self.dps.summary())
+            d.set_metric("dummy by", self.dps.breakdown_line())
         d.set_metric("enemies", len(self.enemies))
         d.set_metric("boss", "yes" if self.boss else "no")
         d.set_metric("projectiles", len(self.projectiles))

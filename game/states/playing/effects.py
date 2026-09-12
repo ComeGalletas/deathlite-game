@@ -257,15 +257,22 @@ class TransientFx:
             if taken > 0:
                 ps.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
 
-    def enemy_explosion(self, pos: pygame.Vector2, radius: float, dmg: float) -> None:
-        """AoE that hurts nearby enemies (not the player) -- blessing procs."""
+    def enemy_explosion(self, pos: pygame.Vector2, radius: float, dmg: float,
+                        source=None) -> None:
+        """AoE that hurts nearby enemies (not the player) -- blessing procs.
+
+        `source` names the proc, so the blast is attributable. Without it an
+        explosion kill credits nothing at all -- `killed_by` stays empty and
+        the DPS meter files the damage under "other"."""
         ps = self.ps
         ps._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
                                "t": 0.0, "dur": 0.3})
         ps.particles.burst(pos, (255, 150, 70), count=14, speed=200, life=0.4)
         for enemy in ps.grid.query_circle(pos.x, pos.y, radius):
             if enemy.alive and (enemy.pos - pos).length() <= radius + enemy.radius:
-                dealt = enemy.take_damage(dmg)
+                dealt = enemy.take_damage(dmg, source=source)
+                if not enemy.alive and source:
+                    enemy.killed_by = source
                 ps.stats["damage_dealt"] += dealt
 
     def update_explosions(self, dt: float) -> None:

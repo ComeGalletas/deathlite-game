@@ -100,7 +100,11 @@ class CapTests(unittest.TestCase):
         self.assertEqual(len(host.live), cap + 1)
         pack = m.spawn_group("warband", at=pygame.Vector2(500, 500), owner="arena")
         self.assertGreaterEqual(len(pack), 3)                                # whole pack lands
-        self.assertEqual(get_content().spawn_tables.owners["cap_exempt"], ["arena", "dev"])
+        # The exact list, deliberately: the cap is a performance guard, so an
+        # owner that bypasses it has to be added on purpose and seen here.
+        # `dummy` is the dev menu's training dummy (`training_dummy_journal.md`).
+        self.assertEqual(get_content().spawn_tables.owners["cap_exempt"],
+                         ["arena", "dev", "dummy"])
         self.assertIsNotNone(m.spawn_at("chaser", pygame.Vector2(1, 1), owner="dev"))
 
     def test_a_pack_spawns_short_rather_than_over_the_cap(self):
@@ -237,3 +241,37 @@ class FallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrainingDummyOwnerTests(unittest.TestCase):
+    """The `dummy` owner is exempt from both the live cap and hibernation.
+
+    `dev` is cap-exempt but sleepable, and a hibernated dummy leaves
+    `host.live_enemies()` while still alive -- the weapons stop reaching it and
+    the DPS meter flatlines with nothing on screen to say why. Measured before
+    the fix: the dummy slept nine seconds into a twenty-second bench.
+    """
+
+    def test_the_owner_is_exempt_from_the_cap_and_from_sleeping(self):
+        owners = get_content().spawn_tables.owners
+        self.assertIn("dummy", owners["cap_exempt"])
+        self.assertIn("dummy", owners["never_sleep"])
+
+    def test_the_plain_dev_owner_still_sleeps(self):
+        """Deliberate: the F2 key and the "Spawn enemy" page pile bodies up for
+        stress tests, and hibernating those is the behaviour under test there."""
+        owners = get_content().spawn_tables.owners
+        self.assertIn("dev", owners["cap_exempt"])
+        self.assertNotIn("dev", owners["never_sleep"])
+
+    def test_hibernation_leaves_a_dummy_alone(self):
+        host = FakeHost()
+        m = _master(host)
+        dummy = m.spawn_at("training_dummy", pygame.Vector2(1, 1), owner="dummy")
+        self.assertIsNotNone(dummy)
+        other = m.spawn_at("chaser", pygame.Vector2(1, 1), owner="dev")
+        self.assertIsNotNone(other)
+        # Hibernate with no island active: everything sleepable goes.
+        m.population._next_tick = 0.0
+        m.population.hibernate(host, active=set(), now=999.0)
+        self.assertIn(dummy, list(host.live_enemies()))

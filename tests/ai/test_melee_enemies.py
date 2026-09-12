@@ -48,6 +48,8 @@ class MeleeRosterTests(unittest.TestCase):
         for eid, cfg in self.enemies.items():
             if cfg.get("contact_damage_enabled", True):
                 continue
+            if "dummy" in cfg.get("tags", ()):
+                continue        # the training dummy is harmless by design
             with self.subTest(eid):
                 self.assertIn(cfg["behavior"], ATTACKING,
                               f"{eid} deals no contact damage and never attacks")

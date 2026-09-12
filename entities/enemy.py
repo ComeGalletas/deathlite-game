@@ -57,6 +57,13 @@ class Enemy:
         self.shield_hp = float(definition.get("shield_hp", 0.0))
         self.explode_radius = float(definition.get("explode_radius", 0.0))
         self.explode_damage = float(definition.get("explode_damage", 0.0))
+        # The training dummy: damage is measured but never subtracted, and
+        # knockback is ignored so it stays where the dev menu put it. Data
+        # only -- no code path asks what kind of enemy this is.
+        self.invulnerable = bool(definition.get("invulnerable", False))
+        # Set by `DpsMeter.arm` while this enemy is the metered one; called
+        # with every point of damage that lands on it, and its source.
+        self.damage_sink = None
 
         self.pos = pygame.Vector2(x, y)
         self.vel = pygame.Vector2()
@@ -88,10 +95,34 @@ class Enemy:
     def apply_knockback(self, direction: pygame.Vector2, strength: float) -> None:
         # CB-3: resistance is expressed as `weight` now (the caller runs
         # `knock_split` against it), so there is no per-type damping here.
+        if self.invulnerable:
+            return                       # the dummy stays where it was put
         if direction.length_squared() > 1e-6:
             self._knock += direction.normalize() * strength
 
-    def take_damage(self, amount: float, armor: float = 0.0) -> float:
+    def _absorb(self, dealt: float, source) -> float:
+        """The one place damage lands on an enemy.
+
+        Every path -- a projectile hit, an explosion, a damage-over-time tick,
+        a villager's lance -- ends here, so the dummy's invulnerability and the
+        DPS meter cannot be bypassed by a new one. Returns what was dealt,
+        which is what the meter and `stats["damage_dealt"]` count, whether or
+        not any HP came off.
+        """
+        if self.damage_sink is not None:
+            self.damage_sink(dealt, source)
+        if self.invulnerable:
+            return dealt
+        self.hp -= dealt
+        if self.hp <= 0:
+            self.hp = 0.0
+            self.alive = False
+        return dealt
+
+    def take_damage(self, amount: float, armor: float = 0.0, source=None) -> float:
+        """`source` names what dealt it -- a weapon id, a blessing id, or
+        `"villager"`. The DPS meter reads it to break a build down by weapon;
+        nothing else does, so it stays optional."""
         dealt = apply_armor(amount, armor)
         # LD-9 D7: a hit provokes, whatever the range. Recorded as a flag rather
         # than a timestamp because nothing here has the clock; `AggroSense`
@@ -106,11 +137,7 @@ class Enemy:
             absorbed = min(self.shield_hp, dealt)
             self.shield_hp -= absorbed
             dealt -= absorbed
-        self.hp -= dealt
-        if self.hp <= 0:
-            self.hp = 0.0
-            self.alive = False
-        return dealt
+        return self._absorb(dealt, source)
 
     # --- per-frame ------------------------------------------------
     def update(self, ctx) -> None:
@@ -128,7 +155,7 @@ class Enemy:
 
         dt = ctx.dt
         # Status DoT (burn) is dealt straight to HP and reported for stats.
-        self.status.update(dt, lambda amt: self._status_damage(amt, ctx))
+        self.status.update(dt, lambda amt, src: self._status_damage(amt, ctx, src))
         # Chill scales movement; knockback is unaffected.
         step = (self.vel * self.status.speed_multiplier() + self._knock) * dt
         self.pos = ctx.resolve_movement(self.pos, self.pos + step, self.radius,
@@ -162,14 +189,15 @@ class Enemy:
     def _attacking(self) -> bool:
         return self.bb.slot(_MACHINE).get("state") in ("telegraph", "attack")
 
-    def _status_damage(self, amount: float, ctx) -> None:
+    def _status_damage(self, amount: float, ctx, source=None) -> None:
+        """A damage-over-time tick. Goes through `_absorb` like every other
+        path -- it used to subtract HP itself, which would have burned the
+        dummy down through its invulnerability and hidden the tick from the
+        meter."""
         if not self.alive:
             return
-        self.hp -= amount
+        self._absorb(amount, source)
         ctx.report_damage(amount)
-        if self.hp <= 0:
-            self.hp = 0.0
-            self.alive = False
 
     @property
     def telegraphing(self) -> bool:

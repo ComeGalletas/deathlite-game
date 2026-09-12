@@ -51,6 +51,10 @@ class _Active:
     time_left: float
     potency: float
     _tick_accum: float = 0.0
+    # What applied it -- a weapon id, normally. Carried so a damage-over-time
+    # tick can say which weapon it belongs to; without it a burn's damage is
+    # unattributable and a build's breakdown has a hole in it.
+    source: object = None
 
 
 class StatusState:
@@ -70,15 +74,20 @@ class StatusState:
         self._active.clear()
 
     def apply(self, status_id: str, duration: float, potency: float,
-              bonus_max_stacks: int = 0) -> None:
+              bonus_max_stacks: int = 0, source=None) -> None:
         kind = REGISTRY[status_id]
         cap = kind.max_stacks + max(0, int(bonus_max_stacks))
         cur = self._active.get(status_id)
         if cur is None:
-            self._active[status_id] = _Active(kind, 1, duration, potency)
+            self._active[status_id] = _Active(kind, 1, duration, potency,
+                                              source=source)
             return
         cur.time_left = max(cur.time_left, duration)
         cur.potency = max(cur.potency, potency)
+        # A refresh re-attributes: the weapon keeping the burn alive is the one
+        # its ticks belong to.
+        if source is not None:
+            cur.source = source
         if kind.stack_mode == STACK:
             cur.stacks = min(cap, cur.stacks + 1)
 
@@ -87,7 +96,8 @@ class StatusState:
         return a.stacks if a else 0
 
     def update(self, dt: float, apply_damage) -> None:
-        """One loop, family dispatch. `apply_damage(amount)` handles DoT ticks."""
+        """One loop, family dispatch. `apply_damage(amount, source)` handles
+        DoT ticks; `source` is what applied the status."""
         done = []
         for sid, a in self._active.items():
             a.time_left -= dt
@@ -96,7 +106,7 @@ class StatusState:
                 while (a._tick_accum >= a.kind.tick_interval
                        and a.time_left > -a.kind.tick_interval):
                     a._tick_accum -= a.kind.tick_interval
-                    apply_damage(a.potency * a.stacks)
+                    apply_damage(a.potency * a.stacks, a.source)
             if a.time_left <= 0.0:
                 done.append(sid)
         for sid in done:

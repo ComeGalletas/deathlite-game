@@ -30,9 +30,13 @@ class FakeEnemy:
         self.is_elite = False
         self.status = StatusState()
         self.knocks: list = []
+        self.damage_sources: list = []
         self.anim = None
 
-    def take_damage(self, amount, armor=0.0):
+    def take_damage(self, amount, armor=0.0, source=None):
+        # `source` mirrors `Enemy.take_damage`; recorded so a test can assert
+        # what a damage path attributed a hit to.
+        self.damage_sources.append(source)
         self.hp -= amount
         if self.hp <= 0:
             self.hp = 0.0

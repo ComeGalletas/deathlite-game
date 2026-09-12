@@ -70,6 +70,18 @@ def build_chase(cfg: dict) -> Behavior:
     return Behavior({"move": [SeekTarget(via="straight", slew=0.0)]})
 
 
+@behavior("dummy")
+def build_dummy(cfg: dict) -> Behavior:
+    """The training dummy: no steering, no attack, no aggro.
+
+    `speed: 0` alone is not enough -- every other behaviour here still runs an
+    attack or a wind-up beat with a zero-speed body -- so the dummy needs a
+    behaviour that genuinely does nothing while it is hit. One state holding no
+    components, because a `Behavior` must have at least one.
+    """
+    return Behavior({"idle": []})
+
+
 @behavior("path_chase")
 def build_path_chase(cfg: dict) -> Behavior:
     return Behavior({"move": _pursuit_stack(cfg)})
