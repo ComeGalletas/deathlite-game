@@ -125,5 +125,15 @@
     "cast_duration": 0.2, "cast_recover": 1.8, "cast_interval": 3.2,
     "hazard_sprite": "hex_shaman_explosion_spell",
     "hazard_radius": 92, "hazard_dps": 23, "hazard_duration": 3.5
+  },
+  "training_dummy": {
+    "name": "Training Dummy", "hp": 1, "speed": 0,
+    "aggro_range": 0,
+    "pursuit_seconds": 0.0, "contact_damage": 0, "radius": 14,
+    "weight": 7,
+    "experience_reward": 0, "behavior": "dummy", "color": [200, 90, 90],
+    "tags": ["dummy"], "sprite": "skull",
+    "contact_damage_enabled": false,
+    "invulnerable": true
   }
 }

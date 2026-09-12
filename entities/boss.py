@@ -92,7 +92,10 @@ class Boss:
         self._facing = -1
 
     # --- combat --------------------------------------------------
-    def take_damage(self, amount: float, armor: float = 0.0) -> float:
+    def take_damage(self, amount: float, armor: float = 0.0, source=None) -> float:
+        # `source` is accepted so the boss and an `Enemy` are interchangeable to
+        # the damage paths; the boss is never the metered target, so it is
+        # ignored rather than recorded.
         dealt = apply_armor(amount, armor)
         self.hp -= dealt
         self.hit_flash = 0.06
@@ -151,7 +154,7 @@ class Boss:
                 self._facing = -1
             self.anim.play(self._anim_name())
             self.anim.update(dt)
-        self.status.update(dt, lambda amt: self._status_damage(amt, ctx))
+        self.status.update(dt, lambda amt, src: self._status_damage(amt, ctx, src))
         self.contact_damage = self._base_contact
         chill = self.status.speed_multiplier()
 
@@ -186,7 +189,9 @@ class Boss:
         return ctx.resolve_movement(self.pos, self.pos + step, self.radius,
                                     flying=self.flying)
 
-    def _status_damage(self, amount: float, ctx) -> None:
+    def _status_damage(self, amount: float, ctx, source=None) -> None:
+        # `source` is accepted for parity with `Enemy` (the status loop passes
+        # it); the boss is never the metered target, so nothing reads it.
         if not self.alive:
             return
         self.hp -= amount

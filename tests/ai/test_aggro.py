@@ -43,12 +43,26 @@ def _run(e, player_x, seconds, now=0.0):
 class AggroDataTests(unittest.TestCase):
     def test_every_enemy_type_declares_both_values(self):
         """A new type that forgets them silently reverts to chasing for ever,
-        which is the behaviour this phase exists to remove."""
+        which is the behaviour this phase exists to remove.
+
+        The training dummy is exempt: it is tagged `dummy` and declares both as
+        zero on purpose, because it must never pursue anything.
+        """
         for eid, cfg in get_content().enemies.items():
+            if "dummy" in cfg.get("tags", ()):
+                continue
             self.assertIn("aggro_range", cfg, eid)
             self.assertIn("pursuit_seconds", cfg, eid)
             self.assertGreater(cfg["aggro_range"], 0, eid)
             self.assertGreater(cfg["pursuit_seconds"], 0, eid)
+
+    def test_the_training_dummy_never_pursues(self):
+        """The other half of the exemption above -- zero, declared, not absent,
+        so a missing value still cannot pass unnoticed."""
+        cfg = get_content().enemies["training_dummy"]
+        self.assertEqual(cfg["aggro_range"], 0)
+        self.assertEqual(cfg["pursuit_seconds"], 0)
+        self.assertEqual(cfg["speed"], 0)
 
     def test_a_type_with_no_values_is_left_alone(self):
         base = build_behavior("path_chase", {})

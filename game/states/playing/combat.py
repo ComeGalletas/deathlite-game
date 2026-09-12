@@ -74,7 +74,7 @@ class CombatResolver:
                     continue
 
                 amount = 0.0 if no_dmg else proj.damage * self.damage_multiplier(proj, enemy)
-                dealt = enemy.take_damage(amount)
+                dealt = enemy.take_damage(amount, source=proj.weapon_id)
                 if not enemy.alive:
                     enemy.killed_by = proj.weapon_id     # P2: Bloodletting etc.
                 self.remember_hit(proj, enemy)           # P4: after the multiplier
@@ -201,7 +201,8 @@ class CombatResolver:
                     status,
                     dur * (1.0 + fx.tuned(status, "duration")),
                     potency * (1.0 + fx.tuned(status, "potency")),
-                    bonus_max_stacks=int(fx.tuned(status, "max_stacks")))
+                    bonus_max_stacks=int(fx.tuned(status, "max_stacks")),
+                    source=proj.weapon_id)   # the burn's ticks belong to it
 
     def trip_mine(self, proj: Projectile, targets) -> None:
         """P3 Minefield: an armed mine goes off the moment an enemy body

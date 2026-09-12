@@ -890,19 +890,26 @@ class DevMenuMouseTests(unittest.TestCase):
         menu.draw(game.screen)
         return game, playing, menu
 
-    def _row(self, menu, i):
+    def _row(self, game, menu, i):
+        """The click point for row `i`, scrolling it into view first.
+
+        Only the `MAX_VISIBLE` rows of the window are registered as click
+        targets, so a row past it has no rect. Scrolling here rather than in
+        each test keeps these tests about the mouse: adding a row to a page
+        used to push whatever sat at the boundary out of the window and fail a
+        test that had nothing to do with it.
+        """
+        from game.states.dev_menu_state import MAX_VISIBLE
+        if not (menu.scroll <= i < menu.scroll + MAX_VISIBLE):
+            menu.sel = i
+            menu._clamp_scroll()
+            menu.draw(game.screen)
         r = menu._mouse.hits.rect_of(i)
         self.assertIsNotNone(r, f"row {i} is not registered (not visible?)")
         return r.center
 
     def _open_items(self, game, menu):
-        # "items" is row 12 of the root page -- just past the 12-row window,
-        # so it has to be scrolled into view (the window follows the
-        # selection) and redrawn before it can be clicked.
-        menu.sel = _ROOT_ROWS.index("items")
-        menu._clamp_scroll()
-        menu.draw(game.screen)
-        _click_at(game, self._row(menu, menu.sel))
+        _click_at(game, self._row(game, menu, _ROOT_ROWS.index("items")))
         self.assertEqual(menu.page, "items")
 
     def test_only_the_visible_window_is_registered(self):
@@ -916,21 +923,21 @@ class DevMenuMouseTests(unittest.TestCase):
     def test_hover_selects_and_click_toggles_a_root_row(self):
         game, playing, menu = self._open()
         i = _ROOT_ROWS.index("colliders")
-        _mouse_ev(game, pygame.MOUSEMOTION, self._row(menu, i))
+        _mouse_ev(game, pygame.MOUSEMOTION, self._row(game, menu, i))
         self.assertEqual(menu.sel, i)
         self.assertFalse(playing._dev_show_colliders)
-        _click_at(game, self._row(menu, i))
+        _click_at(game, self._row(game, menu, i))
         self.assertTrue(playing._dev_show_colliders)
-        _click_at(game, self._row(menu, i))
+        _click_at(game, self._row(game, menu, i))
         self.assertFalse(playing._dev_show_colliders)
 
     def test_click_opens_a_sub_page_and_its_rows_work(self):
         game, playing, menu = self._open()
-        _click_at(game, self._row(menu, _ROOT_ROWS.index("spawn")))
+        _click_at(game, self._row(game, menu, _ROOT_ROWS.index("spawn")))
         self.assertEqual(menu.page, "enemies")
         menu.draw(game.screen)                                     # new rows
         before = len(playing.enemies)
-        _click_at(game, self._row(menu, 0))
+        _click_at(game, self._row(game, menu, 0))
         self.assertEqual(len(playing.enemies), before + 1)
         self.assertEqual(menu.page, "enemies")                     # stays open
 
@@ -965,7 +972,7 @@ class DevMenuMouseTests(unittest.TestCase):
 
     def test_right_click_backs_out_then_closes(self):
         game, playing, menu = self._open()
-        _click_at(game, self._row(menu, _ROOT_ROWS.index("blessings")))
+        _click_at(game, self._row(game, menu, _ROOT_ROWS.index("blessings")))
         self.assertEqual(menu.page, "blessings")
         _mouse_ev(game, pygame.MOUSEBUTTONDOWN, (5, 5), button=3)
         self.assertEqual(menu.page, "root")
@@ -987,3 +994,63 @@ class DevMenuMouseTests(unittest.TestCase):
         self.assertTrue(playing._dev_show_colliders)
         _key(game, pygame.K_ESCAPE)
         self.assertIs(game.state_machine.current, playing)
+
+
+class DevTrainingDummyTests(unittest.TestCase):
+    """The "Training dummy" row (`training_dummy_journal.md`).
+
+    The dummy is spawned through the spawn master like any other enemy --
+    `owner="dev"`, which is on its `cap_exempt` list -- rather than being
+    pushed into `ps.enemies` behind its back, and the meter is armed on that
+    one enemy so nothing else in the world can inflate the reading.
+    """
+
+    def _menu(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        return game, playing, menu
+
+    def test_the_row_spawns_one_dummy_and_arms_the_meter_on_it(self):
+        _game_, playing, menu = self._menu()
+        n0 = len(playing.enemies)
+        menu._activate("dummy")
+        self.assertEqual(len(playing.enemies), n0 + 1)
+        dummy = playing.enemies[-1]
+        self.assertEqual(dummy.enemy_id, "training_dummy")
+        self.assertTrue(playing.dps.armed)
+        self.assertIs(playing.dps.target, dummy)
+        self.assertEqual(dummy.damage_sink, playing.dps.record)
+
+    def test_toggling_it_off_clears_the_dummy_and_the_meter(self):
+        _game_, playing, menu = self._menu()
+        menu._activate("dummy")
+        dummy = playing.dps.target
+        menu._activate("dummy")
+        self.assertFalse(playing.dps.armed)
+        self.assertFalse(dummy.alive)
+        self.assertIsNone(dummy.damage_sink)
+
+    def test_only_damage_on_the_dummy_is_counted(self):
+        """The whole point of metering one target: a hit on anything else must
+        not move the number."""
+        _game_, playing, menu = self._menu()
+        menu._activate("dummy")
+        dummy = playing.dps.target
+        other = [e for e in playing.enemies if e is not dummy]
+        if other:
+            other[0].take_damage(500.0, source="sword")
+        self.assertEqual(playing.dps.total, 0.0)
+        dummy.take_damage(25.0, source="sword")
+        self.assertEqual(playing.dps.total, 25.0)
+
+    def test_the_row_reports_its_state(self):
+        _game_, playing, menu = self._menu()
+        self.assertIn("[  ]", menu._row_label("dummy"))
+        menu._activate("dummy")
+        self.assertIn("[ON]", menu._row_label("dummy"))
+
+    def test_the_meter_clock_runs_with_the_run(self):
+        _game_, playing, menu = self._menu()
+        menu._activate("dummy")
+        playing.update(1 / 60)
+        self.assertGreater(playing.dps.elapsed, 0.0)

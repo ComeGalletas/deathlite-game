@@ -45,7 +45,7 @@ _PRESSURE_STEPS = (1.0, 2.0, 4.0, 0.0, 0.5)
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
               "aim_line", "all_rooms", "freeze", "pressure", "difficulty",
-              "spawn", "blessings", "items", "forges", "remove_weapon",
+              "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
               "reset", "exit", "close")
 
 _LABELS = {
@@ -59,6 +59,7 @@ _LABELS = {
     "freeze":       "Freeze spawns",
     "pressure":     "Spawn pressure",
     "difficulty":   "Difficulty",
+    "dummy":        "Training dummy",
     "spawn":        "Spawn enemy...",
     "blessings":    "Blessings...",
     "items":        "Items...",
@@ -269,6 +270,8 @@ class DevMenuState(State):
             nxt = order[(order.index(p.difficulty) + 1) % len(order)]
             p._set_difficulty(nxt)
             self._status = f"Difficulty -> {config.DIFFICULTY_LABELS[nxt]}"
+        elif rid == "dummy":
+            self._toggle_dummy()
         elif rid == "spawn":
             self._goto("enemies")
         elif rid == "blessings":
@@ -286,6 +289,35 @@ class DevMenuState(State):
             self.game.state_machine.change(MenuState(self.game))
         elif rid == "close":
             self.game.state_machine.pop()
+
+    def _toggle_dummy(self) -> None:
+        """Spawn one training dummy and meter it, or clear both.
+
+        The dummy goes through the spawn master like every other enemy, rather
+        than being dropped into `ps.enemies` behind its back. Its own owner,
+        `"dummy"`, is on both the master's `cap_exempt` and `never_sleep`
+        lists: the plain `"dev"` owner is cap-exempt but *sleepable*, and a
+        hibernated dummy silently leaves `ps.enemies` while still alive, so the
+        weapons stop reaching it and the meter flatlines mid-measurement with
+        nothing to show it happened. Measured: it slept nine seconds in.
+        """
+        p = self._playing
+        if p is None:
+            return
+        if p.dps.armed:
+            dummy = p.dps.target
+            p.dps.disarm()
+            dummy.alive = False               # the master reaps it next tick
+            self._status = "Training dummy removed"
+            return
+        offset = pygame.Vector2(140, 0).rotate(random.uniform(0.0, 360.0))
+        made = p.spawn.spawn_enemy("training_dummy", at=p.player.pos + offset,
+                                   owner="dummy")
+        if made is None:
+            self._status = "training dummy: the spawn master refused"
+            return
+        p.dps.arm(made)
+        self._status = "Training dummy up -- DPS on the F1 overlay"
 
     def _spawn(self, enemy_id: str) -> None:
         p = self._playing
@@ -528,4 +560,6 @@ class DevMenuState(State):
             label += f"   [x{p.spawn.master.modifiers.get('dev_menu', 1.0):g}]"
         elif rid == "difficulty" and p is not None:
             label += f"   [{config.DIFFICULTY_LABELS[p.difficulty]}]"
+        elif rid == "dummy" and p is not None:
+            label += "   [ON]" if p.dps.armed else "   [  ]"
         return label

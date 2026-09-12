@@ -23,6 +23,7 @@ import pygame
 from combat.knockback import knock_split
 from entities.npc import Npc, SheepNpc
 from game import config
+from game.states.playing.dps_meter import VILLAGER
 from game.content import get_content
 
 
@@ -165,7 +166,9 @@ class Npcs:
         sparks and a push through the same weight split as a bump."""
         ps = self.ps
         spec = self.data["kinds"][npc.kind]
-        dealt = foe.take_damage(npc.damage)
+        # `VILLAGER` so the DPS meter can drop it: a lancer that wanders over
+        # and stabs the training dummy is not the hero's damage.
+        dealt = foe.take_damage(npc.damage, source=VILLAGER)
         ps.damage_numbers.add(foe.pos, dealt, False)
         ps.particles.burst(foe.pos, (236, 226, 200), count=4, speed=90,
                            life=0.22, radius=2)
