@@ -70,9 +70,11 @@ class VillageShapeTests(unittest.TestCase):
                 self.assertEqual(sum(1 for c in cells if c.kind == LAKE), 0,
                                  f"seed {seed}: village {r.id} has a lake")
 
-    def test_village_is_about_half_a_volcanic_island(self):
-        """Smaller than any volcanic island of the same world. The exact ratio
-        is the `size` knob's business and is measured in the journal."""
+    def test_village_is_smaller_than_any_volcanic_island(self):
+        """How much smaller is the `size` knob's business, and
+        `test_village_quality.py` measures the band it lands in (a fifth to a
+        quarter of the smallest volcanic island, HI-4). This pins the ordering
+        only, which is what the role assignment relies on."""
         for seed in W.SEEDS:
             w = W.layout(seed)
             volcanic = [len(r.cells) for r in w.rooms if r.topography == "volcanic"]
@@ -177,6 +179,70 @@ class VillageLayoutTests(unittest.TestCase):
                         self.assertEqual(cell.kind, GROUND)
         self.assertGreater(pens, 0, "no village in the pinned seeds got a pen")
 
+    def test_the_pen_refuses_a_footprint_with_something_standing_in_it(self):
+        """`_pen_fits` ends with a containment test -- nothing already placed
+        may have its centre inside the pen's footprint -- and the per-post
+        tests do not imply it.
+
+        The case is a **prop**, and the pass that meets it is the tidy pass:
+        `_repen` re-seats a pen whose posts ended up under something's art,
+        and it runs after the scatter, so by then the island is full of trees
+        and rocks. Two of the post rules miss a tree standing in the middle of
+        a candidate footprint -- `free` rejects only a centre closer than
+        `fence_r + radius + _V_GAP` (38 px for a tree, where the deepest point
+        inside a 7x5 pen is 72 px from the nearest rail), and `art_ok` for a
+        fence post is tested against *buildings* only. The containment test is
+        the one that catches it, which is why it is still here.
+
+        A *building* in the same place is caught by `art_ok` instead, its
+        painted box being far larger than its collider -- so this test uses a
+        tree deliberately. Written after measuring: over thirty-two villages
+        the containment test never once rejected a candidate the posts had
+        accepted, so the case is rare, not unreachable."""
+        import random
+        from entities.obstacle import KINDS, Obstacle
+        from world.gen import village as V
+        from world.gen.tuning import _V_GAP, _V_PEN_SCALE
+
+        room = next(r for seed in W.SEEDS for r in W.layout(seed).rooms
+                    if r.kind == VILLAGE_KIND)
+        site = V._Site(room, [], random.Random(0), get_content().terrain)
+        px = site.px
+        pitch = px * _V_PEN_SCALE
+        fence_r = float(KINDS["fence"][0])
+        pw, ph = 7, 5
+        wide, tall = pw * pitch, ph * pitch
+
+        def posts_at(ox, oy):
+            return [(ox + (c + 0.5) * pitch, oy + (r + 0.5) * pitch, slot)
+                    for (c, r), slot in V._pen_tiles(0, 0, pw, ph)]
+
+        # somewhere on this island a pen of that size fits with nothing in it
+        spot = next(((room.rect.left + col * px, room.rect.top + row * px)
+                     for col, row in sorted(room.cells)
+                     if V._pen_fits(site,
+                                    room.rect.left + col * px,
+                                    room.rect.top + row * px, wide, tall,
+                                    posts_at(room.rect.left + col * px,
+                                             room.rect.top + row * px),
+                                    fence_r, 0.5)), None)
+        self.assertIsNotNone(spot, "no clear pen footprint on this island")
+        ox, oy = spot
+        posts = posts_at(ox, oy)
+
+        site.placed.append(Obstacle("tree", ox + wide / 2, oy + tall / 2))
+        # every per-post rule accepts, so the containment test is the only
+        # thing that can refuse this footprint
+        for x, y, _slot in posts:
+            self.assertFalse(V._blocks(site.doors, x, y, fence_r))
+            self.assertTrue(site.free(x, y, fence_r, _V_GAP),
+                            "a post rejects the tree, so this proves nothing")
+            self.assertTrue(site.off_lanes(x, y, fence_r))
+            self.assertTrue(site.art_ok("fence", x, y),
+                            "the art rule rejects it, so this proves nothing")
+        self.assertFalse(V._pen_fits(site, ox, oy, wide, tall, posts, fence_r, 0.5),
+                         "a pen was seated around a tree standing in it")
+
     def test_satellites_collide_but_carry_no_skin(self):
         for seed in W.SEEDS:
             w = W.layout(seed)
@@ -238,23 +304,44 @@ class VillageLayoutTests(unittest.TestCase):
                     self.assertLessEqual(min(m.distance_to(pos) for m in mouths), 8 * px,
                                          f"seed {seed}: {k} far from every bridge")
 
-    def test_the_ring_is_compact_and_the_props_stay_outside_it(self):
-        """Every house, monastery and archery within the ring's reach of the
-        forge; every tree and rock outside the cluster radius."""
-        from world.gen.tuning import _V_CLUSTER_RADIUS, _V_RING
+    def test_the_ring_is_compact_and_the_props_stay_off_the_square(self):
+        """Every house within the ring's reach of the forge, and no prop on
+        the village square.
+
+        The first scatter keeps the whole `_V_CLUSTER_RADIUS` clear; the fill
+        sweep that follows it (the owner's, 2026-09-12) keeps only
+        `_V_FILL_SQUARE` -- the forge, the heal above it and the hall above
+        that -- because the cluster radius is a circle round the forge while
+        the buildings are not, and the lawn on the empty side of that circle
+        is what the sweep was asked to fill. What still holds for every prop
+        on the island is the square and the spacing: every prop keeps its own
+        radius plus the building's plus a gap, `_V_SCATTER_GAP` for the first
+        sweep and the wider `_V_FILL_GAP` for the second, so the floor
+        asserted here is the smaller of the two."""
+        from entities.obstacle import KINDS
+        from world.gen.tuning import _V_FILL_SQUARE, _V_RING, _V_SCATTER_GAP
         px = config.TILE_PX
+        PROPS = ("tree", "rock", "pillar", "sign", "scarecrow")
         for seed in W.SEEDS:
             w = W.layout(seed)
             for v in w.villages:
                 room = w.room(v.room_id)
+                buildings = [(pygame.Vector2(x, y), float(KINDS[k][0]))
+                             for k, x, y in v.buildings]
                 for kind, x, y in v.buildings:
                     if kind == "house":
                         self.assertLessEqual(v.forge.distance_to((x, y)),
                                              (_V_RING[1] + 1.5) * px, f"seed {seed}: {kind} strays")
                 for o in self._on(w, room):
-                    if o.kind in ("tree", "rock", "pillar", "sign", "scarecrow"):
-                        self.assertGreaterEqual(v.forge.distance_to(o.pos), _V_CLUSTER_RADIUS * px,
-                                                f"seed {seed}: {o.kind} inside the settlement")
+                    if o.kind not in PROPS:
+                        continue
+                    self.assertGreaterEqual(v.forge.distance_to(o.pos), _V_FILL_SQUARE * px,
+                                            f"seed {seed}: {o.kind} on the square")
+                    r = float(KINDS[o.kind][0])
+                    for pos, br in buildings:
+                        self.assertGreaterEqual(
+                            pos.distance_to(o.pos), r + br + _V_SCATTER_GAP,
+                            f"seed {seed}: {o.kind} crowding a building")
 
 
 class VillageIsEmptyTests(unittest.TestCase):

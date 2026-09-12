@@ -247,6 +247,20 @@ the hero-select instruction test already noted as needing re-pinning in the
 commit "Hero select: instruction rows start one line higher". Nothing in it
 touches this screen.
 
+## Revision 1 (owner, 2026-09-12): the tab shade traces the ribbon
+
+The inactive tabs were dimmed by a flat translucent rectangle blitted over
+the ribbon, so the shade boxed the forked ends and showed as a dark square
+against the world behind. Now each tab -- the ribbon art (or the flat
+fallback) and its label -- is drawn on its own transparent layer, and an
+inactive tab's layer is multiplied down (`BLEND_RGBA_MULT` with 135/255,
+the same darkening the 120-alpha wash gave) before it lands on the screen.
+The multiply keeps every pixel's alpha, so the surround stays clear and the
+shade is exactly the ribbon's shape. `ui/run_status/common.py::tab_surface`;
+two tests in `tests/rendering/test_run_status.py` pin the transparent
+corners and the darkened, alpha-preserved ribbon pixels. Checked on the real
+art: corner alpha 0 on both, ribbon pixel (179, 166, 69) → (95, 88, 37).
+
 ### Deferred
 
 - **Next-level and ladder detail** for a blessing: the owner chose the

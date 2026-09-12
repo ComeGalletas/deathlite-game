@@ -29,10 +29,14 @@ from ui.text import shadowed, wrap
 # The preview cycles these; idle / walk are held for a beat, attack plays once.
 _PREVIEW_PHASES = ("idle", "walk", "attack")
 _PREVIEW_HOLD = 1.4          # seconds a looping phase (idle / walk) is shown
-_PREVIEW_PX = 130           # base preview box height
-_PREVIEW_W = _PREVIEW_PX + 30   # base preview box width (sprites read wider than tall)
-# Per-hero (dw, dh) tweak on the base box so each hero sits right.
-_PREVIEW_ADJUST = {"nihil": (24, 0), "kestrel": (-18, 0)}
+_PREVIEW_PX = 130           # height of the band the layout reserves for the preview
+# Each hero previews at its own in-game size (`Assets.scale_for`, the authored
+# draw size the run uses) times this one multiplier -- never a fixed box, or
+# `Assets.frame`'s hard scale stretches the art: Nihil is a wide, low sprite
+# (56x33) and was being squeezed upright. 3.0 is 2 * config.CAMERA_ZOOM, so a
+# preview is exactly the in-game sprite at double size, and the tallest hero
+# still fits the band, leaving the ribbon / Begin / instructions where they are.
+_PREVIEW_ZOOM = 3.0
 # Card body text wraps to the card width minus this inset each side, measured
 # in the body font (`ui.text.wrap`), so it always clears the 9-slice frame.
 _CARD_TEXT_INSET = 19       # 16 for the 9-slice frame + 3 px of breathing room
@@ -286,7 +290,8 @@ class CharacterSelectState(State):
                     hits.add(pygame.Rect(r.centerx, r.top - 4, r.width // 2 + 12, r.height + 8),
                              "weapon_next")
 
-        self._draw_preview(surface, cx, y + card_h + 12)
+        preview_top = y + card_h + 12
+        self._draw_preview(surface, cx, preview_top)
 
         # Difficulty on a ribbon whose colour is the difficulty. The ribbon is
         # a switch (one click steps it, like Down); Up / Down still work. Two
@@ -338,24 +343,61 @@ class CharacterSelectState(State):
         self._layout = {"diff_y": diff_y, "ribbon": pygame.Rect(ribbon),
                         "diff_runs": (pygame.Rect(rect_a), pygame.Rect(rect_b)),
                         "begin": pygame.Rect(begin),
+                        "card_bottom": y + card_h,
+                        "preview_top": preview_top,
+                        "preview_baseline": self._preview_baseline(preview_top),
                         "instr_top": begin.bottom + _INSTR_GAP, "instr_bottom": instr_bottom,
                         "hint_bottom": hint_rect.bottom}
 
+    def _preview_metrics(self, cid: str) -> tuple[int, int, float] | None:
+        """`(w, h, below_feet)` for a hero's preview: its in-game draw size at
+        `_PREVIEW_ZOOM`, plus how far the frame reaches under the feet anchor.
+        None when the rig has no sprite metadata (art missing -> disc)."""
+        rig = self.content.characters[cid].get("sprite")
+        scale = self.game.assets.scale_for(rig) if rig else None
+        if not scale:
+            return None
+        bw, bh = scale
+        ay = self.game.assets.anchor(rig)[1]
+        return (max(1, round(bw * _PREVIEW_ZOOM)), max(1, round(bh * _PREVIEW_ZOOM)),
+                (bh - ay) * _PREVIEW_ZOOM)
+
+    def _preview_baseline(self, top: int) -> int:
+        """The shared ground line the heroes stand on, fixed for the screen so
+        arrowing between cards never moves it. The tallest above-feet reach and
+        the deepest below-feet reach across *every* hero are centred in the
+        band, so a new hero or a re-authored `scale` re-centres the group."""
+        above = below = 0.0
+        for cid in self.ids:
+            m = self._preview_metrics(cid)
+            if m is None:
+                continue
+            above = max(above, m[1] - m[2])     # feet anchor up to the frame top
+            below = max(below, m[2])
+        if not above:
+            return top + _PREVIEW_PX // 2
+        return round(top + (_PREVIEW_PX - (above + below)) / 2 + above)
+
     def _draw_preview(self, surface: pygame.Surface, cx: int, top: int) -> None:
-        """The focused hero's looping animation preview, centred. Falls back to
-        the hero's primitive colour disc if the rig / frame is unavailable."""
+        """The focused hero's looping animation preview. Each hero is drawn at
+        its own in-game size, standing on the shared baseline -- so the cards
+        show the real silhouettes and the real height differences between the
+        heroes. Falls back to the hero's primitive colour disc if the rig /
+        frame is unavailable."""
         cid = self.ids[self.index]
         c = self.content.characters[cid]
-        cy = top + _PREVIEW_PX // 2
-        dw, dh = _PREVIEW_ADJUST.get(cid, (0, 0))
+        baseline = self._preview_baseline(top)
+        metrics = self._preview_metrics(cid)
         frame = None
-        if self._preview is not None:
-            frame = self._preview.frame(size=(_PREVIEW_W + dw, _PREVIEW_PX + dh))
+        if self._preview is not None and metrics is not None:
+            frame = self._preview.frame(size=(metrics[0], metrics[1]))
         if frame is not None:
-            surface.blit(frame, frame.get_rect(center=(cx, cy)))
+            surface.blit(frame, frame.get_rect(
+                midbottom=(cx, round(baseline + metrics[2]))))
         else:
+            r = _PREVIEW_PX // 3
             pygame.draw.circle(surface, tuple(c.get("color", config.COLOR_PLAYER)),
-                               (cx, cy), _PREVIEW_PX // 3)
+                               (cx, baseline - r), r)
 
     def _draw_instructions(self, surface: pygame.Surface, cx: int, top: int) -> int:
         """The game-instructions block from `config.MENU_INSTRUCTIONS`, centred:
@@ -363,7 +405,11 @@ class CharacterSelectState(State):
         last line so the caller can place the hint below it."""
         instr = config.MENU_INSTRUCTIONS
         line_h = self._instr.get_linesize()
-        y = top - 20
+        # "Instruction rows start one line higher" is a *line*, not 20 px:
+        # the face's `get_linesize()` is 21 here, so the literal put the whole
+        # block -- and the hint the caller anchors under it -- one pixel low.
+        # Order is untouched: the notes still come first, then the key row.
+        y = top - line_h
         for note in instr["notes"]:
             y += line_h
             surf = self._instr.render(note, True, config.COLOR_TEXT_DIM)

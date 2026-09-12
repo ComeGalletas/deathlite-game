@@ -24,7 +24,7 @@ _OPS = (FLAT, PCT, MULT)
 
 # Stats that must never resolve below zero.
 _NON_NEGATIVE = {
-    "max_hp", "move_speed", "armor", "pickup_radius",
+    "max_hp", "hp_regen", "move_speed", "armor", "pickup_radius",
     "damage_multiplier", "attack_speed_multiplier", "projectile_speed_multiplier",
     "evasion_chance", "block_chance", "block_strength",
 }

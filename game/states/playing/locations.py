@@ -46,7 +46,7 @@ class SpecialLocations:
     def nearby(self):
         ps = self.ps
         for it in ps.interactables:
-            if not it.used and it.kind != "elite_arena" and it.in_range(ps.player.pos):
+            if not it.used and it.in_range(ps.player.pos):
                 return it
         return None
 
@@ -148,36 +148,8 @@ class SpecialLocations:
 
     def use_merchant(self, it: Interactable) -> None:
         ps = self.ps
-        if ps.stats["gold"] < it.cost:
+        if not ps.spend_gold(it.cost):
             return
-        ps.stats["gold"] -= it.cost
         it.used = True
         ps._drop_item(max(2, int(1 + ps.stats["time"] // 80)))
         ps.particles.burst(it.pos, it.colour, count=20, speed=180, life=0.5)
-
-    # --- elite arenas -----------------------------------------
-    def update_elite_arenas(self) -> None:
-        ps = self.ps
-        for it in ps.interactables:
-            if it.kind != "elite_arena" or it.state == "done":
-                continue
-            if it.state == "idle" and (ps.player.pos - it.pos).length() < it.radius + 120:
-                it.state = "active"
-                it.arena_ids = set()
-                for _ in range(3):
-                    off = pygame.Vector2(ps.rng.uniform(-90, 90),
-                                         ps.rng.uniform(-90, 90))
-                    # Scripted: the spawn master seats arena elites whatever
-                    # the live cap says (`owners.cap_exempt` in the tables).
-                    e = ps.spawn.spawn_enemy("elite", at=it.pos + off, owner="arena")
-                    if e is not None:
-                        it.arena_ids.add(id(e))
-                ps._boss_warning_t = 1.6
-                ps._boss_name = "Elite Arena"
-            elif it.state == "active":
-                live = {id(e) for e in ps.enemies if e.alive}
-                if not (it.arena_ids & live):
-                    it.state = "done"
-                    it.used = True
-                    ps._drop_item(max(3, int(2 + ps.stats["time"] // 60)))
-                    ps.shake.add(0.5)

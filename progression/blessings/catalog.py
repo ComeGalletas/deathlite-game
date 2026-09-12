@@ -16,8 +16,8 @@ CATEGORIES = ("power", "coverage", "behavior", "synergy")
 EFFECT_TYPES = ("stat", "weapon_bonus", "weapon_effect")
 STAT_OPS = ("flat", "pct", "mult")
 BONUS_MODES = ("add", "mult")
-DISPLAYS = ("flat", "pct", "pct_drop", "chance", "seconds", "mult", "raw",
-            "degrees", "hidden")
+DISPLAYS = ("flat", "pct", "pct_gain", "pct_drop", "chance", "seconds",
+            "mult", "raw", "degrees", "hidden")
 ROMAN = ("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X")
 
 
@@ -31,6 +31,10 @@ def format_value(value: float, display: str) -> str:
         return f"+{value:g}"
     if display == "pct":
         return f"+{value * 100:.0f}%"
+    if display == "pct_gain":
+        # A growth multiplier read as the growth: 1.15 -> "+15%". The mirror
+        # of `pct_drop`, for a `mult` bonus that makes something bigger.
+        return f"+{(value - 1.0) * 100:.0f}%"
     if display == "pct_drop":
         return f"{(1.0 - value) * 100:.0f}%"
     if display == "chance":

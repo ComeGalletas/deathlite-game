@@ -45,12 +45,16 @@ from game import config
 from world.gen.scatter import _blocks, _corridor_doorways
 from world.gen.settings import settings_or_config
 from world.gen.tuning import (
-    VILLAGE_KIND, _V_ART_TOL, _V_CLUSTER_RADIUS, _V_COAST_PAD, _V_GAP, _V_HALL_ABOVE,
+    VILLAGE_KIND, _DIRS, _V_ART_TOL, _V_CLUSTER_RADIUS, _V_COAST_PAD, _V_GAP, _V_HALL_ABOVE,
     _V_STREET_REACH,
     _V_HEAL_NORTH, _V_HEAL_RADIUS, _V_HOUSES, _V_HOUSE_LINK, _V_LANE_HALF,
+    _V_PAIR_GAPS,
     _V_MILITARY_FLANK,
     _V_MILITARY_INLAND, _V_MILITARY_PITCH, _V_PEN_DIST, _V_PEN_H, _V_PEN_SCALE,
-    _V_PEN_W,
+    _V_PEN_SWEEPS, _V_PEN_W,
+    _V_FILL_BAND, _V_FILL_CHANCE, _V_FILL_GAP, _V_FILL_INNER, _V_FILL_SQUARE,
+    _V_TREE_GAP, _V_TREE_TOPUP,
+    _TREE_THICKET_MAX_GRID, _TREE_THICKET_MIN_GRID,
     _V_RING, _V_SCATTER_GAP, _V_SCATTER_SCALE, _V_SCATTER_TREES, _V_SLOTS,
     _GRID_OBSTACLES_PER_1000,
 )
@@ -175,6 +179,24 @@ class _Site:
         self.parts: dict[int, list] = {}      # id(primary) -> its satellites
         self.forge = None
         self.pen = None
+        # The two discs round the forge, in world px, converted once here so
+        # no pass multiplies tiles by `px` for itself:
+        #
+        #   `settlement` -- the whole village's extent. The first scatter
+        #   keeps its props outside it, the unseal repair will not take an
+        #   obstacle back from inside it, and the bake's clutter pass keeps
+        #   out too (both read it off `Village.radius`).
+        #   `square` -- just the forge, the heal above it and the hall above
+        #   that. The fill sweep and the tree top-up keep out of this one
+        #   only, because the settlement disc is a circle while the buildings
+        #   are not: on a ragged island they crowd one side and the lawn on
+        #   the other is inside the circle with nothing in it.
+        #
+        # `settlement` is exported on the `Village` record, which the repair
+        # and the bake read; `square` has no consumer outside generation and
+        # stays here, so the record does not grow a field nobody asks for.
+        self.settlement = _V_CLUSTER_RADIUS * self.px
+        self.square = _V_FILL_SQUARE * self.px
 
     # --- coordinates --------------------------------------------------
     def tile_centre(self, col: int, row: int) -> tuple[float, float]:
@@ -200,9 +222,12 @@ class _Site:
                     return False
         return True
 
-    def free(self, x: float, y: float, r: float, gap: float) -> bool:
+    def free(self, x: float, y: float, r: float, gap: float, kind=None) -> bool:
+        """Is `(x, y)` clear of everything placed by `gap` px -- or by the
+        pairing's own gap, for the pairings `_V_PAIR_GAPS` lists."""
         for o in self.placed:
-            if (x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < (r + o.radius + gap) ** 2:
+            keep = _V_PAIR_GAPS.get((kind, o.kind), gap)
+            if (x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < (r + o.radius + keep) ** 2:
                 return False
         for rx, ry, rr in self.reserved:
             if (x - rx) ** 2 + (y - ry) ** 2 < (r + rr + gap) ** 2:
@@ -213,10 +238,11 @@ class _Site:
         keep = r + _V_LANE_HALF * self.px
         return all(_seg_dist(x, y, a, b) >= keep for a, b in self.lanes)
 
-    def circle_ok(self, x: float, y: float, r: float, lane: bool) -> bool:
+    def circle_ok(self, x: float, y: float, r: float, lane: bool,
+                  kind=None) -> bool:
         return (self.ground_disc(x, y, r + _V_COAST_PAD)
                 and not _blocks(self.doors, x, y, r)
-                and self.free(x, y, r, _V_GAP)
+                and self.free(x, y, r, _V_GAP, kind)
                 and (not lane or self.off_lanes(x, y, r)))
 
     def on_axis(self, angle: float) -> bool:
@@ -255,13 +281,33 @@ class _Site:
             for o in self.placed:
                 if o is skip or not o.skin or o.kind not in BUILDINGS:
                     continue
+                if kind == "house" and o.kind == "house":
+                    continue            # houses may crowd: owner, 2026-09-12
                 if clips(box, self.art_of(o), self.art_tol):
                     return False
         return True
 
+    def prop_fits(self, kind: str, x: float, y: float, gap: float) -> bool:
+        """The guard every *prop* passes -- tree, rock, pillar, sign,
+        scarecrow -- whichever sweep is placing it: on ground with the coast
+        pad, out of every bridge mouth, `gap` px from anything standing (less
+        between two trees, `_Site.free`), off the roads, and not painting
+        over the forge, the heal or the hall.
+
+        The three sweeps (`_scatter`, `_fill_scatter`, `_grow_trees`) differ
+        only in how they pick the candidate point and what gap they ask for;
+        they shared this chain by copy before, in three places that had to be
+        kept in step by hand."""
+        r = float(KINDS[kind][0])
+        return (self.ground_disc(x, y, r + _V_COAST_PAD)
+                and not _blocks(self.doors, x, y, r)
+                and self.free(x, y, r, gap, kind)
+                and self.off_lanes(x, y, r)
+                and self.art_ok(kind, x, y))
+
     def fits(self, kind: str, x: float, y: float, lane: bool = True,
              art: bool = True) -> bool:
-        return (all(self.circle_ok(cx, cy, cr, lane)
+        return (all(self.circle_ok(cx, cy, cr, lane, kind)
                     for cx, cy, cr in _circles(kind, x, y))
                 and (not art or self.art_ok(kind, x, y)))
 
@@ -312,10 +358,37 @@ class _Site:
 
 
 def _lay_out(site: _Site, town_hall: bool) -> Village:
-    rng, px = site.rng, site.px
-    room = site.room
-    colours = _Cycle(rng, len(COLOURS))
+    """The village, one step at a time, in the order they run.
 
+    Each step below owns one decision and mutates `site`; what the next step
+    needs, it returns. The order is not arbitrary and mostly cannot change:
+    the roads are drawn to the forge, the axis stands on the forge, the ring
+    is measured from it, the military row follows the roads, and the pen goes
+    where the bridges are not. The two places where the order *is* a choice
+    are marked where they happen.
+    """
+    colours = _Cycle(site.rng, len(COLOURS))
+    mouths = [pygame.Vector2(d.center) for d in site.doors]
+    forge = _seat_forge(site, mouths)
+    fvec = pygame.Vector2(forge)
+    dirs = _lay_roads(site, mouths, fvec)
+    heal = _seat_axis(site, forge, colours, town_hall)
+    want, placed = _seat_houses(site, forge, heal, colours)
+    posts = _seat_military(site, mouths, dirs, colours)
+    back = _seat_pen(site, fvec, dirs)
+    # A choice, not a sequence: the corral claims its ground before the house
+    # row is finished, because a village has one pen and may have five houses.
+    # Filling the row first cost one village in fifty-two its pen.
+    if placed < want:
+        _fill_beside(site, colours, site.rng, want, placed)
+    _decorate(site)
+    return _record(site, heal, mouths, posts, back)
+
+
+def _seat_forge(site: _Site, mouths) -> tuple:
+    """Step 1. Returns the forge's world position; `site.forge` is set."""
+    px = site.px
+    room = site.room
     # 1. The forge, at the walkable centroid -- or the nearest cell to it
     #    that takes the forge *and leaves the axis room*: ground for the
     #    heal two tiles north and for the hall four to five and a half
@@ -326,7 +399,6 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
     cells = sorted(room.cells, key=lambda p: (site.tile_centre(*p)[0] - c.x) ** 2
                    + (site.tile_centre(*p)[1] - c.y) ** 2)
 
-    mouths = [pygame.Vector2(d.center) for d in site.doors]
 
     def axis_room(x, y):
         # Ground for the heal straight above the forge, and for the hall's
@@ -360,8 +432,13 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
     site.forge = forge
     site.add("forge", *forge)
     site.boxes.append(site.art_rect("forge", *forge))
-    fvec = pygame.Vector2(forge)
+    return forge
 
+
+def _lay_roads(site: _Site, mouths, fvec) -> list:
+    """Step 2. Returns the way in from each mouth; `site.lanes` and
+    `site.mouth_dirs` are filled."""
+    px = site.px
     # 2. The roads: one lane from each bridge mouth, in to a knee on the
     #    street (the forge's row) and along it to the forge (`_road`),
     #    kept clear of everything but the guards that flank it. `dirs` is
@@ -376,7 +453,12 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
         if v.length_squared() > 1e-6:
             dirs.append(v.normalize())
     site.mouth_dirs = list(zip(mouths, dirs))
+    return dirs
 
+
+def _seat_axis(site: _Site, forge, colours, town_hall: bool) -> tuple:
+    """Step 3. Returns the heal's world position; the hall stands above it."""
+    px = site.px
     # 3. The north axis. The heal zone stands `_V_HEAL_NORTH` tiles due
     #    north of the forge -- an interactable, not an obstacle, so it only
     #    reserves its disc -- and the town hall (the monastery) due north of
@@ -405,7 +487,13 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
         if pos is not None:
             site.add("monastery", *pos, variant=colours.next() + 1)
             site.boxes.append(site.art_rect("monastery", *pos))
+    return heal
 
+
+def _seat_houses(site: _Site, forge, heal, colours) -> tuple:
+    """Step 4. Returns `(wanted, placed)` -- the row may come up short on a
+    small island, and `_fill_beside` finishes it after the pen."""
+    rng, px = site.rng, site.px
     # 4. The houses. The square first (LD-Z): one house on each flank of
     #    the heal, `_V_HEAL_FLANK` tiles east and west of it, so the
     #    sanctuary has company. Then the rest clustered: a walk round the
@@ -453,7 +541,12 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
         else:
             a += turn * 0.15
             swept += 0.15
+    return n, placed_houses
 
+
+def _seat_military(site: _Site, mouths, dirs, colours) -> list:
+    """Step 5. Returns the guard posts, as the buildings placed at each."""
+    px = site.px
     # 5. The military, grouped: a row beside the road in from every bridge
     #    -- the barracks nearest the road, the tower beyond it, and at the
     #    first bridge the archery beyond that -- on whichever side of the
@@ -506,7 +599,12 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
                 pair.append(site.add(kind, *spot, variant=colours.next() + 1))
         if pair:
             posts.append(pair)
+    return posts
 
+
+def _seat_pen(site: _Site, fvec, dirs):
+    """Step 6. Returns the direction the pen was sought in, which the tidy
+    pass re-uses if it has to move it; `site.pen` is set."""
     # 6. The sheep pen, on the side of the island the bridges are not.
     back = -sum(dirs, pygame.Vector2()) if dirs else pygame.Vector2()
     if back.length_squared() < 1e-6:
@@ -514,14 +612,32 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
                 else pygame.Vector2(0, -1))
     back = back.normalize()
     site.pen = _place_pen(site, fvec, back)
+    return back
 
+
+def _decorate(site: _Site) -> None:
+    """Step 7. The three prop sweeps, in the order density is added: the
+    biome's own scatter, the fill over what it left empty, then the trees."""
     # 7. Trees and rocks, last, in the band outside the cluster: the
     #    island's biome mix, kept off the roads, the pen and every building
     #    by `_V_SCATTER_GAP`, so the settlement sits in a meadow that
     #    thickens toward the coast -- and two tiles clear of the pen, whose
     #    posts are small and whose sheep a canopy would otherwise cover.
     _scatter(site, site.pen)
+    #    ... then a second sweep over the cells the first left empty, chiefly
+    #    the band round the shore (the owner's, 2026-09-12). Before the tidy
+    #    pass, so anything it stands too near the square is judged with the
+    #    rest.
+    _fill_scatter(site, site.pen)
+    _grow_trees(site, site.pen)
 
+
+def _record(site: _Site, heal, mouths, posts, back) -> Village:
+    """Step 8. The tidy pass, then the `Village` the run reads -- taken off
+    the finished site, since the tidy pass may have moved or removed things."""
+    px = site.px
+    room = site.room
+    fvec = pygame.Vector2(site.forge)
     # 8. The tidy pass (LD-Z, `world/gen/village_tidy.py`): nothing paints
     #    over the forge, the heal or the hall, no building over another,
     #    and the heal has company. Buildings may move or go here, so the
@@ -537,33 +653,33 @@ def _lay_out(site: _Site, town_hall: bool) -> Village:
     return Village(room_id=room.id, forge=fvec, heal=pygame.Vector2(heal),
                    buildings=buildings, posts=posts, pen=site.pen,
                    mouths=[(m.x, m.y) for m in mouths],
-                   radius=_V_CLUSTER_RADIUS * px, company=report["company"])
-
+                   radius=site.settlement, company=report["company"])
 
 def _scatter(site: _Site, pen=None) -> None:
     """The village island's own obstacle scatter (`world/gen/scatter.py`
     passes over the island). Same mix as the biome's, `_V_SCATTER_SCALE`
     of its density, same rules as every other village circle plus a wider
-    gap to the buildings, and only outside `_V_CLUSTER_RADIUS` of the forge
-    so the settlement's centre stays open. `shrub` is decoration and is not
-    placed."""
+    gap to the buildings, and only outside the settlement disc so its centre
+    stays open."""
     room, rng, px = site.room, site.rng, site.px
     sheet = room.palette.get(room.floor) if room.palette else None
     mix = biomes.scatter_mix(sheet)
     kinds, weights, per_1000 = mix or (("tree", "rock", "pillar"), (4, 3, 2),
                                        _GRID_OBSTACLES_PER_1000)
-    weights = [w * (_V_SCATTER_TREES if k == "tree" else 1.0)
-               for k, w in zip(kinds, weights)]
+    # Only obstacle kinds, filtered once before the draw rather than tested on
+    # every one. Nothing is filtered today -- `shrub` left the biome mixes with
+    # B3 -- but the mix is data, and a draw this pass cannot place would
+    # otherwise reach `KINDS[kind]` and raise.
+    kinds, weights = zip(*[(k, w * (_V_SCATTER_TREES if k == "tree" else 1.0))
+                           for k, w in zip(kinds, weights) if k in KINDS])
     fam = biomes.biome_of(sheet) if sheet else ""
     cells = sorted(room.cells)
     fx, fy = site.forge
-    keep_sq = (_V_CLUSTER_RADIUS * px) ** 2
+    keep_sq = site.settlement ** 2
     pen_keep = pen.inflate(4 * px, 4 * px) if pen is not None else None
     tries = int(len(cells) * per_1000 * _V_SCATTER_SCALE / 1000.0)
     for _ in range(tries):
         kind = rng.choices(kinds, weights=weights, k=1)[0]
-        if kind not in KINDS:
-            continue                    # `shrub`: decoration, not an obstacle
         col, row = rng.choice(cells)
         x = room.rect.left + col * px + rng.uniform(px * 0.28, px * 0.72)
         y = room.rect.top + row * px + rng.uniform(px * 0.28, px * 0.72)
@@ -571,16 +687,168 @@ def _scatter(site: _Site, pen=None) -> None:
             continue                    # inside the settlement
         if pen_keep is not None and pen_keep.collidepoint(x, y):
             continue                    # a canopy over the sheep
-        r = float(KINDS[kind][0])
-        if not (site.ground_disc(x, y, r + _V_COAST_PAD)
-                and not _blocks(site.doors, x, y, r)
-                and site.free(x, y, r, _V_SCATTER_GAP)
-                and site.off_lanes(x, y, r)
-                and site.art_ok(kind, x, y)):
+        if not site.prop_fits(kind, x, y, _V_SCATTER_GAP):
             continue                    # a canopy over the hall
         o = Obstacle(kind, x, y, rng.randint(1, 4))
         o.biome = fam
         site.placed.append(o)
+
+
+def _edge_distance(cells) -> dict:
+    """Tiles from the shore, per walkable cell: 1 on the coast itself, then
+    inward. A plain breadth-first walk from every cell that has a
+    non-walkable orthogonal neighbour -- the island is a couple of hundred
+    cells, so this costs nothing and saves the fill sweep from guessing at
+    "outside" with a radius from the middle, which on a ragged island is not
+    the same thing at all."""
+    cells = set(cells)
+    frontier = [c for c in cells
+                if any((c[0] + dx, c[1] + dy) not in cells for dx, dy in _DIRS)]
+    out = {c: 1 for c in frontier}
+    d = 1
+    while frontier:
+        d += 1
+        nxt = []
+        for col, row in frontier:
+            for dx, dy in _DIRS:
+                n = (col + dx, row + dy)
+                if n in cells and n not in out:
+                    out[n] = d
+                    nxt.append(n)
+        frontier = nxt
+    return out
+
+
+def _fill_scatter(site: _Site, pen=None) -> None:
+    """The second decoration sweep (the owner's, 2026-09-12): once the
+    village stands, fill what is left of the island -- chiefly its outside.
+
+    The first scatter throws `tries` darts at random cells, which leaves the
+    coverage to luck and the shore half bare. This walks every walkable cell
+    in order and offers the empty ones a prop, at `_V_FILL_CHANCE` within
+    `_V_FILL_BAND` tiles of the shore and a fraction of that further in. The
+    mix is the island's own biome again, trees weighted as before, so the
+    two sweeps read as one meadow; `_V_FILL_GAP` is the spacing that keeps
+    it open ground rather than a wood. Everything the first sweep keeps
+    clear -- the settlement's radius, the pen, the roads, the bridge
+    mouths, the coast pad, the three protected boxes -- this keeps clear
+    too, through the same tests.
+    """
+    room, rng, px = site.room, site.rng, site.px
+    sheet = room.palette.get(room.floor) if room.palette else None
+    mix = biomes.scatter_mix(sheet)
+    kinds, weights, _per_1000 = mix or (("tree", "rock", "pillar"), (4, 3, 2),
+                                        _GRID_OBSTACLES_PER_1000)
+    # Only obstacle kinds, as in `_scatter` above: a sweep that visits each
+    # cell once must not spend a cell on a draw it cannot place.
+    kinds, weights = zip(*[(k, w * (_V_SCATTER_TREES if k == "tree" else 1.0))
+                           for k, w in zip(kinds, weights) if k in KINDS])
+    fam = biomes.biome_of(sheet) if sheet else ""
+    edge = _edge_distance(room.cells)
+    fx, fy = site.forge
+    keep_sq = site.square ** 2
+    pen_keep = pen.inflate(4 * px, 4 * px) if pen is not None else None
+    for col, row in sorted(room.cells):
+        chance = (_V_FILL_CHANCE if edge.get((col, row), 99) <= _V_FILL_BAND
+                  else _V_FILL_CHANCE * _V_FILL_INNER)
+        if rng.random() >= chance:
+            continue
+        kind = rng.choices(kinds, weights=weights, k=1)[0]
+        x = room.rect.left + col * px + rng.uniform(px * 0.28, px * 0.72)
+        y = room.rect.top + row * px + rng.uniform(px * 0.28, px * 0.72)
+        if (x - fx) ** 2 + (y - fy) ** 2 < keep_sq:
+            continue                    # the village square
+        if pen_keep is not None and pen_keep.collidepoint(x, y):
+            continue                    # a canopy over the sheep
+        if not site.prop_fits(kind, x, y, _V_FILL_GAP):
+            continue
+        o = Obstacle(kind, x, y, rng.randint(1, 4))
+        o.biome = fam
+        site.placed.append(o)
+
+
+def _grow_trees(site: _Site, pen=None) -> None:
+    """`_V_TREE_TOPUP` more trees, each grown beside one already standing.
+
+    The owner asked for four more trees a village (2026-09-12). Adding them
+    to the fill sweep's chance would have sprinkled them over the whole
+    island; this is the world scatter's own move (`_topup_trees`) at village
+    scale -- pick a tree, step `_TREE_THICKET_MIN_GRID` to
+    `_TREE_THICKET_MAX_GRID` px off it, and plant there -- so what a village
+    gains is a deeper grove rather than a lawn dotted with trunks. Tree to
+    tree the spacing is `_V_TREE_GAP`; to everything else it is the fill
+    sweep's, and the square, the pen, the roads, the bridge mouths, the
+    coast pad and the three protected boxes are kept exactly as before.
+    """
+    room, rng, px = site.room, site.rng, site.px
+    if _V_TREE_TOPUP <= 0:
+        return
+    fam = ""
+    sheet = room.palette.get(room.floor) if room.palette else None
+    if sheet:
+        fam = biomes.biome_of(sheet)
+    fx, fy = site.forge
+    keep_sq = site.square ** 2
+    pen_keep = pen.inflate(4 * px, 4 * px) if pen is not None else None
+    # Gathered once and appended to as the grove grows, rather than rebuilt
+    # on each try: `site.placed` only ever gains trees from here, so the list
+    # this walks is the same one the rebuild produced.
+    trees = [o for o in site.placed if o.kind == "tree"]
+    if not trees:
+        return
+    grown = 0
+    for _ in range(_V_TREE_TOPUP * 30):
+        if grown >= _V_TREE_TOPUP:
+            return
+        anchor = rng.choice(trees)
+        a = rng.uniform(0.0, 2 * math.pi)
+        d = rng.uniform(_TREE_THICKET_MIN_GRID, _TREE_THICKET_MAX_GRID)
+        x, y = anchor.pos.x + math.cos(a) * d, anchor.pos.y + math.sin(a) * d
+        col = int((x - room.rect.left) // px)
+        row = int((y - room.rect.top) // px)
+        if (col, row) not in room.cells:
+            continue                    # off the island
+        if (x - fx) ** 2 + (y - fy) ** 2 < keep_sq:
+            continue                    # the village square
+        if pen_keep is not None and pen_keep.collidepoint(x, y):
+            continue                    # a canopy over the sheep
+        if not site.prop_fits("tree", x, y, _V_FILL_GAP):
+            continue
+        o = Obstacle("tree", x, y, rng.randint(1, 4))
+        o.biome = fam
+        site.placed.append(o)
+        trees.append(o)
+        grown += 1
+
+
+def _fill_beside(site: _Site, colours, rng, want: int, placed: int) -> int:
+    """Seat the houses the ring walk could not, on a tile centre next to one
+    it did -- the eight neighbours of each house, the houses nearest the
+    forge first, so the row closes up toward the middle rather than
+    trailing off to the coast. Returns the new count."""
+    px = site.px
+    forge = pygame.Vector2(site.forge)
+    around = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+    # Gathered once, in `site.placed` order, and appended to below: the only
+    # houses this loop can add are its own, so re-scanning `site.placed` each
+    # time round produced the same list.
+    row = [o for o in site.placed if o.skin and o.kind == "house"]
+    while placed < want:
+        spot = None
+        for h in sorted(row, key=lambda o: (o.pos - forge).length_squared()):
+            for dx, dy in around:
+                x, y = site.snap(h.pos.x + dx * px, h.pos.y + dy * px)
+                if site.fits("house", x, y):
+                    spot = (x, y)
+                    break
+            if spot is not None:
+                break
+        if spot is None:
+            return placed
+        row.append(site.add("house", *spot,
+                            variant=colours.next() * 3 + rng.randint(0, 2) + 1))
+        placed += 1
+    return placed
 
 
 def _place_pen(site: _Site, forge: pygame.Vector2, back: pygame.Vector2):
@@ -596,7 +864,21 @@ def _place_pen(site: _Site, forge: pygame.Vector2, back: pygame.Vector2):
     gate rather than one, from when the repair still judged the pen: a
     one-tile gap read as sealed whenever a lattice column landed off its
     middle, and the repair pulled a gate post out."""
-    rng, px = site.rng, site.px
+    for step, pad in _V_PEN_SWEEPS:
+        pen = _pen_sweep(site, forge, back, step, pad)
+        if pen is not None:
+            return pen
+    return None
+
+
+def _pen_sweep(site: _Site, forge: pygame.Vector2, back: pygame.Vector2,
+               step: float, pad: float):
+    """One pass of the pen search: every size at every candidate centre, the
+    fan stepping `step` radians either side of `back` and each candidate
+    keeping `pad` tiles of ground round the rail. `_place_pen` runs the
+    passes of `_V_PEN_SWEEPS` in turn and takes the first pen any of them
+    finds."""
+    px = site.px
     pitch = px * _V_PEN_SCALE
     # Smallest first: on the quarter-smaller island (HI-3) a shuffled order
     # lost a third of the pens to sizes that had no room anywhere.
@@ -605,13 +887,15 @@ def _place_pen(site: _Site, forge: pygame.Vector2, back: pygame.Vector2):
                    key=lambda s: s[0] * s[1])
     lo, hi = _V_PEN_DIST
     fence_r = float(KINDS["fence"][0])
-    # Nearest first, fanning out from `back` -- all the way round if the
-    # far side of the island has no room, since a pen beside a road still
-    # beats no pen.
+    # The fan reaches all the way round, so a pen beside a road still beats
+    # no pen; `step` is how finely it is combed. At 0.3 this is the same
+    # twenty-one angles the single-pass search used.
+    fan = [0] + [s * k for k in range(1, int(math.pi / step) + 1) for s in (1, -1)]
+    # Nearest first, then fanning out from `back`.
     d = lo
     while d <= hi + 1e-9:
-        for k in (0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9, 10):
-            a = math.atan2(back.y, back.x) + k * 0.3
+        for k in fan:
+            a = math.atan2(back.y, back.x) + k * step
             cx = forge.x + math.cos(a) * d * px
             cy = forge.y + math.sin(a) * d * px
             for w, h in sizes:
@@ -619,7 +903,8 @@ def _place_pen(site: _Site, forge: pygame.Vector2, back: pygame.Vector2):
                 oy = round(cy - h * pitch / 2)
                 posts = [(ox + (col + 0.5) * pitch, oy + (row + 0.5) * pitch, slot)
                          for (col, row), slot in _pen_tiles(0, 0, w, h)]
-                if _pen_fits(site, ox, oy, w * pitch, h * pitch, posts, fence_r):
+                if _pen_fits(site, ox, oy, w * pitch, h * pitch, posts,
+                             fence_r, pad):
                     for x, y, slot in posts:
                         site.add("fence", x, y, variant=FENCE_SLOTS.index(slot) + 1)
                     return pygame.Rect(round(ox + pitch), round(oy + pitch),
@@ -652,18 +937,19 @@ def _pen_tiles(c0: int, r0: int, w: int, h: int) -> list:
 
 
 def _pen_fits(site: _Site, ox: float, oy: float, W: float, H: float, posts,
-              fence_r) -> bool:
+              fence_r, pad: float) -> bool:
     """`(ox, oy)` is the ring's top-left corner and `W x H` its size, in
-    world px; `posts` the fence centres. The whole footprint and half a
-    world tile round it must be plain ground (a whole one when the posts
-    stood 0.6 of a tile apart; at 0.45 the margin outweighed the pen and
-    the small islands lost theirs), so the pen never straddles the coast
-    and a sheep never bounces over the sea; every post passes the
-    village's own tests; nothing already stands inside."""
+    world px; `posts` the fence centres. The whole footprint and `pad`
+    tiles round it must be plain ground (a whole tile when the posts stood
+    0.6 of a tile apart; at 0.45 the margin outweighed the pen and the
+    small islands lost theirs, so the first sweep asks half a tile and the
+    fallback a quarter), so the pen never straddles the coast and a sheep
+    never bounces over the sea; every post passes the village's own tests;
+    nothing already stands inside."""
     px = site.px
-    pad = px * 0.5
-    c0, r0 = site.cell_of(ox - pad, oy - pad)
-    c1, r1 = site.cell_of(ox + W + pad, oy + H + pad)
+    keep = px * pad
+    c0, r0 = site.cell_of(ox - keep, oy - keep)
+    c1, r1 = site.cell_of(ox + W + keep, oy + H + keep)
     for col in range(c0, c1 + 1):
         for row in range(r0, r1 + 1):
             cell = site.grid.get((col, row))

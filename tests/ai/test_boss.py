@@ -2,15 +2,18 @@
 distinct pattern effects, health fraction, death (spec 3.7)."""
 import unittest
 
-
 from entities.boss import Boss
-from tests.aictx import ai_ctx
+from game import config
 from game.content import get_content
+from tests.aictx import ai_ctx
+
+# Named, not `next(iter(bosses))`: there is a boss pool now, and every
+# assertion below is about this boss's own three patterns.
+BOSS_ID = "the_first_hunger"
 
 
 def boss():
-    bid = next(iter(get_content().bosses))
-    return Boss(bid, get_content().boss(bid), 0, 0)
+    return Boss(BOSS_ID, get_content().boss(BOSS_ID), 0, 0)
 
 
 def ctx(dt, sink):
@@ -90,7 +93,7 @@ class BossVisionTests(unittest.TestCase):
 
     def test_the_vision_range_covers_the_whole_view(self):
         import math
-        from game import config
+
         b = boss()
         half_w = config.SCREEN_WIDTH / config.CAMERA_ZOOM / 2
         half_h = config.SCREEN_HEIGHT / config.CAMERA_ZOOM / 2
@@ -108,7 +111,12 @@ class BossVisionTests(unittest.TestCase):
         self.assertEqual(sink["summoned"], [])
         self.assertEqual(b.phase, "intro")           # the clock never moved
         self.assertEqual(b.phase_t, t0)
-        self.assertAlmostEqual(b.vel.length(), b.speed, places=3)   # full speed
+        # The closing sprint (owner, 2026-09-12): out of sight the boss is not
+        # fighting, so it covers the gap at `BOSS_CLOSING_SPEED_MULT` x speed
+        # rather than strolling. `ClosingSprintTests` in test_boss_pig_rider.py
+        # owns the rule; this only checks the vision branch still applies it.
+        self.assertAlmostEqual(b.vel.length(),
+                               b.speed * config.BOSS_CLOSING_SPEED_MULT, places=3)
         self.assertGreater(b.pos.x, 0.0)             # straight at the player
         self.assertEqual(b._anim_name(), "walk")
 

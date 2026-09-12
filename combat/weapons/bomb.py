@@ -9,6 +9,13 @@ through `CombatResolver.projectile_hits` like any other hit: damage
 multipliers, crit, weight knockback and on-hit effects all apply. A bomb that
 is blocked by an obstacle detonates where it stopped.
 
+The blast is sized by `Weapon._blast_radius`, so it is part of the weapon
+**area** system rather than a stand-alone number (2026-09-12): area items and
+area blessings widen the explosion, and the `blast_radius_mult` blessings
+scale it in steps. The `area` this module passes to `spawn_projectile` is a
+different thing -- the thrown ball's own collider, which stops it on obstacles
+and trips a Minefield mine -- and stays small.
+
 All numbers are the weapon's data fields; nothing here has a default.
 """
 from __future__ import annotations
@@ -63,6 +70,6 @@ def throw_bombs(weapon, ctx, aim: pygame.Vector2, candidates, area: float,
             visual=weapon.visual_id,
             source_tags=weapon.tags, is_crit=dmg.is_crit,
             inert=True, stop_after=stop_after,
-            blast_radius=float(d["blast_radius"]) + weapon.bonus["blast_radius"],
+            blast_radius=weapon._blast_radius(ctx.area_multiplier),
             blast_lifetime=float(d["blast_lifetime"]),
             mine=mine, arm_delay=float(weapon.effects.get("mine_arm_delay", 0.0)))

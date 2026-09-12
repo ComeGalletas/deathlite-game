@@ -69,6 +69,7 @@ from world.layout import CLIFF, GROUND, LAKE, VOID, ResourcePoint, SpawnPoint
 from world.nav.field import _NAV_CLASSES
 from world.nav.lattice import NavGrid
 from world.rules import inset as terrain_inset
+from world.rules.spacing import _Neighbourhood
 
 log = logging.getLogger(__name__)
 
@@ -96,12 +97,29 @@ class _Island:
         self.px = px
         r = room.rect
         self.doors = _doors_near(doors, r, pad)
+        # Scanned, not indexed. An island carries ~58 of these and
+        # `on_keepout` is asked ~11k times a world -- ~675k rectangle tests,
+        # which looks like the same problem D1 fixed for the obstacles and is
+        # not: `Rect.collidepoint` is a C call, and bucketing them by tile
+        # (and a tile-set variant with no rect test at all) both measured
+        # within noise of this loop. See the placement review journal, D2.
         self.keepouts = [k for k in keepouts if k.colliderect(r)]
         # Obstacles that could come within reach of a point on this island.
         reach = max((float(o.radius) for o in layout.obstacles), default=0.0)
         box = r.inflate(2 * reach + 128, 2 * reach + 128)
         self.obstacles = [o for o in layout.obstacles
                           if box.collidepoint(o.pos.x, o.pos.y)]
+        # ... indexed, because every candidate used to be tested against all of
+        # them: ~10k calls a world over ~80 obstacles each, 830k distance
+        # comparisons and the largest remaining O(n*m) in generation. The hash
+        # answers the same question from the nine cells round the candidate.
+        # Its cell is the widest separation any query can produce -- the widest
+        # obstacle plus its gap, plus the widest body that can ask -- or a
+        # rejecting obstacle could sit outside those nine cells.
+        widest_body = body_radii()[1]
+        self.near = _Neighbourhood(reach + _SPAWN_OBSTACLE_GAP + widest_body)
+        for o in self.obstacles:
+            self.near.add(o.pos.x, o.pos.y, float(o.radius) + _SPAWN_OBSTACLE_GAP)
         # Discs kept clear: the scatter's own (interactable / arena / hero),
         # and the wider one round the hero's first position.
         self.clear = []
@@ -121,11 +139,10 @@ class _Island:
         return any(k.collidepoint(x, y) for k in self.keepouts)
 
     def obstacle_free(self, x: float, y: float, radius: float) -> bool:
-        for o in self.obstacles:
-            reach = radius + float(o.radius) + _SPAWN_OBSTACLE_GAP
-            if (x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < reach * reach:
-                return False
-        return True
+        """No obstacle within its own radius plus `radius` plus
+        `_SPAWN_OBSTACLE_GAP`. The stored separation carries the first two
+        terms, so this is `_Neighbourhood.within` with the body radius."""
+        return not self.near.within(x, y, radius)
 
     def in_clear_disc(self, x: float, y: float) -> bool:
         return any((x - cx) ** 2 + (y - cy) ** 2 < rr * rr

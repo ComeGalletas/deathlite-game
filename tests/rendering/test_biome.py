@@ -95,12 +95,18 @@ class PoolDataTests(unittest.TestCase):
             self.assertTrue(mix, f"{name} declares no scatter block")
             self.assertGreater(float(mix["per_1000"]), 0, name)
             weights = mix["weights"]
-            # The four core kinds are mandatory; a biome may additionally name
-            # a post kind (`sign` / `scarecrow`), which only some of them do --
-            # a scarecrow belongs on farmland, not on a rock shelf.
-            self.assertTrue({"tree", "rock", "pillar", "shrub"} <= set(weights),
+            # The three core kinds are mandatory; a biome may additionally
+            # name a post kind (`sign` / `scarecrow`), which only some of them
+            # do -- a scarecrow belongs on farmland, not on a rock shelf.
+            #
+            # `shrub` is deliberately *not* among them any more (B3,
+            # `placement_review_journal.md`): bushes are decoration placed by
+            # the bake from the `decorations` registry, and weighting them here
+            # only spent scatter slots on an obstacle that was dropped before
+            # the list was returned.
+            self.assertTrue({"tree", "rock", "pillar"} <= set(weights),
                             f"{name} is missing a core kind")
-            self.assertTrue(set(weights) <= {"tree", "rock", "pillar", "shrub",
+            self.assertTrue(set(weights) <= {"tree", "rock", "pillar",
                                              "sign", "scarecrow"},
                             f"{name} weights an unknown kind")
             self.assertGreater(sum(weights.values()), 0, name)

@@ -125,6 +125,15 @@
       "attack": {"file": "enemies/giant_bat/attack.png", "frames": 7, "fps": 12, "loop": false}
     }
   },
+  "pig_rider": {
+    "frame": [256, 256], "content": [33, 17, 192, 151], "scale": [260, 204], "anchor": [123, 200], "face": "right",
+    "_note": "The Tusked Lance. Scale is x1.35 on the content: most of the 151 px height is a vertical spear, so the character itself lands at ~118x196. Anchor is the measured ground contact (the pig's feet, 91/192 and 148/151 of the crop) carried through that scale. attack fps 7 is tuned against the sweep pattern's 0.5 s telegraph so the arc frames land on the hitbox -- see documentation/journals/pig_rider_boss_journal.md.",
+    "anims": {
+      "idle":   {"file": "enemies/pig_rider/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/pig_rider/run.png", "frames": 4, "fps": 12, "loop": true},
+      "attack": {"file": "enemies/pig_rider/attack.png", "frames": 7, "fps": 7, "loop": false}
+    }
+  },
   "dead": {
     "frame": [128, 128], "content": [35, 32, 60, 67], "scale": [39, 44], "anchor": [19, 41], "face": "right",
     "_note": "shared one-shot death poof for every entity (hero + enemy) -- copied verbatim in character_sprites.json and enemy_sprites.json. dead.png repacked from a 7x2 grid to a 14x1 strip so the loader (horizontal-strip only) slices it right.",

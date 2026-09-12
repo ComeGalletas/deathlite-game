@@ -20,7 +20,7 @@ _SPECIAL_FLOORS = {
     "start": (24, 34, 30), "boss": (44, 22, 26),
     "shrine": (30, 34, 48), "treasure": (44, 40, 24),
     "fountain": (22, 38, 44), "altar": (40, 24, 40),
-    "merchant": (40, 36, 28), "elite_arena": (46, 26, 30),
+    "merchant": (40, 36, 28),
     "village": (34, 40, 26),
 }
 

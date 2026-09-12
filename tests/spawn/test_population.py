@@ -13,7 +13,7 @@ from spawn.budget import SpawnDirector
 from tests.spawn.fakehost import BRIDGE, FakeHost
 
 
-def _pop(never_sleep=("arena", "boss")) -> Population:
+def _pop(never_sleep=("dummy", "boss")) -> Population:
     return Population(get_content().spawn_tables.population, never_sleep)
 
 
@@ -36,14 +36,14 @@ class HibernateTests(unittest.TestCase):
         pop = _pop()
         inside = _spawn(host, 300, 2, owner="director")            # island 0
         outside = _spawn(host, 2500, 3, owner="director")          # island 1
-        arena = _spawn(host, 2500, 1, owner="arena")
+        exempt = _spawn(host, 2500, 1, owner="dummy")
         chasing = _spawn(host, 2500, 1, owner="director")
         host.pursuing = {id(chasing[0])}
         bridge = host.make_enemy("chaser", *BRIDGE.center, 1.0, 1.0, "director")
         slept = pop.hibernate(host, {0}, 1.0)
         self.assertEqual(slept, {1: 3})
         self.assertEqual(set(map(id, host.live)),
-                         set(map(id, inside + arena + chasing + [bridge])))
+                         set(map(id, inside + exempt + chasing + [bridge])))
         self.assertEqual(pop.dormant_in(1), 3)
         self.assertEqual(pop.total_dormant, 3)
         self.assertEqual(pop.slept, 3)
@@ -244,7 +244,7 @@ class CapAndSwitchTests(unittest.TestCase):
         self.assertEqual(m.population.total_dormant, 4)
         self.assertIsNotNone(m.spawn_at("chaser", pygame.Vector2(50, 50)))     # 4 + 1 = 5
         self.assertIsNone(m.spawn_at("chaser", pygame.Vector2(50, 50)))        # over
-        self.assertIsNotNone(m.spawn_at("elite", pygame.Vector2(50, 50), owner="arena"))
+        self.assertIsNotNone(m.spawn_at("elite", pygame.Vector2(50, 50), owner="dev"))
 
     def test_frozen_stops_the_director_but_not_the_zone(self):
         host = FakeHost()

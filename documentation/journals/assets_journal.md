@@ -2923,3 +2923,340 @@ the stab strip. Six tests in `tests/rendering/test_weapon_rigs.py`
 cancelling the art's heading, a right-going dagger lies flat and a
 down-going one stands, the draw's rotation and size, the fallback.
 `test_forge.py::VisualTests` now expects `thrown` for the Forge's look.
+
+## XP orbs move under `items/` (2026-09-12)
+
+The owner filed the three experience orbs into a new `assets/items/` tree:
+`assets/orbs/orb_{green,blue,purple}.png` -> `assets/items/orbs/…`. The whole
+wiring is three `file` values in `data/prop_sprites.json` (`xp_orb_small`,
+`xp_orb_medium`, `xp_orb_large`); nothing in `game/ world/ ui/ entities/
+systems/ spawn/` names an orb by path -- the drop code asks for the rig and
+`Assets._load_image` joins the rig's `file` onto `ASSETS_DIR`. The `scale`
+values (8, 10, 12 px) are untouched, so the orbs draw exactly as before.
+`utilities/sprite_sheet_lab.py` walks `assets/` with `rglob`, so its browser
+picks the new path up on its own.
+
+Checked after: `tests/rendering/test_assets.py` (whose `test_files_exist`
+resolves every rig `file` against `ASSETS_DIR`) and `test_gem_glow.py` are
+green, and the three rigs load through `Assets.image` at 32 x 32 with their
+expected green / blue / purple centres. The one red test in
+`tests/rendering/` is `test_menu.py::CharacterSelectInstructionsTests::
+test_content_comes_from_config` (743 != 742, a line-height off-by-one); it
+fails identically with this change reverted and belongs to the in-flight
+hero-select work.
+
+**Landed in `items/` but not referenced by anything:** `items/chests/
+chests.png` (pulled back from `unused/items/chests.png`) and
+`items/potions/health_potion.png` (new, never tracked). Both are art waiting
+for a feature, sitting live rather than parked. Also still parked at the old
+shape: `unused/orbs/orb_{red,yellow}.png` -- if the "parked art keeps its old
+path" rule is to hold, those want `unused/items/orbs/`. Left as the owner
+placed them.
+
+## Grave Totem sprite -- wiring (2026-09-12, todo)
+
+**Requirement (owner).** New art under `assets/effects/weapons/grave_totem/`.
+Using **only** `Fire_Totem_blue-Sheet.png`, wire the sprites the totem's
+behaviour needs -- spawning, attacking and leaving -- identify which frames
+serve which action, and cut **one sheet per action** rather than pointing the
+rig at the big sheet with row offsets. Confirm the reading and propose the
+todo first; nothing is coded yet.
+
+### What is in the sheet
+
+`Fire_Totem_blue-Sheet.png` is 896 x 480: a 14 x 5 grid of **64 x 96**
+frames. Measured by ink (alpha > 8) per cell, the five rows are five strips;
+the sibling GIFs (`appear`, `idle`, `attack`, `attack_loop`, `disappear`) name
+them, and their frame counts match the ink counts:
+
+| Row | Frames | GIF | What it shows |
+|---|---|---|---|
+| 0 | 8 | `appear` | a spark grows into the standing totem |
+| 1 | 7 | `idle` | the totem standing, flame flickering |
+| 2 | 14 | `attack` | 8 idle-like frames, then the flame bursts up (frames 8-13) |
+| 3 | 7 | `attack_loop` | the burst alone, first frame idle-like |
+| 4 | 14 | `disappear` | the totem lifts, turns to flame, and dissipates to nothing |
+
+Ink sits in rows 8..94 of the 96-px frame in every strip except `appear`,
+whose early frames are only the base (46..94): the **base ring is at
+y ≈ 90-94**, so the anchor is the bottom-centre. The body is ~35 px wide
+(columns 15..49); the burst and the dissipation use the full 64.
+
+### What the totem needs, action by action
+
+Read against `entities/summon.py` (the totem is a `Summon` of kind `totem`:
+`life` counts down from `summon_lifetime` = 8 s, `_maybe_attack` fires a bolt
+every `attack_interval` = 0.7 s at the nearest enemy in its 360-px ring) and
+`summons/totem.py` (a rounded rectangle and a dot today):
+
+- **Spawning** -> row 0, `appear`, played **once** at spawn. ~0.65 s at
+  12 fps. The totem should not fire during it (today it fires 0.3 s after
+  spawn; the first bolt waits for the sheet to finish -- the same "the
+  visual outlives the hit" rule the sword slash follows).
+- **Idle** -> row 1, `idle`, **looping** between attacks. Not asked for by
+  name but required: without it the totem has no frame to stand on
+  between bursts.
+- **Attacking** -> row 3, `attack_loop`, played **once** per bolt. ~0.5 s at
+  14 fps, inside the 0.7 s attack interval so it always completes before
+  the next bolt. Row 2 (`attack`) is the same burst with eight idle frames
+  in front of it; `idle` + `attack_loop` cover it, so row 2 is **not cut**.
+- **Leaving** -> row 4, `disappear`, played **once** over the last ~1.0 s of
+  the totem's life (14 frames at 14 fps). The totem stops firing when it
+  starts; `life` already counts down, so this is "when `life` drops under
+  the strip's length, play it and hold fire" -- no lifetime change.
+
+### The cut sheets
+
+Each a horizontal strip of 64 x 96 frames, written by a small script
+(`utilities/cut_totem_sheets.py`, reproducible from the blue sheet), into the
+same folder:
+
+| File | Source row | Frames | Size |
+|---|---|---|---|
+| `totem_appear.png` | 0 | 8 | 512 x 96 |
+| `totem_idle.png` | 1 | 7 | 448 x 96 |
+| `totem_attack.png` | 3 | 7 | 448 x 96 |
+| `totem_disappear.png` | 4 | 14 | 896 x 96 |
+
+The rig (`data/weapon_sprites.json`, `grave_totem`) names these files per
+anim, as the `bomb` rig names its `spin` / `fuse` files -- no `row` offsets
+into the original. The original sheet and the GIFs stay in the folder as
+the source; nothing reads them. `Fire_Totem-full_Sheet.png` is not used
+(owner: the blue sheet only).
+
+### Rig numbers (proposed)
+
+`frame [64, 96]`, `content [0, 0, 64, 96]` (the burst and the dissipation
+need the full cell), `scale [32, 48]` (half size: the standing body comes
+out ~17 x 25 world px, next to the 14 x 24 primitive it replaces),
+`anchor [16, 46]` (bottom-centre, on the base ring), `grid` per strip's
+frame count. Anims: `appear` 8 @ 12 fps once; `idle` 7 @ 8 fps loop;
+`attack` 7 @ 14 fps once; `disappear` 14 @ 14 fps once.
+
+### Todo
+
+- [x] 1. `utilities/cut_totem_sheets.py`: cut rows 0, 1, 3, 4 of the blue
+      sheet into the four strips above; run it and commit the PNGs.
+      `--check` re-cuts and compares, so a drift from the source is a test
+      failure, not a surprise.
+- [x] 2. `data/weapon_sprites.json`: the `grave_totem` rig with the four
+      anims, one file each.
+- [x] 3. `entities/summon.py`: an `Animator("grave_totem", start="appear")`
+      for kind `totem`, and the phases `appearing` -> `idle` / `attack` ->
+      `leaving` (`_totem_phase`, `holds_fire`, `_anim_name`). `_phase` had
+      to join `__slots__`.
+- [x] 4. `game/states/playing/summons/totem.py`: blits the frame by the
+      rig's anchor; the rectangle-and-dot stays as the fallback.
+- [x] 5. Tests -- `tests/rendering/test_totem_sprite.py` (13 tests, 44
+      subtests): the rig names one file per action with no `row`; every
+      strip exists, is `frames x 64` wide and matches a fresh cut; every
+      frame loads; the phases walk appear -> attack -> idle -> attack and
+      leaving over a scripted life with no bolt while appearing or leaving;
+      a missing rig passes the phases through at once; the sprite stands on
+      its anchor and the primitive draws without the rig. `tests/combat/
+      test_summons.py` (11) still passes.
+- [x] 6. Screenshots delivered: the four strips as a contact sheet, and
+      three in-run frames zoomed on the hero (appearing, mid-burst,
+      dissipating).
+
+**Owner (2026-09-12): the lift-off stays** -- `disappear` is cut whole, 14
+frames.
+
+**Decisions made while building.**
+
+- The anchor is `[16, 34]` in the 32 x 48 scaled frame, not the base ring's
+  own row (46): the summon's `pos` is its collider centre and the primitive
+  stood 12 px below it, so the base ring lands 12 px under `pos` and the
+  pillar stands where the rectangle stood.
+- With the rig missing every strip is zero frames long, so `appearing`
+  finishes on the first update, the first bolt keeps its old 0.3 s
+  schedule, and `leaving` never starts -- an empty `assets/` plays exactly
+  as before. Pinned by a test.
+- The first bolt now waits for the appear strip (~0.67 s) instead of 0.3 s;
+  the existing "totem fires at a nearby enemy" test walks 1.0 s and still
+  passes.
+
+## Grave Totem bolt -- rework (2026-09-12, todo)
+
+**Requirement (owner).** New art under `assets/effects/weapons/grave_totem/`:
+`proyectile.png` (several coloured effects, one per row) and `fire.png`. Use
+the **third row from the top, the blue one**, of `proyectile.png`, and
+`fire.png` **coloured blue**, and use both for the bolt's animation. Confirm
+and prepare the todo first; nothing is coded yet.
+
+### What is in the sheets
+
+- `proyectile.png` is 768 x 576: a **12 x 9 grid of 64 x 64** frames, one
+  colour per row. Row 3 from the top (index 2) is the blue / cyan one. Its
+  twelve frames are one effect: a spark (frames 0-1) grows into a ball
+  (2-5, the ball fills 34 x 34 px by frame 4 and 40 x 40 by frame 6), then
+  the ball breaks into a ring of shards and fades out (6-11). Ink per
+  frame, sampled: 6, 17, 73, 145, 237, 284, 266, 183, 128, 65, 20, 2.
+- `fire.png` is 896 x 128: **7 frames of 128 x 128**, a flame pointing
+  **up** with a dark tip at the top, ink in columns ~34..93 and rows
+  13..113 of each frame. Its palette is orange (208,128,64), yellow
+  (240,224,32) and a white core -- there is no blue in it and no grey to
+  tint, so the loader's multiply `tint` (which recolours the white
+  `dust_puff`) cannot make it blue: orange x blue is mud. It has to be
+  **recoloured once, offline**, and shipped as its own sheet.
+
+### What the bolt does today
+
+`Summon._maybe_attack` spawns the totem's bolt with no `style`; the spawn
+side resolves the weapon's visual (`weapon_visuals.json`, `grave_totem`:
+colour only) and the bolt draws as the plain `bolt` disc: speed 420, radius
+6, 1.4 s of life, no pierce. It dies on its first hit (`Projectile.on_hit`)
+or when its life runs out, and nothing marks either.
+
+### Proposal
+
+The two pieces of art map onto the two things a bolt does -- **fly** and
+**land**:
+
+- **In flight**: the blue ball from row 3 pulses at the bolt's position (the
+  orb), and the blue flame **trails behind it** like a comet's tail, rotated
+  so its tip points away from the direction of travel. The ember ring
+  already rotates a south-pointing flame to its heading; the same maths.
+- **On impact**: the second half of row 3 -- the ball breaking into shards
+  -- plays once at the point where the bolt landed. The Hammer's impact
+  sheet already has the machinery for "play a rig once at a point"
+  (`slam_fx.spawn_impact`); the bolt reuses it.
+
+Both loop off the shared run clock as `orbit` / `thunder` / `arcane` do, so
+the bolt carries no per-projectile animation state.
+
+### The sheets to make
+
+Cut and recoloured by scripts under `utilities/`, reproducible from the
+two sources, committed next to them:
+
+| File | From | Frames | Size | Note |
+|---|---|---|---|---|
+| `totem_bolt_orb.png` | row 3, frames 3 4 5 6 5 4 | 6 | 384 x 64 | authored as a pulse so a plain forward loop breathes |
+| `totem_bolt_burst.png` | row 3, frames 6..11 | 6 | 384 x 64 | the impact, once |
+| `totem_bolt_fire.png` | `fire.png`, recoloured | 7 | 896 x 128 | luminance mapped onto a blue ramp: dark navy for the orange, cyan for the yellow, white core kept |
+
+The recolour keeps every pixel's alpha and its brightness order, so the
+flame's shape and shading survive; only the hue moves. `--check` on both
+scripts re-derives and compares, as `cut_totem_sheets.py` does.
+
+### Rigs (`data/weapon_sprites.json`)
+
+- `totem_bolt`: frame [64, 64], anims `orb` (6 @ 12 fps, loop) and
+  `burst` (6 @ 16 fps, once), each its own file.
+- `totem_bolt_fire`: frame [128, 128], content [24, 8, 80, 112] (the
+  flame's box), anim `loop` (7 @ 12 fps). `heading_deg` 270 (points up), as
+  the `throwing_dagger` rig records its own heading.
+
+### Code
+
+- `game/states/playing/projectiles/totem_bolt.py`, a new `@style(
+  "totem_bolt")`: the fire frame rotated to `heading - travel`, scaled to
+  ~28 px long, blitted so its tip sits behind the bolt; the orb frame on
+  top, ~24 px (four times the 6 px collider). Missing rig -> the `bolt`
+  disc, as every style falls back.
+- `data/weapon_visuals.json`: `grave_totem` gets `style: totem_bolt` and
+  `fx` with the orb / fire / burst rig names and sizes, so the summon's
+  bolt spawn needs no change -- the spawn side already resolves the weapon's
+  style.
+- **The impact hook**: `Projectile` learns an `fx.impact` rig; the combat
+  resolver, after `proj.on_hit()` **consumes** the bolt (no pierce left),
+  calls the existing `_spawn_impact(pos, radius, rig)`. A bolt that runs out
+  of life in the open just ends, as now (question 1 below).
+- `slam_fx.spawn_impact` takes the anim name (it assumes `loop` today) so
+  the burst rig can call its strip `burst`.
+
+### Tests
+
+- `tests/rendering/test_totem_bolt.py`: the three sheets exist, are
+  `frames x 64` / `frames x 128` wide and match a fresh cut / recolour; the
+  recoloured flame has no pixel redder than it is blue; every frame loads;
+  the style draws ink at the bolt and behind it along the travel line, and
+  nothing ahead of it; without the rigs the disc draws.
+- `tests/combat`: a consuming hit spawns one burst at the hit point; a
+  hit that pierces does not; expiry does not.
+
+### Screenshot
+
+A totem firing at a crowd: bolts in flight with their tails, and a burst
+on a skeleton, delivered.
+
+### Questions for the owner
+
+1. **Burst on expiry too?** Proposed: only when the bolt lands on an enemy;
+   a bolt that flies its 1.4 s into the open just ends.
+2. **Which is the body?** Proposed: the ball is the bolt and the flame is
+   its tail. The other reading -- the flame is the bolt, the ball its
+   head -- is the same wiring with the two swapped.
+3. **Sizes**: the orb at ~24 px and the tail ~28 px long, against a 6 px
+   collider. Tunable in `weapon_visuals.json` `fx` once it is on screen.
+
+### Answers (owner, 2026-09-12)
+
+1. Burst on **hits only**. 2. The **ball is the bolt**, the flame its tail.
+3. **Orb 24 px, tail 28 px.** Plus: cut the blue row out as **its own
+sheet** so nothing reads the big `proyectile.png` at run time.
+
+### Todo
+
+- [x] 1. `utilities/cut_totem_bolt_sheets.py`: `totem_bolt_blue.png` (the
+      whole blue row, the dedicated sheet the owner asked for),
+      `totem_bolt_orb.png` (frames 3 4 5 6 5 4) and `totem_bolt_burst.png`
+      (frames 6..11) from it; `--check`.
+- [x] 2. `utilities/recolour_totem_fire.py`: `totem_bolt_fire.png`, the
+      luminance-to-blue ramp; `--check`.
+- [x] 3. The `totem_bolt` (orb + burst) and `totem_bolt_fire` rigs in
+      `data/weapon_sprites.json`.
+- [x] 4. `projectiles/totem_bolt.py` and the `grave_totem` visual
+      (`style: totem_bolt`, `fx`: rigs, `orb_px` 24, `tail_px` 28,
+      `impact` / `impact_anim`).
+- [x] 5. The impact hook: `CombatResolver.impact_if_spent` after
+      `proj.on_hit()` -- a hit that consumed the bolt plays `fx.impact`
+      through `_spawn_impact`, which now takes the strip name
+      (`slam_fx.spawn_impact(anim=...)`). Pierced hits and expiry draw
+      nothing.
+- [x] 6. Tests -- `tests/rendering/test_totem_bolt.py` (16): the sheets are
+      their frames wide and match the scripts; no opaque pixel of the tail
+      is redder than it is blue; every frame loads; the visual names the
+      style and the burst; the tail trails the bolt along its travel line
+      both ways; the orb pulses with the run clock; missing rigs fall back
+      to the disc; the resolver bursts on a consuming hit, not on a pierce
+      and not without a rig; the burst plays once through the impact
+      machinery. `tests/combat` (383) still passes with the hook in.
+- [x] 7. Screenshots delivered: a bolt in flight with its tail, and a burst
+      landing, zoomed 4x from a real run.
+
+### Decisions made while building
+
+- The tail's centre sits half a tail length behind the bolt along the
+  travel line, so the flame's base is on the orb and its tip trails. The
+  angle passed to the rotated-frame cache is `travel + 180 - 270`: the
+  art points up, and the rig records that as `heading_deg` like the
+  throwing dagger does.
+- The burst is sized by `over_circle` 3.3 on the bolt's 6 px collider
+  (about 40 px), with the ball's box as the rig's `content` and its centre
+  as the `anchor`, so the shards spread around the point of impact.
+- Both loops run on the shared run clock; the bolt keeps no animation
+  state, like `orbit` / `thunder` / `arcane`.
+
+## Spent source sheets move to `unused/` (2026-09-12)
+
+The owner archived `Fire_Totem_blue-Sheet.png` and the reference GIFs into
+`assets/effects/weapons/grave_totem/unused/` once the action strips were
+cut: what the game reads is the strips, and the big sheets are authoring
+input. That broke `cut_totem_sheets.py --check`, which looked only in the
+folder -- and with it the test that pins the strips against a fresh cut.
+
+All three totem scripts (`cut_totem_sheets.py`,
+`cut_totem_bolt_sheets.py`, `recolour_totem_fire.py`) now resolve their
+source from the folder **or** `unused/`, and return exit 2 (rather than
+raising) when it is in neither. The two tests that call them skip on 2 with
+that reason, so archiving a source is a free action and deleting one is
+visible rather than a crash. The same pattern is what any future cut /
+recolour script should follow.
+
+Unrelated miss caught in the same run: `tests/rendering/test_projectiles.py`
+pins the exact set of registered draw families, and the bolt rework's new
+`totem_bolt` family was not added to it -- the bolt work had been verified
+against its own tests and the combat tier only. A new `@style` needs that
+list updated in the same change.

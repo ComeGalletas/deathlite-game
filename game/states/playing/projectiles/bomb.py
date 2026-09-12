@@ -5,6 +5,9 @@ blast. Both loops run off the shared run clock like `orbit` / `thunder`; the
 frame is blitted by the rig's anchor (the centre of the ball) so the fuse
 rises above the projectile position. Rig / sheet missing -> the disc
 `bolt` drew before.
+
+A Cluster Bomb bomblet wears this same rig at a smaller `fx.scale` and holds
+`fuse` throughout, never `spin` (see `anim_for`).
 """
 from __future__ import annotations
 
@@ -16,7 +19,17 @@ _RIG = "bomb"
 
 
 def anim_for(p) -> str:
-    """`spin` while the bomb still moves, `fuse` once it has landed."""
+    """`spin` while the bomb still moves, `fuse` once it has landed.
+
+    A Cluster Bomb **bomblet** never rolls (owner, 2026-09-12): it wears the
+    parent's sprite but holds the lit fuse from the moment it scatters, so a
+    cluster reads as the explosion spreading outward rather than as three
+    more bombs being thrown. It is identified by the `cluster` tag
+    `TransientFx.scatter_bomblets` stamps on it -- the same tag that picks
+    the smaller burst sheet and stops a bomblet scattering again.
+    """
+    if "cluster" in p.source_tags:
+        return "fuse"
     return "spin" if (p.vel.x or p.vel.y) else "fuse"
 
 

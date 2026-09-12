@@ -202,7 +202,10 @@ class FirePathBonusTests(unittest.TestCase):
     def test_bigger_explosion_reaches_the_bomb(self):
         w = Weapon("bomb", C.weapon("bomb"))
         w.bonus["blast_radius"] += 24
-        s = self._fire(w, [FakeEnemy(150, 0)])[0]
+        # Inside the Bomb's reach ring, derived from the data (see the note
+        # in `tests/combat/test_bomb.py`): a target beyond it never fires.
+        near = float(C.weapon("bomb")["reach"]) * 0.4
+        s = self._fire(w, [FakeEnemy(near, 0)])[0]
         self.assertAlmostEqual(s["blast_radius"], C.weapon("bomb")["blast_radius"] + 24)
 
     def test_per_weapon_crit_chance_adds_to_the_heros(self):

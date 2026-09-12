@@ -1,0 +1,33 @@
+{
+  "_comment": "CB-9: what a treasure chest contains. Every number here is tuning; code keeps only the rarity taxonomy. `rarities` is the canonical order (poorest first) and `chests` must cover exactly those keys. How many chests an island gets and which tiers they may be is *placement*, not payload, so it lives with the other generation knobs in `world/gen/tuning.py` -- the generator is pure and never sees Content.",
+
+  "rarities": ["common", "uncommon", "rare", "epic"],
+
+  "chests": {
+    "_comment": "`potion` is a bare CB-8 rarity: the owner's rule is ONE potion per chest, always, and a richer chest buys a *better* potion rather than more of them. There is no epic potion, so an epic chest hands out a rare one -- its edge over a rare chest is the gold and the blessing tier. `blessing.chance` is the odds a chest carries one at all; `blessing.weights` are relative odds over the blessing's own rarity, and the brief's 'higher chance for X' is read as a clear 65/35, not a coin flip.",
+
+    "common":   {"sprite": "chest_common",   "color": [176, 140, 96],
+                 "gold": [10, 25],  "potion": "common"},
+
+    "uncommon": {"sprite": "chest_uncommon", "color": [110, 200, 120],
+                 "gold": [20, 40],  "potion": "uncommon",
+                 "blessing": {"chance": 0.35, "weights": {"common": 1.0}}},
+
+    "rare":     {"sprite": "chest_rare",     "color": [90, 160, 240],
+                 "gold": [35, 65],  "potion": "rare",
+                 "blessing": {"chance": 1.0,
+                              "weights": {"common": 0.65, "uncommon": 0.35}}},
+
+    "epic":     {"sprite": "chest_epic",     "color": [190, 120, 240],
+                 "gold": [60, 100], "potion": "rare",
+                 "blessing": {"chance": 1.0,
+                              "weights": {"uncommon": 0.65, "rare": 0.35}}}
+  },
+
+  "radius": 24,
+
+  "_potion_lift_comment": "The potion appears ON the chest, not beside it (owner, 2026-09-12): loot should read as coming out of the chest it was found in. This is how far above the chest's baseline the potion is centred, in world px. A chest's art stands ~30 px tall off that baseline, so 16 sits the potion in the open box's mouth rather than floating over it. The renderer draws potions after chests, so the chest art never covers it.",
+  "potion_lift": 16,
+
+  "open_seconds": 0.45
+}

@@ -54,8 +54,26 @@ class LayeringTests(unittest.TestCase):
                             f"{path.relative_to(WORLD.parent)} imports {imp}")
 
     def test_the_rules_package_has_the_modules_it_says(self):
+        """The list is the guard: a module joins `world.rules` only when it
+        can be read by every layer without pulling one of them in.
+
+        `spacing` joined it when the spawn-point stage needed the spatial hash
+        the decor scatter already used (D1,
+        `documentation/journals/placement_review_journal.md`). It qualifies by
+        the hardest reading of the rule above: it imports nothing at all --
+        not the data model, not the terrain data -- and the test below says
+        so, so it cannot quietly grow a dependency later."""
         names = {p.stem for p in (WORLD / "rules").glob("*.py")} - {"__init__"}
-        self.assertEqual(names, {"frontier", "inset", "floor", "steps", "biome"})
+        self.assertEqual(names,
+                         {"frontier", "inset", "floor", "steps", "biome", "spacing"})
+
+    def test_the_spatial_hash_stays_pure_geometry(self):
+        """`spacing` is shared by the generator and the bake. It earns that by
+        importing nothing, which is what keeps it from being a back door
+        between the two."""
+        imports = {i for i in _imports(WORLD / "rules" / "spacing.py")
+                   if not i.startswith("__future__")}
+        self.assertEqual(imports, set(), f"world/rules/spacing.py imports {imports}")
 
 
 if __name__ == "__main__":

@@ -65,6 +65,8 @@ class Player:
 
         self.hp: float = self.max_hp
         self.alive = True
+        # CB-7: seconds banked toward the next HP regen tick.
+        self._regen_t: float = 0.0
         self._move_dir = pygame.Vector2()
         self.invulnerable = False
         self.weapons: list = []
@@ -107,6 +109,11 @@ class Player:
     @property
     def max_hp(self) -> float:
         return self.stats["max_hp"]
+
+    @property
+    def hp_regen(self) -> float:
+        """HP restored per regen tick (CB-7)."""
+        return self.stats["hp_regen"]
 
     @property
     def move_speed(self) -> float:
@@ -202,6 +209,26 @@ class Player:
             self._facing = -1
         self._hurt_t = max(0.0, self._hurt_t - dt)
         self._attack_t = max(0.0, self._attack_t - dt)
+        self.tick_regen(dt)
+
+    def tick_regen(self, dt: float) -> None:
+        """CB-7: bank `dt` and restore `hp_regen` HP per whole interval passed.
+
+        Whole ticks are drained in a loop so a long frame (a lag spike, a
+        loading hitch) pays out every interval it spanned instead of one. The
+        timer runs even at full HP -- `heal` clamps the payout away -- so the
+        drip stays phased to run time rather than restarting on every hit.
+        """
+        interval = config.HP_REGEN_INTERVAL
+        if interval <= 0.0 or not self.alive:
+            return
+        self._regen_t += dt
+        if self._regen_t < interval:
+            return
+        ticks, self._regen_t = divmod(self._regen_t, interval)
+        amount = self.hp_regen
+        if amount > 0.0:
+            self.heal(amount * ticks)
 
     def take_damage(self, amount: float) -> float:
         """Incoming hit (design §20): evasion negates it, a block removes
@@ -226,4 +253,14 @@ class Player:
         return dealt
 
     def heal(self, amount: float) -> None:
+        """Restore HP up to `max_hp`, never past it -- and never *downward*.
+
+        The bare `min(max_hp, hp + amount)` cut an over-full hero (the dev HP
+        tools, and tests that bank headroom above `max_hp`) back to maximum, so
+        a 1 HP heal could cost hundreds. Harmless while every heal was a
+        one-shot the player asked for; CB-7's regen ticks unprompted every few
+        seconds, which turned it into a live bug.
+        """
+        if amount <= 0.0 or self.hp >= self.max_hp:
+            return
         self.hp = min(self.max_hp, self.hp + amount)

@@ -7,6 +7,7 @@ import pygame
 
 from game.content import get_content
 from spawn import PointIndex, Placement, SpawnRequest
+from spawn.placement import OFFSCREEN, STARVED
 from tests.spawn.fakehost import FakeHost, ROOM0, ROOM1, grid_points
 from world.layout import SpawnPoint
 
@@ -90,15 +91,52 @@ class CooldownAndDeferralTests(unittest.TestCase):
         self.assertFalse(pl.on_cooldown(p, 10.0 + pl.cooldown))
         self.assertIn(p, [c for c, _w in pl.candidates(_req(host), host, 10.0 + pl.cooldown)])
 
-    def test_nothing_survives_returns_none_and_debt_relaxes_the_view_rule(self):
-        # A view so large that every point is inside it.
+    def test_the_ladder_spawns_on_screen_rather_than_not_at_all(self):
+        # A view so large that every point is inside it. This used to be the
+        # give-up case; the owner asked (2026-09-12) for spawns to continue
+        # even when the camera can see them, so the starved rung seats it.
         host = FakeHost()
         host.view = pygame.Rect(-100, -100, 4200, 4200)
         pl = _placement(host)
+        got = pl.choose(_req(host), host, 0.0)
+        self.assertIsNotNone(got)
+        self.assertGreaterEqual((got.pos - host.player).length(),
+                                pl.starved_min_distance)
+
+    def test_none_means_nothing_is_usable_at_any_rung(self):
+        # Every point inside the keep-away: no rung can offer one, so the
+        # master still gets `None` and keeps the request as debt.
+        host = FakeHost(points=[SpawnPoint(0, 0, 1000.0, 2000.0 + d)
+                                for d in (0.0, 60.0, 120.0)])
+        host.view = pygame.Rect(-100, -100, 4200, 4200)
+        pl = _placement(host)
         self.assertIsNone(pl.choose(_req(host), host, 0.0))
-        # Still nothing when relaxed: relaxed means "outside the view", and
-        # the view covers the world.
-        self.assertIsNone(pl.choose(_req(host), host, 0.0, debt_age=pl.relax_after))
+
+    def test_the_starved_rung_leans_to_the_far_edge(self):
+        # Candidates are weighted by distance there, so of two usable points
+        # the further one is drawn far more often.
+        near = SpawnPoint(0, 0, 1000.0, 2000.0 + 450.0)
+        far = SpawnPoint(0, 0, 1000.0, 2000.0 + 1800.0)
+        host = FakeHost(points=[near, far])
+        host.view = pygame.Rect(-100, -100, 4200, 4200)
+        pl = _placement(host)
+        picks = [p for p, _w in pl.candidates(_req(host), host, 0.0, tier=STARVED)]
+        self.assertEqual(set(picks), {near, far})
+        weights = dict((p, w) for p, w in
+                       pl.candidates(_req(host), host, 0.0, tier=STARVED))
+        self.assertGreater(weights[far], weights[near] * 3)
+
+    def test_the_starved_rung_recycles_points_sooner(self):
+        host = FakeHost()
+        pl = _placement(host)
+        point = pl.choose(_req(host), host, 10.0)
+        self.assertTrue(pl.on_cooldown(point, 11.0))
+        # The same point, at the same moment, is free at the starved rung.
+        self.assertFalse(pl.on_cooldown(point, 10.0 + pl.starved_cooldown, STARVED))
+        self.assertTrue(pl.on_cooldown(point, 10.0 + pl.starved_cooldown))
+
+    def test_an_aged_debt_still_skips_the_keep_away(self):
+        host = FakeHost()
         # A view that leaves points only inside the pad / min-distance band:
         # refused fresh, accepted once the debt is old enough.
         host.view = pygame.Rect(0, 0, 4000, 4000)
@@ -110,7 +148,8 @@ class CooldownAndDeferralTests(unittest.TestCase):
         pts = [SpawnPoint(0, 0, 1450.0, 2000.0), SpawnPoint(0, 0, 2000.0, 1450.0)]
         host.layout.spawn_points = pts
         pl = _placement(host)
-        self.assertIsNone(pl.choose(_req(host), host, 0.0))       # inside the 96 px pad
+        self.assertEqual(pl.candidates(_req(host), host, 0.0, tier=OFFSCREEN), [],
+                         "inside the 96 px pad")
         got = pl.choose(_req(host), host, 0.0, debt_age=pl.relax_after)
         self.assertIn(got, pts)
 

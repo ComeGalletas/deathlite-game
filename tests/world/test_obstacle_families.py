@@ -34,6 +34,17 @@ class ShrubRetiredTests(unittest.TestCase):
             self.assertFalse(any(o.kind == "shrub"
                                  for o in W.layout(seed).obstacles))
 
+    def test_no_biome_weights_a_shrub_in_its_scatter(self):
+        """The stronger form, and the one that keeps it retired: it used to be
+        absent from the *returned* obstacles while still riding the weighted
+        pick, spending a slot and reserving space, so that it could be dropped
+        at the end. B3 took it out of the mixes and scaled each biome's
+        `per_1000` down by its share, which is why the counts barely moved."""
+        from game.content import get_content
+        for name, b in get_content().terrain.get("biomes", {}).items():
+            weights = (b.get("scatter") or {}).get("weights", {})
+            self.assertNotIn("shrub", weights, f"{name} still weights a shrub")
+
     def test_obstacle_kinds_are_only_the_declared_families(self):
         """`sign` and `scarecrow` joined the list when the three post props
         (deco_16..deco_18) stopped being unreachable decoration entries and

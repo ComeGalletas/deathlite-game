@@ -316,6 +316,36 @@
       }
     }
   },
+  "explosion_small": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      61,
+      58,
+      68,
+      68
+    ],
+    "scale": [
+      68,
+      68
+    ],
+    "anchor": [
+      34,
+      36
+    ],
+    "fireball": 64,
+    "_note": "a Cluster Bomb bomblet's detonation: the small sibling of `explosion` from the same pack and the same 192 px grid -- rounder, four short spikes, two frames shorter. Same keys and the same `fireball` rule, so `_blit_burst` sizes it by the bomblet's own blast diameter; it is the *look* that is lighter, not the size.",
+    "anims": {
+      "burst": {
+        "file": "effects/explosion_1.png",
+        "frames": 8,
+        "fps": 20,
+        "loop": false
+      }
+    }
+  },
   "hammer_impact": {
     "frame": [
       80,
@@ -470,5 +500,100 @@
       11
     ],
     "heading_deg": -135
+  },
+  "grave_totem": {
+    "_note": "The Grave Totem (assets journal, 'Grave Totem sprite -- wiring', 2026-09-12): one strip per action, cut from Fire_Totem_blue-Sheet.png by utilities/cut_totem_sheets.py. appear once at spawn (no bolts until it ends), idle between bolts, attack once per bolt, disappear once over the last second of life (no bolts). Anchor = bottom-centre on the base ring, 12 px under the summon's centre so the body stands on its collider like the primitive did.",
+    "frame": [
+      64,
+      96
+    ],
+    "scale": [
+      32,
+      48
+    ],
+    "anchor": [
+      16,
+      34
+    ],
+    "anims": {
+      "appear": {
+        "file": "effects/weapons/grave_totem/totem_appear.png",
+        "frames": 8,
+        "fps": 12,
+        "loop": false
+      },
+      "idle": {
+        "file": "effects/weapons/grave_totem/totem_idle.png",
+        "frames": 7,
+        "fps": 8,
+        "loop": true
+      },
+      "attack": {
+        "file": "effects/weapons/grave_totem/totem_attack.png",
+        "frames": 7,
+        "fps": 14,
+        "loop": false
+      },
+      "disappear": {
+        "file": "effects/weapons/grave_totem/totem_disappear.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": false
+      }
+    }
+  },
+  "totem_bolt": {
+    "_note": "The Grave Totem's bolt (assets journal, 'Grave Totem bolt -- rework', 2026-09-12): the blue row of proyectile.png, cut by utilities/cut_totem_bolt_sheets.py. `orb` pulses at the bolt (frames 3 4 5 6 5 4 of the row); `burst` plays once where a hit lands (frames 6..11), through slam_fx.spawn_impact -- `content` is the ball's box, `anchor` its centre, `over_circle` sizes the burst against the bolt's 6 px collider.",
+    "frame": [
+      64,
+      64
+    ],
+    "content": [
+      11,
+      11,
+      42,
+      42
+    ],
+    "anchor": [
+      21,
+      21
+    ],
+    "over_circle": 3.3,
+    "anims": {
+      "orb": {
+        "file": "effects/weapons/grave_totem/totem_bolt_orb.png",
+        "frames": 6,
+        "fps": 12,
+        "loop": true
+      },
+      "burst": {
+        "file": "effects/weapons/grave_totem/totem_bolt_burst.png",
+        "frames": 6,
+        "fps": 16,
+        "loop": false
+      }
+    }
+  },
+  "totem_bolt_fire": {
+    "_note": "The bolt's tail: fire.png recoloured blue by utilities/recolour_totem_fire.py (the multiply tint cannot turn orange blue). Authored pointing up (heading_deg 270); projectiles/totem_bolt.py rotates it to trail the bolt.",
+    "frame": [
+      128,
+      128
+    ],
+    "content": [
+      24,
+      8,
+      80,
+      112
+    ],
+    "heading_deg": 270,
+    "anims": {
+      "loop": {
+        "file": "effects/weapons/grave_totem/totem_bolt_fire.png",
+        "frames": 7,
+        "fps": 12,
+        "loop": true
+      }
+    }
   }
 }

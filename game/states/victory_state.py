@@ -1,59 +1,83 @@
-"""VICTORY: run summary after the final encounter is beaten.
+"""VICTORY: the run résumé after the final encounter is beaten.
 
-Milestone 1 stub. Persistent-currency award and meta screen come in
-Milestone 5 / Phase 2.
+Was a "Milestone 1 stub" -- nine centred text lines, keyboard only -- while the
+game-over screen grew a résumé, buttons and mouse support, even though
+`PlayingState._end_run` hands both screens the identical stats dict. It now
+draws the same `ui.end_screen.EndScreen` frame, so the whole résumé (the
+weapon damage split, the kills per type, the blessings, the items with their
+rarities) appears here too and the mouse works (owner, 2026-09-12; journal:
+`documentation/journals/victory_screen_journal.md`).
+
+The boss that fell leads the subtitle, the Run column says "Cleared in", and
+a fourth **Hero** column carries the build: trait, the resolved stat block, what
+was equipped, and the first-clear line that announces the main-weapon unlock.
+
+The palette is the one thing here that is not shared with the game-over screen.
+The ribbon colours *are* reused (owner, 2026-09-12) so the two read as one
+family; what changes is everything around them -- a warm ground instead of the
+defeat red, the title in gold, and no `danger` variant on any button. Leading a
+win with a red button was the tell that the screen was a recolour of a loss.
 """
 from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
 from game.state import State
+from ui import end_screen
+from ui.end_screen import Button
+from ui.run_summary import VICTORY_COLUMNS
+
+# A warm, low-saturation ground: bright enough to read as a win against the
+# game-over screen's (22, 10, 12), dark enough that the panels' translucent
+# fill and the light ribbon art still carry.
+BACKDROP = (38, 28, 14)
+TITLE_COLOUR = (255, 214, 112)
+BUTTONS = (
+    Button("new_run", "New run", "ENTER"),
+    Button("sanctuary", "Sanctuary", "S", pygame.K_s),
+    Button("menu", "Main menu", "ESC", pygame.K_ESCAPE),
+)
 
 
 class VictoryState(State):
     def enter(self, *, stats: dict | None = None, **kwargs) -> None:
         self.stats = stats or {}
-        self._title_font = fonts.heading(56)
-        self._font = fonts.body(24)
+        self._screen = end_screen.EndScreen(
+            self.stats, title="Victory", title_colour=TITLE_COLOUR,
+            backdrop=BACKDROP, buttons=BUTTONS,
+            columns=VICTORY_COLUMNS,
+            subtitle=end_screen.run_subtitle(
+                self.stats, lead=(str(self.stats.get("boss", "")),)))
 
+    @property
+    def sel(self) -> int:
+        return self._screen.sel
+
+    @sel.setter
+    def sel(self, value: int) -> None:
+        self._screen.sel = value
+
+    @property
+    def _mouse(self):
+        return self._screen.mouse
+
+    # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
-        if event.type != pygame.KEYDOWN:
-            return
-        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+        bid = self._screen.handle_event(event)
+        if bid is not None:
+            self._activate(bid)
+
+    def _activate(self, bid: str) -> None:
+        if bid == "new_run":
             from game.states.character_select_state import CharacterSelectState
             self.game.state_machine.change(CharacterSelectState(self.game))
-        elif event.key == pygame.K_s:
+        elif bid == "sanctuary":
             from game.states.meta_state import MetaState
             self.game.state_machine.change(MetaState(self.game))
-        elif event.key == pygame.K_ESCAPE:
+        elif bid == "menu":
             from game.states.menu_state import MenuState
             self.game.state_machine.change(MenuState(self.game))
 
+    # --- render ------------------------------------------------------
     def draw(self, surface: pygame.Surface) -> None:
-        surface.fill((12, 20, 16))
-        cx = config.SCREEN_WIDTH // 2
-        title = self._title_font.render("Victory", True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(cx, 190)))
-
-        build = ", ".join(f"{n} Lv{l}" for n, l in self.stats.get("weapons", [])) or "-"
-        blessings = sum(self.stats.get("blessings", {}).values())
-        t = max(1e-6, self.stats.get("time", 0))
-        lines = [
-            f"Hero       {self.stats.get('character', '-')}",
-            f"Survived   {self.stats.get('time', 0):.1f} s",
-            f"Level      {self.stats.get('level', 1)}",
-            f"Kills      {self.stats.get('kills', 0)}   ({self.stats.get('kills', 0) / t * 60:.0f}/min)",
-            f"Damage     {self.stats.get('damage_dealt', 0):.0f}   ({self.stats.get('damage_dealt', 0) / t:.0f} dps)",
-            f"Salvage    {self.stats.get('currency', 0)}   (banked)",
-            f"Blessings  {blessings}",
-            f"Loot       {len(self.stats.get('dropped_items', []))} item(s) to the stash",
-            f"Build      {build}",
-        ]
-        for i, line in enumerate(lines):
-            text = self._font.render(line, True, config.COLOR_TEXT)
-            surface.blit(text, text.get_rect(center=(cx, 262 + i * 30)))
-
-        hint = self._font.render("ENTER new run    -    S Sanctuary    -    ESC menu",
-                                 True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, 262 + len(lines) * 30 + 26)))
+        self._screen.draw(surface, getattr(self.game, "assets", None))

@@ -1,6 +1,6 @@
 # Web build (pygbag)
 
-Everything needed to build/run **Death Lite Die** in the browser lives here, so
+Everything needed to build/run **Deathlite Game** in the browser lives here, so
 the repo root stays clean. Design notes and the milestone log are in
 [`../journals/pygbag.md`](../journals/pygbag.md).
 
@@ -30,14 +30,14 @@ Equivalently, by hand:
 
 ```bash
 cd web
-python -m pygbag --ume_block 0 --title "Death Lite Die" ../main.py
+python -m pygbag --ume_block 0 --title "Deathlite Game" ../main.py
 ```
 
 PowerShell:
 
 ```powershell
 cd web
-..\.venv\Scripts\python.exe -m pygbag --ume_block 0 --title "Death Lite Die" ..\main.py
+..\.venv\Scripts\python.exe -m pygbag --ume_block 0 --title "Deathlite Game" ..\main.py
 ```
 
 First run downloads a CPython-WASM runtime (cached afterwards). Add `--build` to

@@ -872,3 +872,117 @@ budget. `ENEMY_COUNT_HARD_CAP` (600, live + dormant) is untouched.
 ### Suite
 
 1,022 tests, 1,021 passed and 1 skipped (8 min 2 s).
+
+---
+
+## S10 — camping starved the placement filter (owner, 2026-09-12)
+
+### Requirement
+
+> "check the spawn master behaviour and confirm if the camera of the player
+> doesn't move too much, or the player stays too much on a single island,
+> the density of spawns gets greatly reduced, in this case the spawns should
+> continue even if the camera is showing"
+
+### Confirmed, and the cause was not the obvious one
+
+Measured headless on the shipped world, hero parked, enemies culled every
+frame so the live cap could never be the reason a spawn did not happen — what
+is left is placement and nothing else:
+
+| | spawns/min | deferred | strict pool empty |
+|---|---|---|---|
+| camping | 375 | 996 | 90 % of frames |
+| patrolling | 567 | 1498 | 92 % of frames |
+
+So the density drop is real: **camping cost about a third of the spawn rate**.
+Dissecting one frame of the filter showed why, and it is worth recording
+because the intuition ("the camera is in the way") is only a fifth of it:
+
+```
+zone: 1 island, 30 spawn points   (149 in the world)
+  cooldown (3 s)            24  (80 %)
+  inside view + 96 px pad    6  (20 %)
+  PASSED                     0
+```
+
+A player on one island has a zone of one island. Thirty points, each locked
+for 3 s after use, is a hard ceiling of ten seatings a second before any other
+rule applies — and the view removes the fifth of them nearest the hero, which
+with the hero parked is the *same* fifth every frame. The pool was empty on 9
+frames in 10, every pack became debt, the debt queue sat pinned at its cap of
+20, and packs past that were dropped without even being counted.
+
+### The relaxation ladder
+
+`Placement.choose` no longer asks one question and gives up. It walks three
+rungs and takes the first that offers anything:
+
+| rung | view | keep-away | point cooldown |
+|---|---|---|---|
+| `OFFSCREEN` | outside view + `view_pad` | `min_distance` (220) | `cooldown` (3 s) |
+| `NEAR` | outside the bare view | none | `cooldown` |
+| `STARVED` | **not a wall** | `starved_min_distance` (420) | `starved_cooldown` (0.5 s) |
+
+The bottom rung is the owner's call: spawns continue even when the camera can
+see them. It addresses both rejection reasons at once — the view stops
+excluding points, and the cooldown shortens six-fold, which is the larger half
+of the problem. `relax_after` keeps its old meaning: an aged debt request
+starts at `NEAR` instead of paying the keep-away twice.
+
+Two things are deliberately **not** relaxed at any rung, because they are
+physical rather than aesthetic: a body already standing on a point, and a
+large enemy needing a large point. `None` from `choose` now means genuinely
+nothing in the zone is usable, and that request still becomes debt.
+
+### What stops an enemy appearing in the hero's lap
+
+On the bottom rung the view is gone, so distance is the only thing left. Two
+rules carry it: `starved_min_distance` (420) is a hard floor, and candidates
+there are weighted by distance, so the draw leans to the far edge of the
+screen. Measured over a camping run:
+
+* 27 % of spawns appear inside the camera view; the rest are still off-screen.
+* The closest arrival over the whole run was **478 px** from the hero, median
+  623 px. The view's half-diagonal is 612 px, so an on-screen arrival lands in
+  the corners and margins, not next to the player.
+
+### Result
+
+| | before | after |
+|---|---|---|
+| camping, spawns/min | 375 | **1000** |
+| patrolling, spawns/min | 567 | **1022** |
+| camping, deferred | 996 | 393 |
+| patrolling, deferred | 1498 | **1** |
+
+The camping penalty goes from 34 % down to 2 %: standing still no longer buys
+the player quiet.
+
+**What this does not change.** The live enemy cap is untouched, so the crowd
+ceiling is exactly what it was — this changes how fast the crowd *refills*
+after the player clears it, not how large it can get. In a run where the cap
+is already saturated (the hero swarmed and not killing) the cap is the limiter
+and the ladder changes nothing, which is correct: that ceiling is the
+performance budget, not a pacing knob.
+
+### Files
+
+* `data/spawn_tables.json` — `placement.starved_min_distance`,
+  `placement.starved_cooldown`, and the note explaining the rung.
+* `spawn/placement.py` — the `OFFSCREEN` / `NEAR` / `STARVED` rungs,
+  `first_tier`, a tier-aware `on_cooldown` and `candidates`, and a `choose`
+  that walks the ladder.
+* `tests/spawn/test_placement.py`, `tests/spawn/test_master.py` — three tests
+  pinned "a spawn is never on screen" and "an on-screen view refuses the
+  spawn", which is the rule that was deliberately changed. They now pin the
+  new contract: on-screen is allowed, the keep-away never is, and a quiet zone
+  keeps spawning.
+
+### Loose end noticed, not changed
+
+`_MAX_DEBT = 20` in `spawn/master.py` is a module constant, and a pack that
+arrives when the queue is full is dropped silently without incrementing
+`deferred` — so the old logs understated the loss. The ladder makes the queue
+nearly always empty, so it no longer bites, but it is tuning living in code
+rather than in `spawn_tables.json`.

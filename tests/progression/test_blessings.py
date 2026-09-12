@@ -57,6 +57,38 @@ class CatalogTests(unittest.TestCase):
                   "block_strength"):
             self.assertIn(s, stats)
 
+    def test_every_weapon_bonus_field_is_one_the_code_reads(self):
+        """A `weapon_bonus` writes `weapon.bonus[field]`, and nothing
+        validates the name -- a typo would land in the dict, be read by
+        nobody, and the blessing would do nothing in the run while still
+        levelling and still printing its card.
+
+        Two families of name are legitimate:
+
+        * a key of the fixed `Weapon.bonus` dict -- the fire path reads those
+          as `definition + bonus`;
+        * a key some Forging declares under `effects` in data/forges.json --
+          those are read through `Weapon.effect(key)`, which sums the
+          `effects` total with `bonus.get(key, 0.0)`, so a post-Forge
+          blessing raises a Forge's own number without a slot in the dict.
+
+        The second set is derived from the data, so a new Forge effect needs
+        no edit here.
+        """
+        fixed = set(Weapon("sword", C.weapon("sword")).bonus)
+        forged = set()
+        for fdef in C.forges.values():
+            forged |= set(fdef.get("effects") or {})
+        allowed = fixed | forged
+        for bid, b in CAT.by_id.items():
+            for e in b.effects:
+                if e.type != "weapon_bonus":
+                    continue
+                self.assertIn(e.field, allowed,
+                              f"{bid}: weapon_bonus field {e.field!r} is read "
+                              f"by nothing -- not in Weapon.bonus and not a "
+                              f"Forge effect key")
+
     def test_levels_are_monotone_in_the_direction_that_helps(self):
         for bid, b in CAT.by_id.items():
             for e in b.effects:
@@ -80,6 +112,8 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(format_value(0.84, "pct_drop"), "16%")
         self.assertEqual(format_value(0.3, "seconds"), "+0.3s")
         self.assertEqual(format_value(2.2, "mult"), "x2.2")
+        self.assertEqual(format_value(1.15, "pct_gain"), "+15%")
+        self.assertEqual(format_value(1.75, "pct_gain"), "+75%")
 
     def test_bad_data_raises(self):
         bad = {"x": {"name": "X", "kind": "weapon", "weapon": "axe", "category": "power",
@@ -103,6 +137,46 @@ class CatalogTests(unittest.TestCase):
         self.assertLess(RULES.summon_factor, 1.0)
         self.assertEqual(RULES.falloff(1), 1.0)
         self.assertEqual(RULES.falloff(99), RULES.level_falloff[-1])
+
+
+class BlastAmplifierTests(unittest.TestCase):
+    """2026-09-12: the Bomb's radius blessing grows the blast in 15% steps,
+    stacked on the flat "Bigger Explosion" and on the area system."""
+
+    BID = "bomb_blast_amplifier"
+
+    def test_the_card_reads_in_fifteen_point_steps(self):
+        b = CAT.get(self.BID)
+        self.assertEqual([b.describe(lv) for lv in range(1, 6)],
+                         ["The explosion is +15% bigger.",
+                          "The explosion is +30% bigger.",
+                          "The explosion is +45% bigger.",
+                          "The explosion is +60% bigger.",
+                          "The explosion is +75% bigger."])
+
+    def test_each_level_leaves_the_running_total_at_the_table_value(self):
+        p = hero("bomb")
+        w = weapon(p, "bomb")
+        for level, total in enumerate((1.15, 1.30, 1.45, 1.60, 1.75), start=1):
+            self.assertEqual(apply_blessing(p, CAT.get(self.BID)), level)
+            self.assertAlmostEqual(w.bonus["blast_radius_mult"], total)
+
+    def test_it_widens_the_blast_the_fire_path_produces(self):
+        p = hero("bomb")
+        w = weapon(p, "bomb")
+        base = w._blast_radius(1.0)
+        for _ in range(5):
+            apply_blessing(p, CAT.get(self.BID))
+        self.assertAlmostEqual(w._blast_radius(1.0), base * 1.75)
+
+    def test_it_stacks_with_the_flat_bigger_explosion(self):
+        p = hero("bomb")
+        w = weapon(p, "bomb")
+        for _ in range(5):
+            apply_blessing(p, CAT.get("bomb_bigger_explosion"))
+            apply_blessing(p, CAT.get(self.BID))
+        flat = C.weapon("bomb")["blast_radius"] + 60
+        self.assertAlmostEqual(w._blast_radius(1.0), flat * 1.75)
 
 
 class ApplyTests(unittest.TestCase):

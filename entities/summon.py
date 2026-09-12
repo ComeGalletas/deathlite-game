@@ -33,7 +33,7 @@ class Summon:
     __slots__ = ("active", "kind", "pos", "vel", "life", "attack_cd", "radius",
                  "color", "damage", "speed", "attack_range", "attack_interval",
                  "tags", "_t", "anim", "_bite_t", "_side", "reach", "fx",
-                 "weapon_id")
+                 "weapon_id", "_phase")
 
     def __init__(self) -> None:
         self.active = False
@@ -52,7 +52,8 @@ class Summon:
         self.reach = float("inf")            # CB-2 leash ring; wired up in step C
         self.tags: tuple[str, ...] = ("summon",)
         self._t = 0.0
-        self.anim: Animator | None = None   # wolf only
+        self.anim: Animator | None = None   # wolf and totem
+        self._phase = ""                     # totem: appearing | idle | attack | leaving
         self._bite_t = 0.0                   # seconds left showing `bite_*`
         self._side = "right"                 # last-known facing: "left" | "right"
         self.fx: dict = {}                   # render-only: per-weapon effect tuning
@@ -79,8 +80,18 @@ class Summon:
         self._t = 0.0
         self._bite_t = 0.0
         self._side = "right"
-        self.anim = Animator(get_assets(), "spirit_wolf",
-                             start="run_right") if kind == "wolf" else None
+        # The totem's life on screen: `appearing` (the appear strip; no bolts)
+        # -> `idle` / `attack` (the burst once per bolt) -> `leaving` (the
+        # disappear strip over the last second of `life`; no bolts). With the
+        # rig missing every strip is zero-length, so the phases pass through
+        # at once and the totem behaves exactly as the primitive did.
+        self._phase = "appearing" if kind == "totem" else ""
+        if kind == "wolf":
+            self.anim = Animator(get_assets(), "spirit_wolf", start="run_right")
+        elif kind == "totem":
+            self.anim = Animator(get_assets(), "grave_totem", start="appear")
+        else:
+            self.anim = None
 
     def update(self, dt: float, ctx) -> None:
         self.life -= dt
@@ -94,11 +105,33 @@ class Summon:
 
         if self.kind == "wolf":
             self._chase(dt, target, ctx)
+        elif self.kind == "totem":
+            self._totem_phase()
         self._maybe_attack(ctx, target)
 
         if self.anim is not None:
             self.anim.play(self._anim_name(target))
             self.anim.update(dt)
+
+    # --- totem phases -------------------------------------------
+    def _strip_seconds(self, anim: str) -> float:
+        """How long a one-shot strip plays; 0 with the rig or strip missing."""
+        a = self.anim.assets
+        fps = a.fps(self.anim.rig, anim)
+        return a.frame_count(self.anim.rig, anim) / fps if fps > 0 else 0.0
+
+    def _totem_phase(self) -> None:
+        if self._phase == "appearing" and self.anim.finished:
+            self._phase = "idle"
+        elif self._phase == "attack" and self.anim.finished:
+            self._phase = "idle"
+        if self._phase != "leaving" and self.life <= self._strip_seconds("disappear"):
+            self._phase = "leaving"
+
+    @property
+    def holds_fire(self) -> bool:
+        """A totem fires no bolt while it appears or leaves."""
+        return self._phase in ("appearing", "leaving")
 
     def _acquire_target(self, ctx):
         """Nearest enemy that also sits inside the leash ring (CB-2). The wolf's
@@ -137,7 +170,7 @@ class Summon:
             self._side = "left" if self.vel.x < 0 else "right"
 
     def _maybe_attack(self, ctx, target) -> None:
-        if target is None or self.attack_cd > 0.0:
+        if target is None or self.attack_cd > 0.0 or self.holds_fire:
             return
         if (target.pos - self.pos).length() > self.attack_range:
             return
@@ -157,12 +190,18 @@ class Summon:
                                  color=self.color, source_tags=self.tags, style="melee",
                                  weapon_id=self.weapon_id)
         else:  # totem bolt -- a barely-there nudge
+            self._phase = "attack"
+            if self.anim is not None:
+                self.anim.play("attack", restart=True)
             ctx.spawn_projectile(pos=self.pos, vel=direction * 420, damage=self.damage,
                                  radius=6, lifetime=1.4, pierce=0, src_weight=1,
                                  color=self.color, source_tags=self.tags,
                                  weapon_id=self.weapon_id)
 
     def _anim_name(self, target) -> str:
+        if self.kind == "totem":
+            return {"appearing": "appear", "attack": "attack",
+                    "leaving": "disappear"}.get(self._phase, "idle")
         if self._bite_t > 0.0:
             return f"bite_{self._side}"
         # `idle` is the sleeping strip -- only when the wolf is genuinely idle

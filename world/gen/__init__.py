@@ -36,6 +36,7 @@ from world.gen.bridges import _seat_corridors
 from world.gen.islands import build_island, island_caps, _grid_tile_meta
 from world.gen.placement import _resize_by_topography, _offset_in_chunk
 from world.gen.biomes import assign_palettes
+from world.gen.chests import place_chests
 from world.gen.scatter import _scatter_obstacles
 from world.gen.settings import GenSettings, settings_or_config
 from world.gen.spawnpoints import place_points
@@ -229,4 +230,9 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     # stage moves nothing above it. See `world/gen/spawnpoints.py`.
     for room in place_points(layout, settings):
         yield f"spawn points {room.id + 1} of {len(rooms)}"
+    # CB-9: the treasure chests, seated on the anchors the stage above just
+    # wrote. Last, because it reads them; its RNG is private too, so it moves
+    # nothing above it either.
+    place_chests(layout)
+    yield "chests"
     return layout

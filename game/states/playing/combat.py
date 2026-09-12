@@ -98,6 +98,7 @@ class CombatResolver:
                 if proj.chain_left > 0 and self.chain_to_next(proj, targets):
                     continue
                 proj.on_hit()
+                self.impact_if_spent(proj)
                 if not proj.active:
                     break
 
@@ -286,6 +287,18 @@ class CombatResolver:
                 if taken > 0:
                     ps.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
 
+    def impact_if_spent(self, proj: Projectile) -> None:
+        """A hit that *consumed* the projectile (no pierce left) plays its
+        visual's `fx.impact` rig once where it stopped -- the totem bolt's
+        burst (owner, 2026-09-12: on hits only; a bolt that runs out of
+        life in the open just ends). A pierced-through hit draws nothing."""
+        rig = (proj.fx or {}).get("impact")
+        if proj.active or not rig:
+            return
+        self.ps._spawn_impact(pos=proj.pos, radius=proj.radius, rig=rig,
+                              weapon_id=proj.weapon_id,
+                              anim=proj.fx.get("impact_anim", "loop"))
+
     # --- reap the dead ----------------------------------------
     def cull_dead_enemies(self) -> None:
         ps = self.ps
@@ -307,7 +320,7 @@ class CombatResolver:
             ps._apply_on_kill_effects(e)
             ps.game.events.publish(Events.ENEMY_KILLED, pos=e.pos.copy(),
                                    color=e.color, xp=e.xp_reward, tags=e.tags,
-                                   elite=e.is_elite)
+                                   elite=e.is_elite, enemy_id=e.enemy_id)
             ps.fx.spawn_death_fx(e.pos, getattr(e, "_facing", 1),
                                  scale=_ENEMY_DEATH_FX_SCALE, radius=e.radius)
         ps.enemies = survivors

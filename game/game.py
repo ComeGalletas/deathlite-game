@@ -32,6 +32,7 @@ class Game:
     def __init__(self, save_path=None) -> None:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
+        self._set_icon()                    # before the window: SDL reads it there
         self.screen, self.vsync = self._open_window()
         self.clock = pygame.time.Clock()
         self.running = False
@@ -116,6 +117,27 @@ class Game:
         if victory and stats.get("character_id"):
             self.save.mark_cleared(stats["character_id"])
         self.persist()
+
+    @staticmethod
+    def _set_icon() -> bool:
+        """Put Aegis on the window and the taskbar. Returns whether it took.
+
+        Loaded straight off disk rather than through `Assets`, because this runs
+        *before* the display exists and `convert_alpha` needs one -- and it has
+        to run before `set_mode`, which is where SDL picks the icon up. A
+        missing or unreadable file leaves pygame's default, the same degrade
+        contract as the cursor and the sprites: the game never fails to open
+        over decoration.
+        """
+        from game.assets import ASSETS_DIR
+        path = ASSETS_DIR / config.WINDOW_ICON
+        try:
+            pygame.display.set_icon(pygame.image.load(str(path)))
+            return True
+        except (pygame.error, OSError) as exc:
+            logging.getLogger(__name__).info(
+                "window icon unavailable (%s); pygame default", exc)
+            return False
 
     @staticmethod
     def _open_window():

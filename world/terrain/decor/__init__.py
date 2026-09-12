@@ -26,7 +26,7 @@ from world.terrain.decor.rigs import load_rig
 from world.terrain.decor.scatter_room import build_decor_scatter
 from world.terrain.decor.scatter_water import build_water_decor
 from world.terrain.decor.shadows import build_tree_shadows
-from world.terrain.decor.spacing import _Neighbourhood
+from world.rules.spacing import _Neighbourhood
 
 __all__ = [
     "FEATURE", "GROUND_COVER", "LANDMARK", "TIERS",

@@ -23,6 +23,8 @@ from entities.enemy import Enemy
 from entities.boss import Boss
 from entities.projectile import Projectile
 from entities.pickup import XPGem, XP_TIER_COLORS
+from entities.potion import HealthPotion
+from progression import potions as potion_rules
 from entities.summon import Summon
 from entities.hazard import Hazard
 from entities.melee_hitbox import MeleeHitbox
@@ -47,6 +49,7 @@ from game.states.playing import rendering as _rendering
 from game.states.playing.rendering import WorldRenderer
 from game.states.playing.combat import CombatResolver
 from game.states.playing.physics import BumpResolver
+from game.states.playing.chests import Chests
 from game.states.playing.locations import SpecialLocations
 from game.states.playing.npcs import Npcs
 from game.states.playing.effects import TransientFx
@@ -110,6 +113,9 @@ class PlayingState(State):
                          else GameMap(seed=self.run_seed))
         self.locations = SpecialLocations(self)
         self.locations.build()
+        # CB-9: the treasure chests the seed seated across the islands.
+        self.chest_manager = Chests(self)
+        self.chest_manager.build()
         # The villagers (HI-3): scenery that moves, from the village records.
         self.npc_manager = Npcs(self)
         self.npc_manager.build()
@@ -166,6 +172,10 @@ class PlayingState(State):
         self.projectiles: Pool[Projectile] = Pool(Projectile, config.MAX_PROJECTILES, prefill=128)
         self.hostiles: Pool[Projectile] = Pool(Projectile, config.MAX_PROJECTILES, prefill=64)
         self.gems: Pool[XPGem] = Pool(XPGem, config.MAX_PROJECTILES, prefill=64)
+        # CB-8: health potions dropped by enemies. Capped from data so a
+        # potion flood degrades gracefully like every other pool.
+        self.potions: Pool[HealthPotion] = Pool(
+            HealthPotion, int(self.content.potions.get("pool_size", 64)), prefill=8)
         self.summons: Pool[Summon] = Pool(Summon, 32, prefill=8)
         self.hazards: list[Hazard] = []
         self.melee_hitboxes: list[MeleeHitbox] = []
@@ -213,7 +223,10 @@ class PlayingState(State):
         # `currency` = Salvage banked to the save at run end (boss + elite arena).
         # `gold` = spent in-run at the Merchant only, never banked.
         self.stats = {"time": 0.0, "level": 1, "kills": 0, "damage_dealt": 0.0,
-                      "xp": 0, "currency": 0, "gold": 0, "dropped_items": []}
+                      "xp": 0, "currency": 0, "gold": 0, "gold_earned": 0,
+                      "dropped_items": [],
+                      "potions": 0, "potion_healing": 0.0,
+                      "chests": 0}          # CB-9: treasure chests opened
         # Damage per source and kills per enemy type for the whole run, fed
         # through every enemy's `ledger` attribute (`run_ledger.py`). Built
         # before anything can spawn: the spawner hands it to each enemy.
@@ -285,7 +298,13 @@ class PlayingState(State):
             self._suspend_mouse()
             self.game.state_machine.push(PausedState(self.game))
         elif event.key == pygame.K_e:
-            self.locations.activate_nearby()
+            # Special locations first -- they were here before chests, and a
+            # chest can never be seated inside a special island's clear disc,
+            # so the two prompts cannot both be live.
+            if self.locations.nearby() is not None:
+                self.locations.activate_nearby()
+            else:
+                self.chest_manager.activate_nearby()
         elif event.key == pygame.K_BACKQUOTE and self.dev_mode:
             from game.states.dev_menu_state import DevMenuState
             self._suspend_mouse()
@@ -496,7 +515,7 @@ class PlayingState(State):
         self.npc_manager.update(dt)
         self.fx.update_hazards(dt)
         self.fx.update_melee_hitboxes(dt)
-        self.locations.update_elite_arenas()
+        self.chest_manager.update(dt)      # CB-9: the lids that are opening
         self.fx.update_death_fx(dt)
         self.fx.update_trail_fx(dt)
         self.particles.update(dt)
@@ -563,6 +582,7 @@ class PlayingState(State):
                                      count=5, speed=110, life=0.3, radius=2)
                 self.game.events.publish(Events.XP_COLLECTED, value=gem.value)
         self.gems.sweep()
+        self._collect_potions(dt)
         self.stats["level"] = self.levels.level
 
         if self.levels.pending_level_ups > 0 and not self._awaiting_level_up:
@@ -631,17 +651,14 @@ class PlayingState(State):
         self.spawn.spawn_boss()
 
     # --- special locations (see locations.py) -----------
-    # Thin forwarders for the `use_*` / `_update_elite_arenas` names the
-    # interactables tests call directly.
+    # Thin forwarders for the `use_*` names the interactables tests call
+    # directly.
     def _use_shrine(self, it):    self.locations.use_shrine(it)
     def _use_treasure(self, it):  self.locations.use_treasure(it)
     def _use_fountain(self, it):  self.locations.use_fountain(it)
     def _use_forge(self, it):     self.locations.use_forge(it)
     def _use_altar(self, it):     self.locations.use_altar(it)
     def _use_merchant(self, it):  self.locations.use_merchant(it)
-
-    def _update_elite_arenas(self) -> None:
-        self.locations.update_elite_arenas()
 
     def _resolve_visual(self, kw: dict) -> None:
         """Fill `color` / `style` / `fx` from `data/weapon_visuals.json` for a
@@ -696,9 +713,10 @@ class PlayingState(State):
     def _spawn_hazard(self, *a, **kw):    # tests call this one
         self.fx.spawn_hazard(*a, **kw)
 
-    def _spawn_impact(self, *, pos, radius, rig, weapon_id="") -> None:
-        """CR1: the Hammer's impact sheet at the blow."""
-        slam_fx.spawn_impact(self, pos=pos, radius=radius, rig=rig, weapon_id=weapon_id)
+    def _spawn_impact(self, *, pos, radius, rig, weapon_id="", anim="loop") -> None:
+        """CR1: the Hammer's impact sheet at the blow; the totem bolt's burst."""
+        slam_fx.spawn_impact(self, pos=pos, radius=radius, rig=rig, weapon_id=weapon_id,
+                             anim=anim)
 
     def _spawn_hero_hazard(self, *, pos, radius, dps, duration, weapon_id="",
                            source_tags=()) -> None:
@@ -769,7 +787,8 @@ class PlayingState(State):
         log.info("level %d: took %s", self.levels.level, upgrade.id)
 
     # --- event handlers ----------------------------
-    def _on_enemy_killed(self, *, pos, color, xp, tags, elite=False) -> None:
+    def _on_enemy_killed(self, *, pos, color, xp, tags, elite=False,
+                         enemy_id="") -> None:
         self.particles.burst(pos, color, count=16 if elite else 10,
                              speed=200 if elite else 160, life=0.5)
         # In-run gold for the Merchant, scaled by the Gold Rush blessing (P2);
@@ -777,15 +796,58 @@ class PlayingState(State):
         self._gold_carry = (getattr(self, "_gold_carry", 0.0)
                             + (2 if elite else 1) * (1.0 + self.player.stats["gold_gain"]))
         whole = int(self._gold_carry)
-        self.stats["gold"] += whole
+        self.add_gold(whole)
         self._gold_carry -= whole
         if elite:
             self.shake.add(0.18)
             if self.rng.random() < 0.18:
                 self._drop_item(int(1 + self.stats["time"] // 90))
+        if enemy_id:
+            self._roll_potion_drop(enemy_id, pos)
         gem = self.gems.acquire()
         if gem is not None:
             gem.reset(pos, xp)
+
+    def _collect_potions(self, dt: float) -> None:
+        """CB-8: advance the dropped potions and heal on pickup.
+
+        `HealthPotion.update` refuses to be collected at full HP, so a potion
+        waits on the ground rather than being spent for a sliver.
+        """
+        for potion in self.potions:
+            if not potion.update(dt, self.player):
+                continue
+            before = self.player.hp
+            self.player.heal(potion.heal)
+            gained = self.player.hp - before
+            self.stats["potions"] += 1
+            self.stats["potion_healing"] += gained
+            self.particles.burst(self.player.pos,
+                                 potion_rules.colour(potion.rarity, self.content.potions),
+                                 count=14, speed=140, life=0.45, radius=2)
+            if gained > 0.0:
+                self.damage_numbers.add(self.player.pos, gained, healing=True)
+        self.potions.sweep()
+
+    def _roll_potion_drop(self, enemy_id: str, pos) -> None:
+        """CB-8: a kill's chance at a health potion, from the enemy's *base* HP.
+
+        Base HP, not `enemy.max_hp`: the director scales the live value by
+        `hp_mult` as a run goes on, so rolling against it would walk every
+        enemy up to the cap. Bosses never reach here -- `_on_boss_killed` is a
+        separate handler.
+        """
+        table = self.content.potions
+        definition = self.content.enemies.get(enemy_id)
+        if definition is None:
+            return
+        rarity = potion_rules.roll(float(definition["hp"]), table, self.rng)
+        if rarity is None:
+            return
+        potion = self.potions.acquire()
+        if potion is None:
+            return                      # pool capped: drop nothing, never crash
+        potion.reset(pos, rarity, potion_rules.heal_amount(rarity, table))
 
     def _drop_item(self, item_level: int) -> None:
         self._drop_counter += 1
@@ -817,8 +879,36 @@ class PlayingState(State):
                                scale=1.4, radius=self.boss.radius)   # (mostly unseen -- victory follows)
         self.shake.add(1.0)
         self.game.events.publish(Events.BOSS_KILLED, name=self.boss.name)
+        # Kept before the boss is dropped: the victory screen names the boss
+        # that fell, and with a pool to draw from that is the one fact that
+        # tells two wins apart.
+        self._boss_defeated = (self.boss.boss_id, self.boss.name)
         self.boss = None
         self._end_run(victory=True)
+
+    # --- gold -------------------------------------
+    # The balance and the run total move together here rather than at each
+    # income site, because the end screens report the gold *earned* over the
+    # run, not what is left after the Merchant (owner, 2026-09-12): a run that
+    # picks up 200 and spends 50 reports 200. Two counters kept in step by
+    # convention would drift the first time an income source forgot one.
+    def add_gold(self, amount: int) -> int:
+        """Bank `amount` gold. Returns what was actually added."""
+        amount = int(amount)
+        if amount <= 0:
+            return 0
+        self.stats["gold"] += amount
+        self.stats["gold_earned"] = self.stats.get("gold_earned", 0) + amount
+        return amount
+
+    def spend_gold(self, amount: int) -> bool:
+        """Take `amount` off the balance if it is there; False when it is not.
+        The run total is untouched -- spending is not un-earning."""
+        amount = int(amount)
+        if amount <= 0 or self.stats["gold"] < amount:
+            return False
+        self.stats["gold"] -= amount
+        return True
 
     # --- run end ----------------------------------
     def _end_run(self, *, victory: bool) -> None:
@@ -844,6 +934,32 @@ class PlayingState(State):
             (self.blessing_lib.by_id[bid].name if bid in self.blessing_lib.by_id else bid,
              lvl) for bid, lvl in self.player.blessings.items()]
         summary["damage_by_source"] = dict(self.ledger.damage)
+        # The end screens are one piece of code (`ui/end_screen.py`), so what
+        # makes a win a win travels in the dict rather than in two renderers.
+        summary["victory"] = victory
+        boss = getattr(self, "_boss_defeated", None)
+        if boss is not None:
+            summary["boss_id"], summary["boss"] = boss
+        # Read *before* the RUN_ENDED publish below: `Game._on_run_ended` calls
+        # `save.mark_cleared`, so asking afterwards always answers "already
+        # cleared" and the first-clear reward could never be announced.
+        summary["first_clear"] = bool(
+            victory and not self.game.save.hero_cleared(self.character_id))
+        # Same ordering trap, same reason: `record_best` in that handler
+        # overwrites the values this compares against, so afterwards no run
+        # has ever beaten anything. A dev run banks nothing, so it sets no
+        # records and must not claim any.
+        summary["new_records"] = ([] if self.dev_mode else
+                                  self.game.save.beaten_records(summary, self.difficulty))
+        # The hero's resolved build. The run-status screen reads `player.stats`
+        # live; a screen shown after the run is over cannot, so it is snapshot.
+        # `player.stats` is already the resolved plain dict (the `StatSet`
+        # itself is `player.statset`), so this is a copy, not a recompute.
+        summary["trait"] = getattr(self.player, "trait", "")
+        summary["hero_stats"] = dict(getattr(self.player, "stats", None) or {})
+        summary["equipment"] = [
+            {"name": it.name, "rarity": it.rarity, "slot": it.slot, "level": it.level}
+            for it in getattr(self.player, "equipment", ())]
         self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
                                  dev=self.dev_mode)
         if self.dev_mode:
@@ -992,9 +1108,11 @@ class PlayingState(State):
         before the world was banded.
         """
         self.renderer.interactables(surface, level)
+        self.renderer.chests(surface, level)     # CB-9: treasure chests
         self.renderer.hazards(surface, level)
         slam_fx.draw_indicators(surface, self, level)   # CR1: the pending swing
         self.renderer.gems(surface, level)
+        self.renderer.potions(surface, level)   # CB-8: health potion drops
         self.renderer.explosions(surface, level)
         slam_fx.draw_impacts(surface, self, level)      # CR1: the blow
         slash_fx.draw(surface, self, level)             # the Sword's swing sequence

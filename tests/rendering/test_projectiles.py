@@ -31,7 +31,8 @@ class RegistryTests(unittest.TestCase):
     def test_every_family_is_registered(self):
         self.assertEqual(set(registered()),
                          {"bolt", "arrow", "cone", "orbit", "melee", "thunder",
-                          "arcane", "blast", "bomb", "hidden", "thrown"})
+                          "arcane", "blast", "bomb", "hidden", "thrown",
+                          "totem_bolt"})
 
     def test_classify_routes_by_the_projectile_fields(self):
         cone = SimpleNamespace(style="", cone_half_angle=0.5, orbit_speed=0.0, anchor=None)
@@ -254,9 +255,14 @@ class BombTests(unittest.TestCase):
         self.surf = pygame.Surface((200, 200), pygame.SRCALPHA)
         self.ctx = DrawCtx(self.a, now=0.7, zoom=1.0)
 
-    def _bomb(self, vx):
-        return SimpleNamespace(color=(70, 60, 60), radius=8, fx={},
-                               vel=pygame.Vector2(vx, 0))
+    def _bomb(self, vx, *, cluster=False, scale=None):
+        """A stand-in for a thrown Bomb. `source_tags` is what `anim_for`
+        reads to spot a Cluster Bomb bomblet; a real `Projectile` always
+        carries it."""
+        tags = ("ranged", "area", "explosive") + (("cluster",) if cluster else ())
+        return SimpleNamespace(color=(70, 60, 60), radius=8,
+                               fx={"scale": scale} if scale else {},
+                               vel=pygame.Vector2(vx, 0), source_tags=tags)
 
     def test_rig_uses_both_sheets_and_not_the_idle(self):
         self.assertEqual(set(self.a.rig("bomb")["anims"]), {"spin", "fuse"})
@@ -271,6 +277,27 @@ class BombTests(unittest.TestCase):
         bomb_mod.bomb(self.surf, 100, 100, self._bomb(300), self.ctx)
         bomb_mod.bomb(self.surf, 100, 100, self._bomb(0), self.ctx)
         self.assertEqual(got, [("bomb", "spin"), ("bomb", "fuse")])
+
+    def test_a_bomblet_holds_the_fuse_while_it_is_still_flying(self):
+        """Owner, 2026-09-12: a bomblet wears the parent's sprite but never
+        the rolling strip, so a scatter reads as the blast spreading out."""
+        self.assertEqual(bomb_mod.anim_for(self._bomb(300, cluster=True)), "fuse")
+        self.assertEqual(bomb_mod.anim_for(self._bomb(0, cluster=True)), "fuse")
+        got = []
+        self.a.frame = lambda rig, an, idx, **kw: (got.append((rig, an)), None)[1]
+        bomb_mod.bomb(self.surf, 100, 100, self._bomb(300, cluster=True), self.ctx)
+        self.assertEqual(got, [("bomb", "fuse")])
+
+    def test_a_bomblet_is_blitted_at_its_smaller_fx_scale(self):
+        bw, bh = self.a.scale_for("bomb")
+        small = (bw * 0.6, bh * 0.6)
+        got = []
+        self.a.frame = lambda rig, an, idx, size=None, **kw: (got.append(size), None)[1]
+        bomb_mod.bomb(self.surf, 100, 100,
+                      self._bomb(300, cluster=True, scale=small), self.ctx)
+        self.assertEqual(got, [(round(small[0]), round(small[1]))])
+        self.assertLess(got[0][0], bw)
+        self.assertLess(got[0][1], bh)
 
     def test_frame_index_follows_the_run_clock(self):
         want = int(0.7 * self.a.fps("bomb", "fuse")) % self.a.frame_count("bomb", "fuse")

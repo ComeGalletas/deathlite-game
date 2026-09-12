@@ -143,30 +143,69 @@ class TransientFx:
             style="blast", color=(255, 190, 110), no_block=True)
         if blast is not None:
             blast.fire_level = bomb.fire_level
-        ps._explosions.append(self.burst_visual(pos, bomb.blast_radius))
+        ps._explosions.append(self.burst_visual(
+            pos, bomb.blast_radius, rig=self.burst_rig(bomb)))
         ps.particles.burst(pos, (255, 160, 80), count=18, speed=240, life=0.45)
         ps.shake.add(0.3)
         self.scatter_bomblets(bomb, pos)
 
     _BURST_RIG = "explosion"
+    # A Cluster Bomb bomblet gets the small sibling of that sheet (owner,
+    # 2026-09-12): same pack, same 192 px grid, rounder and two frames
+    # shorter, so three simultaneous bomblets read as the blast spreading
+    # out rather than as three copies of it.
+    _BOMBLET_BURST_RIG = "explosion_small"
 
-    def burst_visual(self, pos, radius: float) -> dict:
-        """An `_explosions` entry that plays the `explosion` rig's one-shot
-        `burst` (effects/explosion_2.png) scaled to the blast diameter, and
-        lives exactly as long as the strip. Without the rig it is the plain
-        expanding ring the other explosions use."""
+    def burst_rig(self, bomb) -> str:
+        """Which burst sheet a detonation plays. A bomblet is identified by
+        the `cluster` tag it already carries -- the same test that stops it
+        scattering again in `scatter_bomblets`."""
+        return (self._BOMBLET_BURST_RIG if "cluster" in bomb.source_tags
+                else self._BURST_RIG)
+
+    def burst_visual(self, pos, radius: float, rig: str | None = None) -> dict:
+        """An `_explosions` entry that plays `rig`'s one-shot `burst` scaled
+        to the blast diameter, and lives exactly as long as the strip.
+        Without the rig it is the plain expanding ring the other explosions
+        use. `rig` defaults to the Bomb's own `explosion`."""
+        rig = rig or self._BURST_RIG
         assets = get_assets()
-        n = assets.frame_count(self._BURST_RIG, "burst")
+        n = assets.frame_count(rig, "burst")
         if n <= 0:
             return {"pos": pos, "radius": radius, "t": 0.0, "dur": 0.35}
         return {"pos": pos, "radius": radius, "t": 0.0,
-                "dur": n / assets.fps(self._BURST_RIG, "burst"),
-                "anim": Animator(assets, self._BURST_RIG, start="burst")}
+                "dur": n / assets.fps(rig, "burst"),
+                "anim": Animator(assets, rig, start="burst")}
+
+    _BOMB_RIG = "bomb"
+
+    def bomblet_scale(self, mult: float):
+        """The `fx.scale` a bomblet draws its bomb sprite at: the `bomb`
+        rig's own `scale`, times `cluster_radius_mult`.
+
+        The owner wants a bomblet visibly smaller than the bomb that threw it
+        (2026-09-12) and no second hand-tuned number for it, so the sprite
+        rides the same ratio as the blast: shrink the blast and the ball
+        shrinks with it, and there is nothing to keep in sync. `None` when
+        the rig is missing -- `bomb.py` then falls back to the disc.
+        """
+        scale = get_assets().scale_for(self._BOMB_RIG)
+        if not scale:
+            return None
+        return (max(1.0, scale[0] * mult), max(1.0, scale[1] * mult))
 
     def scatter_bomblets(self, bomb, pos) -> None:
         """P3 Cluster Bomb: the blast throws `cluster_count` lighter bomblets
         outward; each lands and goes off after `cluster_fuse`. Bomblets carry
-        the `cluster` tag and never scatter again."""
+        the `cluster` tag and never scatter again.
+
+        A bomblet wears the parent's bomb sprite at `cluster_radius_mult` of
+        its size, and never the rolling `spin` strip -- `bomb.anim_for` reads
+        the `cluster` tag and holds the lit fuse, so a scatter reads as the
+        explosion spreading out rather than as three bombs being thrown
+        (owner, 2026-09-12). All `n` share one `cluster_fuse`, so they go off
+        together, which is the same intent.
+        """
         ps = self.ps
         w = ps.player.weapon_by_id(bomb.weapon_id) if bomb.weapon_id else None
         if w is None or "cluster" in bomb.source_tags:
@@ -177,6 +216,8 @@ class TransientFx:
         fx = w.effects
         speed = float(fx.get("cluster_speed", 180.0))
         fuse = float(fx.get("cluster_fuse", 0.5))
+        radius_mult = float(fx.get("cluster_radius_mult", 0.6))
+        scale = self.bomblet_scale(radius_mult)
         base = ps.rng.random() * math.tau
         for i in range(n):
             a = base + math.tau * i / n
@@ -187,8 +228,9 @@ class TransientFx:
                 src_weight=bomb.src_weight * 0.5, weapon_id=bomb.weapon_id,
                 source_tags=tuple(bomb.source_tags) + ("cluster",),
                 is_crit=bomb.is_crit, inert=True, stop_after=fuse * 0.5,
-                blast_radius=bomb.blast_radius * float(fx.get("cluster_radius_mult", 0.6)),
-                blast_lifetime=bomb.blast_lifetime)
+                blast_radius=bomb.blast_radius * radius_mult,
+                blast_lifetime=bomb.blast_lifetime,
+                fx={"scale": scale} if scale else {})
 
     # --- ground hazards (spec 5.6) --------------------------
     def spawn_hazard(self, pos, radius, dps, duration, tick_interval=None,

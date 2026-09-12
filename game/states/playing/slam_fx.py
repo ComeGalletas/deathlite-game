@@ -52,12 +52,14 @@ def draw_indicators(surface, ps, level=None) -> None:
         surface.blit(disc, (int(sx) - rr, int(sy) - rr))
 
 
-def spawn_impact(ps, *, pos, radius, rig, weapon_id="") -> None:
+def spawn_impact(ps, *, pos, radius, rig, weapon_id="", anim: str = "loop") -> None:
     """Queue the impact sheet at `pos`, scaled to the circle's diameter. A
-    weapon with no rig (or a rig with no frames) shows nothing."""
-    if not rig or ps.game.assets.frame_count(rig, "loop") <= 0:
+    weapon with no rig (or a rig with no frames) shows nothing. `anim` names
+    the strip: the Hammer's rig has one (`loop`); the totem bolt's `burst`
+    shares its rig with the orb the bolt flies with."""
+    if not rig or ps.game.assets.frame_count(rig, anim) <= 0:
         return
-    ps._impacts.append({"anim": Animator(ps.game.assets, rig, start="loop"),
+    ps._impacts.append({"anim": Animator(ps.game.assets, rig, start=anim),
                         "pos": pygame.Vector2(pos), "radius": float(radius)})
 
 

@@ -11,7 +11,7 @@
     "color": [70, 130, 210],
     "base_stats": {
       "max_hp": 160,
-      "move_speed": 200,
+      "move_speed": 150,
       "armor": 4,
       "pickup_radius": 80,
       "block_chance": 0.30
@@ -29,7 +29,7 @@
     "color": [230, 200, 90],
     "base_stats": {
       "max_hp": 92,
-      "move_speed": 240,
+      "move_speed": 170,
       "armor": 0,
       "pickup_radius": 110,
       "evasion_chance": 0.10
@@ -47,7 +47,7 @@
     "color": [170, 110, 210],
     "base_stats": {
       "max_hp": 96,
-      "move_speed": 190,
+      "move_speed": 140,
       "armor": 0,
       "pickup_radius": 100,
       "luck": 2

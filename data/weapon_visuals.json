@@ -112,7 +112,16 @@
       150,
       220,
       190
-    ]
+    ],
+    "style": "totem_bolt",
+    "fx": {
+      "orb_rig": "totem_bolt",
+      "orb_px": 24,
+      "fire_rig": "totem_bolt_fire",
+      "tail_px": 28,
+      "impact": "totem_bolt",
+      "impact_anim": "burst"
+    }
   },
   "spirit_wolf": {
     "color": [

@@ -13,7 +13,11 @@ from __future__ import annotations
 SCREEN_WIDTH: int = 1600
 SCREEN_HEIGHT: int = 900
 FPS: int = 62
-TITLE: str = "Death Lite Game"
+TITLE: str = "Deathlite Game"
+# The game's own version, shown wherever the build identifies itself (window
+# caption, menu, the packaged exe). Distinct from `save.SAVE_VERSION`, which
+# versions the save *schema* and moves for entirely different reasons.
+VERSION: str = "0.5"
 # Present frames on the display's refresh. The window is created with
 # `pygame.SCALED | pygame.DOUBLEBUF` and `vsync=1`, so `flip()` waits for the
 # refresh and the cadence is the monitor's; without it a frame that fits the
@@ -306,8 +310,13 @@ HEIGHTMAP_TOPOGRAPHIES: dict = {
     # nothing on cliffs, so the linear scale lands higher than `size` says
     # above: 0.76 measured 549 walkable tiles (0.59 of a volcanic island);
     # the owner asked for a quarter less (HI-3): 0.67 measured ~380-410;
-    # then another third less: 0.56 measures ~250, about 0.27 of volcanic.
-    "human":    {"tiers": (0, 0), "size": 0.56, "coast": "square",
+    # then another third less: 0.56 measured ~250, about 0.27 of volcanic;
+    # then a quarter less again: 0.51 measures ~185 (0.20 of volcanic).
+    # `size` is a *linear* scale on both axes (`_resize_by_topography`) and
+    # the coast erosion costs a fixed ring, so a request for a quarter less
+    # ground is not a quarter off this number -- it is measured, and the
+    # even-tile rounding quantises it: 0.52 lost 20%, 0.51 lost 26%.
+    "human":    {"tiers": (0, 0), "size": 0.51, "coast": "square",
                  "bridges": 1, "weight": 0, "lakes": 0,
                  "sheets": ["terrain/tiles/tilemaps/tilemap_1.png",
                             "terrain/tiles/tilemaps/tilemap_7.png"]},
@@ -465,6 +474,12 @@ MENU_BACKGROUND_IMAGE: str = "ui/start_screen/menu_background.png"
 # The game logo, drawn above the option list; falls back to rendered text.
 MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
 
+# The window / taskbar icon: Aegis cropped square on his ink, regenerated from
+# his idle sheet by `utilities/make_icon.py` (which also writes the `.ico` the
+# packaged exe carries). A missing file leaves pygame's default icon, the same
+# degrade contract as the cursor below.
+WINDOW_ICON: str = "ui/icon.png"
+
 # --- Mouse in menus ----------------------------------------------------
 # The hardware cursor, everywhere: the arrow in `assets/ui/pointers/` (the
 # other files there -- `frame` and the four `corner_*` brackets -- are
@@ -482,7 +497,8 @@ MENU_INSTRUCTIONS: dict = {
     "rows": [
         ("Move", "WASD"),
         ("Aim", "Arrows / Click"),
-        ("Auto attack", "Q"),
+        ("Auto attack toggle", "Q"),
+        ("Stat screen", "TAB"),
         ("Pause", "ESC"),
         ("Mute", "M"),
     ],
@@ -491,6 +507,52 @@ MENU_INSTRUCTIONS: dict = {
         "Survive, level up, beat the boss.",
     ],
 }
+
+# --- In-run HUD bars -----------------------------------------------------
+# The HP and XP bars are cut from `assets/ui/04.png`, the hex family (sheet
+# rows 4-7). Both are `ui/bars/meters.bar()`; the rigs live in
+# `data/ui_sprites.json`, so the sheet's cell coordinates are data, not code.
+#
+# HP takes the silver housing and the red fill; XP takes the blue fill with no
+# housing, which is what gives the pair their size hierarchy out of one art
+# family. Because the frameless bar keeps the housing's horizontal inset, the
+# XP fill lines up under the HP fill to the pixel.
+HUD_BAR_FRAME: str = "bar_hex_frame_silver"
+HUD_BAR_HP_FILL: str = "bar_hex_fill_red"
+HUD_BAR_XP_FILL: str = "bar_hex_fill_blue"
+HUD_BAR_EMPTY: str = "bar_hex_empty"
+# Native width of the bars, before HUD_BAR_SCALE. The sheet's cells are 48 px
+# wide and the art 3-slices to any length, so this is a free choice: 104 x 3
+# is 312 px on screen, and leaves ~96 fill positions, i.e. ~1% granularity.
+HUD_BAR_WIDTH: int = 104
+# Nearest-neighbour upscale for every HUD bar piece. At x3 the housing stands
+# 33 px tall and the bare XP fill 15 px, which reads against the 64-px Tiny
+# Swords buttons the menus use.
+HUD_BAR_SCALE: int = 3
+# The level medallion: `assets/ui/01.png`'s blue gem seated in its socket ring,
+# drawn square at this many screen px with the level number centred on it. The
+# gem is bright cyan, so the number is dark -- the same rule as text on the
+# light button art.
+HUD_GEM_SOCKET: str = "gem_socket_blue"
+HUD_GEM_CORE: str = "gem_core_blue"
+HUD_GEM_PX: int = 64
+# Top of the left-hand cluster -- the level gem and the two bars beside it,
+# and the primitive rectangles that stand in when the sheets are missing. Sat
+# at 14 until the same 25 px drop (owner, 2026-09-12).
+HUD_LEFT_TOP: int = 39
+# The boss bar, bottom centre: the same hex family as the hero's bars (owner,
+# 2026-09-12), framed, with the boss name above it. Its width is a fraction of
+# the screen so it stays half the frame at any resolution, and HUD_BOSS_BOTTOM
+# is the gap left under it. The housing is copper rather than the hero's
+# silver, so the two bars read apart at a glance during a boss fight.
+HUD_BOSS_FRAME: str = "bar_hex_frame_copper"
+# The boss name above the bar, in the housing's own copper (owner, 2026-09-12).
+# This is the lit tone off the sheet rather than its mid tone, because the name
+# is thin text on a dark shadow and the mid copper goes muddy at that weight.
+HUD_BOSS_NAME_COLOR: tuple = (230, 156, 105)
+HUD_BOSS_FILL: str = "bar_hex_fill_red"
+HUD_BOSS_WIDTH: float = 0.5
+HUD_BOSS_BOTTOM: int = 28
 
 # --- Audio ---------------------------------------------------------------
 # Master-volume step for the Options screen (0..1). The slider snaps to this
@@ -611,6 +673,9 @@ PLAYER_DEFAULTS = {
     "max_hp": 100.0,
     "move_speed": 260.0,          # world pixels / second
     "armor": 0.0,                  # flat damage reduction
+    # CB-7: HP restored per regen tick (`HP_REGEN_INTERVAL` seconds apart).
+    # Every hero shares this baseline; `characters.json` may override it.
+    "hp_regen": 1.0,
     "damage_multiplier": 1.0,
     "attack_speed_multiplier": 1.0,
     "projectile_speed_multiplier": 1.0,
@@ -663,6 +728,24 @@ BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
 # 1600x900 window (1067x600 world px), so the "APPROACHES" warning plays
 # while it crosses onto the screen instead of while it is an island away.
 BOSS_SPAWN_DISTANCE: float = 680.0
+# A boss that does *not* fly has to land on ground it can actually stand on:
+# the ring above is blind to what is under it, which is fine for the bat and
+# strands The Tusked Lance in the sea. So a walking boss samples the ring
+# instead of taking one point off it -- `RING_SAMPLES` angles around the
+# circle from the random start, at each radius in `RING_SCALES` (a multiple of
+# the distance, nearest-to-intended first), taking the first spot the collider
+# accepts. The scales walk outward as well as inward because a hero fighting
+# on a small island may have no land at 0.6x either. If nothing in the whole
+# sweep is walkable the unconstrained point is used: a boss that spawns
+# awkwardly is recoverable, a boss that never spawns ends the run.
+BOSS_SPAWN_RING_SAMPLES: int = 12
+BOSS_SPAWN_RING_SCALES: tuple[float, ...] = (1.0, 0.8, 1.25, 0.6, 1.5, 0.4, 2.0)
+# Out of its `vision_range` a boss only closes -- no pattern, no telegraph.
+# A ground boss can now start that walk much further out than the flyer ever
+# did (the ring search may have to reach 2x to find land), so closing runs at
+# this multiple of `speed` and drops back to 1x the moment the hero is in
+# sight. It shortens dead time; it never makes the fight itself faster.
+BOSS_CLOSING_SPEED_MULT: float = 3.0
 
 # --- Combat: incoming damage -----------------------------------------
 # Contact and hazard damage land as discrete "bites" this many seconds apart,
@@ -674,6 +757,18 @@ BOSS_SPAWN_DISTANCE: float = 680.0
 # of the largest expected armor, or an armored hero goes immune to that attack:
 #     interval > armor / (rate * bulwark)
 INCOMING_TICK_INTERVAL: float = 0.5
+
+# --- Combat: hero HP regeneration (CB-7) ---------------------------------
+# The hero restores `player.stats["hp_regen"]` HP once every this many seconds.
+# Only the *amount* is a stat; the cadence is fixed so the drip stays readable
+# on the build screen ("1 / 5s") and so a blessing cannot stack itself into a
+# per-frame heal. The phase is run time, not damage time: the timer keeps
+# running at full HP (the heal is simply clamped away), so after a hit the next
+# tick is at most one interval out rather than a fresh countdown.
+# Blessing card text states this number, so `tests/characters/test_regen.py`
+# pins the two together -- retuning here fails there rather than silently
+# leaving a card lying.
+HP_REGEN_INTERVAL: float = 5.0
 
 # --- Spatial grid -------------------------------------------------------
 # Broad-phase collision cell size. Roughly 2x the biggest common entity.

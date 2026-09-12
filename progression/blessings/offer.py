@@ -65,13 +65,20 @@ def _blessing_offer(bdef: BlessingDef, level: int, weight: float, content) -> Up
         kind=bdef.kind, rarity=bdef.rarity, level=level, weapon=bdef.weapon)
 
 
-def blessing_offers(player, content, *, kinds=None) -> list[Upgrade]:
-    """Every stat / weapon blessing the run can take right now."""
+def blessing_offers(player, content, *, kinds=None, rarities=None) -> list[Upgrade]:
+    """Every stat / weapon blessing the run can take right now.
+
+    `rarities` limits to a subset of the catalog's rarities -- CB-9's chests
+    use it to hand out, say, a common-or-uncommon blessing. `None` (the
+    default) means every rarity, which is what the level-up roll wants.
+    """
     catalog, rules = get_catalog(content), get_rules(content)
     owned = _owned(player)
     out = []
     for bdef in catalog.by_id.values():
         if kinds is not None and bdef.kind not in kinds:
+            continue
+        if rarities is not None and bdef.rarity not in rarities:
             continue
         if not _valid_blessing(bdef, owned, player):
             continue
@@ -145,26 +152,34 @@ def forge_offers(player, content) -> list[Upgrade]:
     return out
 
 
-def valid_offers(player, content, rng: random.Random, *, kinds=None) -> list[Upgrade]:
+def valid_offers(player, content, rng: random.Random, *, kinds=None,
+                 rarities=None) -> list[Upgrade]:
     """The whole valid set: blessings, grants and Forge cards. `kinds` limits
     to a subset of ("stat", "weapon", "grant", "forge") -- shrines use it to
-    offer only stat / weapon blessings."""
-    out = blessing_offers(player, content, kinds=kinds)
+    offer only stat / weapon blessings. `rarities` limits the *blessing*
+    rarities (CB-9's chests); grants and Forge cards carry a fixed rarity of
+    their own and are simply dropped when one is asked for and does not match.
+    """
+    out = blessing_offers(player, content, kinds=kinds, rarities=rarities)
     if kinds is None or "grant" in kinds:
-        out.extend(grant_offers(player, content, rng))
+        grants = grant_offers(player, content, rng)
+        out.extend(g for g in grants
+                   if rarities is None or g.rarity in rarities)
     if kinds is None or "forge" in kinds:
-        out.extend(forge_offers(player, content))
+        forges = forge_offers(player, content)
+        out.extend(f for f in forges
+                   if rarities is None or f.rarity in rarities)
     return out
 
 
 def roll_offering(player, content, rng: random.Random, n: int | None = None,
-                  *, kinds=None) -> list[Upgrade]:
+                  *, kinds=None, rarities=None) -> list[Upgrade]:
     """Pick up to `n` distinct cards by weight (default: the data's
     `choices`). Never an invalid or maxed option; fewer if fewer remain."""
     rules = get_rules(content)
     if n is None:
         n = rules.choices
-    candidates = valid_offers(player, content, rng, kinds=kinds)
+    candidates = valid_offers(player, content, rng, kinds=kinds, rarities=rarities)
     chosen: list[Upgrade] = []
     while candidates and len(chosen) < n:
         weights = [u.weight for u in candidates]

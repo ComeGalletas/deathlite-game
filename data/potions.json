@@ -1,0 +1,38 @@
+{
+  "_comment": "CB-8: health potions dropped by enemies. Every number here is tuning; code keeps only the rarity taxonomy. `rarities` is the canonical order (weakest first) and every table below must cover exactly those keys.",
+
+  "rarities": ["common", "uncommon", "rare"],
+
+  "potions": {
+    "common":   {"sprite": "potion_health_common",   "heal": 15,
+                 "color": [235, 110, 130]},
+    "uncommon": {"sprite": "potion_health_uncommon", "heal": 25,
+                 "color": [240, 140, 110]},
+    "rare":     {"sprite": "potion_health_rare",     "heal": 50,
+                 "color": [255, 175, 90]}
+  },
+
+  "drop_chance": {
+    "_comment": "chance = floor + (cap - floor) * t^exponent, where t is the enemy's BASE hp (data, never the run-time hp_mult) log-normalised between hp_min and hp_max and clamped to 0..1. hp_min/hp_max are the weakest and strongest non-boss enemies. The exponent keeps fodder low so the cap stays meaningful -- without it Husk-class trash sits near 10% and, being most of the kills, would be the whole potion economy.",
+    "floor": 0.01,
+    "cap": 0.25,
+    "exponent": 2.0,
+    "hp_min": 5,
+    "hp_max": 290
+  },
+
+  "enemy_rarity_hp": {
+    "_comment": "Lower bound of each band on the enemy's BASE hp; anything under the `uncommon` bound is common. The rare band is exactly the two `is_elite` enemies -- that is the design rule, and these numbers are only how it is expressed. Each bound sits near the MIDDLE of the hp gap it divides rather than on an enemy: uncommon splits teleporter 36 from charger 55, rare splits summoner 87 from elite 125. Was 40 / 125, where 125 was elite's exact hp -- a trap, because shaving a point off elite in a rebalance would silently drop it to the uncommon band and let it roll common potions, breaking a hard rule with no obvious cause. `test_no_enemy_sits_exactly_on_a_band_edge` now guards that.",
+    "uncommon": 45,
+    "rare": 105
+  },
+
+  "rarity_weights": {
+    "_comment": "enemy rarity -> relative weights over potion rarity, rolled only once a drop has been won. The two zeroes are the user's hard rules: a common enemy never drops a rare potion, a rare enemy never drops a common one.",
+    "common":   {"common": 0.80, "uncommon": 0.20, "rare": 0.00},
+    "uncommon": {"common": 0.45, "uncommon": 0.45, "rare": 0.10},
+    "rare":     {"common": 0.00, "uncommon": 0.55, "rare": 0.45}
+  },
+
+  "pool_size": 64
+}

@@ -14,13 +14,35 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
 SAVE_VERSION = 2      # 2: per-hero `heroes` state (six-weapon system P5)
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "save.json"
+
+# Where a *packaged* build keeps its save instead. `DEFAULT_PATH` resolves next
+# to this module, which is right from the source tree and wrong the moment the
+# game is frozen: PyInstaller sets `__file__` to a path inside the bundle, so
+# the save would land in the install folder -- unwritable under `Program Files`.
+# `main.py` hands this to `Game(save_path=...)` when `sys.frozen` is set; a
+# source run never sees it and still uses `DEFAULT_PATH`.
+APP_DIR_NAME = "DeathliteGame"
+
+
+def user_save_path(app: str = APP_DIR_NAME) -> Path:
+    """Per-user, writable save location for a packaged build.
+
+    `%LOCALAPPDATA%\\<app>\\save.json` on Windows. Falls back to `%APPDATA%`,
+    then to a dot-directory under the home folder -- so the caller always gets a
+    usable path rather than having to handle `None` on a machine (or platform)
+    without those variables. The directory is not created here: `save()` already
+    does that on first write.
+    """
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    root = Path(base) if base else Path.home() / ".local" / "share"
+    return root / app / "save.json"
 
 # Characters available from the very first launch.
 _STARTER_CHARACTERS = ["aegis", "kestrel", "nihil"]
@@ -78,6 +100,21 @@ class SaveData:
         self.hero(cid)["main_weapon"] = str(weapon_id) if weapon_id else None
 
     # --- helpers -------------------------------------------------
+    def beaten_records(self, stats: dict, difficulty: str = "normal") -> list[str]:
+        """Which of this difficulty's records `stats` would beat.
+
+        Must be asked **before** `record_best`, which overwrites the values it
+        compares against -- afterwards every answer is "no". It shares
+        `_RECORD_KEYS` and the comparison with `record_best` on purpose: a run
+        that this reports as a new best is exactly a run that one stores, so a
+        screen can never advertise a record the save did not take.
+        """
+        if difficulty not in _RECORD_DIFFICULTIES:
+            difficulty = "normal"
+        bucket = self.records.get(difficulty, {})
+        return [key for key in _RECORD_KEYS
+                if float(stats.get(key, 0)) > float(bucket.get(key, 0.0))]
+
     def record_best(self, stats: dict, difficulty: str = "normal") -> None:
         if difficulty not in _RECORD_DIFFICULTIES:
             difficulty = "normal"

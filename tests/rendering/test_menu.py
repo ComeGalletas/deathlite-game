@@ -336,9 +336,37 @@ def _select():
     return game, cs
 
 
+class _RecordingFont:
+    """Delegates to the real font, remembering every string rendered through it.
+
+    A wrapper rather than a monkeypatch because `pygame.font.Font` is a C type
+    and will not accept an attribute assignment on the instance.
+    """
+
+    def __init__(self, font):
+        self._font = font
+        self.drawn = []
+
+    def render(self, text, *args, **kwargs):
+        self.drawn.append(text)
+        return self._font.render(text, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._font, name)
+
+
 class CharacterSelectInstructionsTests(unittest.TestCase):
     """The game instructions moved here from the start menu; they render from
     `config.MENU_INSTRUCTIONS` between the difficulty line and the nav hint."""
+
+    def _with_instructions(self, instr, fn):
+        """Run `fn` with MENU_INSTRUCTIONS swapped, always restoring it."""
+        old = config.MENU_INSTRUCTIONS
+        config.MENU_INSTRUCTIONS = instr
+        try:
+            return fn()
+        finally:
+            config.MENU_INSTRUCTIONS = old
 
     def test_instruction_block_renders_below_the_begin_button(self):
         game, cs = _select()
@@ -354,17 +382,63 @@ class CharacterSelectInstructionsTests(unittest.TestCase):
                            "no instruction text under the Begin button")
         self.assertLessEqual(lay["hint_bottom"], config.SCREEN_HEIGHT)   # the hint stays on screen   # hint still fits
 
-    def test_content_comes_from_config(self):
+    # These three replace a single `test_content_comes_from_config`, which
+    # asserted `bottom == 700 + 2 * line_h` -- the implementation's arithmetic,
+    # restated as a literal. It was brittle twice over: correcting the block's
+    # start offset by one pixel turned it red though nothing it claimed to test
+    # had changed, and because the return value is computed purely from
+    # `len(notes)` and the line height, it would have passed just as happily if
+    # the block had rendered the wrong text entirely. Expectations here are
+    # derived from the config each test sets, and geometry is asserted as a
+    # *difference*, so values may change freely without breaking the result.
+
+    def test_the_text_drawn_is_the_text_in_config(self):
+        """What the block *says* comes from config -- no geometry involved."""
         game, cs = _select()
-        old = config.MENU_INSTRUCTIONS
-        config.MENU_INSTRUCTIONS = {"rows": [("Jump", "SPACE")],
-                                    "notes": ["one", "two"]}
+        real = cs._instr
+        recorder = _RecordingFont(real)
+        cs._instr = recorder
+        instr = {"rows": [("Jump", "SPACE"), ("Crouch", "CTRL")],
+                 "notes": ["first note", "second note"]}
         try:
-            bottom = cs._draw_instructions(game.screen, config.SCREEN_WIDTH // 2, 700)
-            # heading line + 2 notes -> bottom is two line-heights below `top`
-            self.assertEqual(bottom, 700 + 2 * cs._instr.get_linesize())
+            self._with_instructions(
+                instr,
+                lambda: cs._draw_instructions(game.screen,
+                                              config.SCREEN_WIDTH // 2, 700))
         finally:
-            config.MENU_INSTRUCTIONS = old
+            cs._instr = real
+
+        drawn = recorder.drawn
+        self.assertEqual(drawn[:len(instr["notes"])], instr["notes"])
+        for label, combo in instr["rows"]:
+            self.assertIn(label, drawn[-1])
+            self.assertIn(combo, drawn[-1])
+
+    def test_each_extra_note_pushes_the_block_down_one_line(self):
+        """The growth rule, asserted as a difference -- so moving the whole
+        block up or down a line is a design change, not a test failure."""
+        game, cs = _select()
+        cx, top = config.SCREEN_WIDTH // 2, 700
+        bottoms = [
+            self._with_instructions(
+                {"rows": [("Jump", "SPACE")],
+                 "notes": [f"note {i}" for i in range(n)]},
+                lambda: cs._draw_instructions(game.screen, cx, top))
+            for n in (1, 2, 3)
+        ]
+        line_h = cs._instr.get_linesize()
+        self.assertEqual([b - a for a, b in zip(bottoms, bottoms[1:])],
+                         [line_h, line_h])
+
+    def test_the_block_never_reports_a_bottom_above_its_own_top(self):
+        """`draw` anchors the nav hint under this return value."""
+        game, cs = _select()
+        top = 700
+        bottom = self._with_instructions(
+            {"rows": [("Jump", "SPACE")], "notes": []},
+            lambda: cs._draw_instructions(game.screen,
+                                          config.SCREEN_WIDTH // 2, top))
+        self.assertGreaterEqual(bottom, top - cs._instr.get_linesize())
 
 
 class CharacterSelectPreviewTests(unittest.TestCase):

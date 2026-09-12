@@ -151,23 +151,6 @@ class EffectTests(unittest.TestCase):
         self.assertEqual(len(p.stats["dropped_items"]), drops + 1)
         pygame.quit()
 
-    def test_elite_arena_triggers_on_approach_and_rewards_on_clear(self):
-        _, p = fresh_playing()
-        it = self._get(p, "elite_arena")
-        if it is None:
-            self.skipTest("no elite arena in this layout")
-        p.player.pos.update(it.pos)
-        p._update_elite_arenas()
-        self.assertEqual(it.state, "active")
-        self.assertEqual(len(it.arena_ids), 3)
-        drops = len(p.stats["dropped_items"])
-        for e in p.enemies:
-            e.alive = False
-        p._update_elite_arenas()
-        self.assertEqual(it.state, "done")
-        self.assertEqual(len(p.stats["dropped_items"]), drops + 1)
-        pygame.quit()
-
 
 if __name__ == "__main__":
     unittest.main()

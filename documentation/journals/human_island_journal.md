@@ -445,3 +445,233 @@ heal, roads that bend onto the street (the forge's row) instead of cutting
 the square, the hall at 3–4 tiles above the heal, and the corral at 0.45
 with the sheep unchanged. Over 43 villages: no clip, 42 heals with company
 on both flanks, every pen and hall in place.
+
+---
+
+## HI-4 — a quarter less island (2026-09-12, owner's request)
+
+**The request.** "Only the size of it, reduce it by 25%, keep every other
+functionality the same." Confirmed as a quarter less *walkable ground*, the
+reading the two earlier cuts used, not a quarter off the `size` number:
+`size` scales the rect on both axes and the coast erosion costs a fixed
+ring, so the literal 0.42 would have taken 56% of the ground and left a
+third of the villages without a hall.
+
+**Size.** `size` 0.56 → **0.51**: walkable mean 250 → 185 tiles (−26.1%),
+0.27 → 0.20 of a volcanic island, rect 26–30 × 16–18 → 24–26 × 14–16.
+Measured over 35 seeds / 52 villages; the even-tile rounding quantises the
+steps, so 0.52 landed at −20% and 0.51 was the closest to the quarter.
+Nothing else about the topography changed: flat, square coast, one bridge a
+side, no lakes, the two meadow sheets.
+
+**What the smaller island cost, and what was given back.** The buildings'
+art does not shrink with the island, so the settlement gets tighter rather
+than smaller. Two searches were too coarse for the new ground and now take
+a second, finer pass *only when the first finds nothing*, so nothing that
+already had a spot moves:
+
+- `_place_pen` (`_V_PEN_SWEEPS`): the fan combs 0.1 rad instead of 0.3 and
+  keeps a quarter tile of ground round the rail instead of half. Pens
+  49/52 → **52/52**. A/B'd against the hand-typed fan it replaces and
+  against the single pass: every pen that already had a spot kept it, to
+  the pixel, and the three it gained are the three that had none.
+- `flank_spot` (`_V_HEAL_FLANK_LAPS`): a wider lattice of flank offsets,
+  still inside `_V_HEAL_NEAR`. The heal's full company 44 → 45 of 52, and
+  no village is left with a bare sanctuary.
+
+**What it cost anyway.** Houses per village 3–4 → 1–4 (44 of 52 still get
+3–4); the heal's full company 51/52 → 45/52; the forge more than 5 tiles
+off the island's centre on 3 of 52 (0 before). All three are the same
+cause: a quarter less ground with the street, the north axis and the coast
+taking the same absolute width as before. Keeping 3–4 houses everywhere
+would mean re-tuning the settlement itself, which this request excluded.
+Tried and rejected: judging the forge's cell on its ring as well as its
+axis (moved the forge 5–7 tiles off centre), a tighter street
+(`_V_STREET_REACH` 3.0: no more houses, worse company), a shallower coast
+margin, a wider house ring, a longer house link.
+
+**Tests.** Two "every village" assertions were holding on the four pinned
+seeds by luck -- the heal's full company was already failing elsewhere at
+0.56 -- so the owner asked for tests that measure the generation rather
+than tests the generation has to satisfy. New module
+`tests/world/test_village_quality.py`: fifteen shared worlds (the pinned
+seeds plus the repair suite's twelve, so the sweep costs nothing in a full
+run), twenty-three villages, split into what every village gets and what
+the ground can refuse. Always: a forge within six tiles of the island's
+centre, the heal due north on its x, a hall, a pen, a military building, a
+house, a companion; the island 110-280 walkable tiles, flat, under 0.35 of
+the smallest volcanic island and at least a third of its own rect.
+Measured: 145-222 tiles, 0.16-0.26 of volcanic, fill 0.41-0.57, three or
+four houses on 20 of 23 and the full company on 20 of 23 -- both asserted
+as a rate of at least three in four. `test_the_heal_has_company` keeps the
+floor and the both-flanks shape; `test_village_is_about_half_a_volcanic_island`
+is now `..._is_smaller_than_any_volcanic_island`, since the ratio it named
+has been wrong since HI-3 and the band lives in the new module. The bridge
+test's "no over-cap bridge had a shorter lane" became the seating's own
+measured rate (three of seventy-four over-cap bridges at 0.56, three of
+seventy-three at 0.51: unchanged by this work, and its probe re-seats a
+link in an empty world, so it never sees the gap the real pick has to
+keep). Digests re-pinned.
+
+Screenshots: `village_before_0.56.png`, `village_after_0.51.png` (seed 42,
+the same island) and `village_after_seed2.png` (scratch, sent to the owner).
+
+---
+
+## A row of three to five houses (2026-09-12, owner's request)
+
+"Try placing 3-5 houses this time, it's fine if they get close together as
+long as they don't disrupt the main heal area, forge and monastery." So the
+row grew and the spacing between *houses only* went:
+
+- `_V_HOUSES` 3-4 → **3-5**.
+- `_V_HOUSE_GAP` (0 px): two houses may stand on adjacent tile centres, 64
+  px apart, which still clears their 31 px colliders by 2 px -- nothing
+  overlaps, they just touch. Every other pairing keeps `_V_GAP`.
+- House art may paint over house art: `_Site.art_ok` and the tidy pass's
+  `_unclip_buildings` skip that one pairing. Only that one. The forge, the
+  heal and the hall keep their protected boxes, and the tidy pass still
+  moves or removes anything -- house included -- that crosses them.
+- `_fill_beside`: the houses the ring cannot seat go on a tile centre next
+  to one it did, nearest the forge first, so the row closes up toward the
+  middle. It runs **after the pen** has taken its ground: a village has one
+  corral and may have five houses, and placing the houses first cost one
+  village in fifty-two its pen.
+
+Measured over 35 seeds / 52 villages: houses 1-5, **47 of 52 with three or
+more and 36 with four or five** (before this: 3-4 always at `size` 0.56, and
+1-4 with 44 of 52 at three or more once the island shrank). The heal's
+company rose with it -- 46 of 52 have the full pair and seven of those have
+three or four, since the crowding row gathers round the square. Hall 52/52,
+pen 52/52. Verified over the same sweep: nothing paints over the forge, the
+heal or the hall; no pairing but house-to-house paints over another
+building; no two colliders overlap.
+
+Tests: `test_no_building_paints_over_another` skips the house-to-house
+pairing and says why; the rates in `test_village_quality.py` were
+re-measured (20 of 23 villages at three or more, 16 of 23 at four or five).
+Digests re-pinned.
+
+Screenshots: `village_houses_seed42.png`, `village_houses_seed1234.png`
+(scratch, sent to the owner) -- the second is the island that used to seat
+a single house.
+
+---
+
+## A second decoration sweep, to fill out the island (2026-09-12, owner's request)
+
+"After the buildings and facilities are placed do another decoration and
+tree placement sweep to fill out the remaining empty spaces, not too much
+but enough to fill out the outsides of the island."
+
+`_fill_scatter` (`world/gen/village.py`), run straight after the first
+scatter and before the tidy pass, so anything it puts too near the square
+is judged with the rest. Three things make it different from the scatter it
+follows:
+
+- **It sweeps, it does not throw darts.** The first scatter takes
+  `cells * per_1000 * _V_SCATTER_SCALE / 1000` random shots at the island,
+  so coverage is luck and the shore comes out half bare. This walks every
+  walkable cell in order and offers the empty ones a prop.
+- **It knows where the outside is.** `_edge_distance` is a breadth-first
+  walk in from the coast: 1 on the shore, then inward. A cell within
+  `_V_FILL_BAND` (3) tiles of the shore takes `_V_FILL_CHANCE` (0.5), one
+  further in `_V_FILL_INNER` (0.3) of that. A radius from the middle would
+  not do -- on a ragged island the middle is not where the coast is.
+- **It keeps the square, not the cluster.** `_V_FILL_SQUARE` (4 tiles round
+  the forge) instead of the first scatter's `_V_CLUSTER_RADIUS` (5.5). The
+  cluster radius is a circle round the forge but the buildings are not: on a
+  ragged island they all end up on one side and the lawn on the other is
+  inside the circle with nothing in it, which is exactly the empty space
+  this was asked to fill. Every prop still keeps `_V_FILL_GAP` (52 px) from
+  every building and every other prop, which is what keeps it a meadow and
+  not a wood.
+
+`shrub` is dropped from the mix *before* the weighted draw rather than after
+it -- it is decoration, not an obstacle, and it is a third of the meadow's
+weight, so a one-visit-per-cell sweep would otherwise spend a third of its
+cells on nothing.
+
+Measured over 35 seeds / 52 villages: props a village 5.1 → **12.4**
+(min 3, max 24), of which trees 211 → 523; props standing in the three-tile
+shore band 247 → **618**; island cells with nothing within a tile 90% →
+78%. The settlement's own ground is untouched.
+
+Tests: `test_the_ring_is_compact_and_the_props_stay_outside_it` became
+`..._stay_off_the_square` -- the cluster radius is no longer the prop rule,
+so it now asserts the square (`_V_FILL_SQUARE`) and, in its place, the
+spacing that does still hold for every prop on the island: its own radius
+plus the building's plus `_V_SCATTER_GAP`, which is the stricter thing the
+old assertion never checked. Digests re-pinned.
+
+Screenshots: `village_fill_seed2.png`, `village_fill_seed42.png`,
+`village_fill_seed1234.png`, `village_fill_seed7.png` (scratch, sent to the
+owner).
+
+---
+
+## Four more trees a village (2026-09-12, owner's request)
+
+"Increase the amount of trees by an average of 4 more." Trees a village
+**10.1 → 13.9** over 35 seeds / 52 villages (total 523 → 724), from two
+changes that both keep the grove a grove:
+
+- **`_V_TREE_GAP` (40 px):** trees, and only trees, have their own spacing
+  now -- 15 px trunk + 15 px trunk + 40 = 70 px between centres, the figure
+  the world scatter settled on (`_TREE_TREE_GAP_GRID`), where a canopy's
+  near edge sits inside its neighbour by about a third. The first scatter
+  already asked exactly this (`_V_SCATTER_GAP` is 40), so nothing changes
+  there; it is the fill sweep, which asks 52 px of everything, that can now
+  let two trees stand closer than it lets a tree stand to a rock.
+- **`_grow_trees` (`_V_TREE_TOPUP` = 4):** four more trees a village, each
+  grown beside one already standing, at the world scatter's own thicket
+  offsets (`_TREE_THICKET_MIN_GRID`..`_MAX_GRID`). Raising the fill sweep's
+  chance instead would have sprinkled four lone trunks over the lawn; this
+  deepens the groves the island already has. Same guards as the sweep it
+  follows: the square, the pen, the roads, the bridge mouths, the coast pad
+  and the three protected boxes.
+
+Props a village 12.4 → 16.1, island cells with nothing within a tile 78% →
+74%.
+
+Note for later: a tree may still stand with its canopy over a house, which
+is the rule the village has had since HI-2 ("a prop may stand before or
+behind a house -- that is a tree by a house") and is not new here; with
+more trees it simply happens more often. If it should stop, the change is
+to make `art_ok` treat a building's painted box as blocking for trees, or
+to give trees a wider gap from buildings than from each other.
+
+Screenshots: `village_trees_seed2.png`, `village_trees_seed42.png`
+(scratch, sent to the owner).
+
+---
+
+## Denser clutter on the village island (2026-09-12, owner's request)
+
+"Increase the density of the decorations as well, keep the center (heal
+area) clean but fill out the edges around 35% more."
+
+The decorations are the bake's own non-colliding clutter -- the pebbles,
+bushes, mushrooms and pumpkins of `data/terrain.json` `decorations` -- not
+the obstacle scatter the last two entries were about. They are budgeted per
+terrace by the biome's `decor.per_1000`, and a village island already blanks
+a disc of `Village.radius` (5.5 tiles, `_V_CLUSTER_RADIUS`) round the forge:
+the centre the owner asked to keep clean was already clean, so the whole
+increase lands where it was wanted, on the ground between the buildings and
+the shore.
+
+`decor_placement.village_boost` (**1.4**) in `data/terrain.json`, applied to
+the tier scales in `world/terrain/decor/scatter_room.py` for a village room
+only. It is a data value, not a constant in code, because every other decor
+rate in this system is.
+
+Measured over eight seeds: clutter on a village island 32.9 → **45.0** props
+(190.7 → 260.5 per thousand cells), **+36.8%**; every other island
+unchanged at 134.2 (164.4 per thousand). The boost is 1.4 rather than 1.35
+because the placement retries eat some of it: 1.35 measured +30%, 1.42 +40%.
+
+Digests re-pinned (clutter is part of the bake, so the bake and draw digests
+move with it).
+
+Screenshots: `village_decor_seed2.png`, `village_decor_seed42.png` (scratch,
+sent to the owner).

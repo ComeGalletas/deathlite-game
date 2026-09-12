@@ -131,7 +131,8 @@ class Weapon:
     bonus: dict = field(default_factory=lambda: {
         "damage": 0.0, "cooldown_mult": 1.0, "projectile_count": 0, "area": 0.0,
         "pierce": 0, "crit_chance": 0.0, "weight": 0.0, "stun_chance": 0.0,
-        "stun_duration": 0.0, "blast_radius": 0.0, "aim_assist_deg": 0.0,
+        "stun_duration": 0.0, "blast_radius": 0.0, "blast_radius_mult": 1.0,
+        "aim_assist_deg": 0.0,
         "chain_count": 0, "chain_range": 0.0, "cone_half_angle": 0.0,
         "summon_lifetime": 0.0,
     })
@@ -150,6 +151,9 @@ class Weapon:
     _orbiters: list = field(default_factory=list, init=False)
     _orbit_count: int = field(default=0, init=False)
     _summons: list = field(default_factory=list, init=False)
+    # Seconds left before another summon may be planted after one left the
+    # field (`summon_replant_delay`, scaled by the weapon's cooldown bonus).
+    _replant_t: float = field(default=0.0, init=False)
 
     def __post_init__(self) -> None:
         if self.definition.get("category") not in CATEGORIES:
@@ -270,6 +274,21 @@ class Weapon:
     def _area(self, area_multiplier: float) -> float:
         return (float(self.definition["area"]) + self.bonus["area"]) * area_multiplier
 
+    def _blast_radius(self, area_multiplier: float) -> float:
+        """Radius of the Bomb's detonation -- damage circle and, through
+        `TransientFx.burst_visual`, the explosion art drawn over it.
+
+        Bound to the area system the way `_reach` is (2026-09-12): the data's
+        `blast_radius` plus the flat `bonus["blast_radius"]` and the same
+        `bonus["area"]` every other size bonus feeds, all scaled by the hero's
+        `area_multiplier` and then by `bonus["blast_radius_mult"]`. Before
+        this the blast read its data field alone, so an `of Expanse` affix
+        widened every weapon's area and every reach ring while leaving the one
+        weapon that *is* an area untouched."""
+        base = (float(self.definition["blast_radius"])
+                + self.bonus["blast_radius"] + self.bonus["area"])
+        return max(0.0, base * area_multiplier * self.bonus["blast_radius_mult"])
+
     def _reach(self, area_multiplier: float) -> float:
         """Radius of the reach ring (CB-2). Melee tracks the tip of its own cone
         (`_area`); every other category uses an explicit `reach` field. Both
@@ -367,12 +386,24 @@ class Weapon:
 
     # --- summon --------------------------------------------
     def _maintain_summons(self, dt: float, ctx: FireContext) -> None:
-        self._summons = [s for s in self._summons if getattr(s, "active", False)]
-        self._cd -= dt
-        max_count = self._projectile_count(ctx)
-        if self._cd > 0.0 or len(self._summons) >= max_count:
-            return
         d = self.definition
+        live = [s for s in self._summons if getattr(s, "active", False)]
+        if self._summons and not live:
+            # The field just **emptied** -- the owner's rule is about the
+            # field, not about one summon: "no totem on the field for 5 s
+            # between the spawns" (2026-09-12). With more than one slot
+            # (Twin Totems) the gap therefore starts when the last one
+            # leaves, not when the first does. `summon_replant_delay` is
+            # shortened by the same cooldown bonus Quick Plant applies to
+            # the weapon's own cooldown.
+            gap = float(d["summon_replant_delay"]) * self.bonus["cooldown_mult"]
+            self._replant_t = max(self._replant_t, gap)
+        self._summons = live
+        self._cd -= dt
+        self._replant_t = max(0.0, self._replant_t - dt)
+        max_count = self._projectile_count(ctx)
+        if self._cd > 0.0 or self._replant_t > 0.0 or len(self._summons) >= max_count:
+            return
         # CB-2: the summon gets a leash ring centred on the hero -- it only
         # targets enemies inside it and idles when it is empty.
         reach = float(d["summon_reach"])

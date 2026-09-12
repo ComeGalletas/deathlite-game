@@ -13,8 +13,10 @@ village is laid out and makes three promises the placement cannot:
    theirs is relocated by the same rules it was placed by (`_Site.fits`,
    which since this pass also keeps art clear of art) and, if it fits
    nowhere, removed -- satellites with it.
-2. **No building paints over another.** The later-placed one moves; the
-   one that will not move goes.
+2. **No building paints over another**, except that two houses may paint
+   over each other (the owner's call, 2026-09-12: the row may close up on a
+   small island). The later-placed one moves; the one that will not move
+   goes.
 3. **The heal has company.** At least `_V_HEAL_COMPANY` buildings besides
    the forge and the hall stand within `_V_HEAL_NEAR` tiles of it, on the
    flank slots `_V_HEAL_FLANK` tiles east and west of it, so the sanctuary
@@ -41,7 +43,7 @@ import math
 import pygame
 
 from world.gen.tuning import (
-    _V_CLUSTER_MAX, _V_HEAL_COMPANY, _V_HEAL_FLANK, _V_HEAL_NEAR,
+    _V_CLUSTER_MAX, _V_HEAL_COMPANY, _V_HEAL_FLANK_LAPS, _V_HEAL_NEAR,
     _V_HOUSE_LINK, _V_MILITARY_REACH, _V_RING,
 )
 
@@ -99,6 +101,8 @@ def _unclip_buildings(site, mouths, report) -> None:
             for b in prims[i + 1:]:
                 if b not in site.placed or a not in site.placed:
                     continue
+                if a.kind == "house" and b.kind == "house":
+                    continue            # houses may crowd: owner, 2026-09-12
                 if not clips(site.art_of(a), site.art_of(b), site.art_tol):
                     continue
                 victim = b if (a.kind in KEY or b.kind not in KEY) else a
@@ -191,19 +195,22 @@ def _repen(site, back, report) -> None:
 # --- 3. the heal has company ------------------------------------------------
 def flank_spot(site, heal, side: int, ok=None):
     """A tile centre for a house on the `side` (+1 east, -1 west) of the
-    heal: `_V_HEAL_FLANK` tiles out, nearest first, level with the heal or
-    half a tile to a tile off, that `fits` -- roads, art and all -- and
-    passes `ok(x, y)` when given. `None` when the flank has no room. The
-    layout pass seats the square with this and the tidy pass fills it."""
+    heal: out along the flank, nearest first, level with the heal or a tile
+    or two off, that `fits` -- roads, art and all -- and passes `ok(x, y)`
+    when given. `None` when the flank has no room. The laps of
+    `_V_HEAL_FLANK_LAPS` are tried in turn, the wider one only once the
+    square's own lattice has come up empty. The layout pass seats the
+    square with this and the tidy pass fills it."""
     px = site.px
     heal = pygame.Vector2(heal)
-    for dx in _V_HEAL_FLANK:
-        for dy in (0.0, 1.0, -1.0):
-            x, y = site.snap(heal.x + side * dx * px, heal.y + dy * px)
-            if pygame.Vector2(x, y).distance_to(heal) > _V_HEAL_NEAR * px:
-                continue
-            if site.fits("house", x, y, lane=True) and (ok is None or ok(x, y)):
-                return (x, y)
+    for dxs, dys in _V_HEAL_FLANK_LAPS:
+        for dx in dxs:
+            for dy in dys:
+                x, y = site.snap(heal.x + side * dx * px, heal.y + dy * px)
+                if pygame.Vector2(x, y).distance_to(heal) > _V_HEAL_NEAR * px:
+                    continue
+                if site.fits("house", x, y, lane=True) and (ok is None or ok(x, y)):
+                    return (x, y)
     return None
 
 

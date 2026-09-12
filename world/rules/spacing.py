@@ -1,8 +1,14 @@
 """Spatial hash for placement tests.
 
-Its own module because it is pure geometry with no knowledge of props, rigs or
-terrain -- the room scatter uses it for prop separation and for obstacle
-clearance, with different query conventions each time.
+Pure geometry, with no knowledge of props, rigs, terrain or generation, which
+is why it sits in `world/rules/` and not beside any one of its callers: the
+decor scatter uses it for prop separation and for obstacle clearance, and the
+spawn-point stage uses it to keep points off obstacles.
+
+Callers want two different questions answered, so there are two queries --
+`blocked` takes the larger of the two separations, `within` adds them. Both
+walk the same nine buckets; the difference is only in what "too close" means
+to that caller, and each is documented where it is defined.
 """
 from __future__ import annotations
 
@@ -45,3 +51,23 @@ class _Neighbourhood:
                     if (x - ox) ** 2 + (y - oy) ** 2 < d * d:
                         return True
         return False
+
+    def within(self, x: float, y: float, extra: float) -> bool:
+        """Is anything stored closer than *its own* separation plus `extra`?
+
+        The sum, not the larger: an obstacle keeps a spawn point its own
+        radius plus the point's body radius plus a gap away, and no single
+        number expresses that. Store `radius + gap` and query with the body
+        radius. `cell` must then be at least the largest such *sum* any query
+        can produce -- the widest stored separation plus the widest `extra` --
+        or a rejecting neighbour could sit outside the nine cells searched.
+        """
+        cx, cy = int(x // self.cell), int(y // self.cell)
+        for bx in (cx - 1, cx, cx + 1):
+            for by in (cy - 1, cy, cy + 1):
+                for ox, oy, og in self.buckets.get((bx, by), ()):
+                    d = og + extra
+                    if (x - ox) ** 2 + (y - oy) ** 2 < d * d:
+                        return True
+        return False
+

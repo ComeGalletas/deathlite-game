@@ -86,6 +86,88 @@ class TotemWeaponTests(unittest.TestCase):
         self.assertEqual(len(pool.made), 1)           # weapon never summoned a second
 
 
+class TotemReplantTests(unittest.TestCase):
+    """The owner's rule (2026-09-12) is about the **field**: no totem on it
+    for `summon_replant_delay` seconds between the spawns -- 5 s in the data,
+    shortened by the totem's own cooldown bonus (Quick Plant).
+
+    Three things conspire to make that need its own rule. The life is 8 s and
+    the weapon's cooldown only 6 s, so a slot freed by an expiry used to be
+    refilled on the very next frame; at a 3 s gap the weapon's cooldown was
+    still the binding constraint (a measured 4.0 s between a departure and
+    the next plant); and with more than one slot a departure does not empty
+    the field, so the gap waits for the last totem to go."""
+
+    def _planted(self, w, pool, shots, seconds, dt=1 / 60):
+        before = len(pool.made)
+        for _ in range(int(round(seconds / dt))):
+            w.update(dt, fire_ctx(pool, shots))
+        return len(pool.made) - before
+
+    def _one_up_and_expired(self, w, pool, shots):
+        """Plant the totem, run the cooldown out, then expire it."""
+        w.update(1 / 60, fire_ctx(pool, shots))
+        self.assertEqual(len(pool.made), 1)
+        self._planted(w, pool, shots, 7.0)              # cooldown (6 s) long gone
+        self.assertEqual(len(pool.made), 1)
+        pool.made[0].active = False                     # it leaves
+
+    def test_the_data_carries_the_delay(self):
+        self.assertEqual(get_content().weapon("grave_totem")["summon_replant_delay"], 5.0)
+        self.assertEqual(get_content().weapon("spirit_wolf")["summon_replant_delay"], 0.0)
+
+    def test_one_totem_stands_at_a_time_and_twin_totems_makes_it_two(self):
+        """The base count was 2 from the first prototype, which made the
+        Twin Totems blessing ("+1 more totems can stand at once") give
+        *three* at its first level and contradict its own name -- and left
+        the field never empty, since two 8 s lives planted 6 s apart always
+        overlap. One is the base; the blessing adds to it."""
+        self.assertEqual(get_content().weapon("grave_totem")["projectile_count"], 1)
+        w = Weapon("grave_totem", get_content().weapon("grave_totem"))
+        self.assertEqual(w._projectile_count(), 1)
+        w.bonus["projectile_count"] = 1                 # Twin Totems I
+        self.assertEqual(w._projectile_count(), 2)
+
+    def test_no_replant_for_five_seconds_after_a_totem_leaves(self):
+        w = Weapon("grave_totem", get_content().weapon("grave_totem"))
+        pool, shots = SummonPool(), []
+        self._one_up_and_expired(w, pool, shots)
+        self.assertEqual(self._planted(w, pool, shots, 4.9), 0)
+        self.assertEqual(self._planted(w, pool, shots, 0.2), 1)
+
+    def test_quick_plant_shortens_the_gap(self):
+        w = Weapon("grave_totem", get_content().weapon("grave_totem"))
+        w.bonus["cooldown_mult"] = 0.5                  # Quick Plant V -> 2.5 s
+        pool, shots = SummonPool(), []
+        self._one_up_and_expired(w, pool, shots)
+        self.assertEqual(self._planted(w, pool, shots, 2.4), 0)
+        self.assertEqual(self._planted(w, pool, shots, 0.2), 1)
+
+    def test_with_two_slots_the_gap_waits_for_the_field_to_empty(self):
+        """Twin Totems. One of two leaving does not open the gap -- the
+        field still has a totem on it, and the freed slot refills on the
+        weapon's own cooldown. Only the last one leaving starts the 5 s."""
+        w = Weapon("grave_totem", get_content().weapon("grave_totem"))
+        w.bonus["projectile_count"] = 1                 # Twin Totems -> two slots
+        pool, shots = SummonPool(), []
+        self._planted(w, pool, shots, 7.0)              # planted at 0 s and 6 s
+        self.assertEqual(len(pool.made), 2)
+        pool.made[0].active = False                     # one of the two goes
+        self.assertEqual(self._planted(w, pool, shots, 5.1), 1,
+                         "the freed slot waited although a totem was still up")
+        for made in pool.made:                          # now empty the field
+            made.active = False
+        w._cd = 0.0                                     # isolate the gap from the cooldown
+        self.assertEqual(self._planted(w, pool, shots, 4.9), 0)
+        self.assertGreaterEqual(self._planted(w, pool, shots, 0.2), 1)
+
+    def test_the_gap_does_not_delay_the_first_plant(self):
+        w = Weapon("grave_totem", get_content().weapon("grave_totem"))
+        pool, shots = SummonPool(), []
+        w.update(1 / 60, fire_ctx(pool, shots))
+        self.assertEqual(len(pool.made), 1)
+
+
 class SummonBehaviourTests(unittest.TestCase):
     def _ctx(self, shots, enemies, player=(0, 0)):
         from types import SimpleNamespace

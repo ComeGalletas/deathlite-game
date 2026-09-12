@@ -5,4 +5,4 @@ set -e
 cd "$(dirname "$0")"
 PY="${PYTHON:-../.venv/Scripts/python.exe}"
 [ -x "$PY" ] || PY="${PYTHON:-python}"
-exec "$PY" -m pygbag --build --ume_block 0 --title "Death Lite Die" ../main.py
+exec "$PY" -m pygbag --build --ume_block 0 --title "Deathlite Game" ../main.py

@@ -22,15 +22,16 @@ from tests import worlds as W
 from tests.aictx import ai_ctx
 
 SEED = W.SEEDS[0]
+# Named, not `next(iter(bosses))`: there is a boss pool now and not every boss
+# in it flies -- The Tusked Lance walks. Every assertion here is about the bat.
+BOSS_ID = "the_first_hunger"
 
 
 def _boss(flying=True):
-    c = get_content()
-    bid = next(iter(c.bosses))
-    cfg = dict(c.boss(bid))
+    cfg = dict(get_content().boss(BOSS_ID))
     if not flying:
         cfg["tags"] = tuple(t for t in cfg.get("tags", ()) if t != "flying")
-    return Boss(bid, cfg, 0.0, 0.0)
+    return Boss(BOSS_ID, cfg, 0.0, 0.0)
 
 
 def _mite_cfg(flying=True) -> dict:
@@ -46,8 +47,7 @@ def _mite(flying=True):
 
 class TagTests(unittest.TestCase):
     def test_the_shipped_boss_flies(self):
-        c = get_content()
-        cfg = c.boss(next(iter(c.bosses)))
+        cfg = get_content().boss(BOSS_ID)
         self.assertIn("flying", cfg["tags"])
         self.assertEqual(cfg["sprite"], "giant_bat")     # the reason it flies
         self.assertTrue(_boss().flying)
@@ -59,7 +59,7 @@ class TagTests(unittest.TestCase):
         """The boss's `summon_brood` drops `swarm`; a walker dropped where
         the bat hovers over a cliff face is a walker in a wall."""
         c = get_content()
-        boss = c.boss(next(iter(c.bosses)))
+        boss = c.boss(BOSS_ID)
         brood = next(p for p in boss["patterns"] if p["id"] == "summon_brood")
         self.assertEqual(brood.get("summon_id", "swarm"), "swarm")
         self.assertIn("flying", c.enemy("swarm")["tags"])

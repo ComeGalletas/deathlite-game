@@ -160,6 +160,12 @@ class SpawnTables:
                 bad.append(f"`{section}` must be an object")
                 continue
             for key, v in sec.items():
+                # `_`-prefixed keys are comments, the convention the rest of
+                # the data uses (`game/content.py` skips them everywhere, and
+                # `potions.json` documents its bands that way). Without this a
+                # note written beside a tuning value fails content load.
+                if key.startswith("_"):
+                    continue
                 if not (isinstance(v, (int, float)) and v >= 0):
                     bad.append(f"{section}: `{key}` must be a number >= 0")
         pc = data.get("pacing", {})

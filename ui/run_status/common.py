@@ -17,7 +17,11 @@ RIBBON_H = 48
 TITLE_DY = -5          # ribbon labels sit above the art's geometric centre (owner, 2026-09-12)
 _PANEL_FILL = (10, 8, 14, 215)
 _RULE = config.COLOR_WORLD_BORDER
-_TAB_SHADE = (0, 0, 0, 120)
+# An inactive tab is the ribbon art multiplied down to this fraction of its
+# colour -- the same darkening a 120/255 black wash gives, but applied to
+# the ribbon's own pixels only, so the shade traces the forked shape rather
+# than boxing it (owner, 2026-09-12). Alpha is left alone (255 in the tuple).
+_TAB_SHADE_MULT = (135, 135, 135, 255)
 
 # Rarity colours legible on the dark ground (the config ones are inks for the
 # light button art).
@@ -29,8 +33,10 @@ RARITY_ON_DARK = {"common": config.COLOR_TEXT, "uncommon": (130, 225, 150),
 #   flat  -- a flat amount shown with its sign
 #   pct   -- a fraction shown as a percentage (chances, +gain fractions)
 #   mult  -- a multiplier shown as x1.25
+#   regen -- HP per tick, printed with the cadence: `1 / 5s` (CB-7)
 STAT_ROWS = (
     ("max_hp", "Max HP", "num"),
+    ("hp_regen", "HP regen", "regen"),
     ("move_speed", "Move speed", "num"),
     ("armor", "Armor", "num"),
     ("damage_multiplier", "Damage", "mult"),
@@ -64,6 +70,8 @@ def fmt_stat(stat: str, value: float) -> str:
         return f"{value * 100:.0f}%"
     if kind == "pctplus":
         return f"{value * 100:+.0f}%"
+    if kind == "regen":
+        return f"{value:g} / {config.HP_REGEN_INTERVAL:g}s"
     return f"{value:g}"
 
 
@@ -127,16 +135,27 @@ def draw_tabs(surface, assets, rect: pygame.Rect, labels, active: int,
     rects = []
     for i, label in enumerate(labels):
         r = pygame.Rect(x + i * (w + gap), rect.top - RIBBON_H // 2 + 8, w, RIBBON_H)
-        widgets.draw_ribbon(surface, assets, r, None, colour=colours[i % 3])
-        text = font.render(label, True, config.COLOR_ON_BUTTON)
-        surface.blit(text, text.get_rect(center=(r.centerx, r.centery + TITLE_DY)))
-        if i != active:
-            shade = pygame.Surface(r.size, pygame.SRCALPHA)
-            shade.fill(_TAB_SHADE)
-            surface.blit(shade, r.topleft)
+        surface.blit(tab_surface(assets, r.size, label, colours[i % 3], font,
+                                 active=(i == active)), r.topleft)
         hits.add(r, ("tab", i))
         rects.append(r)
     return rects
+
+
+def tab_surface(assets, size, label: str, colour: str, font, *, active: bool) -> pygame.Surface:
+    """One ribbon tab on its own transparent layer: the art (or the flat
+    fallback), the label, and -- for an inactive tab -- the whole layer's
+    colour multiplied down. Because the multiply keeps each pixel's alpha,
+    the transparent surround of the forked ends stays transparent and the
+    shade is exactly the ribbon's shape."""
+    layer = pygame.Surface(size, pygame.SRCALPHA)
+    r = layer.get_rect()
+    widgets.draw_ribbon(layer, assets, r, None, colour=colour)
+    text = font.render(label, True, config.COLOR_ON_BUTTON)
+    layer.blit(text, text.get_rect(center=(r.centerx, r.centery + TITLE_DY)))
+    if not active:
+        layer.fill(_TAB_SHADE_MULT, special_flags=pygame.BLEND_RGBA_MULT)
+    return layer
 
 
 # --- rows ------------------------------------------------------------------

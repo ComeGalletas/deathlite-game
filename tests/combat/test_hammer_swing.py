@@ -67,12 +67,20 @@ class DataTests(unittest.TestCase):
         self.assertEqual(H["impact_rig"], "hammer_impact")
 
     def test_the_impact_rig_matches_the_sheet(self):
+        """The rig's frame count is the strip's, and the cells are square.
+
+        Asserted as a relationship rather than as `frames == 5` and
+        `size == (400, 80)`: re-cutting the sheet is an art change, and the
+        claim worth keeping is that the data still agrees with the file.
+        """
         rig = C.sprites["hammer_impact"]
-        self.assertEqual(rig["anims"]["loop"]["frames"], 5)
         self.assertFalse(rig["anims"]["loop"]["loop"])
         path = os.path.join(os.path.dirname(__file__), "..", "..", "assets",
                             rig["anims"]["loop"]["file"])
-        self.assertEqual(pygame.image.load(path).get_size(), (400, 80))
+        w, h = pygame.image.load(path).get_size()
+        self.assertEqual(list(rig["frame"]), [h, h], "the cells are not square")
+        self.assertEqual(rig["anims"]["loop"]["frames"], w // h,
+                         "the rig's frame count is not the strip's")
 
     def test_the_impact_crop_is_the_splashs_bounding_box(self):
         """The rig's `content` crops the 80 x 80 cell to the art over all
@@ -84,9 +92,11 @@ class DataTests(unittest.TestCase):
         if pygame.display.get_surface() is None:
             pygame.display.set_mode((1, 1))
         sheet = pygame.image.load(path).convert_alpha()
+        cell = rig["frame"][0]
         union = None
-        for i in range(5):
-            r = sheet.subsurface(pygame.Rect(i * 80, 0, 80, 80)).get_bounding_rect(min_alpha=16)
+        for i in range(rig["anims"]["loop"]["frames"]):
+            r = sheet.subsurface(
+                pygame.Rect(i * cell, 0, cell, cell)).get_bounding_rect(min_alpha=16)
             union = r if union is None else union.union(r)
         self.assertEqual(list(rig["content"]), list(union))
         # The anchor sits 8 crop px below the centre: the splash is drawn
@@ -110,10 +120,16 @@ class DataTests(unittest.TestCase):
     def test_the_impact_is_drawn_a_quarter_wider_than_the_circle_with_the_crops_aspect(self):
         from game.assets import get_assets
         rig = C.sprites["hammer_impact"]
-        self.assertAlmostEqual(rig["over_circle"], 1.25)       # owner: "about 25 % bigger"
-        w, h = slam_fx.impact_size(get_assets(), "hammer_impact", 52, 1.0)
-        self.assertEqual(w, 130)
-        self.assertEqual(h, round(130 * 66 / 75))
+        # This one stays a literal: it is the owner's decision, not tuning
+        # that drifts ("about 25 % bigger").
+        self.assertAlmostEqual(rig["over_circle"], 1.25)
+        # The size itself is derived from the rig, so re-cropping the sheet or
+        # retuning the overhang does not fail a test about the *rule*.
+        radius = 52
+        _cx, _cy, crop_w, crop_h = rig["content"]
+        w, h = slam_fx.impact_size(get_assets(), "hammer_impact", radius, 1.0)
+        self.assertEqual(w, round(radius * 2 * rig["over_circle"]))
+        self.assertEqual(h, round(w * crop_h / crop_w))
         w2, h2 = slam_fx.impact_size(get_assets(), "hammer_impact", 52, 0.5)
         self.assertEqual((w2, h2), (65, round(65 * 66 / 75)))
 

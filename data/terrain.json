@@ -147,7 +147,8 @@
   "decor_placement": {
     "edge_inset": 8,
     "uphill_keepback": 1.0,
-    "centre_clear": 176
+    "centre_clear": 176,
+    "village_boost": 1.4
   },
   "frontier": {
     "body_inset": 8
@@ -789,12 +790,11 @@
       ],
       "note": "bright yellow-green",
       "scatter": {
-        "per_1000": 85,
+        "per_1000": 58,
         "weights": {
           "tree": 5,
           "rock": 2,
           "pillar": 1,
-          "shrub": 4,
           "sign": 0.4,
           "scarecrow": 0.35
         }
@@ -819,12 +819,11 @@
       ],
       "note": "deeper green",
       "scatter": {
-        "per_1000": 100,
+        "per_1000": 70,
         "weights": {
           "tree": 7,
           "rock": 1,
           "pillar": 1,
-          "shrub": 4,
           "sign": 0.4
         }
       },
@@ -849,12 +848,11 @@
       ],
       "note": "olive, worn",
       "scatter": {
-        "per_1000": 80,
+        "per_1000": 61,
         "weights": {
           "tree": 4,
           "rock": 3,
           "pillar": 2,
-          "shrub": 3,
           "sign": 0.4,
           "scarecrow": 0.35
         }
@@ -879,12 +877,11 @@
       ],
       "note": "teal-green, damp",
       "scatter": {
-        "per_1000": 75,
+        "per_1000": 56,
         "weights": {
           "tree": 3,
           "rock": 4,
-          "pillar": 2,
-          "shrub": 3
+          "pillar": 2
         }
       },
       "decor": {
@@ -908,12 +905,11 @@
       ],
       "note": "pale blue-grey stone",
       "scatter": {
-        "per_1000": 140,
+        "per_1000": 128,
         "weights": {
           "tree": 0.3,
           "rock": 6,
-          "pillar": 4,
-          "shrub": 1
+          "pillar": 4
         }
       },
       "decor": {
@@ -937,12 +933,11 @@
       ],
       "note": "pale yellow",
       "scatter": {
-        "per_1000": 45,
+        "per_1000": 37,
         "weights": {
           "tree": 0.3,
           "rock": 3,
-          "pillar": 1,
-          "shrub": 1
+          "pillar": 1
         }
       },
       "decor": {

@@ -200,3 +200,59 @@ class HeroStateTests(unittest.TestCase):
         self.assertNotIn("aegis", back.heroes)
         self.assertTrue(back.hero_cleared("nihil"))
         self.assertEqual(back.main_weapon("nihil"), "5")
+
+class BeatenRecordsTests(unittest.TestCase):
+    """`beaten_records`: what a run would set, asked before it sets it."""
+
+    def _run(self, **kw):
+        base = {"time": 100.0, "level": 5, "kills": 50, "damage_dealt": 1000.0}
+        base.update(kw)
+        return base
+
+    def test_every_key_is_a_record_on_a_fresh_save(self):
+        d = SaveData()
+        self.assertEqual(sorted(d.beaten_records(self._run())),
+                         ["damage_dealt", "kills", "level", "time"])
+
+    def test_nothing_is_a_record_once_the_run_has_been_stored(self):
+        """The ordering rule: `record_best` overwrites what this compares
+        against, so asking afterwards must answer 'no' for everything."""
+        d = SaveData()
+        run = self._run()
+        self.assertTrue(d.beaten_records(run))
+        d.record_best(run)
+        self.assertEqual(d.beaten_records(run), [])
+
+    def test_only_the_keys_actually_beaten_come_back(self):
+        d = SaveData()
+        d.record_best(self._run())
+        self.assertEqual(d.beaten_records(self._run(kills=51)), ["kills"])
+
+    def test_equalling_a_record_does_not_beat_it(self):
+        d = SaveData()
+        d.record_best(self._run())
+        self.assertEqual(d.beaten_records(self._run()), [])
+
+    def test_records_are_per_difficulty(self):
+        d = SaveData()
+        d.record_best(self._run(), difficulty="normal")
+        # The same run is still a clean sweep on a bucket it has never touched.
+        self.assertEqual(len(d.beaten_records(self._run(), difficulty="fast")), 4)
+
+    def test_an_unknown_difficulty_falls_back_to_normal(self):
+        d = SaveData()
+        d.record_best(self._run(), difficulty="normal")
+        self.assertEqual(d.beaten_records(self._run(), difficulty="nonsense"), [])
+
+    def test_it_agrees_with_what_record_best_actually_stores(self):
+        """The two share `_RECORD_KEYS` and the comparison so a screen can
+        never advertise a record the save did not take."""
+        d = SaveData()
+        d.record_best(self._run())
+        better = self._run(kills=999, time=999.0)
+        claimed = set(d.beaten_records(better))
+        before = dict(d.records["normal"])
+        d.record_best(better)
+        moved = {k for k, v in d.records["normal"].items() if v != before.get(k)}
+        self.assertEqual(claimed, moved)
+

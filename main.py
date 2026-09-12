@@ -4,6 +4,11 @@
     python main.py --web      # desktop, but with the browser profile applied
                               # (1280x720 / 60 fps / no save file) for testing
 
+PyInstaller also runs this file -- `desktop/DeathliteGame.spec` names it as the
+entry, and the `sys.frozen` check below sends the save to %LOCALAPPDATA% rather
+than into the bundle. The desktop packaging config and build helper live in
+`desktop/` (see `desktop/README.md`).
+
 pygbag also runs this file -- its generated `index.html` always loads
 `main.py` -- and the `sys.platform == "emscripten"` check below applies the same
 browser profile automatically. The web packaging config and build/serve helpers
@@ -26,7 +31,7 @@ import pygame  # noqa: F401  -- pygbag scans THIS file's imports to preload the
 #                                pygame wasm; transitive imports are invisible
 #                                to its loader.
 
-from game import config
+from game import config, save
 from game.game import Game
 
 
@@ -39,7 +44,14 @@ async def main() -> None:
     if sys.platform == "emscripten" or "--web" in sys.argv:
         config.apply_web_profile()
 
-    await Game().run_async()
+    # PyInstaller sets `sys.frozen`. A packaged build must not keep its save
+    # beside the executable -- `save.DEFAULT_PATH` resolves *inside* the bundle
+    # there -- so it goes to %LOCALAPPDATA%\DeathliteGame\ instead. Running from
+    # source is unaffected and still uses the repo-root save.json; the browser
+    # build never gets this far, since the web profile disables saving outright.
+    save_path = save.user_save_path() if getattr(sys, "frozen", False) else None
+
+    await Game(save_path=save_path).run_async()
 
 
 asyncio.run(main())

@@ -11,6 +11,7 @@ from game.content import get_content
 from spawn import ENEMY_SPAWNED, SpawnMaster
 from spawn.budget import SpawnDirector
 from tests.spawn.fakehost import FakeHost
+from world.layout import SpawnPoint
 
 
 def _master(host, seed: int = 3, duration: float = 600.0) -> SpawnMaster:
@@ -42,15 +43,37 @@ class PackTests(unittest.TestCase):
             self.assertNotIn((e.pos.x, e.pos.y), points)      # followers ring, not stack
         self.assertEqual(m.spawned, len(host.live))
 
-    def test_every_spawn_is_off_screen_and_off_the_player(self):
+    def test_no_spawn_lands_on_top_of_the_player(self):
+        """The guarantee after the relaxation ladder (owner, 2026-09-12).
+
+        Off screen is no longer absolute -- a starved zone spawns in view
+        rather than not at all -- so what every arrival must satisfy is the
+        weaker pair: outside the view, or beyond the starved keep-away.
+        """
         host = FakeHost()
         m = _master(host)
         _run(m, host, 60.0)
         self.assertGreater(len(host.live), 10)
-        pad = m.placement.view_pad
-        padded = host.view.inflate(2 * pad, 2 * pad)
+        keep = m.placement.starved_min_distance
         for e in host.live:
-            self.assertFalse(padded.collidepoint(e.pos.x, e.pos.y))
+            on_screen = host.view.collidepoint(e.pos.x, e.pos.y)
+            self.assertTrue(not on_screen or (e.pos - host.player).length() >= keep,
+                            f"{e.pos} is on screen and inside the keep-away")
+
+    def test_a_quiet_zone_keeps_spawning(self):
+        """The reason the ladder exists: a player who does not move used to
+        starve the strict rung -- its points are all either on cooldown or
+        inside the view -- and most packs became debt."""
+        host = FakeHost()
+        m = _master(host)
+        _run(m, host, 60.0)
+        moving = len(host.live)
+        still = FakeHost()
+        still.view = pygame.Rect(-100, -100, 4200, 4200)   # the whole zone in view
+        m2 = _master(still)
+        _run(m2, still, 60.0)
+        self.assertGreater(len(still.live), 10)
+        self.assertGreater(len(still.live), moving * 0.5)
 
     def test_stat_multipliers_come_from_the_director(self):
         host = FakeHost()
@@ -95,16 +118,18 @@ class CapTests(unittest.TestCase):
             host.make_enemy("chaser", 5, 5, 1.0, 1.0)
         self.assertIsNone(m.spawn_at("elite", pygame.Vector2(1, 1)))          # direct: refused
         self.assertIsNone(m.spawn_at("elite", pygame.Vector2(1, 1), owner="summon"))
-        arena = m.spawn_at("elite", pygame.Vector2(1, 1), owner="arena")     # scripted: seated
-        self.assertIsNotNone(arena)
+        scripted = m.spawn_at("elite", pygame.Vector2(1, 1), owner="dev")    # scripted: seated
+        self.assertIsNotNone(scripted)
         self.assertEqual(len(host.live), cap + 1)
-        pack = m.spawn_group("warband", at=pygame.Vector2(500, 500), owner="arena")
+        pack = m.spawn_group("warband", at=pygame.Vector2(500, 500), owner="dev")
         self.assertGreaterEqual(len(pack), 3)                                # whole pack lands
         # The exact list, deliberately: the cap is a performance guard, so an
         # owner that bypasses it has to be added on purpose and seen here.
         # `dummy` is the dev menu's training dummy (`training_dummy_journal.md`).
+        # `arena` left the list when the elite arena was removed (2026-09-12,
+        # `placement_review_journal.md`): nothing produces that owner now.
         self.assertEqual(get_content().spawn_tables.owners["cap_exempt"],
-                         ["arena", "dev", "dummy"])
+                         ["dev", "dummy"])
         self.assertIsNotNone(m.spawn_at("chaser", pygame.Vector2(1, 1), owner="dev"))
 
     def test_a_pack_spawns_short_rather_than_over_the_cap(self):
@@ -120,22 +145,26 @@ class CapTests(unittest.TestCase):
 
 class DebtTests(unittest.TestCase):
     def test_an_unseatable_pack_is_kept_and_retried(self):
-        host = FakeHost()
-        host.view = pygame.Rect(-100, -100, 4200, 4200)     # everything on screen
+        # Unseatable now means unseatable at every rung of the ladder: an
+        # on-screen view no longer refuses a spawn on its own, so the points
+        # are put inside the starved keep-away instead.
+        host = FakeHost(points=[SpawnPoint(0, 0, 1000.0, 2000.0 + d)
+                                for d in (0.0, 60.0, 120.0)])
+        host.view = pygame.Rect(-100, -100, 4200, 4200)
         m = _master(host)
         host.elapsed = 100.0
         m.update(2.0)
         self.assertEqual(host.live, [])
         self.assertEqual(m.debt, 1)
         self.assertEqual(m.deferred, 1)
-        host.view = pygame.Rect(0, 0, 1000, 600)
-        host.view.center = (1000, 2000)
+        host.player = pygame.Vector2(1000, 100)     # the points are far now
         m.update(0.0)                               # the retry seats it
         self.assertEqual(m.debt, 0)
         self.assertTrue(host.live)
 
     def test_debt_is_capped(self):
-        host = FakeHost()
+        host = FakeHost(points=[SpawnPoint(0, 0, 1000.0, 2000.0 + d)
+                                for d in (0.0, 60.0, 120.0)])
         host.view = pygame.Rect(-100, -100, 4200, 4200)
         m = _master(host)
         host.elapsed = 500.0
@@ -158,10 +187,10 @@ class GroupAndModifierTests(unittest.TestCase):
     def test_a_template_at_a_position_lands_there(self):
         host = FakeHost()
         m = _master(host)
-        made = m.spawn_group("husk_pack", at=pygame.Vector2(300, 300), owner="arena")
+        made = m.spawn_group("husk_pack", at=pygame.Vector2(300, 300), owner="dev")
         self.assertEqual((made[0].pos.x, made[0].pos.y), (300.0, 300.0))
         self.assertTrue(all(e is not None for e in made))
-        self.assertEqual(host.events[-1][1]["owner"], "arena")
+        self.assertEqual(host.events[-1][1]["owner"], "dev")
 
     def test_a_group_that_prefers_upper_lands_upper(self):
         def floor_of(x, y):

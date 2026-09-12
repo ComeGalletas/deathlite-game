@@ -67,6 +67,57 @@ class UnlockOnVictoryTests(unittest.TestCase):
         self.assertEqual(seen[-1]["stats"]["character_id"], "aegis")
         pygame.quit()
 
+    def test_a_real_boss_kill_hands_the_victory_screen_what_it_draws(self):
+        """The victory screen's extra facts, from a real kill rather than a
+        hand-built dict: which boss fell, that this was a win, whether the
+        clear was the hero's first, and the build snapshot the Hero column
+        needs. `first_clear` in particular can only be read *before*
+        `Game._on_run_ended` marks the hero cleared, so it is asserted here
+        where the real ordering applies.
+        """
+        game = _game()
+        _to_select(game)
+        _key(game, pygame.K_RETURN)
+        p = settle(game)
+        self.assertIsInstance(p, PlayingState)
+        p.player.invulnerable = True
+        p.spawn.spawn_boss()
+        boss_name = p.boss.name
+        p._on_boss_killed()
+
+        from game.states.victory_state import VictoryState
+        state = game.state_machine.current
+        self.assertIsInstance(state, VictoryState)
+        s = state.stats
+        self.assertTrue(s["victory"])
+        self.assertEqual(s["boss"], boss_name)
+        self.assertIn(s["boss_id"], game.content.bosses)
+        self.assertTrue(s["first_clear"], "a fresh save's first win is a first clear")
+        self.assertIn(boss_name, state._screen.subtitle)
+        # The Hero column's inputs: the resolved stats are a plain dict on the
+        # player, not the StatSet beside them.
+        self.assertIsInstance(s["hero_stats"], dict)
+        self.assertIn("max_hp", s["hero_stats"])
+        self.assertIsInstance(s["equipment"], list)
+        # Gold is reported gross: a run tracks what it earned alongside the
+        # balance the Merchant spends from.
+        self.assertIn("gold_earned", s)
+        self.assertGreaterEqual(s["gold_earned"], s["gold"],
+                                "the total earned cannot be under the balance")
+        pygame.quit()
+
+    def test_a_later_clear_with_the_same_hero_is_not_a_first_clear(self):
+        game = _game()
+        game.save.mark_cleared("aegis")
+        _to_select(game)
+        _key(game, pygame.K_RETURN)
+        p = settle(game)
+        p.player.invulnerable = True
+        p.spawn.spawn_boss()
+        p._on_boss_killed()
+        self.assertFalse(game.state_machine.current.stats["first_clear"])
+        pygame.quit()
+
 
 class RunStartTests(unittest.TestCase):
     def _run(self, game):

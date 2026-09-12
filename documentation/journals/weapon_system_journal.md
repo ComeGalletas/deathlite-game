@@ -978,3 +978,112 @@ that, which is right for any cooldown.
 (`tests/characters/test_characters.py:116-124` -- evasion 0.05 / 0.10, block
 0.30, block strength 0.5) stay exact: they are a contract the design states,
 not a number tuned between playtests. `RULES.choices == 3` likewise.
+
+## Change request 7 — a gap before a totem is replanted (2026-09-12) — DONE
+
+**Requirement (owner).** Increase the time between a totem despawning and
+the next one appearing to a minimum of 3 seconds; the totem's blessings can
+reduce it.
+
+**What happened before.** `Weapon._maintain_summons` planted a summon
+whenever the weapon's cooldown had run out and a slot was free. The Grave
+Totem's cooldown is 6 s against an 8 s life, so by the time a totem left the
+field the cooldown was long gone and the freed slot was refilled on the next
+frame -- the totem never really left.
+
+**What changed.**
+
+- `data/weapons.json`: `summon_replant_delay` -- 3.0 for `grave_totem`, 0.0
+  for `spirit_wolf` (it never expires; the key is there because the code
+  reads it for every summon weapon, and a missing field is bad data).
+- `combat/weapons/core.py`: the weapon notices when one of its summons has
+  gone inactive and starts a replant timer of
+  `summon_replant_delay x bonus["cooldown_mult"]`; no plant while it runs.
+  A second departure never cuts a running timer short (`max`). The first
+  plant of a run is unaffected -- nothing has left yet.
+- **Reduced by blessings:** Quick Plant's `cooldown_mult` (x0.9 .. x0.5)
+  scales the gap exactly as it scales the weapon's cooldown, so at level V
+  the gap is 1.5 s. No new blessing was added.
+
+**Tests.** `tests/combat/test_summons.py::TotemReplantTests` (5): the data
+carries the delay; no plant for 2.9 s after a departure and one by 3.1 s;
+Quick Plant V halves it; a second departure does not shorten a running gap;
+the first plant is not delayed. The existing `test_dead_summon_is_replaced`
+still passes: its single 10 s update spans the gap.
+
+**Net timeline, default numbers.** Plant at 0 s, leave at 8 s, next plant at
+11 s (the earlier 6 s cooldown is already spent). With two slots the second
+totem's own timeline is offset by the weapon cooldown, so both slots are
+never empty at once for long.
+
+### Revision (owner, 2026-09-12): 3 s -> 5 s
+
+The owner reported totems still appearing almost as soon as the previous one
+left, and asked for a 5 s gap. Measured first, on a real headless run with
+the Grave Totem as the only weapon, logging every plant and departure for a
+minute.
+
+**The review the owner asked for -- life span against cooldown.** The four
+numbers that set the rhythm are the 8 s life, the weapon's 6 s cooldown, the
+two totem slots (`projectile_count`), and the replant gap.
+
+| Gap | Departure -> next plant (measured) | What was binding |
+|---|---|---|
+| none (before CR7) | next frame | nothing |
+| 3 s | 4.0 s | the weapon's own 6 s cooldown, not the gap |
+| 5 s | 5.0 s | the gap |
+
+At 3 s the rule was never the constraint: a totem left at 8.03 s and the
+next was planted at 12.05 s, which is 6 s after the *previous plant*, so the
+weapon cooldown alone decided it and the 3 s did nothing visible. At 5 s the
+gap becomes the binding constraint and the spacing is exact -- departures at
+8.03, 14.05, 21.05, 27.07 s are followed by plants at 13.03, 19.05, 26.05,
+32.07 s: 5.00 s every time.
+
+`data/weapons.json` `summon_replant_delay` 3.0 -> 5.0. Quick Plant still
+scales it, so level V now gives 2.5 s rather than 1.5 s. The tests moved
+with it (`TotemReplantTests`, 5 s / 4.9 s / 2.4 s).
+
+### Revision 2 (owner, 2026-09-12): the rule is about the *field*
+
+Reporting the 5 s change, the note above said the field was still never
+empty because the weapon had two totem slots. The owner asked why it had
+two, and restated the goal: **no totem on the field for 5 seconds between
+the spawns.** Two things were wrong, and both are fixed.
+
+**Why there were two slots: nothing designed it.** `projectile_count: 2`
+for `grave_totem` dates from the first prototype commit (`d3c50c7`), and
+the design document never gives the totem a count. Two consequences:
+
+- The **Twin Totems** blessing reads "+N more totems can stand at once"
+  with levels 1, 1, 2, 2, 3 -- an addition on top of the base. On a base of
+  2 its *first* level gave three totems, so the blessing contradicted its
+  own name. On a base of 1 it gives two, which is what "twin" means.
+- Two 8 s lives planted 6 s apart always overlap, so the field could not
+  empty however long the replant gap was. The gap was being applied to a
+  condition that never mattered.
+
+The other summon weapons are consistent with a base of 1 being the
+intent: Spirit Wolf is 1, and Ember Ring's 3 is its ring of orbiting
+flames, not a stack of independent summons.
+
+**Both changes.**
+
+- `data/weapons.json`: `grave_totem` `projectile_count` 2 -> **1**.
+- `combat/weapons/core.py`: the gap opens when the field **empties**
+  (`self._summons and not live`), not when any one summon leaves. With one
+  slot the two conditions are the same; with Twin Totems the gap now waits
+  for the last totem to go, which is what the goal says.
+
+**Measured, one minute of a real run with the Grave Totem as the only
+weapon:** plant 0.02, leave 8.03, plant 13.03, leave 21.05, plant 26.05,
+leave 34.07, plant 39.07, leave 47.08, plant 52.08. An 8 s watch, then
+5.00 s of empty ground, on a 13 s cycle. Quick Plant V shortens the empty
+stretch to 2.5 s.
+
+**Tests.** `TotemReplantTests` (6): the data carries the delay; one totem
+stands at a time and Twin Totems I makes it two; no replant for 4.9 s after
+the field empties and one by 5.1 s; Quick Plant V halves it; with two slots
+one departure does not open the gap and the freed slot refills on the
+weapon's cooldown, while the field emptying does; the first plant of a run
+is never delayed.

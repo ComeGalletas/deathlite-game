@@ -9,13 +9,17 @@ draws, with dashes where the ledger's numbers would be.
 Columns, left to right, each under a Tiny Swords ribbon (blue / yellow / red,
 dark text on the light art per the owner's rule for text on the sheets):
 
-* **Run** -- survived, level, kills, gold, salvage, then the items acquired.
+* **Run** -- survived (or cleared in, on a win), level, kills, the gold
+  *earned*, potions, then the items acquired. Rows that set a new record
+  for the difficulty carry a `best` marker beside the label.
 * **Enemies slain** -- kills per enemy type (biggest first, the boss as its
   own row, a total that is the sum of the rows).
 * **Weapons** -- weapon, level, damage, share, DPS over the time the weapon
   was held; the blessing-proc rows under them; a total row with the run's
   damage and run DPS; then the blessings with their levels (owner, 2026-09-12:
   they belong with the build, not with the kills).
+* **Hero** -- opt-in, the victory screen only: trait, the resolved stat
+  block, what was equipped, and the first-clear unlock line.
 
 The ribbon titles sit `TITLE_DY` above the ribbon's geometric centre: the
 pack's ribbon art has its fork and shadow at the bottom, so a label on the
@@ -39,12 +43,19 @@ TITLE_DY = -5
 # column has room for every type in `data/enemies.json` plus the boss; the
 # weapon column's budget is four weapon rows (three slots and a summon), the
 # proc rows, the total and the blessings.
+BEST_FLAG = "best"
 MAX_ITEMS = 10
 MAX_KILL_ROWS = 13
 MAX_OTHER_ROWS = 2
 # The blessings come last in their column and take whatever room is left
 # below the weapons table (six rows in the worst case above, more when the
 # run has fewer weapons or no proc rows), so the cut is computed, not fixed.
+
+# The columns `draw` can lay out, and the default set. `hero` is opt-in: every
+# extra column narrows all of them, so whether the run summary is worth four
+# columns at this width is the caller's call.
+COLUMNS = ("run", "kills", "weapons")
+VICTORY_COLUMNS = ("run", "kills", "weapons", "hero")
 
 _PANEL_FILL = (0, 0, 0, 110)
 _RULE = config.COLOR_WORLD_BORDER
@@ -77,6 +88,29 @@ def _item_name(item) -> tuple[str, str]:
     return str(item), ""
 
 
+
+def column_widths(space: int, minimums) -> list[int]:
+    """Split `space` between columns, honouring any that declare a minimum.
+
+    A column below its minimum is not merely tight, it is *wrong*: the weapons
+    table right-aligns its Damage / Share / DPS cells at a fixed offset from
+    the column's right edge, so once the column is short the weapon's name is
+    drawn straight through its own damage figure.
+
+    Columns needing more than the equal share take what they need; the rest
+    divide what is left, and the last column absorbs the rounding so the row
+    ends flush -- so the other columns can differ by a pixel.
+    """
+    minimums = list(minimums)
+    n = len(minimums)
+    equal = space // n
+    greedy = [m for m in minimums if m > equal]
+    rest = ((space - sum(greedy)) // (n - len(greedy))) if len(greedy) < n else 0
+    widths = [m if m > equal else rest for m in minimums]
+    widths[-1] += space - sum(widths)
+    return widths
+
+
 class RunSummaryPanel:
     def __init__(self, stats: dict) -> None:
         self.stats = stats
@@ -87,14 +121,22 @@ class RunSummaryPanel:
 
     # --- the three columns ----------------------------------------
     def draw(self, surface: pygame.Surface, assets, top: int, bottom: int,
-             *, margin: int = 60, gap: int = 20) -> None:
-        w = surface.get_width()
-        col_w = (w - 2 * margin - 2 * gap) // 3
-        cols = [pygame.Rect(margin + i * (col_w + gap), top, col_w, bottom - top)
-                for i in range(3)]
-        self._draw_run(surface, assets, cols[0])
-        self._draw_kills(surface, assets, cols[1])
-        self._draw_damage(surface, assets, cols[2])
+             *, margin: int = 60, gap: int = 20,
+             columns: tuple[str, ...] = COLUMNS) -> None:
+        """`columns` names what to draw, left to right, out of `_COLUMNS`.
+
+        The default is the three the game-over screen has always had. The
+        victory screen asks for `hero` as well; every extra column narrows all
+        of them, so the set is a caller's choice rather than a fixed layout.
+        """
+        picked = [_COLUMNS[name] for name in columns]
+        space = surface.get_width() - 2 * margin - (len(picked) - 1) * gap
+        widths = column_widths(space, [m for _d, m in picked])
+        x = margin
+        for (drawer, _min_w), col_w in zip(picked, widths, strict=True):
+            drawer(self, surface, assets,
+                   pygame.Rect(x, top, col_w, bottom - top))
+            x += col_w + gap
 
     def _column(self, surface, assets, rect, title, colour) -> pygame.Rect:
         """Backdrop and ribbon; returns the content rect beneath the ribbon."""
@@ -111,10 +153,17 @@ class RunSummaryPanel:
                            rect.width - 56, rect.bottom - ribbon.bottom - 30)
 
     # --- primitives -----------------------------------------------
-    def _kv(self, surface, area, y, label, value, *, colour=None, font=None) -> int:
+    def _kv(self, surface, area, y, label, value, *, colour=None, font=None,
+            flag: str = "") -> int:
+        """A label / value row. `flag` is a small accent note set after the
+        label -- the "best" marker. It goes on the *label* side because the
+        value is right-aligned to the column edge and has nothing to spare."""
         font = font or self._row
         lab = font.render(str(label), True, config.COLOR_TEXT_DIM)
         surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
+        if flag:
+            note = self._small.render(flag, True, config.COLOR_ACCENT)
+            surface.blit(note, note.get_rect(midleft=(area.left + lab.get_width() + 8, y)))
         val = font.render(str(value), True, colour or config.COLOR_TEXT)
         surface.blit(val, val.get_rect(midright=(area.right, y)))
         return y + ROW_STEP
@@ -150,14 +199,92 @@ class RunSummaryPanel:
         rate = max(1e-6, t)
         kills = s.get("kills", 0)
         y = area.top + ROW_STEP // 2
-        y = self._kv(surface, area, y, "Survived", fmt_time(t))
-        y = self._kv(surface, area, y, "Level", s.get("level", 1))
-        y = self._kv(surface, area, y, "Kills", f"{kills}   ({kills / rate * 60:.0f}/min)")
-        y = self._kv(surface, area, y, "Gold", s.get("gold", 0), colour=config.COLOR_ACCENT)
-        y = self._kv(surface, area, y, "Salvage banked", s.get("currency", 0),
+        # `new_records` names the save's own record keys this run beat, so a
+        # row is only marked when the record was actually taken.
+        best = set(s.get("new_records", ()))
+
+        def mark(key):
+            return BEST_FLAG if key in best else ""
+
+        # A win is not a death with better numbers: "Survived" is the wrong
+        # word for the run the hero finished on their feet.
+        y = self._kv(surface, area, y,
+                     "Cleared in" if s.get("victory") else "Survived", fmt_time(t),
+                     flag=mark("time"))
+        y = self._kv(surface, area, y, "Level", s.get("level", 1),
+                     flag=mark("level"))
+        y = self._kv(surface, area, y, "Kills",
+                     f"{kills}   ({kills / rate * 60:.0f}/min)", flag=mark("kills"))
+        # Gold *earned* over the run, not the balance left after the Merchant
+        # (owner, 2026-09-12): pick up 200 and spend 50 and this says 200.
+        # `gold` is the fallback for a summary written before the run kept a
+        # total -- there it is the best answer available, if an undercount.
+        y = self._kv(surface, area, y, "Gold earned",
+                     s.get("gold_earned", s.get("gold", 0)),
                      colour=config.COLOR_ACCENT)
+        # No "Salvage banked" row: it printed the raw `currency`, while
+        # `Game._on_run_ended` banks that times the meta salvage multiplier, so
+        # a player with those upgrades was told they earned less than they did.
+        # The owner's call was to drop the line rather than fix the arithmetic.
+        # CB-8: potions picked up, with the HP they actually restored.
+        y = self._kv(surface, area, y, "Potions",
+                     f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
         items = list(s.get("dropped_items", ()))
         y = self._subheader(surface, area, y, f"Items acquired  ({len(items)})")
+        if not items:
+            self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
+            return
+        for item in items[:MAX_ITEMS]:
+            name, rarity = _item_name(item)
+            y = self._line(surface, area, y, name,
+                           colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT))
+        self._more(surface, area, y, len(items) - MAX_ITEMS, "items")
+
+    # --- optional column: the hero the run was played with -------
+    def _draw_hero(self, surface, assets, rect) -> None:
+        """Name, trait, the resolved stat block and what was equipped.
+
+        The stat rows, their labels and their formatting come from
+        `ui.run_status.common`, so the build reads the same here as it does on
+        the in-run status screen rather than growing a second vocabulary.
+        """
+        # Imported here, not at module scope: `ui.run_status`'s package init
+        # pulls in its Overview pane, which imports `fmt_time` from this
+        # module -- so a top-level import is a cycle. By call time both
+        # modules are built and the lookup is a dict hit.
+        from ui.run_status import common as rs_common
+
+        s = self.stats
+        area = self._column(surface, assets, rect, "Hero", "blue")
+        y = area.top + ROW_STEP // 2
+        if s.get("first_clear"):
+            # Victory only, and only the first time with this hero: the clear
+            # is what unlocks the main-weapon choice (design section 20).
+            y = self._line(surface, area, y, "Main weapon unlocked",
+                           colour=config.COLOR_ACCENT, font=self._small)
+        y = self._kv(surface, area, y, "Hero", s.get("character", "-"))
+        trait = s.get("trait")
+        if trait:
+            y = self._kv(surface, area, y, "Trait", str(trait).title())
+
+        stats = dict(s.get("hero_stats", {}))
+        if stats:
+            y = self._subheader(surface, area, y, "Stats")
+            rows = [(stat, label) for stat, label, _k in rs_common.STAT_ROWS
+                    if stat in stats]
+            # Leave room for the equipment block below; the list is cut the
+            # way the blessings are rather than running off the column.
+            items = list(s.get("equipment", ()))
+            reserve = ROW_STEP * (2 + min(len(items), MAX_ITEMS)) if items else 0
+            fit = max(1, (area.bottom - reserve - y) // ROW_STEP)
+            shown = len(rows) if len(rows) <= fit else max(1, fit - 1)
+            for stat, label in rows[:shown]:
+                y = self._kv(surface, area, y, label,
+                             rs_common.fmt_stat(stat, float(stats[stat])))
+            y = self._more(surface, area, y, len(rows) - shown, "stats")
+
+        items = list(s.get("equipment", ()))
+        y = self._subheader(surface, area, y, f"Equipped  ({len(items)})")
         if not items:
             self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
             return
@@ -224,12 +351,16 @@ class RunSummaryPanel:
         y += ROW_STEP - 4
         y = self._rule(surface, area, y)
 
-        def row(name, level, dmg, share, dps, *, colour=None):
+        def row(name, level, dmg, share, dps, *, colour=None, flag=""):
             nonlocal y
             colour = colour or config.COLOR_TEXT
             label = f"{name}  Lv {level}" if level is not None else str(name)
             n = self._row.render(label, True, colour)
             surface.blit(n, n.get_rect(midleft=(area.left, y)))
+            if flag:
+                note = self._small.render(flag, True, config.COLOR_ACCENT)
+                surface.blit(note,
+                             note.get_rect(midleft=(area.left + n.get_width() + 8, y)))
             cells = ((x_dmg, "-" if dmg is None else fmt_damage(dmg)),
                      (x_share, "-" if share is None else f"{share:.0%}"),
                      (x_dps, "-" if dps is None else fmt_dps(dps)))
@@ -254,5 +385,28 @@ class RunSummaryPanel:
         if by_source:
             total = sum(by_source.values())
         row("Total", None, float(total), 1.0 if total else 0.0,
-            float(total) / t if t > 0 else 0.0, colour=config.COLOR_ACCENT)
+            float(total) / t if t > 0 else 0.0, colour=config.COLOR_ACCENT,
+            flag=BEST_FLAG if "damage_dealt" in set(s.get("new_records", ())) else "")
         self._draw_blessings(surface, area, y)
+
+
+# (drawer, minimum width). Only the weapons table has a floor, and it is not a
+# taste call: the Damage / Share / DPS cells are right-aligned 150, 84 and 0 px
+# in from the column's right edge, so a name drawn from the left runs *through*
+# its own damage figure once the column is short. Measured rather than guessed:
+# the widest row label over `data/weapons.json` is "Grave Totem  Lv 9" at 186 px
+# and a seven-figure damage is 94 px, which with the 150 px cell block and the
+# column's 56 px of padding needs 486 -- 498 leaves a little air.
+#
+# This bites at *three* columns too, which was a surprise: the equal share
+# there is 480, leaving 424 px of content for a row that can want 430. So the
+# game-over screen could already print "Grave Totem  Lv 9" through a
+# seven-figure damage, and the minimum widens its weapons column to 498 (the
+# other two to 471) rather than leaving that latent. At four columns the other
+# three take 307 px each, which they fit in.
+_COLUMNS = {
+    "run": (RunSummaryPanel._draw_run, 0),
+    "kills": (RunSummaryPanel._draw_kills, 0),
+    "weapons": (RunSummaryPanel._draw_damage, 498),
+    "hero": (RunSummaryPanel._draw_hero, 0),
+}

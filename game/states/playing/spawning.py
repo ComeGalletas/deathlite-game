@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import logging
 import math
+import random
+from types import SimpleNamespace
 
 import pygame
-
-from types import SimpleNamespace
 
 from entities.ai.components.aggro import is_aggroed
 from entities.boss import Boss
@@ -30,16 +30,41 @@ log = logging.getLogger(__name__)
 
 
 def boss_spawn_point(player_pos, rng, width: float, height: float,
-                     distance: float | None = None) -> pygame.Vector2:
+                     distance: float | None = None, walkable=None) -> pygame.Vector2:
     """Where the boss appears: `distance` (`config.BOSS_SPAWN_DISTANCE`) from
-    the hero on a random side, clamped to the world rect. The boss flies,
-    so what is under the spot -- floor, cliff, lake, sea -- does not matter,
-    and no room is consulted: the boss room stays the spawn master's."""
+    the hero on a random side, clamped to the world rect. No room is consulted:
+    the boss room stays the spawn master's.
+
+    `walkable(pos) -> bool` is the collider test for a boss that **walks**, and
+    the whole reason this is a search rather than one point. A flyer is over the
+    world, so what is under the spot -- floor, cliff, lake, sea -- does not
+    matter and it passes None; a ground boss dropped on water is simply stuck
+    there for the rest of the run. With a test supplied, the ring is sampled at
+    `BOSS_SPAWN_RING_SAMPLES` angles from the random start, at each radius in
+    `BOSS_SPAWN_RING_SCALES`, and the first accepted spot wins. The random side
+    survives: the sweep starts at the drawn angle and only walks on from there.
+
+    The unconstrained point is the fallback when nothing in the sweep is
+    walkable -- the old behaviour, and better than a boss that never spawns.
+    """
     d = float(config.BOSS_SPAWN_DISTANCE if distance is None else distance)
     ang = rng.uniform(0.0, math.tau)
-    return pygame.Vector2(
-        min(max(player_pos.x + math.cos(ang) * d, 0.0), float(width)),
-        min(max(player_pos.y + math.sin(ang) * d, 0.0), float(height)))
+
+    def at(angle: float, radius: float) -> pygame.Vector2:
+        return pygame.Vector2(
+            min(max(player_pos.x + math.cos(angle) * radius, 0.0), float(width)),
+            min(max(player_pos.y + math.sin(angle) * radius, 0.0), float(height)))
+
+    if walkable is None:
+        return at(ang, d)
+    samples = max(1, int(config.BOSS_SPAWN_RING_SAMPLES))
+    step = math.tau / samples
+    for scale in config.BOSS_SPAWN_RING_SCALES:
+        for i in range(samples):
+            spot = at(ang + i * step, d * float(scale))
+            if walkable(spot):
+                return spot
+    return at(ang, d)
 
 
 class PlayingHost:
@@ -231,8 +256,8 @@ class EnemyControl:
     def spawn_enemy(self, enemy_id: str, at: pygame.Vector2 | None = None,
                     owner: str = "direct"):
         """One enemy, at `at` or at a point the master chooses. Debug keys,
-        the dev menu, the arena (`owner="arena"`) and the tests come
-        through here. Returns the enemy, or None when the master refused."""
+        the dev menu and the tests come through here. Returns the enemy, or
+        None when the master refused."""
         return self.master.spawn_at(enemy_id, at, owner=owner)
 
     def summon(self, enemy_id: str, origin: pygame.Vector2, count: int) -> None:
@@ -246,17 +271,48 @@ class EnemyControl:
         if ps.boss is not None:
             return
         ps.director.mark_boss_spawned()
-        boss_id = next(iter(ps.content.bosses))
-        pos = self.boss_spawn_point()
-        ps.boss = Boss(boss_id, ps.content.boss(boss_id), pos.x, pos.y)
+        boss_id = self.pick_boss()
+        definition = ps.content.boss(boss_id)
+        pos = self.boss_spawn_point(definition)
+        ps.boss = Boss(boss_id, definition, pos.x, pos.y)
         ps.boss.ledger = ps.ledger
         ps.shake.add(0.7)
         ps.game.events.publish(Events.BOSS_SPAWNED, name=ps.boss.name)
         log.info("boss spawned: %s", ps.boss.name)
 
-    def boss_spawn_point(self) -> pygame.Vector2:
+    def pick_boss(self) -> str:
+        """Which boss this run faces: one of `data/bosses.json`, drawn from the
+        run seed.
+
+        Deliberately **not** `ps.rng`. The run's shared stream has been
+        consumed an unpredictable number of times by the time a boss spawns --
+        how many depends on how the run actually played -- so drawing from it
+        would make the boss a function of the playthrough rather than of the
+        seed, and two runs on one seed could meet different bosses. A private
+        generator keyed off the seed keeps "same seed, same boss" true, which
+        is the only thing that makes the choice worth reproducing. Sorted, so
+        the answer does not ride on dict ordering in the JSON.
+        """
+        ids = sorted(self.ps.content.bosses)
+        if not ids:
+            raise ValueError("data/bosses.json defines no bosses")
+        return random.Random(f"{self.ps.run_seed}:boss").choice(ids)
+
+    def boss_spawn_point(self, definition: dict | None = None) -> pygame.Vector2:
         """`boss_spawn_point()` for this run: beside the hero, not in the
-        boss room."""
+        boss room.
+
+        A boss that walks is given the collider test, at its own radius, so the
+        ring search only offers it ground it can stand on. A flyer (and a caller
+        that names no boss) gets the plain point -- the sea is walkable to it."""
         ps = self.ps
+        walkable = None
+        if definition is not None and "flying" not in definition.get("tags", ()):
+            radius = float(definition.get("radius", 0.0))
+
+            def walkable(spot) -> bool:          # noqa: F811 -- the ground case
+                return ps.game_map.is_walkable(spot, radius)
+
         return boss_spawn_point(ps.player.pos, ps.rng,
-                                ps.game_map.width, ps.game_map.height)
+                                ps.game_map.width, ps.game_map.height,
+                                walkable=walkable)

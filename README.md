@@ -1,4 +1,4 @@
-# Death Lite Die
+# Deathlite Game
 
 An original 2D action roguelite / bullet-heaven built with Python + Pygame.
 Inspired by the genre (time-survival, auto-attacks, XP, level-up choices,

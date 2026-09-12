@@ -185,7 +185,7 @@ class RecycleTests(unittest.TestCase):
         host = FakeHost()
         m = _master(host)
         e = _off_screen(host)
-        e.owner = "arena"
+        e.owner = "dummy"
         m.recycle(e, "stuck", poof=False)
         self.assertIn(e, host.live)                              # identity kept
         self.assertEqual(len(host.live), 1)

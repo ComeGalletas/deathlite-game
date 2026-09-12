@@ -82,6 +82,9 @@ class OverviewPane:
         y = c.kv(surface, f.row, area, y, "Kills", s.get("kills", 0))
         y = c.kv(surface, f.row, area, y, "Gold", s.get("gold", 0), colour=config.COLOR_ACCENT)
         y = c.kv(surface, f.row, area, y, "Salvage", s.get("currency", 0), colour=config.COLOR_ACCENT)
+        # CB-8: potions picked up, with the HP they actually restored.
+        y = c.kv(surface, f.row, area, y, "Potions",
+                 f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
 
         items = list(getattr(p, "equipment", ()))
         y = c.subheader(surface, f.sub, area, y, f"Equipped items  ({len(items)})")

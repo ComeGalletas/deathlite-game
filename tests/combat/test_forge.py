@@ -326,7 +326,10 @@ class BombForgeTests(unittest.TestCase):
 
     def test_minefield_throws_armed_mines(self):
         w = weapon("bomb", "minefield")
-        s = fire(w, [FakeEnemy(150, 0)])
+        # Inside the Bomb's own reach ring, read from the data: `reach` is a
+        # live balance knob (320 -> 100 already) and a target outside the
+        # ring means the weapon never fires at all.
+        s = fire(w, [FakeEnemy(float(w.definition["reach"]) * 0.4, 0)])
         self.assertEqual(len(s), 1)
         self.assertTrue(s[0].mine)
         self.assertAlmostEqual(s[0].arm_delay, 0.6)

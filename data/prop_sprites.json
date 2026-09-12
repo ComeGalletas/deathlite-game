@@ -1,14 +1,136 @@
 {
   "xp_orb_small": {
-    "file": "orbs/orb_green.png",
-    "scale": [8, 8]
+    "file": "items/orbs/orb_green.png",
+    "scale": [
+      8,
+      8
+    ]
   },
   "xp_orb_medium": {
-    "file": "orbs/orb_blue.png",
-    "scale": [10, 10]
+    "file": "items/orbs/orb_blue.png",
+    "scale": [
+      10,
+      10
+    ]
   },
   "xp_orb_large": {
-    "file": "orbs/orb_purple.png",
-    "scale": [12, 12]
+    "file": "items/orbs/orb_purple.png",
+    "scale": [
+      12,
+      12
+    ]
+  },
+  "potion_health_common": {
+    "file": "items/potions/health_potion.png",
+    "scale": [
+      16,
+      16
+    ]
+  },
+  "potion_health_uncommon": {
+    "file": "items/potions/health_potion_2.png",
+    "scale": [
+      18,
+      18
+    ]
+  },
+  "potion_health_rare": {
+    "file": "items/potions/health_potion_3.png",
+    "scale": [
+      20,
+      20
+    ]
+  },
+  "chest_common": {
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "frame": [
+      32,
+      32
+    ],
+    "scale": [
+      28,
+      28
+    ],
+    "anchor": [
+      14,
+      26
+    ],
+    "anims": {
+      "open": {
+        "file": "items/chests/chest_common.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": false
+      }
+    }
+  },
+  "chest_uncommon": {
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "frame": [
+      32,
+      32
+    ],
+    "scale": [
+      30,
+      30
+    ],
+    "anchor": [
+      15,
+      28
+    ],
+    "anims": {
+      "open": {
+        "file": "items/chests/chest_uncommon.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": false
+      }
+    }
+  },
+  "chest_rare": {
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "frame": [
+      32,
+      32
+    ],
+    "scale": [
+      32,
+      32
+    ],
+    "anchor": [
+      16,
+      30
+    ],
+    "anims": {
+      "open": {
+        "file": "items/chests/chest_rare.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": false
+      }
+    }
+  },
+  "chest_epic": {
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "frame": [
+      32,
+      32
+    ],
+    "scale": [
+      34,
+      34
+    ],
+    "anchor": [
+      17,
+      32
+    ],
+    "anims": {
+      "open": {
+        "file": "items/chests/chest_epic.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": false
+      }
+    }
   }
 }

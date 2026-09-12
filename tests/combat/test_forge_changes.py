@@ -56,13 +56,22 @@ class ForgeChangesTests(unittest.TestCase):
                 with self.subTest(forge=fid, effect=k):
                     self.assertIn((k, None, v), changes)
 
-    def test_whirlwind_reads_as_the_data_says(self):
-        w, _fdef = self._forged("whirlwind")
-        changes = dict((k, (b, a)) for k, b, a in forge_changes(self.content, w))
-        self.assertEqual(changes["cooldown"][1], 0.24)
-        self.assertEqual(changes["damage"][1], 6)
-        self.assertEqual(changes["cone_half_angle"][1], 180)
-        self.assertNotEqual(changes["damage"][0], 6, "the base damage must be the unforged one")
+    def test_the_before_is_the_unforged_weapon_not_the_merged_one(self):
+        """Whirlwind restates the Sword's numbers, so a `before` taken off the
+        merged definition would read as "6 -> 6". Retired the version of this
+        that spelled out whirlwind's own 0.24 / 6 / 180: those are tuning, the
+        two tests above already check every override against the data, and
+        pinning them here meant a balance pass broke a wiring test."""
+        w, fdef = self._forged("whirlwind")
+        changes = {k: (b, a) for k, b, a in forge_changes(self.content, w)}
+        base = self.content.weapon(fdef.weapon)
+        for key, after in fdef.overrides.items():
+            if key in ("name", "description"):
+                continue
+            before = changes[key][0]
+            self.assertEqual(before, base.get(key))
+            self.assertNotEqual(before, after,
+                                f"{key}: the before is the forged value, not the base")
 
 
 if __name__ == "__main__":

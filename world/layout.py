@@ -172,6 +172,25 @@ class ResourcePoint(NamedTuple):
         return pygame.Vector2(self.x, self.y)
 
 
+class Chest(NamedTuple):
+    """A treasure chest, seated at generation (CB-9, `world/gen/chests.py`).
+
+    The seed decides where every chest is and which tier it is, the same way
+    it decides islands and obstacles, so two runs of one seed find the same
+    loot in the same places. `rarity` is a key of `data/chests.json`, which
+    holds everything the chest actually *contains*; nothing about the payload
+    is decided here."""
+    room_id: int
+    floor: int
+    x: float
+    y: float
+    rarity: str
+
+    @property
+    def pos(self) -> pygame.Vector2:
+        return pygame.Vector2(self.x, self.y)
+
+
 @dataclass
 class Village:
     """What the village pass (`world/gen/village.py`, HI-2) put on a human
@@ -187,7 +206,14 @@ class Village:
     pen: object = None                  # pygame.Rect of the interior, or None
     mouths: list = field(default_factory=list)
     # The settlement's extent round the forge, world px: the village pass
-    # keeps its trees outside it and the bake's clutter pass keeps out too.
+    # keeps its first scatter outside it, the unseal repair will not take an
+    # obstacle back from inside it, and the bake's clutter pass keeps out too.
+    #
+    # The *square* -- the smaller disc the fill sweep and the tree top-up keep
+    # out of -- is deliberately not here. It is `_Site.square`, internal to
+    # generation, because nothing downstream reads it; exporting it would add
+    # a field to this record for no caller and move every pinned digest, which
+    # would make the next bisect over "what changed the world" lie.
     radius: float = 0.0
     # LD-Z: how many buildings besides the forge and the hall stand within
     # `_V_HEAL_NEAR` of the heal after the tidy pass (it wants two).
@@ -208,6 +234,9 @@ class WorldLayout:
     resource_points: list = field(default_factory=list)
     # One `Village` per human island (HI-2), in island order.
     villages: list = field(default_factory=list)
+    # CB-9: the treasure chests, seated on the resource anchors above by the
+    # last stage of generation. In island order.
+    chests: list = field(default_factory=list)
 
     def room(self, rid: int) -> Room:
         return self.rooms[rid]

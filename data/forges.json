@@ -2,7 +2,7 @@
   "whirlwind": {
     "name": "Whirlwind", "weapon": "sword", "identity": "Defensive AoE",
     "description": "The Sword spins without pause: a fast, full-circle sweep for far less per hit. Strong when surrounded, weak on a single target.",
-    "overrides": { "name": "Whirlwind", "cooldown": 0.24, "projectile_lifetime": 0.2, "cone_half_angle": 180, "damage": 6, "weight": 12, "area": 70 },
+    "overrides": { "name": "Whirlwind", "cooldown": 0.8, "projectile_lifetime": 0.2, "cone_half_angle": 180, "damage": 6, "weight": 12, "area": 70 },
     "effects": {}
   },
   "greatsword": {

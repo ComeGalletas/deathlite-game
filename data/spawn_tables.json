@@ -33,8 +33,8 @@
                   "prefer": ["upper"]}
   },
 
-  "owners": {"cap_exempt": ["arena", "dev", "dummy"],
-             "never_sleep": ["arena", "boss", "dummy"]},
+  "owners": {"cap_exempt": ["dev", "dummy"],
+             "never_sleep": ["boss", "dummy"]},
 
   "locality": {
     "dwell": 1.0,
@@ -59,10 +59,13 @@
   },
 
   "placement": {
+    "_starved_comment": "The last rung of the relaxation ladder, used only when no point passes the stricter rules -- which is what a player who camps on one island produces: its handful of points are all either on cooldown or inside the view, and every pack becomes debt. At this rung the view stops being a wall (the owner's call, 2026-09-12: spawns continue even if the camera is showing) and the point cooldown shortens, so the same few points can be reused. `starved_min_distance` replaces the view as the keep-away, so an enemy arrives at the edge of the screen rather than in the hero's lap; candidates here are also weighted by distance, which biases the draw to the far edge.",
     "cooldown": 3.0,
     "view_pad": 96,
     "min_distance": 220,
     "relax_after": 5.0,
+    "starved_min_distance": 420,
+    "starved_cooldown": 0.5,
     "ring_gap": 8,
     "same_floor_weight": 1.3,
     "prefer_weight": 2.0

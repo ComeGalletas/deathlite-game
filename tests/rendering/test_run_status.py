@@ -164,6 +164,21 @@ class ReadoutTests(unittest.TestCase):
         self.assertIsNotNone(now)
         self.assertNotEqual(base, now)
 
+    def test_the_blast_radius_row_folds_in_the_area_binding(self):
+        """2026-09-12: the card's "Blast radius" must match what
+        `Weapon._blast_radius` hands the fire path -- the flat adds and
+        `bonus["area"]` inside, the Blast Amplifier multiplier outside."""
+        bomb = Weapon("bomb", dict(self.ps.content.weapon("bomb")))
+        base_r = float(bomb.definition["blast_radius"])
+        bomb.bonus["blast_radius"] += 24.0
+        bomb.bonus["area"] += 10.0
+        bomb.bonus["blast_radius_mult"] *= 1.3
+        rows = dict((label, (base, now)) for label, base, now in weapon_numbers(bomb))
+        base, now = rows["Blast radius"]
+        self.assertEqual(base, f"{base_r:g}")
+        self.assertEqual(now, f"{(base_r + 24 + 10) * 1.3:g}")
+        self.assertEqual(now, f"{bomb._blast_radius(1.0):g}")
+
     def test_synergy_rows_pair_the_weapons(self):
         names = {wid: d["name"] for wid, d in self.ps.content.weapons.items()}
         rows = synergy_rows(self.ps.player, self.ps.catalog, names)
@@ -309,6 +324,38 @@ class EntryTests(unittest.TestCase):
         pushed = game.state_machine.pushed
         self.assertEqual(len(pushed), 1)
         self.assertIsInstance(pushed[0][0], RunStatusState)
+
+
+class TabShadeTests(unittest.TestCase):
+    """An inactive tab is darkened through the ribbon's own alpha (owner,
+    2026-09-12): the transparent surround stays transparent and only the
+    ribbon's pixels get darker. Checked on the flat fallback (no assets),
+    whose rounded corners are transparent like the art's forked ends."""
+
+    @classmethod
+    def setUpClass(cls):
+        _display()
+
+    def _tabs(self):
+        from game import fonts
+        from ui.run_status.common import tab_surface
+        f = fonts.heading(22)
+        return (tab_surface(None, (320, 48), "Build", "yellow", f, active=True),
+                tab_surface(None, (320, 48), "Build", "yellow", f, active=False))
+
+    def test_the_shade_leaves_the_transparent_surround_alone(self):
+        active, inactive = self._tabs()
+        for corner in ((0, 0), (319, 0), (0, 47), (319, 47)):
+            self.assertEqual(active.get_at(corner)[3], 0)
+            self.assertEqual(inactive.get_at(corner)[3], 0)
+
+    def test_the_shade_darkens_the_ribbon_and_keeps_its_alpha(self):
+        active, inactive = self._tabs()
+        px, py = 40, 24                      # on the ribbon, off the label
+        a, b = active.get_at((px, py)), inactive.get_at((px, py))
+        self.assertEqual(a[3], b[3])
+        self.assertLess(sum(b[:3]), sum(a[:3]))
+        self.assertGreater(a[3], 0)
 
 
 if __name__ == "__main__":

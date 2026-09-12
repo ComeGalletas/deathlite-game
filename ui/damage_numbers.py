@@ -3,6 +3,9 @@
 Numbers rise and fade. Crits render larger and in the accent colour; damage the
 hero *takes* renders red and 25% larger than the common number, so the player
 reads build spikes -- and their own health draining -- at a glance.
+
+CB-8: a healing number (a collected health potion) renders green with a `+`,
+at the incoming size, so a heal is as loud as a hit.
 """
 from __future__ import annotations
 
@@ -14,10 +17,12 @@ from systems.object_pool import Pool
 _BASE_PT = 16
 _CRIT_PT = 22
 _IN_PT = round(_BASE_PT * 1.25)       # incoming damage: 25% bigger than common
+_HEAL_COLOR = (120, 230, 140)         # CB-8: a collected health potion
 
 
 class DamageNumber:
-    __slots__ = ("active", "pos", "text", "life", "max_life", "crit", "incoming")
+    __slots__ = ("active", "pos", "text", "life", "max_life", "crit", "incoming",
+                 "healing")
 
     def __init__(self) -> None:
         self.active = False
@@ -27,6 +32,7 @@ class DamageNumber:
         self.max_life = 0.6
         self.crit = False
         self.incoming = False
+        self.healing = False
 
     def update(self, dt: float) -> None:
         self.pos.y -= 38 * dt  # drift upward
@@ -56,15 +62,17 @@ class DamageNumbers:
         return trio
 
     def add(self, pos: pygame.Vector2, amount: float, crit: bool = False,
-            incoming: bool = False) -> None:
+            incoming: bool = False, healing: bool = False) -> None:
         n = self._pool.acquire()
         if n is None:
             return
         n.pos.update(pos.x, pos.y - 10)
-        n.text = str(int(round(amount)))
+        whole = int(round(amount))
+        n.text = f"+{whole}" if healing else str(whole)
         n.life = n.max_life = 0.6
         n.crit = crit
         n.incoming = incoming
+        n.healing = healing
 
     def update(self, dt: float) -> None:
         for n in self._pool:
@@ -75,7 +83,9 @@ class DamageNumbers:
         font, font_crit, font_in = self._fonts(getattr(camera, "zoom", 1.0))
         for n in self._pool:
             frac = max(0.0, min(1.0, n.life / n.max_life))
-            if n.incoming:
+            if n.healing:
+                fnt, colour = font_in, _HEAL_COLOR
+            elif n.incoming:
                 fnt, colour = font_in, config.COLOR_DAMAGE_IN
             elif n.crit:
                 fnt, colour = font_crit, config.COLOR_ACCENT

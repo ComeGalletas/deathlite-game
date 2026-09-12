@@ -78,6 +78,14 @@ def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
         now = base
         if key == "cooldown":
             now = base * float(b.get("cooldown_mult", 1.0))
+        elif key == "blast_radius":
+            # The Bomb's blast is part of the area system (`_blast_radius`):
+            # the flat adds land inside, `bonus["area"]` with them, and the
+            # Blast Amplifier multiplier scales the total. The hero's own
+            # `area_multiplier` stays out, like every other row here.
+            now = ((base + float(b.get("blast_radius", 0.0))
+                    + float(b.get("area", 0.0)))
+                   * float(b.get("blast_radius_mult", 1.0)))
         elif bkey is not None:
             now = base + float(b.get(bkey, 0.0))
         out.append((label, _fmt(base, kind), _fmt(now, kind) if abs(now - base) > 1e-9 else None))

@@ -12,8 +12,8 @@ from world.gen.height.graph import walk_links
 from world.gen.settings import settings_or_config
 from world.layout import VSTAIR, EWSTAIR
 from world.gen.tuning import (
-    SPECIAL_KINDS, VILLAGE_KIND, _OBSTACLE_GAP, _TREE_DENSITY_BOOST,
-    _TREE_TREE_GAP_GRID, _TREE_THICKET_MIN_GRID, _TREE_THICKET_MAX_GRID,
+    SPECIAL_KINDS, VILLAGE_KIND, _OBSTACLE_GAP, _PAIR_GAPS,
+    _TREE_DENSITY_BOOST, _TREE_THICKET_MIN_GRID, _TREE_THICKET_MAX_GRID,
     _HOUSE_RADIUS, _HOUSE_ROOM_CHANCE,
     _HOUSE_MIN_ROOM_CELLS, _HOUSE_GLOBAL_CAP, _VILLAGE_MIN_ROOM_CELLS,
     _VILLAGE_EXTRA, _VILLAGE_RADIUS,
@@ -59,14 +59,6 @@ def _doors_near(doors, rect, pad: int) -> list:
     return [d for d in doors if d.colliderect(box)]
 
 
-def _tree_spacing(room):
-    """`(tree_gap, thicket_min, thicket_max)`: canopy spacing, see
-    `tuning._TREE_TREE_GAP_GRID`. Read through one helper so the scatter and
-    the top-up cannot pick different answers."""
-    return (_TREE_TREE_GAP_GRID, _TREE_THICKET_MIN_GRID,
-            _TREE_THICKET_MAX_GRID)
-
-
 def _uphill_ok(room, x: float, y: float, kind: str, reach: dict, px: int) -> bool:
     """May an obstacle of `kind` stand here without its art reaching onto a
     terrace above the one it stands on?
@@ -84,14 +76,8 @@ def _uphill_ok(room, x: float, y: float, kind: str, reach: dict, px: int) -> boo
 
 
 def _radius(kind: str) -> float:
-    """The radius `_blocks` should test this obstacle with.
-
-    Zero for `shrub`, which makes `_blocks` fall back to the centre test: it
-    rides the weighted pick so the spacing draws stay where they were, but it
-    is decoration, dropped before the list is returned, with no entry in
-    `KINDS` and nothing to intrude with."""
-    entry = KINDS.get(kind)
-    return float(entry[0]) if entry else 0.0
+    """The radius `_blocks` should test this obstacle with."""
+    return float(KINDS[kind][0])
 
 
 def _flight_keepouts(rooms) -> list:
@@ -153,10 +139,8 @@ def _corridor_doorways(rooms, corridors) -> dict:
 
 
 # The fallback mix for a terrace whose biome declares no `scatter` block.
-# `shrub` is decoration -- dropped before the list is returned -- and rides
-# the pick only so the spacing draws stay where they were.
-_DEFAULT_KINDS = ("tree", "rock", "pillar", "shrub")
-_DEFAULT_WEIGHTS = (4, 3, 2, 3)
+_DEFAULT_KINDS = ("tree", "rock", "pillar")
+_DEFAULT_WEIGHTS = (4, 3, 2)
 
 
 def _biome_batches(room) -> list:
@@ -281,13 +265,12 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
         # reaches four tiles north where a boulder reaches half of one, so
         # trees are rejected far more often. A slot that cannot seat its kind
         # simply goes unfilled, which costs density and keeps the mix honest.
-        tree_gap, _tmin, _tmax = _tree_spacing(room)
         for fam, floor, kinds, weights, density in batches:
             for _ in range(density):
                 # Kind is drawn before the position either way, so the
-                # placement gap can depend on it: tree-next-to-tree keeps only
-                # `_TREE_TREE_GAP_GRID` (groves), every other pairing keeps the full
-                # `_OBSTACLE_GAP`.
+                # placement gap can depend on it: `_PAIR_GAPS` holds the
+                # pairings that differ (tree next to tree, for groves) and
+                # every other pairing keeps the full `_OBSTACLE_GAP`.
                 kind = rng.choices(kinds, weights=weights, k=1)[0]
                 for _try in range(tries):
                     if floor:
@@ -306,33 +289,24 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
                     if not _uphill_ok(room, x, y, kind, reach, px):
                         continue
                     if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
-                           < (o.radius + (tree_gap
-                                          if kind == "tree" and o.kind == "tree"
-                                          else _OBSTACLE_GAP)) ** 2
+                           < (o.radius
+                              + _PAIR_GAPS.get((kind, o.kind), _OBSTACLE_GAP)) ** 2
                            for o in out):
                         continue
-                    ob = Obstacle(kind, x, y)
+                    # Cosmetic decoration variant (see world/map.py), drawn
+                    # here rather than in a pass of its own: that pass existed
+                    # only to keep the draw order byte-identical to before the
+                    # variants were added, and `_topup_trees` had to run after
+                    # it for the same reason. Houses carry a colour/type
+                    # `variant` from `_scatter_houses` instead.
+                    ob = Obstacle(kind, x, y, rng.randint(1, 4))
                     ob.biome = fam
                     out.append(ob)
                     break
 
-    # Cosmetic decoration variant per obstacle (see world/map.py). Assigned in a
-    # separate pass so placement above is byte-identical to before this existed.
-    # Houses already carry a colour/type `variant` from `_scatter_houses`.
-    for o in out:
-        if o.kind != "house":
-            o.variant = rng.randint(1, 4)
-
-    # Global +25% tree top-up, clumped into the existing groves. Runs after the
-    # variant pass so every obstacle above keeps its exact `variant` draw.
+    # Global +25% tree top-up, clumped into the existing groves.
     _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach)
-
-    # Bushes are non-colliding decoration now, not obstacles. They still ride the
-    # weighted pick above (and consume a `variant` draw) so the `(radius + gap)`
-    # spacing and every downstream RNG value stay byte-identical to when `shrub`
-    # was a real obstacle; they are simply dropped from the returned list here.
-    # data/terrain.json `decorations` (bush_a..d) scatters the visible bushes.
-    return [o for o in out if o.kind != "shrub"]
+    return out
 
 
 def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach) -> None:
@@ -340,7 +314,8 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach) -> None:
     placed 0.55-1.5 tiles from a randomly chosen existing tree (drawn uniformly
     across the whole world -> a global boost) and kept on that tree's room floor,
     clear of corridor doorways and special-room centre discs. Tree<->tree spacing
-    is the tight `_TREE_TREE_GAP_GRID`; everything else keeps `_OBSTACLE_GAP`."""
+    is the tight one `_PAIR_GAPS` lists; everything else keeps
+    `_OBSTACLE_GAP`."""
     if _TREE_DENSITY_BOOST <= 0:
         return
     px = config.TILE_PX
@@ -381,8 +356,8 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach) -> None:
         rr = room.rect
         cellset = room.cells
         centres, clear, doors = room_clear[room.id]
-        tree_gap, thicket_min, thicket_max = _tree_spacing(room)
-        off = pygame.Vector2(rng.uniform(thicket_min, thicket_max), 0)
+        off = pygame.Vector2(rng.uniform(_TREE_THICKET_MIN_GRID,
+                                         _TREE_THICKET_MAX_GRID), 0)
         off.rotate_ip(rng.uniform(0, 360))
         x, y = anchor.pos.x + off.x, anchor.pos.y + off.y
         col, row = int((x - rr.left) // px), int((y - rr.top) // px)
@@ -397,7 +372,7 @@ def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach) -> None:
             continue
         gap_hit = False
         for o in out:
-            gap = tree_gap if o.kind == "tree" else _OBSTACLE_GAP
+            gap = _PAIR_GAPS.get(("tree", o.kind), _OBSTACLE_GAP)
             if (x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < (o.radius + gap) ** 2:
                 gap_hit = True
                 break

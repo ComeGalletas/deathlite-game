@@ -46,7 +46,7 @@ byte-identical `WorldLayout`. Steps, in order:
 4. **Assign roles.** `_distances(rooms, start_id)` (`world/gen/graph.py`) BFS
    from room 0; the farthest room becomes `boss_id`. `_assign_kinds(…)` labels
    the six special rooms (`SPECIAL_KINDS` in `world/gen/tuning.py`:
-   `shrine`, `treasure`, `fountain`, `altar`, `merchant`, `elite_arena`).
+   `shrine`, `treasure`, `altar`, `merchant`).
 
 5. **Carve room floor shapes.** Each `Room.cells` is a `frozenset` of
    **room-relative** `(col, row)` tile coordinates.

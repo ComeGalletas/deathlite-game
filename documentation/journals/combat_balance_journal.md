@@ -1205,3 +1205,479 @@ time-to-kill pass and not a threat or economy pass.
 - The fixed +50 % floor means anything authored above ~260 HP in future gets
   the same treatment regardless of how much bigger it is; if a second boss
   lands, reconsider whether bosses belong on this curve at all.
+
+---
+
+## CB-9 · Treasure chests: world-placed loot in four rarities
+
+**Status:** **DONE** 2026-09-12. Design confirmed with the owner, who settled
+the two open balance questions (below). Built, tested and screenshotted;
+verification at the end of this entry.
+
+### Requirement (user, 2026-09-12)
+
+> "add randomly spawned chests in the world after the generation completed.
+>
+> chests should come in 3 rarities, common, uncommon, rare and epic.
+>
+> each rarity includes:
+> * health potions of the respective rarity, epic chests always drop rare
+>   potions.
+> * gold: amount starts from 10-25 base and increases per rarity. random amount
+>   in a specific range
+>
+> common: only includes these items.
+> uncommon: might include a common blessing
+> rare: includes a blessing, common or uncommon blessing, with higher chance for
+> common blessings.
+> epic: includes a blessing, uncommon or rare, with higher chance for uncommon.
+>
+> there can only be a max of 5 chests per island, with an average of 2-3.
+>
+> rare chests should be a max of 1 if there are.
+>
+> `assets\items\chests` contains a sprite sheet of many colored chests, choose
+> the ones that fit the color scheme the best and make specific .pngs for each
+> one instead of using the big one."
+
+### Confirmed reading
+
+- **Four tiers, not three.** The line says "3 rarities" and then names four.
+  Read as **four** -- `common`, `uncommon`, `rare`, `epic` -- because the rest
+  of the brief gives each of the four its own contents rule, and `epic` is
+  already a rarity the codebase knows (`progression/items.py RARITIES`,
+  `meta_state._RARITY_COLOR`). Three would leave `epic` with nowhere to go.
+- **Potions are the CB-8 kind, and there are only three of those.** So the
+  "respective rarity" mapping is common -> common, uncommon -> uncommon,
+  rare -> rare, and **epic -> rare** exactly as the brief spells out; there is
+  no epic potion to author.
+- **One potion per chest, always** (owner, 2026-09-12): *"keep only ONE potion
+  per chest, what increases is the rarity of it."* A richer chest is a better
+  potion, never more of them, so an epic and a rare chest hand out the same
+  single rare potion and the epic's edge is its gold and its blessing tier.
+- **"after the generation completed" is literal.** The chests are a **stage of
+  world generation**, not a run-time spawner: the seed decides where every
+  chest is and what tier it is, the same way islands, obstacles and spawn
+  points are decided. The same seed gives the same chests every run.
+- **Counts are per island.** Max 5, average 2-3, and at most 1 `rare` chest on
+  any one island.
+
+### What already exists (this feature is mostly a consumer)
+
+Nothing here is new ground -- the hooks were built and left unused:
+
+- **`layout.resource_points` is already the chest placement.**
+  `world/gen/spawnpoints.py` emits `_RESOURCE_POINTS_PER_ISLAND = 8` anchors
+  per island, each already: on plain ground inside its terrace margin, clear of
+  obstacles, outside every bridge mouth, at least 2 tiles off an enemy spawn
+  point, at least 2 tiles off the straight line between bridge mouths ("so loot
+  is found by looking around, not by walking through"), farthest-point spaced,
+  and **preferring cells that touch a cliff or an obstacle _so a chest has
+  something to sit against_**. Its `kind` hint is already drawn from
+  `("chest", "breakable", "ambient")` at weights `(2, 3, 5)`. The type's own
+  docstring says "nothing consumes them yet". CB-9 is the consumer.
+- **Village islands already carry no anchors** (`place_points` skips
+  `VILLAGE_KIND` -- the sanctuary rule), so no chest lands in a village for
+  free, with no extra code.
+- **CB-8 gave us the potion drop**: the `HealthPotion` pool on `PlayingState`,
+  heal / sprite / colour off `data/potions.json`, and the pickup gate that
+  leaves a potion lying on the ground until the hero is actually hurt.
+- **Gold already exists** as `ps.stats["gold"]` -- 1 per kill, 2 per elite,
+  scaled by Gold Rush, spent only at the Merchant, never banked.
+- **Blessing rolls already carry a rarity**: `Upgrade.rarity` is set from the
+  blessing definition (`progression/blessings/offer.py`). `blessing_offers`
+  filters by `kind` but **not** by rarity -- a `rarities=` keyword is the one
+  API addition CB-9 needs from the blessing package.
+- **`Interactable` already has a `treasure` kind** -- "E  Chest - claim an
+  item", the one-off at the centre of the treasure island that calls
+  `_drop_item`. That is a *different thing* from CB-9 and is left alone; see
+  the open questions.
+
+### The sheet (`assets/items/chests/chests.png`)
+
+384 x 256, 32 px cells -> 12 x 8. Measured, not assumed:
+
+- **The three columns of every family are pixel-identical.** The sheet is a 3x
+  horizontal duplicate, so the real content is **4 column-families x 8 rows =
+  8 chest skins, 4 frames each**.
+- **The four rows of a skin are an open animation**, in order: `closed` (idle),
+  `squash` (wide and low -- the anticipation), `stretch` (tall and narrow --
+  the lid snapping up), `open` (settled, interior visible). Classic
+  squash-and-stretch; the bounding boxes confirm it (25 px tall -> 20 -> 31 ->
+  31).
+- The eight skins are: **red + gold**, **overgrown vine** (green leaves, red
+  flowers, gold), **royal blue + gold**, **ornate gold reliquary**;
+  **purple + gold**, **plain wood**, **iron bars**, **pale bone with a blue
+  gem**.
+
+### The art picks
+
+Mapped onto the rarity ink the game **already** uses everywhere else --
+`config.RARITY_COLOURS` (common grey, uncommon green, rare blue),
+`ui/run_status/common.py RARITY_ON_DARK`, `meta_state._RARITY_COLOR` (epic
+purple). A chest's colour should read as its tier from across the island
+without a label, and the cheapest way to get that is to obey the colour code
+the player already learned on the level-up cards.
+
+| Tier | Skin | Why |
+| --- | --- | --- |
+| common | **plain wood** | Humble and neutral, the way common reads on every card. |
+| uncommon | **overgrown vine** | The only green skin, and uncommon is green everywhere in the UI. |
+| rare | **royal blue + gold** | Rare is blue in all three rarity tables. |
+| epic | **purple + gold** | Epic is purple in the meta screen; the gold trim escalates cleanly off the blue. |
+
+**Not used, and why:** *red + gold* -- red is the damage / danger ink in this
+game and a red chest would read as a threat; *ornate gold reliquary* -- it is a
+crown-and-skull prop, not a chest, and is worth reserving for a legendary tier
+or a boss reward; *iron bars* and *pale bone* -- cold greys that fight the warm
+Tiny Swords palette the islands are painted in.
+
+### The cut PNGs
+
+One file per chosen chest, as asked -- a horizontal 4-frame strip, which is the
+pattern the Grave Totem set (`utilities/cut_totem_sheets.py`, assets journal):
+
+| File | Source (col-family, row-group) | Size |
+|---|---|---|
+| `assets/items/chests/chest_common.png` | wood (cols 3-5, rows 4-7) | 128 x 32 |
+| `assets/items/chests/chest_uncommon.png` | vine (cols 3-5, rows 0-3) | 128 x 32 |
+| `assets/items/chests/chest_rare.png` | blue (cols 6-8, rows 0-3) | 128 x 32 |
+| `assets/items/chests/chest_epic.png` | purple (cols 0-2, rows 4-7) | 128 x 32 |
+
+Cut by a new `utilities/cut_chest_sheets.py`, reproducible from `chests.png`,
+which stays in the folder as the source with nothing reading it. The strip
+keeps the open animation available without a second cut; a first pass may draw
+frame 0 closed and frame 3 open and ignore the two middle frames.
+
+Rig, in `data/prop_sprites.json` beside the potions (`frame [32, 32]`,
+`grid [4, 1]`). `scale` grows a little with tier, the way the potion rigs
+already do (16 / 18 / 20): **28 / 30 / 32 / 34**. The interaction radius is 24,
+matching the existing `treasure` interactable.
+
+### The placement rule
+
+A new **last** stage of `generate_world_steps`, after `place_points` (it reads
+the anchors that stage writes):
+
+1. Per island, skip villages (they have no anchors anyway) and draw a chest
+   count from `count_weights` -- `{1: 20, 2: 35, 3: 25, 4: 15, 5: 5}`, mean
+   **2.50**, max **5**, exactly the brief.
+2. Draw each chest's tier from `rarity_weights`, rejecting a draw that would
+   break a cap (`rare` <= 1 per island, `epic` <= 1 per island) and re-rolling
+   down to `common`.
+3. Seat them on that island's `resource_points`, **`kind == "chest"` anchors
+   first** (that hint averages 1.6 per island, so it covers most of a 2-3 draw)
+   and topping up from the remaining anchors, richest tier seated first so the
+   epic gets the best-sheltered spot.
+4. Emit `layout.chests: list[Chest]` -- a `NamedTuple` beside `ResourcePoint`:
+   `room_id, floor, x, y, rarity`.
+
+**RNG:** a private `random.Random(seed * 104729 + room.id)`, the same trick
+`_island_resource_points` uses, so the stage draws **nothing** from the world's
+stream and moves no room, bridge, obstacle or spawn point.
+
+**Digest note:** `world/digest.py` walks the model generically, so
+`layout.chests` is fingerprinted the day the field is added. The *layout*
+digest in `tests/world/digests.json` will change and must be rewritten
+(`python -m world.digest --write`); the bake and frame digests must **not**
+move, and that is the check that the stage is additive.
+
+### The loot tables -- `data/chests.json`
+
+Per `data-driven-no-code-defaults`, every number below lives in the JSON and
+the code keeps only the rarity taxonomy.
+
+```json
+{
+  "rarities": ["common", "uncommon", "rare", "epic"],
+  "per_island": {
+    "count_weights":  {"1": 20, "2": 35, "3": 25, "4": 15, "5": 5},
+    "rarity_weights": {"common": 58, "uncommon": 30, "rare": 9, "epic": 3},
+    "caps":           {"rare": 1, "epic": 1}
+  },
+  "chests": {
+    "common":   {"sprite": "chest_common",   "color": [176, 140, 96],
+                 "gold": [10, 25],  "potion": "common"},
+    "uncommon": {"sprite": "chest_uncommon", "color": [110, 200, 120],
+                 "gold": [20, 40],  "potion": "uncommon",
+                 "blessing": {"chance": 0.35, "weights": {"common": 1.0}}},
+    "rare":     {"sprite": "chest_rare",     "color": [90, 160, 240],
+                 "gold": [35, 65],  "potion": "rare",
+                 "blessing": {"chance": 1.0,
+                              "weights": {"common": 0.65, "uncommon": 0.35}}},
+    "epic":     {"sprite": "chest_epic",     "color": [190, 120, 240],
+                 "gold": [60, 100], "potion": "rare",
+                 "blessing": {"chance": 1.0,
+                              "weights": {"uncommon": 0.65, "rare": 0.35}}}
+  },
+  "potion_lift": 16
+}
+```
+
+The gold ladder starts at the requested 10-25 and roughly doubles a tier. The
+blessing weights are the brief's "higher chance for X" read as **65 / 35** --
+clearly weighted, not a coin flip.
+
+### Opening a chest
+
+`E`, like every other interactable, and one-shot. On open: play the strip once,
+credit the gold immediately (a number that flies up, as the Merchant's spend
+does), put the potion **on the chest** as a real `HealthPotion` drop, and --
+where the tier has one -- grant the blessing directly with a particle burst and a notice, exactly as
+`SpecialLocations.grant_random_blessing` does for the shrine.
+
+**Direct grant, not a card overlay.** That is the shrine's precedent, and with
+~19 chests in a world a `LevelUpState` push per chest would stop the run three
+or four times an island.
+
+**The potion lands on the chest, not beside it** (owner, 2026-09-12). An
+earlier pass spilled it onto a ring around the chest; the owner asked for it on
+top, *"so the sprite also lands above"*. Both halves of that are real work:
+
+- **Position.** `potion_lift` (16 px) centres the potion above the chest's
+  baseline, which is inside the open box's mouth -- a chest's art stands about
+  30 px off that baseline, so 16 sits the potion in it rather than floating
+  over the lid. Loot now reads as coming *out of* the chest it was found in.
+- **Draw order.** `WorldRenderer.potions` runs after `WorldRenderer.chests` in
+  the banded flat pass, so the chest never paints over a potion sitting in it.
+  Pinned by `DrawOrderTests` rather than left to the order of two lines.
+
+Because CB-8 potions are not collected while the hero is at full HP, opening a
+chest at full health leaves its potion sitting in the open box as a stash to
+come back to. That is a happy accident of the existing rule and worth keeping.
+
+### Balance: what this actually adds to a run
+
+A world is 9 islands, 1-2 of them villages, so **~7.5 islands x 2.5 = ~19
+chests** per world:
+
+| Tier | Expected per world | Gold | Potion HP | Blessings |
+| --- | ---: | ---: | ---: | ---: |
+| common | ~11 | ~190 | ~165 | -- |
+| uncommon | ~5.6 | ~170 | ~140 | ~2.0 |
+| rare | ~1.7 | ~85 | ~85 | 1.7 |
+| epic | ~0.6 | ~45 | ~30 | 0.6 |
+| **total** | **~19** | **~490** | **~420** | **~4.3** |
+
+Three things fall out of that table, and the first is a problem:
+
+- **Gold has no sink, and that is accepted.** A world hands out ~490 gold
+  against exactly one Merchant charging 30 (`_assign_kinds` places one of each
+  special kind), and `gold` is "spent in-run at the Merchant only, never
+  banked". Put to the owner, who ruled: **leave the Merchant exactly as it is
+  -- "for now it doesn't do anything, gold consumption is still work in
+  progress."** So CB-9 ships the brief's gold amounts untouched and does not
+  re-tune them or the Merchant to paper over the gap; the sink is its own
+  future feature.
+- **~4.3 free blessings** on top of a level-up curve that gives maybe 12-18 in
+  a 600 s run -- a ~25-35 % power bump. That is a real but defensible
+  contribution, and `rarity_weights` is the single dial if it plays too rich.
+- **~420 HP of chest healing**, against a 160 HP Aegis and a squishier Kestrel
+  / Nihil, *on top of* CB-8's enemy drops. It is spread over a whole world and
+  gated behind walking to each chest, so probably fine -- but it is the number
+  to watch first in a playtest. With the count fixed at one, its only dials are
+  the potion rarity a tier hands out and the CB-8 `heal` values themselves.
+
+### Decisions the request left open -- my calls
+
+- **Tier caps.** The brief caps `rare` at 1 per island and says nothing about
+  `epic`. Capping only the second-best tier while the best is uncapped is
+  clearly not the intent, so **`epic` is capped at 1 per island too.**
+- **Minimum one chest per island.** `count_weights` has no `0` entry, so every
+  non-village island has something. Adding `"0": n` is a one-line change if
+  empty islands are wanted for variety.
+- **One potion per chest** (the owner's call, not mine -- I had proposed
+  1 / 1 / 2 / 3 by tier and was corrected). The tier buys a *better* potion,
+  never more of them, so `potion` in the data is a bare rarity string rather
+  than a rarity-and-count object.
+- **And it sits on the chest**, also the owner's call, also correcting me: the
+  golden-angle spill ring is gone. With one potion per chest and every chest on
+  its own anchor, nothing needs spreading.
+- **Chests spawn on the start and boss islands.** Both get resource anchors
+  today. The start island's opener is a gentle tutorial for the prop; the boss
+  island's chest is a reward for clearing it.
+- **Its own modules, not an extra `Interactable` kind**
+  (`modular-subpackage-preference`): `entities/chest.py` (the prop and its
+  animation state), `game/states/playing/chests.py` (build from the layout,
+  `nearby()`, open, update), `progression/chests.py` (pure loot rolls),
+  `world/gen/chests.py` (the placement stage). `Interactable` stays what it is
+  -- the special-room one-offs -- and the `E` handler asks the chests after it
+  asks the locations.
+
+### Open questions -- resolved 2026-09-12
+
+1. **The gold sink.** *Answered:* the Merchant stays exactly as it is. The
+   owner: "keep the merchant as is for now, for now it doesn't do anything,
+   gold consumption is still work in progress." Chest gold ships at the
+   brief's numbers.
+2. **Potions per chest.** *Answered:* one, always; the rarity is what climbs.
+3. **The treasure island's existing chest.** Not raised again, so it is left
+   alone: `Interactable("treasure")` stays an item chest, distinct from CB-9
+   loot chests.
+4. **Rare / epic on the start island.** Not raised again, so no tier cap there
+   -- the first island rolls like every other one.
+
+### Checklist -- all done 2026-09-12
+
+- [x] 1. `utilities/cut_chest_sheets.py` -- cuts the four 128 x 32 strips and
+      has a `--check` mode a test runs, so a re-cut can never drift from what
+      is committed.
+- [x] 2. `data/prop_sprites.json` -- four rigs, `frame [32,32]`, one `open`
+      anim of 4 frames at 12 fps, `scale` 28 / 30 / 32 / 34, anchor
+      bottom-centre on the pack's own baseline (30 of the 32 px cell).
+- [x] 3. `data/chests.json` + `_check_chests` in `game/content.py`, which
+      validates the tier coverage, the gold ranges, the potion rarities
+      against `potions.json` and the blessing rarities against the catalog.
+- [x] 4. `world/layout.py` -- the `Chest` NamedTuple and `WorldLayout.chests`.
+- [x] 5. `world/gen/chests.py` + the stage at the end of
+      `generate_world_steps`; `_CHEST_*` constants in `world/gen/tuning.py`.
+- [x] 6. `progression/chests.py` -- gold, potion rarity and blessing rarity,
+      pure, RNG passed in.
+- [x] 7. `progression/blessings/offer.py` -- a `rarities=` filter on
+      `blessing_offers` / `valid_offers` / `roll_offering`.
+- [x] 8. `entities/chest.py` and `game/states/playing/chests.py`; the `E`
+      dispatch asks the locations first, then the chests; the potion is placed
+      on the chest by `potion_lift`.
+- [x] 9. `game/states/playing/rendering.py` -- `chests()` in the banded flat
+      pass, with the disc fallback when the art is missing.
+- [x] 10. Tests: `tests/world/test_chests.py` (17),
+      `tests/progression/test_chests.py` (26),
+      `tests/systems/test_chest_open.py` (30),
+      `tests/rendering/test_chest_sprite.py` (11).
+- [x] 11. Screenshots delivered: the four tiers closed and open, and a real
+      seed-7 island with a chest against a cliff and its prompt showing.
+
+### Verification (CB-9)
+
+**Digests.** Exactly what an additive stage should do: the **layout** digest
+moved for all four pinned seeds and the **bake** and **draw** digests are
+byte-identical, because `world/digest.py` walks the model generically and
+`layout.chests` is a new field on it. Rewritten once, deliberately, with
+`python -m world.digest --write`:
+
+| seed | layout before | layout after | bake | draw |
+| --- | --- | --- | --- | --- |
+| 35 | `5b14e5e8d5189f3a` | `066aa8b0d593818a` | unchanged | unchanged |
+| 7 | `d878271dfaba1aa0` | `03256cd4df53c7d7` | unchanged | unchanged |
+| 1234 | `44e157018dcd1e50` | `4fe57d3805bed8b0` | unchanged | unchanged |
+| 42 | `dbb8420cd93359e2` | `017a95b9d44649a3` | unchanged | unchanged |
+
+`tests/world/test_chests.py` pins the purity a second way: re-running
+`place_chests` on a finished layout leaves the islands, bridges, obstacles,
+spawn points and anchors hashing identically and seats exactly the same
+chests.
+
+**What the shipping seeds actually produce** -- inside every rule, and close
+to the predicted ~19:
+
+| seed | chests | islands | max / island | mix |
+| --- | ---: | ---: | ---: | --- |
+| 35 | 17 | 7 | 4 | 13 common, 3 uncommon, 1 rare |
+| 7 | 19 | 8 | 5 | 12 common, 2 uncommon, 4 rare, 1 epic |
+| 1234 | 18 | 7 | 4 | 10 common, 5 uncommon, 2 rare, 1 epic |
+| 42 | 15 | 7 | 4 | 9 common, 4 uncommon, 2 rare | 
+
+Over a 40-seed sweep the mean is inside the brief's 2-3 per island. Villages
+carry none on every seed.
+
+**Test suite.** The four new modules are **87 tests and 280 subtests**, all
+passing. The whole suite, run in two halves: **1938 passed, 2 skipped, 416
+subtests**, with two failures, **neither caused by this change**:
+
+- `tests/rendering/test_menu.py — CharacterSelectInstructionsTests::test_content_comes_from_config`
+  (`743 != 742`) -- the pre-existing failure CB-6 already documented, fallout
+  from `8d9aa98 "Hero select: instruction rows start one line higher"`.
+- `tests/rendering/test_totem_sprite.py — SheetTests::test_the_strips_are_what_the_cutting_script_produces`
+  failed once, mid-build, because the totem workstream had moved
+  `Fire_Totem_blue-Sheet.png` into `assets/effects/weapons/grave_totem/unused/`
+  while this entry was being written. That workstream put it back and the test
+  passes again (13 passed). Recorded only because it shows up in the run that
+  verified CB-9; nothing here touched it.
+
+A third, `tests/rendering/test_projectiles.py — RegistryTests::test_every_family_is_registered`,
+failed once in the same window and passes in isolation and on a clean re-run:
+`data/weapon_sprites.json` was being edited by that same workstream while the
+suite read it.
+
+### Things found while building it
+
+- **Every `rare` blessing in the catalog is a weapon blessing** -- 16 of them,
+  and there is no rare *stat* blessing. So an epic chest that rolls `rare` can
+  find nothing to give a hero whose weapons have no rare blessing left.
+  `Chests._grant_blessing` therefore falls back a step at a time -- the rolled
+  rarity, then any rarity, then nothing -- rather than paying out an empty
+  chest. Pinned in `tests/progression/test_chests.py`.
+- **A world can hold several rare chests.** The cap is one *per island*, which
+  is how the brief reads next to "max of 5 chests per island", so seed 7 seats
+  four of them across four different islands. If the intent was one rare chest
+  per **world**, that is a one-line change to `world/gen/chests.py` and nothing
+  else moves.
+- **The chest prompt is plain white**, not the tier colour. A wood-brown
+  "Common chest - open it" was the dimmest text on screen; the chest's own art
+  and the word in the prompt already say which tier it is.
+- **A chest opened at full HP leaves its potion on the ground**, because CB-8
+  potions refuse to be collected by a full-health hero. Kept on purpose: it
+  turns a chest into a stash you can come back to.
+
+### Follow-ups (not blocking)
+
+- **The gold sink** is the known gap, deliberately left alone at the owner's
+  instruction. When gold consumption becomes its own feature, ~490 gold a
+  world is the number it has to absorb.
+- **`stats["chests"]`** counts chests opened but nothing displays it. It is
+  there for the balance playtest; the game-over résumé could show it beside
+  potions if it proves interesting.
+- **Four skins are unused** -- red + gold, the ornate gold reliquary, iron bars
+  and pale bone. The reliquary is the obvious art for a legendary tier or a
+  boss reward if either ever lands.
+
+---
+
+## CB-8 tuning table vs the enemy roster (2026-09-12)
+
+`data/potions.json` is fitted to `data/enemies.json` — the drop curve's ends
+are the weakest and strongest non-boss enemies, and the rarity bands are HP
+thresholds. That coupling is invisible from either file, and an HP rebalance
+broke it: with Ravager at 185→125 and Warden at 390→290 but the table still
+carrying `hp_max: 390` and a rare bound of 185, five potion tests failed at
+once. The arithmetic is exact — brute at 290 against a stale `hp_max` of 390
+gives a 0.21847 drop chance, and the suite measured 0.22125 over 20,000 rolls
+(0.9σ apart) — and Ravager, having fallen out of the rare band, could roll
+common potions, breaking a hard rule.
+
+**Two changes, so the next rebalance says so plainly rather than scattering
+failures.**
+
+**The band bounds moved off the data points: 40 / 125 → `45` / `105`.** The
+split is byte-for-byte the same (rare is still exactly the two `is_elite`
+enemies), but 125 *was* Ravager's exact HP — shave one point off it in a
+rebalance and it silently changes band. Each bound now sits near the middle of
+the gap it divides (45 between teleporter 36 and charger 55; 105 between
+summoner 87 and elite 125), so the smallest margin in the roster went from
+**0 to 9**.
+
+**`tests/progression/test_potions.py` derives from the data instead of
+restating it.** It had hard-coded `0.25`, the enemy name `brute`, the roster
+lists per band and `len(common) == 7` — so a rebalance produced five opaque
+failures across three classes. Now:
+
+* A new `TableMatchesTheRosterTests` owns the coupling and names the stale
+  number: *"drop_chance.hp_max is stale: the strongest enemy is now brute at
+  290"*. It also asserts no enemy sits exactly on a band edge, which is the
+  trap above.
+* The cap / floor tests derive both the enemy (`max(ROSTER, key=base_hp)`) and
+  the value from the table.
+* The hard-coded band rosters became invariants — every enemy in exactly one
+  band, bands never interleave on HP — with `rare == is_elite` kept as *the*
+  design rule.
+* The two hand-listed exclusion tests merged into one that reads the forbidden
+  set per enemy off the weights table, so neither the roster nor the weights
+  can go stale in it.
+* The rate test asserts `roll()` honours `drop_chance()` rather than restating
+  0.25, at a **5σ binomial tolerance** instead of a flat `0.015`, so it scales
+  with the tuning.
+
+Re-simulating the stale table now yields **3 failures instead of 5, led by the
+one that names the cause**; the other two are its real consequences (the cap is
+unreachable, and the rare band is no longer the elites). 23 pass against the
+current data.

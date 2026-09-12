@@ -22,6 +22,8 @@ from game.states.playing.drawctx import DrawCtx
 from game.states.playing.glow import GlowCache
 from game.states.playing.projectiles import draw_projectile
 from game.states.playing.summons import draw_summon
+from progression import chests as _chests
+from progression import potions as _potions
 from ui.text import shadowed
 
 # CB-5 dev aim line: length for a main weapon with no finite reach.
@@ -141,13 +143,24 @@ class WorldRenderer:
             text = shadowed(ps._prompt_font, ps._notice_text, config.COLOR_ACCENT)
             surface.blit(text, text.get_rect(center=(w // 2, h - 124)))
 
-        # Interaction prompt when stood on a usable special location.
+        # Interaction prompt when stood on a usable special location, or --
+        # CB-9 -- on an unopened chest. The two cannot both be live: a chest is
+        # never seated inside a special island's clear disc.
         it = ps.locations.nearby()
         if it is not None:
             afford = it.kind != "merchant" or ps.stats["gold"] >= it.cost
             col = (240, 240, 245) if afford else (200, 120, 120)
             prompt = ps._prompt_font.render(it.prompt, True, col)
             surface.blit(prompt, prompt.get_rect(center=(w // 2, h - 96)))
+        else:
+            chest = ps.chest_manager.nearby()
+            if chest is not None:
+                # The same white every other prompt uses: the chest's own art
+                # and the word in the prompt already say which tier it is, and
+                # a wood-brown "Common chest" was the dimmest text on screen.
+                prompt = ps._prompt_font.render(
+                    ps.chest_manager.prompt(chest), True, (240, 240, 245))
+                surface.blit(prompt, prompt.get_rect(center=(w // 2, h - 96)))
 
     # --- world props ----------------------------------------------
     def _off_band(self, level, pos) -> bool:
@@ -193,14 +206,11 @@ class WorldRenderer:
                     surface.blit(frs[idx], (round(sx - ax), round(sy - ay)))
                     continue
             sx, sy = ps.camera.world_to_screen(it.pos)
-            done = it.used or it.state == "done"
+            done = it.used
             col = (90, 90, 100) if done else it.colour
             pygame.draw.circle(surface, col, (int(sx), int(sy)),
                                round(it.radius * z), 0 if done else 3)
             pygame.draw.circle(surface, (240, 245, 255), (int(sx), int(sy)), round(4 * z))
-            if it.kind == "elite_arena" and it.state == "active":
-                pygame.draw.circle(surface, (255, 120, 120), (int(sx), int(sy)),
-                                   round((it.radius + 120) * z), 1)
 
     def _forge_skinned(self) -> bool:
         """Did the bake skin a forge obstacle? Then the interactable draws
@@ -307,6 +317,79 @@ class WorldRenderer:
                     (int(sx), int(sy)),
                     round((3 + gem.tier) * z),
                 )
+
+    def chests(self, surface, level=None) -> None:
+        """CB-9: the treasure chests the seed seated across the islands.
+
+        One rig per rarity, each a four-frame strip: frame 0 while closed,
+        then across the strip as the lid flies open, holding the last frame
+        for the rest of the run. The rig's anchor is bottom-centre on the
+        chest's baseline, so the box stays put while the lid moves. Missing
+        art falls back to a disc in the rarity's colour, like the orbs.
+        """
+        ps = self.ps
+        z = ps.camera.zoom
+        assets = ps.game.assets
+        table = ps.content.chests
+        duration = _chests.open_seconds(table)
+        view = ps.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+
+        for chest in ps.chests:
+            if self._off_band(level, chest.pos):
+                continue
+            if not view.collidepoint(chest.pos.x, chest.pos.y):
+                continue
+            sx, sy = ps.camera.world_to_screen(chest.pos)
+            rig = _chests.sprite_rig(chest.rarity, table)
+            base_size = assets.scale_for(rig) or (30, 30)
+            size = (max(1, round(base_size[0] * z)), max(1, round(base_size[1] * z)))
+            index = chest.frame_index(assets.frame_count(rig, "open") or 1, duration)
+            art = assets.frame(rig, "open", index, size=size)
+            if art is not None:
+                ax, ay = assets.anchor(rig)
+                surface.blit(art, (int(sx - ax * z), int(sy - ay * z)))
+                continue
+            colour = _chests.colour(chest.rarity, table)
+            if chest.opened:
+                colour = tuple(c // 2 for c in colour)
+            pygame.draw.circle(surface, colour, (int(sx), int(sy)),
+                               max(2, round(base_size[0] * 0.4 * z)),
+                               0 if chest.opened else 3)
+
+    def potions(self, surface, level=None) -> None:
+        """CB-8: dropped health potions, over the same breathing glow the XP
+        orbs use so the two drop kinds read as one family. The glow is tinted
+        by rarity, and the rig's own `scale` already grows with rarity, so a
+        rare potion is legible across the screen. Off-screen potions draw
+        nothing; missing art falls back to a disc like the orbs do."""
+        ps = self.ps
+        z = ps.camera.zoom
+        assets = ps.game.assets
+        table = ps.content.potions
+        view = ps.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+
+        for potion in ps.potions:
+            if self._off_band(level, potion.pos):
+                continue
+            if not view.collidepoint(potion.pos.x, potion.pos.y):
+                continue
+            sx, sy = ps.camera.world_to_screen(potion.pos)
+            rig = _potions.sprite_rig(potion.rarity, table)
+            base_size = assets.scale_for(rig) or (16, 16)
+            size = (max(1, round(base_size[0] * z)), max(1, round(base_size[1] * z)))
+
+            halo = self._glow.pulsed(base_size[0], z, potion.age)
+            if halo is not None:
+                surface.blit(halo, halo.get_rect(center=(int(sx), int(sy))))
+
+            art = assets.image(rig, size=size)
+            if art is not None:
+                surface.blit(art, art.get_rect(center=(int(sx), int(sy))))
+            else:
+                pygame.draw.circle(surface,
+                                   _potions.colour(potion.rarity, table),
+                                   (int(sx), int(sy)),
+                                   max(2, round(base_size[0] * 0.4 * z)))
 
     def explosions(self, surface, level=None) -> None:
         """Blast visuals: an entry carrying an `anim` (the Bomb's `explosion`
