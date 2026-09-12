@@ -35,6 +35,8 @@ class Boss:
         self.name = definition.get("name", boss_id)
         self.max_hp = float(definition["hp"])
         self.hp = self.max_hp
+        # The run's `RunLedger` (set by the spawner), as on `Enemy`.
+        self.ledger = None
         self.speed = float(definition["speed"])
         self._base_contact = float(definition["contact_damage"])
         self.contact_damage = self._base_contact
@@ -92,21 +94,26 @@ class Boss:
         self._facing = -1
 
     # --- combat --------------------------------------------------
-    def take_damage(self, amount: float, armor: float = 0.0, source=None) -> float:
-        # `source` is accepted so the boss and an `Enemy` are interchangeable to
-        # the damage paths; the boss is never the metered target, so it is
-        # ignored rather than recorded.
-        dealt = apply_armor(amount, armor)
+    def _absorb(self, dealt: float, source) -> float:
+        """The one place damage lands on the boss (as `Enemy._absorb`): the
+        run ledger hears it here, whichever path delivered it. The boss is
+        never the metered target, so there is no `damage_sink`."""
+        if self.ledger is not None:
+            self.ledger.record(dealt, source)
         self.hp -= dealt
+        if self.hp <= 0:
+            self.hp = 0.0
+            self.alive = False
+        return dealt
+
+    def take_damage(self, amount: float, armor: float = 0.0, source=None) -> float:
+        dealt = apply_armor(amount, armor)
         self.hit_flash = 0.06
         if self.anim is not None:
             self._hurt_t = 0.22
             if self._has_hurt:
                 self.anim.play("hurt", restart=True)
-        if self.hp <= 0:
-            self.hp = 0.0
-            self.alive = False
-        return dealt
+        return self._absorb(dealt, source)
 
     def apply_knockback(self, *_args) -> None:
         pass  # immovable
@@ -190,15 +197,11 @@ class Boss:
                                     flying=self.flying)
 
     def _status_damage(self, amount: float, ctx, source=None) -> None:
-        # `source` is accepted for parity with `Enemy` (the status loop passes
-        # it); the boss is never the metered target, so nothing reads it.
+        # A damage-over-time tick; `source` is the weapon keeping it alive.
         if not self.alive:
             return
-        self.hp -= amount
+        self._absorb(amount, source)
         ctx.report_damage(amount)
-        if self.hp <= 0:
-            self.hp = 0.0
-            self.alive = False
 
     def _seek(self, ctx) -> pygame.Vector2:
         """Unit heading toward the player: the shared flow field (so the boss

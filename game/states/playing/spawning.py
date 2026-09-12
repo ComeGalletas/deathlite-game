@@ -120,6 +120,7 @@ class PlayingHost:
     def make_enemy(self, enemy_id: str, x: float, y: float,
                    hp_mult: float, spd_mult: float, owner: str = "direct") -> Enemy:
         enemy = Enemy(enemy_id, self.ps.content.enemy(enemy_id), x, y)
+        enemy.ledger = self.ps.ledger
         enemy.max_hp *= hp_mult
         enemy.hp = enemy.max_hp
         enemy.speed *= spd_mult
@@ -149,6 +150,7 @@ class PlayingHost:
 
     def wake(self, rec: DormantEnemy, x: float, y: float) -> Enemy:
         enemy = Enemy(rec.enemy_id, self.ps.content.enemy(rec.enemy_id), x, y)
+        enemy.ledger = self.ps.ledger
         enemy.max_hp = rec.max_hp
         enemy.hp = rec.hp
         enemy.shield_hp = rec.shield_hp
@@ -247,6 +249,7 @@ class EnemyControl:
         boss_id = next(iter(ps.content.bosses))
         pos = self.boss_spawn_point()
         ps.boss = Boss(boss_id, ps.content.boss(boss_id), pos.x, pos.y)
+        ps.boss.ledger = ps.ledger
         ps.shake.add(0.7)
         ps.game.events.publish(Events.BOSS_SPAWNED, name=ps.boss.name)
         log.info("boss spawned: %s", ps.boss.name)

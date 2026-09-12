@@ -301,6 +301,7 @@ class CombatResolver:
                 continue
             # Death effects fire NOW, at the instant of death.
             ps.stats["kills"] += 1
+            ps.ledger.kill(e)
             if e.explode_radius > 0.0:
                 ps.fx.explosion(e.pos, e.explode_radius, e.explode_damage)
             ps._apply_on_kill_effects(e)

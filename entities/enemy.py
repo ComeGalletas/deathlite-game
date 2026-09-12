@@ -64,6 +64,9 @@ class Enemy:
         # Set by `DpsMeter.arm` while this enemy is the metered one; called
         # with every point of damage that lands on it, and its source.
         self.damage_sink = None
+        # The run's `RunLedger` (set by the spawner): hears every hit for the
+        # game-over screen's per-weapon split. Independent of the sink above.
+        self.ledger = None
 
         self.pos = pygame.Vector2(x, y)
         self.vel = pygame.Vector2()
@@ -111,6 +114,8 @@ class Enemy:
         """
         if self.damage_sink is not None:
             self.damage_sink(dealt, source)
+        if self.ledger is not None:
+            self.ledger.record(dealt, source)
         if self.invulnerable:
             return dealt
         self.hp -= dealt

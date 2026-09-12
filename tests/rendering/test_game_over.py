@@ -139,10 +139,159 @@ class ExitKeyTests(unittest.TestCase):
         s.handle_event(pygame.event.Event(pygame.KEYUP, key=pygame.K_RETURN))
         self.assertIsNone(s.game.state_machine.changed_to)
 
-    def test_a_mouse_event_is_ignored(self):
+    def test_a_mouse_press_off_every_button_is_ignored(self):
         s = _state()
         s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(0, 0), button=1))
         self.assertIsNone(s.game.state_machine.changed_to)
+
+
+# The summary the ledger now builds (`PlayingState._end_run`): the rows the
+# three columns draw. `FULL_STATS` above is the older shape, kept because a
+# screen fed it must still draw.
+LEDGER_STATS = dict(
+    FULL_STATS,
+    gold=41, seed=911, difficulty="fast",
+    dropped_items=[{"name": "Ring of Ash", "rarity": "rare", "slot": "ring", "level": 3},
+                   {"name": "Cloak", "rarity": "common", "slot": "body", "level": 1}],
+    weapon_rows=[{"id": "sword", "name": "Sword", "level": 4, "damage": 12000.0,
+                  "share": 0.65, "dps": 40.0},
+                 {"id": "bow", "name": "Bow", "level": 2, "damage": 5000.0,
+                  "share": 0.27, "dps": 25.0}],
+    other_rows=[{"id": "fire_nova", "name": "Fire Nova", "level": None,
+                 "damage": 1400.0, "share": 0.08, "dps": 6.0}],
+    kill_rows=[("Husk", 150), ("Skitter", 80), ("Brute", 9), ("The Warden", 1)],
+    blessing_rows=[("Keen Edge", 3), ("Volley", 2)],
+    damage_by_source={"sword": 12000.0, "bow": 5000.0, "fire_nova": 1400.0},
+)
+
+
+class LedgerSummaryTests(unittest.TestCase):
+    """The new summary shape draws, and the columns land where the layout
+    says: the ribbons over each column, the buttons in a row above the hint."""
+
+    @classmethod
+    def setUpClass(cls):
+        _display()
+        pygame.font.init()
+
+    def _drawn(self, stats):
+        s = _state(stats)
+        surface = pygame.Surface((1600, 900))
+        s.draw(surface)
+        return s, surface
+
+    def _lit(self, surface, rect):
+        return sum(1 for x in range(rect.left, rect.right, 4)
+                   for y in range(rect.top, rect.bottom, 4)
+                   if surface.get_at((x, y))[:3] != (22, 10, 12))
+
+    def test_the_ledger_summary_draws_every_column(self):
+        _s, surface = self._drawn(LEDGER_STATS)
+        # Each column's content area, below its ribbon.
+        for left in (60, 560, 1060):
+            self.assertGreater(self._lit(surface, pygame.Rect(left, 240, 480, 500)), 100,
+                               f"the column at x={left} is empty")
+
+    def test_the_older_summary_still_draws_every_column(self):
+        _s, surface = self._drawn(FULL_STATS)
+        for left in (60, 560, 1060):
+            self.assertGreater(self._lit(surface, pygame.Rect(left, 240, 480, 500)), 60)
+
+    def test_long_lists_are_cut_not_overflowed(self):
+        """Twenty items, twenty enemy types, four weapons, twelve procs and
+        twenty blessings must stay inside their columns: nothing may be
+        painted over the button row."""
+        stats = dict(LEDGER_STATS,
+                     dropped_items=[{"name": f"Trinket {i}", "rarity": "common"}
+                                    for i in range(20)],
+                     weapon_rows=[{"id": f"w{i}", "name": f"Weapon {i}", "level": 1,
+                                   "damage": 100.0, "share": 0.1, "dps": 1.0}
+                                  for i in range(4)],
+                     kill_rows=[(f"Type {i}", 20 - i) for i in range(20)],
+                     blessing_rows=[(f"Blessing {i}", 1) for i in range(20)],
+                     other_rows=[{"id": f"p{i}", "name": f"Proc {i}", "level": None,
+                                  "damage": 10.0, "share": 0.01, "dps": 1.0}
+                                 for i in range(12)])
+        _s, surface = self._drawn(stats)
+        # The strip between the columns' bottom and the buttons' top.
+        self.assertEqual(self._lit(surface, pygame.Rect(0, 764, 1600, 14)), 0)
+
+    def test_three_buttons_are_registered_for_the_mouse(self):
+        s, _surface = self._drawn(LEDGER_STATS)
+        self.assertEqual(len(s._mouse.hits), 3)
+        rects = [s._mouse.hits.rect_of(i) for i in range(3)]
+        self.assertTrue(all(r is not None for r in rects))
+        self.assertTrue(rects[0].right < rects[1].left < rects[1].right < rects[2].left)
+
+
+class MouseTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _display()
+        pygame.font.init()
+
+    def _ready(self):
+        s = _state(LEDGER_STATS)
+        s.draw(pygame.Surface((1600, 900)))     # registers the button rects
+        return s
+
+    def _click(self, s, i):
+        pos = s._mouse.hits.rect_of(i).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1))
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1))
+        return s.game.state_machine.changed_to
+
+    def test_hover_selects(self):
+        s = self._ready()
+        pos = s._mouse.hits.rect_of(2).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)))
+        self.assertEqual(s.sel, 2)
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+    def test_clicking_new_run(self):
+        self.assertIsInstance(self._click(self._ready(), 0), CharacterSelectState)
+
+    def test_clicking_sanctuary(self):
+        self.assertIsInstance(self._click(self._ready(), 1), MetaState)
+
+    def test_clicking_main_menu(self):
+        self.assertIsInstance(self._click(self._ready(), 2), MenuState)
+
+    def test_a_press_on_one_button_released_on_another_does_nothing(self):
+        s = self._ready()
+        a = s._mouse.hits.rect_of(0).center
+        b = s._mouse.hits.rect_of(2).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=a, button=1))
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=b, button=1))
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+
+class CursorKeyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _display()
+        pygame.font.init()
+
+    def test_right_then_enter_opens_the_sanctuary(self):
+        s = _state()
+        s.handle_event(_key(pygame.K_RIGHT))
+        self.assertEqual(s.sel, 1)
+        s.handle_event(_key(pygame.K_RETURN))
+        self.assertIsInstance(s.game.state_machine.changed_to, MetaState)
+
+    def test_left_wraps_to_the_menu_button(self):
+        s = _state()
+        s.handle_event(_key(pygame.K_a))
+        self.assertEqual(s.sel, 2)
+        s.handle_event(_key(pygame.K_SPACE))
+        self.assertIsInstance(s.game.state_machine.changed_to, MenuState)
+
+    def test_s_opens_the_sanctuary_whatever_is_selected(self):
+        s = _state()
+        s.handle_event(_key(pygame.K_d))
+        s.handle_event(_key(pygame.K_d))
+        s.handle_event(_key(pygame.K_s))
+        self.assertIsInstance(s.game.state_machine.changed_to, MetaState)
 
 
 if __name__ == "__main__":
