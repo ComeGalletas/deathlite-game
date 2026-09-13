@@ -1,4 +1,4 @@
-"""`data/spawn_tables.json` loads, is sound, and is checked (spawn master S2).
+"""`data/enemies/spawn_tables.json` loads, is sound, and is checked (spawn master S2).
 
 The shipped tables are read through the content loader exactly as the game
 reads them; the malformed ones are built by hand from a copy of the shipped

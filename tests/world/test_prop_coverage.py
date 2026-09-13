@@ -2,7 +2,7 @@
 
 Two things are being pinned here.
 
-The first is coverage: a rig can be declared in `data/terrain.json` and still be
+The first is coverage: a rig can be declared in `data/world/terrain.json` and still be
 reached by nothing, which is how `deco_16`..`deco_18` and four of the eight
 cloud rigs sat unused. Declaring art is not using it, and nothing failed when
 they did not appear -- so this suite walks the props directory and insists on a

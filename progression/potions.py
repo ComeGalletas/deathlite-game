@@ -1,10 +1,10 @@
 """Health potion drops (CB-8): who drops one, and which one.
 
-Two pure decisions, both driven entirely by `data/potions.json`:
+Two pure decisions, both driven entirely by `data/loot/potions.json`:
 
   * `drop_chance(base_hp, table)` -- how likely a kill is to drop anything. The
     chance rises with the enemy's **base** HP (the authored number in
-    `data/enemies.json`, never the run-time `hp_mult`-scaled `max_hp`, or every
+    `data/enemies/enemies.json`, never the run-time `hp_mult`-scaled `max_hp`, or every
     enemy would drift toward the cap as a run goes on) and saturates at the
     table's `cap`.
 

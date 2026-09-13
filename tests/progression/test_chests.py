@@ -2,7 +2,7 @@
 needs from the offering.
 
 The four contents rules from the owner's brief, read straight off
-`data/chests.json`: every tier pays gold in its own range; every tier drops
+`data/loot/chests.json`: every tier pays gold in its own range; every tier drops
 exactly **one** potion and a richer tier buys a *better* one, never more;
 common chests never carry a blessing, uncommon ones sometimes do, rare and
 epic always do; and each of those two draws from its own pair of blessing

@@ -16,7 +16,7 @@ dying or getting away sends the lancer back to that post, and the ordinary
 patrol resumes from there. Hits reach the world through the `on_hit`
 callback the manager hands in; this module never touches an enemy itself.
 
-Tuning per kind is `data/npcs.json`; this module keeps only the machine.
+Tuning per kind is `data/village/npcs.json`; this module keeps only the machine.
 """
 from __future__ import annotations
 

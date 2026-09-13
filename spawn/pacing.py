@@ -25,7 +25,7 @@ standing multiplier, 5 today) by it and by the named modifiers
 product. Pacing never touches the mix or the stat ramp, and it
 does not move the live cap: that is the performance budget.
 
-Knobs from the `pacing` section of `data/spawn_tables.json`.
+Knobs from the `pacing` section of `data/enemies/spawn_tables.json`.
 """
 from __future__ import annotations
 

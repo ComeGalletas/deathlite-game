@@ -52,7 +52,7 @@ floor and retried once on a wider circle. A follower that fits nowhere is
 dropped -- a pack spawns short rather than stacked.
 
 Every number comes from the `placement` section of
-`data/spawn_tables.json`.
+`data/enemies/spawn_tables.json`.
 """
 from __future__ import annotations
 

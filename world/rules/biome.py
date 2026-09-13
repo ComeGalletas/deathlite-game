@@ -1,5 +1,5 @@
 """What a tileset *is*: its biome, whether its shoreline block carries surf,
-and the obstacle mix its biome scatters. Lookups into `data/terrain.json`,
+and the obstacle mix its biome scatters. Lookups into `data/world/terrain.json`,
 read by generation (the palette pick, the scatter), by the tile painter and
 by the decor -- so they live here, below all three.
 
@@ -45,7 +45,7 @@ def scatter_mix(sheet: str | None):
     The mix is the point of the biome table, not a decoration of it: a rock
     terrace wants boulders where a forest one wants trunks, and the density
     differs as much as the mix does -- open sand is meant to read as open.
-    Values live in `data/terrain.json` under each biome's `scatter` block; None
+    Values live in `data/world/terrain.json` under each biome's `scatter` block; None
     here means the biome declares none and the caller keeps its own default.
     """
     if not sheet:

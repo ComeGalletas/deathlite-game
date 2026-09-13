@@ -1,8 +1,8 @@
 """Weapon presentation, split out of the gameplay data.
 
-`data/weapons.json` holds only mechanics + identity; the *look* of a weapon --
+`data/weapons/weapons.json` holds only mechanics + identity; the *look* of a weapon --
 projectile colour, the `projectiles/` draw family, and any per-weapon effect
-tuning -- lives in `data/weapon_visuals.json` and is resolved here, on the
+tuning -- lives in `data/weapons/weapon_visuals.json` and is resolved here, on the
 render / spawn side. The logic in `combat/weapons.py` never reads it.
 """
 from __future__ import annotations

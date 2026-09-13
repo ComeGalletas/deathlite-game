@@ -6,7 +6,7 @@ chosen character, level-up upgrades, blessings, items and meta-progression).
 change, so the hot combat loop reads a dict, not a solver.
 
 Character identity lives in `self.trait` + `self.trait_params` (both from
-`data/characters.json`) and three small hooks: `incoming_damage_multiplier`
+`data/heroes/characters.json`) and three small hooks: `incoming_damage_multiplier`
 (Bulwark), `weapon_mods` (Double Shot, Quick Cast -- handed to weapons through
 `FireContext.weapon_mods`) and the evasion / block rolls in `take_damage`
 (six-weapon system P1, design §20).

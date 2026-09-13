@@ -26,7 +26,7 @@ def base_hp(enemy_id: str) -> float:
 
 
 class TableMatchesTheRosterTests(unittest.TestCase):
-    """Where the tuning table has to agree with `data/enemies.json`.
+    """Where the tuning table has to agree with `data/enemies/enemies.json`.
 
     Kept as its own class, and phrased to name the stale number, because these
     two ends are read by the chance, band and exclusion tests alike -- an HP

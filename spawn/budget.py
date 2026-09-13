@@ -1,7 +1,7 @@
 """The spawn budget: how often, how many, and which (spec 3.4 / 3.8).
 
 `SpawnDirector` drives difficulty over the length of a run through the phase
-schedule in `data/spawn_tables.json` (`spawn/tables.py`). Each phase defines
+schedule in `data/enemies/spawn_tables.json` (`spawn/tables.py`). Each phase defines
 its enemy composition, spawn interval, pack size and elite chance.
 Concurrency is limited by `enemy_count_cap`, which grows with in-game time.
 Separately, `stat_multipliers` ramps enemy HP and speed with elapsed time.

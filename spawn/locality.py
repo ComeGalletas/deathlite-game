@@ -22,7 +22,7 @@ strafes.
 `grace` seconds so pursuers crossing the bridge behind them are not put
 to sleep mid-chase.
 
-Knobs from the `locality` section of `data/spawn_tables.json`.
+Knobs from the `locality` section of `data/enemies/spawn_tables.json`.
 """
 from __future__ import annotations
 

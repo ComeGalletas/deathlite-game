@@ -177,7 +177,7 @@ class Chest(NamedTuple):
 
     The seed decides where every chest is and which tier it is, the same way
     it decides islands and obstacles, so two runs of one seed find the same
-    loot in the same places. `rarity` is a key of `data/chests.json`, which
+    loot in the same places. `rarity` is a key of `data/loot/chests.json`, which
     holds everything the chest actually *contains*; nothing about the payload
     is decided here."""
     room_id: int

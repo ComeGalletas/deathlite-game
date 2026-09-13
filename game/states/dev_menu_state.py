@@ -10,7 +10,7 @@ Pages:
   blessings  -- (D4) pick a blessing; ENTER grants a stack to the hero
   items      -- (D5) every weapon + every item base, straight off the loaded
                 content; ENTER gives the weapon or dev-equips a rolled item
-  forges     -- every Forging in `data/forges.json`; ENTER forges the owned
+  forges     -- every Forging in `data/weapons/forges.json`; ENTER forges the owned
                 weapon of that id (granting it first if the hero lacks it,
                 the blessing-level requirement waived; still one Forge per
                 weapon)

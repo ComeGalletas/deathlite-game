@@ -387,7 +387,7 @@ def world_clear(room, wx: float, wy: float, margin: float) -> bool:
 def body_inset() -> float:
     """The terrace margin a body's centre must keep, in pixels.
 
-    Read from `data/terrain.json` -- no default in code, which is this
+    Read from `data/world/terrain.json` -- no default in code, which is this
     project's standing rule for tuning. Both authorities that enforce it call
     this: the collider in `world/map.py` and the baked step mask in
     `world/pathfinding.py`. They have drifted apart twice this milestone by

@@ -5,7 +5,7 @@ around 300 px. Each sprite on that sheet is a run of pixel-identical columns
 between two authored end caps, so a bar of any length is those caps at their
 native width with the middle stretched between them. That is the rule
 `ui/panels.py` already applies to the 64-px Tiny Swords buttons, but on one
-axis only and driven by the `caps` a rig declares in `data/ui_sprites.json`
+axis only and driven by the `caps` a rig declares in `data/ui/ui_sprites.json`
 rather than by a tile grid -- these sheets have no uniform tile.
 
 Nearest-neighbour throughout (pixel art), cached per `(rig, width)` because

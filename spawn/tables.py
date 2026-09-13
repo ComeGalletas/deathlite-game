@@ -1,4 +1,4 @@
-"""`data/spawn_tables.json`: what spawns when, read once and checked.
+"""`data/enemies/spawn_tables.json`: what spawns when, read once and checked.
 
 Spawn master S2. The phase schedule used to be `_PHASES`, a list literal
 in `world/spawning.py`; it is data, so it lives with the rest of the data

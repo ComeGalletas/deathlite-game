@@ -1,7 +1,7 @@
 """Name -> Behavior builder.
 
 `@behavior("kite_shoot")` registers a builder `fn(cfg) -> Behavior`, where `cfg`
-is the enemy's `data/enemies.json` block. `build_behavior(name, cfg)` resolves
+is the enemy's `data/enemies/enemies.json` block. `build_behavior(name, cfg)` resolves
 it. Behaviour modules (`entities/ai/behaviors/*`) register on import; the game
 imports them once at start-up.
 """

@@ -18,7 +18,7 @@ drop. The brief settled the rule --
   ranged enemy above the player can simply start shooting.
 
 `aggro_range` and `pursuit_seconds` are per-enemy-type values and live in
-`data/enemies.json` / `data/bosses.json`. An enemy that carries neither is
+`data/enemies/enemies.json` / `data/enemies/bosses.json`. An enemy that carries neither is
 left exactly as it was -- unconditional pursuit -- rather than being given a
 number chosen here, so nothing is silently retuned by this module's existence.
 """

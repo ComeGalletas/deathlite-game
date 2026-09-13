@@ -22,7 +22,7 @@ island instead, so the player cannot memorise where the threats stood.
 
 Dormant records **freeze**: no movement, no healing, no regrouping.
 
-Knobs from the `population` section of `data/spawn_tables.json`.
+Knobs from the `population` section of `data/enemies/spawn_tables.json`.
 """
 from __future__ import annotations
 

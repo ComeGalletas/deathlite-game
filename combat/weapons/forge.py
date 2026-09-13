@@ -1,6 +1,6 @@
 """Forging (six-weapon system P3; design §7, §8, §13).
 
-A Forging permanently transforms a weapon. In data (`data/forges.json`) it
+A Forging permanently transforms a weapon. In data (`data/weapons/forges.json`) it
 is a variant: `overrides` merged over the base weapon definition (numbers,
 the special effect, even the category -- Fan of Blades throws, Arcane Storm
 orbits) plus `effects` keys the fire path and the hit resolver read
@@ -8,7 +8,7 @@ orbits) plus `effects` keys the fire path and the hit resolver read
 
 Rules: one Forge per weapon, the two options mutually exclusive; the weapon
 must have taken `forge_requires_levels` blessing levels first
-(`data/offering.json`). Forgings are delivered by the village Forge and, at
+(`data/weapons/offering.json`). Forgings are delivered by the village Forge and, at
 Forge rarity, by the level-up offering (`progression/blessings/offer.py`).
 Post-Forge blessings gate on `requires.forge` in the catalog.
 """

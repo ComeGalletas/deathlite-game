@@ -135,10 +135,10 @@ class PhaseTests(unittest.TestCase):
         self.assertEqual(s._phase, "attack")
 
     def test_the_burst_fits_inside_the_data_attack_interval(self):
-        """0.7 s between bolts in `data/weapons.json`; a 0.5 s burst always
+        """0.7 s between bolts in `data/weapons/weapons.json`; a 0.5 s burst always
         completes before the next one restarts it."""
         import json
-        interval = json.load(open("data/weapons.json"))["grave_totem"]["summon_attack_interval"]
+        interval = json.load(open("data/weapons/weapons.json"))["grave_totem"]["summon_attack_interval"]
         self.assertLess(self.attack_s, interval)
 
     def test_leaving_starts_a_strip_before_the_end_and_holds_fire(self):

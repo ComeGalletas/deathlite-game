@@ -67,7 +67,7 @@ class CatalogTests(unittest.TestCase):
 
         * a key of the fixed `Weapon.bonus` dict -- the fire path reads those
           as `definition + bonus`;
-        * a key some Forging declares under `effects` in data/forges.json --
+        * a key some Forging declares under `effects` in data/weapons/forges.json --
           those are read through `Weapon.effect(key)`, which sums the
           `effects` total with `bonus.get(key, 0.0)`, so a post-Forge
           blessing raises a Forge's own number without a slot in the dict.

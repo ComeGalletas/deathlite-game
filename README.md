@@ -346,12 +346,12 @@ Archer, Nihil = purple Monk), **all 13 enemy variants + the boss**, and the
 enemy-shot arrow. The pack ships no `hurt` / `death` strips, so on a hit the live
 frame is **red-tinted** in place (no pop to a circle) and on death *any* entity
 plays one shared one-shot **skull poof** (`characters/dead/dead.png`; enemy poof
-at 55 %, hero at full size). Each hero's `color` in `data/characters.json` is its
+at 55 %, hero at full size). Each hero's `color` in `data/heroes/characters.json` is its
 primitive-fallback tint. Only XP gems and the HUD still draw as shapes.
 **Obstacles** are skinned by the terrain decoration rigs (below), not the
 `*_sprites.json` files. See `assets/CREDITS.md` for the pack layout.
 
-The **world** is tiled from `data/terrain.json` — a slot table (which sheet
+The **world** is tiled from `data/world/terrain.json` — a slot table (which sheet
 index is the interior / edge / corner tile), a `bridge` block (the corridor
 plank autotile), a `decorations` array (the non-colliding scatter registry), an
 `obstacle_decor` map (obstacle kind → decoration rigs + a size boost + the

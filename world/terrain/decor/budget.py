@@ -11,7 +11,7 @@ from world.rules import biome as biomes
 
 # --- density tiers --------------------------------------------------------
 #
-# Taxonomy only: the names live here, every rate lives in `data/terrain.json`.
+# Taxonomy only: the names live here, every rate lives in `data/world/terrain.json`.
 # An entry names the tier it belongs to; a biome prices each tier per thousand
 # cells. One budget for all of them made props compete -- the authored counts
 # were shares of a single number, so raising the grass rate could only take

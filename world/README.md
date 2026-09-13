@@ -232,7 +232,7 @@ sprite's alpha, independent of depth-sort order.
 
 ## Part 4 — How tiles are split up
 
-All tile metadata lives in `data/terrain.json` and is read once per bake by
+All tile metadata lives in `data/world/terrain.json` and is read once per bake by
 `TileSheets` (`world/terrain/sheets.py`). Tiles are **64 px** (`tile_px`).
 
 ### The grass sheets

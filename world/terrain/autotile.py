@@ -60,7 +60,7 @@ def bridge_slot(axis: str, index: int, ncells: int) -> str:
     """The bridge tile for cell `index` of an `ncells`-long run. The corridor
     `axis` ('h' | 'v') fixes the tile family; the two ends get the matching
     cap (`Corridor.end_low` -> `h_left` / `v_top`, `end_high` -> `h_right` /
-    `v_bot`), everything between gets `mid` (see data/terrain.json 'bridge')."""
+    `v_bot`), everything between gets `mid` (see data/world/terrain.json 'bridge')."""
     low, mid, high = (("h_left", "h_mid", "h_right") if axis == "h"
                       else ("v_top", "v_mid", "v_bot"))
     if ncells <= 1:

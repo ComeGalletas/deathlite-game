@@ -2,7 +2,7 @@
 `entities/enemy_ai.py`.
 
 Every component param defaults to the value the old code hard-coded, and is
-overridable from the enemy's `data/enemies.json` block (`cfg`), so a variant can
+overridable from the enemy's `data/enemies/enemies.json` block (`cfg`), so a variant can
 be re-tuned without a new behaviour.
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from game import config
 # --- path_chase_attack melee tuning ------------------------------------------
 # Default timing for the chaser's chase -> telegraph -> attack -> recover beat.
 # Kept here (module globals, not game/config) so the whole swing can be tuned in
-# one place; an enemy's data/enemies.json block overrides any of these per-key
+# one place; an enemy's data/enemies/enemies.json block overrides any of these per-key
 # (attack_telegraph / attack_active / attack_recover / attack_cooldown), and a
 # missing key falls back to the constant.
 #
@@ -105,7 +105,7 @@ def build_path_chase_attack(cfg: dict) -> Behavior:
     """
     reach = cfg.get(
         "attack_range", cfg.get("radius", 14.0) + config.PLAYER_RADIUS + 5.0)
-    # Per-enemy overrides (data/enemies.json) win; a missing key falls back to
+    # Per-enemy overrides (data/enemies/enemies.json) win; a missing key falls back to
     # the module default above.
     active = cfg.get("attack_active", MELEE_ATTACK_ACTIVE)
 

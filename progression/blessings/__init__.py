@@ -1,11 +1,11 @@
 """Blessings (six-weapon system P2, design §21).
 
 "Blessing" is anything the player is offered on a level-up or at a shrine /
-altar. The catalog (`catalog.py`) is `data/blessings.json`: stat blessings
+altar. The catalog (`catalog.py`) is `data/weapons/blessings.json`: stat blessings
 and weapon blessings, each with cumulative per-level values. `offer.py`
 builds the valid set for a run -- gated on the weapons the hero owns -- adds
 the weapon grants while slots are open, and rolls the weighted offering
-(`data/offering.json`). `apply.py` raises a blessing one level on the hero
+(`data/weapons/offering.json`). `apply.py` raises a blessing one level on the hero
 or a weapon. `effects.py` keeps the flattened `BlessingEffects` aggregate the
 hit resolver reads; since the elemental blessings went, only item affixes
 feed it.

@@ -6,7 +6,7 @@ view, clamped to the world. A generated world has its spawn points decided
 at generation (`world/gen/spawnpoints.py`).
 
 The wave/budget director that lived here moved to `spawn/budget.py` in
-spawn master S2, with its schedule in `data/spawn_tables.json`. The name is
+spawn master S2, with its schedule in `data/enemies/spawn_tables.json`. The name is
 re-exported so `from world.spawning import SpawnDirector` keeps working.
 """
 from __future__ import annotations

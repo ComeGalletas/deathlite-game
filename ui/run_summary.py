@@ -40,7 +40,7 @@ RIBBON_H = 48
 TITLE_DY = -5
 # Rows shown before a list is cut with "+n more"; sized so each column fits
 # the 590 px between the title block and the buttons at 1600x900. The kill
-# column has room for every type in `data/enemies.json` plus the boss; the
+# column has room for every type in `data/enemies/enemies.json` plus the boss; the
 # weapon column's budget is four weapon rows (three slots and a summon), the
 # proc rows, the total and the blessings.
 BEST_FLAG = "best"
@@ -394,7 +394,7 @@ class RunSummaryPanel:
 # taste call: the Damage / Share / DPS cells are right-aligned 150, 84 and 0 px
 # in from the column's right edge, so a name drawn from the left runs *through*
 # its own damage figure once the column is short. Measured rather than guessed:
-# the widest row label over `data/weapons.json` is "Grave Totem  Lv 9" at 186 px
+# the widest row label over `data/weapons/weapons.json` is "Grave Totem  Lv 9" at 186 px
 # and a seven-figure damage is 94 px, which with the 150 px cell block and the
 # column's 56 px of padding needs 486 -- 498 leaves a little air.
 #

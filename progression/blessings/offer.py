@@ -11,7 +11,7 @@ Three kinds of card:
     bundled level-I blessing was removed).
 
 Weight = kind weight x level falloff x rarity weight (x summon factor for a
-summon's blessings and the summon grant). Every number is `data/offering.json`.
+summon's blessings and the summon grant). Every number is `data/weapons/offering.json`.
 `roll_offering` is a pure weighted pick without replacement given the RNG, so
 it is testable seed by seed.
 """

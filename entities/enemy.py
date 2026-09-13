@@ -1,4 +1,4 @@
-"""Enemy entity, data-driven from data/enemies.json.
+"""Enemy entity, data-driven from data/enemies/enemies.json.
 
 One class, many variants: `self.behavior` names a builder in `entities/ai`
 (`build_behavior`) which composes a component pipeline; variant-specific numbers
@@ -42,7 +42,7 @@ class Enemy:
         self.contact_cd = 0.0
         self.radius = float(definition["radius"])
         # CB-3 bump/knockback mass. Fallback ~= radius/2; elites carry the
-        # folded "resist knockback" as extra weight (see data/enemies.json).
+        # folded "resist knockback" as extra weight (see data/enemies/enemies.json).
         self.weight = float(definition.get("weight", self.radius / 2.0))
         self.xp_reward = int(definition.get("experience_reward", 1))
         self.behavior = definition.get("behavior", "chase")

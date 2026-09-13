@@ -242,7 +242,7 @@ class MedallionTests(_Base):
 
 
 class RigDataTests(_Base):
-    """`data/ui_sprites.json`: the sheet coordinates the bars are cut from."""
+    """`data/ui/ui_sprites.json`: the sheet coordinates the bars are cut from."""
 
     def test_every_bar_rig_declares_its_caps(self):
         for rig in (FRAME, HP_FILL, XP_FILL, EMPTY, "bar_hex_frame_grey",

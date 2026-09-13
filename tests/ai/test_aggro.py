@@ -7,7 +7,7 @@ to reach a player one tile away across a drop.
 
 The gate is applied once, in `registry.build_behavior`, so it covers all twelve
 enemy types and the boss without any builder knowing about it. `aggro_range`
-and `pursuit_seconds` live in `data/enemies.json`; a type carrying neither is
+and `pursuit_seconds` live in `data/enemies/enemies.json`; a type carrying neither is
 returned untouched, which is how the boss keeps chasing unconditionally.
 """
 import unittest

@@ -28,7 +28,7 @@ reads as intentional. `update()` returns the recycles due this frame; the
 master does the moving (`SpawnMaster.recycle`), since only it knows the
 points, the caps and the owners.
 
-Knobs from the `watchdog` section of `data/spawn_tables.json`.
+Knobs from the `watchdog` section of `data/enemies/spawn_tables.json`.
 """
 from __future__ import annotations
 

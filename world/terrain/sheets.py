@@ -1,4 +1,4 @@
-"""`TileSheets` -- the adapter over `data/terrain.json`'s tileset metadata plus
+"""`TileSheets` -- the adapter over `data/world/terrain.json`'s tileset metadata plus
 the per-bake tile cache.
 
 One `TileSheets` instance is built per bake and handed to every painter.

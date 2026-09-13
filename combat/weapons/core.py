@@ -1,6 +1,6 @@
 """Weapon runtime (the core of the `combat.weapons` package).
 
-Weapons are data-driven (data/weapons.json) and fire automatically on a
+Weapons are data-driven (data/weapons/weapons.json) and fire automatically on a
 cooldown (spec 3.2). Behavior differences come from data fields; four
 `special_effect` values need extra logic:
 
@@ -46,7 +46,7 @@ from combat.damage import outgoing_damage
 from game import config
 
 # --- weapon taxonomy (the only fixed weapon data that stays in code) ---------
-# Every `data/weapons.json` entry names one `category` and one `special_effect`
+# Every `data/weapons/weapons.json` entry names one `category` and one `special_effect`
 # from these sets; the values decide how the reach ring is sized, what "no
 # target" means, and which extra fire path runs. All per-weapon numbers live in
 # the JSON -- nothing here has a value default.
@@ -139,7 +139,7 @@ class Weapon:
     # Behaviour hooks the hit resolver / fire path read by key (P2): totals
     # set by `weapon_effect` blessings -- executioner_mult, split_count, ...
     effects: dict = field(default_factory=dict)
-    # P3: the Forging this weapon took (`data/forges.json` id), or None.
+    # P3: the Forging this weapon took (`data/weapons/forges.json` id), or None.
     forge: str | None = None
     _shots: int = field(default=0, init=False)          # attacks fired (Overcharge)
     _volley_mult: float = field(default=1.0, init=False)

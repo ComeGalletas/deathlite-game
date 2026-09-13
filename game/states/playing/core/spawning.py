@@ -281,7 +281,7 @@ class EnemyControl:
         log.info("boss spawned: %s", ps.boss.name)
 
     def pick_boss(self) -> str:
-        """Which boss this run faces: one of `data/bosses.json`, drawn from the
+        """Which boss this run faces: one of `data/enemies/bosses.json`, drawn from the
         run seed.
 
         Deliberately **not** `ps.rng`. The run's shared stream has been
@@ -295,7 +295,7 @@ class EnemyControl:
         """
         ids = sorted(self.ps.content.bosses)
         if not ids:
-            raise ValueError("data/bosses.json defines no bosses")
+            raise ValueError("data/enemies/bosses.json defines no bosses")
         return random.Random(f"{self.ps.run_seed}:boss").choice(ids)
 
     def boss_spawn_point(self, definition: dict | None = None) -> pygame.Vector2:

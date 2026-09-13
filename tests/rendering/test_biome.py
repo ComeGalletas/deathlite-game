@@ -15,7 +15,7 @@ topography may opt out -- `boss` does, deliberately, to see what a beachless
 coastline reads like.
 
 Adjacency compares the **biome** rather than the filename, over the six biomes
-grouped on measured ground colour in `data/terrain.json`. LD-10 step 3 gives
+grouped on measured ground colour in `data/world/terrain.json`. LD-10 step 3 gives
 each of those a scatter mix as well, so a rock terrace is boulders where a
 forest one is trunks -- which is why the palette is decided at generation
 (`world/gen/biomes.py`) and merely read at bake.
@@ -49,7 +49,7 @@ FAMILY = {"base.png": "grass", "a.png": "rock", "b.png": "grass",
 
 class PoolDataTests(unittest.TestCase):
     def setUp(self):
-        with open(os.path.join("data", "terrain.json"), encoding="utf-8") as fh:
+        with open(os.path.join("data", "world", "terrain.json"), encoding="utf-8") as fh:
             self.t = json.load(fh)
 
     def test_every_topography_declares_sheets_it_can_wear(self):
@@ -413,7 +413,7 @@ class DecorBiomeTests(unittest.TestCase):
     def setUpClass(cls):
         pygame.init()
         cls.layout = W.layout(21)
-        with open(os.path.join("data", "terrain.json"), encoding="utf-8") as fh:
+        with open(os.path.join("data", "world", "terrain.json"), encoding="utf-8") as fh:
             cls.t = json.load(fh)
         cls.props = [e for e in cls.t["decorations"]
                      if e.get("placement") == "room_interior"
@@ -536,7 +536,7 @@ class TreeGroupTests(unittest.TestCase):
     def setUpClass(cls):
         pygame.init()
         pygame.display.set_mode((1, 1))
-        with open(os.path.join("data", "terrain.json"), encoding="utf-8") as fh:
+        with open(os.path.join("data", "world", "terrain.json"), encoding="utf-8") as fh:
             cls.t = json.load(fh)
 
 

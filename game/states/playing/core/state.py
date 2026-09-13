@@ -662,7 +662,7 @@ class PlayingState(State):
     def _use_merchant(self, it):  self.locations.use_merchant(it)
 
     def _resolve_visual(self, kw: dict) -> None:
-        """Fill `color` / `style` / `fx` from `data/weapon_visuals.json` for a
+        """Fill `color` / `style` / `fx` from `data/weapons/weapon_visuals.json` for a
         spawn that named its `weapon_id`. An explicit value in `kw` (e.g. the
         wolf's bite) wins; a spawn with no `weapon_id` keeps the pool default."""
         wid = kw.get("weapon_id", "")

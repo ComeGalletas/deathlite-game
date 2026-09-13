@@ -36,17 +36,17 @@ class SpriteMetadataTests(unittest.TestCase):
         import json
         from game.content import DATA_DIR
         files = {f: json.loads((DATA_DIR / f).read_text("utf-8")) for f in (
-            "character_sprites.json", "enemy_sprites.json",
-            "weapon_sprites.json", "prop_sprites.json")}
+            "heroes/character_sprites.json", "enemies/enemy_sprites.json",
+            "weapons/weapon_sprites.json", "loot/prop_sprites.json")}
         # every split-file rig ended up in the merged namespace
         for name, rigs in files.items():
             for rig in rigs:
                 self.assertIn(rig, self.meta, f"{rig} from {name} not merged")
         # `dead` is copied into both character + enemy files, identical content
-        self.assertIn("dead", files["character_sprites.json"])
-        self.assertIn("dead", files["enemy_sprites.json"])
-        self.assertEqual(files["character_sprites.json"]["dead"],
-                         files["enemy_sprites.json"]["dead"])
+        self.assertIn("dead", files["heroes/character_sprites.json"])
+        self.assertIn("dead", files["enemies/enemy_sprites.json"])
+        self.assertEqual(files["heroes/character_sprites.json"]["dead"],
+                         files["enemies/enemy_sprites.json"]["dead"])
 
     def test_files_exist(self):
         for rig, r in self.meta.items():

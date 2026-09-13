@@ -37,7 +37,7 @@ class Hazard:
         self.color = color
         self.tick_interval = float(tick_interval or config.INCOMING_TICK_INTERVAL)
         self._tick_accum = 0.0
-        # Flair only: a rig (`data/enemy_sprites.json`) the renderer plays
+        # Flair only: a rig (`data/enemies/enemy_sprites.json`) the renderer plays
         # out over the pool's last seconds. The ring and the disc stay what a
         # player reads for the damage radius; a pool with no rig is the bare
         # circle it always was.

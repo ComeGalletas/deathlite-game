@@ -1,7 +1,7 @@
 """`combat/weapons/forge.py::forge_changes`: what a Forging changed, as the
 run status screen prints it.
 
-Real content (`data/forges.json`, `data/weapons.json`), no display: the
+Real content (`data/weapons/forges.json`, `data/weapons/weapons.json`), no display: the
 readout is a comparison of the Forging's overrides against the base weapon
 definition, plus the effects it added, so the test pins that shape against
 the data every Forging is validated from.

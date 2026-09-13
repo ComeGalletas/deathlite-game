@@ -46,7 +46,7 @@ class Assets:
 
     @property
     def terrain(self) -> dict:
-        """The `data/terrain.json` config (tile_px, grid, slots, palettes)."""
+        """The `data/world/terrain.json` config (tile_px, grid, slots, palettes)."""
         if self._terrain is None:
             from game.content import get_content
             self._terrain = get_content().terrain

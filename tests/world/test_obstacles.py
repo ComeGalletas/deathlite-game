@@ -43,7 +43,7 @@ class ObstacleCollisionTests(unittest.TestCase):
         # close enough that the move and both slides are blocked, far enough
         # that a short hop toward the goal is still free. Hardcoding the offsets
         # tied this test to one obstacle size, and it broke the moment those
-        # moved into data/terrain.json and were retuned.
+        # moved into data/world/terrain.json and were retuned.
         r = Obstacle("tree", 0, 0).radius
         d = 20.0 + (r + 10.0) * 0.6
         gm.obstacles = [Obstacle("tree", 1000 + d, 1000 + d),  # blocks the move

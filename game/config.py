@@ -62,7 +62,7 @@ WORLD_HEIGHT: int = 3200
 
 # World grid unit. Room rects and corridor widths are snapped to this so the
 # tiled renderer covers each cell exactly (terrain T7). Keep in sync with
-# data/terrain.json "tile_px" (Assets.tile uses that for sheet slicing).
+# data/world/terrain.json "tile_px" (Assets.tile uses that for sheet slicing).
 TILE_PX: int = 64
 
 # --- Islands: rooms are height maps ----------------------------------------
@@ -368,7 +368,7 @@ TERRAIN_FOAM: bool = True
 TERRAIN_DECORATIONS: bool = True
 # Non-colliding scenery scatter (terrain T8): clutter on room interiors and
 # water scenery (rocks / a duck) in the void. Purely cosmetic -- no effect on
-# walkability. Data-driven from data/terrain.json "decorations".
+# walkability. Data-driven from data/world/terrain.json "decorations".
 TERRAIN_DECOR: bool = True
 # Soft round canopy shadow cast on the ground by each tree, depth-sorted just
 # before its owner and alpha-masked over intersecting character sprites
@@ -511,7 +511,7 @@ MENU_INSTRUCTIONS: dict = {
 # --- In-run HUD bars -----------------------------------------------------
 # The HP and XP bars are cut from `assets/ui/04.png`, the hex family (sheet
 # rows 4-7). Both are `ui/bars/meters.bar()`; the rigs live in
-# `data/ui_sprites.json`, so the sheet's cell coordinates are data, not code.
+# `data/ui/ui_sprites.json`, so the sheet's cell coordinates are data, not code.
 #
 # HP takes the silver housing and the red fill; XP takes the blue fill with no
 # housing, which is what gives the pair their size hierarchy out of one art
@@ -668,7 +668,7 @@ DIFFICULTY_RIBBON: dict[str, str] = {
 
 # --- Player defaults -----------------------------------------------------
 # Mirrors the stat list in spec section 3.1. Concrete hero data will move to
-# data/characters.json in Milestone 6; kept here now so Phase 1 has one source.
+# data/heroes/characters.json in Milestone 6; kept here now so Phase 1 has one source.
 PLAYER_DEFAULTS = {
     "max_hp": 100.0,
     "move_speed": 260.0,          # world pixels / second
@@ -775,7 +775,7 @@ HP_REGEN_INTERVAL: float = 5.0
 GRID_CELL_SIZE: int = 96
 
 # --- Physics: bumping & knockback (CB-3) --------------------------------
-# Every mobile body carries a `weight` (enemies: data/enemies.json, fallback
+# Every mobile body carries a `weight` (enemies: data/enemies/enemies.json, fallback
 # radius/2; hero: PLAYER_WEIGHT; boss: inf). Bumps between overlapping bodies
 # and weapon hits both run through `combat.knockback.knock_split`, which shares
 # the impulse by the *other* body's weight fraction and amplifies it by the
@@ -833,7 +833,7 @@ KEY_TOGGLE_AUTO_ATTACK: int = 113     # K_q
 # Half-angle of the fire-time aim-assist cone: a manual attack targets the
 # closest enemy inside this cone (out to the weapon's reach) and fires
 # straight along the aim when the cone is empty. A weapon may override it
-# with `aim_assist_deg` in data/weapons.json.
+# with `aim_assist_deg` in data/weapons/weapons.json.
 MANUAL_AIM_ASSIST_DEG: float = 25.0
 
 _KEYS_WASD = {"left": (97,), "right": (100,), "up": (119,), "down": (115,)}

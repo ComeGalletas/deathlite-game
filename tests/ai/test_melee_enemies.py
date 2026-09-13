@@ -28,8 +28,8 @@ ATTACKING = frozenset({"path_chase_attack", "brute", "fsm_charger",
 
 def _sprites() -> dict:
     from pathlib import Path
-    root = Path(__file__).resolve().parents[2]
-    return json.loads((root / "data" / "enemy_sprites.json").read_text(encoding="utf-8"))
+    root = Path(__file__).resolve().parents[3]
+    return json.loads((root / "data" / "enemies" / "enemy_sprites.json").read_text(encoding="utf-8"))
 
 
 class MeleeRosterTests(unittest.TestCase):

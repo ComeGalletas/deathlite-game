@@ -102,7 +102,7 @@ class ChainTests(unittest.TestCase):
 
     def test_fire_tags_the_projectile_with_its_weapon_id_not_a_look(self):
         # the logic layer forwards identity only; colour / style are resolved
-        # from data/weapon_visuals.json on the spawn side.
+        # from data/weapons/weapon_visuals.json on the spawn side.
         w = Weapon("magic_rod", get_content().weapon("magic_rod"))
         shots = []
         w.update(0.016, ctx([FakeEnemy(200, 0)], shots))

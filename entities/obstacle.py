@@ -4,7 +4,7 @@ All block movement and projectiles (a solid trunk / mass / wall). Circular
 colliders -- convex, so entities using axis-slide movement resolution slide
 around them rather than getting wedged. Low foliage (bushes) is no longer an
 obstacle -- it is scattered as non-colliding decoration (see
-world/map.py `_build_decor_scatter` and data/terrain.json `decorations`).
+world/map.py `_build_decor_scatter` and data/world/terrain.json `decorations`).
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pygame
 
 class _Kinds:
     """`kind -> (radius, blocks_projectiles, color)`, read from
-    `data/terrain.json` `obstacles`.
+    `data/world/terrain.json` `obstacles`.
 
     These used to be literals here, which put an obstacle's *collision* size in
     code while its *drawn* size lived in `terrain.json` `obstacle_decor` -- two
@@ -43,7 +43,7 @@ class _Kinds:
                            tuple(v.get("color", (92, 92, 100))))
                        for k, v in block.items()}
             if not self._d:
-                raise KeyError("data/terrain.json is missing its `obstacles` block")
+                raise KeyError("data/world/terrain.json is missing its `obstacles` block")
         return self._d
 
     def __getitem__(self, k):

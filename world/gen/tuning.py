@@ -52,7 +52,7 @@ _TREE_THICKET_MAX_GRID = 128.0
 # Houses (config.TERRAIN_BUILDINGS): a circular `Obstacle` skinned per colour,
 # placed off-centre in big rooms; a roomy room grows a colour-matched village
 # cluster. `variant` = colour_band * 3 + (type - 1) + 1, indexing the 15-entry
-# data/terrain.json `obstacle_decor.rigs["house"]` list. Keep in sync with
+# data/world/terrain.json `obstacle_decor.rigs["house"]` list. Keep in sync with
 # entities/obstacle.py KINDS["house"]; the sprite scales off this radius.
 _HOUSE_RADIUS = 31
 _HOUSE_ROOM_CHANCE = 0.35
@@ -210,7 +210,7 @@ _RESOURCE_KINDS = ("chest", "breakable", "ambient")
 _RESOURCE_WEIGHTS = (2, 3, 5)
 # --- treasure chests (CB-9, `world/gen/chests.py`) -------------------------
 #
-# *Placement* only. What a chest contains lives in `data/chests.json`; these
+# *Placement* only. What a chest contains lives in `data/loot/chests.json`; these
 # are here because the generator is pure and never sees `Content`, and because
 # they are the same class of knob as `_RESOURCE_*` above.
 #

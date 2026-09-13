@@ -177,38 +177,38 @@ class Content:
     """Immutable-ish container for all loaded definitions."""
 
     def __init__(self) -> None:
-        self.weapons: dict[str, dict] = _load("weapons.json")
-        self.weapon_visuals: dict[str, dict] = _load("weapon_visuals.json")
-        self.enemies: dict[str, dict] = _load("enemies.json")
-        self.bosses: dict[str, dict] = _load("bosses.json")
-        self.characters: dict[str, dict] = _load("characters.json")
-        self.blessings: dict[str, dict] = _load("blessings.json")
-        self.offering: dict = _load("offering.json")        # P2 weights
-        self.forges: dict[str, dict] = _load("forges.json")   # P3 Forgings
-        self.items: dict = _load("items.json")
-        self.meta_upgrades: dict[str, dict] = _load("meta_upgrades.json")
+        self.weapons: dict[str, dict] = _load("weapons/weapons.json")
+        self.weapon_visuals: dict[str, dict] = _load("weapons/weapon_visuals.json")
+        self.enemies: dict[str, dict] = _load("enemies/enemies.json")
+        self.bosses: dict[str, dict] = _load("enemies/bosses.json")
+        self.characters: dict[str, dict] = _load("heroes/characters.json")
+        self.blessings: dict[str, dict] = _load("weapons/blessings.json")
+        self.offering: dict = _load("weapons/offering.json")        # P2 weights
+        self.forges: dict[str, dict] = _load("weapons/forges.json")   # P3 Forgings
+        self.items: dict = _load("weapons/items.json")
+        self.meta_upgrades: dict[str, dict] = _load("heroes/meta_upgrades.json")
         # CB-8: health potion drops. Validated here so a table that does not
         # cover every rarity fails at boot, not on the first kill.
-        self.potions: dict = _check_potions(_load("potions.json"))
+        self.potions: dict = _check_potions(_load("loot/potions.json"))
         # CB-9: what a treasure chest contains. Checked against the potion
         # table it draws from, so a tier naming a potion rarity that does not
         # exist fails at boot rather than on the first chest opened.
-        self.chests: dict = _check_chests(_load("chests.json"), self.potions)
+        self.chests: dict = _check_chests(_load("loot/chests.json"), self.potions)
         # Sprite rigs are split by domain; a rig shared by two domains (e.g.
         # `dead`, used by heroes and enemies) is copied into both files. They
         # merge back into one flat `sprites` namespace here.
         self.sprites: dict[str, dict] = _merge_sprites(
-            "character_sprites.json", "enemy_sprites.json",
-            "weapon_sprites.json", "prop_sprites.json")
-        self.terrain: dict = _load("terrain.json")
-        self.ui_sprites: dict[str, dict] = _load("ui_sprites.json")
+            "heroes/character_sprites.json", "enemies/enemy_sprites.json",
+            "weapons/weapon_sprites.json", "loot/prop_sprites.json")
+        self.terrain: dict = _load("world/terrain.json")
+        self.ui_sprites: dict[str, dict] = _load("ui/ui_sprites.json")
         # Village NPC tuning (HI-3): speeds, idle bands, leashes, counts.
-        self.npcs: dict = _load("npcs.json")
+        self.npcs: dict = _load("village/npcs.json")
         # The spawn schedule (spawn master S2). Checked here, against the
         # enemies just loaded, so a phase that names an enemy that does not
         # exist fails at boot rather than at minute eight.
         try:
-            self.spawn_tables = SpawnTables(_load("spawn_tables.json"),
+            self.spawn_tables = SpawnTables(_load("enemies/spawn_tables.json"),
                                             enemy_ids=self.enemies)
         except TableError as exc:
             raise ContentError(str(exc)) from exc

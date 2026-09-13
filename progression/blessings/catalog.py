@@ -1,4 +1,4 @@
-"""The blessing catalog: `data/blessings.json` validated and typed.
+"""The blessing catalog: `data/weapons/blessings.json` validated and typed.
 
 A `BlessingDef` is pure data. Every effect carries a `levels` list of
 cumulative values (level I is `levels[0]`); the catalog's `max_level` is the
@@ -203,7 +203,7 @@ def _parse_effect(bid: str, e: dict) -> Effect:
     return Effect(t, levels, display, key=e["key"])
 
 
-# --- offering rules (data/offering.json) --------------------------------
+# --- offering rules (data/weapons/offering.json) --------------------------------
 @dataclass(frozen=True)
 class OfferingRules:
     choices: int

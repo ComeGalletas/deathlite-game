@@ -1,6 +1,6 @@
 """What a treasure chest contains (CB-9).
 
-Pure decisions driven entirely by `data/chests.json`; no pygame, no game
+Pure decisions driven entirely by `data/loot/chests.json`; no pygame, no game
 state. `PlayingState` supplies the RNG and the table, the way it does for
 CB-8's potion drops.
 
@@ -27,7 +27,7 @@ import random
 
 
 def spec(rarity: str, table: dict) -> dict:
-    """The `data/chests.json` row for one tier."""
+    """The `data/loot/chests.json` row for one tier."""
     return table["chests"][rarity]
 
 
