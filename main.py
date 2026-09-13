@@ -4,15 +4,15 @@
     python main.py --web      # desktop, but with the browser profile applied
                               # (1280x720 / 60 fps / no save file) for testing
 
-PyInstaller also runs this file -- `desktop/DeathliteGame.spec` names it as the
+PyInstaller also runs this file -- `dist/desktop/DeathliteGame.spec` names it as the
 entry, and the `sys.frozen` check below sends the save to %LOCALAPPDATA% rather
 than into the bundle. The desktop packaging config and build helper live in
-`desktop/` (see `desktop/README.md`).
+`dist/desktop/` (see `dist/desktop/README.md`).
 
 pygbag also runs this file -- its generated `index.html` always loads
 `main.py` -- and the `sys.platform == "emscripten"` check below applies the same
 browser profile automatically. The web packaging config and build/serve helpers
-live in `web/` (see `web/README.md`).
+live in `dist/web/` (see `dist/web/README.md`).
 
 Kept thin: configure logging, apply the browser profile when appropriate, hand
 control to `game.game.Game`. The loop is `asyncio`-driven so one code path

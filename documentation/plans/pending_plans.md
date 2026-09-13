@@ -124,8 +124,9 @@ done, and two items block the build from being playable by anyone else.
   `/cdn/cp312/pygame_ce-…whl` and the page reloads in a loop; only pygbag's own
   dev server serves it. Vendoring it into `build/web/cdn/cp312/` is what makes
   the bundle hostable.
-- **`assets/unused/` is not in `web/pygbag.ini`'s `ignoreDirs`**, so 40 MB of
-  unreferenced art ships to the browser.
+- ~~`assets/unused/` is not in `pygbag.ini`'s `ignoreDirs`~~ -- done 2026-09-13
+  (`dist/web/pygbag.ini` ignores `/assets/unused`, `/tools`, `/.ruff_cache`).
+  The unreferenced art *inside* the shipped folders still needs the manifest pack.
 - Still open behind those: the finer loading steps and progress bar, the
   manifest-driven pack, and browser spawn-master knobs in
   `config.apply_web_profile()`.

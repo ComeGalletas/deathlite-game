@@ -2,7 +2,7 @@
 
 > Assessment (2026-09-03), after spawn master S7 and the fluidity plan.
 > Measured facts are marked; the rest is a proposal. The pygbag milestones
-> W1-W8 in `journals/pygbag.md` are the baseline this builds on.
+> W1-W8 in `../journals/pygbag.md` are the baseline this builds on.
 
 **In one paragraph.** The browser build boots and starts a run with the
 spawn master in it, but three things stand between it and something you
@@ -21,7 +21,7 @@ its own spawn-master numbers.
 
 | Finding | Evidence |
 |---|---|
-| `pygbag.ini` was missing `/.claude` | The first build packed 2,103 files / 82 MB; `.claude/worktrees/` held a full copy of the repo. Fixed in `web/pygbag.ini`; the bundle is now 1,083 files / 44.8 MB with `spawn/` and `data/spawn_tables.json` inside and no tests, journals or web folder. |
+| `pygbag.ini` was missing `/.claude` | The first build packed 2,103 files / 82 MB; `.claude/worktrees/` held a full copy of the repo. Fixed in `dist/web/pygbag.ini`; the bundle is now 1,083 files / 44.8 MB with `spawn/` and `data/spawn_tables.json` inside and no tests, journals or web folder. |
 | **A static host cannot serve the build as generated** | Served from `python -m http.server -d build/web`, the loader fetches the 44 MB bundle, then `GET /cdn/cp312/pygame_ce-2.5.7-...whl` → 404, stalls on a grey canvas, and the page reloads itself in a loop. pygbag's own dev server proxies `/cdn/` to the CDN; a static host does not. **The W9 GitHub Pages plan would hit this.** With the wheel copied to `build/web/cdn/cp312/` the game boots. |
 | The game runs in the browser with the spawn master | Menu, hero select, loading screen, a run with the F1 overlay showing the zone / population / pressure lines, all from the static server plus the vendored wheel. Nothing in `spawn/` touches threads, files or numpy. |
 | 35 MB of the bundle is art nothing loads | 893 asset files; 223 (11.1 MB) are named by `data/*.json` or a code string, 670 (34.7 MB) are not -- 29 MB of it `assets/unordered-effects/`, the rest stray sheets under `characters/`, `terrain/`, `enemies/`. |
@@ -50,7 +50,7 @@ The wheel is 1.5 MB. The version string is whatever
 `https://pygame-web.github.io/cdn/index-0.9.3-cp312.json` maps `pygame`
 to; read it from there in the script rather than hard-coding, so a
 pygbag upgrade does not silently break the deploy. This is what the
-GitHub Action in `journals/pygbag.md` needs as a step before
+GitHub Action in `../journals/pygbag.md` needs as a step before
 `upload-pages-artifact`.
 
 **2b. Point the loader at the CDN for wheels.** pygbag's `--cdn` flag
@@ -152,10 +152,10 @@ worker that could share the Python heap; slicing is the mechanism.
 
 | Step | Effort | Where |
 |---|---|---|
-| vendor the wheel in `build.sh` and the deploy action (2a) | an hour | `web/build.sh`, the W9 workflow |
-| move `assets/unordered-effects/` out of the bundle | minutes | `web/pygbag.ini` `ignoreDirs`, or the folder itself |
+| vendor the wheel in `build.sh` and the deploy action (2a) | an hour | `dist/web/build.sh`, the W9 workflow |
+| move `assets/unordered-effects/` out of the bundle | minutes | `dist/web/pygbag.ini` `ignoreDirs`, or the folder itself |
 | obstacle index, sliced fill (fluidity plan items 1 and 3) | a day and a half | `world/map.py`, `world/nav/field.py` |
 | browser spawn-master knobs in `apply_web_profile()` | an hour, after measuring on a real browser | `game/config.py` |
 | finer loading steps + progress bar | half a day | `world/gen/__init__.py`, `world/gen/repair.py`, `game/states/loading_state.py` |
-| manifest-driven pack (3) | half a day | new `web/manifest.py`, `web/build.sh` |
+| manifest-driven pack (3) | half a day | new `dist/web/manifest.py`, `dist/web/build.sh` |
 | W9: GitHub Pages workflow | an hour | `.github/workflows/deploy-web.yml` |

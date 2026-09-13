@@ -456,3 +456,14 @@ settled. Worth knowing for whoever picks this up next:
   is what stops the next 254 MB pack from joining the build unnoticed.
 * **`build.ps1 -Console`** is the only way to see inside a packaged build,
   since file logging was declined.
+
+### 2026-09-13 -- moved under `dist/`
+
+All packaging now lives in one place: this build is `dist/desktop/` (spec,
+`build.ps1`, README) and the browser build is `dist/web/`, with `dist/README.md`
+as the index. Outputs moved with the configs: the shipping bundle and ZIP go to
+`dist/desktop/out/`, the `-Console` build to `dist/desktop/out-console/`, and
+PyInstaller's intermediates to `dist/desktop/work/` (all gitignored; the old
+`dist/`, `dist_console/` and `build/pyinstaller` locations are gone). The spec
+resolves the repo root as `Path(SPECPATH).parent.parent` and `build.ps1` walks
+two levels up; nothing about what ships changed.

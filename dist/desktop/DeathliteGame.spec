@@ -1,13 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec for the Windows desktop build of Deathlite Game.
 
-Mirrors `web/pygbag.ini`'s role for the browser build: this file is the single
-place that says what goes into the bundle. Design notes and the decision log are
-in `../documentation/journals/desktop_packaging_journal.md`.
+Mirrors `../web/pygbag.ini`'s role for the browser build: this file is the
+single place that says what goes into the bundle. Design notes and the decision
+log are in `../../documentation/journals/desktop_packaging_journal.md`.
 
 Build it with `build.ps1` rather than by hand -- that script pins the Python to
 `.venv` (which is what keeps numpy out of the bundle) and redirects PyInstaller's
-work directory away from `build/`, which the pygbag build already owns.
+work directory to `work/` here, away from `<repo>/build/`, which pygbag owns.
 
 Two things worth knowing before editing:
 
@@ -15,8 +15,8 @@ Two things worth knowing before editing:
   ZIP. Onefile would re-extract every asset to %TEMP% on each launch and its
   self-extracting stub attracts antivirus warnings.
 * **Assets are allow-listed, never deny-listed.** `assets/` also holds reserve
-  packs that the game does not load -- `unused/` (40 MB) and
-  `Super Pixel Effects Gigapack/` (254 MB, 61,783 files). Listing what ships
+  packs that the game does not load -- `unused/`, the reserve art library
+  (hundreds of MB, tens of thousands of files). Listing what ships
   means a new pack dropped into `assets/` tomorrow cannot silently add itself
   to the build; a deny-list would let it in. `ASSET_DIRS` below was derived from
   every asset path referenced by `data/*.json` and `game/config.py`.
@@ -31,7 +31,7 @@ from PyInstaller.utils.win32.versioninfo import (
     VarFileInfo, VarStruct, VSVersionInfo,
 )
 
-ROOT = Path(SPECPATH).parent          # repo root; SPECPATH is this file's folder
+ROOT = Path(SPECPATH).parent.parent   # repo root; SPECPATH is dist/desktop
 NAME = "DeathliteGame"                # exe / dist folder name (no space: paths)
 
 # --- what ships ---------------------------------------------------------------

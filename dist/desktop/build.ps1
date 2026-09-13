@@ -1,25 +1,25 @@
 <#
-    Build the Windows desktop bundle. Output lands in ../dist/DeathliteGame/
-    (gitignored). The web build's equivalent is ../web/build.sh.
+    Build the Windows desktop bundle. Output lands in out/DeathliteGame/ beside
+    this script (gitignored). The web build's equivalent is ../web/build.sh.
 
     Usage, from anywhere:
-        powershell -ExecutionPolicy Bypass -File desktop\build.ps1
-        powershell -ExecutionPolicy Bypass -File desktop\build.ps1 -Zip
+        powershell -ExecutionPolicy Bypass -File dist\desktop\build.ps1
+        powershell -ExecutionPolicy Bypass -File dist\desktop\build.ps1 -Zip
 
-    -Zip also produces ../dist/DeathliteGame-<version>.zip, which is the thing
+    -Zip also produces out/DeathliteGame-<version>.zip, which is the thing
     you actually hand to someone: they unzip it anywhere and run the exe.
 #>
 [CmdletBinding()]
 param(
-    [switch]$Zip,          # also package dist/ as a versioned ZIP
+    [switch]$Zip,          # also package out/ as a versioned ZIP
     [switch]$KeepWork,     # keep the intermediate work dir for debugging
-    [switch]$Console       # diagnostic build with a console -> dist_console/
+    [switch]$Console       # diagnostic build with a console -> out-console/
 )
 
 $ErrorActionPreference = "Stop"
 
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$root = Split-Path -Parent $here
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path      # dist/desktop
+$root = Split-Path -Parent (Split-Path -Parent $here)        # repo root
 $spec = Join-Path $here "DeathliteGame.spec"
 
 # Build from .venv, never the system Python. That venv holds only pygame and the
@@ -30,19 +30,19 @@ if (-not (Test-Path $py)) {
     throw "No .venv at $py -- create it and 'pip install pygame pyinstaller' first."
 }
 
-# PyInstaller's default work directory is 'build/', which the pygbag web build
-# already owns (build/web, build/web-cache). Send it somewhere of its own.
-$work = Join-Path $root "build\pyinstaller"
+# PyInstaller's default work directory is '<repo>/build/', which the pygbag web
+# build owns (build/web, build/web-cache). Keep the intermediates here instead.
+$work = Join-Path $here "work"
 
-# A -Console build goes to its own dist so it can never be mistaken for, or
-# overwrite, the real one. The spec reads DLG_CONSOLE at build time; a windowed
+# A -Console build goes to its own output folder so it can never be mistaken
+# for, or overwrite, the real one. The spec reads DLG_CONSOLE at build time; a windowed
 # build has no stdout at all, so this is the only way to read the startup log
 # (which save path it resolved, whether vsync was refused, missing assets).
 if ($Console) {
-    $dist = Join-Path $root "dist_console"
+    $dist = Join-Path $here "out-console"
     $env:DLG_CONSOLE = "1"
 } else {
-    $dist = Join-Path $root "dist"
+    $dist = Join-Path $here "out"
 }
 
 Write-Host "python : $py"

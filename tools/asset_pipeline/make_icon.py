@@ -3,7 +3,7 @@
 Writes two files, both from the same crop so the window and the executable show
 the same picture:
 
-    assets/ui/icon.ico   multi-size, for the packaged exe (desktop/*.spec)
+    assets/ui/icon.ico   multi-size, for the packaged exe (dist/desktop/*.spec)
     assets/ui/icon.png   96x96 native, for `pygame.display.set_icon`
 
 Run it from the repo root with either interpreter -- it needs pygame and the

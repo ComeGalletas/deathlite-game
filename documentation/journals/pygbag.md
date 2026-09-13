@@ -268,3 +268,21 @@ and drove it from an embedded browser. Full findings and the plan:
   flow-field rebuild), render 14-20 ms; about 2-4x desktop. Frame *rate*
   could not be measured -- the embedded pane never fires
   `requestAnimationFrame`, so its 0.3 FPS is the pane's, not the game's.
+
+---
+
+## 2026-09-13 -- moved under `dist/web/`, ignore list refreshed
+
+The pygbag files (`pygbag.ini`, `build.sh`, `serve.sh`, README) moved from
+`web/` to `dist/web/` so every packaging target sits under `dist/` (index in
+`dist/README.md`; the desktop build is `dist/desktop/`). pygbag still writes to
+its hard-coded `<repo>/build/web`; `build.sh` now copies the finished bundle to
+`dist/web/out/`, the deliverable, and `serve.sh` keeps serving from `build/web`.
+
+`pygbag.ini` was stale: a rebuild before the fix packed **63,040 files /
+175 MB** because `assets/unused/` (now the whole reserve library, ~294 MB) was
+not ignored, and `.ruff_cache/`, `tools/` and `desktop/` were riding along. The
+list now ignores `/assets/unused`, `/tools`, `/.ruff_cache`, `/dist`, and
+`pytest.ini` / `README.md`; the stale `/journals` and `/web` entries and the
+long-gone `red` / spec-markdown file names are dropped. W9 (Pages) and the
+wheel vendoring are untouched and still open.

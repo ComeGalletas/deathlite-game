@@ -44,12 +44,12 @@ runtime (or with `--web` on the desktop) it calls `config.apply_web_profile()` �
 the browser compositor, and a **1280×720** render target that keeps the desktop
 field of view while cutting per-frame work ~35%.
 
-Everything else pygbag needs lives in `web/` (`pygbag.ini`, `build.sh`,
-`serve.sh`, and `web/README.md` with the details):
+Everything else pygbag needs lives in `dist/web/` (`pygbag.ini`, `build.sh`,
+`serve.sh`, and `dist/web/README.md` with the details):
 
 ```bash
-bash web/serve.sh        # rebuild + serve at http://localhost:8000
-bash web/build.sh        # build only -> build/web/  (gitignored)
+bash dist/web/serve.sh   # rebuild + serve at http://localhost:8000
+bash dist/web/build.sh   # build only -> dist/web/out/  (gitignored)
 ```
 
 First run downloads a CPython-WASM runtime (cached after). Mixer bring-up is
@@ -57,6 +57,19 @@ platform-specific behind `systems/mixer_backend.py` (desktop re-inits at
 22050 Hz; the browser keeps the WebAudio context it was given and resamples).
 Fonts are the bundled **Fredoka** face (`assets/fonts/`, via `game/fonts.py`).
 See `documentation/journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
+
+## Build for distribution
+
+All packaging lives under `dist/`, one folder per target, with `dist/README.md`
+as the index. The Windows desktop build is a PyInstaller `onedir` bundle:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File dist\desktop\build.ps1 -Zip
+```
+
+That produces `dist/desktop/out/DeathliteGame-<version>.zip` (gitignored); the
+recipient unzips it anywhere and runs `DeathliteGame.exe`. Details and the
+diagnostic `-Console` build are in `dist/desktop/README.md`.
 
 ## Run the tests
 
@@ -212,7 +225,9 @@ or corrupt file is handled gracefully — the game never crashes over it).
 deathlite-game/
 ├── main.py             entry point (async loop); `--web` / emscripten applies
 │                       the browser profile
-├── web/                pygbag packaging: pygbag.ini, build.sh, serve.sh, README
+├── dist/               packaging, one folder per target: desktop/ (PyInstaller
+│                       spec + build.ps1), web/ (pygbag.ini, build.sh, serve.sh);
+│                       each target's output lands in its own out/ (gitignored)
 ├── game/               loop, state machine, config, event bus, content,
 │   │                   save, assets (sprite loader/cache), fonts
 │   └── states/         one module per game state (menu, options, rankings,
