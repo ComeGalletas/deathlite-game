@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import math
 
-from game.states.playing.projectiles import style
-from game.states.playing.projectiles.simple import bolt
+from game.states.playing.visual.projectiles import style
+from game.states.playing.visual.projectiles.simple import bolt
 
 
 def heading_of(p) -> float:

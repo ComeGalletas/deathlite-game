@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from game.states.playing.summons import summon_style
+from game.states.playing.visual.summons import summon_style
 
 
 @summon_style("wolf")

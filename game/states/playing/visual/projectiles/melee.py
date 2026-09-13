@@ -4,7 +4,7 @@ the projectile is only the collision shape, so it draws nothing.
 """
 from __future__ import annotations
 
-from game.states.playing.projectiles import style
+from game.states.playing.visual.projectiles import style
 
 
 @style("melee")

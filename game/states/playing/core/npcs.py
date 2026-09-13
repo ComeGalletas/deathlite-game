@@ -23,7 +23,7 @@ import pygame
 from combat.knockback import knock_split
 from entities.npc import Npc, SheepNpc
 from game import config
-from game.states.playing.dps_meter import VILLAGER
+from game.states.playing.core.run_ledger import VILLAGER
 from game.content import get_content
 
 

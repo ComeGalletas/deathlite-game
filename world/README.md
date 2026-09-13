@@ -210,7 +210,7 @@ smaller y than an obstacle is hidden behind it. Each `draw_fn` calls
 `self.gm._draw_one_obstacle` / `self.gm._draw_one_tree_shadow` (routed through
 `self.gm` so a test can monkey-patch them on the instance).
 
-### Whole-frame composition (`game/states/playing/state.py::PlayingState.draw`)
+### Whole-frame composition (`game/states/playing/core/state.py::PlayingState.draw`)
 
 ```
 game_map.draw_ground(surface, camera)        # Part 3 layer order above

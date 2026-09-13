@@ -1,4 +1,4 @@
-"""`game/states/playing/run_ledger.py`: the run-wide damage and kill ledger
+"""`game/states/playing/core/run_ledger.py`: the run-wide damage and kill ledger
 the game-over screen reads.
 
 Hand-built objects, no world: the ledger only needs things with a
@@ -16,8 +16,8 @@ Hand-built objects, no world: the ledger only needs things with a
 import unittest
 from types import SimpleNamespace
 
-from game.states.playing.dps_meter import UNATTRIBUTED, VILLAGER
-from game.states.playing.run_ledger import RunLedger
+from game.states.playing.core.run_ledger import UNATTRIBUTED, VILLAGER
+from game.states.playing.core.run_ledger import RunLedger
 
 
 def _weapon(wid, name, level=1):

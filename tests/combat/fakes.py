@@ -145,6 +145,6 @@ def fake_ps(enemies=(), rng=None, blocked=False):
 
     ps._spawn_projectile = spawn_projectile
     ps.hazards = []
-    from game.states.playing.effects import TransientFx
+    from game.states.playing.core.effects import TransientFx
     ps.fx = TransientFx(ps)
     return ps

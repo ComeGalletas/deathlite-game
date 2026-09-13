@@ -22,7 +22,7 @@ import math
 
 import pygame
 
-from game.states.playing.projectiles import style
+from game.states.playing.visual.projectiles import style
 
 _ORB_RIG, _ORB_ANIM = "totem_bolt", "orb"
 _FIRE_RIG, _FIRE_ANIM = "totem_bolt_fire", "loop"

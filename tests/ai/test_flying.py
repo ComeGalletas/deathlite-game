@@ -275,7 +275,7 @@ class ShotsOverTheSeaTests(unittest.TestCase):
 
     def _fx(self):
         from types import SimpleNamespace
-        from game.states.playing.effects import TransientFx
+        from game.states.playing.core.effects import TransientFx
         bursts = []
         ps = SimpleNamespace(game_map=self.gm,
                              particles=SimpleNamespace(burst=lambda *a, **k: bursts.append(a)))
@@ -320,7 +320,7 @@ class BossSpawnPointTests(unittest.TestCase):
     def test_the_point_is_the_configured_distance_from_the_hero(self):
         import random
         from game import config
-        from game.states.playing.spawning import boss_spawn_point
+        from game.states.playing.core.spawning import boss_spawn_point
         hero = pygame.Vector2(3000, 3000)
         for seed in range(6):
             p = boss_spawn_point(hero, random.Random(seed), 6000, 6000)
@@ -328,7 +328,7 @@ class BossSpawnPointTests(unittest.TestCase):
 
     def test_the_point_is_clamped_inside_the_world(self):
         import random
-        from game.states.playing.spawning import boss_spawn_point
+        from game.states.playing.core.spawning import boss_spawn_point
         for hero in (pygame.Vector2(0, 0), pygame.Vector2(6000, 0),
                      pygame.Vector2(0, 6000), pygame.Vector2(6000, 6000)):
             for seed in range(8):
@@ -340,7 +340,7 @@ class BossSpawnPointTests(unittest.TestCase):
         import random
         from types import SimpleNamespace
         from game import config
-        from game.states.playing.spawning import EnemyControl
+        from game.states.playing.core.spawning import EnemyControl
         gm = W.game_map(SEED)
         start = gm.layout.room(gm.layout.start_id).center
         ps = SimpleNamespace(player=SimpleNamespace(pos=pygame.Vector2(start)),

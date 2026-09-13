@@ -607,7 +607,7 @@ MAX_PROJECTILES: int = 800
 # A soft white disc under every orb, breathing in alpha on each orb's own
 # clock (`XPGem.age`), so a field of orbs shimmers out of phase. Surfaces
 # are pre-rendered per (diameter, alpha step) and looked up -- see
-# `game/states/playing/glow.py`. `scale` is the glow's diameter as a multiple
+# `game/states/playing/visual/glow.py`. `scale` is the glow's diameter as a multiple
 # of the orb's; 0 turns the effect off.
 XP_GLOW: dict = {
     "scale": 2.25,

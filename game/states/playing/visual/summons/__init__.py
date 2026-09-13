@@ -16,7 +16,7 @@ from typing import Callable
 
 import pygame
 
-from game.states.playing.drawctx import DrawCtx  # noqa: F401 (re-export)
+from game.states.playing.visual.drawctx import DrawCtx  # noqa: F401 (re-export)
 
 _STYLES: dict[str, Callable] = {}
 
@@ -49,5 +49,5 @@ def registered() -> tuple[str, ...]:
 
 
 # Import the kind modules so their @summon_style decorators run.
-from game.states.playing.summons import totem as _totem  # noqa: E402,F401
-from game.states.playing.summons import wolf as _wolf    # noqa: E402,F401
+from game.states.playing.visual.summons import totem as _totem  # noqa: E402,F401
+from game.states.playing.visual.summons import wolf as _wolf    # noqa: E402,F401

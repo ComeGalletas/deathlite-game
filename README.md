@@ -314,7 +314,7 @@ arena, drops an item) → victory / defeat → Salvage & loot banked → Sanctua
 kills, gold and Salvage, the items acquired; kills per enemy type and the
 blessings with their levels; and the damage done per weapon with its DPS over
 the time the weapon was held, fed by a run-wide ledger every enemy reports
-to (`game/states/playing/run_ledger.py`). Three buttons — New run, Sanctuary,
+to (`game/states/playing/core/run_ledger.py`). Three buttons — New run, Sanctuary,
 Main menu — take the mouse or ENTER / S / ESC. See
 `documentation/journals/game_over_journal.md`.
 

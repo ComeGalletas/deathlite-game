@@ -220,3 +220,48 @@ PlayingState` and `from game.states.playing import PlayingState` work.
   the list layout updated.
 - `_report_debug` stays central (it reads every sub-system's counters); fine as
   is.
+
+## 2026-09-12 -- three sub-packages: `core/`, `visual/`, `devtools/`
+
+**Request.** Review the modules in `game/states/playing/`, tell apart the
+ones the run cannot work without from the ones that only draw or only serve
+testing, then put each group in its own folder and fix every reference.
+
+**Layout.** Everything moved with `git mv`, so each file keeps its history.
+`game/states/playing/__init__.py` still exports `PlayingState`, and the
+`game/states/playing_state.py` shim still works.
+
+| Folder | Modules | Role |
+|---|---|---|
+| `core/` | `state`, `aim`, `combat`, `physics`, `navigation`, `perception`, `spawning`, `chests`, `locations`, `npcs`, `effects`, `run_ledger` | the simulation: everything that changes the run |
+| `visual/` | `rendering`, `drawctx`, `glow`, `slam_fx`, `slash_fx`, `projectiles/` (11 files), `summons/` (3 files) | read-only over the state; draws the world layers |
+| `devtools/` | `dps_meter` | armed only by the dev menu's training dummy |
+
+Two modules are not pure members of their group and are placed by their
+weight: `effects.py` is core (hostile shots, hazards, melee hitboxes and
+damaging explosions) with a visual tail (death poof, burst discs, trail
+particles); `run_ledger.py` never affects the simulation but the game-over
+summary is built from it, so it is shipped feature logic rather than a
+visual. `rendering.py` also carries the three dev overlays (colliders, spawn
+points, aim line) since they are draw code over the same camera.
+
+**Dependency direction.** `VILLAGER` and `UNATTRIBUTED` were defined in
+`dps_meter.py` but imported by `npcs.py` and `run_ledger.py`, which would have
+made two core modules depend on `devtools/`. Both constants now live in
+`core/run_ledger.py`; `dps_meter.py` imports and re-exports them, so
+`from ...dps_meter import VILLAGER` still resolves. The one remaining
+`core/` -> `devtools/` import is the coordinator constructing `self.dps`.
+
+**References.** 50 imports inside the package, 26 test modules, the shim,
+`game/dps_bench.py`, a `game/config.py` comment, `README.md` and
+`world/README.md` were rewritten to the new paths. No test used a
+string-based monkeypatch path and the PyInstaller spec has no hidden imports,
+so nothing else needed to change. Older journal entries keep the paths they
+were written with.
+
+**Verification.** Baseline before the move: 2143 passed, 1 failed
+(`test_forge.py::test_whirlwind_is_a_fast_full_circle`, unrelated and
+already failing on `main`). The post-move run is recorded below.
+After the move: 2153 passed, the same single pre-existing failure, and a
+headless run (`PlayingState.enter`, 120 frames, one `draw`) completes with the
+renderer, ledger and meter resolving from `visual/`, `core/` and `devtools/`.

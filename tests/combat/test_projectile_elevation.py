@@ -50,7 +50,7 @@ class _PS:
 
 
 def _fx(levels):
-    from game.states.playing.effects import TransientFx
+    from game.states.playing.core.effects import TransientFx
     return TransientFx(_PS(levels))
 
 

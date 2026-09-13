@@ -410,7 +410,7 @@ class MirroredAnchorTests(unittest.TestCase):
     def _renderer(self):
         from types import SimpleNamespace
         from game.assets import get_assets
-        from game.states.playing.rendering import WorldRenderer
+        from game.states.playing.visual.rendering import WorldRenderer
         ps = SimpleNamespace(game=SimpleNamespace(assets=get_assets()))
         return WorldRenderer(ps), get_assets()
 

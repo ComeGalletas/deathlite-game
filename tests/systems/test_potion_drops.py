@@ -15,7 +15,7 @@ from entities.potion import HealthPotion
 from game.content import get_content
 from game.events import Events
 from game.game import Game
-from game.states.playing.state import PlayingState
+from game.states.playing.core.state import PlayingState
 
 C = get_content()
 T = C.potions

@@ -12,7 +12,7 @@ import pygame
 
 from entities.player import Player
 from game.content import get_content
-from game.states.playing.state import PlayingState
+from game.states.playing.core.state import PlayingState
 
 
 def fake_state(anims=("idle", "walk", "attack", "attack2", "guard"), **player_over):

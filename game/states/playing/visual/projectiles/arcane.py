@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pygame
 
-from game.states.playing.projectiles import style
+from game.states.playing.visual.projectiles import style
 
 _ANIM = "loop"
 

@@ -1,4 +1,4 @@
-"""The per-family projectile draw package (`game/states/playing/projectiles/`):
+"""The per-family projectile draw package (`game/states/playing/visual/projectiles/`):
 the `@style` registry, `classify()`, the animated `orbit` flame, and the `cone`
 reaping sector + `soul_slash` sprite.
 """
@@ -13,12 +13,12 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game.assets import Assets, reset_assets
-from game.states.playing.projectiles import DrawCtx, classify, registered
-from game.states.playing.projectiles import cone as cone_mod
-from game.states.playing.projectiles.orbit import orbit
-from game.states.playing.projectiles.thunder import thunder
-from game.states.playing.projectiles.arcane import arcane
-from game.states.playing.projectiles import bomb as bomb_mod
+from game.states.playing.visual.projectiles import DrawCtx, classify, registered
+from game.states.playing.visual.projectiles import cone as cone_mod
+from game.states.playing.visual.projectiles.orbit import orbit
+from game.states.playing.visual.projectiles.thunder import thunder
+from game.states.playing.visual.projectiles.arcane import arcane
+from game.states.playing.visual.projectiles import bomb as bomb_mod
 
 
 def _display():

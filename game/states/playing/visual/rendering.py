@@ -18,10 +18,10 @@ import pygame
 
 from game import config, fonts
 from entities.pickup import XP_TIER_COLORS
-from game.states.playing.drawctx import DrawCtx
-from game.states.playing.glow import GlowCache
-from game.states.playing.projectiles import draw_projectile
-from game.states.playing.summons import draw_summon
+from game.states.playing.visual.drawctx import DrawCtx
+from game.states.playing.visual.glow import GlowCache
+from game.states.playing.visual.projectiles import draw_projectile
+from game.states.playing.visual.summons import draw_summon
 from progression import chests as _chests
 from progression import potions as _potions
 from ui.text import shadowed
@@ -30,7 +30,7 @@ from ui.text import shadowed
 _AIM_LINE_PX = 160.0
 # Re-exported so `PlayingState._draw_cone` (a `test_depth_sort` entry point) and
 # `_rendering.draw_cone` keep resolving after the move to the projectiles pkg.
-from game.states.playing.projectiles.cone import draw_cone  # noqa: F401
+from game.states.playing.visual.projectiles.cone import draw_cone  # noqa: F401
 
 
 _ORB_RIGS = {0: "xp_orb_small", 1: "xp_orb_medium", 2: "xp_orb_large"}

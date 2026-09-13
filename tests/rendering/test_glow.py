@@ -1,4 +1,4 @@
-"""game/states/playing/glow.py -- the XP-orb glow cache and its breathing
+"""game/states/playing/visual/glow.py -- the XP-orb glow cache and its breathing
 curve (group A of the glow plan)."""
 import os
 import unittest
@@ -9,7 +9,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
-from game.states.playing.glow import GlowCache, pulse_alpha, quantise
+from game.states.playing.visual.glow import GlowCache, pulse_alpha, quantise
 
 CFG = {"scale": 2.25, "alpha_min": 40, "alpha_max": 110, "period": 1.1,
        "steps": 8, "colour": (255, 255, 255)}

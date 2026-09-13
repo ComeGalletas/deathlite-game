@@ -26,14 +26,11 @@ from __future__ import annotations
 
 from collections import deque
 
-# The source string village NPCs damage with. Lives here rather than in
-# `npcs.py` because only the meter and the run ledger care.
-VILLAGER = "villager"
+# The shared source labels are owned by the run ledger (core side); they are
+# re-exported here so the meter's callers keep one import.
+from game.states.playing.core.run_ledger import UNATTRIBUTED, VILLAGER  # noqa: F401
 
 WINDOW_S = 10.0
-# Anything a damage path did not name. Kept visible rather than folded into a
-# weapon, so a hole in the attribution shows up as a hole.
-UNATTRIBUTED = "other"
 
 
 class DpsMeter:

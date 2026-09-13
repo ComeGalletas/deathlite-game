@@ -15,8 +15,8 @@ from combat.weapons import FireContext, Weapon, WeaponMods
 from combat.weapons.forge import apply_forge, get_forges
 from game import config
 from game.content import get_content
-from game.states.playing import slam_fx
-from game.states.playing.aim import AimInput
+from game.states.playing.visual import slam_fx
+from game.states.playing.core.aim import AimInput
 from tests.combat.fakes import FakeEnemy
 
 C = get_content()

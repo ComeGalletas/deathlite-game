@@ -18,7 +18,7 @@ import pygame
 from entities.hazard import Hazard
 from game.assets import get_assets
 from game.content import get_content
-from game.states.playing import rendering
+from game.states.playing.visual import rendering
 from tests import worlds as W
 
 RIG = "hex_shaman_explosion_spell"

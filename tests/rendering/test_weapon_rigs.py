@@ -14,7 +14,7 @@ import pygame
 from combat.weapons import FireContext, Weapon
 from game.assets import Assets, reset_assets
 from game.content import get_content
-from game.states.playing.projectiles import cone as cone_mod
+from game.states.playing.visual.projectiles import cone as cone_mod
 from tests.combat.fakes import FakeEnemy
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -170,7 +170,7 @@ class SwingSequenceTests(unittest.TestCase):
         cls.a = Assets()
 
     def _ps(self):
-        from game.states.playing import slash_fx
+        from game.states.playing.visual import slash_fx
         return SimpleNamespace(_slashes=[], game=SimpleNamespace(assets=self.a)), slash_fx
 
     def _cone(self, fx):
@@ -345,7 +345,7 @@ class ThrownDaggerTests(unittest.TestCase):
         self.assertEqual(sheet.get_size(), (32, 32))
 
     def test_the_fan_of_blades_draws_it_thrown(self):
-        from game.states.playing.projectiles import registered
+        from game.states.playing.visual.projectiles import registered
         vis = get_content().weapon_visual("fan_of_blades")
         self.assertEqual(vis.style, "thrown")
         self.assertEqual(vis.fx["rig"], "throwing_dagger")
@@ -353,7 +353,7 @@ class ThrownDaggerTests(unittest.TestCase):
         self.assertEqual(get_content().weapon_visual("daggers").style, "cone")   # the base stays
 
     def test_the_turn_cancels_the_arts_own_heading(self):
-        from game.states.playing.projectiles import thrown as t
+        from game.states.playing.visual.projectiles import thrown as t
         self.assertAlmostEqual(t.rotation_for(self.a, "throwing_dagger", -135.0), 0.0)
         self.assertAlmostEqual(t.rotation_for(self.a, "throwing_dagger", 0.0), 135.0)
         self.assertAlmostEqual(t.rotation_for(self.a, "arrow", 30.0), 30.0)  # no key -> as is
@@ -361,7 +361,7 @@ class ThrownDaggerTests(unittest.TestCase):
         self.assertAlmostEqual(t.heading_of(p), 90.0)
 
     def test_a_right_going_dagger_lies_flat_and_a_down_going_one_stands(self):
-        from game.states.playing.projectiles import thrown as t
+        from game.states.playing.visual.projectiles import thrown as t
         flat = self.a.rotated("throwing_dagger", t.rotation_for(self.a, "throwing_dagger", 0.0))
         tall = self.a.rotated("throwing_dagger", t.rotation_for(self.a, "throwing_dagger", 90.0))
         fb, tb = flat.get_bounding_rect(), tall.get_bounding_rect()
@@ -373,8 +373,8 @@ class ThrownDaggerTests(unittest.TestCase):
         self.assertEqual(untouched.size, (19, 19))
 
     def test_the_draw_blits_the_rotated_rig_centred_on_the_shot(self):
-        from game.states.playing.projectiles import draw_projectile
-        from game.states.playing.drawctx import DrawCtx
+        from game.states.playing.visual.projectiles import draw_projectile
+        from game.states.playing.visual.drawctx import DrawCtx
         calls = []
         real = self.a.rotated
         self.a.rotated = lambda *a, **k: (calls.append((a, k)), real(*a, **k))[1]
@@ -391,8 +391,8 @@ class ThrownDaggerTests(unittest.TestCase):
         self.assertGreater(surf.get_bounding_rect().w, 20)
 
     def test_a_missing_rig_falls_back_to_the_disc(self):
-        from game.states.playing.projectiles import draw_projectile
-        from game.states.playing.drawctx import DrawCtx
+        from game.states.playing.visual.projectiles import draw_projectile
+        from game.states.playing.visual.drawctx import DrawCtx
         p = SimpleNamespace(vel=pygame.Vector2(3, 0), fx={"rig": "no_such_rig"},
                             style="thrown", cone_half_angle=0.0, orbit_speed=0.0,
                             anchor=None, color=(9, 8, 7), radius=4)

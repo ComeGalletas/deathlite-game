@@ -17,7 +17,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game.content import get_content
-from game.states.playing.dps_meter import UNATTRIBUTED, VILLAGER, DpsMeter
+from game.states.playing.devtools.dps_meter import UNATTRIBUTED, VILLAGER, DpsMeter
 
 
 class _Target:

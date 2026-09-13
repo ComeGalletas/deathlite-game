@@ -11,11 +11,11 @@ import pygame
 
 from combat.weapons import FireContext, Weapon
 from combat.weapons.bomb import landing_time
-from game.states.playing.projectiles.bomb import anim_for
+from game.states.playing.visual.projectiles.bomb import anim_for
 from entities.projectile import Projectile
 from game.content import get_content
-from game.states.playing.combat import CombatResolver
-from game.states.playing.effects import TransientFx
+from game.states.playing.core.combat import CombatResolver
+from game.states.playing.core.effects import TransientFx
 from tests.combat.fakes import FakeEnemy, fake_ps
 
 
@@ -116,7 +116,7 @@ class ThrowTests(unittest.TestCase):
         self.assertEqual(len({round(s.vel.y) for s in sink}), 3)
 
     def test_manual_throw_whiffs_into_empty_space_with_the_full_throw(self):
-        from game.states.playing.aim import AimInput
+        from game.states.playing.core.aim import AimInput
         sink = []
         held = AimInput(pygame.Vector2(0, -1), "keys", held=True)
         self.assertTrue(bomb().update(1 / 60, ctx([], sink, aim=held)))
@@ -463,7 +463,7 @@ class BombletSpriteTests(unittest.TestCase):
     def setUpClass(cls):
         import tempfile
         from game.game import Game
-        from game.states.playing.state import PlayingState
+        from game.states.playing.core.state import PlayingState
         cls.game = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         cls.ps = PlayingState(cls.game)
         cls.ps.enter(seed=7)
@@ -557,7 +557,7 @@ class BurstVisualTests(unittest.TestCase):
     def test_the_renderer_scales_the_burst_to_the_blast_diameter(self):
         from types import SimpleNamespace
         from game.assets import get_assets
-        from game.states.playing.rendering import WorldRenderer
+        from game.states.playing.visual.rendering import WorldRenderer
         pygame.init()
         if pygame.display.get_surface() is None:
             pygame.display.set_mode((1, 1))

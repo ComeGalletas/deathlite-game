@@ -13,7 +13,7 @@ from combat import synergy
 from combat.weapons import Weapon
 from game import config
 from game.content import get_content
-from game.states.playing.combat import CombatResolver
+from game.states.playing.core.combat import CombatResolver
 from progression.blessings import get_catalog
 from tests.combat.fakes import FakeEnemy, fake_ps
 

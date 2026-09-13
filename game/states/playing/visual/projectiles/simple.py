@@ -8,7 +8,7 @@ import math
 import pygame
 
 from game import config
-from game.states.playing.projectiles import style
+from game.states.playing.visual.projectiles import style
 
 
 

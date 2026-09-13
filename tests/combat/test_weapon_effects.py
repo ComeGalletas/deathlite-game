@@ -14,7 +14,7 @@ import pygame
 
 from combat.weapons import FireContext, Weapon
 from game.content import get_content
-from game.states.playing.combat import CombatResolver
+from game.states.playing.core.combat import CombatResolver
 from tests.combat.fakes import FakeEnemy, fake_ps
 
 C = get_content()
@@ -242,7 +242,7 @@ class FirePathBonusTests(unittest.TestCase):
 
 class BloodlettingTests(unittest.TestCase):
     def test_a_kill_by_the_blessed_weapon_heals(self):
-        from game.states.playing.state import PlayingState
+        from game.states.playing.core.state import PlayingState
         healed = []
         ps = fake_ps([])
         ps.player.heal = lambda amt: healed.append(amt)

@@ -9,7 +9,7 @@ import math
 
 import pygame
 
-from game.states.playing.projectiles import style
+from game.states.playing.visual.projectiles import style
 
 # Sector alphas -- dimmed 35% (was 70 / 210, i.e. round(x * 0.65)) now that
 # `_SLASH_RIG` carries the read; the sector is just the honest damage footprint.

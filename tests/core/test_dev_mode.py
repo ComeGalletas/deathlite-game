@@ -347,7 +347,7 @@ class DevMenuTests(unittest.TestCase):
         self.assertFalse(playing._dev_show_spawn_points)
 
     def test_aim_line_row_toggles_the_dev_overlay(self):
-        from game.states.playing.aim import AimInput
+        from game.states.playing.core.aim import AimInput
         game = _game()
         playing, menu = _open_dev_menu(game)
         self.assertFalse(playing._dev_show_aim)
@@ -365,7 +365,7 @@ class DevMenuTests(unittest.TestCase):
 
     def test_aim_overlay_draws_only_in_dev_with_the_flag_and_an_aim(self):
         from unittest import mock
-        from game.states.playing.aim import AimInput
+        from game.states.playing.core.aim import AimInput
 
         def lines(game, ps):
             with mock.patch.object(pygame.draw, "line", wraps=pygame.draw.line) as m:

@@ -1,6 +1,6 @@
 """CB-5 manual aim: the input side (group B).
 
-Pure tests for `game.states.playing.aim.read_aim` -- the priority ladder
+Pure tests for `game.states.playing.core.aim.read_aim` -- the priority ladder
 (click > held aim key > nothing), the layout swap, the tap flag, the cursor-on-
 hero fallback -- and for the hero's facing override. The state-level wiring
 (`Q` toggle, the tap queue, the frame's `AimInput`) is in
@@ -26,7 +26,7 @@ from combat.weapons import FireContext, Weapon
 from entities.player import Player
 from game import config
 from game.content import get_content
-from game.states.playing.aim import AimInput, mouse_direction, read_aim
+from game.states.playing.core.aim import AimInput, mouse_direction, read_aim
 from systems.camera import Camera
 
 WASD = config.KEY_LAYOUTS["wasd_move"]

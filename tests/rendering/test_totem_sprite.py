@@ -184,8 +184,8 @@ class DrawTests(unittest.TestCase):
         _display()
 
     def _draw(self, s, assets):
-        from game.states.playing.summons import draw_summon
-        from game.states.playing.drawctx import DrawCtx
+        from game.states.playing.visual.summons import draw_summon
+        from game.states.playing.visual.drawctx import DrawCtx
         surface = pygame.Surface((160, 160), pygame.SRCALPHA)
         draw_summon(surface, 80, 100, s, DrawCtx(assets, 0.0, 1.0))
         return surface

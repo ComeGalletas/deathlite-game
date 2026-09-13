@@ -17,7 +17,7 @@ import pygame
 
 from game import config
 from combat.knockback import knock_split
-from game.states.playing.physics import BumpResolver, _PEN_CAP_FRAC
+from game.states.playing.core.physics import BumpResolver, _PEN_CAP_FRAC
 
 
 class Body:

@@ -14,7 +14,7 @@ from combat.status import REGISTRY, StatusState
 from combat.weapons import FireContext, Weapon
 from entities.enemy import Enemy
 from game.content import get_content
-from game.states.playing.combat import CombatResolver
+from game.states.playing.core.combat import CombatResolver
 from tests.aictx import ai_ctx
 from tests.combat.fakes import FakeEnemy, fake_ps
 

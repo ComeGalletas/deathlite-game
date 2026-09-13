@@ -30,7 +30,7 @@ from entities.hazard import Hazard
 from entities.melee_hitbox import MeleeHitbox
 from combat.weapons import Weapon, FireContext
 from progression.experience import LevelTracker, xp_for_level
-from game.states.playing.aim import AimInput, read_aim
+from game.states.playing.core.aim import AimInput, read_aim
 from progression.blessings import get_catalog, rebuild as rebuild_blessings, roll_offering
 from progression.items import Item, generate_item
 from progression.stats import FLAT, MULT, PCT, Modifier
@@ -45,20 +45,21 @@ from ui.damage_numbers import DamageNumbers
 from world.map import GameMap
 from world.pathfinding import NavField
 from spawn.budget import SpawnDirector
-from game.states.playing import rendering as _rendering
-from game.states.playing.rendering import WorldRenderer
-from game.states.playing.combat import CombatResolver
-from game.states.playing.physics import BumpResolver
-from game.states.playing.chests import Chests
-from game.states.playing.locations import SpecialLocations
-from game.states.playing.npcs import Npcs
-from game.states.playing.effects import TransientFx
-from game.states.playing.dps_meter import DpsMeter
-from game.states.playing.run_ledger import RunLedger
-from game.states.playing import slam_fx, slash_fx
-from game.states.playing.navigation import NavCoordinator
-from game.states.playing.spawning import EnemyControl
-from game.states.playing.perception import PlayingPerception
+from game.states.playing.visual import rendering as _rendering
+from game.states.playing.visual.rendering import WorldRenderer
+from game.states.playing.core.combat import CombatResolver
+from game.states.playing.core.physics import BumpResolver
+from game.states.playing.core.chests import Chests
+from game.states.playing.core.locations import SpecialLocations
+from game.states.playing.core.npcs import Npcs
+from game.states.playing.core.effects import TransientFx
+from game.states.playing.devtools.dps_meter import DpsMeter
+from game.states.playing.core.run_ledger import RunLedger
+from game.states.playing.visual import slam_fx
+from game.states.playing.visual import slash_fx
+from game.states.playing.core.navigation import NavCoordinator
+from game.states.playing.core.spawning import EnemyControl
+from game.states.playing.core.perception import PlayingPerception
 
 log = logging.getLogger(__name__)
 
@@ -228,12 +229,12 @@ class PlayingState(State):
                       "potions": 0, "potion_healing": 0.0,
                       "chests": 0}          # CB-9: treasure chests opened
         # Damage per source and kills per enemy type for the whole run, fed
-        # through every enemy's `ledger` attribute (`run_ledger.py`). Built
+        # through every enemy's `ledger` attribute (`core/run_ledger.py`). Built
         # before anything can spawn: the spawner hands it to each enemy.
         self.ledger = RunLedger()
         self._drop_counter = 0
         # Damage-per-second against the dev menu's training dummy. Inert --
-        # and free -- until something arms it (`dps_meter.py`).
+        # and free -- until something arms it (`devtools/dps_meter.py`).
         self.dps = DpsMeter()
 
     def _init_nav(self) -> None:
@@ -1157,7 +1158,7 @@ class PlayingState(State):
         return out
 
     # --- render: thin forwarders to WorldRenderer -------------
-    # The bodies live in `game/states/playing/rendering.py`; these stay so that
+    # The bodies live in `game/states/playing/visual/rendering.py`; these stay so that
     # `draw()` / `_depth_items()` and existing call sites + tests keep a stable
     # `PlayingState` surface. `_hit_tinted` / `_draw_cone` are pure helpers.
     _hit_tinted = staticmethod(_rendering.hit_tinted)

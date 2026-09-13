@@ -17,7 +17,7 @@ from combat.weapons import FireContext, Weapon
 from combat.weapons.forge import (EFFECT_KEYS, OVERRIDABLE, Forges, apply_forge,
                                   blessing_levels, forge_eligible, get_forges)
 from game.content import get_content
-from game.states.playing.combat import CombatResolver
+from game.states.playing.core.combat import CombatResolver
 from tests.combat.fakes import FakeEnemy, fake_ps
 
 C = get_content()
@@ -372,7 +372,7 @@ class BombForgeTests(unittest.TestCase):
 class VisualTests(unittest.TestCase):
     def test_a_forged_weapon_names_its_forge_look_and_falls_back(self):
         from types import SimpleNamespace
-        from game.states.playing.state import PlayingState
+        from game.states.playing.core.state import PlayingState
         fake = SimpleNamespace(content=C)
         kw = {"weapon_id": "daggers", "visual": "fan_of_blades"}
         PlayingState._resolve_visual(fake, kw)

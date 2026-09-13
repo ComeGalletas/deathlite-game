@@ -14,7 +14,7 @@ import math
 
 import pygame
 
-from game.states.playing.projectiles import style
+from game.states.playing.visual.projectiles import style
 
 _RIG, _ANIM = "ember", "loop"
 

@@ -19,10 +19,10 @@ import pygame
 from entities.projectile import Projectile
 from game.assets import get_assets
 from game.content import get_content
-from game.states.playing.combat import CombatResolver
-from game.states.playing.drawctx import DrawCtx
-from game.states.playing.projectiles import draw_projectile
-from game.states.playing.projectiles.totem_bolt import tail_angle
+from game.states.playing.core.combat import CombatResolver
+from game.states.playing.visual.drawctx import DrawCtx
+from game.states.playing.visual.projectiles import draw_projectile
+from game.states.playing.visual.projectiles.totem_bolt import tail_angle
 
 FOLDER = os.path.join("assets", "effects", "weapons", "grave_totem")
 
@@ -199,7 +199,7 @@ class ImpactTests(unittest.TestCase):
     def test_the_burst_plays_once_through_the_impact_machinery(self):
         """`slam_fx.spawn_impact` with `anim="burst"`: queued, advances, and
         is culled when the strip has shown its last frame (6 @ 16 fps)."""
-        from game.states.playing import slam_fx
+        from game.states.playing.visual import slam_fx
         ps = SimpleNamespace(game=SimpleNamespace(assets=get_assets()), _impacts=[])
         slam_fx.spawn_impact(ps, pos=(1, 2), radius=6, rig="totem_bolt", anim="burst")
         self.assertEqual(len(ps._impacts), 1)

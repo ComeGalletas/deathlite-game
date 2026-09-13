@@ -19,7 +19,7 @@ import math
 
 import pygame
 
-from game.states.playing.projectiles.cone import _SLASH_ANIM, _SLASH_FWD, slash_size
+from game.states.playing.visual.projectiles.cone import _SLASH_ANIM, _SLASH_FWD, slash_size
 
 SEQUENCE = "sequence"
 

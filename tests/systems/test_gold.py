@@ -13,7 +13,7 @@ covers the merchant end to end.
 import unittest
 from types import SimpleNamespace
 
-from game.states.playing.state import PlayingState
+from game.states.playing.core.state import PlayingState
 
 
 def _ps(gold=0, earned=0):

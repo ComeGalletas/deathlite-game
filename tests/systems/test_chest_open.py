@@ -16,7 +16,7 @@ import pygame
 from entities.chest import Chest
 from game.content import get_content
 from game.game import Game
-from game.states.playing.state import PlayingState
+from game.states.playing.core.state import PlayingState
 from progression import chests as chest_rules
 
 C = get_content()

@@ -27,7 +27,17 @@ Three things it keeps, and why:
 """
 from __future__ import annotations
 
-from game.states.playing.dps_meter import UNATTRIBUTED, VILLAGER
+# The two damage-source labels the ledger and the training dummy's meter
+# share. They live here, on the core side, so the ledger and the NPCs never
+# import from `devtools/`: the meter is the optional consumer, the ledger
+# the run's.
+#
+# The source string village NPCs damage with (`core/npcs.py`); both accountants
+# drop it, since a lancer stabbing an enemy is not the hero's damage.
+VILLAGER = "villager"
+# Anything a damage path did not name. Kept visible rather than folded into a
+# weapon, so a hole in the attribution shows up as a hole.
+UNATTRIBUTED = "other"
 
 
 class RunLedger:

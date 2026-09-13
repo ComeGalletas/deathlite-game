@@ -15,7 +15,7 @@ import pygame
 from entities.boss import Boss
 from game.content import get_content
 from game import config
-from game.states.playing.spawning import EnemyControl, boss_spawn_point
+from game.states.playing.core.spawning import EnemyControl, boss_spawn_point
 from tests import worlds as W
 from tests.aictx import ai_ctx
 
