@@ -74,10 +74,10 @@ python -m pytest -m unit
 
 | tier | what it does | tests | time |
 |------|--------------|------:|-----:|
-| `unit` | hand-built grids and fakes | 768 | 12 s |
-| `world` | the four cached worlds in `tests/worlds.py` | 485 | 3 min 32 s |
-| `integration` | boots a real `Game` and drives its states | 390 | 6 min 13 s |
-| `sweep` | many seeds, statistical | 7 | 2 min 8 s |
+| `unit` | hand-built grids and fakes | 1,133 | 50 s |
+| `world` | the four cached worlds in `tests/worlds.py` | 525 | 2 min 57 s |
+| `integration` | boots a real `Game` and drives its states | 503 | 6 min 29 s |
+| `sweep` | many seeds, statistical | 8 | 2 min 18 s |
 
 The default `python -m pytest` is the first three together: 1,643 tests in
 8 min 40 s.
