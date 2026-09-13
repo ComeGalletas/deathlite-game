@@ -19,7 +19,7 @@ import pygame
 from pygame._sdl2 import Renderer, Texture, Window
 
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parents[2]   # tools/asset_pipeline/ -> repo root
 ASSETS_DIR = ROOT_DIR / "assets"
 DATA_DIR = ROOT_DIR / "data"
 SPRITES_JSON_FILES = [

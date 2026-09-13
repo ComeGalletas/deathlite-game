@@ -195,3 +195,59 @@ segmented pip bars that would suit XP-to-next-level, `05.png` a wedge meter,
 `03.png` radial dial rings for cooldowns, `00.png` hearts, stars and small
 chevrons, and `04.png`'s own vertical section a boss bar down the screen edge.
 The boss bar in `ui/hud.py` is still a primitive rectangle.
+
+## The pieces were cut out of the pack sheets (owner, 2026-09-12)
+
+> "review the ui elements that have sprites associated with them and cut them
+> from the sprite sheet to create specific sprite sheets for the ui elements
+> [...] and then move the big sprite sheets in a different 'base' folder"
+
+Ten rigs were reaching into `assets/ui/04.png` and `01.png` with offsets — the
+only assets in the whole of `assets/ui/` doing so, since the buttons, ribbons
+and pointer have always been one file per rig.
+
+### What was proposed, and what was chosen
+
+The obvious reading — one sheet per element, `health_bar.png` / `xp_bar.png` /
+`boss_bar.png` — does not survive contact with the art: **the three bars share
+pieces.** The empty trough is in all three and the red fill is in both the HP
+and boss bars, so element sheets would duplicate them and a later edit to the
+trough would have to remember three files. There is also a non-obvious
+dependency: the XP bar is frameless but reads `bar_hex_frame_silver`'s `well`
+for its inset, which is the only reason the HP and XP fills line up to the
+pixel.
+
+The owner chose **one file per piece**, named exactly after the rig that draws
+it, in `assets/ui/hud/`. `bar_hex_frame_silver.png` is rig
+`bar_hex_frame_silver` — no indirection, and duplication is impossible. The
+three spare colours (grey housing, yellow and green fills) were cut too, so
+nobody has to reopen the pack sheet to use them.
+
+### How
+
+`utilities/cut_ui_bars.py`, in the shape the chest and totem cutters already
+take: the rects in one table with the measured geometry in the docstring, and
+a `--check` mode a test runs so a re-cut can never drift from what is
+committed. The rigs lost their `content` crops entirely — the file *is* the
+crop now — while `caps` and `well` stayed, because those describe how the art
+is rebuilt, not where it lives. `well` needed no adjustment: it was always
+relative to the housing's art box, which is exactly what the cut file is.
+
+The gem pieces keep their whole 48x48 cell rather than being cropped to their
+ink. Cropping each to its own ink would have thrown away precisely the offset
+that seats the gem inside the ring.
+
+`00`–`07.png` and `All.png` moved to `assets/ui/base/`, unread. **`icon.png`
+and `icon.ico` stayed put** — they sit in `assets/ui/` beside the sheets but
+`config.WINDOW_ICON` points at `ui/icon.png`, so sweeping them into `base/`
+would have dropped the window icon.
+
+### Proof it changed nothing
+
+The HUD (HP, XP and boss bar), the victory screen and the game-over screen were
+rendered before and after and compared byte for byte: **all three identical**.
+`tests/rendering/test_ui_bar_sprites.py` (10) pins the rest — the committed
+files against the cutter, that no rig still reads a pack sheet, that each
+filename matches its rig, that no `content` crop survives, that every housing's
+`well` matches the fill it holds, and that the window icon is still where
+`config` says it is.

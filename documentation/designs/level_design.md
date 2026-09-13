@@ -204,7 +204,7 @@ villagers read `villages`, the bake reads everything.
 `gen/validate.py — validate(layout)` reads every promise above back off a
 finished world as a list of sentences; the tests run it on every cached
 world. `world/digest.py` fingerprints the layout, the bake and one drawn
-frame; `python -m world.digest --write` re-pins them after an intended
+frame; `python -m tools.verification.world_digest --write` re-pins them after an intended
 change.
 
 ---

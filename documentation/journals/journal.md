@@ -2795,7 +2795,7 @@ the collision discs; the drawn size (`render_radius`, the rigs) is
 untouched. Everything reads `KINDS` off the data, so nothing else moved
 by hand: the scatter spaces trees by the same constants, the unseal
 repair and the spawn-point stage see the smaller discs, and the pinned
-layout / bake / frame digests were regenerated (`python -m world.digest
+layout / bake / frame digests were regenerated (`python -m tools.verification.world_digest
 --write`) because a collider is part of the world they fingerprint.
 
 **What the trim uncovered.** `tests/ai/test_pathfinding.py` then found

@@ -14,8 +14,8 @@ purple = epic (purple). Each is written as a horizontal 4-frame strip, the way
 instead of reaching into the big sheet with offsets. The sheet stays in the
 folder as the source; nothing reads it.
 
-    python utilities/cut_chest_sheets.py            # writes the four strips
-    python utilities/cut_chest_sheets.py --check    # exits 1 if any differs
+    python tools/asset_pipeline/cut_chest_sheets.py            # writes the four strips
+    python tools/asset_pipeline/cut_chest_sheets.py --check    # exits 1 if any differs
 """
 from __future__ import annotations
 
@@ -26,7 +26,8 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pygame
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# repo root: this file lives in tools/asset_pipeline/, two folders down
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FOLDER = os.path.join(ROOT, "assets", "items", "chests")
 SOURCE = os.path.join(FOLDER, "chests.png")
 CELL = 32

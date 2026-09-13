@@ -13,7 +13,7 @@ impact, so one cycle is swing + cooldown.
 The Forge extras land with the blow at the circle's centre: Earthshaker's
 shockwave blast and the Meteor Hammer's crater. The impact sheet
 (`hammer_impact`) is spawned through `FireContext.spawn_impact` and the
-pending swing is drawn by `game/states/playing/slam_fx.py` from
+pending swing is drawn by `game/states/playing/visual/slam_fx.py` from
 `Weapon.swing_progress` / `Weapon.slam_centre`.
 
 All numbers are the weapon's data; nothing here has a default.

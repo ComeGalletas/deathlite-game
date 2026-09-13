@@ -30,9 +30,13 @@ build/
 dist/
 dist_console/
 
-# Reserve art packs kept beside the loaded sprites but never shipped --
-# see ASSET_DIRS in desktop/DeathliteGame.spec.
-assets/Super Pixel Effects Gigapack/
+# The reserve art library: packs and spare sprites kept for reference, never
+# loaded by the game (`ASSET_DIRS` in desktop/DeathliteGame.spec ships only the
+# folders the data names). It was tracked until 2026-09-12 and is not any more
+# -- ~300 MB, most of it one 61,783-file effects pack, for art the build never
+# touches. Kept out by folder, not by path, so moving it cannot un-ignore it.
+assets/unused/
+Super Pixel Effects Gigapack/
 
 # Claude Code session data (worktrees, preview config)
 .claude/

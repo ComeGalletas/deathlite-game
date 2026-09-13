@@ -18,7 +18,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 from game import config
 from spawn import PointIndex
 from tests import worlds as W
-from world import digest
+from tools.verification import world_digest as digest
 from world.gen.scatter import _blocks, _corridor_doorways, _flight_keepouts
 from world.gen.spawnpoints import body_radii
 from world.gen.tuning import (VILLAGE_KIND, _GRID_BOSS_CLEAR_RADIUS, _RESOURCE_KINDS,

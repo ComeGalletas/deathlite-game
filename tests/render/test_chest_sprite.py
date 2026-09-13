@@ -69,10 +69,10 @@ class SheetTests(unittest.TestCase):
                                  (CELL * FRAMES, CELL))
 
     def test_the_strips_are_what_the_cutting_script_produces(self):
-        """`utilities/cut_chest_sheets.py --check` compares every committed
+        """`tools/asset_pipeline/cut_chest_sheets.py --check` compares every committed
         strip against a fresh cut of the source sheet, pixel for pixel."""
         done = subprocess.run(
-            [sys.executable, os.path.join("utilities", "cut_chest_sheets.py"), "--check"],
+            [sys.executable, os.path.join("tools", "asset_pipeline", "cut_chest_sheets.py"), "--check"],
             capture_output=True, text=True)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 

@@ -81,7 +81,7 @@ bake); sharing them is on the S7 list.
 - **The layout digest moved; the geometry did not.** `world/digest.py`
   walks every field of the model, so two new lists on `WorldLayout` change
   the four pinned layout digests (re-pinned with
-  `python -m world.digest --write`). The bake and frame digests are
+  `python -m tools.verification.world_digest --write`). The bake and frame digests are
   unchanged, and `test_the_knob_changes_the_count_and_nothing_else` pins
   that the islands, bridges and obstacles digest identically with the knob
   at 10 and at 4: the stage's only RNG is private, keyed by seed and
@@ -458,7 +458,7 @@ the gate removed.
 
 ### The harness
 
-`python -m spawn.stress` (`spawn/stress.py`): a real dev run at 300 s,
+`python -m tools.benchmarks.spawn_stress` (`tools/benchmarks/spawn_stress.py`): a real dev run at 300 s,
 `--live` enemies seated by the master's own placement in the zone,
 `--dormant` records banked in the other islands, `--frames` updates with
 the hero jittering by up to 24 px a frame (so the flow field's drift
@@ -588,7 +588,7 @@ property whose setter rebuilds the index, because the tests assign the
 list after construction (`test_obstacles`); obstacles never move once
 placed, so nothing else can stale it.
 
-| `python -m spawn.stress`, 100 live | p50 | p90 | p99 |
+| `python -m tools.benchmarks.spawn_stress`, 100 live | p50 | p90 | p99 |
 |---|---|---|---|
 | before, LOD 2 | 5.78 | 27.02 | 29.82 ms |
 | after, LOD 2 | **1.13** | 24.34 | 30.33 ms |
@@ -642,7 +642,7 @@ rebuild and advances them `config.ENEMY_NAV_FILL_BUDGET` (3 ms) a frame.
 
 ### Measured
 
-`python -m spawn.stress`, 100 live, update only:
+`python -m tools.benchmarks.spawn_stress`, 100 live, update only:
 
 | | p50 | p90 | p99 | max |
 |---|---|---|---|---|

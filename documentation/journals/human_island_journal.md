@@ -86,7 +86,7 @@ determinism A/B-checked, nothing committed unless asked.
     1–2; forge near the centroid; military within N tiles of a mouth; pen on
     ground; no overlapping colliders; connectivity; zero spawn points.
     Update `test_interactables` and `test_houses`.
-15. Re-pin `tests/world/digests.json` (`python -m world.digest --write`).
+15. Re-pin `tests/world/digests.json` (`python -m tools.verification.world_digest --write`).
 16. `documentation/level_design.md` §1.2 and §1.7; entry in this log.
 
 ---
@@ -266,7 +266,7 @@ Left for HI-4: `documentation/level_design.md` §1.2 / §1.7, re-pinning
   and the updates to `test_houses`, `test_terrain`, `test_obstacle_families`,
   `test_interactables`, `test_repair`, `test_spawn_points`, `test_biome`,
   `test_ghost`).
-- `tests/world/digests.json` re-pinned with `python -m world.digest --write`.
+- `tests/world/digests.json` re-pinned with `python -m tools.verification.world_digest --write`.
   The layout digests had already drifted before HI-0 (in-flight terrain
   work); every stage moves again here because the village draws from the
   world stream in `_assign_kinds`. Intended.

@@ -29,7 +29,7 @@ class TerrainRenderer:
     def __init__(self, game_map) -> None:
         self.gm = game_map
         # Animation time source. `None` reads the pygame clock; a test or the
-        # frame digest (`world/digest.py`) sets a callable returning fixed
+        # frame digest (`tools/verification/world_digest.py`) sets a callable returning fixed
         # seconds so foam and decor land on a known frame.
         self.clock = None
         # The tree-shadow index and the shade scratch surfaces

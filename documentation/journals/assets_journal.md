@@ -2622,7 +2622,7 @@ World suite: 234 passed, **4 digest mismatches that pre-date this sort** --
 four fail identically with the restored `vstairs_2.png` set aside; they
 belong to the in-flight bridge-shadow work (`world/terrain/*` modified,
 `digests.json` partly re-pinned). Left for that work to re-pin with
-`python -m world.digest --write` once it is finished.
+`python -m tools.verification.world_digest --write` once it is finished.
 
 **Not touched, for the record:** the rest of `assets/` has many
 unreferenced files by the same audit -- the whole `buildings/` set except
@@ -2726,7 +2726,7 @@ else" test expects the sea-facing feet as well, the corridor test's
 "room cells" include cliff cells, and a new
 `test_cliff_feet_standing_in_the_sea_are_foam_anchors` checks seeds 35 and
 1234 (8 and 2 such feet) anchor exactly the feet over open sea. The world
-digests were re-pinned (`python -m world.digest --write`); the `layout`
+digests were re-pinned (`python -m tools.verification.world_digest --write`); the `layout`
 digests moved too, from the uncommitted village generator work already in
 the tree, not from this change, which only touches the bake.
 

@@ -70,7 +70,7 @@ grid on fractional boundaries shimmers at the seams.
 - [x] `CAMERA_ZOOM` set to **1.75** — the nearest value to the intended 1.7 that
       keeps a whole-pixel tile (`64 × 1.75 = 112`). `game/config.py` now carries
       the constraint and the legal steps (0.25) as a comment next to the value.
-- [x] `digests.json` re-pinned with `python -m world.digest --write`. Seed 42's
+- [x] `digests.json` re-pinned with `python -m tools.verification.world_digest --write`. Seed 42's
       `draw` moved too, as the visible extent changed.
 - [x] `tests/render/test_gem_glow.py::test_glow_breathes_on_the_gems_own_age`
       fixed. It separated halos from orbs with a hard-coded `width > 12` pixel
@@ -111,7 +111,7 @@ the most common case, since water is on screen continuously.
 - [ ] `test_the_bake_is_pinned` and `test_the_frame_is_pinned` hash
       `W.baked(seed)` — the *shared cached* world from `tests/worlds.py`, baked
       under whatever ambient config the first caller happened to have — while
-      `python -m world.digest --write` hashes a fresh `GameMap`. They agree
+      `python -m tools.verification.world_digest --write` hashes a fresh `GameMap`. They agree
       today, and the shared build is a default build, so this is latent rather
       than broken. But nothing enforces it. Worth having the test go through
       `digest.world_digests(seed)`, the same entry point as the writer, so the
@@ -225,14 +225,14 @@ At 91.3 % the gaps are narrow and specific. In priority order:
 
 ### Exclude the tooling from the number — DONE
 
-`utilities/` (1,489 LOC: `sprite_sheet_lab`, `build_ground_tilemaps`,
+`tools/asset_pipeline/` (1,489 LOC: `sprite_sheet_lab`, `build_ground_tilemaps`,
 `key_sheet`, `prep_vstairs`, `slice_tree_sheet`) is imported by **no** runtime
 module, and `spawn/stress.py` (94 stmts) is a `python -m` CLI harness. Together
 they accounted for the whole gap between the headline 85.8 % and the real
 91.3 %.
 
 - [x] `.coveragerc` added: sources the eight runtime packages, omits
-      `utilities/*` and `spawn/stress.py`, and carries the run/report commands
+      `tools/*` and `tools/benchmarks/spawn_stress.py`, and carries the run/report commands
       in a comment at the top.
 - [x] `.coverage`, `.coverage.*` and `htmlcov/` added to `.gitignore`.
 - [ ] Still open: decide whether `coverage` becomes a declared dev dependency.

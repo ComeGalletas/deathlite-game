@@ -33,6 +33,7 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts
+from ui import text as uitext
 from ui import widgets
 
 ROW_STEP = 28
@@ -159,18 +160,28 @@ class RunSummaryPanel:
         label -- the "best" marker. It goes on the *label* side because the
         value is right-aligned to the column edge and has nothing to spare."""
         font = font or self._row
-        lab = font.render(str(label), True, config.COLOR_TEXT_DIM)
-        surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
-        if flag:
-            note = self._small.render(flag, True, config.COLOR_ACCENT)
-            surface.blit(note, note.get_rect(midleft=(area.left + lab.get_width() + 8, y)))
         val = font.render(str(value), True, colour or config.COLOR_TEXT)
+        note = self._small.render(flag, True, config.COLOR_ACCENT) if flag else None
+        # The value is the data and is never trimmed; the label gives way to
+        # it, and to the marker, rather than drawing over either.
+        room = area.width - val.get_width() - 12 - (note.get_width() + 8 if note else 0)
+        lab = font.render(uitext.ellipsize(font, str(label), room),
+                          True, config.COLOR_TEXT_DIM)
+        surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
+        if note is not None:
+            surface.blit(note, note.get_rect(midleft=(area.left + lab.get_width() + 8, y)))
         surface.blit(val, val.get_rect(midright=(area.right, y)))
         return y + ROW_STEP
 
     def _line(self, surface, area, y, text, *, colour=None, font=None) -> int:
+        """One full-width line, trimmed to the column.
+
+        Item names are rolled from affixes and run long -- "Ascendant Warded
+        Weave of Scholarship" is 452 px against a 251 px column -- so without
+        the trim they draw straight over the column beside them."""
         font = font or self._row
-        t = font.render(str(text), True, colour or config.COLOR_TEXT)
+        t = font.render(uitext.ellipsize(font, str(text), area.width),
+                        True, colour or config.COLOR_TEXT)
         surface.blit(t, t.get_rect(midleft=(area.left, y)))
         return y + ROW_STEP
 
@@ -273,9 +284,13 @@ class RunSummaryPanel:
             rows = [(stat, label) for stat, label, _k in rs_common.STAT_ROWS
                     if stat in stats]
             # Leave room for the equipment block below; the list is cut the
-            # way the blessings are rather than running off the column.
+            # way the blessings are rather than running off the column. The
+            # two reserved rows are the subheader and its first line, and they
+            # are reserved *even with nothing equipped* -- an empty block still
+            # prints "Equipped (0)" and "none", and zeroing the reserve there
+            # let the stats fill the column and pushed both off the bottom.
             items = list(s.get("equipment", ()))
-            reserve = ROW_STEP * (2 + min(len(items), MAX_ITEMS)) if items else 0
+            reserve = ROW_STEP * (2 + min(len(items), MAX_ITEMS))
             fit = max(1, (area.bottom - reserve - y) // ROW_STEP)
             shown = len(rows) if len(rows) <= fit else max(1, fit - 1)
             for stat, label in rows[:shown]:

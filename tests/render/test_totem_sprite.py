@@ -52,12 +52,12 @@ class SheetTests(unittest.TestCase):
                 self.assertEqual((w, h), (64 * frames, 96))
 
     def test_the_strips_are_what_the_cutting_script_produces(self):
-        """`utilities/cut_totem_sheets.py --check` compares every committed
+        """`tools/asset_pipeline/cut_totem_sheets.py --check` compares every committed
         strip with a fresh cut of the blue sheet. The script looks for the
         sheet in the folder and in `unused/`, where spent sources are
         archived; exit 2 means it is gone from both and there is nothing to
         compare against -- the strips themselves are still pinned above."""
-        from utilities import cut_totem_sheets
+        from tools.asset_pipeline import cut_totem_sheets
         code = cut_totem_sheets.main(["--check"])
         if code == 2:
             self.skipTest("the source sheet has been archived away entirely")

@@ -13,7 +13,7 @@ from game.game import Game
 from game.states.loading_state import LoadingState
 from game.states.playing_state import PlayingState
 from tests import worlds as W
-from world import digest
+from tools.verification import world_digest as digest
 
 SEED = W.SEEDS[0]
 

@@ -1379,7 +1379,7 @@ stream and moves no room, bridge, obstacle or spawn point.
 **Digest note:** `world/digest.py` walks the model generically, so
 `layout.chests` is fingerprinted the day the field is added. The *layout*
 digest in `tests/world/digests.json` will change and must be rewritten
-(`python -m world.digest --write`); the bake and frame digests must **not**
+(`python -m tools.verification.world_digest --write`); the bake and frame digests must **not**
 move, and that is the check that the stage is additive.
 
 ### The loot tables -- `data/chests.json`
@@ -1553,7 +1553,7 @@ Three things fall out of that table, and the first is a problem:
 moved for all four pinned seeds and the **bake** and **draw** digests are
 byte-identical, because `world/digest.py` walks the model generically and
 `layout.chests` is a new field on it. Rewritten once, deliberately, with
-`python -m world.digest --write`:
+`python -m tools.verification.world_digest --write`:
 
 | seed | layout before | layout after | bake | draw |
 | --- | --- | --- | --- | --- |

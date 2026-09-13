@@ -60,7 +60,7 @@ class SheetTests(unittest.TestCase):
         """Exit 2 from either script means its source has been archived away
         from the folder and `unused/` both; the sheets themselves are still
         pinned by the tests above."""
-        from utilities import cut_totem_bolt_sheets, recolour_totem_fire
+        from tools.asset_pipeline import cut_totem_bolt_sheets, recolour_totem_fire
         for script in (cut_totem_bolt_sheets, recolour_totem_fire):
             with self.subTest(script=script.__name__):
                 code = script.main(["--check"])

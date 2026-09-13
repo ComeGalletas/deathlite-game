@@ -2,7 +2,7 @@
 
 > Assessment (2026-09-03), written after spawn master S7. Nothing here is
 > implemented. Every number is measured on this machine with
-> `python -m spawn.stress` (seed 35, 100 live enemies, 400 dormant) unless
+> `python -m tools.benchmarks.spawn_stress` (seed 35, 100 live enemies, 400 dormant) unless
 > it says otherwise. The threading question is answered in section 4.
 
 **In one paragraph.** The update loop's per-enemy cost is a linear scan of

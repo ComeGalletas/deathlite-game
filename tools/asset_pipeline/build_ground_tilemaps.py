@@ -41,7 +41,7 @@ import numpy as np
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 import pygame
 
-from utilities import key_sheet
+from tools.asset_pipeline import key_sheet
 
 PX = 64
 COLS, ROWS = 9, 6

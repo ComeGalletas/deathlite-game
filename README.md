@@ -108,7 +108,7 @@ one takes `worlds.fresh(seed)`; one that changes generation settings passes
 them as keywords (`worlds.layout(seed, HEIGHTMAP_UNSEAL=False)`) and gets a
 separately cached build. `tests/world/test_digest.py` pins a fingerprint of
 the layout, the bake and one drawn frame for each cached seed; a change that
-moves the world says so and runs `python -m world.digest --write`.
+moves the world says so and runs `python -m tools.verification.world_digest --write`.
 
 1,650 tests: pure logic plus headless integration (SDL dummy video/audio driver)
 covering boot, a full state walk, the death/dying lifecycles, sprite slicing,

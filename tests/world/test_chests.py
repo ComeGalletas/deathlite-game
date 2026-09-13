@@ -19,7 +19,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 from tests import worlds as W
-from world import digest
+from tools.verification import world_digest as digest
 from world.gen.chests import (island_chest_count, island_chest_rarities,
                               place_chests)
 from world.gen.tuning import (VILLAGE_KIND, _CHEST_CAPS, _CHEST_COUNT_WEIGHTS,

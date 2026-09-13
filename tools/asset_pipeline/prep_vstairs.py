@@ -28,7 +28,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-TILES = Path(__file__).resolve().parent.parent / "assets" / "terrain" / "tiles"
+TILES = Path(__file__).resolve().parents[2] / "assets" / "terrain" / "tiles"
 SRC = TILES / "vertical_stairs.png"
 # (destination, tiles tall) -- the sprite for each supported drop.
 OUTS = ((TILES / "vstairs_1.png", 1), (TILES / "vstairs_2.png", 2))

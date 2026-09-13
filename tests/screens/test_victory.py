@@ -178,11 +178,11 @@ class SummaryTests(_Base):
 
 
 def _drawn_text(stats, columns=None):
-    """Every label and line the panel renders, by spying on its two text
-    primitives -- what the column *says*, with no geometry involved."""
+    """Every label, line and subheader the panel renders, by spying on its
+    text primitives -- what the columns *say*, with no geometry involved."""
     panel = run_summary.RunSummaryPanel(stats)
     seen = []
-    real_kv, real_line = panel._kv, panel._line
+    real_kv, real_line, real_sub = panel._kv, panel._line, panel._subheader
 
     def kv(surface, area, y, label, value, **kw):
         seen.extend((str(label), str(value)))
@@ -194,7 +194,11 @@ def _drawn_text(stats, columns=None):
         seen.append(str(text))
         return real_line(surface, area, y, text, **kw)
 
-    panel._kv, panel._line = kv, line
+    def sub(surface, area, y, text):
+        seen.append(str(text))
+        return real_sub(surface, area, y, text)
+
+    panel._kv, panel._line, panel._subheader = kv, line, sub
     panel.draw(pygame.Surface((1600, 900)), None,
                end_screen.PANEL_TOP, end_screen.PANEL_BOTTOM,
                columns=columns or run_summary.VICTORY_COLUMNS)
@@ -216,6 +220,41 @@ def _ribbon_colours(columns):
     panel.draw(pygame.Surface((1600, 900)), None,
                end_screen.PANEL_TOP, end_screen.PANEL_BOTTOM, columns=columns)
     return seen
+
+
+
+def _hero_rows(stats):
+    """(the Hero column's content rect, every row drawn in it as (y, text)).
+
+    Spies on the panel's own primitives, so it reports where the text really
+    landed rather than what the pixels look like."""
+    panel = run_summary.RunSummaryPanel(stats)
+    rows, areas = [], {}
+    real_kv, real_line = panel._kv, panel._line
+    real_sub, real_col = panel._subheader, panel._column
+
+    def col(surface, assets, rect, title, colour):
+        area = real_col(surface, assets, rect, title, colour)
+        areas[title] = area
+        return area
+
+    def kv(surface, area, y, label, value, **kw):
+        rows.append((y, str(label)))
+        return real_kv(surface, area, y, label, value, **kw)
+
+    def line(surface, area, y, text, **kw):
+        rows.append((y, str(text)))
+        return real_line(surface, area, y, text, **kw)
+
+    def sub(surface, area, y, text):
+        rows.append((y, str(text)))
+        return real_sub(surface, area, y, text)
+
+    panel._column, panel._kv, panel._line, panel._subheader = col, kv, line, sub
+    panel.draw(pygame.Surface((1600, 900)), None, end_screen.PANEL_TOP,
+               end_screen.PANEL_BOTTOM, columns=run_summary.VICTORY_COLUMNS)
+    hero = areas["Hero"]
+    return hero, [(y, t) for y, t in rows if y >= hero.top]
 
 
 class ColumnWidthTests(unittest.TestCase):
@@ -302,6 +341,26 @@ class HeroColumnTests(_Base):
     def test_a_win_says_cleared_in_and_a_death_says_survived(self):
         for victory, want in ((True, "Cleared in"), (False, "Survived")):
             self.assertIn(want, _drawn_text({**LEDGER_STATS, "victory": victory}))
+
+    def test_nothing_equipped_still_fits_inside_the_column(self):
+        """Caught on a real run, not in a fixture: with an empty equipment
+        list the stat rows filled the column and pushed "Equipped (0)" and
+        "none" off the bottom of the panel, because the block only reserved
+        room for itself when it had something in it.
+
+        Asserted on where the rows were actually drawn -- a pixel count cannot
+        see this, since the panel's translucent fill darkens its whole
+        interior and the button row sits just under it.
+        """
+        for equipment in ([], [{"name": "Ring", "rarity": "rare"}]):
+            area, rows = _hero_rows({**LEDGER_STATS, "equipment": equipment})
+            self.assertTrue(rows, "the Hero column drew nothing")
+            last_y, last_text = rows[-1]
+            self.assertLessEqual(
+                last_y, area.bottom,
+                f"{last_text!r} was drawn {last_y - area.bottom} px past the "
+                f"bottom of the Hero column (equipment={len(equipment)})")
+        self.assertIn("Equipped  (0)", _drawn_text({**LEDGER_STATS, "equipment": []}))
 
     def test_a_summary_with_no_hero_block_still_draws_the_column(self):
         bare = {k: v for k, v in LEDGER_STATS.items()

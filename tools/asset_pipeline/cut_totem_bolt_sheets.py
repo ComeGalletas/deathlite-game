@@ -12,8 +12,8 @@ own sheet so nothing reads the big one at run time:
 * `totem_bolt_burst.png` -- frames 6..11: the ball breaking into shards,
   played once where a bolt lands.
 
-    python utilities/cut_totem_bolt_sheets.py            # writes the three
-    python utilities/cut_totem_bolt_sheets.py --check    # exits 1 on a drift
+    python tools/asset_pipeline/cut_totem_bolt_sheets.py            # writes the three
+    python tools/asset_pipeline/cut_totem_bolt_sheets.py --check    # exits 1 on a drift
 """
 from __future__ import annotations
 
@@ -24,7 +24,8 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pygame
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# repo root: this file lives in tools/asset_pipeline/, two folders down
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FOLDER = os.path.join(ROOT, "assets", "effects", "weapons", "grave_totem")
 SOURCE_NAME = "proyectile.png"
 FRAME = 64

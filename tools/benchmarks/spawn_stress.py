@@ -7,9 +7,9 @@ in the other islands, then runs `--frames` frames of `PlayingState.update`
 with the hero jittering (so the flow field's drift trigger fires as it
 would in play) and reports the update time's p50 / p90 / p99 / max.
 
-    python -m spawn.stress                         # 100 live, 400 dormant, 1200 frames
-    python -m spawn.stress --live 200 --lod 2      # a heavier crowd, half-rate LOD
-    python -m spawn.stress --profile               # cProfile's top entries too
+    python -m tools.benchmarks.spawn_stress                         # 100 live, 400 dormant, 1200 frames
+    python -m tools.benchmarks.spawn_stress --live 200 --lod 2      # a heavier crowd, half-rate LOD
+    python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
 
 Headless: the dummy SDL drivers are set before pygame is imported, so
 this runs anywhere the tests do. Numbers land in

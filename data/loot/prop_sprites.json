@@ -42,7 +42,7 @@
     ]
   },
   "chest_common": {
-    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by tools/asset_pipeline/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
     "frame": [
       32,
       32
@@ -65,7 +65,7 @@
     }
   },
   "chest_uncommon": {
-    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by tools/asset_pipeline/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
     "frame": [
       32,
       32
@@ -88,7 +88,7 @@
     }
   },
   "chest_rare": {
-    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by tools/asset_pipeline/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
     "frame": [
       32,
       32
@@ -111,7 +111,7 @@
     }
   },
   "chest_epic": {
-    "_comment": "CB-9 treasure chest: one 4-frame strip cut by utilities/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
+    "_comment": "CB-9 treasure chest: one 4-frame strip cut by tools/asset_pipeline/cut_chest_sheets.py. Frame 0 is closed, 3 is open; the two between are the squash-and-stretch of the lid. The anchor is bottom-centre on the chest's baseline (30 of the 32 px cell), so the box stays put while the lid flies up.",
     "frame": [
       32,
       32

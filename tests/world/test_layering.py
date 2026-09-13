@@ -14,7 +14,7 @@ WORLD = pathlib.Path(__file__).resolve().parents[2] / "world"
 # module or package -> the `world.*` / `game.*` prefixes it may not import
 RULES = {
     "rules": ("world.gen", "world.terrain", "world.map", "world.pathfinding",
-              "world.elevation", "world.spawning", "world.digest"),
+              "world.elevation", "world.spawning"),
     "elevation.py": ("world.gen", "world.terrain", "world.map",
                      "world.pathfinding", "world.spawning"),
     "layout.py": ("world.gen", "world.terrain", "world.map",

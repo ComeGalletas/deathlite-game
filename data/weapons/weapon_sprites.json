@@ -502,7 +502,7 @@
     "heading_deg": -135
   },
   "grave_totem": {
-    "_note": "The Grave Totem (assets journal, 'Grave Totem sprite -- wiring', 2026-09-12): one strip per action, cut from Fire_Totem_blue-Sheet.png by utilities/cut_totem_sheets.py. appear once at spawn (no bolts until it ends), idle between bolts, attack once per bolt, disappear once over the last second of life (no bolts). Anchor = bottom-centre on the base ring, 12 px under the summon's centre so the body stands on its collider like the primitive did.",
+    "_note": "The Grave Totem (assets journal, 'Grave Totem sprite -- wiring', 2026-09-12): one strip per action, cut from Fire_Totem_blue-Sheet.png by tools/asset_pipeline/cut_totem_sheets.py. appear once at spawn (no bolts until it ends), idle between bolts, attack once per bolt, disappear once over the last second of life (no bolts). Anchor = bottom-centre on the base ring, 12 px under the summon's centre so the body stands on its collider like the primitive did.",
     "frame": [
       64,
       96
@@ -543,7 +543,7 @@
     }
   },
   "totem_bolt": {
-    "_note": "The Grave Totem's bolt (assets journal, 'Grave Totem bolt -- rework', 2026-09-12): the blue row of proyectile.png, cut by utilities/cut_totem_bolt_sheets.py. `orb` pulses at the bolt (frames 3 4 5 6 5 4 of the row); `burst` plays once where a hit lands (frames 6..11), through slam_fx.spawn_impact -- `content` is the ball's box, `anchor` its centre, `over_circle` sizes the burst against the bolt's 6 px collider.",
+    "_note": "The Grave Totem's bolt (assets journal, 'Grave Totem bolt -- rework', 2026-09-12): the blue row of proyectile.png, cut by tools/asset_pipeline/cut_totem_bolt_sheets.py. `orb` pulses at the bolt (frames 3 4 5 6 5 4 of the row); `burst` plays once where a hit lands (frames 6..11), through slam_fx.spawn_impact -- `content` is the ball's box, `anchor` its centre, `over_circle` sizes the burst against the bolt's 6 px collider.",
     "frame": [
       64,
       64
@@ -575,7 +575,7 @@
     }
   },
   "totem_bolt_fire": {
-    "_note": "The bolt's tail: fire.png recoloured blue by utilities/recolour_totem_fire.py (the multiply tint cannot turn orange blue). Authored pointing up (heading_deg 270); projectiles/totem_bolt.py rotates it to trail the bolt.",
+    "_note": "The bolt's tail: fire.png recoloured blue by tools/asset_pipeline/recolour_totem_fire.py (the multiply tint cannot turn orange blue). Authored pointing up (heading_deg 270); projectiles/totem_bolt.py rotates it to trail the bolt.",
     "frame": [
       128,
       128

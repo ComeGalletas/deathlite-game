@@ -5,7 +5,7 @@
 Regenerate with:
 
 ```bash
-python -m game.dps_bench --runs 10 --seconds 60 --seed 911 --markdown documentation/dps_report_2026-09-12.md
+python -m tools.benchmarks.dps_bench --runs 10 --seconds 60 --seed 911 --markdown documentation/dps_calcs/dps_report_2026-09-12.md
 ```
 
 Each loadout is a fresh developer run: the hero's starting weapon is dropped, three random non-summon weapons are granted at level 1, and three random blessings applied. No items. The hero stands 16 px from the dummy — inside the shortest melee reach in the roster — and every weapon fires on its own cadence.

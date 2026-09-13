@@ -30,7 +30,7 @@ case here.
 **RNG.** A private `random.Random` keyed by seed and island, the same trick
 `_island_resource_points` uses, so this stage draws nothing from the world's
 stream and moves no room, bridge, obstacle or spawn point. What it *does*
-change is the layout fingerprint, because `world/digest.py` walks the model
+change is the layout fingerprint, because `tools/verification/world_digest.py` walks the model
 generically and `layout.chests` is a new field on it -- see the CB-9 journal
 entry.
 """

@@ -144,7 +144,7 @@ Conventions that apply to every item below:
 
 ## S7 — Performance pass — done 2026-09-03 (see `journals/spawn_master_journal.md`)
 
-- [x] Stress harness (`python -m spawn.stress`): 100 live in the zone, 400 dormant elsewhere, 1200
+- [x] Stress harness (`python -m tools.benchmarks.spawn_stress`): 100 live in the zone, 400 dormant elsewhere, 1200
       frames, player jitter; record p50 / p90 / p99 in the journal.
 - [x] Tick LOD for out-of-aggro, off-view enemies (`config.ENEMY_LOD_SKIP`),
       measured, default 2. Skips whole frames, not just the behaviour tick:

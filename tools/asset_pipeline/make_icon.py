@@ -9,7 +9,7 @@ the same picture:
 Run it from the repo root with either interpreter -- it needs pygame and the
 standard library, no numpy:
 
-    .venv\\Scripts\\python.exe utilities/make_icon.py
+    .venv\\Scripts\\python.exe tools/asset_pipeline/make_icon.py
 
 **The crop is tight on the ink, not the whole frame.** Aegis is `hero_aegis` ->
 `characters/blue/warrior/idle.png`, a 1536x192 strip of eight 192 px frames, and

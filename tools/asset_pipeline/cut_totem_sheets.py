@@ -2,13 +2,13 @@
 
 The blue sheet is a 14 x 5 grid of 64 x 96 frames, one action per row
 (assets journal, "Grave Totem sprite -- wiring", 2026-09-12). The rig
-(`data/weapon_sprites.json`, `grave_totem`) names one file per action rather
+(`data/weapons/weapon_sprites.json`, `grave_totem`) names one file per action rather
 than the big sheet with row offsets, so the strips are cut once here and
 committed. Row 2 (`attack`: eight idle frames then the burst) is not cut --
 `idle` + `attack` (row 3, the burst alone) cover it.
 
-    python utilities/cut_totem_sheets.py            # writes the four strips
-    python utilities/cut_totem_sheets.py --check    # exits 1 if any differs
+    python tools/asset_pipeline/cut_totem_sheets.py            # writes the four strips
+    python tools/asset_pipeline/cut_totem_sheets.py --check    # exits 1 if any differs
 """
 from __future__ import annotations
 
@@ -19,7 +19,8 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pygame
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# repo root: this file lives in tools/asset_pipeline/, two folders down
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FOLDER = os.path.join(ROOT, "assets", "effects", "weapons", "grave_totem")
 SOURCE_NAME = "Fire_Totem_blue-Sheet.png"
 FRAME_W, FRAME_H = 64, 96

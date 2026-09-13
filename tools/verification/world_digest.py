@@ -10,8 +10,8 @@ script and was lost with it -- this is that script, kept.
 
 From the command line::
 
-    python -m world.digest              # print the digests for SEEDS
-    python -m world.digest --write      # rewrite tests/world/digests.json
+    python -m tools.verification.world_digest              # print the digests for SEEDS
+    python -m tools.verification.world_digest --write      # rewrite tests/world/digests.json
 
 The hash walks the data model generically -- dataclasses, slotted objects,
 `pygame.Rect`, `Vector2`, `array`, `Surface` -- so a new field on `Room` is

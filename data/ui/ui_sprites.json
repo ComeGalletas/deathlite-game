@@ -12,16 +12,16 @@
   "ribbon_yellow": {"file": "ui/ribbons/yellow_ribbon.png", "frame": [192, 64]},
   "ribbon_red":    {"file": "ui/ribbons/red_ribbon.png",    "frame": [192, 64]},
 
-  "bar_hex_frame_silver": {"file": "ui/04.png", "content": [3,  67, 42, 11], "caps": [6, 6], "well": [4, 3, 34, 5]},
-  "bar_hex_frame_grey":   {"file": "ui/04.png", "content": [3,  83, 42, 11], "caps": [6, 6], "well": [4, 3, 34, 5]},
-  "bar_hex_frame_copper": {"file": "ui/04.png", "content": [3,  99, 42, 11], "caps": [6, 6], "well": [4, 3, 34, 5]},
+  "bar_hex_frame_silver": {"file": "ui/hud/bar_hex_frame_silver.png", "caps": [6, 6], "well": [4, 3, 34, 5]},
+  "bar_hex_frame_grey":   {"file": "ui/hud/bar_hex_frame_grey.png",   "caps": [6, 6], "well": [4, 3, 34, 5]},
+  "bar_hex_frame_copper": {"file": "ui/hud/bar_hex_frame_copper.png", "caps": [6, 6], "well": [4, 3, 34, 5]},
 
-  "bar_hex_fill_red":     {"file": "ui/04.png", "content": [55,  70, 34, 5], "caps": [2, 2]},
-  "bar_hex_fill_yellow":  {"file": "ui/04.png", "content": [55,  86, 34, 5], "caps": [2, 2]},
-  "bar_hex_fill_blue":    {"file": "ui/04.png", "content": [55, 102, 34, 5], "caps": [2, 2]},
-  "bar_hex_fill_green":   {"file": "ui/04.png", "content": [55, 118, 34, 5], "caps": [2, 2]},
-  "bar_hex_empty":        {"file": "ui/04.png", "content": [295, 70, 34, 5], "caps": [2, 2]},
+  "bar_hex_fill_red":     {"file": "ui/hud/bar_hex_fill_red.png",    "caps": [2, 2]},
+  "bar_hex_fill_yellow":  {"file": "ui/hud/bar_hex_fill_yellow.png", "caps": [2, 2]},
+  "bar_hex_fill_blue":    {"file": "ui/hud/bar_hex_fill_blue.png",   "caps": [2, 2]},
+  "bar_hex_fill_green":   {"file": "ui/hud/bar_hex_fill_green.png",  "caps": [2, 2]},
+  "bar_hex_empty":        {"file": "ui/hud/bar_hex_empty.png",       "caps": [2, 2]},
 
-  "gem_socket_blue":      {"file": "ui/01.png", "content": [176,  0, 48, 48]},
-  "gem_core_blue":        {"file": "ui/01.png", "content": [176, 48, 48, 48]}
+  "gem_socket_blue":      {"file": "ui/hud/gem_socket_blue.png"},
+  "gem_core_blue":        {"file": "ui/hud/gem_core_blue.png"}
 }

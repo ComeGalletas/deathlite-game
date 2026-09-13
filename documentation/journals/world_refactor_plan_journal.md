@@ -41,7 +41,7 @@ which rebuild their worlds inside every test. A height-map world costs 1.5 to
 - `world/digest.py` + `tests/world/test_digest.py` + `tests/world/digests.json`:
   a sha256 walk of the whole data model (layout), every baked surface and
   anchor list (bake), and one composited frame (draw), pinned for seeds
-  35 / 7 / 1234 / 42. Stable across processes. `python -m world.digest
+  35 / 7 / 1234 / 42. Stable across processes. `python -m tools.verification.world_digest
   --write` re-pins after an intended change.
 - `pytest.ini` + `tests/conftest.py`: `unit` / `world` / `sweep` markers
   assigned by path; the default run excludes `sweep`. README updated with

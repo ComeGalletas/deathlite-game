@@ -366,7 +366,7 @@ The owner reverted `CAMERA_ZOOM` from 1.75 to 1.5, which moves the baked water
 buffer (`world/terrain/bake.py` sizes it from `SCREEN_WIDTH / CAMERA_ZOOM`) and
 so moves the bake digest for every seed.
 
-- [x] `python -m world.digest --write`. The values came back **exactly** to
+- [x] `python -m tools.verification.world_digest --write`. The values came back **exactly** to
       their pre-1.75 state -- seed 35's bake is `cca4b4214a356a69` again -- which
       is a useful confirmation on its own: the bake is a pure function of the
       world and the zoom, with nothing else leaking in.

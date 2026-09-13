@@ -3,11 +3,11 @@
 What a build does is not readable off the data -- cooldowns, conditional
 blessing multipliers, wind-ups and reach all land somewhere between the numbers
 and the fight. This drives real runs and measures, the same way
-`spawn/stress.py` drives a real run to measure frame time.
+`tools/benchmarks/spawn_stress.py` drives a real run to measure frame time.
 
-    python -m game.dps_bench                        # 10 loadouts, 30 s each
-    python -m game.dps_bench --runs 5 --seconds 60
-    python -m game.dps_bench --seed 1234 --markdown report.md
+    python -m tools.benchmarks.dps_bench                        # 10 loadouts, 30 s each
+    python -m tools.benchmarks.dps_bench --runs 5 --seconds 60
+    python -m tools.benchmarks.dps_bench --seed 1234 --markdown report.md
 
 Each loadout is a fresh developer run with the hero's starting weapon dropped,
 then `--weapons` random non-summon weapons at level 1 and `--blessings` random
@@ -216,7 +216,7 @@ def to_markdown(rows, seconds, seed, when: str) -> str:
          f"{len(rows)} random loadouts measured against the training dummy, "
          f"{seconds:.0f} s each, seed `{seed}`.", "",
          "Regenerate with:", "", "```bash",
-         f"python -m game.dps_bench --runs {len(rows)} --seconds {seconds:.0f} "
+         f"python -m tools.benchmarks.dps_bench --runs {len(rows)} --seconds {seconds:.0f} "
          f"--seed {seed} --markdown documentation/dps_report_{when}.md", "```", "",
          "Each loadout is a fresh developer run: the hero's starting weapon is "
          "dropped, three random non-summon weapons are granted at level 1, and "

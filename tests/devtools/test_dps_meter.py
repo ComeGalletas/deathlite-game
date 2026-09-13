@@ -312,7 +312,7 @@ class GroundTruthTests(unittest.TestCase):
 
 
 class BenchArenaTests(unittest.TestCase):
-    """`game/dps_bench.py` measures on an empty arena, not a generated world.
+    """`tools/benchmarks/dps_bench.py` measures on an empty arena, not a generated world.
 
     A generated world differs per run, so a loadout was measured on its own
     ground with its own obstacles between the hero and the dummy -- variance
@@ -323,7 +323,7 @@ class BenchArenaTests(unittest.TestCase):
     """
 
     def test_the_arena_has_no_world_and_nothing_in_it(self):
-        from game import dps_bench
+        from tools.benchmarks import dps_bench
         game, ps = dps_bench._start_dev_run()
         self.assertIsNone(ps.game_map.layout)
         self.assertEqual(list(ps.game_map.obstacles), [])
@@ -332,7 +332,7 @@ class BenchArenaTests(unittest.TestCase):
     def test_the_dummy_lands_at_a_fixed_offset(self):
         """Not the dev menu's random bearing: two arenas put it in the same
         place, which is what makes a bench reproducible."""
-        from game import dps_bench
+        from tools.benchmarks import dps_bench
         seen = []
         for _ in range(2):
             game, ps = dps_bench._start_dev_run()
@@ -345,13 +345,13 @@ class BenchArenaTests(unittest.TestCase):
         """The Daggers reach 22 px. A standoff outside that measures them at
         zero and the table reads as though they did nothing -- which is exactly
         what a 40 px standoff did."""
-        from game import dps_bench
+        from tools.benchmarks import dps_bench
         reaches = [float(c["area"]) for c in get_content().weapons.values()
                    if c.get("category") == "melee"]
         self.assertLess(dps_bench.STANDOFF, min(reaches))
 
     def test_spawns_are_frozen_and_the_dummy_is_metered(self):
-        from game import dps_bench
+        from tools.benchmarks import dps_bench
         game, ps = dps_bench._start_dev_run()
         dummy = dps_bench._arm_dummy(game, ps)
         self.assertTrue(ps.spawn.master.frozen)
@@ -360,7 +360,7 @@ class BenchArenaTests(unittest.TestCase):
         self.assertTrue(ps._dev_unlimited_hp)
 
     def test_isolate_clears_everything_but_the_dummy(self):
-        from game import dps_bench
+        from tools.benchmarks import dps_bench
         game, ps = dps_bench._start_dev_run()
         dummy = dps_bench._arm_dummy(game, ps)
         other = ps.spawn.spawn_enemy("chaser", at=dummy.pos, owner="dev")

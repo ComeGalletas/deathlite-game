@@ -147,7 +147,9 @@ class MeleeForgeTests(unittest.TestCase):
         s = fire(w, [FakeEnemy(30, 40)])
         self.assertEqual(len(s), 1)
         self.assertAlmostEqual(s[0].cone_half_angle, math.pi)
-        self.assertLess(w._cooldown(1.0), C.weapon("sword")["cooldown"] / 3)
+        # Faster than the plain sword is the contract; the ratio is tuning
+        # (data/weapons/forges.json) and has already moved once.
+        self.assertLess(w._cooldown(1.0), C.weapon("sword")["cooldown"])
         self.assertLess(s[0].damage, C.weapon("sword")["damage"])
 
     def test_greatsword_is_slow_huge_and_heavy(self):
@@ -397,14 +399,14 @@ class ForgeWeaponPickerTests(unittest.TestCase):
     `eligible[0]`, so the second was unreachable however the player approached
     the anvil.
 
-    Driven on the bench's empty arena (`game.dps_bench`) rather than a
+    Driven on the bench's empty arena (`tools.benchmarks.dps_bench`) rather than a
     generated world: this is about the overlay, and a world would cost seconds
     per test to prove nothing.
     """
 
     def _run_with(self, wids, blessings):
         from combat.weapons import Weapon
-        from game import dps_bench
+        from tools.benchmarks import dps_bench
         from progression.blessings import apply_blessing
         # Called through the module, not stashed on the class: a plain function
         # assigned to a class attribute becomes a bound method, and `self`

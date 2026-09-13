@@ -3,7 +3,7 @@
 The master never imports `entities` or `game.states`. Everything it needs
 -- where the player is, what is on screen, whether a spot is floor, how to
 make an enemy -- comes through this protocol, implemented once on the run
-side (`game/states/playing/spawning.py`) and once as a stub in the tests.
+side (`game/states/playing/core/spawning.py`) and once as a stub in the tests.
 Keep it narrow: a new method here is a new thing the master depends on.
 """
 from __future__ import annotations

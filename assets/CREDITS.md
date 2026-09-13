@@ -5,50 +5,61 @@ audio in `systems/audio.py` — is original to this project.
 
 ## Art — "Tiny Swords" by Pixel Frog
 
-**Every PNG under `assets/` is from the "Tiny Swords" asset pack by Pixel Frog**
-(itch.io). `.aseprite` editor sources and `.DS_Store` files were removed; only
+**Most PNGs under `assets/` are from the "Tiny Swords" asset pack by Pixel Frog**
+(itch.io); the remaining art comes from the purchased packs listed at the end of
+this file. `.aseprite` editor sources and `.DS_Store` files were removed; only
 sprites the game loads (plus a set of reserve packs kept for future use) remain.
 
 | Field | Value |
 |-------|-------|
 | Pack name | Tiny Swords |
 | Author | Pixel Frog |
-| Source URL | _<FILL IN — https://pixelfrog-assets.itch.io/tiny-swords>_ |
-| Licence | _<FILL IN — Tiny Swords is CC0; verify the version downloaded>_ |
-| Attribution required? | _<FILL IN>_ |
-| Date obtained | _<FILL IN>_ |
+| Source URL | https://pixelfrog-assets.itch.io/tiny-swords |
+| Licence | Pixel Frog's own terms (not CC0): use in personal and commercial projects is allowed, modification is allowed; redistributing, reselling or repackaging the assets is not, even when modified |
+| Attribution required? | No (credit is optional but welcomed by the author) |
+| Purchased? | Yes, paid for on itch.io (pay-what-you-want pack) |
 
-### Wired into the game
+### General usage
 
-- `assets/characters/<colour>/<unit>/` — the three heroes:
-  **Aegis** = blue Warrior (`hero_aegis`), **Kestrel** = yellow Archer
-  (`hero_kestrel`), **Nihil** = purple Monk (`hero_nihil`). `idle` + `walk` +
-  `attack`, 192 px frames, no hurt/death strip (the renderer red-tints on hit
-  and plays the shared `dead` poof).
-- `assets/characters/dead/dead.png` — the shared one-shot **death poof** (14 f,
-  repacked to a 14×1 128 px strip) used for every entity, hero and enemy.
-- `assets/enemies/<mob>/` — all 13 enemy variants + the boss:
-  `chaser`→skull, `fast`→spider, `tank`→turtle, `swarm`→bumblebee,
-  `ranged`→slingshot_gnome, `exploder`→bomb_fish, `shielded`→panda,
-  `elite`→bear, `summoner`→gnome, `brute`→troll, `charger`→minotaur,
-  `teleporter`→thief, `warlock`→hex_shaman, and `the_first_hunger` (boss)→giant_bat.
-- `assets/projectiles/arrow.png` — the archer arrow, used for enemy / boss shots.
-- `assets/terrain/tiles/` — `tilemap_1..5` (grass autotile per room palette),
-  `water_background`, `water_foam` (16 f shoreline); `shadow.png` present, unused.
-- `assets/terrain/bridge/bridge_all.png` — the plank-bridge autotile (corridors).
-- `assets/terrain/props/` — `bush_*` / `rock_*` / `tree_*` skin the obstacles;
-  `water_rock_*` / `duck` are the void scatter.
+Tiny Swords supplies the main art of the game:
 
-### Reserve (in the tree, not wired)
+- **World** — `assets/terrain/`: the grass tilemaps, water and shoreline
+  animations and the plank bridge that build every island, plus the trees,
+  bushes, rocks, stumps, decorations, clouds and animals scattered over them.
+  The village buildings in `assets/buildings/`, the forge and healing facilities
+  and the sheep NPCs are also from this pack.
+- **Characters** — `assets/characters/`: the three heroes are Tiny Swords units
+  (Aegis = blue Warrior, Kestrel = yellow Archer, Nihil = purple Monk), with the
+  shared death poof and the hero summons drawn from the same sheets.
+- **Enemies** — `assets/enemies/`: every enemy variant and the boss are Tiny
+  Swords mobs (skull, spider, turtle, bumblebee, gnomes, bomb fish, panda, bear,
+  troll, minotaur, thief, hex shaman, pig rider, giant bat).
+- **Interface** — `assets/ui/`: the buttons, ribbons and pointer cursors of the
+  menus come from the Tiny Swords UI sheets.
 
-`assets/enemies/<mob>/` for the ~7 unused mobs + `assets/enemies/extra/`;
-`assets/characters/{black,red}/…` and the `lancer` / `pawn` unit types;
-`assets/buildings/`, `assets/effects/`, `assets/terrain/props/{cloud_*,deco_*,
-stump_*}`, `assets/terrain/resources/`. All Tiny Swords, kept and renamed to the
-project's `lower_snake_case` convention so a future skin pass is drop-in.
+Items, weapon effects, potions, chests and other visual effects come from the
+purchased packs listed at the end of this file. `assets/unused/` holds reserve
+art from all packs that is kept in the tree but not loaded by the game.
 
-## Not part of the Tiny Swords pack
+## Main screen art (`assets/ui/start_screen/`)
 
-- `assets/ui/title.png` — a standalone title-screen illustration.
-  **Confirm its source and licence separately before distribution.** Optional at
-  runtime (the menu falls back to drawn text if it is missing).
+- `menu_background.png` — the full-screen menu backdrop. Taken from the Tiny
+  Swords store page on itch.io (Pixel Frog's promotional art for the pack), not
+  from the downloaded asset files.
+- `text_title.png` — the game logo drawn above the menu options. An AI-generated generic logo.
+
+All three are optional at runtime: the menu falls back to drawn text and a flat
+fill when a file is missing.
+
+## Additional art packs (purchased on itch.io)
+
+| Pack | Author | Source URL |
+|------|--------|------------|
+| Fire Totem | CreativeKind | https://creativekind.itch.io/fire-totem-free |
+| Pixel Art Potion Pack 32x32 | xnaxlzz | https://xnaxlzz.itch.io/pixel-art-potion-pack-32x32 |
+| 32x32 RPG Swords with Evolutions | maasa | https://maasa.itch.io/32x32-rpg-swords-with-evolutions |
+| Combat FX | RagnaPixel | https://ragnapixel.itch.io/combat-fx |
+| Super Pixel Effects Gigapack | Untied Games | https://untiedgames.itch.io/super-pixel-effects-gigapack |
+| Free RPG Maker Chests | franjatesa | https://franjatesa.itch.io/free-rpgmaker-chests |
+| 750+ Effect and FX Pixel All | BDragon1727 | https://bdragon1727.itch.io/750-effect-and-fx-pixel-all |
+| Goth | ansimuz | https://ansimuz.itch.io/goth |

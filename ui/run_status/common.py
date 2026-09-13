@@ -10,6 +10,7 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts
+from ui import text as uitext
 from ui import widgets
 
 ROW_STEP = 26
@@ -160,23 +161,36 @@ def tab_surface(assets, size, label: str, colour: str, font, *, active: bool) ->
 
 # --- rows ------------------------------------------------------------------
 def kv(surface, font, area, y, label, value, *, colour=None, label_colour=None) -> int:
-    lab = font.render(str(label), True, label_colour or config.COLOR_TEXT_DIM)
-    surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
+    """A label / value row, the label trimmed if the two would meet.
+
+    Nothing clips at the blit, so a label that outgrows its column draws over
+    its own value. There is 169 px of headroom on the tightest row today --
+    this is a guard, not a fix for something visible -- but the same primitive
+    on the run summary *did* overlap once its columns narrowed, and an item
+    name is rolled from affixes rather than authored.
+    """
     val = font.render(str(value), True, colour or config.COLOR_TEXT)
+    room = area.width - val.get_width() - 8
+    lab = font.render(uitext.ellipsize(font, str(label), room),
+                      True, label_colour or config.COLOR_TEXT_DIM)
+    surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
     surface.blit(val, val.get_rect(midright=(area.right, y)))
     return y + ROW_STEP
 
 
 def line(surface, font, area, y, text, *, colour=None, indent: int = 0,
          step: int = ROW_STEP) -> int:
-    t = font.render(str(text), True, colour or config.COLOR_TEXT)
+    """One line, trimmed to what is left of the column after `indent`."""
+    t = font.render(uitext.ellipsize(font, str(text), area.width - indent),
+                    True, colour or config.COLOR_TEXT)
     surface.blit(t, t.get_rect(midleft=(area.left + indent, y)))
     return y + step
 
 
 def subheader(surface, font, area, y, text) -> int:
     y += 6
-    t = font.render(text, True, config.COLOR_ACCENT)
+    t = font.render(uitext.ellipsize(font, str(text), area.width),
+                    True, config.COLOR_ACCENT)
     surface.blit(t, t.get_rect(midleft=(area.left, y)))
     pygame.draw.line(surface, _RULE, (area.left, y + 15), (area.right, y + 15))
     return y + ROW_STEP + 4

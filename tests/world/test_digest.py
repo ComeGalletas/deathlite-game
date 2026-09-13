@@ -5,7 +5,7 @@ terrain, one drawn frame -- against `digests.json`. A refactor that claims to
 be a pure move has to leave all three alone; one that changes the world says
 so and regenerates the file:
 
-    python -m world.digest --write
+    python -m tools.verification.world_digest --write
 
 The determinism test covers what `test_obstacles`, `test_houses`, `test_repair`
 and `test_water_decor` each asserted separately (two builds of one seed agree),
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 from tests import worlds as W
-from world import digest
+from tools.verification import world_digest as digest
 
 _PINNED = Path(__file__).with_name("digests.json")
 
@@ -33,7 +33,7 @@ class DigestTests(unittest.TestCase):
                 self.assertEqual(
                     compute(seed), pinned[str(seed)][stage],
                     f"{stage} digest moved for seed {seed}; if the change is "
-                    f"intended, run `python -m world.digest --write`")
+                    f"intended, run `python -m tools.verification.world_digest --write`")
 
     def test_the_layout_is_pinned(self):
         self._check("layout", lambda s: digest.layout_digest(W.layout(s)))

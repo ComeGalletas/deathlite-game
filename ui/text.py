@@ -29,6 +29,37 @@ def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
     return lines
 
 
+def ellipsize(font: pygame.font.Font, text: str, max_width: int) -> str:
+    """`text` trimmed with a trailing `...` until it renders inside
+    `max_width`, measured in the font that will draw it.
+
+    `wrap`'s sibling for the places a second line is not available: a column
+    row, where the next line belongs to the next item. Nothing here clips at
+    the blit, so without this a long name simply draws over its neighbour --
+    38 % of generated item names are wider than the victory screen's Run
+    column, and the widest is nearly double it.
+
+    Returns `text` unchanged when it already fits, and never returns more than
+    the ellipsis: a width too small for even that yields `...`.
+    """
+    text = str(text)
+    if max_width <= 0:
+        return ""
+    if font.size(text)[0] <= max_width:
+        return text
+    dots = "..."
+    room = max_width - font.size(dots)[0]
+    if room <= 0:
+        return dots
+    # Longest prefix that still fits beside the ellipsis. Linear from the end
+    # rather than bisected: these are short strings drawn once per frame at
+    # most, and a scan cannot disagree with `size()` about where to cut.
+    cut = len(text)
+    while cut > 0 and font.size(text[:cut])[0] > room:
+        cut -= 1
+    return text[:cut].rstrip() + dots
+
+
 def shadowed(font: pygame.font.Font, text: str, colour, *, shadow=(28, 28, 34),
              offset=(2, 2)) -> pygame.Surface:
     """`text` in `colour` over a copy in `shadow` displaced by `offset`: the

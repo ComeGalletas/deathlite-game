@@ -90,7 +90,7 @@ if _credits.exists():
 # --- what does not ship -------------------------------------------------------
 # `.venv` holds only pygame + pygbag + PyInstaller, so most of this never had a
 # chance to be pulled in; it is belt-and-braces against a future dependency.
-# numpy in particular is imported by three scripts under `utilities/` and would
+# numpy in particular is imported by three scripts under `tools/asset_pipeline/` and would
 # add ~30 MB if it ever landed in the runtime path.
 excludes = [
     "numpy", "tkinter", "pygbag", "pytest", "_pytest",

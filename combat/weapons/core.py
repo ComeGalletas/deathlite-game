@@ -25,7 +25,7 @@ inside that ring; with the ring empty the hero drops to idle (the polling
 tip (`_area`); every other category reads an explicit `reach` field. The ring
 scales with `area_multiplier` and `bonus["area"]`, so area blessings widen it.
 
-CB-5: a manual aim (`FireContext.aim`, see `game/states/playing/aim.py`)
+CB-5: a manual aim (`FireContext.aim`, see `game/states/playing/core/aim.py`)
 overrides all of that for the straight / chain / cone weapons: the attack goes
 off in the aimed direction as soon as the cooldown allows, ring empty or not
 (it may whiff), targeting the closest enemy inside an assist cone around the

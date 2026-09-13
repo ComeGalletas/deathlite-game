@@ -7,7 +7,7 @@ it been opened. `age` drives the lid animation after it has, and stops
 climbing once the strip has played out so the frame index is stable for the
 rest of the run.
 
-The payload is not here. `game/states/playing/chests.py` rolls it from
+The payload is not here. `game/states/playing/core/chests.py` rolls it from
 `data/loot/chests.json` the moment the chest is opened, so a chest's gold is
 decided when it is found rather than banked into the world at generation --
 `progression/chests.py` holds those rules.

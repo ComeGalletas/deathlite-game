@@ -8,8 +8,8 @@ brightness order, and its brightness picks a colour off a blue ramp (dark
 navy where the flame was orange, cyan where it was yellow, the white core
 kept white). Shape and shading survive; only the hue moves.
 
-    python utilities/recolour_totem_fire.py            # writes totem_bolt_fire.png
-    python utilities/recolour_totem_fire.py --check    # exits 1 on a drift
+    python tools/asset_pipeline/recolour_totem_fire.py            # writes totem_bolt_fire.png
+    python tools/asset_pipeline/recolour_totem_fire.py --check    # exits 1 on a drift
 """
 from __future__ import annotations
 
@@ -20,7 +20,8 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pygame
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# repo root: this file lives in tools/asset_pipeline/, two folders down
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FOLDER = os.path.join(ROOT, "assets", "effects", "weapons", "grave_totem")
 SOURCE_NAME = "fire.png"
 TARGET = os.path.join(FOLDER, "totem_bolt_fire.png")
