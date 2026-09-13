@@ -374,16 +374,34 @@ mentions in code comments, `README.md`, `world/README.md` and
 `designs/sprite_functionality.md` were rewritten; journals keep the old paths.
 
 **Not done here, still open.** The six phase-keyed weapon modules were moved
-into `combat/` unmerged (§6). The six modules that boot a `Game` while tiered
-`unit` (`test_bomb`, `test_chest_open`, `test_potion_drops`, `test_window`,
-`test_hero_select_preview`, `test_boss_pig_rider`) keep that tier, as do the
-three statistical tests in the default run
-(`test_chests::test_the_average_island_carries_two_to_three`, 61 s, and the
-two `test_master::PackTests`, 38 s and 26 s) which belong in `sweep`. The four
-negative tests that pin the absence of long-removed code (`RETIRED` in
-`test_weapon_classes`, `heightmap_floor_sheets` in `test_biome`,
-`three_slice_h` in `test_menu`, `draw_room_clutter` in `test_decor_frontiers`)
-are also still there.
+into `combat/` unmerged (§6). The four negative tests that pin the absence of
+long-removed code (`RETIRED` in `test_weapon_classes`,
+`heightmap_floor_sheets` in `test_biome`, `three_slice_h` in `test_menu`,
+`draw_room_clutter` in `test_decor_frontiers`) are still there.
+
+### Tier drift fixed — DONE (2026-09-12, same day)
+
+The six modules that booted a `Game` or read the cached worlds while tiered
+`unit` are now where they belong: `test_bomb`, `test_chest_open`,
+`test_potion_drops`, `test_window` and `test_hero_select_preview` in
+`integration`, `test_boss_pig_rider` in `world`. A scan of every `unit`
+module for `Game(`, `tests.boot` or `tests.worlds` now comes back empty.
+
+`test_chests::CountingRuleTests::test_the_average_island_carries_two_to_three`
+generates forty worlds for one mean (61 s, the slowest test in the suite)
+and is now `sweep`; the per-seed caps and floors in the same class stay in
+`world`. The two `test_master::PackTests` (38 s and 26 s) were listed
+alongside it as statistical, which on a closer read they are not: each
+simulates sixty seconds of one deterministic run to check a placement
+guarantee. They stay in the default run; the honest way to make them cheaper
+is a shorter simulation, which is a change to the tests themselves.
+
+| tier | before | after |
+|---|---:|---:|
+| `unit` | 1,260 tests, 1 min 55 s | 1,133 tests, 50 s |
+| `world` | 501 | 525 |
+| `integration` | 401 | 503 |
+| `sweep` | 7 | 8 |
 
 **Where the suite's time goes** (durations run, 2026-09-12, 835 s total):
 `flows/test_dev_mode.py` 172 s (21 %), `world/test_chests.py` 84 s,

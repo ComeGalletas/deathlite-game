@@ -17,6 +17,10 @@ SWEEP = (
     "test_boost_adds_about_25_percent_more_trees_globally",
     # Twelve seeds pooled to judge each biome's scatter mix against intent.
     "tests/render/test_biome.py::ScatterMixTests",
+    # Forty generated worlds for one mean; the per-seed caps and floors in the
+    # same class stay in `world`.
+    "tests/world/test_chests.py::CountingRuleTests::"
+    "test_the_average_island_carries_two_to_three",
 )
 
 # Modules that read generated worlds (through tests/worlds.py or directly).
@@ -26,6 +30,7 @@ WORLD = (
     # folder reorganisation and keep their tier.
     "tests/entities/test_npcs.py",
     "tests/playing/test_interactables.py",
+    "tests/entities/ai/test_boss_pig_rider.py",
     "tests/world/test_pathfinding.py",
     "tests/playing/test_enemy_nav.py",
     "tests/entities/ai/test_aggro.py",
@@ -44,6 +49,11 @@ WORLD = (
 # run on every save.
 INTEGRATION = (
     "tests/combat/test_incoming_damage.py",
+    "tests/flows/test_window.py",
+    "tests/playing/test_bomb.py",
+    "tests/playing/test_chest_open.py",
+    "tests/playing/test_potion_drops.py",
+    "tests/screens/test_hero_select_preview.py",
     "tests/playing/test_manual_aim.py",
     "tests/combat/test_weapons_special.py",
     "tests/flows/test_controls.py",
