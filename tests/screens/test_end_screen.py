@@ -5,7 +5,7 @@ selection and the mouse, and `handle_event` hands back the id of the button to
 fire so the state does the acting. So these tests never touch a state -- they
 assert the ids that come back, which is the whole contract between the two.
 
-`tests/rendering/test_game_over.py` and `test_victory.py` cover the two states'
+`tests/screens/test_game_over.py` and `test_victory.py` cover the two states'
 wiring on top of this.
 """
 import itertools

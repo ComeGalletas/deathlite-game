@@ -13,7 +13,7 @@ import pygame
 
 from game.content import get_content
 from tests import worlds as W
-from tests.rendering.test_depth_sort import fresh_playing
+from tests.render.test_depth_sort import fresh_playing
 
 SEED = W.SEEDS[0]
 

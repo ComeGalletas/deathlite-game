@@ -1,7 +1,7 @@
 """The wave/budget director (spec 3.4 / 3.8 / 8: "Enemy spawn constraints"),
 now `spawn/budget.py` reading `data/enemies/spawn_tables.json` (spawn master S2).
 
-Moved from `tests/world/test_spawning.py` with the director. The sequence
+Moved from `tests/spawn/test_spawning.py` with the director. The sequence
 test is the proof the move changed nothing: `director_sequence.json` was
 written by the old `world.spawning` module before it was touched, from a
 scripted 600 s run under a fixed RNG, and the new director must reproduce

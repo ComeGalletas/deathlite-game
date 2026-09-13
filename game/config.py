@@ -43,7 +43,7 @@ MAX_DT: float = 1.0 / 20.0
 # Keep `TILE_PX * CAMERA_ZOOM` a whole number of pixels, or the tile grid lands
 # on fractional boundaries and the seams shimmer. At the 64 px tile that means
 # steps of 0.25: 1.25 -> 80, 1.5 -> 96, 1.75 -> 112, 2.0 -> 128.
-# `tests/rendering/test_camera.py` pins this for the desktop and web profiles.
+# `tests/systems/test_camera.py` pins this for the desktop and web profiles.
 CAMERA_ZOOM: float = 1.5
 
 # --- Persistence -----------------------------------------------------------
@@ -765,7 +765,7 @@ INCOMING_TICK_INTERVAL: float = 0.5
 # per-frame heal. The phase is run time, not damage time: the timer keeps
 # running at full HP (the heal is simply clamped away), so after a hit the next
 # tick is at most one interval out rather than a fresh countdown.
-# Blessing card text states this number, so `tests/characters/test_regen.py`
+# Blessing card text states this number, so `tests/entities/test_regen.py`
 # pins the two together -- retuning here fails there rather than silently
 # leaving a card lying.
 HP_REGEN_INTERVAL: float = 5.0

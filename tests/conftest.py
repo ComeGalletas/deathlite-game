@@ -16,21 +16,25 @@ SWEEP = (
     "tests/world/test_obstacle_families.py::TreeDensityBoostTests::"
     "test_boost_adds_about_25_percent_more_trees_globally",
     # Twelve seeds pooled to judge each biome's scatter mix against intent.
-    "tests/rendering/test_biome.py::ScatterMixTests",
+    "tests/render/test_biome.py::ScatterMixTests",
 )
 
 # Modules that read generated worlds (through tests/worlds.py or directly).
 WORLD = (
     "tests/world/",
-    "tests/ai/test_pathfinding.py",
-    "tests/ai/test_enemy_nav.py",
-    "tests/ai/test_aggro.py",
-    "tests/ai/test_flying.py",
-    "tests/rendering/test_terrain.py",
-    "tests/rendering/test_biome.py",
-    "tests/rendering/test_depth_sort.py",
-    "tests/rendering/test_hazard_sprite.py",
-    "tests/combat/test_projectile_elevation.py",
+    # Booted or generated worlds that moved out of tests/world/ in the
+    # folder reorganisation and keep their tier.
+    "tests/entities/test_npcs.py",
+    "tests/playing/test_interactables.py",
+    "tests/world/test_pathfinding.py",
+    "tests/playing/test_enemy_nav.py",
+    "tests/entities/ai/test_aggro.py",
+    "tests/entities/ai/test_flying.py",
+    "tests/render/test_terrain.py",
+    "tests/render/test_biome.py",
+    "tests/render/test_depth_sort.py",
+    "tests/render/test_hazard_sprite.py",
+    "tests/playing/test_projectile_elevation.py",
 )
 
 # Modules that boot a real `Game` and drive its states -- the menu into a run,
@@ -40,26 +44,26 @@ WORLD = (
 # run on every save.
 INTEGRATION = (
     "tests/combat/test_incoming_damage.py",
-    "tests/combat/test_manual_aim.py",
+    "tests/playing/test_manual_aim.py",
     "tests/combat/test_weapons_special.py",
-    "tests/core/test_controls.py",
-    "tests/core/test_dev_mode.py",
-    "tests/core/test_hero_unlock.py",
-    "tests/core/test_loading.py",
-    "tests/core/test_lod.py",
-    "tests/core/test_smoke.py",
-    "tests/rendering/test_damage_numbers.py",
-    "tests/rendering/test_enemy_sprite.py",
-    "tests/rendering/test_gem_glow.py",
-    "tests/rendering/test_ghost.py",
-    "tests/rendering/test_hostile_glow.py",
-    "tests/rendering/test_level_up.py",
-    "tests/rendering/test_menu.py",
-    "tests/rendering/test_mouse.py",
-    "tests/rendering/test_options.py",
-    "tests/rendering/test_pause.py",
-    "tests/rendering/test_rankings.py",
-    "tests/rendering/test_render_cull.py",
+    "tests/flows/test_controls.py",
+    "tests/flows/test_dev_mode.py",
+    "tests/flows/test_hero_unlock.py",
+    "tests/flows/test_loading.py",
+    "tests/flows/test_lod.py",
+    "tests/flows/test_smoke.py",
+    "tests/render/test_damage_numbers.py",
+    "tests/render/test_enemy_sprite.py",
+    "tests/render/test_gem_glow.py",
+    "tests/render/test_ghost.py",
+    "tests/render/test_hostile_glow.py",
+    "tests/screens/test_level_up.py",
+    "tests/screens/test_menu.py",
+    "tests/screens/test_mouse.py",
+    "tests/screens/test_options.py",
+    "tests/screens/test_pause.py",
+    "tests/screens/test_rankings.py",
+    "tests/render/test_render_cull.py",
 )
 
 

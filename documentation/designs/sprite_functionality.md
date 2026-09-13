@@ -817,7 +817,7 @@ plus their own selection; picks still happen on the release.
 
 ### Tests
 
-`tests/rendering/test_ui_panels.py — SliceTests` pins caps and corners
+`tests/screens/test_ui_panels.py — SliceTests` pins caps and corners
 against the source sheet pixel-for-pixel (including the pre-scaled case
 against a hand-scaled reference). `test_widgets.py` pins state / shape /
 variant → sheet, the 4-px label shift and the fallbacks. Each screen's art
@@ -856,7 +856,7 @@ on top and everything painted after gems on that terrace band covers both.
   20-bullet radial barrage -- draw as the arrow and get it; a whole barrage
   shares one cached surface. Hostiles are view-culled with it.
 
-Tests: `tests/rendering/test_glow.py` (curve, quantisation, cache, disc
-alpha profile) and `tests/rendering/test_gem_glow.py` (blit order and
+Tests: `tests/render/test_glow.py` (curve, quantisation, cache, disc
+alpha profile) and `tests/render/test_gem_glow.py` (blit order and
 geometry in the world pass, out-of-phase breathing, cull, off switch, cache
 size under a field of orbs).

@@ -199,7 +199,7 @@ class ProjectileTrailTests(unittest.TestCase):
         hero happens to start below a terrace the puff count collapses -- 0 or 1
         against the 4-6 the spacing predicts. `fire_level = NONE` is the
         documented way to opt a projectile out; the rule has its own coverage in
-        `tests/combat/test_projectile_elevation.py`.
+        `tests/playing/test_projectile_elevation.py`.
         """
         base = dict(pos=pygame.Vector2(p.player.pos), vel=pygame.Vector2(300, 0),
                     damage=1, radius=4, lifetime=9.0)

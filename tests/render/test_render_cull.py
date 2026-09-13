@@ -13,7 +13,7 @@ import pygame
 from game import config
 from game.states.playing.visual import rendering
 from tests import worlds as W
-from tests.rendering.test_depth_sort import fresh_playing
+from tests.render.test_depth_sort import fresh_playing
 from world.map import GameMap
 
 

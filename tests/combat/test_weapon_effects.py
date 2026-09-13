@@ -203,7 +203,7 @@ class FirePathBonusTests(unittest.TestCase):
         w = Weapon("bomb", C.weapon("bomb"))
         w.bonus["blast_radius"] += 24
         # Inside the Bomb's reach ring, derived from the data (see the note
-        # in `tests/combat/test_bomb.py`): a target beyond it never fires.
+        # in `tests/playing/test_bomb.py`): a target beyond it never fires.
         near = float(C.weapon("bomb")["reach"]) * 0.4
         s = self._fire(w, [FakeEnemy(near, 0)])[0]
         self.assertAlmostEqual(s["blast_radius"], C.weapon("bomb")["blast_radius"] + 24)

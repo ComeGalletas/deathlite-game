@@ -60,7 +60,7 @@ class LevelUpPanel:
         """`card_w` narrows the cards so something else can share the screen --
         the Forge's weapon rail (`ui/forge_rail.py`) sits in the margin the
         narrower cards free up. The default is the level-up width and that path
-        is unchanged, which `tests/rendering/test_level_up.py` pins."""
+        is unchanged, which `tests/screens/test_level_up.py` pins."""
         w, h = surface.get_size()
         dim = pygame.Surface((w, h), pygame.SRCALPHA)
         dim.fill((8, 6, 16, 200))

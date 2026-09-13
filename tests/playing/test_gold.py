@@ -7,7 +7,7 @@ merchant subtracts from it -- so `PlayingState` keeps both in one pair of
 methods rather than asking every income site to remember a second counter.
 
 `add_gold` / `spend_gold` touch nothing but `self.stats`, so they are exercised
-against a stand-in rather than a booted run; `tests/world/test_interactables.py`
+against a stand-in rather than a booted run; `tests/playing/test_interactables.py`
 covers the merchant end to end.
 """
 import unittest

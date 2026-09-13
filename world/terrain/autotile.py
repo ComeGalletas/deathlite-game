@@ -2,7 +2,7 @@
 
 W3 of `journals/world_refactor.md`. Moved verbatim off `GameMap`; it holds
 `GameMap._mask_slot` / `_bridge_slot` as `staticmethod` aliases so existing call
-sites and `tests/rendering/test_terrain.py` keep working. No pygame, no assets
+sites and `tests/render/test_terrain.py` keep working. No pygame, no assets
 -- just ints, strings and a `slots` dict.
 """
 from __future__ import annotations

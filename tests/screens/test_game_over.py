@@ -1,7 +1,7 @@
 """`game/states/game_over_state.py`: the run summary shown after a death.
 
 The state had no coverage at all -- the only thing the suite said about it was
-that a *developer* run never opens one (`tests/core/test_dev_mode.py`). What is
+that a *developer* run never opens one (`tests/flows/test_dev_mode.py`). What is
 pinned here is the readout a real run produces: the summary survives a run that
 banked nothing (the per-minute and dps rates divide by the survival time, which
 is zero on a death at t=0), it reports what the run actually did, and the three

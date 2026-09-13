@@ -372,7 +372,7 @@ def paint_room_levels(store, sheets, layout, room):
     already down when their band is painted, and the higher ground is not.
 
     Composited in level order this is pixel-identical to `paint_room_grid`,
-    which is the property that makes the split safe; `tests/rendering/
+    which is the property that makes the split safe; `tests/render/
     test_level_bands.py` asserts it.
     """
     return _paint_room(store, sheets, layout, room, banded=True)

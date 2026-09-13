@@ -62,7 +62,7 @@ and `world/terrain/bake.py:70` sizes the baked water buffer from
 of the diff `digests.json` was carrying.
 
 The same change broke the whole-pixel invariant that
-`tests/rendering/test_camera.py:114` pins: `64 × 1.7 = 108.8 px`, and a tile
+`tests/systems/test_camera.py:114` pins: `64 × 1.7 = 108.8 px`, and a tile
 grid on fractional boundaries shimmers at the seams.
 
 **Done**
@@ -72,7 +72,7 @@ grid on fractional boundaries shimmers at the seams.
       the constraint and the legal steps (0.25) as a comment next to the value.
 - [x] `digests.json` re-pinned with `python -m world.digest --write`. Seed 42's
       `draw` moved too, as the visible extent changed.
-- [x] `tests/rendering/test_gem_glow.py::test_glow_breathes_on_the_gems_own_age`
+- [x] `tests/render/test_gem_glow.py::test_glow_breathes_on_the_gems_own_age`
       fixed. It separated halos from orbs with a hard-coded `width > 12` pixel
       threshold; a tier-0 orb is 8 world px, so at zoom 1.5 it drew exactly 12 px
       and the rule worked by luck. It now selects on the renderer's own
@@ -81,7 +81,7 @@ grid on fractional boundaries shimmers at the seams.
 
 ### The loading-screen warm test — also fixed
 
-`tests/core/test_loading.py::test_the_view_is_warmed_before_the_run_starts` was
+`tests/flows/test_loading.py::test_the_view_is_warmed_before_the_run_starts` was
 order-dependent: it passed alone and failed after a few hundred other tests.
 
 Both foam and scenery pick their animation frame from
@@ -144,7 +144,7 @@ cached worlds and belonged in `world` all along:
 - [x] README updated with the tier table and the `-m unit` command, and its
       stale "863 tests" count (in two places) corrected to 1,630.
 
-**Still worth doing:** `tests/core/test_dev_mode.py` is 63 tests driving ~40 full
+**Still worth doing:** `tests/flows/test_dev_mode.py` is 63 tests driving ~40 full
 boots through the menu and loading screen on an unpinned seed, and is most of
 what makes `integration` five minutes. Pointing it at a pinned seed and reusing
 one booted run per test class would cut the bulk of it — most of its tests are
@@ -165,7 +165,7 @@ it produces no rooms. No room without a grid can exist.
 - [x] `tests/world/test_decor_frontiers.py` `LegacyPathTests` → the grid-less
       arm of `world/rules/frontier.py:interior_cells`. The surviving
       no-cells case is kept as `EmptyRoomTests`.
-- [x] `tests/rendering/test_biome.py::test_a_room_with_no_height_map_stays_one_group`
+- [x] `tests/render/test_biome.py::test_a_room_with_no_height_map_stays_one_group`
       → `not room.grid` dropped from `world/terrain/decor/budget.py:_cell_biomes`.
       The `not room.palette` guard stays: it is a different condition and still
       the documented contract, so the test was kept and renamed
@@ -182,7 +182,7 @@ it produces no rooms. No room without a grid can exist.
 - [x] `game/config.py` `COLOR_GRID` — `world/terrain/render.py` keeps its own
       module-local fallback palette and inlines the same literal, so the config
       constant was a leftover.
-- [x] `tests/ai/test_pathfinding.py` `_SAVED_VERT` — assigned, never read.
+- [x] `tests/world/test_pathfinding.py` `_SAVED_VERT` — assigned, never read.
 
 The world digest is unchanged by all of this, which is the proof the deletions
 were behaviour-preserving rather than merely test-passing.
@@ -206,7 +206,7 @@ At 91.3 % the gaps are narrow and specific. In priority order:
 
 - [x] **`game/states/game_over_state.py` — was 0 % (35 stmts).** The death
       summary was completely untested; `test_dev_mode.py` only asserted that a
-      *dev* run never opens one. `tests/rendering/test_game_over.py` now covers
+      *dev* run never opens one. `tests/screens/test_game_over.py` now covers
       it — 11 tests in 0.2 s, in the `unit` tier, on a fake game rather than a
       booted one (the states it hands off to do their work in `enter`, which a
       recording state machine never calls). Includes the death-at-zero-seconds
@@ -249,9 +249,9 @@ the open on this seed"`, `"no open sea at the world's corner on this seed"`.
 Today only 2 actually skip, but a generation change can silently retire any of
 them without a single failure.
 
-Concentrated in `tests/world/test_interactables.py` (6), `tests/ai/test_flying.py`
-(3), `tests/world/test_npcs.py` (2), `tests/ai/test_enemy_nav.py` (2), and
-`tests/rendering/test_biome.py` (7, all `"tileset missing"`).
+Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/test_flying.py`
+(3), `tests/entities/test_npcs.py` (2), `tests/playing/test_enemy_nav.py` (2), and
+`tests/render/test_biome.py` (7, all `"tileset missing"`).
 
 **Todo**
 
@@ -267,14 +267,14 @@ Concentrated in `tests/world/test_interactables.py` (6), `tests/ai/test_flying.p
 
 ## 6. Duplication and organisation
 
-- [ ] `tests/core/test_dev_mode.py:38` defines `_settle()`, a verbatim copy of
+- [ ] `tests/flows/test_dev_mode.py:38` defines `_settle()`, a verbatim copy of
       `tests/boot.py::settle`. 17 other modules import the shared one. Delete the
       copy.
 - [ ] Six `FakeEnemy` and three `FakeProj` definitions are scattered across
       `test_manual_aim`, `test_summons`, `test_weapons`, `test_weapons_reach` and
       `test_weapons_special`, although `tests/combat/fakes.py` is the designated
       home. Consolidate.
-- [ ] `tests/rendering/test_menu.py` is 952 lines and two subjects — 9 of its 15
+- [ ] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15
       classes are character-select. Split out `test_character_select.py`.
 - [ ] The six weapon modules are keyed by the plan phase that produced them
       (`test_weapons` = Milestone 2, `test_weapons_special` = Milestone 4,
@@ -282,8 +282,8 @@ Concentrated in `tests/world/test_interactables.py` (6), `tests/ai/test_flying.p
       `test_weapon_effects` = P2, `test_hammer_swing` = change request 1) rather
       than by concern. Now that the six-weapon rework is landing, regroup by
       subject: roster/data, fire path, special effects, blessings.
-- [ ] `tests/ai/test_fsm_enemies.py` (Milestone 9) and
-      `tests/ai/test_ai_behaviors_fsm.py` both cover charger / teleporter /
+- [ ] `tests/entities/ai/test_fsm_enemies.py` (Milestone 9) and
+      `tests/entities/ai/test_ai_behaviors_fsm.py` both cover charger / teleporter /
       warlock. Merge.
 - [ ] 50 modules open with the plan phase they were written in (`"""Milestone 2:`,
       `"""R4 --`, `"""CB-2:`, `"""LD-9 phase D7:`). Those plans are done; retitle
@@ -299,10 +299,10 @@ Concentrated in `tests/world/test_interactables.py` (6), `tests/ai/test_flying.p
       expression that is discarded (`math.radians(...) * (count - 1)`). The
       `KeyError` guard is real but invisible; make it an explicit assertion or
       drive the actual fire path.
-- [ ] `tests/core/test_events.py:26` `test_clear_removes_everything` subscribes a
+- [ ] `tests/systems/test_events.py:26` `test_clear_removes_everything` subscribes a
       handler, clears, publishes — and never observes that the handler did not
       fire. Record calls and assert the list is empty.
-- [ ] `tests/rendering/test_weapon_rigs.py:137`
+- [ ] `tests/render/test_weapon_rigs.py:137`
       `test_legacy_true_and_no_fx_keep_the_old_rig` — `soul_slash` is the current
       default for a cone weapon with no visuals entry, not a legacy path. Rename.
 - [ ] ~38 assertions across 20 modules pin exact balance numbers from the data
@@ -335,3 +335,56 @@ Left, in the order worth taking them:
 *Working note: this review left an untracked `.coverage` data file in the repo
 root. `python -m coverage html` will turn it into a browsable report; delete it
 otherwise.*
+
+---
+
+## 8. Folder reorganisation — DONE (2026-09-12)
+
+The old folders mixed three axes: the package under test (`spawn`,
+`progression`), the concern (`rendering`, `combat`) and the phase the tests were
+written in (`core`, `characters`). Modules now live by the runtime code they
+exercise, with one folder for the tests that drive whole flows through a
+booted `Game`. 94 modules moved with `git mv`; 41 stayed.
+
+| folder | what it covers | modules |
+|---|---|---:|
+| `combat/` | `combat/*` — damage, status, knockback, synergy, the weapons and their forgings | 15 |
+| `entities/` | `entities/*` — player, pickup, NPCs; `entities/ai/` for the AI scaffold, behaviours, bosses and flyers | 6 + 12 |
+| `progression/` | `progression/*` | 10 |
+| `spawn/` | `spawn/*`, plus the no-layout spawn geometry (`test_spawning`) | 9 |
+| `world/` | `world/*` — generation, rules, pathfinding, digest, layering | 21 |
+| `playing/` | `game/states/playing/core` — aim, hit resolution, bumping, effects, nav wiring, ledger, gold, chests, potions, interactables | 10 |
+| `render/` | `game/states/playing/visual` and the terrain renderer — projectiles, summons, glow, depth sort, terrain, biome, sprites | 16 |
+| `screens/` | the menu, select, pause, level-up, options, end and run-status states and `ui/*` | 18 |
+| `systems/` | `systems/*` plus `game/{assets,fonts,save,events,state}` | 10 |
+| `flows/` | boots a real `Game` and walks its states — smoke, loading, dev mode, hero unlock, controls, LOD, window | 7 |
+| `devtools/` | the training-dummy DPS meter and its bench arena | 1 |
+
+`tests/worlds.py`, `boot.py`, `aictx.py`, `nearby.py`, `combat/fakes.py`
+and `spawn/fakehost.py` stay where they were; `world/digests.json` and
+`spawn/director_sequence.json` stay beside the modules that read them.
+
+**What had to follow.** `tests/conftest.py`'s tier lists were repathed, and
+`test_npcs` / `test_interactables` — which the old `tests/world/` prefix had
+placed in `world` — are now listed there by name so their tier does not change.
+`test_ghost` and `test_render_cull` import `fresh_playing` from
+`test_depth_sort`, now under `tests.render`. `test_melee_enemies` builds the
+repo root from its own path and moved one folder deeper (`parents[3]`). Path
+mentions in code comments, `README.md`, `world/README.md` and
+`designs/sprite_functionality.md` were rewritten; journals keep the old paths.
+
+**Not done here, still open.** The six phase-keyed weapon modules were moved
+into `combat/` unmerged (§6). The six modules that boot a `Game` while tiered
+`unit` (`test_bomb`, `test_chest_open`, `test_potion_drops`, `test_window`,
+`test_hero_select_preview`, `test_boss_pig_rider`) keep that tier, as do the
+three statistical tests in the default run
+(`test_chests::test_the_average_island_carries_two_to_three`, 61 s, and the
+two `test_master::PackTests`, 38 s and 26 s) which belong in `sweep`. The four
+negative tests that pin the absence of long-removed code (`RETIRED` in
+`test_weapon_classes`, `heightmap_floor_sheets` in `test_biome`,
+`three_slice_h` in `test_menu`, `draw_room_clutter` in `test_decor_frontiers`)
+are also still there.
+
+**Where the suite's time goes** (durations run, 2026-09-12, 835 s total):
+`flows/test_dev_mode.py` 172 s (21 %), `world/test_chests.py` 84 s,
+`spawn/test_master.py` 64 s, `playing/test_chest_open.py` 50 s.
