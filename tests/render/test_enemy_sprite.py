@@ -361,6 +361,7 @@ class EnemyStateRingsTests(unittest.TestCase):
         pygame.draw.circle = lambda *a, **k: (n.__setitem__(0, n[0] + 1),
                                               real(*a, **k))[1]
         try:
+            p.fx.update_spawn_fx(1.0)     # past the spawn burst's veil
             p._draw_one_enemy(pygame.Surface((1600, 900)), e)
         finally:
             pygame.draw.circle = real

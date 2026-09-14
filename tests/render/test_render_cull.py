@@ -25,6 +25,7 @@ class ActorCullTests(unittest.TestCase):
             config.SCREEN_WIDTH / config.CAMERA_ZOOM + 2 * config.RENDER_ACTOR_CULL_PAD + 300, 0))
         edge = p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(
             config.SCREEN_WIDTH / config.CAMERA_ZOOM / 2 + config.RENDER_ACTOR_CULL_PAD - 40, 0))
+        p.fx.update_spawn_fx(1.0)     # let the spawn bursts out: bodies only
         ys = [d for _lvl, d, _f in p._actor_items()]
         self.assertIn(near.pos.y, ys)
         self.assertIn(edge.pos.y, ys)

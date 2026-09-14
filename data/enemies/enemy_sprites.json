@@ -140,5 +140,13 @@
     "anims": {
       "loop": {"file": "characters/dead/dead.png", "frames": 14, "fps": 15, "loop": false}
     }
+  },
+  "enemy_spawn": {
+    "frame": [64, 64], "scale": [64, 64], "anchor": [32, 32],
+    "ring": 50, "over_sprite": 1.25, "reveal_frame": 6,
+    "_note": "the burst every enemy (and the boss) appears out of: the dark purple bottom row of the spawn pack, cut to its own strip by tools/asset_pipeline/cut_spawn_sheet.py. `ring` is the widest shard ring's width in rig px; the renderer scales the frame so that ring spans `over_sprite` x the enemy sprite's larger drawn side (the collider diameter for a rig-less enemy), centred on the drawn sprite. The body is held back until frame `reveal_frame` (the ball breaking) so it steps out of the burst; 0 shows it at once. Cosmetic only -- the enemy is live from its first frame.",
+    "anims": {
+      "burst": {"file": "effects/spawn/enemy_spawn.png", "frames": 12, "fps": 20, "loop": false}
+    }
   }
 }

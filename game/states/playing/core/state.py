@@ -198,6 +198,10 @@ class PlayingState(State):
         # fade]. A `fx.trail` projectile sheds one per `spacing` px; each plays
         # its one-shot burst where it was dropped, then is culled.
         self._trail_fx: list = []
+        # Enemy spawn bursts: [Animator("enemy_spawn burst"), body]. Every
+        # enemy the master seats (and the boss) pushes one; drawn in the depth
+        # layer just over its body, dropped when the burst finishes.
+        self._spawn_fx: list = []
         self._last_move_dir = pygame.Vector2(1, 0)
         self._frame = 0                       # update count; the tick LOD's phase
         self._awaiting_level_up = False
@@ -394,6 +398,7 @@ class PlayingState(State):
             self._death_seq_t = None
             self._death_fx.clear()
             self._trail_fx.clear()
+            self.fx.update_spawn_fx(1e9)          # let any running burst out
             self.player.alive = True
             self.player.hp = max(self.player.hp, self._dev_hp_floor,
                                  self.player.max_hp * 0.5)
@@ -402,6 +407,7 @@ class PlayingState(State):
         self._update_hero_anim(dt)
         self.fx.update_death_fx(dt)
         self.fx.update_trail_fx(dt)
+        self.fx.update_spawn_fx(dt)
         self.camera.update(dt, self.player.pos)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
@@ -519,6 +525,7 @@ class PlayingState(State):
         self.chest_manager.update(dt)      # CB-9: the lids that are opening
         self.fx.update_death_fx(dt)
         self.fx.update_trail_fx(dt)
+        self.fx.update_spawn_fx(dt)
         self.particles.update(dt)
         self.damage_numbers.update(dt)
         self.shake.update(dt)
@@ -1145,6 +1152,12 @@ class PlayingState(State):
             if view.collidepoint(fx[1].x, fx[1].y):
                 out.append((lvl(fx[1].x, fx[1].y), fx[1].y,
                             lambda s, fx=fx: self._draw_death_fx(s, fx)))
+        for fx in self._spawn_fx:
+            body = fx[1]
+            if view.collidepoint(body.pos.x, body.pos.y):
+                # Just over the body it announces (+0.5), in the body's band.
+                out.append((band(body), body.pos.y + 0.5,
+                            lambda s, fx=fx: self._draw_spawn_fx(s, fx)))
         if (self.boss is not None and self.boss.alive
                 and view.inflate(2 * pad, 2 * pad).collidepoint(self.boss.pos.x, self.boss.pos.y)):
             out.append((band(self.boss), self.boss.pos.y, self._draw_boss))
@@ -1181,6 +1194,9 @@ class PlayingState(State):
 
     def _draw_death_fx(self, surface, fx) -> None:
         self.renderer.death_fx(surface, fx)
+
+    def _draw_spawn_fx(self, surface, fx) -> None:
+        self.renderer.spawn_fx(surface, fx)
 
     def _draw_player_projectiles(self, surface, level=None) -> None:
         self.renderer.player_projectiles(surface, level)

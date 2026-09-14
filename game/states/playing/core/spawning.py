@@ -152,6 +152,7 @@ class PlayingHost:
         enemy.spawn_owner = owner
         enemy.spawned_at = self.elapsed
         self.ps.enemies.append(enemy)
+        self.ps.fx.spawn_spawn_fx(enemy)      # the burst it appears out of
         return enemy
 
     # --- live <-> dormant (S4) ----------------------------------------
@@ -276,6 +277,7 @@ class EnemyControl:
         pos = self.boss_spawn_point(definition)
         ps.boss = Boss(boss_id, definition, pos.x, pos.y)
         ps.boss.ledger = ps.ledger
+        ps.fx.spawn_spawn_fx(ps.boss)          # sized to the boss's own rig
         ps.shake.add(0.7)
         ps.game.events.publish(Events.BOSS_SPAWNED, name=ps.boss.name)
         log.info("boss spawned: %s", ps.boss.name)

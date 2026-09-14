@@ -339,6 +339,34 @@ class TransientFx:
             fx[0].update(dt)
         ps._death_fx = [fx for fx in ps._death_fx if not fx[0].finished]
 
+    # --- enemy spawn burst -----------------------------------
+    def spawn_spawn_fx(self, body) -> None:
+        """The purple burst every enemy (and the boss) appears out of --
+        `[Animator("enemy_spawn"), body]` on `ps._spawn_fx`. The entry keeps
+        the body rather than a copy of its position so the ring follows an
+        enemy that starts walking inside the burst; a body that dies first
+        leaves the ring finishing where it stood. The animator is also hung
+        on the body as `_spawn_fx`, which is what the renderer reads to hold
+        the sprite back until the ball breaks (the rig's `reveal_frame`).
+        Cosmetic only: the body is live, hittable and moving from its first
+        frame. `PlayingHost.wake` does not call this -- a dormant enemy
+        coming back was never a new spawn."""
+        anim = Animator(self.ps.game.assets, "enemy_spawn", start="burst")
+        body._spawn_fx = anim
+        self.ps._spawn_fx.append([anim, body])
+
+    def update_spawn_fx(self, dt: float) -> None:
+        ps = self.ps
+        keep = []
+        for fx in ps._spawn_fx:
+            fx[0].update(dt)
+            if fx[0].finished:
+                if getattr(fx[1], "_spawn_fx", None) is fx[0]:
+                    fx[1]._spawn_fx = None
+            else:
+                keep.append(fx)
+        ps._spawn_fx = keep
+
     # --- projectile dust trail ---------------------------------
     _TRAIL_CAP = 400
 

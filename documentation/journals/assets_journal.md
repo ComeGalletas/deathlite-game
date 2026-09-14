@@ -3260,3 +3260,149 @@ pins the exact set of registered draw families, and the bolt rework's new
 `totem_bolt` family was not added to it -- the bolt work had been verified
 against its own tests and the combat tier only. A new `@style` needs that
 list updated in the same change.
+
+## Enemy spawn burst (2026-09-12, done)
+
+**Requirement (owner).** A sprite animation for enemy spawns: when an enemy
+spawns, whatever its type, a burst plays that **scales with the size of the
+enemy's sprite**. New art at `assets/effects/spawn/77.png`; use the **dark
+purple, bottom row**. Cut that row into **a sheet of its own**. Confirm
+first, and keep the record here.
+
+### What is in the sheet
+
+`77.png` is 768 x 576: the same **12 x 9 grid of 64 x 64** frames as the
+totem bolt's `proyectile.png`, one colour per row, the same effect in each.
+The bottom row (index 8) is the dark purple / indigo one -- mean opaque
+colour about (82, 63, 144); the second row is the *bright* magenta (191, 86,
+231) and is not the one asked for. Its twelve frames, by opaque bounds:
+
+| frame | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ink (px) | 7x7 | 12x12 | 14x18 | 26x26 | 38x40 | 42x42 | 44x48 | 46x48 | 48x48 | 50x48 | 50x48 | 8x48 |
+
+A spark (0-1) swells into a ball (2-5), the ball breaks into a ring of
+shards (6-10) and the last frame is a few stray specks. The widest ring is
+50 px in the 64 px cell.
+
+### What happens today
+
+Nothing marks a spawn. Every enemy the spawn master seats -- the director's
+waves, packs, an enemy's own brood (`owner="summon"`), the dev menu, the
+debug keys, the tests -- is made by `PlayingHost.make_enemy`
+(`game/states/playing/core/spawning.py`), which builds the `Enemy` and
+appends it to `ps.enemies`. The boss is the one enemy outside the master:
+`EnemyControl.spawn_boss` builds it directly. A dormant enemy coming back
+through `PlayingHost.wake` is *not* a spawn -- it was already in the world
+and only left the live list for the reduced tick.
+
+### Proposal
+
+- **The sheet.** `tools/asset_pipeline/cut_spawn_sheet.py` cuts the bottom
+  row into `assets/effects/spawn/enemy_spawn.png` (768 x 64, twelve 64 px
+  frames, the whole row in order), with `--check` and the same
+  folder-or-`unused/` source lookup and exit 2 as the totem scripts. Once
+  cut, `77.png` moves to `assets/effects/spawn/unused/` like the spent totem
+  sources (the game reads the strip; the grid is authoring input).
+- **The rig.** `enemy_spawn` in `data/enemies/enemy_sprites.json` (enemy
+  side, next to `dead`): frame 64 x 64, `scale` 64 x 64, `anchor` 32 x 32
+  (the effect is radial), one anim `burst` of 12 frames at 20 fps, once
+  (0.6 s). Two tuning keys on the rig, not in code (the data-driven rule):
+  `ring: 50` -- the widest ring's width in rig px, the `fireball` idea from
+  the Bomb, so the renderer scales the frame by what the *art* fills rather
+  than by the cell; `over_sprite: 1.25` -- the ring's diameter as a
+  multiple of the enemy sprite's larger drawn side, so the burst wraps the
+  body with a margin.
+- **Sizing.** The burst diameter is `over_sprite x max(w, h)` of the enemy
+  rig's `scale` (the drawn size in world px, zoomed like everything else),
+  centred on the drawn sprite's centre (the same anchor + drop arithmetic
+  `enemy_sprite` uses, so a bottom-anchored body gets the ring round its
+  middle, not its feet). An enemy with no rig (the primitive disc) uses its
+  collider diameter instead, centred on the collider. The boss uses its own
+  rig the same way -- the Tusked Lance's 260 x 204 gives a ring about 325
+  px across, scaled up from 64 px like the explosion is.
+- **Where it hooks.** `TransientFx.spawn_spawn_fx(body)` appends
+  `[Animator("enemy_spawn", start="burst"), body]` to a new `ps._spawn_fx`
+  list; `make_enemy` and `spawn_boss` call it, `wake` does not. The entry
+  keeps the *body*, not a copy of its position, so the ring follows an
+  enemy that starts walking inside the 0.6 s; if the body dies first the
+  ring finishes where it stood. `update_spawn_fx` ticks and culls like the
+  death poofs.
+- **Draw order.** In the actor depth pass (`_actor_items`), in the body's
+  elevation band at `pos.y + 0.5`, so it draws just over the enemy it
+  belongs to and under anything standing in front. Not in the flat effects
+  layer: a flat ring would be cut by the enemy's own sprite.
+- **The reveal.** The enemy is *live* from its first frame -- the spawn
+  master, the caps and the tests see no change -- but the renderer does not
+  draw it until the ball breaks (`reveal_frame: 6` on the rig, 0.3 s in),
+  so the body appears out of the burst instead of standing under a spark.
+  Purely cosmetic: it can already be hit and can already move. If that
+  reads as unfair for a fast melee type, `reveal_frame: 0` shows it at once.
+
+### Tests
+
+`tests/render/test_spawn_fx.py`, real assets, no world:
+
+- the strip is 64 x 12 wide and matches the script (skip on exit 2, as the
+  totem test does); its opaque pixels are the dark purple row -- mean
+  colour within tolerance of (82, 63, 144), bluer than red, and not the
+  magenta row's;
+- every frame of the rig loads; `ring` and `over_sprite` are on the rig;
+- `make_enemy` appends one entry per spawn, `wake` none, `spawn_boss` one;
+- the ring's size follows the rig's `scale` (a wider rig gives a wider
+  frame) and falls back to the collider for a rig-less enemy;
+- the enemy is not drawn before `reveal_frame` and is drawn after;
+- entries are culled once the burst finishes.
+
+`tests/render/test_projectiles.py`'s family list is untouched (this is not a
+projectile style). A screenshot of a burst mid-ring from a real run closes
+the work.
+
+### Confirmed (owner, 2026-09-12)
+
+Go as proposed: keep the veil at frame 6, `over_sprite` 1.25, and `77.png`
+archived under `unused/` after the cut.
+
+### Done
+
+- [x] 1. `tools/asset_pipeline/cut_spawn_sheet.py` writes
+      `assets/effects/spawn/enemy_spawn.png` (768 x 64, the bottom row in
+      order); `--check` re-cuts and compares; `77.png` is under
+      `assets/effects/spawn/unused/`.
+- [x] 2. The `enemy_spawn` rig in `data/enemies/enemy_sprites.json`: 64 px
+      frame, anchor 32 x 32, `burst` 12 frames at 20 fps once, `ring` 50,
+      `over_sprite` 1.25, `reveal_frame` 6.
+- [x] 3. `TransientFx.spawn_spawn_fx(body)` / `update_spawn_fx`,
+      `PlayingState._spawn_fx`, ticked in both the live loop and the death
+      sequence; `PlayingHost.make_enemy` and `EnemyControl.spawn_boss`
+      call it, `wake` does not.
+- [x] 4. `WorldRenderer.spawn_fx_geometry` / `spawn_fx` / `spawn_veiled`;
+      the `_actor_items` entry at `pos.y + 0.5` in the body's band; the
+      veil check at the top of `one_enemy` and `boss`.
+- [x] 5. `tests/render/test_spawn_fx.py` (13): the strip is its frames
+      wide and matches the script (skip on exit 2); its ink is the dark
+      purple row, not the magenta one; every frame loads; the rig carries
+      its tuning; one burst per spawn on its body, none on a wake, one for
+      the boss; the ring follows the rig's `scale` and falls back to the
+      collider; the body is veiled through frame 5 and drawn from frame 6
+      while alive throughout; the burst is culled when done; it sits just
+      over its body in the depth pass; it paints purple round the body.
+- [x] 6. Screenshot delivered: swarm, chaser and brute spawning side by
+      side at the ball, the reveal and the widest ring, zoomed 2x from a
+      real run.
+
+### Decisions made while building
+
+- The animator is hung on the body as `_spawn_fx` as well as listed on
+  `ps._spawn_fx`, so the veil is one attribute read in the draw path
+  rather than a scan of the list per enemy per frame. `update_spawn_fx`
+  clears it when the burst finishes.
+- The burst blits plainly (no elevation shading, no ghost record) -- it is
+  an effect, not a character, and the explosions do the same.
+- Two existing tests counted what a freshly spawned enemy draws and how
+  many actor items three spawns make; both now let the burst out first
+  (`fx.update_spawn_fx(1.0)`) because a fresh spawn is veiled by design:
+  `test_enemy_sprite.EnemyStateRingsTests` and
+  `test_render_cull.test_far_enemies_are_not_in_the_actor_pass`. Tiers
+  run clean afterwards: render 302, spawn 130, playing 222, flows 106,
+  devtools + entities + combat 491.

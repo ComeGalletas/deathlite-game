@@ -449,6 +449,8 @@ class WorldRenderer:
     # --- characters (depth layer) --------------------------------
     def one_enemy(self, surface, e) -> None:
         ps = self.ps
+        if self.spawn_veiled(e):
+            return                              # still inside its spawn burst
         z = ps.camera.zoom
         sx, sy = ps.camera.world_to_screen(e.pos)
         er = e.radius * z
@@ -503,6 +505,63 @@ class WorldRenderer:
         self._blit_character(
             surface, frame, (sx - ax * scale, sy - ay * scale + drop), pos.y)
 
+    # --- the enemy spawn burst ---------------------------------
+    _SPAWN_RIG = "enemy_spawn"
+
+    def spawn_veiled(self, body) -> bool:
+        """Is `body` still hidden inside its spawn burst? True from its
+        spawn until the burst reaches the rig's `reveal_frame` (the ball
+        breaking), so the sprite steps out of the burst rather than standing
+        under a spark. Render-only: the body itself is live throughout."""
+        anim = getattr(body, "_spawn_fx", None)
+        if anim is None or anim.finished:
+            return False
+        rig = self.ps.game.assets.rig(self._SPAWN_RIG) or {}
+        return anim.index < int(rig.get("reveal_frame", 0))
+
+    def spawn_fx_geometry(self, body) -> tuple[float, float, float]:
+        """Where the burst sits and how wide it is, in screen px:
+        `(cx, cy, diameter)`. A sprited body gets the ring round the centre
+        of its drawn frame -- the same anchor + drop arithmetic the sprite
+        itself uses, so a bottom-anchored body is wrapped at its middle, not
+        its feet -- with the diameter `over_sprite` x its larger drawn side.
+        A rig-less body gets the collider: its centre, and `over_sprite` x
+        its diameter."""
+        ps = self.ps
+        assets = ps.game.assets
+        z = ps.camera.zoom
+        sx, sy = ps.camera.world_to_screen(body.pos)
+        over = float((assets.rig(self._SPAWN_RIG) or {}).get("over_sprite", 1.0))
+        anim = getattr(body, "anim", None)
+        scale = assets.scale_for(anim.rig) if anim is not None else None
+        if scale:
+            bw, bh = scale
+            flip = getattr(body, "_facing", 1) < 0 and assets.face(anim.rig) == "right"
+            ax, ay = self.anchor_for(anim.rig, flip)
+            left = sx - ax * z
+            top = sy - ay * z + self.sprite_drop(body.radius)
+            return (left + bw * z / 2.0, top + bh * z / 2.0, over * max(bw, bh) * z)
+        return (sx, sy, over * 2.0 * body.radius * z)
+
+    def spawn_fx(self, surface, fx) -> None:
+        """One `[Animator, body]` entry of `ps._spawn_fx`: the current burst
+        frame, scaled so the rig's `ring` spans the diameter
+        `spawn_fx_geometry` asks for, centred there."""
+        anim, body = fx
+        assets = self.ps.game.assets
+        rig = assets.rig(anim.rig) or {}
+        bw, bh = assets.scale_for(anim.rig) or (0, 0)
+        ring = float(rig.get("ring") or bw)
+        if not bw or not ring:
+            return
+        cx, cy, diameter = self.spawn_fx_geometry(body)
+        k = diameter / ring                     # rig px -> screen px
+        frame = anim.frame(size=(max(1, round(bw * k)), max(1, round(bh * k))))
+        if frame is None:
+            return
+        ax, ay = assets.anchor(anim.rig)
+        surface.blit(frame, (cx - ax * k, cy - ay * k))
+
     def enemy_sprite(self, surface, e) -> None:
         ps = self.ps
         z = ps.camera.zoom
@@ -527,7 +586,7 @@ class WorldRenderer:
     def boss(self, surface) -> None:
         ps = self.ps
         b = ps.boss
-        if b is None or not b.alive:
+        if b is None or not b.alive or self.spawn_veiled(b):
             return
         z = ps.camera.zoom
         sx, sy = ps.camera.world_to_screen(b.pos)
