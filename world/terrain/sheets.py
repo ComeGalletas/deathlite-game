@@ -160,19 +160,30 @@ class TileSheets:
             self._cell_cache[key] = frs[0]
         return self._cell_cache[key]
 
-    def vstair_sprite(self, drop: int) -> pygame.Surface | None:
+    def vstair_sprite(self, drop: int, north: bool = False
+                      ) -> pygame.Surface | None:
         """The stone flight for a `drop`-level descent -- one tile wide,
         `drop` tiles tall. Two sprites are authored (`vstairs_1` / `vstairs_2`)
         rather than one rescaled, so the steps stay square at either depth.
-        `None` when the art is missing; the caller keeps the grass channel."""
-        key = ("vstair-sprite", drop)
+        `None` when the art is missing; the caller keeps the grass channel.
+
+        `north` is the flight on a plateau's back, which ascends *toward*
+        the camera: the same art flipped vertically, so the widest step and
+        the dark foot line sit at the north end on the low ground and the
+        top step meets the terrace to the south. Derived at load rather than
+        shipped as a file -- there is no north-ascending flight in the
+        source art, and a flip is the whole of what one would be."""
+        key = ("vstair-sprite", drop, north)
         if key not in self._cell_cache:
             rel = self.vstair.get("sheets", {}).get(str(drop))
             img = self._a._load_image(rel) if rel else None
             if img is None:
                 return None
             want = (self.px, max(1, drop) * self.px)
-            self._cell_cache[key] = (img if img.get_size() == want
-                                     else pygame.transform.smoothscale(img, want))
+            if img.get_size() != want:
+                img = pygame.transform.smoothscale(img, want)
+            if north:
+                img = pygame.transform.flip(img, False, True)
+            self._cell_cache[key] = img
         return self._cell_cache[key]
 

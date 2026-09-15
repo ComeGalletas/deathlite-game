@@ -301,15 +301,20 @@ class GeneratedTests(unittest.TestCase):
 
 class PainterTests(unittest.TestCase):
     def test_the_cell_is_painted_as_terrace_and_casts_no_shadow(self):
-        """The placeholder: the plateau sheet's plain interior tile on the
-        plateau's own band, opaque, with no shadow blob on the low ground
-        north of it."""
+        """On the plateau's own band, opaque, with no shadow blob on the low
+        ground north of it. A grass flight is the terrace sheet's plain
+        interior tile, pixel for pixel at its centre; a rock one carries the
+        flipped stone flight, pixel for pixel where the sprite is opaque.
+        Compared against the sheet and the sprite themselves rather than
+        against a colour, because a biome's "grass" may well be teal."""
         from world.terrain.grid_paint import _shadow_casts
         W.display()
         for seed in SEEDS:
             gm = W.baked(seed)
+            sheets = gm._sheets
             px = config.TILE_PX
             seen = 0
+            styles = set()
             for room, (c, r), cell in _north_flights(gm.layout):
                 self.assertEqual(_shadow_casts(room.grid, c, r, cell, 0, 0, px),
                                  [])
@@ -323,9 +328,80 @@ class PainterTests(unittest.TestCase):
                 self.assertTrue(hit, f"seed {seed}: flight at {(c, r)} not "
                                 f"on its terrace's band")
                 rect, surf = hit[0]
-                self.assertEqual(surf.get_at((wx - rect.x, wy - rect.y)).a, 255)
+                got = tuple(surf.get_at((wx - rect.x, wy - rect.y)))
+                self.assertEqual(got[3], 255)
+                sheet = sheets.sheet_for(cell.level, room.kind, room)
+                tile = sheets.cell(sheet, sheets.interior).copy()
+                if cell.tag == "rock":
+                    # Composed as the painter composes it: the sprite over
+                    # the interior tile. Its centre is a hair short of
+                    # opaque after the smoothscale, so the pixel is a blend.
+                    tile.blit(sheets.vstair_sprite(cell.drop, north=True),
+                              (0, 0))
+                want = tuple(tile.get_at((px // 2, px // 2)))
+                self.assertEqual(got, want, f"seed {seed}: {cell.tag} flight "
+                                 f"at {(c, r)} is not painted as expected")
+                styles.add(cell.tag)
                 seen += 1
             self.assertGreater(seen, 5)
+            self.assertEqual(styles, {"grass", "rock"}, f"seed {seed}")
+
+    def test_south_flights_are_still_painted_as_flights(self):
+        """The regression the north branch caused once: every wall-cut
+        flight fell through to the east/west branch and came out as a bare
+        cliff face. A south flight's head is the grass channel piece with,
+        when "rock", the stone flight over it -- composed here as the
+        painter composes it and compared pixel for pixel at the centre.
+        Both styles must be seen per seed, or the test proves nothing."""
+        W.display()
+        px = config.TILE_PX
+        for seed in SEEDS:
+            gm = W.baked(seed)
+            sheets = gm._sheets
+            styles = set()
+            for room in gm.layout.rooms:
+                for (c, r), cell in room.grid.items():
+                    if cell.kind != VSTAIR or cell.dir != "s" or cell.row != 0:
+                        continue
+                    sheet = sheets.sheet_for(cell.level, room.kind, room)
+                    piece = sheets.ramp_slots.get("s")
+                    idx = piece[0] if cell.drop > 1 else piece[-1]
+                    tile = sheets.cell(sheet, idx).copy()
+                    if cell.tag == "rock":
+                        tile.blit(sheets.vstair_sprite(cell.drop), (0, 0))
+                    want = tuple(tile.get_at((px // 2, px // 2)))
+                    wx = room.rect.x + c * px + px // 2
+                    wy = room.rect.y + r * px + px // 2
+                    # the flight stands on the terrace below it, so it is
+                    # painted on that terrace's band
+                    hit = [(rect, surf) for rect, surf, lvl in gm._grid_surfs
+                           if lvl == cell.level - cell.drop
+                           and rect.collidepoint(wx, wy)]
+                    self.assertTrue(hit, f"seed {seed}: no band under {(c, r)}")
+                    rect, surf = hit[0]
+                    got = tuple(surf.get_at((wx - rect.x, wy - rect.y)))
+                    self.assertEqual(got, want, f"seed {seed}: south {cell.tag} "
+                                     f"flight at {(c, r)} is not painted as a "
+                                     f"flight")
+                    styles.add(cell.tag)
+            self.assertEqual(styles, {"grass", "rock"}, f"seed {seed}")
+
+    def test_the_north_sprite_is_the_south_one_upside_down(self):
+        """Derived at load, so it stays in step with the authored file: the
+        foot line -- the darkest row of the south sprite, at its bottom --
+        is the top row of the north one."""
+        W.display()
+        sheets = W.baked(SEEDS[0])._sheets
+        south = sheets.vstair_sprite(1)
+        north = sheets.vstair_sprite(1, north=True)
+        self.assertIsNotNone(south)
+        self.assertEqual(north.get_size(), south.get_size())
+        w, h = south.get_size()
+        for y in (0, h // 3, h - 1):
+            for x in (w // 4, w // 2, 3 * w // 4):
+                self.assertEqual(tuple(north.get_at((x, y))),
+                                 tuple(south.get_at((x, h - 1 - y))))
+        self.assertIs(north, sheets.vstair_sprite(1, north=True), "cached")
 
 
 if __name__ == "__main__":

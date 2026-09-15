@@ -11,7 +11,8 @@ Layering inside the returned surface, per cell:
     cliff     the stone face, `row` down the stack, run-capped left/right
     vstair    the grass channel, plus the stone sprite on top when "rock";
               a north flight (`dir == "n"`) is a plain interior tile of its
-              own terrace for now -- a placeholder until its art is chosen
+              own terrace, plus the stone sprite flipped to ascend toward
+              the camera when "rock"
     ewstair   the biome `slots.ramp` wedge for its descent direction
 
 A side counts as **open** (and so gets a grass fringe / shoreline edge) only
@@ -531,10 +532,24 @@ def _paint_room(store, sheets, layout, room, banded: bool):
         elif c.kind == VSTAIR and c.dir == "n":
             # The rim cell of the plateau's back, and part of that terrace:
             # it goes on the plateau's own band, so a body standing on it is
-            # layered as it would be on the ground beside it. Its art is not
-            # chosen yet; a plain interior tile of the terrace marks the
-            # gateway as a bite out of the rim's lip.
+            # layered as it would be on the ground beside it. A plain
+            # interior tile of the terrace first: for a grass flight that is
+            # the whole of it -- with no wall to cut a channel through, the
+            # bare gap in the rim's lip *is* the grass reading -- and under
+            # a rock flight it is what shows in the sprite's transparent
+            # side margins, so the stone sits in plateau grass rather than
+            # over a hole. The rock flight is the stone flight flipped to
+            # ascend toward the camera; see `vstair_sprite`.
             band(c.level).blit(cell(sheet, interior), (x, y))
+            if c.tag == "rock":
+                tall.append((x, y, sheets.vstair_sprite(c.drop, north=True),
+                             band(c.level)))
+        elif c.kind == VSTAIR:
+            # The wall-cut straight flight: the grass channel, and the stone
+            # flight over it when "rock". Its own branch -- when the north
+            # branch above was first added it took this line's place, and
+            # every south flight fell through to the east/west branch below
+            # and came out as a bare cliff face.
             piece = ramp_slots.get("s", (interior, interior))
             idx = piece[0] if (c.row == 0 and c.drop > 1) else piece[-1]
             surf.blit(cell(sheet if c.row == 0 else low, idx), (x, y))

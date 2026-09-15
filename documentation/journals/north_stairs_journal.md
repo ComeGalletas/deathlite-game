@@ -6,8 +6,10 @@ Milestones are prefixed **NS**. Same rules as the other logs: full suite
 green per milestone, digests re-pinned when generation moves, nothing
 committed unless asked.
 
-**Status:** NS-0 to NS-4 **COMPLETE** (2026-09-14). Full default suite
-green: 2193 passed, 487 subtests. Nothing committed.
+**Status:** NS-0 to NS-5 **COMPLETE** (2026-09-14). NS-0 to NS-4
+committed as `00bc70c` (full default suite green: 2193 passed). NS-5 is
+in the working tree, world and render tiers green (620 passed);
+uncommitted.
 
 ---
 
@@ -167,3 +169,60 @@ keep-out rule as every other flight (the flight and its two landings).
 
 **Screenshot delivered**: seed 35, island 1, a level-1 north rim with the
 flight outlined, plus the full frame.
+
+### NS-5 — the stone flight, upside down (2026-09-14)
+
+The user asked for the flipped `vstairs_1` from the orientation survey to
+be the north flight's tile. Measured first: every north flight over six
+seeds is a one-level drop (concentric caps put level 1 north of every
+level-2 rim), so only the 64 px sprite is ever needed, and the tags split
+57 rock / 49 grass.
+
+- `TileSheets.vstair_sprite(drop, north=True)` in `world/terrain/sheets.py`:
+  the same art flipped vertically at load, cached under its own key. No new
+  file -- the source has no north-ascending flight and a flip is the whole
+  of what one would be. The prep script can bake a `vstairs_1n.png` later
+  if the lighting wants hand-fixing; the loader would then prefer the file.
+- `grid_paint`: a **rock** north flight paints the interior tile and then
+  the flipped sprite through the tall-sprite pass, on the plateau's band.
+  A **grass** north flight stays the plain tile: with no wall to cut a
+  channel through, the bare gap in the rim's lip is the grass reading, so
+  the two styles come for free as they do on the south wall. The interior
+  tile under a rock flight is what shows in the sprite's transparent side
+  margins, so the stone sits in plateau grass rather than over a hole.
+  After the flip the full-width rows sit north, so nothing leaks against
+  the low ground. No shadow, rim and fringe rules unchanged.
+- Tests: the painter test now reads the centre pixel per tag (stone is
+  teal, blue level with green; grass has green well over blue) and requires
+  both styles per seed; a new test pins the north sprite as the south one
+  row-reversed and cached. Bake and draw digests re-pinned; layouts are
+  untouched.
+- The known lie stands: flipped risers read as shade falling north. Shipped
+  as is, to be judged in a frame.
+
+### Regression: south flights painted as cliff faces (2026-09-14)
+
+Reported off a screenshot: a wall-cut staircase drawn as a plain cliff
+face with a strip of water showing under it, still walkable. Confirmed
+against a worktree at `b4b302e`, the commit before the north flights: the
+same cells rendered the stone flight and the grass channel there and a
+cliff face here.
+
+The cause was in `grid_paint` pass 3. Adding the north branch *replaced*
+the `elif` that caught every straight flight instead of going above it,
+so the channel-and-sprite lines were indented under the north branch and
+a south flight fell through to the east/west branch: cliff body, then a
+wedge looked up by the flight's tag, which "rock" and "grass" do not
+name. The water strip was the body art's scalloped bottom over the
+floor a straight flight is deliberately not given. It shipped in
+`00bc70c`; the digests were re-pinned over it, and nothing tested how a
+south flight is painted.
+
+Fixed by restoring the branch, so the three are north flight, south
+flight, east/west flight, each self-contained. `test_south_flights_are_
+still_painted_as_flights` now composes the channel piece and the sprite
+as the painter does and compares the centre pixel on every south head of
+the pinned seeds, both styles required. Re-rendered against the baseline
+worktree: the flight tiles and their wall rows are pixel-identical; what
+still differs in the crops is an obstacle or two moved by the north
+flights' keep-outs. Digests re-pinned.
