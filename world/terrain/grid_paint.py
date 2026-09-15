@@ -9,7 +9,9 @@ Layering inside the returned surface, per cell:
     lake      nothing painted -- the world's water buffer shows through
     ground    the biome sheet for its level, autotiled by its open sides
     cliff     the stone face, `row` down the stack, run-capped left/right
-    vstair    the grass channel, plus the stone sprite on top when "rock"
+    vstair    the grass channel, plus the stone sprite on top when "rock";
+              a north flight (`dir == "n"`) is a plain interior tile of its
+              own terrace for now -- a placeholder until its art is chosen
     ewstair   the biome `slots.ramp` wedge for its descent direction
 
 A side counts as **open** (and so gets a grass fringe / shoreline edge) only
@@ -99,6 +101,11 @@ def _floor_sides(grid, col, row, level) -> str:
                     and nb.row == nb.drop):
                 out.append(side)
             elif side in "we" or _open_channel(nb, side):
+                continue
+            elif side == "n" and nb.kind == VSTAIR and nb.dir == "n":
+                # The rim cell on the plateau's back is the flight itself,
+                # and this floor runs straight on into it. The rim's lip is
+                # on the flight's flanks, not here.
                 continue
             else:
                 out.append(side)
@@ -272,6 +279,11 @@ def _shadow_casts(grid, col, row, c, x, y, px) -> list:
     # to be laid onto the floor it darkens, and stone can drop two levels, so
     # "one below the caster" is not good enough.
     if c.kind == VSTAIR:
+        # A north flight drops nothing: what it would shade lies north of
+        # it, and a shadow falling north fights the rest of the lighting --
+        # the same rule that keeps a plateau's back edge clean.
+        if c.dir == "n":
+            return []
         return [(x, y, None, max(0, c.level - c.drop))] if c.tag == "rock" else []
     if c.kind == EWSTAIR and str(c.tag).startswith("side_"):
         # Only the lower of the unit's two tiles casts. Both did at first,
@@ -516,7 +528,13 @@ def _paint_room(store, sheets, layout, room, banded: bool):
             foot = c.row == c.drop - 1 and grid.get((col, row + 1)) is None
             surf.blit(cell(sheet, cliff_idx("bottom" if foot else "body", var)),
                       (x, y))
-        elif c.kind == VSTAIR:
+        elif c.kind == VSTAIR and c.dir == "n":
+            # The rim cell of the plateau's back, and part of that terrace:
+            # it goes on the plateau's own band, so a body standing on it is
+            # layered as it would be on the ground beside it. Its art is not
+            # chosen yet; a plain interior tile of the terrace marks the
+            # gateway as a bite out of the rim's lip.
+            band(c.level).blit(cell(sheet, interior), (x, y))
             piece = ramp_slots.get("s", (interior, interior))
             idx = piece[0] if (c.row == 0 and c.drop > 1) else piece[-1]
             surf.blit(cell(sheet if c.row == 0 else low, idx), (x, y))

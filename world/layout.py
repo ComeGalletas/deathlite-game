@@ -21,6 +21,8 @@ class Cell(NamedTuple):
         `=` ground   walkable surface at `level`
         `#` cliff    the wall holding up `level`; not walkable
         `0` vstair   straight N/S flight, `level` down to `level - drop`
+        `^` vstair   the same, descending *north*: one cell on a plateau's
+                     north rim, `dir == "n"`
         `>` ewstair  east/west flight, same span, `tag` is the descent side
         `~` lake     inland water inside a terrace; not walkable
         ` ` void     open sea / nothing
@@ -29,12 +31,19 @@ class Cell(NamedTuple):
     stair that is the terrace it hangs from. `row` indexes a cliff / stair cell
     within its own vertical stack (0 = the topmost), so the renderer can pick
     the top / body / bottom art without re-deriving the stack.
+
+    `dir` is the way a straight flight descends. "s" is the wall-cut flight:
+    `drop` cells of stone with the terrace north of its head and the low
+    ground south of its foot. "n" is the flight on a plateau's *back* -- a
+    north face has no wall, so it is the rim cell itself, one cell whatever
+    the drop, with the low ground north of it and its own terrace south.
     """
     kind: str
     level: int = 0
     drop: int = 0          # cliff / stair: levels spanned (1 or 2)
     row: int = 0           # cliff / stair: index down the stack, 0 = top
     tag: str = ""          # stair: "grass" / "rock", or the "w" / "e" descent
+    dir: str = "s"         # vstair: the descent direction, "s" or "n"
 
 
 GROUND, CLIFF, VSTAIR, EWSTAIR, LAKE, VOID = (
@@ -52,8 +61,8 @@ class TileMeta(NamedTuple):
     surface: str               # "room" | "corridor"
     foam: bool                 # may this cell join the water shoreline (`_shore`)?
     room_id: int = -1          # owning room, or -1 for a bridge cell
-    # A flight cell: "s" for a straight north/south flight, "w" / "e" for an
-    # east/west one, the direction it descends. "" on ground.
+    # A flight cell: "s" or "n" for a straight north/south flight, "w" / "e"
+    # for an east/west one, the direction it descends. "" on ground.
     ramp: str = ""
 
 

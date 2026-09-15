@@ -35,6 +35,12 @@ def _flight_opens(index, ftile, gtile) -> bool:
         return (p == gtile and index.kind_at(*p) == GROUND
                 and index.level_at(*p) == level)
 
+    if cell.kind == VSTAIR and cell.dir == "n":
+        # The rim cell on a plateau's back: the runtime half of the north
+        # branch in `walk_links`. Down is north, up is south, one cell.
+        return (ground((c, r - 1), cell.level - cell.drop)
+                or ground((c, r + 1), cell.level))
+
     if cell.kind == VSTAIR:
         return ((cell.row == 0 and ground((c, r - 1), cell.level))
                 or (cell.row == cell.drop - 1

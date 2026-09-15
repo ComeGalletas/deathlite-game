@@ -109,7 +109,7 @@ def _grid_tile_meta(rooms) -> None:
                 continue
             meta[pos] = TileMeta(floor=cell.level, surface="room",
                                  foam=(cell.level == 0), room_id=room.id,
-                                 ramp=("s" if cell.kind == VSTAIR
+                                 ramp=(cell.dir if cell.kind == VSTAIR
                                        else cell.tag if cell.kind == EWSTAIR
                                        else ""))
         room.tile_meta = meta

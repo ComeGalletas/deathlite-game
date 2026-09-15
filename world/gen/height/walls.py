@@ -105,6 +105,10 @@ def _free_flight_feet(grid) -> None:
     for (c, r), cell in list(grid.items()):
         if cell.kind not in (VSTAIR, EWSTAIR):
             continue
+        if cell.kind == VSTAIR and cell.dir == "n":
+            # Its foot is its north end, and what lies south of the cell is
+            # its own terrace, not stone: nothing to give back.
+            continue
         # The asymmetry `_flight_opens` documents: a straight flight's foot is
         # row `drop - 1`, an east/west one's is `drop`.
         foot = cell.drop - 1 if cell.kind == VSTAIR else cell.drop

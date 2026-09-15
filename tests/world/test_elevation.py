@@ -648,6 +648,12 @@ class ColliderTests(unittest.TestCase):
                              if grid[p].kind == GROUND]
                     exits = [p for p in walk_links(grid, foot)
                              if grid[p].kind == GROUND]
+                    if cell.kind == VSTAIR and cell.dir == "n":
+                        # One cell, both ends: walk it top to bottom, from
+                        # its own terrace south down to the low ground north.
+                        span = 1
+                        entry = [(pos[0], pos[1] + 1)]
+                        exits = [(pos[0], pos[1] - 1)]
                     self.assertTrue(entry and exits,
                                     f"seed {seed}: flight at {pos} has no landing")
                     route = ([entry[0]]

@@ -8,9 +8,11 @@ verticality even though the game is top-down (see the level-design journal).
 
 The grid this emits is the machine form of the ASCII layouts in the journal::
 
-    = = = = = =      terrace, level 2
-    # # 0 # # #      the wall, with a straight flight cut through it
+    = = = = = =      terrace, level 0 -- the island's back
+    = = ^ = = =      terrace, level 1, with a north flight in its rim
     = = = = = =      terrace, level 1
+    # # 0 # # #      the wall, with a straight flight cut through it
+    = = = = = =      terrace, level 0
     # # # # > =      ... and an east/west flight, which jogs the wall one row
     = = = = = #
     = = = = = =      terrace, level 0
@@ -26,7 +28,8 @@ every finished world by `world/gen/validate.py`):
 * no floating ground -- a ground cell above sea level always has ground or
   cliff directly south of it;
 * a stair spans at most 2 levels and *links* other terraces only at its two
-  ends (`walk_links` is the authority on which cells those are);
+  ends (`walk_links` is the authority on which cells those are); a north
+  flight is one rim cell with its low landing north and its terrace south;
 * every walkable cell is reachable from every other one.
 
 Rendering reads the grid and nothing else.
@@ -52,7 +55,8 @@ from world.gen.height.walls import (
     _free_flight_feet,
 )
 from world.gen.height.flights import (          # noqa: F401
-    _vstair_site, _ewstair_site, _cut_flights, _cut_lateral_stairs, _link_levels,
+    _vstair_site, _nstair_site, _ewstair_site, _cut_flights,
+    _cut_lateral_stairs, _cut_north_flights, _link_levels,
 )
 from world.gen.height.water import (            # noqa: F401
     _trim_lake_stubs, _water_blobs, _fill_holes, _carve_lakes,
@@ -135,6 +139,15 @@ def build_grid(mask: frozenset, cols: int, rows: int, rng, base: int = 0,
     # faces can all be seen at once. It draws nothing from the stream.
     _free_flight_feet(grid)
     _link_levels(grid, rng)
+    # The back of every plateau, last of the flights and off a restored
+    # stream for the same reason the lateral crossings are: its draws must
+    # not move what the prune, the hole fill or anything outside this
+    # function decides. After `_link_levels`, so that pass sees the grid it
+    # always saw and draws as it always drew; a cap it could not join from a
+    # wall site is joined from its back here, before the prune.
+    state = rng.getstate()
+    _cut_north_flights(grid, rng, stairs_per_wall, region, spacing)
+    rng.setstate(state)
     _prune_unreachable(grid)
     # Last, because every stage above can leave a one-tile hole behind --
     # a bay bitten in by the coast walk, a pocket the prune emptied.

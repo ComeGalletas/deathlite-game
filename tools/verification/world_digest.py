@@ -33,7 +33,7 @@ import pygame
 from game import config
 
 SEEDS = (35, 7, 1234, 42)
-PINNED = Path(__file__).resolve().parent.parent / "tests" / "world" / "digests.json"
+PINNED = Path(__file__).resolve().parents[2] / "tests" / "world" / "digests.json"
 
 # The containers the bake fills on a `GameMap`. Empty ones are skipped, so a
 # container that is deleted once nothing fills it leaves the digest unchanged.

@@ -1,15 +1,17 @@
-"""Cutting the ways up: straight and east/west staircases through a wall.
+"""Cutting the ways up: straight and east/west staircases through a wall,
+lateral crossings on the flanks, and north flights on a plateau's back.
 
 A wall is the level boundary and a
 flight is the only hole in it, so this stage is what makes an island walkable
-rather than a stack of islands.
+rather than a stack of islands. The flanks and the back have no wall, so a
+crossing there is not a hole but a rim cell handed over to the stair.
 """
 from __future__ import annotations
 
 from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
 from world.gen.height.const import (
-    REGION, STAIR_SPACING, SIDE_STAIRS, SIDE_STAIRS_HIGH,
+    MAX_DROP, REGION, STAIR_SPACING, SIDE_STAIRS, SIDE_STAIRS_HIGH,
     SIDE_STAIRS_HIGH_FROM, SIDE_SPACING,
 )
 from world.gen.height.graph import reachable, _components
@@ -33,6 +35,47 @@ def _vstair_site(grid, c, r):
             nb = grid.get((c + dx, r + k))
             if nb is None or nb.kind != CLIFF:
                 return None
+    return d
+
+
+def _nstair_site(grid, c, r):
+    """Is `(c, r)` a rim cell on a plateau's back that a north flight could
+    take? Returns the drop, or `None`.
+
+    A north face has no wall -- `_raise_walls` only stones southward drops --
+    so there is nothing to cut through. The flight is the rim cell itself,
+    handed over whole::
+
+        = = = = = =            = = = = = =
+        # # # # # #     ->     # # # ^ # #
+        # # # # # #            # # # # # #
+
+    It takes nothing from the ground floor and needs no notch to already be
+    there. What it needs: the cell is terrace ground, the low ground is
+    directly north of it, its own terrace continues south of it and on both
+    flanks (so it is part of the rim, not a spur), and the landing beyond
+    the foot is somewhere a large body can stand -- the two cells beside it
+    and the one north of it are that floor too, the same clearance rule the
+    lateral crossings apply to theirs."""
+    cell = grid.get((c, r))
+    if cell is None or cell.kind != GROUND or cell.level <= 0:
+        return None
+    level = cell.level
+    north = grid.get((c, r - 1))
+    if north is None or north.kind != GROUND or north.level >= level:
+        return None
+    d = level - north.level
+    if d > MAX_DROP:
+        return None
+    for p in ((c - 1, r), (c + 1, r), (c, r + 1)):
+        nb = grid.get(p)
+        if nb is None or nb.kind != GROUND or nb.level != level:
+            return None
+    low = north.level
+    for p in ((c - 1, r - 1), (c + 1, r - 1), (c, r - 2)):
+        nb = grid.get(p)
+        if nb is None or nb.kind != GROUND or nb.level != low:
+            return None
     return d
 
 
@@ -230,6 +273,35 @@ def _cut_lateral_stairs(grid, rng, spacing: int = None) -> None:
                 cut += 1
 
 
+def _cut(grid, c, r, kind, tag, d, dir="s") -> bool:
+    """Hand the cells of one flight over to it. A wall-cut straight flight
+    spans its `d` cells of stone, an east/west one a row more (the jog), and
+    a north flight is the single rim cell it was found at.
+
+    A north cut is **provisional**, like a lateral one: the rim cell was
+    terrace ground, and a flight links only at its two ends, so where the
+    rim is the only thing joining a strip of terrace to the rest -- a thin
+    band of level 1 pinched between the low ground and a higher cap, say --
+    taking the cell severs that strip. The prune would then delete it, and
+    the flight would be left with no flank on that side. The cut is kept
+    only if both flanks still reach the terrace south of the flight by some
+    other way; returns whether it stood."""
+    if kind == VSTAIR and dir == "n":
+        was = grid[(c, r)]
+        grid[(c, r)] = Cell(VSTAIR, level=was.level, drop=d, row=0,
+                            tag=tag, dir="n")
+        keep = reachable(grid, (c, r + 1))
+        if (c - 1, r) in keep and (c + 1, r) in keep:
+            return True
+        grid[(c, r)] = was
+        return False
+    span = d if kind == VSTAIR else d + 1
+    for k in range(span):
+        grid[(c, r + k)] = Cell(kind, level=grid[(c, r)].level,
+                                drop=d, row=k, tag=tag)
+    return True
+
+
 def _cut_flights(grid, rng, per_region: int, region: int = None,
                  spacing: int = None) -> None:
     """Cut ways up through the walls, using all four kinds of stair the tileset
@@ -245,7 +317,11 @@ def _cut_flights(grid, rng, per_region: int, region: int = None,
     the shuffle happens to fall, which on a large island reliably leaves whole
     stretches of rim -- the north especially, where the caps are widest --
     without a way up. A per-region quota guarantees every part of the coast has
-    its own crossings."""
+    its own crossings.
+
+    The north rim has no wall and so no candidate here; `_cut_north_flights`
+    serves it, in its own pass and off a restored stream, so that its draws
+    never move anything this pass or the stages after it decide."""
     region = REGION if region is None else region
     spacing = STAIR_SPACING if spacing is None else spacing
     buckets: dict = {}
@@ -277,10 +353,7 @@ def _cut_flights(grid, rng, per_region: int, region: int = None,
             if any(abs(c - tc) < spacing and abs(r - tr) < spacing
                    for tc, tr in taken):
                 continue
-            span = d if kind == VSTAIR else d + 1
-            for k in range(span):
-                grid[(c, r + k)] = Cell(kind, level=grid[(c, r)].level,
-                                        drop=d, row=k, tag=tag)
+            _cut(grid, c, r, kind, tag, d)
             taken.append((c, r))
             cut += 1
 
@@ -309,7 +382,77 @@ def _link_levels(grid, rng) -> None:
         if not cuts:
             return
         c, r, d = cuts[rng.randrange(len(cuts))]
+        _cut(grid, c, r, VSTAIR, rng.choice(("grass", "rock")), d)
+
+
+def _cut_north_flights(grid, rng, per_region: int = 1, region: int = None,
+                       spacing: int = None) -> None:
+    """A north flight on the back of every plateau, and one more wherever a
+    cap is still stranded.
+
+    Placed by region, spacing and quota exactly as `_cut_flights` places the
+    wall-cut and east/west flights, against the crossings already standing,
+    so a region of the north rim -- which has no wall and so never had a
+    candidate -- gets its own way up. Then the stranded caps: any part not
+    joined to the rest is given a north flight where its rim cell and the
+    low ground north of it lie in different parts, as `_link_levels` does
+    with wall sites.
+
+    Runs after every other flight is cut and **off a restored stream**, like
+    the lateral crossings, because it draws once per candidate cell and the
+    stages after it -- the prune, the hole fill, the corridor seating outside
+    `build_grid`, the village -- would otherwise see a different stream purely
+    because north flights exist. That is not a formality: with the draws
+    left in, seed 42's village lost its hall and its pen to a layout the tidy
+    pass could not save, and nothing about it had a staircase in it."""
+    region = REGION if region is None else region
+    spacing = STAIR_SPACING if spacing is None else spacing
+    taken = [p for p, cl in grid.items()
+             if cl.kind in (VSTAIR, EWSTAIR) and cl.row == 0]
+    buckets: dict = {}
+    for (c, r), cell in list(grid.items()):
+        if cell.kind != GROUND:
+            continue
+        d = _nstair_site(grid, c, r)
+        if d:
+            buckets.setdefault((c // region, r // region), []).append((c, r, d))
+    for key in sorted(buckets):
+        here = buckets[key]
+        rng.shuffle(here)
+        cut = 0
+        for c, r, d in here:
+            if cut >= per_region:
+                break
+            if any(abs(c - tc) < spacing and abs(r - tr) < spacing
+                   for tc, tr in taken):
+                continue
+            # An earlier cut in this pass may have spent this site's landing.
+            if _nstair_site(grid, c, r) != d:
+                continue
+            if not _cut(grid, c, r, VSTAIR, rng.choice(("grass", "rock")), d,
+                        "n"):
+                continue
+            taken.append((c, r))
+            cut += 1
+
+    for _ in range(16):
+        parts = _components(grid)
+        if len(parts) <= 1:
+            return
+        owner = {p: i for i, part in enumerate(parts) for p in part}
+        cuts = [(c, r, d) for (c, r), cell in grid.items()
+                if cell.kind == GROUND
+                and (d := _nstair_site(grid, c, r))
+                and owner.get((c, r)) != owner.get((c, r - 1))]
+        if not cuts:
+            return
+        # One draw picks where to start; a cut that would sever its own
+        # flank is rolled back, so carry on round the list from there rather
+        # than spend a whole iteration on nothing.
+        start = rng.randrange(len(cuts))
         tag = rng.choice(("grass", "rock"))
-        for k in range(d):
-            grid[(c, r + k)] = Cell(VSTAIR, level=grid[(c, r)].level,
-                                    drop=d, row=k, tag=tag)
+        for c, r, d in cuts[start:] + cuts[:start]:
+            if _cut(grid, c, r, VSTAIR, tag, d, "n"):
+                break
+        else:
+            return

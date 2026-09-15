@@ -1,0 +1,169 @@
+# North stairs — dev log
+
+A straight flight on the **north** rim of a plateau, so an island can be
+climbed from its back and not only from its south wall and its two flanks.
+Milestones are prefixed **NS**. Same rules as the other logs: full suite
+green per milestone, digests re-pinned when generation moves, nothing
+committed unless asked.
+
+**Status:** NS-0 to NS-4 **COMPLETE** (2026-09-14). Full default suite
+green: 2193 passed, 487 subtests. Nothing committed.
+
+---
+
+## The request (2026-09-14)
+
+The user's snip showed the north side of a volcanic island's plateau: teal
+second-floor stone to the south, green ground floor to the north, and a
+one-tile bite in the rim marked with an X. The ask: make that cell a
+gateway between the two floors, the way the south wall has its straight
+flights and the flanks their lateral crossings.
+
+The notch in the picture is only how it happened to look. The rule is
+general — **any** rim cell on the north edge may become the flight:
+
+    = = = = = =            = = = = = =
+    # # # # # #     ->     # # # ^ # #
+    # # # # # #            # # # # # #
+
+`=` is the ground floor, `#` the top floor, `^` the staircase. The flight is
+carved out of the top floor's own rim cell; it takes nothing from the
+ground floor, and it needs no pre-existing gap.
+
+This is world and level-design generation work. The tile is undecided, so
+the flight is drawn as a plain interior ground tile until one is chosen.
+
+## Decisions
+
+- **Orientation is a field, not a tag.** `Cell` gains `dir: str = "s"`,
+  the direction a straight flight descends. `tag` keeps carrying
+  grass/rock for straight flights and the `w`/`e`/`side_` vocabulary for
+  east/west ones; stacking a second prefix onto it is what makes such
+  fields unreadable. `TileMeta.ramp` already says `s`/`w`/`e` and simply
+  gains `n`. The default `"s"` keeps every existing `Cell(...)` call and
+  every pinned expectation about south flights unchanged.
+- **The cell is the plateau's own rim cell.** A south flight lives in the
+  wall between the plateau and the low ground; a north flight lives in the
+  rim cell itself, because a north face has no wall. Both leave the
+  plateau's interior alone and both sit between the two floors.
+- **One cell per flight.** A north face has no depth to fill, so the flight
+  is one cell whatever the drop (1 or 2, as `MAX_DROP` allows). `row` is 0
+  and `drop` is the level difference, so everything that reads
+  `row == 0` for the head keeps working; only which end opens where is
+  mirrored.
+- **Site rule** (`_nstair_site`): the cell is ground at level `L > 0`;
+  the cell north of it is ground at `L - d`; the cell south of it and
+  both flanks are ground at `L`; and the landing beyond the foot is a
+  place a large body can stand — the two cells beside it and the one
+  north of it are ground at `L - d`, the same clearance rule the lateral
+  crossings use.
+- **Placement** uses the regional quota, the spacing and the shuffled
+  buckets of `_cut_flights`, in a pass of its own after every other
+  flight and off a restored stream, so a region on the north rim, which
+  has no wall and so never had a candidate, gets its own way up and
+  nothing downstream sees a different world. A plateau still stranded
+  afterwards is joined from its back.
+- **Connectivity.** Row 0 opens *north* onto ground at `L - d` and *south*
+  onto ground at `L`. `walk_links` is the authority; `steps._flight_opens`
+  mirrors it; `check_grid` gains the invariant.
+- **Rendering placeholder.** The cell is painted with the plateau sheet's
+  plain interior tile on the plateau's own band, no sprite and no drop
+  shadow (a shadow falling north fights the lighting, the same rule the
+  ground casters follow). The plateau cell south of the flight does not
+  fringe north — its floor runs on into the flight — and the flanking
+  cells keep their north lip, so the gateway reads as a bite in the rim.
+- **Out of scope for now:** grass/rock styling of the north flight and
+  its final art; carving a rim where none qualifies.
+
+## Todo
+
+**NS-0 data model** — `Cell.dir`, ASCII glyph `^`, `TileMeta.ramp = "n"`.
+
+**NS-1 generation** — `_nstair_site`, north candidates in `_cut_flights`
+and `_link_levels`, `_free_flight_feet` skips them, `check_grid` invariant.
+
+**NS-2 runtime** — `walk_links` and `steps._flight_opens` mirrored ends.
+
+**NS-3 painter** — plain interior tile, no shadow, rim fringe rules.
+
+**NS-4 tests and pins** — hand-built grid tests for the site rule and the
+step rule, shared-world tests that north flights exist and are walkable
+end to end by both nav classes, digests re-pinned, screenshot delivered.
+
+---
+
+## Log
+
+### What landed (2026-09-14)
+
+**The data (NS-0).** `Cell.dir` in `world/layout.py`, default `"s"`, so
+no existing constructor moved; `to_ascii` draws a north flight as `^`;
+`TileMeta.ramp` carries `cell.dir` for straight flights, so it reads `"n"`
+here and `"s"` as before.
+
+**Generation (NS-1).** `_nstair_site` in `world/gen/height/flights.py`
+is the site rule from the Decisions above. `_cut_north_flights` is its
+own pass: it buckets north sites by the same region, spacing and quota
+`_cut_flights` uses, against every crossing already standing, and then
+joins any cap still stranded from its back, the way `_link_levels` does
+from wall sites. It runs after `_link_levels` and **off a restored
+stream**, exactly as the lateral crossings do. The first build had the
+north candidates inside `_cut_flights` itself, drawing once per
+candidate cell; that moved the stream for every stage after it, and
+seed 42's village lost its hall and its pen to a layout the tidy pass
+could not save (four village tests, none of them about stairs). With the
+pass isolated, everything but the north flights is byte-identical to the
+world before. `_free_flight_feet` skips north flights (there is no stone
+south of one to give back). `check_grid` complains about a north flight
+with no low landing north or no terrace south.
+
+**The cut is provisional.** The first build left three flights on seeds
+35 and 7 with a missing flank. A rim cell can be the only thing joining a
+strip of terrace to the rest -- level 1 pinched between the low ground
+and a level-2 cap -- and a flight links only at its ends, so taking the
+cell stranded the strip and `_prune_unreachable` deleted it, flank
+included. `_cut` now keeps a north cut only if both flanks still reach the
+terrace south of the flight, and rolls it back otherwise, the same guard
+the lateral crossings use. The stranded-cap loop walks on round its
+candidate list from the drawn start when a cut is rolled back, one RNG
+draw either way.
+
+**Runtime (NS-2).** `walk_links` and `steps._flight_opens` gain the
+mirrored branch: row 0 opens north onto ground at `level - drop` and
+south onto ground at `level`. Nothing else in nav, collision, the inset
+field, the scatter keep-outs or the level index needed to change; they
+all read the link rule.
+
+**Painter (NS-3).** `grid_paint` paints a north flight as the plateau
+sheet's plain interior tile on the plateau's own band, casts no shadow
+for it, and lets the terrace cell south of it run on unfringed. The
+result reads as a one-tile bite out of the rim's lip, which is the
+gateway. Placeholder until the tile is chosen.
+
+**Tests and pins (NS-4).** `tests/world/test_north_flights.py` (18):
+hand-built rims for the site rule, the rollback, `_cut_flights`,
+`_link_levels`, the link rule, the `check_grid` complaints and the ASCII
+glyph; on the shared worlds, that the generator places them, that every
+one sits on an intact rim, that tile meta says `"n"`, that the runtime
+rule mirrors the generator on every one, that both nav classes climb
+every one in both directions, and that the cell is painted opaque on its
+terrace's band with no shadow. `test_elevation`'s head-to-foot walk
+takes a north flight from its terrace down to the low ground. Digests
+re-pinned. The digest tool's pin path was one directory short since the
+tools folder moved; fixed.
+
+**Measured** over six seeds (35, 7, 1234, 42, 3, 99), with the pass
+isolated: 106 north flights against 73 wall-cut and 324 lateral; per
+plateau 0 to 7, mean 2.3, in line with the two to three laterals a side.
+Nine of the 47 plateaus carry none -- small upper caps whose whole rim is
+within spacing of a crossing already standing. Every world validates.
+
+**Nav note.** The large class walks a 48 px lattice against 64 px tiles,
+so a landing tile's centre maps to one nav cell that can straddle the
+tile below, and a tree standing diagonally off the landing can take that
+one cell's clearance under the radius. The tile is still crossed through
+its other cells, so the test samples the tile's quarter points. Same
+keep-out rule as every other flight (the flight and its two landings).
+
+**Screenshot delivered**: seed 35, island 1, a level-1 north rim with the
+flight outlined, plus the full frame.

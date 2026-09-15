@@ -18,7 +18,9 @@ def walk_links(grid, pos) -> list:
     directly north of its top cell and the one directly south of its foot. An
     east/west flight joins the upper terrace beside its top cell and the lower
     terrace on the opposite side of its foot -- the entry and exit tiles the
-    journal's diagram calls for."""
+    journal's diagram calls for. A north flight (`dir == "n"`) is one cell on
+    a plateau's back and is the mirror: the low ground lies north of it and
+    its own terrace south."""
     cell = grid.get(pos)
     if cell is None or cell.kind not in WALKABLE_KINDS:
         return []
@@ -50,7 +52,12 @@ def walk_links(grid, pos) -> list:
     # inside a flight: the cell above and below in the same stack
     stair((c, r - 1))
     stair((c, r + 1))
-    if cell.kind == VSTAIR:
+    if cell.kind == VSTAIR and cell.dir == "n":
+        # The rim cell of a plateau's back. Down is north, up is south; there
+        # is no stack, the one cell is both head and foot.
+        ground((c, r - 1), cell.level - cell.drop)
+        ground((c, r + 1), cell.level)
+    elif cell.kind == VSTAIR:
         if cell.row == 0:
             ground((c, r - 1), cell.level)
         if cell.row == cell.drop - 1:
@@ -194,6 +201,19 @@ def check_grid(grid) -> list[str]:
         if cell.kind in (VSTAIR, EWSTAIR):
             if cell.drop > MAX_DROP:
                 bad.append(f"stair drop {cell.drop} at ({c},{r})")
+            if cell.kind == VSTAIR and cell.dir == "n":
+                # A north flight is a rim cell: its own terrace has to be
+                # there to the south and the floor it descends to north, or
+                # it is a staircase leading nowhere.
+                north, south = grid.get((c, r - 1)), grid.get((c, r + 1))
+                if (north is None or north.kind != GROUND
+                        or north.level != cell.level - cell.drop):
+                    bad.append(f"north flight at ({c},{r}) has no low "
+                               f"landing to the north")
+                if (south is None or south.kind != GROUND
+                        or south.level != cell.level):
+                    bad.append(f"north flight at ({c},{r}) has no terrace "
+                               f"to the south")
             # A flight *links* other levels only at its ends (`walk_links`
             # says where), but it may well *touch* one at its side: a flight
             # cut on a plateau's flank has the lower terrace beside it with
@@ -231,6 +251,8 @@ def to_ascii(grid) -> str:
                 line.append(" ")
             elif cell.kind == EWSTAIR:
                 line.append(">" if cell.tag == "w" else "<")
+            elif cell.kind == VSTAIR and cell.dir == "n":
+                line.append("^")
             else:
                 line.append(_GLYPH.get(cell.kind, "?"))
         lines.append(" ".join(line))
