@@ -440,6 +440,23 @@ class NativeRenderTests(unittest.TestCase):
             dw.set_mode("borderless")
             self.assertEqual(self.reopens, ["16:9"])                     # same aspect, other size
 
+    def test_a_4k_screen_renders_at_the_cap_and_is_presented_scaled(self):
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(3840, 2160)]), \
+                mock.patch.object(config, "RENDER_MAX_HEIGHT", 1440):
+            self.h.window_size = (3840, 2160)
+            dw = _open(self.h, {"display": {"mode": "borderless"}})
+            self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (2560, 1440))
+            self.assertAlmostEqual(config.RENDER_SCALE, 1.6)
+            self.assertEqual(config.effective_zoom(), 2.40625)
+            self.assertAlmostEqual(dw.scale, 1.5)                        # the presenter's share
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(3840, 2160)]), \
+                mock.patch.object(config, "RENDER_MAX_HEIGHT", 0):
+            self.h.window_size = (3840, 2160)
+            dw = _open(self.h, {"display": {"mode": "borderless"}})
+            self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (3840, 2160))
+            self.assertAlmostEqual(config.RENDER_SCALE, 2.4)
+            self.assertEqual(config.effective_zoom(), 230 / 64)           # 3.59375 for 3.6: the seam snap
+
     def test_the_fallback_is_the_design_size_at_scale_one(self):
         refused = mock.patch.object(
             DisplayWindow, "open_surface", staticmethod(_Harness(refuse=True).open_surface))

@@ -183,11 +183,18 @@ class DisplayWindow:
     # --- the render size ----------------------------------------------
     def native_size(self) -> tuple[int, int]:
         """What the logical surface is under native rendering: the desktop
-        in Borderless, the picked (clamped) window size otherwise."""
+        in Borderless, the picked (clamped) window size otherwise -- held to
+        `config.RENDER_MAX_HEIGHT` at the same aspect (a 4K screen renders
+        2560x1440 and is presented scaled; stage 3 of the journal)."""
         if self.mode == "borderless":
-            return self.desktop_size()
-        return fit.clamp_window(self.windowed_size or self.fitted_size(),
-                                config.WINDOW_MIN, self.desktop_size())
+            w, h = self.desktop_size()
+        else:
+            w, h = fit.clamp_window(self.windowed_size or self.fitted_size(),
+                                    config.WINDOW_MIN, self.desktop_size())
+        cap = int(config.RENDER_MAX_HEIGHT)
+        if cap > 0 and h > cap:
+            w, h = int(round(w * cap / float(h))), cap
+        return (w, h)
 
     def _apply_render_size(self) -> None:
         """Set `config.SCREEN_*` and `RENDER_SCALE` for the display about to

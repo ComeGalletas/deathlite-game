@@ -40,6 +40,13 @@ UI_HEIGHT: int = 900
 # until then -- the owner's call).
 RENDER_NATIVE: bool = True
 RENDER_SCALE: float = 1.0
+# The most the native render may be tall. Render time grows with the pixel
+# count: 3440x1440 costs ~12 ms of the 16 ms budget on the owner's machine,
+# and a 4K screen (1.7x the pixels) would not fit. Above the cap the logical
+# surface is the cap's height at the window's aspect and the presenter
+# scales it up -- soft, but playable -- and the cap is a knob for a machine
+# that can afford more. 0 disables it.
+RENDER_MAX_HEIGHT: int = 1440
 
 
 def effective_zoom() -> float:
@@ -627,8 +634,30 @@ HUD_BOSS_BOTTOM: int = 28
 
 # --- Audio ---------------------------------------------------------------
 # Master-volume step for the Options screen (0..1). The slider snaps to this
-# grid; AudioManager.set_volume() clamps to [0, 1].
+# grid; AudioManager.set_volume() clamps to [0, 1]. Both volume rows -- the
+# cue master and the music level -- step on it.
 VOLUME_STEP: float = 0.05
+
+# --- Music ---------------------------------------------------------------
+# The streamed background tracks (journal `music_journal.md`, 2026-09-16),
+# keyed by the id a `State.music` declares. Paths are relative to
+# `assets.ASSETS_DIR`, the same convention as MENU_BACKGROUND_IMAGE, so a
+# third track is a one-line change here plus the state that asks for it.
+#
+# Both files come from Pixabay under the Pixabay Content License and ship as
+# delivered, at 320 kbps (owner, 2026-09-16 -- see assets/CREDITS.md).
+MUSIC_TRACKS: dict = {
+    "menu": "music/main-menu.mp3",
+    "gameplay": "music/gameplay-1.mp3",
+}
+# Music sits *under* the cues rather than beside them, so its default is
+# lower than the cue master's 0.7. Overridden by save.settings["music_volume"].
+MUSIC_VOLUME_DEFAULT: float = 0.5
+# Length of the fade out / fade in when the track changes. `mixer.music` has
+# one stream, so a switch is a gap-fade, never a true crossfade.
+MUSIC_FADE_MS: int = 600
+# What the music drops to under a pause overlay (`MusicPlayer.set_ducked`).
+MUSIC_DUCK: float = 0.4
 
 # --- Entity limits (graceful degradation, not crashes, when exceeded) -----
 # Absolute enemy concurrency ceiling -- a perf safety net, rarely the real

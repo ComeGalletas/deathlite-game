@@ -9,11 +9,11 @@ Branch: `native-resolution` (off `main` at `cf50aba`, 2026-09-16).
 > pixel perfect? Make a new branch for this, journal it in a new file,
 > prepare a todo list for option 2.
 
-Status: **stages 1, 1b and 2 built** (2026-09-16): the world renders at
-the window's native size at the effective zoom, the interface draws at the
-same scale inside its box, and a display change from the pause menu
-rebuilds the live run in place. Stage 3 (performance, 4K, the merge
-decision) open.
+Status: **all stages built** (2026-09-16): the world renders at the
+window's native size at the effective zoom, the interface draws at the
+same scale inside its box, a display change from the pause menu rebuilds
+the live run in place, and screens past the frame budget render at a
+capped height. The merge to `main` is the owner's decision (stage 3).
 
 ---
 
@@ -330,11 +330,46 @@ for.
 
 ### Stage 3 — polish and the decision
 
-- [ ] Performance at 3440x1440 and 3840x2160 against the 62 fps budget;
-      the sprite and terrain caches' memory at 2.4x.
-- [ ] Options: nothing new if the native size follows the existing rows;
-      otherwise a "Render: native / scaled" row.
-- [ ] Journal the measurements and screenshots; decide merge to `main`.
+- [x] Performance at 3440x1440 with the finished build (stages 1, 1b and
+      2), 150 timed frames of the hero walking on seed 35, then 60 frames
+      under cProfile:
+
+      | | median | p95 |
+      |---|---|---|
+      | update | 0.6 ms | -- |
+      | render | 11.9 ms | 12.9 ms |
+
+      The render is ~150 blits per frame (8 ms: the island surfaces at
+      2.4x are large), the texture upload in `flip` (2.3 ms for 3440x1440),
+      and the sea band's one full-screen blit (2 ms). It fits the 16.1 ms
+      budget on the owner's machine with ~2.5 ms to spare at the 95th
+      percentile. Memory at 2.4x was measured in stage 0 (+320 MB).
+- [x] 3840x2160 would be 1.7x the pixels, ~20 ms of render: over budget.
+      `config.RENDER_MAX_HEIGHT = 1440` caps the native render height at
+      the window's aspect -- a 4K screen renders 2560x1440 (`RENDER_SCALE`
+      1.6, zoom 2.40625) and the presenter scales it 1.5x, soft but
+      playable; 0 disables the cap for a machine that can afford it.
+      Pinned in `tests/display/test_window.py`.
+- [x] Options: nothing new. The native size follows the existing Display
+      mode and Resolution rows, and the cap is a config knob.
+- [x] Journal and screenshots: this file; the stage-2 frames (pause, run
+      status, menu at 3440x1440) and the stage-1b pause menu at 1280x720
+      were delivered. **Merge to `main`: the owner's call.** What the
+      branch changes for a player: sharp at every size (stage 0's
+      comparison), Options in the pause menu, ~245 ms per display change
+      mid-run, 2.4x the render time and +320 MB at 1.6x, the 4K cap.
+
+### Loose ends noticed, not changed
+
+- A dragged window is presented scaled (soft) until the next Options
+  change, by the owner's choice. The Options screen could say so on the
+  Resolution row ("Custom WxH, scaled") if it ever confuses.
+- The seam snap keeps the covered height within 0.3 % of 600 world px;
+  the exact-area alternative (composite each island's terrain into one
+  surface at the zoom, drop the snap) stays a follow-up.
+- The render's 150 blits per frame are the island and decor surfaces at
+  the zoom; a per-frame cull of off-screen decor blits, or batching the
+  island layers, would be where to look if a slower machine needs it.
 
 ---
 
