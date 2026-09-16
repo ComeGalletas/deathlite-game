@@ -64,11 +64,17 @@ class HUD:
         if gem is not None:
             surface.blit(gem, (left, top))
             # Near-black on the bright cyan gem, the same rule as text on the
-            # light button art.
+            # light button art. The digit's *ink* is centred on the core
+            # art's centre (not the text surface on the sprite's box: side
+            # bearings and the ring's outline both wander by half a pixel),
+            # then nudged by `HUD_LEVEL_NUDGE` for the gem's shading.
             num = self._lvl.render(str(stats.get("level", 1)), True,
                                    config.COLOR_ON_BUTTON)
-            surface.blit(num, num.get_rect(center=(
-                left + gem.get_width() // 2, top + gem.get_height() // 2)))
+            cx, cy = bars.core_centre(assets, core=config.HUD_GEM_CORE, size=config.HUD_GEM_PX)
+            ink = num.get_bounding_rect()
+            nx, ny = config.HUD_LEVEL_NUDGE
+            surface.blit(num, (round(left + cx + nx - (ink.x + ink.w / 2.0)),
+                               round(top + cy + ny - (ink.y + ink.h / 2.0))))
 
         surface.blit(hp, (bar_x, bar_y))
         readout = uitext.shadowed(

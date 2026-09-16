@@ -177,3 +177,38 @@ class FallbackTests(_Base):
                                      - config.HUD_BOSS_BOTTOM, 1600, 28))):
             self.assertEqual(self.painted(art, rect), 0, f"{name} art overflows")
             self.assertEqual(self.painted(flat, rect), 0, f"{name} fallback overflows")
+
+class LevelNumberTests(_Base):
+    """The level number on the gem (owner, 2026-09-15: it read slightly right
+    of centre). The digit's ink is centred on the core art's centre, then
+    nudged by `HUD_LEVEL_NUDGE`; so every digit lands the same way."""
+
+    def _ink_centre(self, level):
+        s = self.screen()
+        self.hud.draw(s, self.player, dict(STATS, level=level), xp_fraction=0.5)
+        gem = pygame.Rect(16, config.HUD_LEFT_TOP, config.HUD_GEM_PX, config.HUD_GEM_PX)
+        dark = [(x, y) for y in range(gem.top, gem.bottom) for x in range(gem.left, gem.right)
+                if s.get_at((x, y))[:3] == config.COLOR_ON_BUTTON]
+        self.assertTrue(dark, "no digit ink found on the gem")
+        xs, ys = [x for x, _ in dark], [y for _, y in dark]
+        return ((min(xs) + max(xs) + 1) / 2.0, (min(ys) + max(ys) + 1) / 2.0)
+
+    def test_the_digit_ink_sits_on_the_core_centre_plus_the_nudge(self):
+        cx, cy = bars.core_centre(get_assets(), core=config.HUD_GEM_CORE, size=config.HUD_GEM_PX)
+        nx, ny = config.HUD_LEVEL_NUDGE
+        want = (16 + cx + nx, config.HUD_LEFT_TOP + cy + ny)
+        for level in (1, 4, 7, 12):
+            got = self._ink_centre(level)
+            self.assertLessEqual(abs(got[0] - want[0]), 1.0, (level, got, want))
+            self.assertLessEqual(abs(got[1] - want[1]), 1.0, (level, got, want))
+
+    def test_every_digit_lands_alike(self):
+        centres = [self._ink_centre(level) for level in (1, 4, 7)]
+        self.assertLessEqual(max(c[0] for c in centres) - min(c[0] for c in centres), 1.0)
+
+    def test_the_core_centre_falls_back_to_the_sprite_centre_without_art(self):
+        with mock.patch.object(config, "HUD_GEM_CORE", "no_such_core"):
+            bars.clear_cache()
+            self.assertEqual(bars.core_centre(get_assets(), core=config.HUD_GEM_CORE, size=64),
+                             (32.0, 32.0))
+

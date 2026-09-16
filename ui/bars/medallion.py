@@ -39,6 +39,28 @@ def medallion(assets, *, socket: str, core: str, size: int):
     return out
 
 
+def core_centre(assets, *, core: str, size: int) -> tuple[float, float]:
+    """Where the seated gem's face is, in a `size` px medallion: the centre
+    of the core art's opaque bounding box at that size (the ring's outline
+    is not symmetric around it, so the sprite's own centre is ~half a pixel
+    off). The level number is centred here (`ui/hud.py`). Falls back to the
+    sprite centre when the core art is missing."""
+    size = int(size)
+    key = ("centre", core, size)
+    if key in _cache:
+        return _cache[key]
+    gem = assets.image(core)
+    if gem is None or size <= 0:
+        out = (size / 2.0, size / 2.0)
+    else:
+        if gem.get_width() != size:
+            gem = pygame.transform.scale(gem, (size, size))
+        ink = gem.get_bounding_rect()
+        out = (ink.x + ink.w / 2.0, ink.y + ink.h / 2.0)
+    _cache[key] = out
+    return out
+
+
 def clear_cache() -> None:
     """Test helper: drop cached medallions."""
     _cache.clear()

@@ -20,8 +20,9 @@ from ui.bars import slices as _slices
 
 bar = _meters.bar
 medallion = _medallion.medallion
+core_centre = _medallion.core_centre
 
-__all__ = ["bar", "clear_cache", "medallion"]
+__all__ = ["bar", "clear_cache", "core_centre", "medallion"]
 
 
 def clear_cache() -> None:
