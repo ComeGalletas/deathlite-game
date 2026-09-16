@@ -44,26 +44,29 @@ class PackTests(unittest.TestCase):
         self.assertEqual(m.spawned, len(host.live))
 
     def test_no_spawn_lands_on_top_of_the_player(self):
-        """The guarantee after the relaxation ladder (owner, 2026-09-12).
+        """The guarantee after the relaxation ladder (owner, 2026-09-12),
+        restated for S11 (owner, 2026-09-15): the camera is not part of it.
 
-        Off screen is no longer absolute -- a starved zone spawns in view
-        rather than not at all -- so what every arrival must satisfy is the
-        weaker pair: outside the view, or beyond the starved keep-away.
+        Every rung is a distance band around the hero, and the starved
+        keep-away is the smallest of them, so every arrival -- leaders on
+        their points, followers on the ring around them -- is at least that
+        far from the player, wherever the view is.
         """
         host = FakeHost()
         m = _master(host)
+        host.view = pygame.Rect(3000, 3000, 1000, 600)       # looking elsewhere
         _run(m, host, 60.0)
         self.assertGreater(len(host.live), 10)
         keep = m.placement.starved_min_distance
+        ring = 2 * (26.0 + 26.0 + m.placement.ring_gap) * 1.6   # a follower's reach
         for e in host.live:
-            on_screen = host.view.collidepoint(e.pos.x, e.pos.y)
-            self.assertTrue(not on_screen or (e.pos - host.player).length() >= keep,
-                            f"{e.pos} is on screen and inside the keep-away")
+            self.assertGreaterEqual((e.pos - host.player).length(), keep - ring,
+                                    f"{e.pos} is inside the keep-away")
 
     def test_a_quiet_zone_keeps_spawning(self):
         """The reason the ladder exists: a player who does not move used to
         starve the strict rung -- its points are all either on cooldown or
-        inside the view -- and most packs became debt."""
+        inside the keep-away -- and most packs became debt."""
         host = FakeHost()
         m = _master(host)
         _run(m, host, 60.0)
@@ -199,8 +202,8 @@ class GroupAndModifierTests(unittest.TestCase):
         pts = grid_points(0, ROOM0, floor_of=floor_of) + grid_points(1, ROOM1, floor_of=floor_of)
         pts = [p._replace(tags=frozenset({"upper"}) if p.floor == 1 else frozenset()) for p in pts]
         host = FakeHost(points=pts)
-        host.player = pygame.Vector2(1000, 3000)          # on floor 0, view far from floor 1
-        host.view.center = (1000, 3000)
+        host.player = pygame.Vector2(1000, 2300)          # on floor 0; the band reaches both floors
+        host.view.center = (1000, 2300)
         m = _master(host)
         # with the weighting only, both floors are possible; make it certain
         m.placement.prefer_weight = 1e9

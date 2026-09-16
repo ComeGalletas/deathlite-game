@@ -2,7 +2,7 @@
 points of the rooms in play, plus the ring a pack's followers stand on.
 
 Spawn master S3. The run used to try a dozen random cells of a nearby
-island (`GameMap.offscreen_spawn_point`); now it asks this for one of the
+island (the fallback now called `GameMap.spawn_point_near`); now it asks this for one of the
 points generation already vetted (`world/gen/spawnpoints.py`).
 
 `choose(request, host, now, debt_age)` filters the candidate points,
@@ -12,8 +12,10 @@ cheapest test first:
    weight is its base weight;
 2. the point is not on cooldown -- each remembers when it was last used,
    so one pack does not stack on the next;
-3. it is outside the view inflated by `view_pad`, and farther than
-   `min_distance` from the player (the two rules the old helper kept);
+3. it is inside the distance band around the player -- at least
+   `far_min_distance` away and no farther than `far_max_distance`. The
+   camera is not consulted: where the view is, or how wide it is, never
+   moves a spawn (owner, 2026-09-15);
 4. its clearance class fits the request;
 5. no live body stands within twice the request's radius of it;
 6. a point on the player's floor is weighted up by `same_floor_weight`,
@@ -25,21 +27,27 @@ Then one weighted draw from the host's RNG.
 **The relaxation ladder.** Rule 3 is not pass/fail: `choose` walks three
 rungs and takes the first that offers anything.
 
-    OFFSCREEN  outside the view inflated by `view_pad`, and beyond
-               `min_distance` from the player -- the strict arrival
-    NEAR       outside the bare view; the keep-away is dropped. A request
-               whose debt has aged past `relax_after` starts here
-    STARVED    the view is no longer a wall. `starved_min_distance` becomes
-               the keep-away and `starved_cooldown` the point cooldown, and
-               candidates are weighted by distance so the draw leans to the
-               far edge of the screen
+    FAR        between `far_min_distance` and `far_max_distance` from the
+               player -- the strict arrival
+    NEAR       the ceiling is dropped; `near_min_distance` is the keep-away.
+               A request whose debt has aged past `relax_after` starts here
+    STARVED    `starved_min_distance` becomes the keep-away and
+               `starved_cooldown` the point cooldown, and candidates are
+               weighted by distance so the draw leans outward
 
 The bottom rung exists because a player who stays on one island starves the
 top one (owner, 2026-09-12): the zone is then a single island of a few dozen
 points, and with the hero parked they are permanently either on cooldown or
-inside the view. Measured while camping, the strict rung was empty on 90 % of
-frames and roughly half of every pack the director emitted was deferred. The
-owner's call is that spawns continue even when the camera can see them.
+inside the keep-away. Measured while camping, the strict rung was empty on
+90 % of frames and roughly half of every pack the director emitted was
+deferred. The owner's call is that spawns continue even when the camera can
+see them.
+
+The rungs used to be built from the camera's visible rect ("outside the
+padded view", "outside the bare view"). They became distance bands on
+2026-09-15 (S11) so that a wider render (21:9) does not push every spawn
+further out: whether an arrival is on screen is now a consequence of the
+band and the view, never a rule.
 
 Rules 1, 4 and 5 hold at every rung -- the zone, the clearance class and a
 body already standing on the point are physical, not aesthetic. `None` now
@@ -65,17 +73,17 @@ from spawn.points import PointIndex, SpawnPoint
 
 __all__ = ["Placement", "SpawnRequest"]
 
-_KEYS = ("cooldown", "view_pad", "min_distance", "relax_after", "ring_gap",
-         "same_floor_weight", "prefer_weight", "starved_min_distance",
-         "starved_cooldown")
+_KEYS = ("cooldown", "far_min_distance", "far_max_distance", "near_min_distance",
+         "relax_after", "ring_gap", "same_floor_weight", "prefer_weight",
+         "starved_min_distance", "starved_cooldown")
 
 # The relaxation ladder, strictest first. `choose` walks it and takes the
 # first rung that offers anything, so a request fails only when no point in
 # the zone is physically usable at all.
-OFFSCREEN = 0      # outside the padded view, beyond `min_distance`
-NEAR = 1           # outside the bare view; the keep-away is dropped
-STARVED = 2        # the view is not a wall; `starved_*` rules instead
-_LADDER = (OFFSCREEN, NEAR, STARVED)
+FAR = 0            # `far_min_distance` .. `far_max_distance` from the player
+NEAR = 1           # beyond `near_min_distance`; no ceiling
+STARVED = 2        # beyond `starved_min_distance`; `starved_*` rules instead
+_LADDER = (FAR, NEAR, STARVED)
 
 
 @dataclass
@@ -94,8 +102,9 @@ class Placement:
             raise KeyError(f"spawn_tables.json `placement` lacks {missing}")
         self.index = index
         self.cooldown = float(knobs["cooldown"])
-        self.view_pad = float(knobs["view_pad"])
-        self.min_distance = float(knobs["min_distance"])
+        self.far_min_distance = float(knobs["far_min_distance"])
+        self.far_max_distance = float(knobs["far_max_distance"])
+        self.near_min_distance = float(knobs["near_min_distance"])
         self.relax_after = float(knobs["relax_after"])
         self.ring_gap = float(knobs["ring_gap"])
         self.same_floor_weight = float(knobs["same_floor_weight"])
@@ -108,7 +117,7 @@ class Placement:
     def mark_used(self, point: SpawnPoint, now: float) -> None:
         self._used[point] = now
 
-    def on_cooldown(self, point: SpawnPoint, now: float, tier: int = OFFSCREEN) -> bool:
+    def on_cooldown(self, point: SpawnPoint, now: float, tier: int = FAR) -> bool:
         last = self._used.get(point)
         if last is None:
             return False
@@ -120,7 +129,7 @@ class Placement:
         """The strictest rung this request is entitled to. A request whose
         debt has aged past `relax_after` has already waited, so it skips the
         keep-away rung rather than paying for it twice."""
-        return NEAR if debt_age >= self.relax_after else OFFSCREEN
+        return NEAR if debt_age >= self.relax_after else FAR
 
     def candidates(self, request: SpawnRequest, host, now: float,
                    debt_age: float = 0.0,
@@ -134,19 +143,15 @@ class Placement:
         if tier is None:
             tier = self.first_tier(debt_age)
         ppos = host.player_pos()
+        # The band this rung allows, squared. Only the strict rung has a
+        # ceiling; the keep-away shrinks rung by rung. The camera is never
+        # asked (owner, 2026-09-15).
         if tier >= STARVED:
-            # The view stops being a wall here; a plain keep-away radius
-            # takes its place, so an enemy arrives at the edge of the screen
-            # rather than on top of the hero.
-            view = None
-            min_sq = self.starved_min_distance ** 2
+            min_sq, max_sq = self.starved_min_distance ** 2, None
+        elif tier >= NEAR:
+            min_sq, max_sq = self.near_min_distance ** 2, None
         else:
-            view = host.visible_rect()
-            if tier <= OFFSCREEN:
-                view = view.inflate(2 * self.view_pad, 2 * self.view_pad)
-                min_sq = self.min_distance ** 2
-            else:
-                min_sq = 0.0
+            min_sq, max_sq = self.far_min_distance ** 2, self.far_max_distance ** 2
         need_large = request.clearance == "large"
         body = 2.0 * request.radius
         out: list[tuple[SpawnPoint, float]] = []
@@ -154,10 +159,8 @@ class Placement:
             for p in self.index.by_room.get(rid, ()):
                 if self.on_cooldown(p, now, tier):
                     continue
-                if view is not None and view.collidepoint(p.x, p.y):
-                    continue
                 dist_sq = (p.x - ppos.x) ** 2 + (p.y - ppos.y) ** 2
-                if dist_sq < min_sq:
+                if dist_sq < min_sq or (max_sq is not None and dist_sq > max_sq):
                     continue
                 if need_large and p.clearance != "large":
                     continue
@@ -175,7 +178,7 @@ class Placement:
                 if request.prefer and any(t in p.tags for t in request.prefer):
                     w *= self.prefer_weight
                 if tier >= STARVED and self.starved_min_distance > 0.0:
-                    # On screen, distance is the only thing left separating
+                    # This close, distance is the only thing left separating
                     # a fair arrival from a body appearing next to the hero,
                     # so it is what the draw is biased by.
                     w *= math.sqrt(dist_sq) / self.starved_min_distance
@@ -190,7 +193,7 @@ class Placement:
         Walking down instead of giving up is what keeps a camping player
         under pressure (owner, 2026-09-12): on one island the zone holds only
         a few dozen points, and with the hero parked they are permanently
-        either on cooldown or inside the view, so the strict rung is empty
+        either on cooldown or inside the keep-away, so the strict rung is empty
         almost every frame and every pack used to become debt. `None` now
         means no point in the zone is usable at all -- occupied, of the wrong
         clearance, or too close to the hero to be a fair arrival."""

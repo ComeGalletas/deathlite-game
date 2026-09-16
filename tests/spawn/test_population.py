@@ -167,8 +167,9 @@ class MasterZoneTests(unittest.TestCase):
         residents = [e for e in host.live if e.owner == "resident"]
         self.assertTrue(residents)
         self.assertTrue(all(host.room_at(e.pos).id == 1 for e in residents))
-        padded = host.view.inflate(2 * m.placement.view_pad, 2 * m.placement.view_pad)
-        self.assertTrue(all(not padded.collidepoint(e.pos.x, e.pos.y) for e in residents))
+        # S11: seated by the distance band around the hero, never the view.
+        keep = m.placement.starved_min_distance
+        self.assertTrue(all((e.pos - host.player).length() >= keep for e in residents))
         # a second visit does not seed again
         self.assertIn(1, m.population.seeded)
         host.player = pygame.Vector2(1000, 2000)

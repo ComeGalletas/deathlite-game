@@ -28,7 +28,7 @@ class Host(Protocol):
     def player_pos(self) -> pygame.Vector2: ...
     def player_heading(self) -> pygame.Vector2: ...   # current move dir, zero when still
     def player_floor(self) -> int | None: ...  # terrace level under the player
-    def visible_rect(self) -> pygame.Rect: ...
+    def visible_rect(self) -> pygame.Rect: ...   # the watchdog only; placement never looks (S11)
 
     # --- the world ----------------------------------------------------
     def is_walkable(self, pos: pygame.Vector2, radius: float,

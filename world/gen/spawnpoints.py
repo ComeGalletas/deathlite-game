@@ -2,7 +2,7 @@
 
 Phase S1 of `documentation/spawn_master_design.md`. The run used to pick a
 spawn spot by trying random cells of a nearby island a dozen times
-(`GameMap.offscreen_spawn_point`) with no obstacle, terrace or clearance
+(the fallback that is now `GameMap.spawn_point_near`) with no obstacle, terrace or clearance
 check, so an enemy could materialise on a rock or astride a rim. This
 stage runs last in `generate_world_steps` -- after the scatter and the
 unseal repair, so the obstacles and the lattice the game steers on are

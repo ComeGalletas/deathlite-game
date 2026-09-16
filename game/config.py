@@ -723,10 +723,12 @@ RUN_DURATION_SECONDS: float = 600.0
 BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
 # Where the boss appears: this far from the hero, on a random side, clamped
 # to the world rect. It flies, so nothing under the spot matters and no room
-# is consulted. Sized to sit just past the edge of the view whichever side
-# it picks: half the visible diagonal is ~612 px at CAMERA_ZOOM 1.5 on the
-# 1600x900 window (1067x600 world px), so the "APPROACHES" warning plays
-# while it crosses onto the screen instead of while it is an island away.
+# is consulted. A distance from the hero, never from the camera (the same
+# rule as the spawn master's placement band, S11): sized to sit just past
+# the edge of a 16:9 view whichever side it picks -- half the visible
+# diagonal is ~612 px at CAMERA_ZOOM 1.5 on 1600x900 (1067x600 world px) --
+# so the "APPROACHES" warning plays while it crosses onto the screen instead
+# of while it is an island away. A wider render (21:9) may see it appear.
 BOSS_SPAWN_DISTANCE: float = 680.0
 # A boss that does *not* fly has to land on ground it can actually stand on:
 # the ring above is blind to what is under it, which is fine for the bat and

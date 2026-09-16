@@ -45,7 +45,7 @@ hero's own summons (wolf, totem) are not enemies and never come here.
 **Watchdog.** Every tick the watchdog (`spawn/watchdog.py`) is asked for
 its verdicts and `recycle()` acts on them: the body is put to sleep with
 its state, moved to a fresh point of its island (the nearest free one if
-placement has nothing off screen), and woken; an owner in `never_sleep`
+placement has nothing in the band), and woken; an owner in `never_sleep`
 (an arena's elite, whose identity the arena tracks) is relocated as the
 same object. A body recycled more than `max_recycles` times is dropped
 and logged: that is a generation bug, not a gameplay event.
@@ -214,8 +214,8 @@ class SpawnMaster:
 
     def _seed_residents(self, room_id: int, now: float) -> int:
         """An island's first population: `residents` packs off the director's
-        current phase, seated on that island only (off screen by the view
-        rule). Returns how many enemies were made."""
+        current phase, seated on that island only (in the placement band
+        around the hero). Returns how many enemies were made."""
         table = self.tables.residents
         if not table:
             return 0
@@ -279,7 +279,7 @@ class SpawnMaster:
 
     def _nearest_free(self, enemy, room, now: float):
         """A free point of the island nearest the body, when placement has
-        no off-screen one to offer; `None` when there is none at all."""
+        none in the band to offer; `None` when there is none at all."""
         if room is None:
             return None
         points = self.index.by_room.get(room.id, [])

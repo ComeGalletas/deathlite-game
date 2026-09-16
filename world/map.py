@@ -320,33 +320,33 @@ class GameMap:
             room.rect.left + col * px + rng.uniform(m, px - m),
             room.rect.top + row * px + rng.uniform(m, px - m))
 
-    def offscreen_spawn_point(self, camera, rng: random.Random) -> pygame.Vector2:
-        """A walkable point just outside the view: prefer the closest rooms that
-        are not fully on screen, so pressure stays on the player even though the
-        world is large.
+    def spawn_point_near(self, player_pos: pygame.Vector2, rng: random.Random,
+                         min_distance: float, max_distance: float) -> pygame.Vector2:
+        """A point in the band `min_distance..max_distance` around the hero:
+        prefer the closest rooms, so pressure stays on the player even though
+        the world is large. The camera is never consulted (S11, owner
+        2026-09-15): the band is the rule, not the view.
 
         Since spawn master S3 this is the **fallback** only -- the world with
         no layout, or one generated with no spawn points. A generated world
         places on its `layout.spawn_points` (`spawn/placement.py`)."""
-        view = camera.visible_rect()
-        vc = pygame.Vector2(view.center)
-
+        from world.spawning import ring_point_around
         if self.layout is None:
-            for _ in range(20):
-                p = pygame.Vector2(rng.uniform(0, self.width), rng.uniform(0, self.height))
-                if not view.collidepoint(p.x, p.y):
-                    return p
-            return pygame.Vector2(self.width / 2, self.height / 2)
+            return ring_point_around(player_pos, self.width, self.height,
+                                     min_distance, max_distance, rng=rng)
 
-        rooms = sorted(self.layout.rooms, key=lambda r: (r.center - vc).length_squared())
+        rooms = sorted(self.layout.rooms,
+                       key=lambda r: (r.center - player_pos).length_squared())
         room = rng.choice(rooms[:3])
-        min_dist_sq = 220.0 ** 2
+        min_sq, max_sq = min_distance ** 2, max_distance ** 2
         best = room.center
         for _ in range(12):
             p = self.random_point_in_room(room, rng)
-            if not view.collidepoint(p.x, p.y) and (p - vc).length_squared() > min_dist_sq:
+            d_sq = (p - player_pos).length_squared()
+            if min_sq <= d_sq <= max_sq:
                 return p
-            best = p
+            if d_sq >= min_sq:
+                best = p          # outside the keep-away at least
         return best
 
     # --- tiled terrain (built once, on the first draw) ----------

@@ -986,3 +986,129 @@ arrives when the queue is full is dropped silently without incrementing
 `deferred` — so the old logs understated the loss. The ladder makes the queue
 nearly always empty, so it no longer bites, but it is tuning living in code
 rather than in `spawn_tables.json`.
+
+## S11 — placement by distance from the player, regardless of the camera (owner, 2026-09-15)
+
+### Requirement
+
+> Change the way the spawn master spawns enemies to do it on a range outside
+> of the player so it doesn't spawn on top of them, but regardless of the
+> camera. Confirm.
+
+Raised while considering the ultrawide render extent
+(`window_scaling_journal.md`): a wider view would have pushed every spawn
+further out horizontally, because the ladder's first two rungs are walls
+built from the camera's visible rect.
+
+Status: **built** the same day (owner: "start only with the spawn master changes").
+
+### Confirmed reading
+
+Today (`spawn/placement.py`, S10) the ladder is:
+
+| Rung | Rule today | Camera-dependent? |
+|---|---|---|
+| OFFSCREEN | outside the view inflated by `view_pad` (96) **and** beyond `min_distance` (220) from the hero | yes |
+| NEAR | outside the bare view; the keep-away is dropped | yes |
+| STARVED | the view is not a wall; keep-away `starved_min_distance` (420), draw weighted by distance | no |
+
+The change: the view stops being an input to placement at every rung. Each
+rung becomes a distance band around the hero, so the same request lands the
+same way at 16:9, 21:9, or with the camera anywhere. Whether a point is on
+screen is no longer a rule; it becomes a consequence of the band, and on a
+wider view some arrivals will be visible at the edges, which the owner
+accepted with the ultrawide extent.
+
+### Proposal
+
+- **Bands replace the view.** In `data/enemies/spawn_tables.json`
+  `placement`: `spawn_min_distance` and `spawn_max_distance` for the strict
+  rung; `near_min_distance` for the middle rung (no maximum); the existing
+  `starved_min_distance` / `starved_cooldown` for the last. `view_pad` and
+  `min_distance` are retired. Suggested starting values, for the owner to
+  tune: strict 700–1100 world px (just past the 16:9 half-diagonal of 612
+  plus the old pad, so a 16:9 player still sees nothing appear), near ≥ 480,
+  starved ≥ 420 as now. Every number stays in the data, none in code.
+- **The ladder keeps its shape**: strict → near → starved, `first_tier` by
+  debt age unchanged, the physical rules (zone, cooldown, clearance, an
+  occupied point) unchanged, the distance weighting on the starved rung
+  unchanged. Only the wall changes.
+- **`host.visible_rect()` leaves the placement path.** It stays on the
+  `SpawnHost` protocol for the watchdog, whose on-screen wait before a poof
+  is a visual concern and still needs the camera. `GameMap.offscreen_spawn_point`
+  (the no-layout fallback) takes the same band instead of the view.
+- **The boss ring is already player-relative** (`BOSS_SPAWN_DISTANCE` = 680
+  from the hero) and needs no change; its comment tying the number to the
+  16:9 view edge is updated to say the boss may be visible at 21:9.
+- **The dev overlay** that colours candidate points by rung keeps working;
+  the rung names lose the word "offscreen" (`FAR` / `NEAR` / `STARVED`).
+- **Tests** (`tests/spawn/test_placement.py`, `test_master.py`, eight
+  references to the view or the rung names): the tests that pin "outside the
+  view" are replaced by ones that measure the band — a point inside
+  `spawn_min_distance` is never chosen at the strict rung, one beyond
+  `spawn_max_distance` is not chosen while nearer ones exist, and moving the
+  camera without moving the hero changes nothing.
+
+### Built
+
+- `data/enemies/spawn_tables.json` `placement`: `view_pad` and `min_distance`
+  retired; `far_min_distance` 700, `far_max_distance` 1100,
+  `near_min_distance` 480 added, with a `_band_comment` saying why. The
+  starved knobs are unchanged.
+- `spawn/placement.py`: rungs renamed `FAR` / `NEAR` / `STARVED`; each is a
+  squared distance band (only the strict rung has a ceiling); the
+  `host.visible_rect()` call is gone from the pick. Cooldowns, the physical
+  rules, the starved weighting and `choose` are untouched.
+- `world/map.py`: `offscreen_spawn_point(camera, rng)` became
+  `spawn_point_near(player_pos, rng, min_distance, max_distance)`;
+  `world/spawning.py`: `ring_point_outside_view` became `ring_point_around`
+  and is now the no-layout branch of that fallback. The run-side host
+  (`game/states/playing/core/spawning.py`) passes the hero and the strict
+  band from the tables.
+- `spawn/host.py`: `visible_rect` stays on the protocol for the watchdog
+  only. `spawn/master.py`, `spawn/tables.py`, `world/gen/spawnpoints.py`
+  and the boss-ring comment in `game/config.py` no longer describe an
+  off-screen rule.
+
+### The ceiling, measured
+
+Before keeping 1100 the band was measured on the four cached test worlds
+(`tests/worlds.py`), standing at each island's centre and at each bridge:
+
+| Where the hero stands | Points in 700..1100 |
+|---|---|
+| An island's centre, its own points | 4 to 15 (islands with points) |
+| An island's centre, the neighbour's points | 0 to 1 -- the nearest neighbour point is 930..2500 px away |
+| A bridge, both islands' points | 2 to 15 (one bridge in seed 42 has 0) |
+
+So from mid-island the strict rung draws from the hero's own island, and
+the neighbour joins as the hero nears the bridge -- "spawn near the player"
+by construction. Where the band is empty (the small hub islands carry no
+points; one bridge) the NEAR rung, which has no ceiling, takes over.
+
+### Tests
+
+`tests/spawn/test_placement.py`: the "outside the padded view" test became
+"the strict rung is a band around the player"; new tests pin that the
+camera never moves a spawn (the view moved away, then covering the world:
+identical candidates at every rung) and that the ceiling drops at the near
+rung. The starved and aged-debt tests lost their view set-up and describe
+distances instead. Two filter tests and the upper-preference test in
+`test_master.py` stand the fake hero at the bridge, because the fake
+islands sit 1300 px apart. `test_no_spawn_lands_on_top_of_the_player` now
+looks elsewhere with the camera and asserts the starved keep-away (minus a
+follower's ring reach) for every live body. `test_population.py` asserts
+the keep-away for residents instead of the padded view.
+`tests/spawn/test_spawning.py` tests `ring_point_around` (in band, clamped,
+deterministic).
+
+Suite: `tests/spawn` 132 tests OK; full default tiers 2197 passed, 8 sweep
+tests deselected (11m44s).
+
+### Progress
+
+- [x] Data knobs and the note in `spawn_tables.json`
+- [x] `spawn/placement.py` rungs by distance band
+- [x] `world/map.py` fallback
+- [x] Boss ring comment
+- [x] Tests replaced

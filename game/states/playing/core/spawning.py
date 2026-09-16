@@ -131,7 +131,12 @@ class PlayingHost:
         return None
 
     def fallback_point(self):
-        return self.ps.game_map.offscreen_spawn_point(self.ps.camera, self.ps.rng)
+        # The no-layout world (or one generated with no points): the same
+        # band the placement uses, around the hero, never the camera (S11).
+        knobs = self.ps.content.spawn_tables.placement
+        return self.ps.game_map.spawn_point_near(
+            self.ps.player.pos, self.ps.rng,
+            float(knobs["far_min_distance"]), float(knobs["far_max_distance"]))
 
     def live_count(self) -> int:
         return len(self.ps.enemies)

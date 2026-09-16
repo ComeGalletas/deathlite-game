@@ -26,9 +26,10 @@ Sections:
     watchdog    S5: the sample interval and window of the stuck check, the
                 on-screen hold, the recycle limit, and the contact margin
     placement   S3: the knobs of `spawn/placement.py` -- point cooldown,
-                view pad, minimum distance from the player, when a deferred
-                pack relaxes the view rule, the follower ring gap, and the
-                same-floor / preferred-tag weights
+                the distance band around the player (S11: never the
+                camera), when a deferred pack relaxes the band, the
+                follower ring gap, and the same-floor / preferred-tag
+                weights
     difficulty  per-level overrides; a level may carry its own `phases`
                 list (same shape) that replaces the shared one. Empty today:
                 the four difficulty *factors* stay in `config.DIFFICULTIES`.
