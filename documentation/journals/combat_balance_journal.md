@@ -1681,3 +1681,256 @@ Re-simulating the stale table now yields **3 failures instead of 5, led by the
 one that names the cause**; the other two are its real consequences (the cap is
 unreachable, and the rare band is no longer the elites). 23 pass against the
 current data.
+
+---
+
+## CB-10 · XP curve: a flat 25 % cut to every level's cost
+
+**Status:** **DONE** 2026-09-16. Not committed.
+
+### Requirement (as asked)
+
+> "review the current exp requirements to level up per each level increase, and
+> reduce the amount of exp required by a flat 25% all around."
+
+Confirmed before implementing: *flat* means the same 25 % at every level, not a
+steeper cut early or late — the curve's shape is deliberately left alone and
+only its magnitude moves.
+
+### What the curve was
+
+`progression/experience.py` holds the whole progression in one function. There
+is no per-level table and no data JSON for it; every consumer — the HUD XP bar
+(`progress_fraction`), the level-up screen, and the F3 "grant XP" debug key in
+`game/states/playing/core/state.py` — derives from this single call:
+
+```python
+BASE_XP = 5
+LINEAR = 4       # extra xp per level
+QUADRATIC = 0.9  # gentle acceleration
+
+def xp_for_level(level: int) -> int:
+    n = level - 1
+    return int(BASE_XP + LINEAR * n + QUADRATIC * n * n)
+```
+
+The docstring's intent — "early levels come fast (dopamine) and later ones slow
+down without ever spiking unfairly" — is a property of the *shape*, so the cut
+had to preserve it.
+
+### Design (confirmed)
+
+**One scalar, not three retuned constants.** The alternative was to bake 0.75
+into `BASE_XP`, `LINEAR` and `QUADRATIC` directly (`3.75`, `3.0`, `0.675`). That
+was rejected: those three constants are the *authored* shape of the curve and
+should stay readable as the numbers someone chose, while the pacing cut is a
+separate, later decision that should be visible and reversible on its own line.
+
+```python
+# Flat pacing cut applied to every level's cost, so levels arrive faster
+# across the whole run without changing the shape of the curve.
+XP_SCALE = 0.75
+
+def xp_for_level(level: int) -> int:
+    n = level - 1
+    return int(XP_SCALE * (BASE_XP + LINEAR * n + QUADRATIC * n * n))
+```
+
+Scaling inside the `int()` rather than outside keeps a single truncation, so the
+result is still monotonic and never drifts a level's cost upward.
+
+### The resulting curve
+
+| level | 1 | 2 | 3 | 4 | 5 | 6 | 8 | 10 | 15 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| before | 5 | 9 | 16 | 25 | 35 | 47 | 77 | 113 | 237 | 405 |
+| after | 3 | 7 | 12 | 18 | 26 | 35 | 57 | 85 | 178 | 304 |
+
+Cumulative XP to reach level 20 falls from **3074 to 2301**, i.e. **25.1 %**
+less over a full run's worth of levelling.
+
+### Known wrinkle: truncation at the bottom of the curve
+
+`int()` truncates rather than rounds, so the two cheapest levels are cut a
+little harder than 25 %:
+
+* level 1: `int(0.75 · 5.0) = int(3.75) = 3` against a previous `int(5.0) = 5`
+  — a **40 %** cut, not 25 %
+* level 2: `int(0.75 · 9.9) = int(7.42) = 7` against a previous `int(9.9) = 9`
+  — a **22 %** cut, erring the other way
+
+From level 3 onward the error is under a point and the cut settles at a true
+~25 %. This was **surfaced to the user rather than silently corrected**:
+switching to `round()` would make level 1 cost 4 (a 20 % cut) and is a one-word
+change if the deeper early cut ever reads badly in play. Left as truncation
+because that is what the function already did, and changing rounding behaviour
+is a separate decision from changing magnitude.
+
+### Verification
+
+`tests/progression/test_experience.py` and `tests/screens/test_level_up.py`
+pass unchanged — **31 tests, 3 subtests**. No test needed editing, which is the
+point worth recording: the XP tests assert the curve's *properties* (strictly
+increasing across levels 1–39, level 1 positive and cheapest, rollover across
+multiple levels, partial-progress fraction) and never pin a literal cost. The
+level-up and pause screen tests reach the next level with
+`add_xp(xp_for_level(level) - xp_into_level)` rather than a magic number, so
+they follow the curve automatically.
+
+Both properties the cut could have broken were checked and hold: the curve is
+still strictly increasing (a positive multiplier preserves order, and `int()` of
+an increasing sequence is non-decreasing), and `xp_for_level(1) = 3 < 6 =
+xp_for_level(2)`.
+
+### Follow-up (same day): recalibrated to the level-15 milestone
+
+**Requirement:** *"lower the curve so that reaching level 15 takes 20% less
+experience."*
+
+Read as a **cumulative** target, not a per-level one: the cost of *arriving* at
+level 15 is the sum of levels 1-14, and that sum had to drop a fifth from where
+the 0.75 pass left it. "Lower the curve" also settled which baseline the 20 %
+counts against — the live curve, not the original, since 20 % off the original
+(1165 -> 932) would have *raised* the current 870.
+
+Solving on the one knob, with the truncation included rather than assumed away:
+
+| `XP_SCALE` | XP to reach L15 | vs 870 |
+|---|---|---|
+| 0.62 | 719 | −17.4 % |
+| 0.61 | 709 | −18.5 % |
+| 0.605 | 702 | −19.3 % |
+| **0.60** | **696** | **−20.0 %** |
+| 0.595 | 688 | −20.9 % |
+
+`0.60` hits the target exactly and is `0.75 × 0.8`, so the constant still reads
+as the two decisions that produced it. The curve is now 40 % below the original
+everywhere, and the milestone table reads:
+
+| reach level | original | scale 0.75 | now (0.60) |
+|---|---|---|---|
+| 5 | 55 | 40 | 32 |
+| 10 | 369 | 274 | 219 |
+| **15** | **1165** | **870** | **696** |
+| 20 | 2669 | 1997 | 1597 |
+
+**Modelled effect on the run** (same spawn-schedule income model as above):
+level 15 lands at **195 s instead of 227 s**, level 20 at 293 s, level 30 at
+436 s, and a full 600 s run ends at **level 42** rather than 39. Worth watching
+in play: the end-of-run level has now moved 36 -> 42 across the two passes, so
+if the upgrade pool or the level-up screen assumes a ceiling near the mid-30s,
+that is the thing this tuning breaks, not the curve itself.
+
+55 tests pass (`test_experience`, `test_level_up`, `test_pause`); again no test
+needed editing, for the reason given above.
+
+### Follow-up 2: flattening the curve above level 20
+
+**Requirement:** *"now flatten the curve more after lvl 20, around 25% for the
+higher levels above it."*
+
+A further 25 % off, but only past level 20 — the cut is not flat this time, so
+`XP_SCALE` could not carry it. A second factor was added instead:
+
+```python
+LATE_LEVEL = 20
+LATE_CUT = 0.25
+LATE_RAMP = 5
+
+def _late_factor(level: int) -> float:
+    t = (level - LATE_LEVEL) / LATE_RAMP
+    return 1.0 - LATE_CUT * min(1.0, max(0.0, t))
+```
+
+### Why it eases in instead of stepping
+
+**Applying the 25 % as a step at level 21 breaks the curve.** Around level 20
+the base curve only grows about **9 % per level** (243 -> 267), so taking 25 %
+off level 21 makes it cost **200 against level 20's 243** — the player would
+reach a level that is *cheaper than the one before it*, and
+`test_strictly_increasing` would fail. That is why the cut phases in rather
+than landing at once; the measured phase-ins were:
+
+| `LATE_RAMP` | L21 | L22 | L23 | L24 | L25 | rises every level? |
+|---|---|---|---|---|---|---|
+| 1 | 200 | 218 | 246 | 257 | 278 | **no** — L21 < L20 |
+| 2 | 233 | 218 | 246 | 257 | 278 | **no** |
+| 4 | 250 | 255 | 257 | 257 | 278 | monotonic, but **L23 = L24** |
+| **5** | **253** | **262** | **269** | **275** | **278** | **yes** |
+| 8 | 258 | 273 | 287 | 300 | 313 | yes, but the cut lands late |
+
+Four is the shortest phase-in that never goes *down*, but it puts levels 23 and
+24 on the same cost — a dead level where the bar's pace visibly stalls. **Five**
+is the shortest that still rises at every step, so that is the value, and the
+full 25 % is in effect from **level 25** onward.
+
+### Result
+
+Levels 1-20 are **byte-identical** — this pass is invisible below the
+threshold, which is what "after lvl 20" asks for. Above it:
+
+| level | before | now | cut |
+|---|---|---|---|
+| 20 | 243 | 243 | — |
+| 21 | 267 | 253 | 5 % |
+| 23 | 317 | 269 | 15 % |
+| 25 | 371 | 278 | **25 %** |
+| 30 | 526 | 395 | 25 % |
+| 40 | 917 | 688 | 25 % |
+
+The knee at level 20 is now the flattest stretch of the whole curve: four
+levels that each cost about 10 XP more than the last, where before each cost
+about 25 more.
+
+**Modelled effect on the run:** level 30 at 423 s (was 436), level 35 at 466 s
+(was 494), and a 600 s run now ends at **level 46**.
+
+### Carried risk (restated, now larger)
+
+The end-of-run level has moved **36 -> 39 -> 42 -> 46** across the three passes.
+The curve itself is fine at those levels, but nothing has verified that the
+upgrade pool, the blessing tiers or the level-up screen behave sensibly at 46 —
+that is the thing to check before this ships, and it was **not** part of any of
+the three requests.
+
+55 tests pass. The suite still needed no edits: `test_strictly_increasing`
+asserts non-decreasing costs across levels 1-39, which now exercises the phased
+region directly and is exactly the check that rejected the step version.
+
+### Follow-up 3: the carried risk, checked — the pool holds
+
+The three tuning passes moved a full run's end level 36 -> 46, and the entry
+above flagged the upgrade pool as the thing that might not survive it. Checked
+by simulation against the real content, not by reading: build a `Player`, roll
+`roll_offering` 45 times, apply the top card each time, across seeds and
+loadouts.
+
+**The pool does not run dry.** A run consumes 45 picks; the offering holds far
+more:
+
+* **75** stat-blessing picks (15 defs x 5 levels), always valid;
+* **15-45** more per owned weapon (`magic_rod` 30 and `ember_ring` 15 are the
+  thinnest, `bow` / `daggers` 45 the fattest), so **100-145** for three weapons
+  plus a summon;
+* plus weapon grants while slots are open and 12 Forge cards.
+
+Even on the thinnest loadout (`hammer` + `bomb` + `magic_rod` + `ember_ring`)
+every one of 45 level-ups offers a full three cards, across 40 seeds. Pushing
+the simulation past the run's end, the **first short offer lands around level
+177 and the first empty one around 180** — roughly four times the headroom the
+new curve needs.
+
+**Nothing else keys on the level either.** Each stat blessing caps at five
+levels, so no stat runs away with extra picks — 45 picks buys *more distinct*
+blessings, not bigger ones, and the reachable maximum is unchanged.
+`OfferingRules.falloff` already clamps past its five-entry table
+(`min(len(...), max(1, level)) - 1`), so a high level cannot index off the end.
+The blessings pane in the run-status screen scrolls and prints "+n more", and
+the run summary truncates the same way; the extra levels take the held-blessing
+count from ~22 to ~26 on average (29 worst case), well inside both. The HUD
+level gem centres the digits' ink on the gem core, and 46 is two digits exactly
+as 36 was.
+
+**Conclusion: the end-of-run level can rise this far without touching the
+offering.** The risk noted in the previous two entries is closed. The number to
+watch is ~180, and nothing in a 600 s run approaches it.
