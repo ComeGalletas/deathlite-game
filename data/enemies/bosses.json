@@ -26,7 +26,7 @@
         "telegraph": 1.0,
         "duration": 0.55,
         "recover": 1.4,
-        "charge_speed": 720,
+        "charge_speed": 600,
         "charge_damage": 30
       },
       {

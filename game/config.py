@@ -586,7 +586,7 @@ HUD_GEM_PX: int = 64
 # number placed at the true centre reads as sitting to the right (owner,
 # 2026-09-15). The digit's own ink is what is centred, so "1", "7" and "12"
 # land alike.
-HUD_LEVEL_NUDGE: tuple[int, int] = (-3, 0)
+HUD_LEVEL_NUDGE: tuple[int, int] = (-1, 0)
 # Top of the left-hand cluster -- the level gem and the two bars beside it,
 # and the primitive rectangles that stand in when the sheets are missing. Sat
 # at 14 until the same 25 px drop (owner, 2026-09-12).
