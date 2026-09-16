@@ -37,6 +37,7 @@ import pygame
 from game import config, fonts
 from game.content import get_content
 from game.state import State
+from ui import scale
 from ui.mouse import MouseNav
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
@@ -463,24 +464,25 @@ class DevMenuState(State):
         n = len(rows)
         window = min(MAX_VISIBLE, n) or 1
 
-        panel = pygame.Rect(0, 0, 480, 34 * window + 172)
+        S = scale.px
+        panel = pygame.Rect(0, 0, S(480), S(34 * window + 172))
         panel.center = (w // 2, h // 2)
         card = pygame.Surface(panel.size, pygame.SRCALPHA)
-        pygame.draw.rect(card, _PANEL, card.get_rect(), border_radius=12)
-        pygame.draw.rect(card, _ACCENT, card.get_rect(), width=2, border_radius=12)
+        pygame.draw.rect(card, _PANEL, card.get_rect(), border_radius=S(12))
+        pygame.draw.rect(card, _ACCENT, card.get_rect(), width=max(1, S(2)), border_radius=S(12))
         surface.blit(card, panel.topleft)
 
-        x = panel.left + 28
-        y = panel.top + 22
+        x = panel.left + S(28)
+        y = panel.top + S(22)
         surface.blit(self._title_font.render(_HEADINGS[self.page], True, _ACCENT),
                      (x, y))
-        y += 40
+        y += S(40)
 
         above = self.scroll
         below = n - (self.scroll + window)
         surface.blit(self._hint_font.render(f"^  {above} more" if above else "",
                                             True, _DIM), (x, y))
-        y += 18
+        y += S(18)
 
         hits = self._mouse.hits
         hits.clear()
@@ -491,15 +493,15 @@ class DevMenuState(State):
                                       + self._row_label(rows[i]),
                                       True, _FG if selected else _DIM), (x, y))
             # The row's band inside the panel, keyed by its absolute index.
-            hits.add(pygame.Rect(panel.left + 16, y - 3, panel.width - 32, 34), i)
-            y += 34
+            hits.add(pygame.Rect(panel.left + S(16), y - S(3), panel.width - S(32), S(34)), i)
+            y += S(34)
 
         surface.blit(self._hint_font.render(f"v  {below} more" if below > 0 else "",
                                             True, _DIM), (x, y))
-        y += 22
+        y += S(22)
         if self._status:
             surface.blit(self._hint_font.render(self._status, True, _ACCENT), (x, y))
-        y += 20
+        y += S(20)
         surface.blit(self._hint_font.render(_NAV[self.page], True, _DIM), (x, y))
 
     def _row_label(self, rid) -> str:

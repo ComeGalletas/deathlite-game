@@ -19,6 +19,19 @@ if TYPE_CHECKING:  # avoid a runtime import cycle game <-> state
     from game.game import Game
 
 
+class _MusicInherit:
+    """Sentinel for `State.music`: leave whatever track is playing alone."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "MUSIC_INHERIT"
+
+
+#: Default for `State.music`. Distinct from `None`, which means *silence*.
+MUSIC_INHERIT = _MusicInherit()
+
+
 class GameState(enum.Enum):
     MENU = enum.auto()
     PLAYING = enum.auto()
@@ -53,9 +66,29 @@ class State:
     # instead of showing the loop's grey around a 16:9 box (owner,
     # 2026-09-16). Overlays leave it None: they dim in `draw_backdrop`.
     backdrop: tuple[int, int, int] | None = None
+    # Which background track plays while this state is on top of the stack
+    # (journal `music_journal.md`, 2026-09-16). One of:
+    #   * `MUSIC_INHERIT` (the default) -- leave whatever is playing alone;
+    #   * a key of `config.MUSIC_TRACKS` ("menu" / "gameplay");
+    #   * `None` -- fade out to silence.
+    # `StateMachine` applies it after every push / pop / change, so no state
+    # touches the player in `enter()` and the main loop stays untouched --
+    # the same arrangement as `backdrop` and `ui_box` above. Inheriting by
+    # default is what makes the overlays free: PAUSED, LEVEL_UP, RUN STATUS
+    # and the dev menu declare nothing and the run's track keeps playing
+    # underneath them. `MusicPlayer.play` is idempotent, so the sibling
+    # screens that all declare "menu" never restart it between themselves.
+    music: "str | None | _MusicInherit" = MUSIC_INHERIT
 
     def __init__(self, game: "Game") -> None:
         self.game = game
+
+    @property
+    def music_player(self):
+        """The game's `MusicPlayer`, or None when there is not one. Read
+        defensively because many tests drive a single state with a stub game
+        that carries only the few attributes that state touches."""
+        return getattr(self.game, "music", None)
 
     def enter(self, **kwargs) -> None:  # noqa: D401 - hook
         """Called when this state becomes active (pushed or switched to)."""
@@ -68,6 +101,14 @@ class State:
 
     def update(self, dt: float) -> None:
         """Advance simulation by dt seconds."""
+
+    def on_display_changed(self) -> None:
+        """The display was re-opened under this state (an Options change
+        from the pause menu: another native size, mode or aspect). Anything
+        built for the old surface -- fonts at the old scale, a camera with
+        the old view, caches sized to the old span -- is rebuilt here. The
+        default is nothing: a screen that builds all of it in `draw` needs
+        no more."""
 
     def draw_backdrop(self, surface: pygame.Surface) -> None:
         """Paint on the *whole* render surface before `draw` gets the box:
@@ -94,16 +135,35 @@ class StateMachine:
     def push(self, state: State, **enter_kwargs) -> None:
         self._stack.append(state)
         state.enter(**enter_kwargs)
+        self._apply_music()
 
     def pop(self) -> None:
         if self._stack:
             self._stack.pop().exit()
+            self._apply_music()
 
     def change(self, state: State, **enter_kwargs) -> None:
         """Replace the whole stack with a single new state."""
         while self._stack:
             self._stack.pop().exit()
         self.push(state, **enter_kwargs)
+
+    def _apply_music(self) -> None:
+        """Hand the top state's `music` declaration to the player. Walks down
+        past states that inherit, so popping a PAUSED overlay restores the
+        run's track rather than falling silent -- and because `play` is
+        idempotent, that restore is a no-op when nothing was ever swapped."""
+        player = getattr(self.game, "music", None)
+        if player is None:
+            return
+        for state in reversed(self._stack):
+            if state.music is not MUSIC_INHERIT:
+                player.play(state.music)
+                return
+        # Nothing on the stack has an opinion, so nothing changes. This is
+        # load-bearing for the loading screen: it inherits, which is what
+        # carries the menu track through world generation even though
+        # `change()` cleared the menu off the stack first.
 
     def is_empty(self) -> bool:
         return not self._stack
@@ -117,6 +177,12 @@ class StateMachine:
                 if screen is not None:
                     event = uibox.translate_event(event, screen)
             state.handle_event(event)
+
+    def on_display_changed(self) -> None:
+        """Every state on the stack, bottom first, so the run under a pause
+        overlay rebuilds before the overlay redraws over it."""
+        for state in list(self._stack):
+            state.on_display_changed()
 
     def update(self, dt: float) -> None:
         # Walk from the top down; stop once a state says the one below it is

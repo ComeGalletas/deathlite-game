@@ -24,6 +24,7 @@ import pygame
 
 from game import config, fonts
 from ui import widgets
+from ui import scale
 from ui.mouse import MouseNav
 from ui.run_summary import COLUMNS, RunSummaryPanel
 
@@ -118,13 +119,14 @@ class EndScreen:
         surface.fill(self.backdrop)
         cx = surface.get_width() // 2
 
+        S = scale.px
         title = self._title_font.render(self.title, True, self.title_colour)
-        surface.blit(title, title.get_rect(center=(cx, TITLE_CY)))
+        surface.blit(title, title.get_rect(center=(cx, S(TITLE_CY))))
         if self.subtitle:
             sub = self._sub_font.render(self.subtitle, True, config.COLOR_TEXT_DIM)
-            surface.blit(sub, sub.get_rect(center=(cx, SUBTITLE_CY)))
+            surface.blit(sub, sub.get_rect(center=(cx, S(SUBTITLE_CY))))
 
-        self._panel.draw(surface, assets, PANEL_TOP, PANEL_BOTTOM,
+        self._panel.draw(surface, assets, S(PANEL_TOP), S(PANEL_BOTTOM),
                          columns=self.columns)
         self._draw_buttons(surface, assets, cx)
 
@@ -132,17 +134,19 @@ class EndScreen:
             "   -   ".join(f"{b.hint} {b.label.lower()}" for b in self.buttons)
             + "   -   Left / Right select",
             True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, BTN_CY + BTN_H // 2 + 30)))
+        surface.blit(hint, hint.get_rect(center=(cx, S(BTN_CY + BTN_H // 2 + 30))))
 
     def _draw_buttons(self, surface: pygame.Surface, assets, cx: int) -> None:
         hits = self.mouse.hits
         hits.clear()
+        S = scale.px
         n = len(self.buttons)
-        total_w = n * BTN_W + (n - 1) * BTN_GAP
+        bw, bh, gap = S(BTN_W), S(BTN_H), S(BTN_GAP)
+        total_w = n * bw + (n - 1) * gap
         x0 = cx - total_w // 2
         for i, b in enumerate(self.buttons):
-            rect = pygame.Rect(x0 + i * (BTN_W + BTN_GAP), 0, BTN_W, BTN_H)
-            rect.centery = BTN_CY
+            rect = pygame.Rect(x0 + i * (bw + gap), 0, bw, bh)
+            rect.centery = S(BTN_CY)
             hits.add(rect, i)                 # the button *is* the mouse target
             state = ("pressed" if self.mouse.pressed_on == i
                      else "hover" if i == self.sel else "normal")

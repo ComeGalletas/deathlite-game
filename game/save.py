@@ -76,7 +76,8 @@ class SaveData:
     equipped: dict[str, str | None] = field(default_factory=lambda: {
         "weapon": None, "armor": None, "accessory": None})
     settings: dict = field(default_factory=lambda: {
-        "muted": False, "volume": 0.7, "key_layout": _DEFAULT_KEY_LAYOUT})
+        "muted": False, "volume": 0.7, "music_volume": 0.5,
+        "key_layout": _DEFAULT_KEY_LAYOUT})
     # P5 (design §20): per hero, whether the boss has been cleared with that
     # hero (which unlocks the main-weapon choice) and the chosen main weapon.
     heroes: dict[str, dict] = field(default_factory=dict)

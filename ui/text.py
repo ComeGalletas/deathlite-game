@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import pygame
 
+from game import config
+
 
 def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
     """Lines of `text` no wider than `max_width` px in `font`."""
@@ -68,7 +70,9 @@ def shadowed(font: pygame.font.Font, text: str, colour, *, shadow=(28, 28, 34),
     the plain text at its top-left."""
     top = font.render(text, True, colour)
     under = font.render(text, True, shadow)
-    dx, dy = int(offset[0]), int(offset[1])
+    # Design px: the drop grows with the interface (`ui/scale`).
+    dx = int(round(offset[0] * config.RENDER_SCALE))
+    dy = int(round(offset[1] * config.RENDER_SCALE))
     out = pygame.Surface((top.get_width() + abs(dx), top.get_height() + abs(dy)), pygame.SRCALPHA)
     out.blit(under, (max(0, dx), max(0, dy)))
     out.blit(top, (max(0, -dx), max(0, -dy)))

@@ -145,23 +145,24 @@ class BuildPane:
         names = {wid: d.get("name", wid) for wid, d in ps.content.weapons.items()}
 
         # Cards across the top; the detail strip takes the rest.
-        card_h = min(380, int(area.height * 0.56))
+        card_h = min(c.S(380), int(area.height * 0.56))
         n = max(1, len(weapons))
-        gap = 20
+        gap = c.S(20)
         card_w = (area.width - gap * (n - 1)) // n
         if not weapons:
-            c.line(surface, f.row, area, area.top + c.ROW_STEP, "no weapons",
+            c.line(surface, f.row, area, area.top + c.S(c.ROW_STEP), "no weapons",
                    colour=config.COLOR_TEXT_DIM)
         for i, w in enumerate(weapons):
             card = pygame.Rect(area.left + i * (card_w + gap), area.top, card_w, card_h)
             hits.add(card, ("row", i))
             self._draw_card(surface, card, w, need, forges, selected=(i == self.sel))
 
-        strip = pygame.Rect(area.left, area.top + card_h + 16, area.width, 0)
+        strip = pygame.Rect(area.left, area.top + card_h + c.S(16), area.width, 0)
         strip.height = area.bottom - strip.top
         split = int(strip.width * 0.55)
-        left = pygame.Rect(strip.left, strip.top, split - 20, strip.height)
-        right = pygame.Rect(strip.left + split + 20, strip.top, strip.width - split - 20, strip.height)
+        g = c.S(20)
+        left = pygame.Rect(strip.left, strip.top, split - g, strip.height)
+        right = pygame.Rect(strip.left + split + g, strip.top, strip.width - split - g, strip.height)
         if weapons:
             self._draw_forging(surface, left, weapons[self.sel], need, forges, ps.content)
         self._draw_synergies(surface, right, synergy_rows(ps.player, ps.catalog, names))
@@ -169,11 +170,11 @@ class BuildPane:
     # --- a weapon card --------------------------------------------------
     def _draw_card(self, surface, card, w, need, forges, *, selected: bool) -> None:
         f = self.f
-        pygame.draw.rect(surface, (40, 36, 60) if selected else (18, 16, 26), card, border_radius=8)
+        pygame.draw.rect(surface, (40, 36, 60) if selected else (18, 16, 26), card, border_radius=c.S(8))
         pygame.draw.rect(surface, config.COLOR_ACCENT if selected else config.COLOR_WORLD_BORDER,
-                         card, width=1, border_radius=8)
-        area = pygame.Rect(card.left + 16, card.top, card.width - 32, card.height)
-        y = area.top + 22
+                         card, width=1, border_radius=c.S(8))
+        area = pygame.Rect(card.left + c.S(16), card.top, card.width - c.S(32), card.height)
+        y = area.top + c.S(22)
         y = c.line(surface, f.title, area, y, f"{w.name}  Lv {w.level}", step=30)
         # Class, then the category and the special effect where they say
         # something the class does not ("summon · summon" told the player nothing).
@@ -185,22 +186,22 @@ class BuildPane:
         y = c.line(surface, f.small, area, y, "  ·  ".join(parts), colour=config.COLOR_TEXT_DIM, step=24)
 
         # The gate block is anchored at the bottom; the numbers fill down to it.
-        gate_top = area.bottom - GATE_H
+        gate_top = area.bottom - c.S(GATE_H)
         rows = weapon_numbers(w)
-        room = max(0, (gate_top - y) // CARD_STEP)
+        room = max(0, (gate_top - y) // c.S(CARD_STEP))
         shown = rows if len(rows) <= room else rows[:max(0, room - 1)]
         for label, base, now in shown:
             value = base if now is None else f"{base}  ->  {now}"
             y = c.kv(surface, f.row, area, y, label, value,
                      colour=config.COLOR_ACCENT if now is not None else None)
-            y -= c.ROW_STEP - CARD_STEP
+            y -= c.S(c.ROW_STEP) - c.S(CARD_STEP)
         if len(shown) < len(rows):
             c.line(surface, f.small, area, y, f"+{len(rows) - len(shown)} more",
                    colour=config.COLOR_TEXT_DIM)
 
-        y = c.rule(surface, area, gate_top + 6)
+        y = c.rule(surface, area, gate_top + c.S(6))
         y = c.kv(surface, f.row, area, y, "Blessing levels", blessing_levels(w))
-        c.line(surface, f.small, area, y - 6, gate_text(w, need, forges), step=24,
+        c.line(surface, f.small, area, y - c.S(6), gate_text(w, need, forges), step=24,
                colour=config.COLOR_ACCENT if w.forge else config.COLOR_TEXT_DIM)
 
     # --- the selected weapon's Forging ----------------------------------
@@ -216,16 +217,16 @@ class BuildPane:
         # The numbers first -- they are what the player came for -- then the
         # description in whatever room is left.
         for key, before, after in forge_changes(content, w):
-            if y > area.bottom - 8:
+            if y > area.bottom - c.S(8):
                 return
             value = (f"+ {_fmt(after, 'n')}" if before is None
                      else f"{_fmt(before, 'n')}  ->  {_fmt(after, 'n')}")
             y = c.kv(surface, f.small, area, y, key.replace("_", " "), value,
                      colour=config.COLOR_ACCENT)
-            y -= c.ROW_STEP - 22
-        y += 6
+            y -= c.S(c.ROW_STEP) - c.S(22)
+        y += c.S(6)
         for text_line in wrap(f.small, fdef.description, area.width):
-            if y > area.bottom - 8:
+            if y > area.bottom - c.S(8):
                 return
             y = c.line(surface, f.small, area, y, text_line, colour=config.COLOR_TEXT_DIM, step=20)
 
@@ -238,12 +239,12 @@ class BuildPane:
                    colour=config.COLOR_TEXT_DIM)
             return
         for head, text in syn[:MAX_SYNERGIES]:
-            if y > area.bottom - 30:
+            if y > area.bottom - c.S(30):
                 break
             y = c.line(surface, f.row, area, y, head, colour=config.COLOR_ACCENT)
-            for text_line in wrap(f.small, text, area.width - 18):
-                y = c.line(surface, f.small, area, y - 6, text_line, colour=config.COLOR_TEXT_DIM,
+            for text_line in wrap(f.small, text, area.width - c.S(18)):
+                y = c.line(surface, f.small, area, y - c.S(6), text_line, colour=config.COLOR_TEXT_DIM,
                            indent=18, step=22)
-                y += 6
-            y -= 6
+                y += c.S(6)
+            y -= c.S(6)
         c.more(surface, f.small, area, y, len(syn) - MAX_SYNERGIES, "synergies")

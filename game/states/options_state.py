@@ -1,6 +1,11 @@
 """OPTIONS: audio settings, the key layout, the window, and the entry point
 into the Sanctuary.
 
+There are two independent volume rows: "Master volume" is the synthesised cue
+level (`systems/audio.py`) and "Music volume" the streamed score
+(`systems/music.py`, journal `music_journal.md`, 2026-09-16). Both step on
+`config.VOLUME_STEP` and both are saved on every change; Mute silences both.
+
 Start-screen milestone M2. Reached from the menu's "Options" entry. Up / Down
 (also W / S) move the cursor; Left / Right adjust the master volume, cycle
 the key layout (CB-5: WASD move / arrows aim, or the swap), switch the
@@ -25,22 +30,45 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts
-from game.state import State
+from game.state import MUSIC_INHERIT, State
+from ui import scale
 
-_LABELS = {"volume": "Master volume", "mute": "Mute", "key_layout": "Key layout",
+_LABELS = {"volume": "Master volume", "music": "Music volume",
+           "mute": "Mute", "key_layout": "Key layout",
            "display": "Display mode", "resolution": "Resolution",
            "sanctuary": "Sanctuary", "back": "Back"}
 
 
 class OptionsState(State):
-    def enter(self, **kwargs) -> None:
+    # Reached from the menu, this is a menu screen -- and you need to hear
+    # the track to set the slider. Pushed from the pause menu over a live
+    # run (`in_run`), it is an overlay and inherits instead; `enter` sets
+    # that per instance, before `StateMachine` reads the declaration.
+    music = "menu"
+
+    def enter(self, *, in_run: bool = False, **kwargs) -> None:
+        """`in_run`: pushed from the pause menu over a live run (stage 1b of
+        the native-resolution journal). The Sanctuary row is hidden -- it is
+        the meta shop, not part of a run -- and Back / ESC pop to the pause
+        menu instead of leaving for the main menu."""
         self.audio = self.game.audio
-        self._rows = ("volume", "mute", "key_layout", "display", "resolution",
-                      "sanctuary", "back")
+        self.in_run = bool(in_run)
+        if self.in_run:
+            self.music = MUSIC_INHERIT   # keep the run's track playing
+        self._rows = ("volume", "music", "mute", "key_layout", "display",
+                      "resolution", "back") if self.in_run else (
+            "volume", "music", "mute", "key_layout", "display", "resolution",
+            "sanctuary", "back")
         self.sel = 0
+        self._build_fonts()
+
+    def _build_fonts(self) -> None:
         self._title = fonts.heading(40)
         self._row = fonts.body(26)
         self._hint = fonts.body(16)
+
+    def on_display_changed(self) -> None:
+        self._build_fonts()          # the screen that made the change redraws at the new scale
 
     # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -102,13 +130,18 @@ class OptionsState(State):
         if rid == "resolution":
             self._step_resolution(direction)
             return
-        if rid != "volume":
+        if rid not in ("volume", "music"):
             return
         step = config.VOLUME_STEP
-        stepped = round(self.audio.volume / step + direction) * step
-        self.audio.set_volume(stepped)
+        if rid == "volume":
+            self.audio.set_volume(round(self.audio.volume / step + direction) * step)
+            self.audio.play("xp")        # a blip at the new level as feedback
+        else:
+            # No blip on the music row -- the track itself is the feedback,
+            # changing level under the cursor as Left/Right is held.
+            player = self.game.music
+            player.set_volume(round(player.volume / step + direction) * step)
         self.game.persist()
-        self.audio.play("xp")            # a blip at the new level as feedback
 
     def _activate(self) -> None:
         rid = self._row_id()
@@ -128,20 +161,37 @@ class OptionsState(State):
             self._back()
 
     def _back(self) -> None:
+        if self.in_run:
+            self.game.state_machine.pop()        # back to the pause menu
+            return
         from game.states.menu_state import MenuState
         self.game.state_machine.change(MenuState(self.game))
 
     # --- render ----------------------------------------------------
+    def _draw_slider(self, surface, vx: int, y: int, level: float,
+                     colour) -> None:
+        """One volume bar plus its percentage. Shared by the cue master and
+        the music level -- independent values on the same step grid."""
+        bar = pygame.Rect(vx, y - scale.px(11), scale.px(220), scale.px(22))
+        pygame.draw.rect(surface, config.COLOR_WORLD_BORDER, bar,
+                         width=max(1, scale.px(2)), border_radius=scale.px(4))
+        fill = bar.inflate(-scale.px(6), -scale.px(6))
+        fill.width = int(fill.width * level)
+        if fill.width > 0:
+            pygame.draw.rect(surface, colour, fill, border_radius=3)
+        pct = self._row.render(f"{round(level * 100)}%", True, colour)
+        surface.blit(pct, pct.get_rect(midleft=(vx + scale.px(236), y)))
+
     def draw(self, surface: pygame.Surface) -> None:
         surface.fill(config.COLOR_BG)
         cx = surface.get_width() // 2
 
         title = self._title.render("Options", True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(cx, 96)))
+        surface.blit(title, title.get_rect(center=(cx, scale.px(96))))
 
-        x0 = cx - 250          # label column
-        vx = x0 + 250          # value / bar column
-        y0, step = 240, 74
+        x0 = cx - scale.px(250)          # label column
+        vx = x0 + scale.px(250)          # value / bar column
+        y0, step = scale.px(240), scale.px(74)
         for i, rid in enumerate(self._rows):
             y = y0 + i * step
             selected = i == self.sel
@@ -151,21 +201,14 @@ class OptionsState(State):
 
             if selected:
                 mark = self._row.render(">", True, config.COLOR_ACCENT)
-                surface.blit(mark, mark.get_rect(midright=(x0 - 14, y)))
+                surface.blit(mark, mark.get_rect(midright=(x0 - scale.px(14), y)))
             lab = self._row.render(_LABELS[rid], True, colour)
             surface.blit(lab, lab.get_rect(midleft=(x0, y)))
 
-            if rid == "volume":
-                bar = pygame.Rect(vx, y - 11, 220, 22)
-                pygame.draw.rect(surface, config.COLOR_WORLD_BORDER, bar,
-                                 width=2, border_radius=4)
-                fill = bar.inflate(-6, -6)
-                fill.width = int(fill.width * self.audio.volume)
-                if fill.width > 0:
-                    pygame.draw.rect(surface, colour, fill, border_radius=3)
-                pct = self._row.render(f"{round(self.audio.volume * 100)}%",
-                                       True, colour)
-                surface.blit(pct, pct.get_rect(midleft=(vx + 236, y)))
+            if rid in ("volume", "music"):
+                level = (self.audio.volume if rid == "volume"
+                         else self.game.music.volume)
+                self._draw_slider(surface, vx, y, level, colour)
             elif rid == "mute":
                 val = self._row.render("On" if self.audio.muted else "Off",
                                        True, colour)
@@ -184,4 +227,4 @@ class OptionsState(State):
         hint = self._hint.render(
             "Up / Down select    -    Left / Right adjust    -    "
             "ENTER toggle / open    -    ESC back", True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - 40)))
+        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - scale.px(40))))

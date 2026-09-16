@@ -1,12 +1,19 @@
-"""The window the fixed-size frame is scaled into.
+"""The window, and the logical surface the game draws into.
 
 The game draws every frame to a `config.SCREEN_WIDTH x SCREEN_HEIGHT`
-display surface (the *logical* size) and never learns how big the window
-is: pygame's `SCALED` mode scales the finished frame into the window on
-the GPU, aspect kept, black bars for the rest, and maps the mouse back
-into logical coordinates. So the camera, the zoom, the HUD and every
-click target are the same on a 1366x768 laptop and a 3440x1440 monitor
-(journal: "Dynamic window scaling", 2026-09-15).
+display surface (the *logical* size); pygame's `SCALED` mode presents it
+in the window, aspect kept, black bars for the rest, and maps the mouse
+back into logical coordinates (journal: "Dynamic window scaling",
+2026-09-15).
+
+With `config.RENDER_NATIVE` (journal "Native-resolution rendering",
+2026-09-16) the logical size *is* the window -- the desktop in Borderless,
+the picked size in Windowed -- so the presenter has nothing to
+interpolate, and the run draws at `config.effective_zoom()`, the design
+zoom times the native scale, so the covered world area is the same at
+every size. A drag resize keeps the logical size (the frame is presented
+scaled until the next Options change). Native rendering off, or the plain
+fallback: the fixed 1600x900 / 2100x900 frame as before.
 
 `DisplayWindow` owns that window:
 
@@ -50,8 +57,20 @@ def _logical() -> tuple[int, int]:
     return (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
 
 
+def _headless() -> bool:
+    """The dummy video driver: a fresh process gets a software-rendered
+    scaled window from it, an already-open display does not, so whether the
+    feature came up would depend on process history (the suite found this
+    once native rendering made `SCREEN_*` follow the window). Headless has
+    nothing to scale into: the feature stays dormant there, always."""
+    try:
+        return pygame.display.get_driver() == "dummy"
+    except pygame.error:
+        return False
+
+
 def _scalable() -> bool:
-    return bool(config.WINDOW_RESIZABLE) and sys.platform != "emscripten"
+    return bool(config.WINDOW_RESIZABLE) and sys.platform != "emscripten" and not _headless()
 
 
 class DisplayWindow:
@@ -123,9 +142,13 @@ class DisplayWindow:
             flags |= pygame.RESIZABLE
             if self.render_aspect is None:
                 self.render_aspect = self.wanted_aspect()
+            if self.windowed_size is None:
+                self.windowed_size = self.fitted_size()
+            self._apply_render_size()
         else:
+            # Not ours to size: the browser profile owns SCREEN_* (1280x720).
             self.render_aspect = "16:9"
-        self._apply_render_width()
+            config.RENDER_SCALE = 1.0
         # Always opened windowed, even for a saved borderless mode: with the
         # FULLSCREEN flag pygame's scaled path picks a *display mode* for the
         # logical size (a 2100x900 render came up in a 2560x1440 mode on the
@@ -137,18 +160,18 @@ class DisplayWindow:
         self.available = bool(self.vsync) and _scalable()
         if not self.available:
             self.mode = "windowed"
-            if self.render_aspect != "16:9":
-                # A saved 21:9 render on a driver that refused the scaled
-                # window: the plain window is fixed and 16:9, so the surface
-                # already opened 2100 wide is replaced.
+            design = (config.RENDER_WIDTHS["16:9"], config.UI_HEIGHT)
+            if _scalable() and (self.render_aspect != "16:9" or _logical() != design):
+                # A saved 21:9 render, or a native size, on a driver that
+                # refused the scaled window: the plain window is fixed and
+                # 16:9, so the surface already opened is replaced.
                 self.render_aspect = "16:9"
-                self._apply_render_width()
+                config.SCREEN_WIDTH, config.SCREEN_HEIGHT = design
+                config.RENDER_SCALE = 1.0
                 self.surface = pygame.display.set_mode(_logical())
             return self.surface, self.vsync
         native.set_minimum_size(*config.WINDOW_MIN)
         native.set_integer_scale(False)
-        if self.windowed_size is None:
-            self.windowed_size = self.fitted_size()
         if self.mode == "windowed":
             self._apply_windowed_size(self.windowed_size)
         else:
@@ -157,9 +180,37 @@ class DisplayWindow:
         self._refresh_scale()
         return self.surface, self.vsync
 
-    # --- the render width ---------------------------------------------
-    def _apply_render_width(self) -> None:
-        config.SCREEN_WIDTH = int(config.RENDER_WIDTHS[self.render_aspect])
+    # --- the render size ----------------------------------------------
+    def native_size(self) -> tuple[int, int]:
+        """What the logical surface is under native rendering: the desktop
+        in Borderless, the picked (clamped) window size otherwise -- held to
+        `config.RENDER_MAX_HEIGHT` at the same aspect (a 4K screen renders
+        2560x1440 and is presented scaled; stage 3 of the journal)."""
+        if self.mode == "borderless":
+            w, h = self.desktop_size()
+        else:
+            w, h = fit.clamp_window(self.windowed_size or self.fitted_size(),
+                                    config.WINDOW_MIN, self.desktop_size())
+        cap = int(config.RENDER_MAX_HEIGHT)
+        if cap > 0 and h > cap:
+            w, h = int(round(w * cap / float(h))), cap
+        return (w, h)
+
+    def _apply_render_size(self) -> None:
+        """Set `config.SCREEN_*` and `RENDER_SCALE` for the display about to
+        open: the native size, or the design width for the aspect when
+        native rendering is off."""
+        if config.RENDER_NATIVE:
+            w, h = self.native_size()
+            config.SCREEN_WIDTH, config.SCREEN_HEIGHT = int(w), int(h)
+            config.RENDER_SCALE = float(h) / float(config.UI_HEIGHT)
+        else:
+            config.SCREEN_WIDTH = int(config.RENDER_WIDTHS[self.render_aspect])
+            config.SCREEN_HEIGHT = int(config.UI_HEIGHT)
+            config.RENDER_SCALE = 1.0
+
+    def _apply_render_width(self) -> None:      # the older name, kept for callers
+        self._apply_render_size()
 
     def wanted_aspect(self) -> str:
         """The aspect the current mode calls for: the desktop's in
@@ -170,10 +221,14 @@ class DisplayWindow:
         return fit.aspect_class(self.windowed_size or _logical())
 
     def _settle_aspect(self) -> bool:
-        """Re-open the display if the mode / size just chosen calls for the
-        other render width. Returns whether it did."""
+        """Re-open the display if the mode / size just chosen calls for a
+        different logical surface: another native size, or (native
+        rendering off) the other render width. Returns whether it did."""
         want = self.wanted_aspect()
-        if want == self.render_aspect:
+        if config.RENDER_NATIVE:
+            if self.native_size() == _logical() and want == self.render_aspect:
+                return False
+        elif want == self.render_aspect:
             return False
         self.reopen(want)
         return True

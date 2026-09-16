@@ -23,7 +23,7 @@ import pygame
 
 from game import config, fonts
 from game.state import State
-from ui import widgets
+from ui import scale, widgets
 from ui.mouse import MouseNav
 
 # The option rows: 64-px `wide` buttons (the pack's native height) on a
@@ -34,6 +34,7 @@ _DANGER = {"exit"}          # drawn on the red sheet
 
 
 class MenuState(State):
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self._menu_font_px = 24
         self._title_font = fonts.heading(64)
@@ -103,27 +104,28 @@ class MenuState(State):
 
         # Layout band only -- nothing is drawn for it. It anchors the logo above
         # and gives the rows their x inset and width.
-        panel_width, panel_height = 625, 495   # +25% on both axes (was 500x320)
-        band = pygame.Rect((w - panel_width) // 2, 890 - panel_height,
+        panel_width, panel_height = scale.px(625), scale.px(495)   # +25% on both axes (was 500x320)
+        band = pygame.Rect((w - panel_width) // 2, scale.px(890) - panel_height,
                            panel_width, panel_height)  # bottom pinned at 890, clear of the save summary
 
         logo_native = self.game.assets.picture(config.MENU_LOGO_IMAGE)
         if logo_native is not None:
-            logo_h = 390
+            logo_h = scale.px(390)
             logo_w = round(logo_h * logo_native.get_width() / logo_native.get_height())
             logo = self.game.assets.picture(config.MENU_LOGO_IMAGE, size=(logo_w, logo_h))
-            surface.blit(logo, logo.get_rect(center=(cx, band.top - logo_h // 2 + 50 )))
+            surface.blit(logo, logo.get_rect(center=(cx, band.top - logo_h // 2 + scale.px(50))))
         else:
             # Fallback: the title as text when the logo art is absent.
             title = self._title_font.render(config.TITLE, True, config.MENU_FG)
-            surface.blit(title, title.get_rect(center=(cx, band.top - 60)))
+            surface.blit(title, title.get_rect(center=(cx, band.top - scale.px(60))))
 
         # --- option list: one button per row, the selected one gold ---
         hits = self._mouse.hits
         hits.clear()
         for i, (label, action) in enumerate(self._options):
-            rect = pygame.Rect(band.left + _ROW_INSET, 0, band.width - 2 * _ROW_INSET, _ROW_H)
-            rect.centery = _ROW_TOP + i * _ROW_STEP
+            inset = scale.px(_ROW_INSET)
+            rect = pygame.Rect(band.left + inset, 0, band.width - 2 * inset, scale.px(_ROW_H))
+            rect.centery = scale.px(_ROW_TOP + i * _ROW_STEP)
             hits.add(rect, i)                 # the button *is* the mouse target
             state = ("pressed" if self._mouse.pressed_on == i
                      else "hover" if i == self._index else "normal")
@@ -140,4 +142,4 @@ class MenuState(State):
                    f"{int(best.get('kills', 0))} kills    "
                    f"Items found {len(save.discovered_items)}")
         s = self._small.render(summary, True, config.MENU_FG_DIM)
-        surface.blit(s, s.get_rect(center=(cx, h - 40)))
+        surface.blit(s, s.get_rect(center=(cx, h - scale.px(40))))

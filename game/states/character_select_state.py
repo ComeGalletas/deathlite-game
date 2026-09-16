@@ -23,6 +23,7 @@ from game.content import get_content
 from game.state import State
 from systems.animation import Animator
 from ui import widgets
+from ui import scale as ui_scale     # `scale` is a rig field here
 from ui.mouse import MouseNav
 from ui.text import shadowed, wrap
 
@@ -56,6 +57,9 @@ _RIBBON_TEXT_DY = -10        # lift the label pair off the ribbon's exact centre
 
 
 class CharacterSelectState(State):
+    # Same track as the menu; `MusicPlayer.play` is idempotent, so
+    # arriving here does not restart it.
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self._dev = bool(kwargs.get("dev", False))   # forwarded to the run
         self.content = get_content()
@@ -238,16 +242,17 @@ class CharacterSelectState(State):
         w = surface.get_width()
         cx = w // 2
 
+        S = ui_scale.px
         title = self._title.render("Choose your hero", True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(cx, 80)))
+        surface.blit(title, title.get_rect(center=(cx, S(80))))
 
         hits = self._mouse.hits
         hits.clear()
 
         n = len(self.ids)
-        card_w, gap = 340, 36
+        card_w, gap = S(340), S(36)
         x0 = (w - (n * card_w + (n - 1) * gap)) // 2
-        y, card_h = 170, 340
+        y, card_h = S(170), S(340)
         for i, cid in enumerate(self.ids):
             c = self.content.characters[cid]
             x = x0 + i * (card_w + gap)
@@ -258,15 +263,15 @@ class CharacterSelectState(State):
             state = self._card_state(i)
             widgets.draw_button(surface, self.game.assets, rect, None,
                                 state=state, shape="panel")
-            dy = widgets.PRESSED_DY if state == "pressed" else 0
+            dy = S(widgets.PRESSED_DY) if state == "pressed" else 0
 
             # Text on the light card: the name and the trait line are titles
             # (title face, black); the rest is body text in the dark grey.
             name = shadowed(self._name, c["name"], config.COLOR_ACCENT)   # gold with a dark drop shadow
-            surface.blit(name, name.get_rect(midtop=(rect.centerx, y + 16 + dy)))
+            surface.blit(name, name.get_rect(midtop=(rect.centerx, y + S(16) + dy)))
 
             trait_line = f"Trait - {c['trait_name']}"
-            text_w = card_w - 2 * _CARD_TEXT_INSET      # pixel-measured wrap
+            text_w = card_w - 2 * S(_CARD_TEXT_INSET)      # pixel-measured wrap
             unlocked = self.weapon_unlocked(cid)
             weapon_line = (f"<  {self._weapon_name(self._main_weapon[cid])}  >" if unlocked
                            else f"Starts with: {self._weapon_name(c['starting_weapon'])}")
@@ -280,34 +285,34 @@ class CharacterSelectState(State):
                     surf = shadowed(self._trait, line, config.COLOR_ACCENT)
                 else:
                     surf = self._body.render(line, True, config.COLOR_ON_BUTTON_DIM)
-                r = surf.get_rect(midtop=(rect.centerx, y + 66 + j * 24 + dy))
+                r = surf.get_rect(midtop=(rect.centerx, y + S(66 + j * 24) + dy))
                 surface.blit(surf, r)
                 if unlocked and line == weapon_line and i == self.index:
                     # The arrows are click targets (P5): each takes its half
                     # of the line, so a slip still lands on an arrow.
-                    half = pygame.Rect(r.left - 12, r.top - 4, r.width // 2 + 12, r.height + 8)
+                    half = pygame.Rect(r.left - S(12), r.top - S(4), r.width // 2 + S(12), r.height + S(8))
                     hits.add(half, "weapon_prev")
-                    hits.add(pygame.Rect(r.centerx, r.top - 4, r.width // 2 + 12, r.height + 8),
+                    hits.add(pygame.Rect(r.centerx, r.top - S(4), r.width // 2 + S(12), r.height + S(8)),
                              "weapon_next")
 
-        preview_top = y + card_h + 12
+        preview_top = y + card_h + S(12)
         self._draw_preview(surface, cx, preview_top)
 
         # Difficulty on a ribbon whose colour is the difficulty. The ribbon is
         # a switch (one click steps it, like Down); Up / Down still work. Two
         # runs, centred as a pair: "Difficulty:" in the title face (black),
         # the type in the body face (dark grey).
-        diff_y = y + card_h + 178
+        diff_y = y + card_h + S(178)
         run_a = self._name.render("Difficulty:  ", True, config.COLOR_ON_BUTTON)
         run_b = self._diff_type.render(config.DIFFICULTY_LABELS[self.difficulty], True,
                                        config.COLOR_ON_BUTTON_DIM)
         pair_w = run_a.get_width() + run_b.get_width()
-        ribbon = pygame.Rect(0, 0, max(_RIBBON_MIN_W, pair_w + 2 * _RIBBON_END), _RIBBON_H)
+        ribbon = pygame.Rect(0, 0, max(S(_RIBBON_MIN_W), pair_w + 2 * S(_RIBBON_END)), S(_RIBBON_H))
         ribbon.center = (cx, diff_y)
         hits.add(ribbon, "difficulty")    # positioned first, then registered
         widgets.draw_ribbon(surface, self.game.assets, ribbon, None,
                             colour=config.DIFFICULTY_RIBBON[self.difficulty])
-        text_y = diff_y + _RIBBON_TEXT_DY
+        text_y = diff_y + S(_RIBBON_TEXT_DY)
         rect_a = run_a.get_rect(midleft=(cx - pair_w // 2, text_y))
         rect_b = run_b.get_rect(midleft=(rect_a.right, text_y))
         surface.blit(run_a, rect_a)
@@ -316,8 +321,8 @@ class CharacterSelectState(State):
         # Begin button, below the difficulty line (mouse twin of ENTER). Gold
         # while the cursor is over it, pressed while the button is held on
         # it; ENTER always fires it, so the keyboard adds no focus state.
-        begin = pygame.Rect(0, 0, _BEGIN_W, _BEGIN_H)
-        begin.center = (cx, diff_y + _BEGIN_GAP + _BEGIN_H // 2)
+        begin = pygame.Rect(0, 0, S(_BEGIN_W), S(_BEGIN_H))
+        begin.center = (cx, diff_y + S(_BEGIN_GAP + _BEGIN_H // 2))
         hits.add(begin, "begin")          # register once it is in place (add copies)
         widgets.draw_button(surface, self.game.assets, begin, "Begin",
                             state=self._button_state("begin"), shape="wide",
@@ -325,21 +330,21 @@ class CharacterSelectState(State):
                             label_dy=widgets.LABEL_DY - _BEGIN_TEXT_DY)
 
         # Instructions sit under the button now; the hint under them.
-        instr_bottom = self._draw_instructions(surface, cx, begin.bottom + _INSTR_GAP)
+        instr_bottom = self._draw_instructions(surface, cx, begin.bottom + S(_INSTR_GAP))
 
         weapon_hint = ("    -    Q / E main weapon" if self.weapon_unlocked() else "")
         hint = self._hint.render(
             "Left / Right hero    -    Up / Down or click difficulty" + weapon_hint
             + "    -    ENTER / Begin    -    ESC back",
             True, config.COLOR_TEXT_DIM)
-        hint_rect = hint.get_rect(center=(cx, instr_bottom + 18))
+        hint_rect = hint.get_rect(center=(cx, instr_bottom + S(18)))
         surface.blit(hint, hint_rect)
 
         # Back target, bottom-left (ESC's twin).
         back = self._hint.render("<  Back", True, config.COLOR_TEXT_DIM)
-        back_rect = back.get_rect(bottomleft=(28, surface.get_height() - 16))
+        back_rect = back.get_rect(bottomleft=(S(28), surface.get_height() - S(16)))
         surface.blit(back, back_rect)
-        hits.add(back_rect.inflate(20, 12), "back")
+        hits.add(back_rect.inflate(S(20), S(12)), "back")
         self._layout = {"diff_y": diff_y, "ribbon": pygame.Rect(ribbon),
                         "diff_runs": (pygame.Rect(rect_a), pygame.Rect(rect_b)),
                         "begin": pygame.Rect(begin),
@@ -359,8 +364,8 @@ class CharacterSelectState(State):
             return None
         bw, bh = scale
         ay = self.game.assets.anchor(rig)[1]
-        return (max(1, round(bw * _PREVIEW_ZOOM)), max(1, round(bh * _PREVIEW_ZOOM)),
-                (bh - ay) * _PREVIEW_ZOOM)
+        z = _PREVIEW_ZOOM * ui_scale.factor()
+        return (max(1, round(bw * z)), max(1, round(bh * z)), (bh - ay) * z)
 
     def _preview_baseline(self, top: int) -> int:
         """The shared ground line the heroes stand on, fixed for the screen so
@@ -374,9 +379,10 @@ class CharacterSelectState(State):
                 continue
             above = max(above, m[1] - m[2])     # feet anchor up to the frame top
             below = max(below, m[2])
+        band = ui_scale.px(_PREVIEW_PX)
         if not above:
-            return top + _PREVIEW_PX // 2
-        return round(top + (_PREVIEW_PX - (above + below)) / 2 + above)
+            return top + band // 2
+        return round(top + (band - (above + below)) / 2 + above)
 
     def _draw_preview(self, surface: pygame.Surface, cx: int, top: int) -> None:
         """The focused hero's looping animation preview. Each hero is drawn at
@@ -395,7 +401,7 @@ class CharacterSelectState(State):
             surface.blit(frame, frame.get_rect(
                 midbottom=(cx, round(baseline + metrics[2]))))
         else:
-            r = _PREVIEW_PX // 3
+            r = ui_scale.px(_PREVIEW_PX) // 3
             pygame.draw.circle(surface, tuple(c.get("color", config.COLOR_PLAYER)),
                                (cx, baseline - r), r)
 

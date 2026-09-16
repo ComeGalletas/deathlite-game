@@ -985,7 +985,7 @@
       ]
     },
     "rock": {
-      "radius": 30,
+      "radius": 19.5,
       "blocks_projectiles": true,
       "color": [
         92,
@@ -1144,9 +1144,11 @@
   "obstacle_decor": {
     "size_boost": 1.25,
     "render_radius": {
-      "tree": 22
+      "tree": 22,
+      "rock": 30
     },
     "sprite_drop": {
+      "rock": 1.28,
       "house": 1.35,
       "barracks": 1.0,
       "tower": 1.0,

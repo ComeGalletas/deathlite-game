@@ -24,6 +24,7 @@ from game.state import StateMachine
 from progression.meta import MetaCatalog
 from systems.audio import AudioManager
 from systems.debug_overlay import DebugOverlay
+from systems.music import MusicPlayer
 from ui.mouse import install_cursor
 
 log = logging.getLogger(__name__)
@@ -67,6 +68,13 @@ class Game:
         self.audio = AudioManager(self.events)
         self.audio.muted = bool(self.save.settings.get("muted", False))
         self.audio.volume = float(self.save.settings.get("volume", 0.7))
+        # The streamed score shares the device the cue player just opened.
+        # Which track plays is not decided here: every state declares it
+        # (`State.music`) and `StateMachine` applies the declaration.
+        self.music = MusicPlayer(self.audio.backend)
+        self.music.set_volume(self.save.settings.get(
+            "music_volume", config.MUSIC_VOLUME_DEFAULT))
+        self.music.set_muted(self.audio.muted)
 
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
@@ -106,7 +114,11 @@ class Game:
         return nxt
 
     def _cursor_scale(self) -> float:
-        return float(config.UI_CURSOR_SCALE) * float(self.display.scale)
+        # The design scale, times the render scale (the interface's size),
+        # times what the presenter still adds (1 under native rendering,
+        # more while a dragged window is being scaled).
+        return (float(config.UI_CURSOR_SCALE) * float(config.RENDER_SCALE)
+                * float(self.display.scale))
 
     def _before_display_open(self) -> None:
         """A display re-init (a render-width change in Options) loses the
@@ -117,12 +129,15 @@ class Game:
     def _on_display_reopened(self, surface) -> None:
         self.screen = surface
         self.vsync = self.display.vsync
+        self.debug._font = None                   # rebuilt at the new scale
+        self.state_machine.on_display_changed()
 
     def persist(self) -> None:
         if not config.SAVE_ENABLED:
             return  # session-only build (browser) -- nothing is written to disk
         self.save.settings["muted"] = self.audio.muted
         self.save.settings["volume"] = self.audio.volume
+        self.save.settings["music_volume"] = self.music.volume
         self.save.settings["display"] = self.display.settings()
         self.display.dirty = False
         try:
@@ -193,6 +208,8 @@ class Game:
             self.running = False
             return
 
+        self.music.update(dt)   # advances a track fade; no-op otherwise
+
         t0 = time.perf_counter()
         self.state_machine.update(dt)
         t1 = time.perf_counter()
@@ -237,6 +254,7 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_m:
                     self.audio.toggle_mute()
+                    self.music.set_muted(self.audio.muted)
                     self.persist()
                     continue
                 if self._handle_debug_key(event.key):

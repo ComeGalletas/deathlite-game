@@ -27,6 +27,33 @@ SCREEN_HEIGHT: int = 900
 RENDER_WIDTHS: dict[str, int] = {"16:9": 1600, "21:9": 2100}
 UI_WIDTH: int = 1600
 UI_HEIGHT: int = 900
+# Native-resolution rendering (journal "Native-resolution rendering",
+# 2026-09-16). When on and the scaled window opened, the logical surface is
+# the window itself (the desktop in Borderless, the picked size in
+# Windowed), so nothing is interpolated by the presenter, and the camera
+# draws at `effective_zoom()` -- the design `CAMERA_ZOOM` times
+# `RENDER_SCALE`, snapped so `TILE_PX x zoom` is whole -- so it covers the
+# same world area as the 1600x900 design at every size. `RENDER_SCALE` is
+# native height over `UI_HEIGHT`, set by `game/display/window.py`; 1.0
+# in the plain fallback and the browser build. A drag resize keeps the
+# logical size until the next Options change (the frame is scaled, soft,
+# until then -- the owner's call).
+RENDER_NATIVE: bool = True
+RENDER_SCALE: float = 1.0
+# The most the native render may be tall. Render time grows with the pixel
+# count: 3440x1440 costs ~12 ms of the 16 ms budget on the owner's machine,
+# and a 4K screen (1.7x the pixels) would not fit. Above the cap the logical
+# surface is the cap's height at the window's aspect and the presenter
+# scales it up -- soft, but playable -- and the cap is a knob for a machine
+# that can afford more. 0 disables it.
+RENDER_MAX_HEIGHT: int = 1440
+
+
+def effective_zoom() -> float:
+    """The zoom the run draws at: `CAMERA_ZOOM x RENDER_SCALE`, rounded to
+    the nearest 1/TILE_PX so tiles land on whole pixels (the seam rule).
+    Exact at 1x and 2x, within 0.3 % elsewhere (2.40625 for 2.4)."""
+    return round(CAMERA_ZOOM * RENDER_SCALE * TILE_PX) / TILE_PX
 FPS: int = 62
 TITLE: str = "Deathlite Game"
 # The game's own version, shown wherever the build identifies itself (window
@@ -607,8 +634,66 @@ HUD_BOSS_BOTTOM: int = 28
 
 # --- Audio ---------------------------------------------------------------
 # Master-volume step for the Options screen (0..1). The slider snaps to this
-# grid; AudioManager.set_volume() clamps to [0, 1].
+# grid; AudioManager.set_volume() clamps to [0, 1]. Both volume rows -- the
+# cue master and the music level -- step on it.
 VOLUME_STEP: float = 0.05
+
+# --- Sound effects (recorded) --------------------------------------------
+# Cues that come from files rather than from the synth in `systems/audio.py`
+# (journal `sound_effects_journal.md`, 2026-09-16). Paths are relative to
+# `assets.ASSETS_DIR`. The files are cut from the Freesound downloads kept in
+# `assets/sound_effects/unused/` by `tools/asset_pipeline/cut_sound_effects.py`,
+# already trimmed, normalised and at the device's 44.1 kHz -- so they load with
+# no conversion and start on frame 0, with no silence to hear as latency.
+#
+# A name that collides with a synthesised cue replaces it: `boss_spawn` is the
+# recorded growl now, not the saw sweep (owner, 2026-09-16).
+SOUND_EFFECTS: dict = {
+    "footstep_hard": "sound_effects/footstep_grass_hard.wav",
+    "footstep_soft": "sound_effects/footstep_grass_soft.wav",
+    "boss_spawn":    "sound_effects/monster_growl.wav",
+}
+
+# Hero footsteps. The cadence is a fixed *stride* rather than a fixed interval,
+# so a speed-buffed run steps faster on its own without a reference speed to
+# keep in sync with the hero data: one step per this many pixels travelled.
+# 64 px is one tile, which at the heroes' 140-170 px/s base speed lands at a
+# 0.38-0.46 s cadence -- an ordinary walking pace.
+FOOTSTEP_STRIDE_PX: float = 64.0
+# Bounds on the derived interval, so a heavily stacked speed build does not
+# turn the walk into a machine gun and a slowed hero does not fall silent.
+FOOTSTEP_INTERVAL_MIN_S: float = 0.16
+FOOTSTEP_INTERVAL_MAX_S: float = 0.85
+# Footsteps are constant, so they sit well under the rest of the mix.
+FOOTSTEP_GAIN: float = 0.30
+
+# The growl plays on two occasions (owner, 2026-09-16). A boss entrance gets it
+# at full level; a room waking up gets the same recording quieter, so the boss
+# stays the loud one.
+GROWL_ROOM_GAIN: float = 0.45
+# A room can wake often enough to be worth a floor between growls.
+GROWL_ROOM_MIN_GAP_MS: int = 6000
+
+# --- Music ---------------------------------------------------------------
+# The streamed background tracks (journal `music_journal.md`, 2026-09-16),
+# keyed by the id a `State.music` declares. Paths are relative to
+# `assets.ASSETS_DIR`, the same convention as MENU_BACKGROUND_IMAGE, so a
+# third track is a one-line change here plus the state that asks for it.
+#
+# Both files come from Pixabay under the Pixabay Content License and ship as
+# delivered, at 320 kbps (owner, 2026-09-16 -- see assets/CREDITS.md).
+MUSIC_TRACKS: dict = {
+    "menu": "music/main-menu.mp3",
+    "gameplay": "music/gameplay-1.mp3",
+}
+# Music sits *under* the cues rather than beside them, so its default is
+# lower than the cue master's 0.7. Overridden by save.settings["music_volume"].
+MUSIC_VOLUME_DEFAULT: float = 0.5
+# Length of the fade out / fade in when the track changes. `mixer.music` has
+# one stream, so a switch is a gap-fade, never a true crossfade.
+MUSIC_FADE_MS: int = 600
+# What the music drops to under a pause overlay (`MusicPlayer.set_ducked`).
+MUSIC_DUCK: float = 0.4
 
 # --- Entity limits (graceful degradation, not crashes, when exceeded) -----
 # Absolute enemy concurrency ceiling -- a perf safety net, rarely the real

@@ -6,8 +6,10 @@ mixer is brought up on a given platform.
 differs:
 
 * **Desktop SDL** (`DesktopMixer`) -- we own the device. Tear down whatever
-  `pygame.init()` opened and re-open it at exactly 22050 Hz / mono / 24 channels
-  so buffers play back at the pitch they were rendered at.
+  `pygame.init()` opened and re-open it at 44100 Hz stereo / 24 channels (see
+  `DESKTOP_RATE` below for why it is no longer the synth's own rate). Buffers
+  are resampled and up-mixed in `make_sound`, so they still play back at the
+  pitch and length they were rendered at.
 * **Browser** (`BrowserMixer`, pygbag / emscripten) -- the WebAudio context is
   fragile: `pygame.mixer.quit()` followed by `init()` after startup routinely
   leaves audio dead. Init **once**, no teardown, accept whatever sample rate and
@@ -33,10 +35,26 @@ log = logging.getLogger(__name__)
 # runs at a different rate resamples to it in `make_sound`.
 SYNTH_RATE = 22050
 
+# What the desktop device is actually opened at. This used to be SYNTH_RATE in
+# mono, so that the synthesised cues needed no conversion at all. Music changed
+# the trade (owner, 2026-09-16, `documentation/journals/music_journal.md`): the
+# two streamed tracks are 44.1/48 kHz stereo masters, and a 22050 Hz mono device
+# downmixed them to one channel at roughly telephone bandwidth. `make_sound`
+# already resamples from SYNTH_RATE and interleaves to the device's channel
+# count, so the cues still play at the pitch and length they were rendered at;
+# what the change costs is the resample, which they used to skip. Measured on
+# the owner's machine, building all eight went from 119 ms to 204 ms -- an
+# extra 85 ms once at startup, against a loading screen that takes four to
+# five seconds. All eight together are only 2.4 seconds of audio.
+DESKTOP_RATE = 44100
+DESKTOP_CHANNELS = 2
+
 
 # --------------------------------------------------------------------------
-# sample helpers -- pure Python, run once per cue at startup. On the desktop
-# fast path (rate == SYNTH_RATE, mono) both are skipped entirely.
+# sample helpers -- pure Python, run once per cue at startup. Each is skipped
+# when it would be a no-op (a device already at SYNTH_RATE, or a mono one).
+# The desktop used to hit both of those and skip all conversion; since the
+# device moved to 44100 Hz stereo it resamples and up-mixes like any other.
 def _resample_i16(src: "array.array", src_rate: int, dst_rate: int) -> "array.array":
     if src_rate == dst_rate or len(src) == 0:
         return src
@@ -122,13 +140,14 @@ class DesktopMixer(MixerBackend):
         try:
             if pygame.mixer.get_init() is not None:
                 pygame.mixer.quit()
-            pygame.mixer.init(frequency=SYNTH_RATE, size=-16, channels=1)
+            pygame.mixer.init(frequency=DESKTOP_RATE, size=-16,
+                              channels=DESKTOP_CHANNELS)
             pygame.mixer.set_num_channels(24)
         except pygame.error as exc:  # no device / dummy driver
             log.warning("desktop mixer unavailable: %s", exc)
             self.ready = False
             return False
-        got = pygame.mixer.get_init() or (SYNTH_RATE, -16, 1)
+        got = pygame.mixer.get_init() or (DESKTOP_RATE, -16, DESKTOP_CHANNELS)
         self.rate, _, self.channels = got
         self.ready = True
         return True

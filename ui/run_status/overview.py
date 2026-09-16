@@ -54,7 +54,7 @@ class OverviewPane:
         pass
 
     def draw(self, surface: pygame.Surface, area: pygame.Rect, ps, hits) -> None:
-        gap = 40
+        gap = c.S(40)
         col_w = (area.width - gap) // 2
         left = pygame.Rect(area.left, area.top, col_w, area.height)
         right = pygame.Rect(area.left + col_w + gap, area.top, col_w, area.height)
@@ -64,7 +64,7 @@ class OverviewPane:
     # --- left: the run and the items --------------------------------------
     def _draw_run(self, surface, area, ps) -> None:
         f, s, p = self.f, ps.stats, ps.player
-        y = area.top + c.ROW_STEP // 2
+        y = area.top + c.S(c.ROW_STEP) // 2
         hero = ps.content.character(ps.character_id)["name"]
         trait = getattr(p, "trait", "")
         y = c.kv(surface, f.row, area, y, "Hero", f"{hero}" + (f"  ({trait})" if trait else ""))
@@ -75,10 +75,10 @@ class OverviewPane:
         # Level, with the XP bar in the gap under its row.
         y = c.kv(surface, f.row, area, y, "Level", ps.levels.level)
         frac = max(0.0, min(1.0, float(ps.levels.progress_fraction)))
-        bar = pygame.Rect(area.left, y - c.ROW_STEP // 2 + 1, area.width, 6)
+        bar = pygame.Rect(area.left, y - c.S(c.ROW_STEP) // 2 + c.S(1), area.width, c.S(6))
         pygame.draw.rect(surface, (14, 20, 40), bar)
         pygame.draw.rect(surface, (90, 150, 240), (bar.left, bar.top, int(bar.width * frac), bar.height))
-        y += 10
+        y += c.S(10)
         y = c.kv(surface, f.row, area, y, "Kills", s.get("kills", 0))
         y = c.kv(surface, f.row, area, y, "Gold", s.get("gold", 0), colour=config.COLOR_ACCENT)
         y = c.kv(surface, f.row, area, y, "Salvage", s.get("currency", 0), colour=config.COLOR_ACCENT)
@@ -92,23 +92,23 @@ class OverviewPane:
             c.line(surface, f.row, area, y, "none", colour=config.COLOR_TEXT_DIM)
             return
         for item in items[:MAX_ITEMS]:
-            if y > area.bottom - c.ROW_STEP:
+            if y > area.bottom - c.S(c.ROW_STEP):
                 break
             name = f"[{item.rarity[:1].upper()}] {item.name}"
             y = c.kv(surface, f.row, area, y, name, f"{item.slot}  Lv {item.level}",
                      label_colour=c.RARITY_ON_DARK.get(item.rarity, config.COLOR_TEXT))
             for text in item_lines(item, ps.content):
-                if y > area.bottom - 10:
+                if y > area.bottom - c.S(10):
                     break
                 y = c.line(surface, f.small, area, y, text, colour=config.COLOR_TEXT_DIM,
                            indent=18, step=22)
-            y += 4
+            y += c.S(4)
 
     # --- right: the stats -------------------------------------------------
     def _draw_stats(self, surface, area, ps) -> None:
         f = self.f
         stats = ps.player.stats
-        y = c.subheader(surface, f.sub, area, area.top + 2, "Hero stats")
+        y = c.subheader(surface, f.sub, area, area.top + c.S(2), "Hero stats")
         for stat, label, _kind in c.STAT_ROWS:
             if y > area.bottom:
                 break

@@ -72,6 +72,10 @@ class PlayingState(State):
     # from `draw` itself (see there). Mouse events arrive in surface
     # coordinates, which is what the manual aim reads against the camera.
     ui_box = False
+    # The run's track. Swapping to it here rather than on the loading
+    # screen means the crossfade lands as the world appears.
+    music = "gameplay"
+
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
               dev: bool = False, difficulty: str | None = None,
               prebuilt=None, main_weapon: str | None = None, **kwargs) -> None:
@@ -164,10 +168,12 @@ class PlayingState(State):
         rebuild_blessings(self.player)
 
         # The world is drawn straight to the screen; `Camera.zoom` magnifies at
-        # draw time (config.CAMERA_ZOOM), so sprites stay crisp. HUD is unscaled.
+        # draw time -- `config.effective_zoom()`, the design zoom times the
+        # native render scale -- so sprites stay crisp and the view covers
+        # the same world area at every window size. HUD is unscaled.
         self.camera = Camera(self.game_map.width, self.game_map.height,
                              config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
-                             zoom=config.CAMERA_ZOOM)
+                             zoom=config.effective_zoom())
         self.camera.snap_to(self.player.pos)
 
     def _init_scaffold(self) -> None:
@@ -326,6 +332,38 @@ class PlayingState(State):
         closes the overlay cannot land as an attack."""
         self._tap_pending = False
         self._mouse_armed = False
+
+    def on_display_changed(self) -> None:
+        """The display was re-opened under the run (Options from the pause
+        menu; stage 1b of the native-resolution journal). The camera is
+        rebuilt for the new surface and effective zoom at the same world
+        centre, so the hero does not move on screen; the fonts and the HUD
+        follow the new scale; the sea buffer is re-tiled for the new world
+        span; and one frame of the world is drawn off screen so the terrain
+        and sprite caches refill before the player sees the next one."""
+        old = self.camera
+        span_w, span_h = old.world_span()
+        centre = pygame.Vector2(old.pos.x + span_w / 2.0, old.pos.y + span_h / 2.0)
+        cam = Camera(self.game_map.width, self.game_map.height,
+                     config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
+                     zoom=config.effective_zoom())
+        cam.follow_lerp = old.follow_lerp
+        cam.snap_to(centre)
+        self.camera = cam
+        self.hud = HUD()
+        self._banner_font = fonts.heading(40)
+        self._prompt_font = fonts.heading(20)
+        gm = self.game_map
+        if getattr(gm, "_tiles_ready", False):
+            from world.terrain import bake as terrain_bake
+            buf, wt = terrain_bake.water_buffer(self.game.assets)
+            if buf is not None:
+                gm._water_buf, gm._water_tile = buf, wt
+        try:
+            scratch = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+            self._draw_world(scratch)
+        except pygame.error:
+            pass                                   # a headless surface: no warm-up
 
     def handle_debug_key(self, key: int) -> bool:
         keys = config.DEBUG_KEYS
@@ -489,6 +527,12 @@ class PlayingState(State):
 
     def _phase_update(self, dt: float) -> None:
         self.player.update(dt, self.game_map)
+        # Footsteps follow the *input* direction, not the resolved motion, so
+        # a shove or a walk into a wall does not produce phantom steps. The
+        # cadence lives in the audio system (`_Footsteps`).
+        self.game.audio.tick_footsteps(
+            dt, self.player._move_dir.length_squared() > 0,
+            self.player.move_speed)
         self._update_hero_anim(dt)
         self.camera.update(dt, self.player.pos)
         self.nav.update(dt)

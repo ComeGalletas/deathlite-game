@@ -12,6 +12,7 @@ import pygame
 
 from game import config, fonts
 from game.state import State
+from ui import scale
 
 # (stat key in save.records, row label, formatter)
 _ROWS = (
@@ -23,6 +24,7 @@ _ROWS = (
 
 
 class RankingsState(State):
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self.records = dict(self.game.save.records)
         self._title = fonts.heading(40)
@@ -43,16 +45,17 @@ class RankingsState(State):
         w = surface.get_width()
         cx = w // 2
 
+        S = scale.px
         title = self._title.render("Rankings", True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(cx, 84)))
+        surface.blit(title, title.get_rect(center=(cx, S(84))))
         sub = self._hint.render("Best run per difficulty  -  never compared across difficulties",
                                 True, config.COLOR_TEXT_DIM)
-        surface.blit(sub, sub.get_rect(center=(cx, 120)))
+        surface.blit(sub, sub.get_rect(center=(cx, S(120))))
 
         order = config.DIFFICULTY_ORDER
-        col_w = 300
+        col_w = S(300)
         x0 = cx - (len(order) * col_w) // 2
-        y_head, y_rows, step = 180, 232, 40
+        y_head, y_rows, step = S(180), S(232), S(40)
         for c, diff in enumerate(order):
             bucket = self.records.get(diff, {})
             colx = x0 + c * col_w + col_w // 2
@@ -61,7 +64,7 @@ class RankingsState(State):
                                      config.COLOR_TEXT)
             surface.blit(head, head.get_rect(midtop=(colx, y_head)))
             pygame.draw.line(surface, config.COLOR_WORLD_BORDER,
-                             (colx - 120, y_head + 34), (colx + 120, y_head + 34))
+                             (colx - S(120), y_head + S(34)), (colx + S(120), y_head + S(34)))
 
             if not bucket:
                 none = self._row.render("no runs yet", True, config.COLOR_TEXT_DIM)
@@ -71,11 +74,11 @@ class RankingsState(State):
             for r, (key, label, fmt) in enumerate(_ROWS):
                 y = y_rows + r * step
                 lab = self._row.render(label, True, config.COLOR_TEXT_DIM)
-                surface.blit(lab, lab.get_rect(midright=(colx - 12, y)))
+                surface.blit(lab, lab.get_rect(midright=(colx - S(12), y)))
                 val_s = fmt(bucket[key]) if key in bucket else "-"
                 val = self._row.render(val_s, True, config.COLOR_TEXT)
-                surface.blit(val, val.get_rect(midleft=(colx + 12, y)))
+                surface.blit(val, val.get_rect(midleft=(colx + S(12), y)))
 
         hint = self._hint.render("ENTER / ESC  -  back to menu", True,
                                  config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - 40)))
+        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - S(40))))

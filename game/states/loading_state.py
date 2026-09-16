@@ -25,6 +25,7 @@ import pygame
 from game import config, fonts
 from game.content import get_content
 from game.state import State
+from ui import scale
 from systems.animation import Animator
 from world.gen import generate_world_steps
 from world.map import GameMap
@@ -43,6 +44,11 @@ _BUDGET_S = 0.030
 
 class LoadingState(State):
     backdrop = _BG          # the whole surface, not a 16:9 box (owner, 2026-09-16)
+    # No `music` declaration on purpose: inheriting is what keeps the menu
+    # track playing through world generation, so the swap to the run's
+    # track lands the moment the world appears (owner, 2026-09-16).
+    # `mixer.music` streams on SDL's own thread, so the 50-350 ms slices
+    # below never stutter it.
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
               dev: bool = False, difficulty: str | None = None,
               main_weapon: str | None = None, **kwargs) -> None:
@@ -111,7 +117,7 @@ class LoadingState(State):
             return
         from systems.camera import Camera
         cam = Camera(gm.width, gm.height, config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
-                     zoom=config.CAMERA_ZOOM)
+                     zoom=config.effective_zoom())
         scratch = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         r = gm.renderer
         centre = gm.center
@@ -153,14 +159,14 @@ class LoadingState(State):
         surface.fill(_BG)
         cx, cy = surface.get_width() // 2, surface.get_height() // 2
         text = self._font.render(self._label, True, _FG)
-        surface.blit(text, text.get_rect(center=(cx, cy - 40)))
-        self._draw_hero(surface, cx, cy + 60)
+        surface.blit(text, text.get_rect(center=(cx, cy - scale.px(40))))
+        self._draw_hero(surface, cx, cy + scale.px(60))
 
     def _draw_hero(self, surface, cx: int, ground_y: int) -> None:
         """The hero as the run draws it -- same rig, same size, same anchor
         -- standing on `ground_y`, running in place."""
         assets = self.game.assets
-        z = config.CAMERA_ZOOM
+        z = config.effective_zoom()
         if self._anim is None:
             r = round(16 * z)
             pygame.draw.circle(surface, self._hero_color, (cx, ground_y), r)

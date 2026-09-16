@@ -27,6 +27,8 @@ from pathlib import Path
 
 import pygame
 
+from game import config
+
 log = logging.getLogger(__name__)
 
 FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
@@ -73,18 +75,30 @@ def _load(role: str, px: int, bold: bool) -> pygame.font.Font:
     return font
 
 
-def heading(px: int, *, bold: bool = True) -> pygame.font.Font:
+def native_px(px: float, scaled: bool = True) -> int:
+    """A design size in native pixels: `px x config.RENDER_SCALE` under
+    native-resolution rendering (journal "Native-resolution rendering",
+    stage 2), the identity at scale 1. `scaled=False` is for text that
+    already sized itself to the camera zoom (floating damage numbers),
+    which includes the render scale."""
+    if not scaled:
+        return max(1, int(round(px)))
+    return max(1, int(round(float(px) * float(config.RENDER_SCALE))))
+
+
+def heading(px: int, *, bold: bool = True, scaled: bool = True) -> pygame.font.Font:
     """Titles, banners, hero names -- the bundled title face (NunitoSans),
-    bold."""
-    return _load("title", px, bold)
+    bold. `px` is the design size; see `native_px`."""
+    return _load("title", native_px(px, scaled), bold)
 
 
-def body(px: int, *, bold: bool = False) -> pygame.font.Font:
-    """Menu rows, HUD, instructions, floating damage -- the bundled face."""
-    return _load("sans", px, bold)
+def body(px: int, *, bold: bool = False, scaled: bool = True) -> pygame.font.Font:
+    """Menu rows, HUD, instructions, floating damage -- the bundled face.
+    `px` is the design size; see `native_px`."""
+    return _load("sans", native_px(px, scaled), bold)
 
 
-def mono(px: int, *, bold: bool = False) -> pygame.font.Font:
+def mono(px: int, *, bold: bool = False, scaled: bool = True) -> pygame.font.Font:
     """Fixed-width, for the dev overlay / dev menu column alignment. There is no
     bundled monospace face: SysFont('consolas') on desktop, default in-browser."""
-    return _load("mono", px, bold)
+    return _load("mono", native_px(px, scaled), bold)

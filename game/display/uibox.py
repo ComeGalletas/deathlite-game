@@ -19,9 +19,12 @@ from game import config
 
 
 def rect(surface: pygame.Surface) -> pygame.Rect:
-    """The box, centred on `surface` and never larger than it."""
+    """The box, centred on `surface` and never larger than it: the 1600x900
+    design at `config.RENDER_SCALE` (`ui/scale.py`), so on a native 3440x1440
+    surface it is 2560x1440 with 440 px margins."""
     w, h = surface.get_size()
-    bw, bh = min(int(config.UI_WIDTH), w), min(int(config.UI_HEIGHT), h)
+    bw = min(int(round(config.UI_WIDTH * config.RENDER_SCALE)), w)
+    bh = min(int(round(config.UI_HEIGHT * config.RENDER_SCALE)), h)
     return pygame.Rect((w - bw) // 2, (h - bh) // 2, bw, bh)
 
 

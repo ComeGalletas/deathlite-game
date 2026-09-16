@@ -17,6 +17,7 @@ import math
 import pygame
 
 from game import config, fonts
+from ui import scale
 from entities.pickup import XP_TIER_COLORS
 from game.states.playing.visual.drawctx import DrawCtx
 from game.states.playing.visual.glow import GlowCache
@@ -141,13 +142,13 @@ class WorldRenderer:
             if blink:
                 text = ps._banner_font.render(
                     f"{ps._boss_name} APPROACHES", True, (255, 90, 90))
-                surface.blit(text, text.get_rect(center=(w // 2, 120)))
+                surface.blit(text, text.get_rect(center=(w // 2, scale.px(120))))
 
         # P3: a transient notice (the Forge's answer), bottom centre, one
         # line above the interaction prompt it usually answers.
         if ps._notice_t > 0.0 and ps._notice_text:
             text = shadowed(ps._prompt_font, ps._notice_text, config.COLOR_ACCENT)
-            surface.blit(text, text.get_rect(center=(w // 2, h - 124)))
+            surface.blit(text, text.get_rect(center=(w // 2, h - scale.px(124))))
 
         # Interaction prompt when stood on a usable special location, or --
         # CB-9 -- on an unopened chest. The two cannot both be live: a chest is
@@ -157,7 +158,7 @@ class WorldRenderer:
             afford = it.kind != "merchant" or ps.stats["gold"] >= it.cost
             col = (240, 240, 245) if afford else (200, 120, 120)
             prompt = ps._prompt_font.render(it.prompt, True, col)
-            surface.blit(prompt, prompt.get_rect(center=(w // 2, h - 96)))
+            surface.blit(prompt, prompt.get_rect(center=(w // 2, h - scale.px(96))))
         else:
             chest = ps.chest_manager.nearby()
             if chest is not None:
@@ -166,7 +167,7 @@ class WorldRenderer:
                 # a wood-brown "Common chest" was the dimmest text on screen.
                 prompt = ps._prompt_font.render(
                     ps.chest_manager.prompt(chest), True, (240, 240, 245))
-                surface.blit(prompt, prompt.get_rect(center=(w // 2, h - 96)))
+                surface.blit(prompt, prompt.get_rect(center=(w // 2, h - scale.px(96))))
 
     # --- world props ----------------------------------------------
     def _off_band(self, level, pos) -> bool:

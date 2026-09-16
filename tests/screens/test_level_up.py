@@ -308,7 +308,7 @@ class TitleShadowAndBadgeTests(unittest.TestCase):
         import inspect
         from ui import level_up
         src = inspect.getsource(level_up.LevelUpPanel.draw)
-        self.assertIn("(x + 39, y + 10 + dy)", src)
+        self.assertIn("(x + scale.px(39), y + scale.px(10) + dy)", src)   # design px, scaled at draw
         self.assertIn('f"#{i + 1}"', src, "the badge reads #1, #2, #3 (owner, 2026-09-10)")
 
 
@@ -320,7 +320,7 @@ class CategoryLineTests(unittest.TestCase):
         import inspect
         from ui import level_up
         src = inspect.getsource(level_up.LevelUpPanel.draw)
-        self.assertIn("y + card_h - 39 + dy", src)
+        self.assertIn("y + card_h - scale.px(39) + dy", src)
         self.assertNotIn("y + card_h - 14 + dy", src)
         words = " ".join(t[:1].upper() + t[1:] for t in ("hero", "power"))
         self.assertEqual(words, "Hero Power")

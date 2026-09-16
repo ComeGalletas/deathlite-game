@@ -95,16 +95,17 @@ class RunStatusState(State):
 
     def draw(self, surface: pygame.Surface) -> None:
         w, h = surface.get_size()
-        panel = pygame.Rect(_MARGIN_X, _TOP, w - 2 * _MARGIN_X, h - _TOP - _BOTTOM)
+        mx, top, bottom = c.S(_MARGIN_X), c.S(_TOP), c.S(_BOTTOM)
+        panel = pygame.Rect(mx, top, w - 2 * mx, h - top - bottom)
         c.draw_panel(surface, panel)
         hits = self._mouse.hits
         hits.clear()
         assets = getattr(self.game, "assets", None)
         c.draw_tabs(surface, assets, panel, [LABELS[p] for p in PANES], self.tab,
                     self._fonts.ribbon, hits)
-        area = pygame.Rect(panel.left + 28, panel.top + c.RIBBON_H // 2 + 8 + 18,
-                           panel.width - 56, 0)
-        area.height = panel.bottom - 24 - area.top
+        area = pygame.Rect(panel.left + c.S(28), panel.top + c.S(c.RIBBON_H) // 2 + c.S(8 + 18),
+                           panel.width - c.S(56), 0)
+        area.height = panel.bottom - c.S(24) - area.top
         if self.playing is None:
             t = self._fonts.row.render("no run", True, config.COLOR_TEXT_DIM)
             surface.blit(t, t.get_rect(center=panel.center))
@@ -114,4 +115,4 @@ class RunStatusState(State):
         hint = self._hint.render(
             "TAB / ESC close   -   Left / Right or 1 2 3 switch pane   -   "
             "Up / Down or wheel select", True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(w // 2, h - _BOTTOM // 2)))
+        surface.blit(hint, hint.get_rect(center=(w // 2, h - bottom // 2)))
