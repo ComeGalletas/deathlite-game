@@ -2,7 +2,7 @@
   "chaser": {
     "name": "Husk", "hp": 20, "speed": 75,
     "aggro_range": 420,
-    "pursuit_seconds": 6.0, "contact_damage": 13, "radius": 14,
+    "pursuit_seconds": 6.0, "contact_damage": 13, "radius": 10,
     "weight": 7,
     "experience_reward": 3, "behavior": "path_chase_attack", "color": [200, 90, 90],
     "tags": ["basic"], "sprite": "skull", "contact_damage_enabled": false,

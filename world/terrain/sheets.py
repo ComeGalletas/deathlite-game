@@ -187,3 +187,21 @@ class TileSheets:
             self._cell_cache[key] = img
         return self._cell_cache[key]
 
+    def vstair_seam(self, drop: int = 1):
+        """The north flight as it is painted: the flipped sprite cut at its
+        middle into `(foot_half, top_half)`, each `px` wide and half a
+        sprite tall. The foot half lies on the landing's lower half and the
+        top half on the rim's upper half, so the stairs sit centred on the
+        seam between the two floors. `None` when the art is missing."""
+        key = ("vstair-seam", drop)
+        if key not in self._cell_cache:
+            spr = self.vstair_sprite(drop, north=True)
+            if spr is None:
+                return None
+            w, h = spr.get_size()
+            half = h // 2
+            self._cell_cache[key] = (
+                spr.subsurface(pygame.Rect(0, 0, w, half)).copy(),
+                spr.subsurface(pygame.Rect(0, half, w, h - half)).copy())
+        return self._cell_cache[key]
+

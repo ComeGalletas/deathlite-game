@@ -200,6 +200,39 @@ level-2 rim), so only the 64 px sprite is ever needed, and the tags split
 - The known lie stands: flipped risers read as shade falling north. Shipped
   as is, to be judged in a frame.
 
+### NS-6 — the stairs on the seam (2026-09-14)
+
+**Decisions.** North flights only; south and east/west painting stay
+byte-identical. The rim cell goes back to ordinary plateau ground,
+autotiled with its lip. One stair sprite -- the flipped stone flight,
+foot end north -- is centred on the seam between the landing and the rim,
+at least half on each tile (the 64 px sprite: exactly half and half).
+Grass and rock north flights look the same. Generation and walkability
+untouched.
+
+**Layering.** The sprite is split at the seam and each half drawn on its
+own floor's band: the foot half on the low floor after the landing's
+grass, so a body on the landing draws over it; the top half on the
+plateau's band after the rim tile, so it covers the rim's lip in that
+column and the stairs read as cutting through the edge rather than
+vanishing under it. A body on the rim draws over that half as usual.
+
+**What landed.** `TileSheets.vstair_seam(drop)` returns the flipped
+sprite cut at its middle, `(foot_half, top_half)`, cached. In
+`grid_paint` pass 1 a north flight now joins the ground floors list, so
+it is autotiled with its lip like the rim cells beside it and casts
+nothing; the pass-3 branch that painted a plain tile is gone. A new step
+after the tall-sprite pass blits the foot half at the landing's lower
+half on the low band and the top half at the rim's upper half on the
+plateau's band, whatever the tag. The painter test samples the most
+opaque pixel down each half's middle column and checks the baked pixel
+against it within a small blend tolerance on the rim and on the landing,
+plus opaque ground beyond the sprite on both tiles, both styles required.
+South flights re-checked pixel-identical by the south-flight test. Bake
+and draw digests re-pinned; layouts untouched. Screenshot delivered:
+seed 35, island 0, a rock and a grass north flight side by side, both
+now the stairs on the seam.
+
 ### Regression: south flights painted as cliff faces (2026-09-14)
 
 Reported off a screenshot: a wall-cut staircase drawn as a plain cliff

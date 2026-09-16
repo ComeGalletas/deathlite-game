@@ -10,9 +10,9 @@ Layering inside the returned surface, per cell:
     ground    the biome sheet for its level, autotiled by its open sides
     cliff     the stone face, `row` down the stack, run-capped left/right
     vstair    the grass channel, plus the stone sprite on top when "rock";
-              a north flight (`dir == "n"`) is a plain interior tile of its
-              own terrace, plus the stone sprite flipped to ascend toward
-              the camera when "rock"
+              a north flight (`dir == "n"`) is ordinary plateau ground with
+              the stone sprite, flipped to ascend toward the camera, centred
+              on the seam between it and the landing north of it
     ewstair   the biome `slots.ramp` wedge for its descent direction
 
 A side counts as **open** (and so gets a grass fringe / shoreline edge) only
@@ -432,6 +432,7 @@ def _paint_room(store, sheets, layout, room, banded: bool):
 
     order = sorted(grid.items(), key=lambda kv: kv[0][1])
     walls = []                       # (col, row, cell, x, y) -- stone to come
+    seams = []                       # (cell, x, y) -- north flights, pass 4
     floors: dict = {}                # level -> the ground tiles painted at it
     shadows: dict = {}               # level -> the casters standing at it
 
@@ -467,6 +468,14 @@ def _paint_room(store, sheets, layout, room, banded: bool):
         if c.kind == GROUND:
             floors.setdefault(c.level, []).append((col, row, c.level, x, y,
                                                    False))
+            continue
+        if c.kind == VSTAIR and c.dir == "n":
+            # The rim cell of a plateau's back is painted as the plateau
+            # ground it is -- autotiled, lip and all -- and the stairs go
+            # on afterwards, centred on the seam; see pass 4.
+            floors.setdefault(c.level, []).append((col, row, c.level, x, y,
+                                                   False))
+            seams.append((c, x, y))
             continue
 
         walls.append((col, row, c, x, y))
@@ -529,21 +538,6 @@ def _paint_room(store, sheets, layout, room, banded: bool):
             foot = c.row == c.drop - 1 and grid.get((col, row + 1)) is None
             surf.blit(cell(sheet, cliff_idx("bottom" if foot else "body", var)),
                       (x, y))
-        elif c.kind == VSTAIR and c.dir == "n":
-            # The rim cell of the plateau's back, and part of that terrace:
-            # it goes on the plateau's own band, so a body standing on it is
-            # layered as it would be on the ground beside it. A plain
-            # interior tile of the terrace first: for a grass flight that is
-            # the whole of it -- with no wall to cut a channel through, the
-            # bare gap in the rim's lip *is* the grass reading -- and under
-            # a rock flight it is what shows in the sprite's transparent
-            # side margins, so the stone sits in plateau grass rather than
-            # over a hole. The rock flight is the stone flight flipped to
-            # ascend toward the camera; see `vstair_sprite`.
-            band(c.level).blit(cell(sheet, interior), (x, y))
-            if c.tag == "rock":
-                tall.append((x, y, sheets.vstair_sprite(c.drop, north=True),
-                             band(c.level)))
         elif c.kind == VSTAIR:
             # The wall-cut straight flight: the grass channel, and the stone
             # flight over it when "rock". Its own branch -- when the north
@@ -614,6 +608,21 @@ def _paint_room(store, sheets, layout, room, banded: bool):
     for x, y, spr, target in tall:
         if spr is not None:
             target.blit(spr, (x, y))
+
+    # A north flight's stairs sit centred on the seam between the landing
+    # and the rim, half on each tile, whatever the tag. Split at the seam
+    # and each half on its own floor: the foot half over the landing's
+    # grass on the low band, where a body on the landing draws over it;
+    # the top half over the rim tile on the plateau's band, where it
+    # covers the rim's lip in that column so the stairs cut through the
+    # edge rather than vanish under it.
+    for c, x, y in seams:
+        halves = sheets.vstair_seam(c.drop)
+        if halves is None:
+            continue
+        foot, top = halves
+        band(max(0, c.level - c.drop)).blit(foot, (x, y - foot.get_height()))
+        band(c.level).blit(top, (x, y))
 
     # Trim each band to what it actually holds. A terrace occupies a fraction
     # of the island's bounding box, and an untrimmed band would cost the whole

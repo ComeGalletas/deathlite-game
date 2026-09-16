@@ -1,6 +1,6 @@
 {
   "skull": {
-    "frame": [192, 192], "content": [52, 52, 121, 78], "scale": [56, 36], "anchor": [20, 36], "face": "right",
+    "frame": [192, 192], "content": [52, 52, 121, 78], "scale": [56, 36], "anchor": [20, 33], "face": "right",
     "anims": {
       "idle":   {"file": "enemies/skull/idle.png", "frames": 8, "fps": 7, "loop": true},
       "walk":   {"file": "enemies/skull/run.png", "frames": 6, "fps": 9, "loop": true},

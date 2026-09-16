@@ -300,47 +300,66 @@ class GeneratedTests(unittest.TestCase):
 
 
 class PainterTests(unittest.TestCase):
-    def test_the_cell_is_painted_as_terrace_and_casts_no_shadow(self):
-        """On the plateau's own band, opaque, with no shadow blob on the low
-        ground north of it. A grass flight is the terrace sheet's plain
-        interior tile, pixel for pixel at its centre; a rock one carries the
-        flipped stone flight, pixel for pixel where the sprite is opaque.
-        Compared against the sheet and the sprite themselves rather than
-        against a colour, because a biome's "grass" may well be teal."""
+    def test_the_stairs_sit_on_the_seam_and_cast_no_shadow(self):
+        """No shadow blob on the low ground north of a north flight; the
+        stairs centred on the seam, half on each tile, each half on its own
+        floor's band, grass and rock alike. Where the sprite is opaque the
+        baked pixel *is* the sprite's pixel: the foot half on the landing's
+        lower half, the top half on the rim's upper half. Outside the
+        sprite the rim is plateau ground and the landing is low ground,
+        both opaque."""
         from world.terrain.grid_paint import _shadow_casts
         W.display()
+        px = config.TILE_PX
+
+        def baked(gm, level, wx, wy):
+            hit = [(rect, surf) for rect, surf, lvl in gm._grid_surfs
+                   if lvl == level and rect.collidepoint(wx, wy)]
+            self.assertTrue(hit, f"no band {level} at {(wx, wy)}")
+            rect, surf = hit[0]
+            return tuple(surf.get_at((wx - rect.x, wy - rect.y)))
+
+        def opaque_point(half):
+            """The most opaque pixel down the half's middle column. The
+            smoothscaled art is a hair short of opaque everywhere, so the
+            baked pixel is a blend and is compared with a small tolerance."""
+            x = half.get_width() // 2
+            y = max(range(half.get_height()), key=lambda yy: half.get_at((x, yy)).a)
+            self.assertGreaterEqual(half.get_at((x, y)).a, 240)
+            return x, y
+
+        def close(got, want):
+            return all(abs(a - b) <= 8 for a, b in zip(got[:3], want[:3]))
+
         for seed in SEEDS:
             gm = W.baked(seed)
-            sheets = gm._sheets
-            px = config.TILE_PX
+            foot, top = gm._sheets.vstair_seam(1)
+            self.assertEqual(foot.get_size(), (px, px // 2))
+            self.assertEqual(top.get_size(), (px, px // 2))
+            tx, ty = opaque_point(top)
+            fx, fy = opaque_point(foot)
             seen = 0
             styles = set()
             for room, (c, r), cell in _north_flights(gm.layout):
                 self.assertEqual(_shadow_casts(room.grid, c, r, cell, 0, 0, px),
                                  [])
-                # `_grid_surfs` is the flat list of `(rect, surface, level)`
-                # bands over every island; the flight's own band is the one
-                # at its level whose rect holds the cell.
-                wx = room.rect.x + c * px + px // 2
-                wy = room.rect.y + r * px + px // 2
-                hit = [(rect, surf) for rect, surf, lvl in gm._grid_surfs
-                       if lvl == cell.level and rect.collidepoint(wx, wy)]
-                self.assertTrue(hit, f"seed {seed}: flight at {(c, r)} not "
-                                f"on its terrace's band")
-                rect, surf = hit[0]
-                got = tuple(surf.get_at((wx - rect.x, wy - rect.y)))
-                self.assertEqual(got[3], 255)
-                sheet = sheets.sheet_for(cell.level, room.kind, room)
-                tile = sheets.cell(sheet, sheets.interior).copy()
-                if cell.tag == "rock":
-                    # Composed as the painter composes it: the sprite over
-                    # the interior tile. Its centre is a hair short of
-                    # opaque after the smoothscale, so the pixel is a blend.
-                    tile.blit(sheets.vstair_sprite(cell.drop, north=True),
-                              (0, 0))
-                want = tuple(tile.get_at((px // 2, px // 2)))
-                self.assertEqual(got, want, f"seed {seed}: {cell.tag} flight "
-                                 f"at {(c, r)} is not painted as expected")
+                low = cell.level - cell.drop
+                x0 = room.rect.x + c * px
+                y0 = room.rect.y + r * px
+                sx = px // 2
+                # the rim's upper half carries the top half of the sprite
+                self.assertTrue(close(baked(gm, cell.level, x0 + tx, y0 + ty),
+                                      tuple(top.get_at((tx, ty)))),
+                                f"seed {seed}: no top step on the rim at {(c, r)}")
+                # the landing's lower half carries the foot half
+                self.assertTrue(close(baked(gm, low, x0 + fx, y0 - px // 2 + fy),
+                                      tuple(foot.get_at((fx, fy)))),
+                                f"seed {seed}: no foot on the landing at {(c, r)}")
+                # and beyond the sprite both tiles are opaque ground
+                self.assertEqual(baked(gm, cell.level, x0 + sx, y0 + 3 * px // 4)[3],
+                                 255)
+                self.assertEqual(baked(gm, low, x0 + sx, y0 - px + px // 4)[3],
+                                 255)
                 styles.add(cell.tag)
                 seen += 1
             self.assertGreater(seen, 5)
