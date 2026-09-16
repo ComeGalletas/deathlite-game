@@ -111,7 +111,7 @@ class LoadingState(State):
             return
         from systems.camera import Camera
         cam = Camera(gm.width, gm.height, config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
-                     zoom=config.CAMERA_ZOOM)
+                     zoom=config.effective_zoom())
         scratch = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         r = gm.renderer
         centre = gm.center
@@ -160,7 +160,7 @@ class LoadingState(State):
         """The hero as the run draws it -- same rig, same size, same anchor
         -- standing on `ground_y`, running in place."""
         assets = self.game.assets
-        z = config.CAMERA_ZOOM
+        z = config.effective_zoom()
         if self._anim is None:
             r = round(16 * z)
             pygame.draw.circle(surface, self._hero_color, (cx, ground_y), r)

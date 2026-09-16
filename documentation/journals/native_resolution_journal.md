@@ -9,8 +9,9 @@ Branch: `native-resolution` (off `main` at `cf50aba`, 2026-09-16).
 > pixel perfect? Make a new branch for this, journal it in a new file,
 > prepare a todo list for option 2.
 
-Status: **review and todo only**. No code on this branch yet. The two
-stage-0 decisions were taken by the owner on 2026-09-16 (see "Decisions").
+Status: **stage 1 built** (2026-09-16): the world renders at the window's
+native size at the effective zoom; the interface is still drawn unscaled
+in its 1600x900 box (stage 2). Stages 1b, 2 and 3 open.
 
 ---
 
@@ -205,29 +206,53 @@ for.
       is a stage-3 item. The span differs from the design by 0.27 % from
       the seam snap, as decided.
 
-### Stage 1 — the world at native resolution (UI composited)
+### Stage 1 — the world at native resolution (UI unscaled in its box)
 
-- [ ] `config.py`: `RENDER_NATIVE: bool` (branch default True), the
-      effective-zoom snap (`ZOOM_SNAP = 1 / TILE_PX`), the design size
-      renamed in comments as the *design* size (`SCREEN_*` stays the
-      surface size).
-- [ ] `game/display/window.py`: `render_scale` (window px per design px,
-      from the window size and the design size); the logical size passed to
-      `set_mode` becomes the native size; borderless uses the desktop size;
-      `reopen` on an Options change only. `uibox` gets the scaled box.
-- [ ] `Camera` built with the native view and `CAMERA_ZOOM x render_scale`
-      snapped; the loading prewarm the same; `bake.py` sea span unchanged
-      (world px).
-- [ ] The UI composited: the screens keep drawing on a 1600x900 surface
-      that is `smoothscale`d into the box each frame (temporary, measured).
-- [ ] Tests: the camera's world span equals the design span within the
-      snap tolerance at 1.0x, 1.2x, 1.6x, 2.4x; the effective zoom keeps
-      `64 x zoom` whole; the window manager reports the scale; the
-      fallback (dummy driver) renders 1.0x exactly as today.
-- [ ] Screenshot at 1.6x borderless: world sharp, UI soft (the composite).
-- [ ] The effective zoom in one place (`display.effective_zoom()`), pinned
-      by a test: `64 x zoom` whole at every scale, exact at 1x and 2x,
-      within 0.3 % of `CAMERA_ZOOM x s` otherwise.
+- [x] `config.py`: `RENDER_NATIVE` (True on the branch), `RENDER_SCALE`
+      (native height over `UI_HEIGHT`, set by the window manager) and
+      `effective_zoom()` = `round(CAMERA_ZOOM x RENDER_SCALE x TILE_PX) /
+      TILE_PX`, the one place the run's zoom comes from. `CAMERA_ZOOM` is
+      the design zoom and never changes.
+- [x] `game/display/window.py`: `native_size()` (the desktop in
+      Borderless, the clamped pick in Windowed) and `_apply_render_size()`
+      set `SCREEN_*` and `RENDER_SCALE` before `set_mode`; a mode switch or
+      a Resolution pick re-opens whenever the native size differs; a drag
+      never does (the frame is presented scaled until the next Options
+      change). The plain fallback resets to 1600x900 at scale 1. Fixed on
+      the way: the ultrawide code was setting the render width even for a
+      non-scalable window, which would have overridden the browser
+      profile's 1280x720.
+- [x] The three camera sites (`PlayingState`, the loading prewarm, the
+      loading hero preview) and the sea-buffer span (`bake.py`) read
+      `effective_zoom()`.
+- [x] The interface: **not** composited. Drawing it unscaled in the centred
+      1600x900 box costs nothing and is sharp; it is simply small on a
+      large native surface until stage 2 scales it. (Chosen over the
+      `smoothscale` composite from the first draft of this list.)
+- [x] Tests (`tests/display/test_window.py::NativeRenderTests`, 7): the
+      windowed pick and the desktop are the logical size with the right
+      scale and zoom; the covered height is within 0.3 % of 600 world px
+      at 1280x720, 1920x1080, 2560x1440, 3440x1440 and 3840x2160 with
+      `64 x zoom` whole, and exact at 2x; a pick re-opens and a drag does
+      not; a mode switch re-opens at the new size; the fallback is
+      1600x900 at scale 1; the web profile keeps 1280x720. The older
+      scaled-frame tests run with native rendering off.
+- [x] Verified on the real window (3440x1440):
+
+      | Step | Logical surface | `RENDER_SCALE` | zoom | camera span |
+      |---|---|---|---|---|
+      | boot Borderless | 3440x1440 (presented 1:1) | 1.6 | 2.40625 | 1429.6 x 598.4 |
+      | Display mode -> Windowed 1920x1080 | 1920x1080 (re-opened) | 1.2 | 1.796875 | -- |
+      | Resolution -> 1280x720 | 1280x720 (re-opened) | 0.8 | 1.203125 | 1063.9 x 598.4 |
+      | dragged to 1500x844 | still 1280x720, presented at 1.17x | 0.8 | 1.203125 | -- |
+
+      Update + render in the borderless run: median 14.4 ms, p95 18.2 ms
+      (the probe's 11.9 / 12.9 were render alone at a quieter spot); the
+      p95 is over the 16.1 ms budget on this monitor and is stage 3's
+      first item.
+- [x] Screenshot at 1.6x borderless delivered: world native and sharp,
+      the pause dim across the whole surface, the interface small in its
+      box.
 
 ### Stage 1b — Options from the pause menu (a change mid-run)
 

@@ -27,6 +27,26 @@ SCREEN_HEIGHT: int = 900
 RENDER_WIDTHS: dict[str, int] = {"16:9": 1600, "21:9": 2100}
 UI_WIDTH: int = 1600
 UI_HEIGHT: int = 900
+# Native-resolution rendering (journal "Native-resolution rendering",
+# 2026-09-16). When on and the scaled window opened, the logical surface is
+# the window itself (the desktop in Borderless, the picked size in
+# Windowed), so nothing is interpolated by the presenter, and the camera
+# draws at `effective_zoom()` -- the design `CAMERA_ZOOM` times
+# `RENDER_SCALE`, snapped so `TILE_PX x zoom` is whole -- so it covers the
+# same world area as the 1600x900 design at every size. `RENDER_SCALE` is
+# native height over `UI_HEIGHT`, set by `game/display/window.py`; 1.0
+# in the plain fallback and the browser build. A drag resize keeps the
+# logical size until the next Options change (the frame is scaled, soft,
+# until then -- the owner's call).
+RENDER_NATIVE: bool = True
+RENDER_SCALE: float = 1.0
+
+
+def effective_zoom() -> float:
+    """The zoom the run draws at: `CAMERA_ZOOM x RENDER_SCALE`, rounded to
+    the nearest 1/TILE_PX so tiles land on whole pixels (the seam rule).
+    Exact at 1x and 2x, within 0.3 % elsewhere (2.40625 for 2.4)."""
+    return round(CAMERA_ZOOM * RENDER_SCALE * TILE_PX) / TILE_PX
 FPS: int = 62
 TITLE: str = "Deathlite Game"
 # The game's own version, shown wherever the build identifies itself (window

@@ -164,10 +164,12 @@ class PlayingState(State):
         rebuild_blessings(self.player)
 
         # The world is drawn straight to the screen; `Camera.zoom` magnifies at
-        # draw time (config.CAMERA_ZOOM), so sprites stay crisp. HUD is unscaled.
+        # draw time -- `config.effective_zoom()`, the design zoom times the
+        # native render scale -- so sprites stay crisp and the view covers
+        # the same world area at every window size. HUD is unscaled.
         self.camera = Camera(self.game_map.width, self.game_map.height,
                              config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
-                             zoom=config.CAMERA_ZOOM)
+                             zoom=config.effective_zoom())
         self.camera.snap_to(self.player.pos)
 
     def _init_scaffold(self) -> None:

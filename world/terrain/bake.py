@@ -67,8 +67,8 @@ def bake_steps(layout):
         wt = water.get_width()
         # Big enough to cover the visible world extent (SCREEN / zoom) plus
         # one tile of scroll slack; `_z_surf` blows it up to the screen.
-        span_w = round(config.SCREEN_WIDTH / config.CAMERA_ZOOM) + wt
-        span_h = round(config.SCREEN_HEIGHT / config.CAMERA_ZOOM) + wt
+        span_w = round(config.SCREEN_WIDTH / config.effective_zoom()) + wt
+        span_h = round(config.SCREEN_HEIGHT / config.effective_zoom()) + wt
         buf = pygame.Surface((span_w, span_h)).convert()
         for y in range(0, span_h, wt):
             for x in range(0, span_w, wt):

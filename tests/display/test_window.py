@@ -55,6 +55,12 @@ class _Harness:
             mock.patch.object(pygame.display, "toggle_fullscreen", self.toggle),
             mock.patch.object(config, "WINDOW_RESIZABLE", True),
             mock.patch("game.display.window.sys.platform", "win32"),
+            # The scaled-frame tests describe the fixed 1600x900 render;
+            # `NativeRenderTests` turns native rendering on for itself.
+            mock.patch.object(config, "RENDER_NATIVE", False),
+            mock.patch.object(config, "RENDER_SCALE", 1.0),
+            mock.patch.object(config, "SCREEN_WIDTH", 1600),
+            mock.patch.object(config, "SCREEN_HEIGHT", 900),
         ]
 
 
@@ -362,6 +368,96 @@ class ReopenTests(unittest.TestCase):
         self.assertTrue(dw.available)
         with self.assertRaises(ValueError):
             dw.reopen("4:3")
+
+
+class NativeRenderTests(unittest.TestCase):
+    """Stage 1 of the native-resolution journal: the logical surface is the
+    window, `RENDER_SCALE` and `effective_zoom` follow it, the covered area
+    does not, and a drag never re-opens."""
+
+    def setUp(self):
+        self.h = _Harness()
+        self._ps = self.h.patches()
+        for p in self._ps:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in self._ps])
+        on = mock.patch.object(config, "RENDER_NATIVE", True)
+        on.start()
+        self.addCleanup(on.stop)
+        self.reopens = []
+        reopen = mock.patch.object(
+            DisplayWindow, "reopen",
+            lambda dw, aspect: self.reopens.append(aspect) or setattr(dw, "render_aspect", aspect))
+        reopen.start()
+        self.addCleanup(reopen.stop)
+
+    def test_a_windowed_pick_is_the_logical_size(self):
+        self.h.window_size = (1920, 1080)
+        dw = _open(self.h, {"display": {"mode": "windowed", "window": [1920, 1080]}})
+        self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (1920, 1080))
+        self.assertEqual(dw.surface.get_size(), (1920, 1080))
+        self.assertAlmostEqual(config.RENDER_SCALE, 1.2)
+        self.assertAlmostEqual(config.effective_zoom(), 115 / 64)        # 1.796875 for 1.8
+        self.assertAlmostEqual(dw.scale, 1.0)                            # presented 1:1
+
+    def test_borderless_is_the_desktop(self):
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(3440, 1440)]):
+            self.h.window_size = (3440, 1440)
+            dw = _open(self.h, {"display": {"mode": "borderless", "window": [1920, 1080]}})
+            self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (3440, 1440))
+            self.assertAlmostEqual(config.RENDER_SCALE, 1.6)
+            self.assertEqual(config.effective_zoom(), 2.40625)
+            self.assertEqual(64 * config.effective_zoom(), 154.0)
+            self.assertEqual(dw.mode, "borderless")
+
+    def test_the_covered_area_matches_the_design_within_the_snap(self):
+        from systems.camera import Camera
+        for size in ((1280, 720), (1920, 1080), (2560, 1440), (3440, 1440), (3840, 2160)):
+            config.RENDER_SCALE = size[1] / 900.0
+            z = config.effective_zoom()
+            self.assertEqual(round(z * 64), z * 64)                      # the seam rule
+            span_h = Camera(10000, 10000, *size, zoom=z).world_span()[1]
+            self.assertLess(abs(span_h - 600.0) / 600.0, 0.003, size)
+        config.RENDER_SCALE = 2.0
+        self.assertEqual(config.effective_zoom(), 3.0)                   # exact at 2x
+
+    def test_a_pick_reopens_and_a_drag_does_not(self):
+        self.h.window_size = (1920, 1080)
+        dw = _open(self.h, {"display": {"mode": "windowed", "window": [1920, 1080]}})
+        self.h.window_size = (1734, 975)
+        dw.handle_event(pygame.event.Event(pygame.WINDOWSIZECHANGED))
+        self.assertEqual(self.reopens, [])
+        self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (1920, 1080))
+        self.assertAlmostEqual(dw.scale, 975 / 1080)                     # soft until Options
+        dw.set_windowed_size((1280, 720))
+        self.assertEqual(self.reopens, ["16:9"])
+
+    def test_the_mode_switch_reopens_at_the_new_size(self):
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(1920, 1080)]):
+            self.h.window_size = (1280, 720)
+            dw = _open(self.h, {"display": {"mode": "windowed", "window": [1280, 720]}})
+            dw.set_mode("borderless")
+            self.assertEqual(self.reopens, ["16:9"])                     # same aspect, other size
+
+    def test_the_fallback_is_the_design_size_at_scale_one(self):
+        refused = mock.patch.object(
+            DisplayWindow, "open_surface", staticmethod(_Harness(refuse=True).open_surface))
+        refused.start()
+        self.addCleanup(refused.stop)
+        dw = _open(self.h, {"display": {"mode": "borderless", "window": [1920, 1080]}})
+        self.assertEqual(dw.surface.get_size(), (1600, 900))
+        self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (1600, 900))
+        self.assertEqual(config.RENDER_SCALE, 1.0)
+        self.assertEqual(config.effective_zoom(), config.CAMERA_ZOOM)
+
+    def test_the_web_profile_keeps_its_own_size(self):
+        with mock.patch.object(config, "WINDOW_RESIZABLE", False), \
+                mock.patch.object(config, "SCREEN_WIDTH", 1280), \
+                mock.patch.object(config, "SCREEN_HEIGHT", 720):
+            dw = _open(self.h)
+            self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (1280, 720))
+            self.assertEqual(config.RENDER_SCALE, 1.0)
+            self.assertFalse(dw.available)
 
 
 class SettingsTests(unittest.TestCase):
