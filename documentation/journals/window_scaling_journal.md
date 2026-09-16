@@ -423,6 +423,15 @@ open points are folded in below.
   surface in `draw_backdrop`, scaled to cover the height and centred, and
   skips the 16:9 art in the box; `config.MENU_BACKGROUND_LONG_IMAGE`.
   Pinned in `tests/screens/test_ultrawide.py`; verified at 3440x1440.
+  The strip itself was then cut (owner, 2026-09-16, "1920, go"): the
+  delivered 2496x800 art had a 1095 px band of plain sea in its middle,
+  and an ultrawide needs 800 x aspect -- 1867 (21:9), 1911 (3440x1440),
+  1920 (3840x1600). 576 px are removed from the centre by
+  `tools/asset_pipeline/cut_menu_background_long.py`, leaving 359 px of
+  sea either side of the seam; the source moved to
+  `assets/ui/start_screen/unused/` as the project's art rule asks. The
+  cover scaling now shows the whole strip on 3840x1600 and crops 4 px a
+  side on 3440x1440.
 
 ### Verified on the real window (3440x1440)
 

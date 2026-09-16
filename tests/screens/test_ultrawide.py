@@ -94,6 +94,24 @@ class DimCoversTheMarginsTests(unittest.TestCase):
         self.assertEqual(s2.get_at(MARGIN_PX)[:3], config.MENU_BG)
 
 
+class LongBackgroundStripTests(unittest.TestCase):
+    """`menu_background_long.png` is the delivered 2496x800 strip with 576 px
+    of plain sea cut from its middle (owner, 2026-09-16: 1920 wide, 2.4:1,
+    the widest common ultrawide). The cut script is the source of truth and
+    the seam must be sea on both sides."""
+
+    def test_the_strip_is_what_the_cut_script_makes(self):
+        from tools.asset_pipeline import cut_menu_background_long as cut
+        self.assertEqual(cut.main(["--check"]), 0)
+        img = pygame.image.load(cut.OUT)
+        self.assertEqual(img.get_size(), (1920, 800))
+        blue = (71, 171, 169)                         # the sea, measured on the source
+        for x in range(cut.LEFT - 10, cut.LEFT + 11, 2):
+            clouds = sum(1 for y in range(0, 800, 4)
+                         if sum(abs(a - b) for a, b in zip(img.get_at((x, y))[:3], blue)) > 90)
+            self.assertEqual(clouds, 0, f"cloud pixels at the seam column {x}")
+
+
 class ScreenBackdropTests(unittest.TestCase):
     """A screen with a background of its own paints it on the whole
     surface (owner, 2026-09-16: the loading screen showed as a black square
