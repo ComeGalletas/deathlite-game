@@ -57,6 +57,9 @@ _RIBBON_TEXT_DY = -10        # lift the label pair off the ribbon's exact centre
 
 
 class CharacterSelectState(State):
+    # Same track as the menu; `MusicPlayer.play` is idempotent, so
+    # arriving here does not restart it.
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self._dev = bool(kwargs.get("dev", False))   # forwarded to the run
         self.content = get_content()

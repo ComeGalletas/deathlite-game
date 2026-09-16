@@ -40,6 +40,7 @@ BUTTONS = (
 
 
 class VictoryState(State):
+    music = None        # fades out, like GAME OVER (owner, 2026-09-16)
     backdrop = BACKDROP     # the whole surface; the panel goes on the box
     def enter(self, *, stats: dict | None = None, **kwargs) -> None:
         self.stats = stats or {}

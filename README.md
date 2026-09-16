@@ -54,7 +54,8 @@ bash dist/web/build.sh   # build only -> dist/web/out/  (gitignored)
 
 First run downloads a CPython-WASM runtime (cached after). Mixer bring-up is
 platform-specific behind `systems/mixer_backend.py` (desktop re-inits at
-22050 Hz; the browser keeps the WebAudio context it was given and resamples).
+44100 Hz stereo and resamples the 22050 Hz synth cues up to it; the browser
+keeps the WebAudio context it was given and resamples to that instead).
 Fonts are the bundled **Fredoka** face (`assets/fonts/`, via `game/fonts.py`).
 See `documentation/journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
 

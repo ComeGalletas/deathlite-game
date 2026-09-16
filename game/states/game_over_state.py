@@ -31,6 +31,9 @@ BUTTONS = (
 
 
 class GameOverState(State):
+    # The music stopping is itself the signal that the run is over, and
+    # it leaves the boss-death cue room (owner, 2026-09-16).
+    music = None
     backdrop = BACKDROP     # the whole surface; the panel goes on the box
     def enter(self, *, stats: dict | None = None, **kwargs) -> None:
         self.stats = stats or {}

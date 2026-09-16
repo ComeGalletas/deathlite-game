@@ -1,7 +1,9 @@
 # Asset Credits
 
 All game **content** — design, code, data, and the procedurally synthesised
-audio in `systems/audio.py` — is original to this project.
+sound effects in `systems/audio.py` — is original to this project, with two
+exceptions that are licensed rather than original: the art packs listed below,
+and the two background music tracks in `assets/music/`.
 
 ## Art — "Tiny Swords" by Pixel Frog
 
@@ -40,6 +42,37 @@ Tiny Swords supplies the main art of the game:
 Items, weapon effects, potions, chests and other visual effects come from the
 purchased packs listed at the end of this file. `assets/unused/` holds reserve
 art from all packs that is kept in the tree but not loaded by the game.
+
+## Music — Pixabay (`assets/music/`)
+
+The two streamed background tracks are from [Pixabay](https://pixabay.com) and
+are the only audio in the game that is not synthesised at runtime. They are
+named by `config.MUSIC_TRACKS` and played by `systems/music.py`.
+
+| Slot | Track | Author | Pixabay ID |
+|------|-------|--------|------------|
+| Main menu, hero select, Options, Rankings, Sanctuary, loading | Shakuhachi Sunrise (Full Version) | kaazoom | 553468 |
+| In-run gameplay | Happy Adventure Quest | jorisvermeer | 572050 |
+
+| Field | Value |
+|-------|-------|
+| Licence | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
+| Commercial use? | Yes |
+| Modification allowed? | Yes |
+| Attribution required? | No (credit is optional but appreciated by the community — given here anyway) |
+| Purchased? | No (free download) |
+
+### The one restriction that matters here
+
+The Pixabay Content License prohibits selling or distributing Content **on a
+standalone basis** — that is, in substantially the form it has on the site,
+with no creative effort applied. Shipping the tracks inside the game as its
+score is not a standalone distribution, so both the desktop and the web builds
+are within the licence. Selling the MP3s as files, or releasing a soundtrack
+of them, would not be.
+
+The files ship as downloaded, at 320 kbps, and are streamed rather than
+decoded into memory (see `systems/music.py`).
 
 ## Main screen art (`assets/ui/start_screen/`)
 

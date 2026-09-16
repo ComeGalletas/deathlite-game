@@ -24,6 +24,7 @@ from game.state import StateMachine
 from progression.meta import MetaCatalog
 from systems.audio import AudioManager
 from systems.debug_overlay import DebugOverlay
+from systems.music import MusicPlayer
 from ui.mouse import install_cursor
 
 log = logging.getLogger(__name__)
@@ -67,6 +68,13 @@ class Game:
         self.audio = AudioManager(self.events)
         self.audio.muted = bool(self.save.settings.get("muted", False))
         self.audio.volume = float(self.save.settings.get("volume", 0.7))
+        # The streamed score shares the device the cue player just opened.
+        # Which track plays is not decided here: every state declares it
+        # (`State.music`) and `StateMachine` applies the declaration.
+        self.music = MusicPlayer(self.audio.backend)
+        self.music.set_volume(self.save.settings.get(
+            "music_volume", config.MUSIC_VOLUME_DEFAULT))
+        self.music.set_muted(self.audio.muted)
 
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
@@ -129,6 +137,7 @@ class Game:
             return  # session-only build (browser) -- nothing is written to disk
         self.save.settings["muted"] = self.audio.muted
         self.save.settings["volume"] = self.audio.volume
+        self.save.settings["music_volume"] = self.music.volume
         self.save.settings["display"] = self.display.settings()
         self.display.dirty = False
         try:
@@ -199,6 +208,8 @@ class Game:
             self.running = False
             return
 
+        self.music.update(dt)   # advances a track fade; no-op otherwise
+
         t0 = time.perf_counter()
         self.state_machine.update(dt)
         t1 = time.perf_counter()
@@ -243,6 +254,7 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_m:
                     self.audio.toggle_mute()
+                    self.music.set_muted(self.audio.muted)
                     self.persist()
                     continue
                 if self._handle_debug_key(event.key):

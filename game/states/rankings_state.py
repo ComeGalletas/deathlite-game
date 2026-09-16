@@ -24,6 +24,7 @@ _ROWS = (
 
 
 class RankingsState(State):
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self.records = dict(self.game.save.records)
         self._title = fonts.heading(40)

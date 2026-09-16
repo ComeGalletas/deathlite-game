@@ -38,10 +38,12 @@ NAME = "DeathliteGame"                # exe / dist folder name (no space: paths)
 # Top-level `assets/` folders the game actually loads from. Derived, not guessed:
 # every "*.png" / "*.ttf" string in data/*.json and game/config.py resolves into
 # one of these. `fonts` carries no directory prefix in the data (game/fonts.py
-# names the files directly) but is required all the same.
+# names the files directly) but is required all the same, and `music` holds
+# the two streamed tracks named by `config.MUSIC_TRACKS` (about 8.5 MB, the
+# largest single contribution to the bundle).
 ASSET_DIRS = [
     "buildings", "characters", "effects", "enemies",
-    "fonts", "items", "projectiles", "terrain", "ui",
+    "fonts", "items", "music", "projectiles", "terrain", "ui",
 ]
 
 # Editor/preview cruft that lives beside the sprites the game loads. `.ico` is

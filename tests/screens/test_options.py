@@ -177,6 +177,76 @@ class VolumeTests(unittest.TestCase):
         self.assertAlmostEqual(Game(save_path=game.save_path).audio.volume, v, places=6)
 
 
+class MusicVolumeTests(unittest.TestCase):
+    """The music level is its own row and its own saved value, independent of
+    the cue master (journal `music_journal.md`, 2026-09-16)."""
+
+    def _on_music_row(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("music")
+        return game, opt
+
+    def test_right_raises_music_volume_by_one_step_and_persists(self):
+        game, _ = self._on_music_row()
+        start = game.music.volume
+        _key(game, pygame.K_RIGHT)
+        self.assertAlmostEqual(game.music.volume, start + config.VOLUME_STEP, places=6)
+        self.assertAlmostEqual(
+            save_mod.load(game.save_path).settings["music_volume"],
+            game.music.volume, places=6)
+
+    def test_left_lowers_music_volume_by_one_step(self):
+        game, _ = self._on_music_row()
+        start = game.music.volume
+        _key(game, pygame.K_LEFT)
+        self.assertAlmostEqual(game.music.volume, start - config.VOLUME_STEP, places=6)
+
+    def test_music_volume_clamps_to_unit_range(self):
+        game, _ = self._on_music_row()
+        for _ in range(40):
+            _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.music.volume, 1.0)
+        for _ in range(60):
+            _key(game, pygame.K_LEFT)
+        self.assertEqual(game.music.volume, 0.0)
+
+    def test_the_two_sliders_are_independent(self):
+        game, opt = self._on_music_row()
+        cue_before = game.audio.volume
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.audio.volume, cue_before)
+        opt.sel = opt._rows.index("volume")
+        music_before = game.music.volume
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.music.volume, music_before)
+
+    def test_music_volume_survives_reload_into_a_fresh_game(self):
+        game, _ = self._on_music_row()
+        _key(game, pygame.K_RIGHT)
+        _key(game, pygame.K_RIGHT)
+        v = game.music.volume
+        self.assertAlmostEqual(Game(save_path=game.save_path).music.volume, v, places=6)
+
+    def test_the_default_is_the_configured_one(self):
+        game, _ = _options()
+        self.assertAlmostEqual(game.music.volume, config.MUSIC_VOLUME_DEFAULT, places=6)
+
+
+class MusicRoutingTests(unittest.TestCase):
+    def test_the_standalone_screen_plays_the_menu_track(self):
+        _, opt = _options()
+        self.assertEqual(opt.music, "menu")
+
+    def test_opened_over_a_run_it_inherits_instead(self):
+        """Pushed from the pause menu, Options is an overlay -- switching to
+        the menu track there would interrupt the run's music."""
+        from game.state import MUSIC_INHERIT
+        game = _game()
+        opt = OptionsState(game)
+        game.state_machine.change(opt, in_run=True)
+        self.assertIs(opt.music, MUSIC_INHERIT)
+
+
 class MuteTests(unittest.TestCase):
     def test_enter_on_mute_row_toggles_and_persists(self):
         game, opt = _options()
@@ -185,6 +255,16 @@ class MuteTests(unittest.TestCase):
         _key(game, pygame.K_RETURN)
         self.assertNotEqual(game.audio.muted, before)
         self.assertEqual(save_mod.load(game.save_path).settings["muted"], game.audio.muted)
+
+    def test_the_m_key_mutes_the_music_as_well_as_the_cues(self):
+        game, _ = _options()
+        before = game.audio.muted
+        # The M key is handled by Game, not the state, so drive it through
+        # the real input pump rather than the state machine.
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_m))
+        game._process_input()
+        self.assertNotEqual(game.audio.muted, before)
+        self.assertEqual(game.music.muted, game.audio.muted)
 
 
 class NavigationTests(unittest.TestCase):

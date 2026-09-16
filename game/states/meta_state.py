@@ -22,6 +22,7 @@ _RARITY_COLOR = {
 
 
 class MetaState(State):
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self.save = self.game.save
         self.catalog = self.game.meta_catalog

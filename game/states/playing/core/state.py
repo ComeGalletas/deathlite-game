@@ -72,6 +72,10 @@ class PlayingState(State):
     # from `draw` itself (see there). Mouse events arrive in surface
     # coordinates, which is what the manual aim reads against the camera.
     ui_box = False
+    # The run's track. Swapping to it here rather than on the loading
+    # screen means the crossfade lands as the world appears.
+    music = "gameplay"
+
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
               dev: bool = False, difficulty: str | None = None,
               prebuilt=None, main_weapon: str | None = None, **kwargs) -> None:

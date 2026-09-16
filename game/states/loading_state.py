@@ -44,6 +44,11 @@ _BUDGET_S = 0.030
 
 class LoadingState(State):
     backdrop = _BG          # the whole surface, not a 16:9 box (owner, 2026-09-16)
+    # No `music` declaration on purpose: inheriting is what keeps the menu
+    # track playing through world generation, so the swap to the run's
+    # track lands the moment the world appears (owner, 2026-09-16).
+    # `mixer.music` streams on SDL's own thread, so the 50-350 ms slices
+    # below never stutter it.
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
               dev: bool = False, difficulty: str | None = None,
               main_weapon: str | None = None, **kwargs) -> None:

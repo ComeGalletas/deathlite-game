@@ -122,6 +122,13 @@ class AudioManager:
         bus.subscribe(Events.BOSS_SPAWNED, lambda **kw: self.play("boss_spawn"))
         bus.subscribe(Events.BOSS_KILLED, lambda **kw: self.play("boss_death"))
 
+    @property
+    def backend(self):
+        """The mixer backend this manager brought up. `MusicPlayer` reads
+        `ready` off it -- the device is opened once, by whoever is built
+        first, and the music stream shares it with the cues."""
+        return self._backend
+
     def toggle_mute(self) -> None:
         self.muted = not self.muted
 

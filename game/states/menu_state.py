@@ -34,6 +34,7 @@ _DANGER = {"exit"}          # drawn on the red sheet
 
 
 class MenuState(State):
+    music = "menu"
     def enter(self, **kwargs) -> None:
         self._menu_font_px = 24
         self._title_font = fonts.heading(64)

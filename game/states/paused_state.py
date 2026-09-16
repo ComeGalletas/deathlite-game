@@ -41,11 +41,24 @@ _LABELS = {"resume": "Resume", "status": "Run status", "options": "Options",
 class PausedState(State):
     draw_below = True      # keep the frozen game visible behind the dim layer
     update_below = False   # ...but do not advance it
+    # `music` is inherited: the run's track keeps playing, dipped to
+    # `config.MUSIC_DUCK` by the enter/exit hooks below.
 
     def enter(self, **kwargs) -> None:
         self.sel = 0
         self._build_fonts()
         self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
+        self._duck(True)
+
+    def exit(self) -> None:
+        # Ducking is separate from the stored volume, so this restores the
+        # player's Options setting rather than a value saved here.
+        self._duck(False)
+
+    def _duck(self, on: bool) -> None:
+        player = self.music_player
+        if player is not None:
+            player.set_ducked(on)
 
     def _build_fonts(self) -> None:
         self._title_font = fonts.heading(48)
