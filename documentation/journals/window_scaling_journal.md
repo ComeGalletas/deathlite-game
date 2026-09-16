@@ -418,6 +418,11 @@ open points are folded in below.
   behind the margins the same way.
 - `game/save.py`: `display["render"]` coerced. `game/game.py`: the
   before-open and reopened hooks.
+- **The ultrawide main menu** (owner, 2026-09-16): on a 21:9 render the
+  menu paints `menu_background_long.png` (2496x800) across the whole
+  surface in `draw_backdrop`, scaled to cover the height and centred, and
+  skips the 16:9 art in the box; `config.MENU_BACKGROUND_LONG_IMAGE`.
+  Pinned in `tests/screens/test_ultrawide.py`; verified at 3440x1440.
 
 ### Verified on the real window (3440x1440)
 

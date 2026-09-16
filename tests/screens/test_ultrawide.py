@@ -72,6 +72,27 @@ class DimCoversTheMarginsTests(unittest.TestCase):
         MenuState(game).draw_backdrop(s)
         self.assertEqual(s.get_at(MARGIN_PX)[:3], config.MENU_BG)
 
+    def test_on_a_21_9_render_the_menu_draws_the_long_background_edge_to_edge(self):
+        # Owner, 2026-09-16: the ultrawide menu uses menu_background_long.png
+        # across the whole surface, so the margins carry art, not black.
+        game = _game()
+        game.display.render_aspect = "21:9"
+        s = _bright()
+        st = MenuState(game)
+        st.draw_backdrop(s)
+        self.assertNotEqual(s.get_at(MARGIN_PX)[:3], config.MENU_BG)
+        self.assertNotEqual(s.get_at(MARGIN_PX)[:3], (255, 255, 255))
+        self.assertNotEqual(s.get_at(BOX_PX)[:3], (255, 255, 255))
+        # The box draw leaves that art alone (no 16:9 background over it).
+        before = s.get_at((260, 20))[:3]                 # just inside the box, top-left corner
+        st.enter()
+        st.draw(uibox.box(s))
+        self.assertEqual(s.get_at((260, 20))[:3], before)
+        game.display.render_aspect = "16:9"
+        s2 = _bright()
+        MenuState(game).draw_backdrop(s2)
+        self.assertEqual(s2.get_at(MARGIN_PX)[:3], config.MENU_BG)
+
 
 class ScreenBackdropTests(unittest.TestCase):
     """A screen with a background of its own paints it on the whole

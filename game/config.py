@@ -542,6 +542,10 @@ MENU_TITLE_IMAGE: str = "ui/start_screen/title.png"
 # Full-screen backdrop, drawn under the logo; falls back to MENU_TITLE_IMAGE,
 # then to the flat MENU_BG fill.
 MENU_BACKGROUND_IMAGE: str = "ui/start_screen/menu_background.png"
+# The 21:9 backdrop (owner, 2026-09-16): on an ultrawide render the menu
+# draws this 2496x800 strip across the whole surface -- scaled to cover the
+# height and centred, never stretched -- instead of the 16:9 art in the box.
+MENU_BACKGROUND_LONG_IMAGE: str = "ui/start_screen/menu_background_long.png"
 # The game logo, drawn above the option list; falls back to rendered text.
 MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
 
