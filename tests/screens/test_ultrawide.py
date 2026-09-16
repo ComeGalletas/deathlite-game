@@ -14,9 +14,13 @@ import pygame
 from game import config
 from game.display import uibox
 from game.game import Game
+from game.states.game_over_state import GameOverState
+from game.states.level_up_state import LevelUpState
+from game.states.loading_state import LoadingState
 from game.states.menu_state import MenuState
 from game.states.paused_state import PausedState
 from game.states.run_status_state import RunStatusState
+from game.states.victory_state import VictoryState
 from ui.level_up import LevelUpPanel
 from ui.run_status import common as rs_common
 
@@ -67,6 +71,41 @@ class DimCoversTheMarginsTests(unittest.TestCase):
         s = _bright()
         MenuState(game).draw_backdrop(s)
         self.assertEqual(s.get_at(MARGIN_PX)[:3], config.MENU_BG)
+
+
+class ScreenBackdropTests(unittest.TestCase):
+    """A screen with a background of its own paints it on the whole
+    surface (owner, 2026-09-16: the loading screen showed as a black square
+    inside the loop's grey on a 21:9 render). Overlays declare none."""
+
+    def _margin_and_box(self, state):
+        s = _bright()
+        state.draw_backdrop(s)
+        return s.get_at(MARGIN_PX)[:3], s.get_at(BOX_PX)[:3]
+
+    def test_the_loading_screen_is_black_edge_to_edge(self):
+        game = _game()
+        margin, box = self._margin_and_box(LoadingState(game))
+        self.assertEqual(margin, box)
+        self.assertEqual(margin, LoadingState.backdrop)
+        self.assertNotEqual(margin, (255, 255, 255))
+
+    def test_the_end_screens_paint_their_colour_edge_to_edge(self):
+        game = _game()
+        for cls in (GameOverState, VictoryState):
+            margin, box = self._margin_and_box(cls(game))
+            self.assertEqual(margin, box, cls.__name__)
+            self.assertEqual(margin, cls.backdrop, cls.__name__)
+
+    def test_overlays_declare_no_backdrop_colour(self):
+        for cls in (PausedState, LevelUpState, RunStatusState):
+            self.assertIsNone(cls.backdrop, cls.__name__)
+
+    def test_a_plain_state_leaves_the_loop_fill_alone(self):
+        from game.state import State
+        s = _bright()
+        State(_game()).draw_backdrop(s)
+        self.assertEqual(s.get_at(MARGIN_PX)[:3], (255, 255, 255))
 
 
 class PanelsStayInTheBoxTests(unittest.TestCase):

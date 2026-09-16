@@ -44,6 +44,15 @@ class State:
     # surface and it draws its own HUD on the box. On a 16:9 render the box
     # is the surface and nothing differs.
     ui_box: bool = True
+    # The colour this screen paints on the *whole* render surface before
+    # its content goes on the box, or None to leave the main loop's
+    # `COLOR_BG` (which is what the Options, hero-select, rankings and
+    # Sanctuary screens use anyway). A screen with a background of its own
+    # -- the loading screen's black, the end screens' colours, the menu --
+    # sets it here, so a 21:9 render's side margins match the screen
+    # instead of showing the loop's grey around a 16:9 box (owner,
+    # 2026-09-16). Overlays leave it None: they dim in `draw_backdrop`.
+    backdrop: tuple[int, int, int] | None = None
 
     def __init__(self, game: "Game") -> None:
         self.game = game
@@ -62,8 +71,11 @@ class State:
 
     def draw_backdrop(self, surface: pygame.Surface) -> None:
         """Paint on the *whole* render surface before `draw` gets the box:
-        the overlays' dim layer lives here so that on a 21:9 render it
-        darkens the side margins too (owner, 2026-09-15)."""
+        a screen's `backdrop` colour, or the overlays' dim layer, so that
+        on a 21:9 render the side margins match too (owner, 2026-09-15 and
+        2026-09-16)."""
+        if self.backdrop is not None:
+            surface.fill(self.backdrop)
 
     def draw(self, surface: pygame.Surface) -> None:
         """Render this state onto surface."""

@@ -40,6 +40,7 @@ BUTTONS = (
 
 
 class VictoryState(State):
+    backdrop = BACKDROP     # the whole surface; the panel goes on the box
     def enter(self, *, stats: dict | None = None, **kwargs) -> None:
         self.stats = stats or {}
         self._screen = end_screen.EndScreen(
