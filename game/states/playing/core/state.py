@@ -527,6 +527,12 @@ class PlayingState(State):
 
     def _phase_update(self, dt: float) -> None:
         self.player.update(dt, self.game_map)
+        # Footsteps follow the *input* direction, not the resolved motion, so
+        # a shove or a walk into a wall does not produce phantom steps. The
+        # cadence lives in the audio system (`_Footsteps`).
+        self.game.audio.tick_footsteps(
+            dt, self.player._move_dir.length_squared() > 0,
+            self.player.move_speed)
         self._update_hero_anim(dt)
         self.camera.update(dt, self.player.pos)
         self.nav.update(dt)

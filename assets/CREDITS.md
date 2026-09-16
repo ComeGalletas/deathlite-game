@@ -1,9 +1,15 @@
 # Asset Credits
 
 All game **content** — design, code, data, and the procedurally synthesised
-sound effects in `systems/audio.py` — is original to this project, with two
+sound effects in `systems/audio.py` — is original to this project, with three
 exceptions that are licensed rather than original: the art packs listed below,
-and the two background music tracks in `assets/music/`.
+the two background music tracks in `assets/music/`, and the recorded sound
+effects in `assets/sound_effects/`.
+
+> **Attribution is required** for the two grass-footstep recordings (CC BY 4.0).
+> Everything else here is either attribution-optional or covered by a purchase;
+> the Sound effects section below is the one that must not be dropped from a
+> shipped build.
 
 ## Art — "Tiny Swords" by Pixel Frog
 
@@ -73,6 +79,47 @@ of them, would not be.
 
 The files ship as downloaded, at 320 kbps, and are streamed rather than
 decoded into memory (see `systems/music.py`).
+
+## Sound effects — Freesound (`assets/sound_effects/`)
+
+Three recordings from [Freesound](https://freesound.org). Freesound licences
+are chosen per upload, so these are **not** all the same: the two footsteps
+require attribution, the growl does not.
+
+| File in game | Source | Author | Freesound ID | Licence |
+|--------------|--------|--------|--------------|---------|
+| `footstep_grass_hard.wav` | [grass_footstep_hard_4.wav](https://freesound.org/s/386678/) | [laurenmg95](https://freesound.org/people/laurenmg95/) | 386678 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — **attribution required** |
+| `footstep_grass_soft.wav` | [grass_footstep_soft_4.wav](https://freesound.org/s/386686/) | [laurenmg95](https://freesound.org/people/laurenmg95/) | 386686 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — **attribution required** |
+| `monster_growl.wav` | [Monster_Growls_Grunts_10](https://freesound.org/s/869056/) | [SignatureSoundsOrg](https://freesound.org/people/SignatureSoundsOrg/) | 869056 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) — attribution not required (given anyway) |
+
+### Changes made
+
+CC BY 4.0 requires that modifications be indicated. **All three files were
+modified.** None is used as downloaded:
+
+- **Trimmed.** Each source was mostly dead air. The growl ran 14.08 s with the
+  growl itself over by ~2.2 s and the remaining 11.9 s at a −84 dBFS noise
+  floor; both footsteps carried about a second of silence after the step, and
+  a further 0.23 s (hard) and 0.09 s (soft) of handling noise *before* it.
+- **Resampled.** The growl was 96 kHz and is now 44.1 kHz, the rate the game
+  opens its audio device at.
+- **Normalised.** The growl was raised from −21.6 dBFS to −2.9 dBFS peak; the
+  two footsteps were raised by a single shared factor, so their relative
+  loudness is unchanged.
+- **Faded.** A short fade-out was applied at each new end point so the cut does
+  not click.
+
+The originals are kept unmodified in `assets/sound_effects/unused/` under their
+Freesound filenames, which carry the ID and author. The transformation is
+reproducible: `python -m tools.asset_pipeline.cut_sound_effects`.
+
+### Attribution text
+
+> "grass_footstep_hard_4.wav" and "grass_footstep_soft_4.wav" by laurenmg95
+> (freesound.org/s/386678, freesound.org/s/386686), licensed under CC BY 4.0;
+> trimmed, normalised and faded for use in this game.
+> "Monster_Growls_Grunts_10" by SignatureSoundsOrg (freesound.org/s/869056),
+> CC0; trimmed, resampled, normalised and faded.
 
 ## Main screen art (`assets/ui/start_screen/`)
 

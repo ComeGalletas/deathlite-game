@@ -40,10 +40,13 @@ NAME = "DeathliteGame"                # exe / dist folder name (no space: paths)
 # one of these. `fonts` carries no directory prefix in the data (game/fonts.py
 # names the files directly) but is required all the same, and `music` holds
 # the two streamed tracks named by `config.MUSIC_TRACKS` (about 8.5 MB, the
-# largest single contribution to the bundle).
+# largest single contribution to the bundle). `sound_effects` holds the cues
+# named by `config.SOUND_EFFECTS`; its `unused/` folder of Freesound originals
+# is skipped by SKIP_DIRS below, like every other `unused/`.
 ASSET_DIRS = [
     "buildings", "characters", "effects", "enemies",
-    "fonts", "items", "music", "projectiles", "terrain", "ui",
+    "fonts", "items", "music", "projectiles", "sound_effects",
+    "terrain", "ui",
 ]
 
 # Editor/preview cruft that lives beside the sprites the game loads. `.ico` is

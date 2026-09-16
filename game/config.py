@@ -638,6 +638,42 @@ HUD_BOSS_BOTTOM: int = 28
 # cue master and the music level -- step on it.
 VOLUME_STEP: float = 0.05
 
+# --- Sound effects (recorded) --------------------------------------------
+# Cues that come from files rather than from the synth in `systems/audio.py`
+# (journal `sound_effects_journal.md`, 2026-09-16). Paths are relative to
+# `assets.ASSETS_DIR`. The files are cut from the Freesound downloads kept in
+# `assets/sound_effects/unused/` by `tools/asset_pipeline/cut_sound_effects.py`,
+# already trimmed, normalised and at the device's 44.1 kHz -- so they load with
+# no conversion and start on frame 0, with no silence to hear as latency.
+#
+# A name that collides with a synthesised cue replaces it: `boss_spawn` is the
+# recorded growl now, not the saw sweep (owner, 2026-09-16).
+SOUND_EFFECTS: dict = {
+    "footstep_hard": "sound_effects/footstep_grass_hard.wav",
+    "footstep_soft": "sound_effects/footstep_grass_soft.wav",
+    "boss_spawn":    "sound_effects/monster_growl.wav",
+}
+
+# Hero footsteps. The cadence is a fixed *stride* rather than a fixed interval,
+# so a speed-buffed run steps faster on its own without a reference speed to
+# keep in sync with the hero data: one step per this many pixels travelled.
+# 64 px is one tile, which at the heroes' 140-170 px/s base speed lands at a
+# 0.38-0.46 s cadence -- an ordinary walking pace.
+FOOTSTEP_STRIDE_PX: float = 64.0
+# Bounds on the derived interval, so a heavily stacked speed build does not
+# turn the walk into a machine gun and a slowed hero does not fall silent.
+FOOTSTEP_INTERVAL_MIN_S: float = 0.16
+FOOTSTEP_INTERVAL_MAX_S: float = 0.85
+# Footsteps are constant, so they sit well under the rest of the mix.
+FOOTSTEP_GAIN: float = 0.30
+
+# The growl plays on two occasions (owner, 2026-09-16). A boss entrance gets it
+# at full level; a room waking up gets the same recording quieter, so the boss
+# stays the loud one.
+GROWL_ROOM_GAIN: float = 0.45
+# A room can wake often enough to be worth a floor between growls.
+GROWL_ROOM_MIN_GAP_MS: int = 6000
+
 # --- Music ---------------------------------------------------------------
 # The streamed background tracks (journal `music_journal.md`, 2026-09-16),
 # keyed by the id a `State.music` declares. Paths are relative to
