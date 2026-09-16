@@ -68,6 +68,7 @@ class WindowTests(unittest.TestCase):
         with mock.patch.object(config, "VSYNC", True), \
                 mock.patch.object(config, "WINDOW_RESIZABLE", True), \
                 mock.patch("game.display.window.sys.platform", "win32"), \
+                mock.patch("game.display.window._headless", lambda: False), \
                 mock.patch.object(pygame.display, "set_mode", refusing):
             dw = DisplayWindow()
             surf, on = dw.open()

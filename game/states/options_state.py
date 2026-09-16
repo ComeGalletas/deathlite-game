@@ -26,6 +26,7 @@ import pygame
 
 from game import config, fonts
 from game.state import State
+from ui import scale
 
 _LABELS = {"volume": "Master volume", "mute": "Mute", "key_layout": "Key layout",
            "display": "Display mode", "resolution": "Resolution",
@@ -137,11 +138,11 @@ class OptionsState(State):
         cx = surface.get_width() // 2
 
         title = self._title.render("Options", True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(cx, 96)))
+        surface.blit(title, title.get_rect(center=(cx, scale.px(96))))
 
-        x0 = cx - 250          # label column
-        vx = x0 + 250          # value / bar column
-        y0, step = 240, 74
+        x0 = cx - scale.px(250)          # label column
+        vx = x0 + scale.px(250)          # value / bar column
+        y0, step = scale.px(240), scale.px(74)
         for i, rid in enumerate(self._rows):
             y = y0 + i * step
             selected = i == self.sel
@@ -151,21 +152,21 @@ class OptionsState(State):
 
             if selected:
                 mark = self._row.render(">", True, config.COLOR_ACCENT)
-                surface.blit(mark, mark.get_rect(midright=(x0 - 14, y)))
+                surface.blit(mark, mark.get_rect(midright=(x0 - scale.px(14), y)))
             lab = self._row.render(_LABELS[rid], True, colour)
             surface.blit(lab, lab.get_rect(midleft=(x0, y)))
 
             if rid == "volume":
-                bar = pygame.Rect(vx, y - 11, 220, 22)
+                bar = pygame.Rect(vx, y - scale.px(11), scale.px(220), scale.px(22))
                 pygame.draw.rect(surface, config.COLOR_WORLD_BORDER, bar,
-                                 width=2, border_radius=4)
-                fill = bar.inflate(-6, -6)
+                                 width=max(1, scale.px(2)), border_radius=scale.px(4))
+                fill = bar.inflate(-scale.px(6), -scale.px(6))
                 fill.width = int(fill.width * self.audio.volume)
                 if fill.width > 0:
                     pygame.draw.rect(surface, colour, fill, border_radius=3)
                 pct = self._row.render(f"{round(self.audio.volume * 100)}%",
                                        True, colour)
-                surface.blit(pct, pct.get_rect(midleft=(vx + 236, y)))
+                surface.blit(pct, pct.get_rect(midleft=(vx + scale.px(236), y)))
             elif rid == "mute":
                 val = self._row.render("On" if self.audio.muted else "Off",
                                        True, colour)
@@ -184,4 +185,4 @@ class OptionsState(State):
         hint = self._hint.render(
             "Up / Down select    -    Left / Right adjust    -    "
             "ENTER toggle / open    -    ESC back", True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - 40)))
+        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - scale.px(40))))

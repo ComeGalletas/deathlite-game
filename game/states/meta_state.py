@@ -11,6 +11,7 @@ import pygame
 
 from game import config, fonts
 from game.state import State
+from ui import scale
 from progression.items import Item
 from progression.meta import buy
 
@@ -82,25 +83,27 @@ class MetaState(State):
     def draw(self, surface: pygame.Surface) -> None:
         surface.fill(config.COLOR_BG)
         w = surface.get_width()
+        S = scale.px
         title = self._title.render("Sanctuary", True, config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(midtop=(w // 2, 28)))
+        surface.blit(title, title.get_rect(midtop=(w // 2, S(28))))
         salvage = self._h.render(f"Salvage: {self.save.currency}", True, config.COLOR_TEXT)
-        surface.blit(salvage, salvage.get_rect(midtop=(w // 2, 78)))
+        surface.blit(salvage, salvage.get_rect(midtop=(w // 2, S(78))))
 
-        self._draw_upgrades(surface, x=70, active=self.panel == 0)
-        self._draw_stash(surface, x=w // 2 + 30, active=self.panel == 1)
+        self._draw_upgrades(surface, x=S(70), active=self.panel == 0)
+        self._draw_stash(surface, x=w // 2 + S(30), active=self.panel == 1)
 
         hint = self._small.render(
             "TAB switch panel   -   Up/Down select   -   ENTER buy/equip   -   "
             "U unequip   -   ESC back", True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(midbottom=(w // 2, surface.get_height() - 18)))
+        surface.blit(hint, hint.get_rect(midbottom=(w // 2, surface.get_height() - S(18))))
 
     def _draw_upgrades(self, surface, x, active) -> None:
-        y = 130
+        S = scale.px
+        y = S(130)
         head = self._h.render("Upgrades" + (" <" if active else ""), True,
                               config.COLOR_TEXT if active else config.COLOR_TEXT_DIM)
         surface.blit(head, (x, y))
-        y += 40
+        y += S(40)
         for i, uid in enumerate(self._upgrade_ids()):
             d = self.game.content.meta_upgrades[uid]
             lvl = self.save.meta.get(uid, 0)
@@ -113,15 +116,16 @@ class MetaState(State):
             surface.blit(self._f.render(
                 f"{d['name']:<14} {lvl}/{mx}   {cost:>4}", True, colour), (x, y))
             surface.blit(self._small.render(d["desc"], True, config.COLOR_TEXT_DIM),
-                         (x + 16, y + 20))
-            y += 46
+                         (x + S(16), y + S(20)))
+            y += S(46)
 
     def _draw_stash(self, surface, x, active) -> None:
-        y = 130
+        S = scale.px
+        y = S(130)
         head = self._h.render("Stash" + (" <" if active else ""), True,
                               config.COLOR_TEXT if active else config.COLOR_TEXT_DIM)
         surface.blit(head, (x, y))
-        y += 34
+        y += S(34)
         for slot in ("weapon", "armor", "accessory"):
             eid = self.save.equipped.get(slot)
             name = "-"
@@ -131,8 +135,8 @@ class MetaState(State):
                     name = match["name"]
             surface.blit(self._small.render(f"{slot:<10} {name}", True,
                                             (150, 200, 255)), (x, y))
-            y += 20
-        y += 10
+            y += S(20)
+        y += S(10)
 
         if not self.save.stash:
             surface.blit(self._f.render("(no items yet - beat elites / the boss)",
@@ -145,4 +149,4 @@ class MetaState(State):
             colour = config.COLOR_ACCENT if (active and i == self.sel[1]) else base
             tag = " *" if equipped else ""
             surface.blit(self._f.render(f"{it.short()}{tag}", True, colour), (x, y))
-            y += 24
+            y += S(24)

@@ -25,6 +25,7 @@ import pygame
 from game import config, fonts
 from game.content import get_content
 from game.state import State
+from ui import scale
 from systems.animation import Animator
 from world.gen import generate_world_steps
 from world.map import GameMap
@@ -153,8 +154,8 @@ class LoadingState(State):
         surface.fill(_BG)
         cx, cy = surface.get_width() // 2, surface.get_height() // 2
         text = self._font.render(self._label, True, _FG)
-        surface.blit(text, text.get_rect(center=(cx, cy - 40)))
-        self._draw_hero(surface, cx, cy + 60)
+        surface.blit(text, text.get_rect(center=(cx, cy - scale.px(40))))
+        self._draw_hero(surface, cx, cy + scale.px(60))
 
     def _draw_hero(self, surface, cx: int, ground_y: int) -> None:
         """The hero as the run draws it -- same rig, same size, same anchor

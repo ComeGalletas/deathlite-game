@@ -15,7 +15,7 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts
-from ui import widgets
+from ui import scale, widgets
 from ui.mouse import HitMap
 from ui.text import shadowed, wrap
 
@@ -77,14 +77,15 @@ class LevelUpPanel:
 
         title = self._title.render(title or "Level Up  -  choose one", True,
                                    config.COLOR_ACCENT)
-        surface.blit(title, title.get_rect(center=(w // 2, 110)))
+        surface.blit(title, title.get_rect(center=(w // 2, scale.px(110))))
 
         n = len(choices)
-        card_h = _CARD_H
-        gap = 40
+        card_w = scale.px(card_w)               # design widths in; native px from here on
+        card_h = scale.px(_CARD_H)
+        gap = scale.px(40)
         total = n * card_w + (n - 1) * gap
         x0 = (w - total) // 2
-        y = h // 2 - _CARD_TOP_H // 2       # the top edge stays where the 200-tall card had it
+        y = h // 2 - scale.px(_CARD_TOP_H) // 2   # the top edge stays where the 200-tall card had it
 
         self.hits.clear()
         for i, up in enumerate(choices):
@@ -93,15 +94,15 @@ class LevelUpPanel:
             state = ("pressed" if pressed == i
                      else "hover" if i == selected else "normal")
             widgets.draw_button(surface, assets, rect, None, state=state, shape="panel")
-            dy = widgets.PRESSED_DY if state == "pressed" else 0
+            dy = scale.px(widgets.PRESSED_DY) if state == "pressed" else 0
 
             # Text on the light card: the name is a title (title face, black);
             # badge, description and tags are the dark grey.
             key_badge = self._name.render(f"#{i + 1}", True, config.COLOR_ON_BUTTON_DIM)
-            surface.blit(key_badge, (x + 39, y + 10 + dy))    # 25 px in from the corner (owner)
+            surface.blit(key_badge, (x + scale.px(39), y + scale.px(10) + dy))    # 25 px in from the corner (owner)
 
             name = shadowed(self._name, up.title, config.COLOR_ACCENT)   # gold with a dark drop shadow
-            surface.blit(name, name.get_rect(midtop=(rect.centerx, y + 46 + dy)))
+            surface.blit(name, name.get_rect(midtop=(rect.centerx, y + scale.px(46) + dy)))
 
             # P2: the rarity, top-right, in its colour (the level is in the
             # title's roman numeral).
@@ -109,28 +110,29 @@ class LevelUpPanel:
             if rarity:
                 r = self._hint.render(rarity.upper(), True,
                                       config.RARITY_COLOURS.get(rarity, config.COLOR_ON_BUTTON_DIM))
-                surface.blit(r, r.get_rect(topright=(x + card_w - 24, y + 14 + dy)))
+                surface.blit(r, r.get_rect(topright=(x + card_w - scale.px(24), y + scale.px(14) + dy)))
 
-            lines = wrap(self._desc, up.description, card_w - 2 * _CARD_TEXT_INSET)
-            band_top = y + _DESC_TOP
-            band_bottom = (y + card_h - _TAG_UP
-                           - self._hint.get_height() - _DESC_GAP)
-            slack = band_bottom - band_top - len(lines) * _DESC_LINE_H
+            lines = wrap(self._desc, up.description, card_w - 2 * scale.px(_CARD_TEXT_INSET))
+            line_h = scale.px(_DESC_LINE_H)
+            band_top = y + scale.px(_DESC_TOP)
+            band_bottom = (y + card_h - scale.px(_TAG_UP)
+                           - self._hint.get_height() - scale.px(_DESC_GAP))
+            slack = band_bottom - band_top - len(lines) * line_h
             top = band_top + max(0, slack // 2)      # never above the band's top
             for j, line in enumerate(lines):
                 d = self._desc.render(line, True, config.COLOR_ON_BUTTON_DIM)
                 surface.blit(d, d.get_rect(
-                    midtop=(rect.centerx, top + j * _DESC_LINE_H + dy)))
+                    midtop=(rect.centerx, top + j * line_h + dy)))
 
             if up.tags:
                 # The category line: each word capitalised, 25 px up from
                 # the bottom bevel (owner, 2026-09-10).
                 words = " ".join(t[:1].upper() + t[1:] for t in up.tags)
                 tag = self._hint.render(words, True, config.COLOR_ON_BUTTON_DIM)
-                surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - 39 + dy)))
+                surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - scale.px(39) + dy)))
 
         hint = self._hint.render(
             hint or "1/2/3 or Left/Right + Enter to pick    -    or click a card",
             True, config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(w // 2, y + card_h + 60)))
+        surface.blit(hint, hint.get_rect(center=(w // 2, y + card_h + scale.px(60))))
 

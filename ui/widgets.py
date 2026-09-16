@@ -27,7 +27,7 @@ from __future__ import annotations
 import pygame
 
 from game import config
-from ui import panels
+from ui import panels, scale
 
 STATES = ("normal", "hover", "pressed")
 SHAPES = ("wide", "panel")
@@ -75,15 +75,15 @@ def draw_button(surface: pygame.Surface, assets, rect: pygame.Rect, label: str |
     if art is not None:
         surface.blit(art, rect.topleft)
     else:
-        pygame.draw.rect(surface, _FALLBACK_FILL[state], rect, border_radius=12)
+        pygame.draw.rect(surface, _FALLBACK_FILL[state], rect, border_radius=scale.px(12))
         edge = config.COLOR_ACCENT if state == "hover" else config.COLOR_WORLD_BORDER
-        pygame.draw.rect(surface, edge, rect, width=3 if state == "hover" else 2,
-                         border_radius=12)
+        pygame.draw.rect(surface, edge, rect, width=max(1, scale.px(3 if state == "hover" else 2)),
+                         border_radius=scale.px(12))
     if label is None or font is None:
         return None
     text = font.render(label, True, text_colour or config.COLOR_ON_BUTTON)
     lift = LABEL_DY if label_dy is None else label_dy
-    dy = lift + (PRESSED_DY if state == "pressed" else 0)
+    dy = scale.px(lift + (PRESSED_DY if state == "pressed" else 0))
     text_rect = text.get_rect(center=(rect.centerx, rect.centery + dy))
     surface.blit(text, text_rect)
     return text_rect
@@ -106,8 +106,9 @@ def draw_ribbon(surface: pygame.Surface, assets, rect: pygame.Rect, label: str |
     if art is not None:
         surface.blit(art, rect.topleft)
     else:
-        pygame.draw.rect(surface, (36, 40, 60), rect, border_radius=6)
-        pygame.draw.rect(surface, config.COLOR_ACCENT, rect, width=2, border_radius=6)
+        pygame.draw.rect(surface, (36, 40, 60), rect, border_radius=scale.px(6))
+        pygame.draw.rect(surface, config.COLOR_ACCENT, rect, width=max(1, scale.px(2)),
+                         border_radius=scale.px(6))
     if label is None or font is None:
         return None
     text = font.render(label, True, text_colour or config.COLOR_ON_BUTTON)

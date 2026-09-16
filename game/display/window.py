@@ -57,8 +57,20 @@ def _logical() -> tuple[int, int]:
     return (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
 
 
+def _headless() -> bool:
+    """The dummy video driver: a fresh process gets a software-rendered
+    scaled window from it, an already-open display does not, so whether the
+    feature came up would depend on process history (the suite found this
+    once native rendering made `SCREEN_*` follow the window). Headless has
+    nothing to scale into: the feature stays dormant there, always."""
+    try:
+        return pygame.display.get_driver() == "dummy"
+    except pygame.error:
+        return False
+
+
 def _scalable() -> bool:
-    return bool(config.WINDOW_RESIZABLE) and sys.platform != "emscripten"
+    return bool(config.WINDOW_RESIZABLE) and sys.platform != "emscripten" and not _headless()
 
 
 class DisplayWindow:

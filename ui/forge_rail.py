@@ -21,6 +21,7 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts
+from ui import scale
 from ui.mouse import HitMap
 
 
@@ -46,7 +47,7 @@ class ForgeRail:
         self.hits = HitMap()        # row index -> rect, rebuilt every draw
 
     def height(self, rows) -> int:
-        return len(rows) * ROW_H + max(0, len(rows) - 1) * ROW_GAP
+        return len(rows) * scale.px(ROW_H) + max(0, len(rows) - 1) * scale.px(ROW_GAP)
 
     def draw(self, surface: pygame.Surface, rows, selected: int, *,
              assets=None, right: int, top: int) -> None:
@@ -56,13 +57,14 @@ class ForgeRail:
         from ui import widgets
 
         self.hits.clear()
-        left = right - WIDTH
+        width, row_h, row_gap = scale.px(WIDTH), scale.px(ROW_H), scale.px(ROW_GAP)
+        left = right - width
         head = self._head.render("REFORGE WHICH WEAPON", True, config.COLOR_TEXT_DIM)
-        surface.blit(head, head.get_rect(midbottom=(left + WIDTH // 2, top - 10)))
+        surface.blit(head, head.get_rect(midbottom=(left + width // 2, top - scale.px(10))))
 
         for i, (weapon, eligible, note) in enumerate(rows):
-            y = top + i * (ROW_H + ROW_GAP)
-            rect = pygame.Rect(left, y, WIDTH, ROW_H)
+            y = top + i * (row_h + row_gap)
+            rect = pygame.Rect(left, y, width, row_h)
             if eligible:
                 # Only a selectable row is a click target, so a click on a
                 # weapon that cannot be forged does nothing at all.
@@ -76,16 +78,16 @@ class ForgeRail:
                 name_col = config.COLOR_ON_BUTTON
                 note_col = config.COLOR_ON_BUTTON_DIM
             else:
-                pygame.draw.rect(surface, (26, 24, 36), rect, border_radius=10)
-                pygame.draw.rect(surface, (54, 52, 70), rect, width=2,
-                                 border_radius=10)
+                pygame.draw.rect(surface, (26, 24, 36), rect, border_radius=scale.px(10))
+                pygame.draw.rect(surface, (54, 52, 70), rect, width=max(1, scale.px(2)),
+                                 border_radius=scale.px(10))
                 name_col = config.COLOR_TEXT_DIM
                 note_col = config.COLOR_TEXT_DIM
 
             name = self._name.render(weapon.name, True, name_col)
-            surface.blit(name, (left + _PAD_X, y + _TITLE_DY))
+            surface.blit(name, (left + scale.px(_PAD_X), y + scale.px(_TITLE_DY)))
             sub = self._note.render(note, True, note_col)
-            surface.blit(sub, (left + _PAD_X, y + _SUB_DY))
+            surface.blit(sub, (left + scale.px(_PAD_X), y + scale.px(_SUB_DY)))
 
 
 def rows_for(weapons, need: int, blessing_levels, forged_name=None):

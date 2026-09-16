@@ -9,9 +9,10 @@ Branch: `native-resolution` (off `main` at `cf50aba`, 2026-09-16).
 > pixel perfect? Make a new branch for this, journal it in a new file,
 > prepare a todo list for option 2.
 
-Status: **stage 1 built** (2026-09-16): the world renders at the window's
-native size at the effective zoom; the interface is still drawn unscaled
-in its 1600x900 box (stage 2). Stages 1b, 2 and 3 open.
+Status: **stages 1 and 2 built** (2026-09-16): the world renders at the
+window's native size at the effective zoom, and the interface draws at the
+same scale inside its box. Stages 1b (Options from the pause menu) and 3
+(performance, 4K, the merge decision) open.
 
 ---
 
@@ -272,19 +273,44 @@ for.
 
 ### Stage 2 — the UI at native resolution
 
-- [ ] `ui/scale.py`: the one seam -- `factor()`, `px(n)`, `rect(x, y, w, h)`,
-      `font(role, px)` building fonts at `round(px x s)` with a per-size
-      cache (fonts today are built per call: `game/fonts.py:17`).
-- [ ] Widgets: `ui/widgets.py` button art scaled once per size; `ui/bars`
-      meters and the medallion at `HUD_GEM_PX x s`; `ui/text.py`.
-- [ ] Screens, one at a time, each with its screenshot at 1.6x: HUD,
-      pause, level-up (cards and the Forge rail), run status (all panes),
-      menu, character select, options, meta, rankings, game over, victory,
-      loading, dev menu.
-- [ ] `uibox` in scaled pixels; `translate_event` unchanged in form.
-- [ ] The composite from stage 1 removed.
-- [ ] Tests: each screen's layout test parameterised by `s` in {1.0, 1.6};
-      hit rects scale with the layout; fonts at `s` are the requested size.
+- [x] `ui/scale.py`: the one seam -- `factor()` (= `config.RENDER_SCALE`),
+      `px(n)`, `size`, `rect`, `box_size()`, `int_scale(n)` for pixel-art
+      scales (a x3 bar becomes x5 at 1.6x, never x4.8). Fonts go through
+      `game/fonts.py`: `heading / body / mono(px)` take the *design* size
+      and build the native one (`native_px`); `scaled=False` is for text
+      that already follows the camera zoom (the floating damage numbers).
+- [x] Widgets and helpers: the button label lifts, the fallback radii and
+      edges, the ribbon fallback; the HUD's bar scale, gem size, offsets,
+      timer, boss bar and the level-number nudge; `ui/text.shadowed`'s drop
+      offset; `uibox` is the 1600x900 design at the factor (2560x1440 on
+      the owner's desktop, 440 px margins); the cursor follows
+      `RENDER_SCALE` (times what the presenter adds during a drag).
+- [x] Screens, every pixel number wrapped at the point of use: pause,
+      options, menu, loading, level-up (cards and the Forge rail), run
+      status (the shared primitives take design px for `indent` / `step`;
+      the three panes; the state's panel), the end screens and the run
+      summary, the hero select (cards, ribbon, Begin, the preview zoom and
+      band), the Sanctuary, the rankings, the dev menu, and the run's
+      banner / notice / prompts. Module constants stay design numbers.
+- [x] No composite was ever needed: the stage-1 interim drew the interface
+      unscaled in the box, and stage 2 scales it in place.
+- [x] Tests: `tests/screens/test_ui_scale.py` (10) at `RENDER_SCALE = 1.6`
+      on a 3440x1440 surface -- the helpers, the box, fonts scaled and
+      world text not, the pause buttons at 896 px centred in the box on a
+      115 px step, the Options rows, the HUD cluster at its scaled corner
+      and nowhere else, the level-up cards at 544x472, the menu rows, the
+      end-screen buttons, and every other screen drawing without error.
+      The existing screen tests run at scale 1, where every helper is the
+      identity; the two level-up source pins moved to the scaled
+      expressions. Found on the way: the headless dummy driver gives a
+      fresh process a software-rendered scaled window, so `available`
+      depended on process history once `SCREEN_*` followed the window;
+      `_headless()` keeps the feature dormant under that driver, always.
+- [x] Verified on the real window (3440x1440 borderless, `RENDER_SCALE`
+      1.6, zoom 2.40625, box 2560x1440 at x 440): menu, options, hero
+      select, the run with its HUD, pause, run status and game over
+      captured from the render surface; the pause and run-status frames
+      delivered.
 
 ### Stage 3 — polish and the decision
 

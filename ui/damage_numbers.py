@@ -56,7 +56,8 @@ class DamageNumbers:
         trio = self._font_cache.get(key)
         if trio is None:
             def f(pt):
-                return fonts.body(max(6, round(pt * zoom)), bold=True)
+                # The zoom already carries the render scale: not the UI seam.
+                return fonts.body(max(6, round(pt * zoom)), bold=True, scaled=False)
             trio = (f(_BASE_PT), f(_CRIT_PT), f(_IN_PT))
             self._font_cache[key] = trio
         return trio

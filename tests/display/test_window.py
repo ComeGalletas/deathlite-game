@@ -55,6 +55,7 @@ class _Harness:
             mock.patch.object(pygame.display, "toggle_fullscreen", self.toggle),
             mock.patch.object(config, "WINDOW_RESIZABLE", True),
             mock.patch("game.display.window.sys.platform", "win32"),
+            mock.patch("game.display.window._headless", lambda: False),   # the suite's dummy driver
             # The scaled-frame tests describe the fixed 1600x900 render;
             # `NativeRenderTests` turns native rendering on for itself.
             mock.patch.object(config, "RENDER_NATIVE", False),

@@ -106,7 +106,11 @@ class Game:
         return nxt
 
     def _cursor_scale(self) -> float:
-        return float(config.UI_CURSOR_SCALE) * float(self.display.scale)
+        # The design scale, times the render scale (the interface's size),
+        # times what the presenter still adds (1 under native rendering,
+        # more while a dragged window is being scaled).
+        return (float(config.UI_CURSOR_SCALE) * float(config.RENDER_SCALE)
+                * float(self.display.scale))
 
     def _before_display_open(self) -> None:
         """A display re-init (a render-width change in Options) loses the

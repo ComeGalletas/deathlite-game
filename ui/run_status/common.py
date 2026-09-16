@@ -12,10 +12,16 @@ import pygame
 from game import config, fonts
 from ui import text as uitext
 from ui import widgets
+from ui import scale
 
-ROW_STEP = 26
-RIBBON_H = 48
+ROW_STEP = 26          # design px: every number in this package is, and is
+RIBBON_H = 48          # scaled at the point of use with `S` (`ui/scale.px`)
 TITLE_DY = -5          # ribbon labels sit above the art's geometric centre (owner, 2026-09-12)
+
+
+def S(n: float) -> int:
+    """`n` design pixels in native pixels (`ui/scale.px`)."""
+    return scale.px(n)
 _PANEL_FILL = (10, 8, 14, 215)
 _RULE = config.COLOR_WORLD_BORDER
 # An inactive tab is the ribbon art multiplied down to this fraction of its
@@ -120,7 +126,7 @@ def draw_panel(surface: pygame.Surface, rect: pygame.Rect) -> None:
     panel = pygame.Surface(rect.size, pygame.SRCALPHA)
     panel.fill(_PANEL_FILL)
     surface.blit(panel, rect.topleft)
-    pygame.draw.rect(surface, _RULE, rect, width=1, border_radius=8)
+    pygame.draw.rect(surface, _RULE, rect, width=1, border_radius=S(8))
 
 
 def draw_tabs(surface, assets, rect: pygame.Rect, labels, active: int,
@@ -129,13 +135,13 @@ def draw_tabs(surface, assets, rect: pygame.Rect, labels, active: int,
     others shaded. Registers each as `("tab", i)` in `hits`."""
     colours = ("blue", "yellow", "red")
     n = len(labels)
-    gap = 24
-    w = min(320, (rect.width - 32 - gap * (n - 1)) // n)
+    gap = S(24)
+    w = min(S(320), (rect.width - S(32) - gap * (n - 1)) // n)
     total = n * w + gap * (n - 1)
     x = rect.centerx - total // 2
     rects = []
     for i, label in enumerate(labels):
-        r = pygame.Rect(x + i * (w + gap), rect.top - RIBBON_H // 2 + 8, w, RIBBON_H)
+        r = pygame.Rect(x + i * (w + gap), rect.top - S(RIBBON_H) // 2 + S(8), w, S(RIBBON_H))
         surface.blit(tab_surface(assets, r.size, label, colours[i % 3], font,
                                  active=(i == active)), r.topleft)
         hits.add(r, ("tab", i))
@@ -153,7 +159,7 @@ def tab_surface(assets, size, label: str, colour: str, font, *, active: bool) ->
     r = layer.get_rect()
     widgets.draw_ribbon(layer, assets, r, None, colour=colour)
     text = font.render(label, True, config.COLOR_ON_BUTTON)
-    layer.blit(text, text.get_rect(center=(r.centerx, r.centery + TITLE_DY)))
+    layer.blit(text, text.get_rect(center=(r.centerx, r.centery + S(TITLE_DY))))
     if not active:
         layer.fill(_TAB_SHADE_MULT, special_flags=pygame.BLEND_RGBA_MULT)
     return layer
@@ -170,35 +176,37 @@ def kv(surface, font, area, y, label, value, *, colour=None, label_colour=None) 
     name is rolled from affixes rather than authored.
     """
     val = font.render(str(value), True, colour or config.COLOR_TEXT)
-    room = area.width - val.get_width() - 8
+    room = area.width - val.get_width() - S(8)
     lab = font.render(uitext.ellipsize(font, str(label), room),
                       True, label_colour or config.COLOR_TEXT_DIM)
     surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
     surface.blit(val, val.get_rect(midright=(area.right, y)))
-    return y + ROW_STEP
+    return y + S(ROW_STEP)
 
 
 def line(surface, font, area, y, text, *, colour=None, indent: int = 0,
          step: int = ROW_STEP) -> int:
-    """One line, trimmed to what is left of the column after `indent`."""
+    """One line, trimmed to what is left of the column after `indent`.
+    `indent` and `step` are design px."""
+    indent = S(indent)
     t = font.render(uitext.ellipsize(font, str(text), area.width - indent),
                     True, colour or config.COLOR_TEXT)
     surface.blit(t, t.get_rect(midleft=(area.left + indent, y)))
-    return y + step
+    return y + S(step)
 
 
 def subheader(surface, font, area, y, text) -> int:
-    y += 6
+    y += S(6)
     t = font.render(uitext.ellipsize(font, str(text), area.width),
                     True, config.COLOR_ACCENT)
     surface.blit(t, t.get_rect(midleft=(area.left, y)))
-    pygame.draw.line(surface, _RULE, (area.left, y + 15), (area.right, y + 15))
-    return y + ROW_STEP + 4
+    pygame.draw.line(surface, _RULE, (area.left, y + S(15)), (area.right, y + S(15)))
+    return y + S(ROW_STEP + 4)
 
 
 def rule(surface, area, y) -> int:
-    pygame.draw.line(surface, _RULE, (area.left, y - 2), (area.right, y - 2))
-    return y + 6
+    pygame.draw.line(surface, _RULE, (area.left, y - S(2)), (area.right, y - S(2)))
+    return y + S(6)
 
 
 def more(surface, font, area, y, n: int, what: str) -> int:
@@ -210,5 +218,5 @@ def more(surface, font, area, y, n: int, what: str) -> int:
 def fits(area, y, rows: int, step: int = ROW_STEP) -> int:
     """How many of `rows` rows fit between `y` and the area's bottom, leaving
     the last slot for a "+n more" line when they do not all fit."""
-    room = max(0, (area.bottom - y) // step + 1)
+    room = max(0, (area.bottom - y) // S(step) + 1)
     return rows if rows <= room else max(0, room - 1)

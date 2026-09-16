@@ -14,6 +14,7 @@ from __future__ import annotations
 import pygame
 
 from game.state import State
+from ui import scale
 from progression.upgrades import apply_choice
 from ui.forge_rail import ForgeRail
 from ui.level_up import CARD_W, CARD_W_NARROW, LevelUpPanel
@@ -148,7 +149,7 @@ class LevelUpState(State):
         # stays beside them at 1600 and at the 1280 web profile instead of
         # drifting into the corner on the wider one.
         first = self.panel.hits.rect_of(0)
-        right = (first.left - 30) if first is not None else surface.get_width() // 4
-        top = first.top if first is not None else 300
+        right = (first.left - scale.px(30)) if first is not None else surface.get_width() // 4
+        top = first.top if first is not None else scale.px(300)
         self.rail.draw(surface, self.weapon_rows, self.weapon_sel,
                        assets=self.game.assets, right=right, top=top)
