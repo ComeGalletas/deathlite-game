@@ -562,7 +562,12 @@ WINDOW_ICON: str = "ui/icon.png"
 # hotspot sits on the arrow tip. A missing file, or a build that refuses a
 # surface cursor, keeps the system arrow.
 UI_CURSOR_IMAGE: str = "ui/pointers/arrow.png"
-UI_CURSOR_SCALE: float = 1.0      # the ink is 22x30 px at 1x; 1.5 if it reads small
+# The arrow is drawn at the size the desktop draws its own cursor (Windows'
+# `CursorBaseSize` times the display DPI, times the system arrow's ink
+# fraction -- `game/display/native.py`), so 1.0 means "the same size as the
+# system cursor". Raise it only to make the game's arrow deliberately larger
+# than the player's; the render scale no longer enters the sizing.
+UI_CURSOR_SCALE: float = 1.0
 
 # Game instructions, surfaced on the character-select screen (they lived on the
 # start menu until the hero-preview rework). A (label, keys) grid plus free

@@ -16,7 +16,9 @@ import pygame
 from game import config
 from game.assets import get_assets
 from game.game import Game
-from ui.mouse import HitMap, MouseNav, install_cursor
+from game.display import native
+from ui.mouse import (HitMap, MouseNav, cursor_ink, install_cursor,
+                      system_match_scale)
 
 
 def motion(pos):
@@ -127,6 +129,40 @@ class CursorTests(unittest.TestCase):
         self.assertEqual((w, h), (round(ink.width * config.UI_CURSOR_SCALE),
                                   round(ink.height * config.UI_CURSOR_SCALE)))
         self.assertEqual(cur.data[0], (0, 0))                 # hotspot: the arrow tip
+
+    def test_the_arrow_is_scaled_to_the_system_arrow_ink_height(self):
+        # The whole point of the match: whatever the desktop draws its arrow
+        # at, ours comes out the same number of screen pixels tall.
+        assets = get_assets()
+        ink = cursor_ink(assets)
+        self.assertIsNotNone(ink)
+        for target in (18.0, 33.75, 54.0):
+            with mock.patch.object(native, "system_cursor_ink_height",
+                                   return_value=target):
+                scale = system_match_scale(assets)
+            self.assertAlmostEqual(ink.height * scale, target, places=6)
+
+    def test_the_match_is_absolute_and_ignores_the_render_scale(self):
+        # A hardware cursor is in screen pixels: the render width and the
+        # presenter's own scaling must not enter the size.
+        game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        with mock.patch.object(native, "system_cursor_ink_height", return_value=33.75):
+            with mock.patch.object(config, "RENDER_SCALE", 1.6):
+                game.display.scale = 2.0
+                wide = game._cursor_scale()
+            with mock.patch.object(config, "RENDER_SCALE", 1.0):
+                game.display.scale = 1.0
+                narrow = game._cursor_scale()
+        self.assertEqual(wide, narrow)
+        self.assertAlmostEqual(wide, 33.75 / cursor_ink(game.assets).height, places=6)
+
+    def test_a_platform_that_will_not_say_keeps_the_render_scale_rule(self):
+        game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        with mock.patch.object(native, "system_cursor_ink_height", return_value=None):
+            with mock.patch.object(config, "RENDER_SCALE", 1.6):
+                game.display.scale = 1.0
+                self.assertAlmostEqual(game._cursor_scale(),
+                                       config.UI_CURSOR_SCALE * 1.6, places=6)
 
     def test_missing_pointer_keeps_the_system_cursor_and_boots(self):
         with mock.patch.object(config, "UI_CURSOR_IMAGE", "ui/pointers/nope.png"):

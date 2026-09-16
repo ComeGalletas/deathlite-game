@@ -15,7 +15,9 @@ its logic:
   every frame, so a pick on the press would fire an attack the moment an
   overlay closed.
 
-`install_cursor` sets the hardware cursor from `config.UI_CURSOR_IMAGE`.
+`install_cursor` sets the hardware cursor from `config.UI_CURSOR_IMAGE`,
+and `system_match_scale` says what to draw it at so it is the size the
+desktop draws its own arrow.
 """
 from __future__ import annotations
 
@@ -24,6 +26,7 @@ import logging
 import pygame
 
 from game import config
+from game.display import native
 
 log = logging.getLogger(__name__)
 
@@ -101,21 +104,44 @@ class MouseNav:
         return None
 
 
+def cursor_ink(assets) -> pygame.Rect | None:
+    """The arrow's ink inside `config.UI_CURSOR_IMAGE` (22x30 in the shipped
+    file, which is 64x64 with the arrow off-centre). None when the image is
+    missing or wholly transparent."""
+    base = assets.picture(config.UI_CURSOR_IMAGE)
+    if base is None:
+        return None
+    ink = base.get_bounding_rect()
+    return ink if ink.width and ink.height else None
+
+
+def system_match_scale(assets) -> float | None:
+    """The scale that draws our arrow at the size the desktop draws its own:
+    the system arrow's ink height over ours, times `config.UI_CURSOR_SCALE`.
+
+    A hardware cursor is in screen pixels, so this match is *absolute* --
+    neither the render scale nor the window scale enters it, and the arrow
+    keeps one physical size windowed, fullscreen and at every render width.
+    None where the platform will not say its cursor size, which leaves the
+    caller its own sizing."""
+    ink = cursor_ink(assets)
+    target = native.system_cursor_ink_height()
+    if ink is None or not target:
+        return None
+    return float(config.UI_CURSOR_SCALE) * float(target) / float(ink.height)
+
+
 def install_cursor(assets, scale: float | None = None) -> bool:
     """Set the hardware cursor to the arrow in `config.UI_CURSOR_IMAGE`:
     cropped to its ink, scaled by `scale` (default `config.UI_CURSOR_SCALE`;
-    the game passes that times the window scale, since a hardware cursor is
-    in screen pixels and would not follow the scaled frame), hotspot on the
-    ink's top-left pixel (the arrow tip). Returns True when installed; a
-    missing image or a refusing driver / build leaves the system cursor and
-    returns False."""
-    base = assets.picture(config.UI_CURSOR_IMAGE)
-    if base is None:
+    the game passes what `system_match_scale` measured, so the arrow is the
+    size the player's desktop cursor is), hotspot on the ink's top-left
+    pixel (the arrow tip). Returns True when installed; a missing image or a
+    refusing driver / build leaves the system cursor and returns False."""
+    ink = cursor_ink(assets)
+    if ink is None:
         return False
-    ink = base.get_bounding_rect()
-    if ink.width == 0 or ink.height == 0:
-        return False
-    surf = base.subsurface(ink).copy()
+    surf = assets.picture(config.UI_CURSOR_IMAGE).subsurface(ink).copy()
     scale = float(config.UI_CURSOR_SCALE if scale is None else scale)
     if scale != 1.0:
         surf = pygame.transform.smoothscale(

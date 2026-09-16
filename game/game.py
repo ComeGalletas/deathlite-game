@@ -25,7 +25,7 @@ from progression.meta import MetaCatalog
 from systems.audio import AudioManager
 from systems.debug_overlay import DebugOverlay
 from systems.music import MusicPlayer
-from ui.mouse import install_cursor
+from ui.mouse import install_cursor, system_match_scale
 
 log = logging.getLogger(__name__)
 
@@ -58,8 +58,8 @@ class Game:
         self.assets = get_assets()
         # The arrow from assets/ui/pointers as the hardware cursor; a missing
         # file or a refusing build keeps the system arrow (see ui/mouse.py).
-        # A hardware cursor is in screen pixels, so it follows the window
-        # scale or it shrinks to a third of itself at 3440x1440.
+        # A hardware cursor is in screen pixels, so it is measured against
+        # the cursor the desktop itself draws -- see `_cursor_scale`.
         self.cursor_installed = install_cursor(self.assets, self._cursor_scale())
         self.display.on_scale_changed = lambda _s: install_cursor(
             self.assets, self._cursor_scale())
@@ -114,9 +114,17 @@ class Game:
         return nxt
 
     def _cursor_scale(self) -> float:
-        # The design scale, times the render scale (the interface's size),
-        # times what the presenter still adds (1 under native rendering,
-        # more while a dragged window is being scaled).
+        """What to draw the arrow at. The desktop's own cursor is the
+        measure (owner, 2026-09-16: tied to the render scale it read 20-40 %
+        too big on a 1440p desktop), so the size is absolute in screen
+        pixels and the same windowed, fullscreen and at either render width.
+        Where the platform will not say its cursor size the old rule stands:
+        the design scale, times the render scale (the interface's size),
+        times what the presenter still adds (1 under native rendering, more
+        while a dragged window is being scaled)."""
+        matched = system_match_scale(self.assets)
+        if matched is not None:
+            return matched
         return (float(config.UI_CURSOR_SCALE) * float(config.RENDER_SCALE)
                 * float(self.display.scale))
 
