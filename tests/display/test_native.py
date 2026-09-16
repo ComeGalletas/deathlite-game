@@ -8,6 +8,7 @@ pointer and the next resize event read freed memory (an access violation
 in the event pump, on a fresh save and not on a saved one -- heap layout).
 """
 import os
+import sys
 import unittest
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -56,6 +57,37 @@ class NativeShimTests(unittest.TestCase):
             self.assertIsNone(native.dpi_scale(0))
         finally:
             native._lib = saved
+
+
+class SystemCursorTests(unittest.TestCase):
+    """`system_cursor_ink_height`: the size the desktop draws its own arrow,
+    which the in-game arrow is matched against (journal "Cursor size")."""
+
+    def test_it_is_a_plausible_pixel_height_on_windows_and_none_elsewhere(self):
+        height = native.system_cursor_ink_height()
+        if height is None:
+            self.assertNotEqual(sys.platform, "win32")
+            return
+        self.assertIsInstance(height, float)
+        # A cursor smaller than the smallest slider stop's ink, or larger
+        # than its largest, means the reading went wrong rather than the
+        # player choosing an unusual size.
+        self.assertGreater(height, 8.0)
+        self.assertLess(height, 512.0)
+
+    def test_the_arrow_ink_fraction_is_a_fraction_and_is_read_once(self):
+        saved = native._arrow_fraction
+        try:
+            native._arrow_fraction = None
+            first = native._arrow_ink_fraction()
+            self.assertGreater(first, 0.0)
+            self.assertLessEqual(first, 1.0)
+            self.assertEqual(native._arrow_ink_fraction(), first)   # cached
+        finally:
+            native._arrow_fraction = saved
+
+    def test_an_unreadable_bitmap_falls_back_to_the_stock_arrow(self):
+        self.assertIsNone(native._ink_fraction_of(None, 0))
 
 
 if __name__ == "__main__":

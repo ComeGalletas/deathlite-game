@@ -542,6 +542,10 @@ MENU_TITLE_IMAGE: str = "ui/start_screen/title.png"
 # Full-screen backdrop, drawn under the logo; falls back to MENU_TITLE_IMAGE,
 # then to the flat MENU_BG fill.
 MENU_BACKGROUND_IMAGE: str = "ui/start_screen/menu_background.png"
+# The 21:9 backdrop (owner, 2026-09-16): on an ultrawide render the menu
+# draws this 2496x800 strip across the whole surface -- scaled to cover the
+# height and centred, never stretched -- instead of the 16:9 art in the box.
+MENU_BACKGROUND_LONG_IMAGE: str = "ui/start_screen/menu_background_long.png"
 # The game logo, drawn above the option list; falls back to rendered text.
 MENU_LOGO_IMAGE: str = "ui/start_screen/text_title.png"
 
@@ -558,7 +562,12 @@ WINDOW_ICON: str = "ui/icon.png"
 # hotspot sits on the arrow tip. A missing file, or a build that refuses a
 # surface cursor, keeps the system arrow.
 UI_CURSOR_IMAGE: str = "ui/pointers/arrow.png"
-UI_CURSOR_SCALE: float = 1.0      # the ink is 22x30 px at 1x; 1.5 if it reads small
+# The arrow is drawn at the size the desktop draws its own cursor (Windows'
+# `CursorBaseSize` times the display DPI, times the system arrow's ink
+# fraction -- `game/display/native.py`), so 1.0 means "the same size as the
+# system cursor". Raise it only to make the game's arrow deliberately larger
+# than the player's; the render scale no longer enters the sizing.
+UI_CURSOR_SCALE: float = 1.0
 
 # Game instructions, surfaced on the character-select screen (they lived on the
 # start menu until the hero-preview rework). A (label, keys) grid plus free

@@ -92,15 +92,38 @@ class MenuState(State):
     # --- render ------------------------------------------------------
     backdrop = config.MENU_BG    # a 21:9 render's margins match the screen
 
+    def _wide(self) -> bool:
+        """An ultrawide render (owner, 2026-09-16): Borderless on a 21:9
+        desktop, or a 21:9 size picked in Windowed."""
+        display = getattr(self.game, "display", None)
+        return getattr(display, "render_aspect", "16:9") == "21:9"
+
+    def draw_backdrop(self, surface: pygame.Surface) -> None:
+        super().draw_backdrop(surface)                    # the menu's black
+        if not self._wide():
+            return
+        # The long strip across the whole surface, scaled to cover its
+        # height and centred (never stretched: 3.12:1 art on a 2.33-2.39:1
+        # surface loses a sliver of each end).
+        base = self.game.assets.picture(config.MENU_BACKGROUND_LONG_IMAGE)
+        if base is None:
+            return
+        w, h = surface.get_size()
+        iw, ih = base.get_size()
+        f = max(w / float(iw), h / float(ih))
+        sw, sh = max(1, round(iw * f)), max(1, round(ih * f))
+        art = self.game.assets.picture(config.MENU_BACKGROUND_LONG_IMAGE, size=(sw, sh))
+        surface.blit(art, ((w - sw) // 2, (h - sh) // 2))
+
     def draw(self, surface: pygame.Surface) -> None:
         w, h = surface.get_size()
         cx = w // 2
-        surface.fill(config.MENU_BG)
-
-        bg = (self.game.assets.picture(config.MENU_BACKGROUND_IMAGE, size=(w, h))
-             or self.game.assets.picture(config.MENU_TITLE_IMAGE, size=(w, h)))
-        if bg is not None:
-            surface.blit(bg, (0, 0))
+        if not self._wide():
+            surface.fill(config.MENU_BG)
+            bg = (self.game.assets.picture(config.MENU_BACKGROUND_IMAGE, size=(w, h))
+                 or self.game.assets.picture(config.MENU_TITLE_IMAGE, size=(w, h)))
+            if bg is not None:
+                surface.blit(bg, (0, 0))
 
         # Layout band only -- nothing is drawn for it. It anchors the logo above
         # and gives the rows their x inset and width.
