@@ -127,6 +127,9 @@ class LevelUpState(State):
             self.on_done(upgrade)
         self.game.state_machine.pop()
 
+    def draw_backdrop(self, surface: pygame.Surface) -> None:
+        self.panel.draw_dim(surface)         # the whole surface, margins included
+
     def draw(self, surface: pygame.Surface) -> None:
         if self.rail is not None:
             hint = ("Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter "
@@ -137,7 +140,8 @@ class LevelUpState(State):
             hint = None
         self.panel.draw(surface, self.choices, self.selected,
                         assets=self.game.assets, pressed=self._mouse.pressed_on,
-                        title=self.title, hint=hint, card_w=self.card_width)
+                        title=self.title, hint=hint, card_w=self.card_width,
+                        dim=False)
         if self.rail is None:
             return
         # The rail sits just left of the cards rather than at a fixed x, so it

@@ -90,8 +90,10 @@ class RunStatusState(State):
         self.game.state_machine.pop()
 
     # --- render ------------------------------------------------------
+    def draw_backdrop(self, surface: pygame.Surface) -> None:
+        c.draw_dim(surface)                  # the whole surface, margins included
+
     def draw(self, surface: pygame.Surface) -> None:
-        c.draw_dim(surface)
         w, h = surface.get_size()
         panel = pygame.Rect(_MARGIN_X, _TOP, w - 2 * _MARGIN_X, h - _TOP - _BOTTOM)
         c.draw_panel(surface, panel)

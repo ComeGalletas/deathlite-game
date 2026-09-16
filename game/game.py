@@ -43,6 +43,8 @@ class Game:
         # The window the fixed 1600x900 frame is scaled into (game/display/).
         self.display = DisplayWindow()
         self.display.restore(self.save.settings)
+        self.display.on_before_open = self._before_display_open
+        self.display.on_reopened = self._on_display_reopened
         self.screen, self.vsync = self.display.open()
         self.clock = pygame.time.Clock()
         self.running = False
@@ -105,6 +107,16 @@ class Game:
 
     def _cursor_scale(self) -> float:
         return float(config.UI_CURSOR_SCALE) * float(self.display.scale)
+
+    def _before_display_open(self) -> None:
+        """A display re-init (a render-width change in Options) loses the
+        caption and the icon; both must be set before the window opens."""
+        pygame.display.set_caption(config.TITLE)
+        self._set_icon()
+
+    def _on_display_reopened(self, surface) -> None:
+        self.screen = surface
+        self.vsync = self.display.vsync
 
     def persist(self) -> None:
         if not config.SAVE_ENABLED:

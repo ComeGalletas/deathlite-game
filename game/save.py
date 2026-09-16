@@ -58,6 +58,7 @@ _RECORD_KEYS = ("time", "level", "kills", "damage_dealt")
 _KEY_LAYOUTS = ("wasd_move", "arrows_move")
 _DEFAULT_KEY_LAYOUT = "wasd_move"
 _DISPLAY_MODES = ("windowed", "borderless")   # game/display/window.MODES
+_RENDER_ASPECTS = ("16:9", "21:9")            # game/display/window.ASPECTS
 
 
 @dataclass
@@ -188,6 +189,8 @@ def _coerce(raw: dict) -> SaveData:
         if (isinstance(win, (list, tuple)) and len(win) == 2
                 and all(_is_int(v) and int(v) > 0 for v in win)):
             clean["window"] = [int(win[0]), int(win[1])]
+        if disp.get("render") in _RENDER_ASPECTS:
+            clean["render"] = disp["render"]
     if clean:
         d.settings["display"] = clean
     else:

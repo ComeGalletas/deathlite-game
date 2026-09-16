@@ -43,6 +43,7 @@ log = logging.getLogger(__name__)
 
 MODES = ("windowed", "borderless")
 MODE_LABELS = {"windowed": "Windowed", "borderless": "Borderless"}
+ASPECTS = ("16:9", "21:9")
 
 
 def _logical() -> tuple[int, int]:
@@ -64,6 +65,13 @@ class DisplayWindow:
         self.scale = 1.0                # window pixels per logical pixel
         self.on_scale_changed = None    # callable(scale); the cursor follows
         self.dirty = False              # a drag resize not yet persisted
+        # The render aspect: "16:9" (1600 wide) or "21:9" (2100 wide). Set
+        # from the saved value, else from the mode (borderless: the desktop;
+        # windowed: the picked size) when the display opens; changed only by
+        # the Options rows, which re-open the display (`reopen`).
+        self.render_aspect = "16:9"
+        self.on_before_open = None      # callable(); caption and icon again
+        self.on_reopened = None         # callable(surface); the game's screen
 
     # --- before the window --------------------------------------------
     @staticmethod
@@ -89,6 +97,7 @@ class DisplayWindow:
         win = d.get("window")
         if isinstance(win, (list, tuple)) and len(win) == 2:
             self.windowed_size = (int(win[0]), int(win[1]))
+        self.render_aspect = d.get("render") if d.get("render") in ASPECTS else None
 
     # --- the window -------------------------------------------------
     @staticmethod
@@ -112,14 +121,25 @@ class DisplayWindow:
         flags = 0
         if _scalable():
             flags |= pygame.RESIZABLE
-            if self.mode == "borderless":
-                flags |= pygame.FULLSCREEN
+            if self.render_aspect is None:
+                self.render_aspect = self.wanted_aspect()
+        else:
+            self.render_aspect = "16:9"
+        self._apply_render_width()
+        # Always opened windowed, even for a saved borderless mode: with the
+        # FULLSCREEN flag pygame's scaled path picks a *display mode* for the
+        # logical size (a 2100x900 render came up in a 2560x1440 mode on the
+        # 3440x1440 desktop), which is the mode switch borderless must never
+        # be. The toggle below is SDL's desktop fullscreen, always.
         self.surface, self.vsync = self.open_surface(flags)
         # The scaled path is the only one that scales; the plain fallback
         # is a fixed window and the feature stays dormant.
         self.available = bool(self.vsync) and _scalable()
         if not self.available:
             self.mode = "windowed"
+            if self.render_aspect != "16:9":
+                self.render_aspect = "16:9"
+                self._apply_render_width()
             return self.surface, self.vsync
         native.set_minimum_size(*config.WINDOW_MIN)
         native.set_integer_scale(False)
@@ -127,8 +147,55 @@ class DisplayWindow:
             self.windowed_size = self.fitted_size()
         if self.mode == "windowed":
             self._apply_windowed_size(self.windowed_size)
+        else:
+            pygame.display.toggle_fullscreen()
+            native.set_integer_scale(False)
         self._refresh_scale()
         return self.surface, self.vsync
+
+    # --- the render width ---------------------------------------------
+    def _apply_render_width(self) -> None:
+        config.SCREEN_WIDTH = int(config.RENDER_WIDTHS[self.render_aspect])
+
+    def wanted_aspect(self) -> str:
+        """The aspect the current mode calls for: the desktop's in
+        borderless, the picked window's otherwise. A dragged window is not
+        consulted -- it keeps the current render behind bars."""
+        if self.mode == "borderless":
+            return fit.aspect_class(self.desktop_size())
+        return fit.aspect_class(self.windowed_size or _logical())
+
+    def _settle_aspect(self) -> bool:
+        """Re-open the display if the mode / size just chosen calls for the
+        other render width. Returns whether it did."""
+        want = self.wanted_aspect()
+        if want == self.render_aspect:
+            return False
+        self.reopen(want)
+        return True
+
+    def reopen(self, aspect: str) -> pygame.Surface:
+        """Change the render width. pygame cannot re-create its scaled
+        window at another logical size (`set_mode` again fails to create
+        the renderer, probe #14), so the display module is quit and
+        re-initialised and the window opened afresh through `open()`,
+        which re-applies the mode, the shims and the size. Converted
+        surfaces and fonts survive a display re-init; the caption, the icon
+        and the cursor do not, hence the hooks. Only ever called from the
+        Options screen, so never during a run."""
+        if aspect not in ASPECTS:
+            raise ValueError(f"unknown render aspect: {aspect!r}")
+        self.render_aspect = aspect
+        native.forget_window()
+        pygame.display.quit()
+        pygame.display.init()
+        if self.on_before_open is not None:
+            self.on_before_open()
+        self.scale = 0.0                    # so the cursor is reinstalled
+        surface, _vsync = self.open()
+        if self.on_reopened is not None:
+            self.on_reopened(surface)
+        return surface
 
     # --- geometry -----------------------------------------------------
     def desktop_size(self) -> tuple[int, int]:
@@ -186,6 +253,7 @@ class DisplayWindow:
         else:
             native.set_integer_scale(False)
         self._refresh_scale()
+        self._settle_aspect()
         return True
 
     def set_windowed_size(self, size: tuple[int, int]) -> bool:
@@ -196,6 +264,7 @@ class DisplayWindow:
         if self.mode == "windowed":
             self._apply_windowed_size(size)
             self._refresh_scale()
+            self._settle_aspect()
         else:
             self.windowed_size = fit.clamp_window(size, config.WINDOW_MIN, self.desktop_size())
         self.dirty = False
@@ -277,4 +346,6 @@ class DisplayWindow:
         d: dict = {"mode": self.mode}
         if self.windowed_size is not None:
             d["window"] = [int(self.windowed_size[0]), int(self.windowed_size[1])]
+        if self.render_aspect in ASPECTS:
+            d["render"] = self.render_aspect
         return d

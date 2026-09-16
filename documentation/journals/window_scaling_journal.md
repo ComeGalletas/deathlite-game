@@ -311,9 +311,10 @@ reading the desktop in Borderless, the save carrying the block).
 > because the spawn master can spawn enemies anywhere it should affect the
 > gameplay. HUD elements must remain static as a 16:9 resolution.
 
-Status: **confirmed by the owner 2026-09-15**, not built. It relaxes the
-"identical gameplay at every size" rule above for ultrawide players. The
-owner's rulings on the open points are folded in below.
+Status: **built** (2026-09-15, "start with the ultrawide changes"); see
+"Built" at the end of this section. It relaxes the "identical gameplay at
+every size" rule above for ultrawide players. The owner's rulings on the
+open points are folded in below.
 
 ### Reading
 
@@ -382,19 +383,78 @@ owner's rulings on the open points are folded in below.
    the menus' hit rects stay where the 16:9 tests pin them, offset by the
    margin.
 
-### To probe before building
+### Probed while building
 
-- A second `set_mode` that changes the logical width (windowed) keeps
-  vsync, the renderer and the integer-scale fix.
-- Whether the same works through the borderless toggle, or whether the
-  logical width must be chosen before the toggle.
+| # | Finding | Consequence |
+|---|---|---|
+| 14 | A second `set_mode` at a **different** logical size fails with `failed to create renderer` in every path: windowed, while fullscreen with the flag, and after toggling out. A `pygame.display.quit()` + `display.init()` + `set_mode` works in every path, and converted surfaces and fonts survive it. | The render width changes by re-initialising the display module and opening afresh (`DisplayWindow.reopen`); the caption, the icon and the cursor are set again through hooks. Only ever from Options, so never during a run. |
+| 15 | Opening a 2100x900 render **with the `FULLSCREEN` flag** made pygame's scaled path pick a 2560x1440 display mode on the 3440x1440 desktop -- a real mode switch. The toggle from a windowed window is desktop fullscreen at 3440x1440 every time. | Borderless always opens windowed and toggles; the flag is never passed. |
+
+### Built
+
+- `game/config.py`: `RENDER_WIDTHS = {"16:9": 1600, "21:9": 2100}`,
+  `UI_WIDTH x UI_HEIGHT = 1600x900` (the box), the 21:9 sizes 2560x1080,
+  3440x1440 and 5120x2160 in `WINDOW_RESOLUTIONS`; `SCREEN_WIDTH` is set
+  from the render aspect when the display opens.
+- `game/display/fit.py`: `aspect_class` -- wider than the midpoint of 16:9
+  and 21:9 renders 21:9; 16:10 and 4:3 get the 16:9 render behind bars.
+- `game/display/uibox.py`: the box rect, the subsurface, the offset, and
+  `translate_event` for mouse events.
+- `game/display/window.py`: `render_aspect` (saved as
+  `display["render"]`, else derived: the desktop's class in Borderless,
+  the picked size's class in Windowed); `wanted_aspect` / `_settle_aspect`
+  after a mode switch or a Resolution pick (a drag never re-opens);
+  `reopen(aspect)` per probe #14; Borderless opens windowed then toggles
+  per probe #15.
+- `game/state.py`: `State.ui_box` (default True; `PlayingState` False)
+  and `State.draw_backdrop(surface)`. `StateMachine.draw` calls the
+  backdrop with the whole surface and `draw` with the box for box states;
+  `handle_event` hands a box state its mouse events in box coordinates.
+- `game/states/playing/core/state.py`: the world on the surface, the HUD
+  and the interface half of `feedback_overlays` on the box (the vignette
+  and the hit flash stay full width).
+- Overlays: the pause, level-up (`LevelUpPanel.draw_dim`, `draw(dim=False)`)
+  and run-status dims moved to `draw_backdrop`; the menu paints its black
+  behind the margins the same way.
+- `game/save.py`: `display["render"]` coerced. `game/game.py`: the
+  before-open and reopened hooks.
+
+### Verified on the real window (3440x1440)
+
+| Step | Render | Window | Camera span |
+|---|---|---|---|
+| boot Borderless (saved) | 2100x900, 21:9 | 3440x1440 desktop fullscreen, 1.6x | 1400x600 |
+| Display mode -> Windowed (saved 1920x1080) | 1600x900, 16:9 (re-opened) | 1920x1080, 1.2x | -- |
+| Resolution -> 2560x1080 | 2100x900, 21:9 (re-opened) | 2560x1080, 1.2x | 1400x600 |
+| quit | -- | save holds `render: 21:9`, `[2560, 1080]` | -- |
+
+The Resolution list on this desktop: 1280x720, 1600x900, 1920x1080,
+2560x1080, 2560x1440, 3440x1440. Screenshots of the 2100x900 render
+delivered: the run with the pause overlay (the dim covers the margins, the
+buttons and the HUD sit in the box), the run itself, and the Options
+screen in the 2560x1080 window.
+
+### Tests
+
+`tests/display/test_uibox.py` (the box geometry, drawing through it,
+event translation, the state machine handing the box to a box state and
+the surface to the run, the camera span at 2100, the aspect class),
+`tests/display/test_window.py` (+8: the aspect from the save, from the
+mode and from the pick; a pick re-opens and a drag does not; the mode
+switch settles both ways; the fallback always 16:9; `reopen` re-inits the
+display and calls the hooks in order; the saved render coerced),
+`tests/screens/test_ultrawide.py` (the pause, level-up and run-status
+dims darken a margin pixel exactly like a box pixel; the menu's black
+behind the margins; the pause buttons centred in the box; a level-up draw
+without the dim leaves the margins alone).
 
 ### Progress
 
-- [ ] Logical width from the resolution pick / desktop aspect (16:9 or 21:9)
-- [ ] The UI box: HUD, menus and overlay panels on a centred 1600x900
+- [x] Logical width from the resolution pick / desktop aspect (16:9 or 21:9)
+- [x] The UI box: HUD, menus and overlay panels on a centred 1600x900
       subsurface; mouse events offset for UI hit-testing
-- [ ] Dim layers painted on the full surface before the box
-- [ ] Terrain bake and loading prewarm span the render width
-- [ ] Tests listed in item 6
-- [ ] Screenshot at 21:9 with the pause overlay open
+- [x] Dim layers painted on the full surface before the box
+- [x] Terrain bake and loading prewarm span the render width (they read
+      `config.SCREEN_WIDTH` at run start; nothing to change)
+- [x] Tests listed in item 6
+- [x] Screenshot at 21:9 with the pause overlay open

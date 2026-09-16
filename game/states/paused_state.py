@@ -86,12 +86,14 @@ class PausedState(State):
         self.game.state_machine.pop()
 
     # --- render ------------------------------------------------------
-    def draw(self, surface: pygame.Surface) -> None:
+    def draw_backdrop(self, surface: pygame.Surface) -> None:
+        # The whole render surface, side margins included on a 21:9 render.
         dim = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 150))
         surface.blit(dim, (0, 0))
 
-        cx = config.SCREEN_WIDTH // 2
+    def draw(self, surface: pygame.Surface) -> None:
+        cx = surface.get_width() // 2
         title = self._title_font.render("Paused", True, config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(cx, 250)))
 

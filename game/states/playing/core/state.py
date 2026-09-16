@@ -41,6 +41,7 @@ from systems.object_pool import Pool
 from systems.particles import ParticleSystem
 from systems.screen_shake import ScreenShake
 from ui.hud import HUD
+from game.display import uibox
 from ui.damage_numbers import DamageNumbers
 from world.map import GameMap
 from world.pathfinding import NavField
@@ -67,6 +68,10 @@ STARTING_WEAPON = "sword"
 
 
 class PlayingState(State):
+    # The world fills the render surface; the HUD is drawn on the UI box
+    # from `draw` itself (see there). Mouse events arrive in surface
+    # coordinates, which is what the manual aim reads against the camera.
+    ui_box = False
     def enter(self, *, seed: int | None = None, character_id: str | None = None,
               dev: bool = False, difficulty: str | None = None,
               prebuilt=None, main_weapon: str | None = None, **kwargs) -> None:
@@ -1048,9 +1053,12 @@ class PlayingState(State):
         finally:
             self.camera.pos += offset
 
-        self.hud.draw(surface, self.player, self.stats,
+        # The world above fills the render surface (2100 wide on a 21:9
+        # render); the interface stays in the centred 16:9 box.
+        box = uibox.box(surface)
+        self.hud.draw(box, self.player, self.stats,
                       xp_fraction=self.levels.progress_fraction, boss=self.boss)
-        self.renderer.feedback_overlays(surface)
+        self.renderer.feedback_overlays(surface, box)
     # --- render: scene composition ---------------
     def _depth_items(self) -> list:
         """`(depth_y, draw_fn)` for the whole sprite layer -- map scenery

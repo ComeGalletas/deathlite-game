@@ -54,17 +54,26 @@ class LevelUpPanel:
         self._hint = fonts.body(16)
         self.hits = HitMap()          # card index -> rect, rebuilt every draw
 
+    @staticmethod
+    def draw_dim(surface: pygame.Surface) -> None:
+        """The dark layer under the cards. The state paints it on the whole
+        render surface (`draw_backdrop`) so a 21:9 render's side margins
+        darken too, then draws the cards on the UI box with `dim=False`."""
+        w, h = surface.get_size()
+        dim = pygame.Surface((w, h), pygame.SRCALPHA)
+        dim.fill((8, 6, 16, 200))
+        surface.blit(dim, (0, 0))
+
     def draw(self, surface: pygame.Surface, choices, selected: int, *,
              assets=None, pressed=None, title=None, hint=None,
-             card_w: int = CARD_W) -> None:
+             card_w: int = CARD_W, dim: bool = True) -> None:
         """`card_w` narrows the cards so something else can share the screen --
         the Forge's weapon rail (`ui/forge_rail.py`) sits in the margin the
         narrower cards free up. The default is the level-up width and that path
         is unchanged, which `tests/screens/test_level_up.py` pins."""
         w, h = surface.get_size()
-        dim = pygame.Surface((w, h), pygame.SRCALPHA)
-        dim.fill((8, 6, 16, 200))
-        surface.blit(dim, (0, 0))
+        if dim:
+            self.draw_dim(surface)
 
         title = self._title.render(title or "Level Up  -  choose one", True,
                                    config.COLOR_ACCENT)

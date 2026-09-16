@@ -110,7 +110,10 @@ class WorldRenderer:
             r.record_character(drawn.copy(), dest, character_y, cacheable=False)
 
     # --- feedback / hud-adjacent overlays --------------------------
-    def feedback_overlays(self, surface: pygame.Surface) -> None:
+    def feedback_overlays(self, surface: pygame.Surface, box: pygame.Surface | None = None) -> None:
+        """The vignette and the hit flash cover the whole render surface;
+        the banner, the notice and the prompts are interface and sit in the
+        UI `box` (the surface itself on a 16:9 render)."""
         ps = self.ps
         w, h = surface.get_size()
 
@@ -128,6 +131,9 @@ class WorldRenderer:
             flash = pygame.Surface((w, h), pygame.SRCALPHA)
             flash.fill((200, 30, 30, a))
             surface.blit(flash, (0, 0))
+
+        surface = box if box is not None else surface
+        w, h = surface.get_size()
 
         # Boss-incoming warning banner (spec 3.6 "Boss warning").
         if ps._boss_warning_t > 0.0:

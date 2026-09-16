@@ -59,6 +59,19 @@ def resolution_entries(candidates, desktop: tuple[int, int],
     return sorted(set(out))
 
 
+# Halfway between 16:9 (1.78) and 21:9 (2.33): wider than this renders 21:9.
+_ASPECT_SPLIT = (16 / 9 + 21 / 9) / 2
+
+
+def aspect_class(size: tuple[int, int]) -> str:
+    """`"21:9"` for an ultrawide window or desktop, `"16:9"` for everything
+    else (16:10 and 4:3 included: they get the 16:9 render behind bars)."""
+    w, h = size
+    if h <= 0:
+        return "16:9"
+    return "21:9" if w / float(h) >= _ASPECT_SPLIT else "16:9"
+
+
 def nearest_entry(entries: list[tuple[int, int]], size: tuple[int, int]) -> int:
     """Index of the entry closest in width to `size` (-1 when there are
     none) -- where the cycle starts from a custom, dragged size."""

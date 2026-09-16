@@ -86,6 +86,14 @@ def _window():
         return None, None
 
 
+def forget_window() -> None:
+    """Drop the kept wrapper before `pygame.display.quit()`: its window is
+    about to be destroyed, and asking a destroyed window for its id would
+    read freed memory."""
+    global _wrapper
+    _wrapper = None
+
+
 def set_minimum_size(width: int, height: int) -> bool:
     """Lift pygame's minimum (the logical size) so the window can shrink."""
     sdl, win = _window()

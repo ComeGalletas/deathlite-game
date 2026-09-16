@@ -89,8 +89,11 @@ class MenuState(State):
         # action is None -> inert (drawn but does nothing).
 
     # --- render ------------------------------------------------------
+    def draw_backdrop(self, surface: pygame.Surface) -> None:
+        surface.fill(config.MENU_BG)         # a 21:9 render's margins match the screen
+
     def draw(self, surface: pygame.Surface) -> None:
-        w, h = config.SCREEN_WIDTH, config.SCREEN_HEIGHT
+        w, h = surface.get_size()
         cx = w // 2
         surface.fill(config.MENU_BG)
 

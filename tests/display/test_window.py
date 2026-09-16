@@ -92,10 +92,14 @@ class OpenTests(unittest.TestCase):
         self.assertEqual(dw.windowed_size, DESKTOP)
         self.h.native.set_window_size.assert_called_with(*DESKTOP)
 
-    def test_a_saved_borderless_mode_opens_fullscreen_and_keeps_the_size_for_later(self):
+    def test_a_saved_borderless_mode_opens_windowed_then_toggles(self):
+        # Never the FULLSCREEN flag: pygame's scaled path would pick a
+        # display mode for the logical size (a real mode switch); the toggle
+        # is SDL's desktop fullscreen.
         dw = _open(self.h, {"display": {"mode": "borderless", "window": [1280, 720]}})
         self.assertEqual(dw.mode, "borderless")
-        self.assertEqual(self.h.opened_flags & pygame.FULLSCREEN, pygame.FULLSCREEN)
+        self.assertFalse(self.h.opened_flags & pygame.FULLSCREEN)
+        self.assertEqual(self.h.toggles, 1)
         self.h.native.set_window_size.assert_not_called()
         self.assertEqual(dw.windowed_size, (1280, 720))
 
@@ -263,7 +267,107 @@ class EventTests(unittest.TestCase):
         self.h.native.set_window_size.assert_called_with(1280, 720)
 
 
+class RenderAspectTests(unittest.TestCase):
+    """The 21:9 render (journal section "Ultrawide render extent"): the
+    aspect follows the mode and the picked size, a change re-opens the
+    display, a drag never does, and `config.SCREEN_WIDTH` follows."""
+
+    def setUp(self):
+        self.h = _Harness()
+        self._ps = self.h.patches()
+        for p in self._ps:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in self._ps])
+        self.addCleanup(setattr, config, "SCREEN_WIDTH", 1600)
+        self.reopens = []
+        reopen = mock.patch.object(
+            DisplayWindow, "reopen",
+            lambda dw, aspect: self.reopens.append(aspect) or setattr(dw, "render_aspect", aspect))
+        reopen.start()
+        self.addCleanup(reopen.stop)
+
+    def test_a_16_9_pick_opens_the_16_9_render(self):
+        dw = _open(self.h, {"display": {"mode": "windowed", "window": [1920, 1080]}})
+        self.assertEqual(dw.render_aspect, "16:9")
+        self.assertEqual(config.SCREEN_WIDTH, 1600)
+        self.assertEqual(dw.settings()["render"], "16:9")
+
+    def test_a_saved_21_9_render_opens_2100_wide(self):
+        dw = _open(self.h, {"display": {"mode": "windowed", "window": [1920, 1080],
+                                        "render": "21:9"}})
+        self.assertEqual(dw.render_aspect, "21:9")
+        self.assertEqual(config.SCREEN_WIDTH, 2100)
+        self.assertEqual(self.h.opened_flags & pygame.RESIZABLE, pygame.RESIZABLE)
+
+    def test_borderless_on_an_ultrawide_desktop_derives_21_9(self):
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(3440, 1440)]):
+            dw = _open(self.h, {"display": {"mode": "borderless"}})
+        self.assertEqual(dw.render_aspect, "21:9")
+        self.assertEqual(config.SCREEN_WIDTH, 2100)
+
+    def test_picking_a_21_9_size_reopens_and_a_drag_does_not(self):
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(3440, 1440)]):
+            dw = _open(self.h, {"display": {"mode": "windowed", "window": [1920, 1080]}})
+            self.assertEqual(dw.render_aspect, "16:9")
+            dw.set_windowed_size((2560, 1080))
+            self.assertEqual(self.reopens, ["21:9"])
+            self.h.window_size = (2000, 900)                 # a drag to a 21:9-ish shape
+            dw.handle_event(pygame.event.Event(pygame.WINDOWSIZECHANGED))
+            self.assertEqual(self.reopens, ["21:9"])        # no re-open for a drag
+            dw.set_windowed_size((1600, 900))
+            self.assertEqual(self.reopens, ["21:9", "16:9"])
+
+    def test_the_mode_switch_settles_the_aspect_both_ways(self):
+        with mock.patch.object(pygame.display, "get_desktop_sizes", lambda: [(3440, 1440)]):
+            dw = _open(self.h, {"display": {"mode": "windowed", "window": [1920, 1080]}})
+            dw.set_mode("borderless")
+            self.assertEqual(self.reopens, ["21:9"])
+            dw.set_mode("windowed")
+            self.assertEqual(self.reopens, ["21:9", "16:9"])
+
+    def test_the_plain_fallback_always_renders_16_9(self):
+        refused = mock.patch.object(
+            DisplayWindow, "open_surface", staticmethod(_Harness(refuse=True).open_surface))
+        refused.start()
+        self.addCleanup(refused.stop)
+        dw = _open(self.h, {"display": {"mode": "borderless", "render": "21:9"}})
+        self.assertEqual(dw.render_aspect, "16:9")
+        self.assertEqual(config.SCREEN_WIDTH, 1600)
+
+
+class ReopenTests(unittest.TestCase):
+    def test_reopen_reinits_the_display_and_calls_the_hooks_in_order(self):
+        h = _Harness()
+        ps = h.patches()
+        for p in ps:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in ps])
+        self.addCleanup(setattr, config, "SCREEN_WIDTH", 1600)
+        order = []
+        with mock.patch.object(pygame.display, "quit", lambda: order.append("quit")), \
+                mock.patch.object(pygame.display, "init", lambda: order.append("init")), \
+                mock.patch("game.display.window.native.forget_window",
+                           lambda: order.append("forget")):
+            dw = _open(h, {"display": {"mode": "windowed", "window": [1920, 1080]}})
+            dw.on_before_open = lambda: order.append("before")
+            dw.on_reopened = lambda surf: order.append(("reopened", surf.get_size()))
+            surf = dw.reopen("21:9")
+        self.assertEqual(order, ["forget", "quit", "init", "before", ("reopened", (2100, 900))])
+        self.assertEqual(surf.get_size(), (2100, 900))
+        self.assertEqual(dw.render_aspect, "21:9")
+        self.assertEqual(config.SCREEN_WIDTH, 2100)
+        self.assertTrue(dw.available)
+        with self.assertRaises(ValueError):
+            dw.reopen("4:3")
+
+
 class SettingsTests(unittest.TestCase):
+    def test_the_render_aspect_round_trips_and_junk_is_dropped(self):
+        d = save_mod._coerce({"settings": {"display": {"mode": "windowed", "render": "21:9"}}})
+        self.assertEqual(d.settings["display"]["render"], "21:9")
+        d = save_mod._coerce({"settings": {"display": {"mode": "windowed", "render": "4:3"}}})
+        self.assertNotIn("render", d.settings["display"])
+
     def test_settings_round_trip_through_the_save_coercion(self):
         dw = DisplayWindow()
         dw.mode = "borderless"

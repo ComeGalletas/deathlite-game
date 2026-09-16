@@ -12,9 +12,21 @@ from __future__ import annotations
 # window scales that finished frame into whatever size the window is, aspect
 # kept, black bars for the rest (`game/display/`). So the camera, the zoom,
 # the HUD and every click target are the same on every screen; only the
-# window changes. 16:9.
+# window changes.
+#
+# The width is 1600 (16:9) or, on an ultrawide screen or window, 2100
+# (21:9): the world then fills the extra width -- the camera shows more,
+# at the same zoom -- while the HUD, the menus and the overlay panels stay
+# in the centred `UI_WIDTH x UI_HEIGHT` box (`game/display/uibox.py`).
+# `game/display/window.py` sets SCREEN_WIDTH from `RENDER_WIDTHS` when the
+# display opens or is re-opened from the Options screen, never during a run,
+# so everything that sizes itself at run start (the camera, the terrain bake,
+# the loading prewarm) reads one value for the whole run.
 SCREEN_WIDTH: int = 1600
 SCREEN_HEIGHT: int = 900
+RENDER_WIDTHS: dict[str, int] = {"16:9": 1600, "21:9": 2100}
+UI_WIDTH: int = 1600
+UI_HEIGHT: int = 900
 FPS: int = 62
 TITLE: str = "Deathlite Game"
 # The game's own version, shown wherever the build identifies itself (window
@@ -54,7 +66,8 @@ WINDOW_MODE_DEFAULT: str = "windowed"
 WINDOW_MIN: tuple[int, int] = (800, 450)
 WINDOW_FIT_FRACTION: float = 0.90
 WINDOW_RESOLUTIONS: tuple[tuple[int, int], ...] = (
-    (1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160))
+    (1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160),
+    (2560, 1080), (3440, 1440), (5120, 2160))          # the 21:9 sizes
 WINDOW_RESIZABLE: bool = True
 WINDOW_DPI_AWARE: bool = True
 WINDOW_SCALE_FILTER: str = "linear"
