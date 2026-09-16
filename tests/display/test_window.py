@@ -333,6 +333,9 @@ class RenderAspectTests(unittest.TestCase):
         dw = _open(self.h, {"display": {"mode": "borderless", "render": "21:9"}})
         self.assertEqual(dw.render_aspect, "16:9")
         self.assertEqual(config.SCREEN_WIDTH, 1600)
+        # The surface too, not only the number: the suite's dummy driver
+        # caught a 2100-wide surface left behind by the refused open.
+        self.assertEqual(dw.surface.get_size(), (1600, 900))
 
 
 class ReopenTests(unittest.TestCase):

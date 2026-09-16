@@ -138,8 +138,12 @@ class DisplayWindow:
         if not self.available:
             self.mode = "windowed"
             if self.render_aspect != "16:9":
+                # A saved 21:9 render on a driver that refused the scaled
+                # window: the plain window is fixed and 16:9, so the surface
+                # already opened 2100 wide is replaced.
                 self.render_aspect = "16:9"
                 self._apply_render_width()
+                self.surface = pygame.display.set_mode(_logical())
             return self.surface, self.vsync
         native.set_minimum_size(*config.WINDOW_MIN)
         native.set_integer_scale(False)
