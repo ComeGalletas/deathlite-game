@@ -9,10 +9,11 @@ Branch: `native-resolution` (off `main` at `cf50aba`, 2026-09-16).
 > pixel perfect? Make a new branch for this, journal it in a new file,
 > prepare a todo list for option 2.
 
-Status: **stages 1 and 2 built** (2026-09-16): the world renders at the
-window's native size at the effective zoom, and the interface draws at the
-same scale inside its box. Stages 1b (Options from the pause menu) and 3
-(performance, 4K, the merge decision) open.
+Status: **stages 1, 1b and 2 built** (2026-09-16): the world renders at
+the window's native size at the effective zoom, the interface draws at the
+same scale inside its box, and a display change from the pause menu
+rebuilds the live run in place. Stage 3 (performance, 4K, the merge
+decision) open.
 
 ---
 
@@ -257,19 +258,34 @@ for.
 
 ### Stage 1b — Options from the pause menu (a change mid-run)
 
-- [ ] Pause menu: an "Options" row; `OptionsState` pushed over the frozen
-      run with a `return_to` so ESC / Back pop to the pause menu; the
-      Sanctuary row hidden while a run is live.
-- [ ] `PlayingState.on_display_changed(display)`: rebuild the camera at
-      the same world position with the new view and zoom; re-sync the
-      terrain zoom cache; re-run the loading prewarm synchronously behind
-      an "Applying" frame; re-fetch the UI box.
-- [ ] The state machine tells the run when the display re-opened (the
-      hook already exists on `DisplayWindow.on_reopened`).
-- [ ] Tests: a mode, resolution and aspect change with a run live keeps
-      the player at the same screen fraction, the camera span at the design
-      span, the enemies where they were; the Options screen returns to the
-      pause menu and never to the main menu from a run.
+- [x] Pause menu: an **Options** row between Run status and Key layout;
+      `OptionsState` is pushed over the frozen run with `in_run=True`: the
+      Sanctuary row is hidden and Back / ESC pop to the pause menu.
+- [x] `State.on_display_changed()` (a no-op by default) fanned out by
+      `StateMachine.on_display_changed()` bottom-first from
+      `Game._on_display_reopened`, which also drops the debug overlay's
+      font. `PlayingState` rebuilds its camera for the new surface and
+      `effective_zoom()` at the **same world centre**, rebuilds the HUD and
+      its banner / prompt fonts, re-tiles the sea buffer for the new world
+      span (`bake.water_buffer`, shared with the bake), and draws one frame
+      of the world off screen so the terrain and sprite caches refill before
+      the player sees the next one. The pause and Options screens rebuild
+      their fonts. No "Applying" frame turned out to be needed: the whole
+      change is ~245 ms on the owner's machine (below).
+- [x] Tests (`tests/flows/test_display_change_in_run.py`, 6): the Options
+      row pushes the screen over the run without the Sanctuary; Back pops
+      to the pause menu and the run is still underneath; from the main menu
+      the Sanctuary is there; a change to 3440x1440 rebuilds the camera at
+      the same centre with the view, the zoom 2.40625 and the design
+      height; fonts, the HUD and the sea follow; a change with no run is
+      harmless.
+- [x] Verified on the real window: a run in borderless (3440x1440, zoom
+      2.40625) -> pause -> Options -> Windowed 1920x1080 (247 ms; zoom
+      1.796875) -> Resolution 1280x720 (zoom 1.203125) -> ESC to the pause
+      menu -> resume -> pause -> Options -> Borderless (241 ms). The world
+      centre stayed at the same coordinates and the hero at exactly
+      (0.500, 0.500) of the screen through every switch; the covered height
+      598-601 world px each time.
 
 ### Stage 2 — the UI at native resolution
 

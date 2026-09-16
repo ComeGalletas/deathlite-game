@@ -121,6 +121,8 @@ class Game:
     def _on_display_reopened(self, surface) -> None:
         self.screen = surface
         self.vsync = self.display.vsync
+        self.debug._font = None                   # rebuilt at the new scale
+        self.state_machine.on_display_changed()
 
     def persist(self) -> None:
         if not config.SAVE_ENABLED:

@@ -30,6 +30,27 @@ def bake(layout) -> BakedTerrain:
             return done.value
 
 
+def water_buffer(assets=None):
+    """The sea under everything: the water tile repeated over the visible
+    world extent (`SCREEN / effective_zoom`) plus one tile of scroll slack;
+    `render._z_surf` blows it up to the screen. `(surface, tile_px)`, or
+    `(None, 0)` without the art. Baked with the world, and rebuilt by a live
+    run when the display changes under it (stage 1b): a wider view needs a
+    wider sea."""
+    a = assets or get_assets()
+    water = a.tile(str(a.terrain.get("water_tile")), 0)
+    if water is None:
+        return None, 0
+    wt = water.get_width()
+    span_w = round(config.SCREEN_WIDTH / config.effective_zoom()) + wt
+    span_h = round(config.SCREEN_HEIGHT / config.effective_zoom()) + wt
+    buf = pygame.Surface((span_w, span_h)).convert()
+    for y in range(0, span_h, wt):
+        for x in range(0, span_w, wt):
+            buf.blit(water, (x, y))
+    return buf, wt
+
+
 def bake_steps(layout):
     """Yields a label after each island and each finishing pass; *returns*
     the `BakedTerrain` when exhausted."""
@@ -62,17 +83,8 @@ def bake_steps(layout):
 
     # The water buffer, drop shadow, foam frames and scenery scatter.
     data = a.terrain
-    water = a.tile(str(data.get("water_tile")), 0)
-    if water is not None:
-        wt = water.get_width()
-        # Big enough to cover the visible world extent (SCREEN / zoom) plus
-        # one tile of scroll slack; `_z_surf` blows it up to the screen.
-        span_w = round(config.SCREEN_WIDTH / config.effective_zoom()) + wt
-        span_h = round(config.SCREEN_HEIGHT / config.effective_zoom()) + wt
-        buf = pygame.Surface((span_w, span_h)).convert()
-        for y in range(0, span_h, wt):
-            for x in range(0, span_w, wt):
-                buf.blit(water, (x, y))
+    buf, wt = water_buffer(a)
+    if buf is not None:
         t.water_buf = buf
         t.water_tile = wt
 

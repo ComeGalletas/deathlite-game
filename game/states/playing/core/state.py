@@ -329,6 +329,38 @@ class PlayingState(State):
         self._tap_pending = False
         self._mouse_armed = False
 
+    def on_display_changed(self) -> None:
+        """The display was re-opened under the run (Options from the pause
+        menu; stage 1b of the native-resolution journal). The camera is
+        rebuilt for the new surface and effective zoom at the same world
+        centre, so the hero does not move on screen; the fonts and the HUD
+        follow the new scale; the sea buffer is re-tiled for the new world
+        span; and one frame of the world is drawn off screen so the terrain
+        and sprite caches refill before the player sees the next one."""
+        old = self.camera
+        span_w, span_h = old.world_span()
+        centre = pygame.Vector2(old.pos.x + span_w / 2.0, old.pos.y + span_h / 2.0)
+        cam = Camera(self.game_map.width, self.game_map.height,
+                     config.SCREEN_WIDTH, config.SCREEN_HEIGHT,
+                     zoom=config.effective_zoom())
+        cam.follow_lerp = old.follow_lerp
+        cam.snap_to(centre)
+        self.camera = cam
+        self.hud = HUD()
+        self._banner_font = fonts.heading(40)
+        self._prompt_font = fonts.heading(20)
+        gm = self.game_map
+        if getattr(gm, "_tiles_ready", False):
+            from world.terrain import bake as terrain_bake
+            buf, wt = terrain_bake.water_buffer(self.game.assets)
+            if buf is not None:
+                gm._water_buf, gm._water_tile = buf, wt
+        try:
+            scratch = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+            self._draw_world(scratch)
+        except pygame.error:
+            pass                                   # a headless surface: no warm-up
+
     def handle_debug_key(self, key: int) -> bool:
         keys = config.DEBUG_KEYS
         if key == keys["toggle_invuln"]:

@@ -9,6 +9,10 @@ sinks, and Quit to menu is red.
   * Resume        -- back to the run (ESC / P do the same from anywhere here)
   * Run status    -- the build screen (`run_status_state.py`), pushed on top;
                      closing it returns here
+  * Options       -- the Options screen, pushed on top (owner, 2026-09-16;
+                     journal "Native-resolution rendering", stage 1b): a
+                     display change made there re-opens the display under
+                     the frozen run and the run rebuilds itself in place
   * Key layout    -- cycles `config.KEY_LAYOUTS`; persisted at once (also in
                      the Options screen)
   * Quit to menu  -- abandons the run
@@ -26,12 +30,12 @@ from game.state import State
 from ui import scale, widgets
 from ui.mouse import MouseNav
 
-_ROWS = ("resume", "status", "key_layout", "quit")
+_ROWS = ("resume", "status", "options", "key_layout", "quit")
 # 64-px `wide` buttons on a 72-px step; the Quit row on the red sheet.
 _ROW_TOP, _ROW_STEP, _ROW_H, _ROW_W = 330, 72, 64, 560
 _DANGER = {"quit"}
-_LABELS = {"resume": "Resume", "status": "Run status", "key_layout": "Key layout",
-           "quit": "Quit to menu"}
+_LABELS = {"resume": "Resume", "status": "Run status", "options": "Options",
+           "key_layout": "Key layout", "quit": "Quit to menu"}
 
 
 class PausedState(State):
@@ -40,10 +44,16 @@ class PausedState(State):
 
     def enter(self, **kwargs) -> None:
         self.sel = 0
+        self._build_fonts()
+        self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
+
+    def _build_fonts(self) -> None:
         self._title_font = fonts.heading(48)
         self._font = fonts.body(26)
         self._hint = fonts.body(16)
-        self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
+
+    def on_display_changed(self) -> None:
+        self._build_fonts()          # the sizes follow the new scale
 
     # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -76,6 +86,9 @@ class PausedState(State):
         elif rid == "status":
             from game.states.run_status_state import RunStatusState
             self.game.state_machine.push(RunStatusState(self.game))
+        elif rid == "options":
+            from game.states.options_state import OptionsState
+            self.game.state_machine.push(OptionsState(self.game), in_run=True)
         elif rid == "key_layout":
             self.game.cycle_key_layout()
         elif rid == "quit":

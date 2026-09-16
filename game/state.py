@@ -69,6 +69,14 @@ class State:
     def update(self, dt: float) -> None:
         """Advance simulation by dt seconds."""
 
+    def on_display_changed(self) -> None:
+        """The display was re-opened under this state (an Options change
+        from the pause menu: another native size, mode or aspect). Anything
+        built for the old surface -- fonts at the old scale, a camera with
+        the old view, caches sized to the old span -- is rebuilt here. The
+        default is nothing: a screen that builds all of it in `draw` needs
+        no more."""
+
     def draw_backdrop(self, surface: pygame.Surface) -> None:
         """Paint on the *whole* render surface before `draw` gets the box:
         a screen's `backdrop` colour, or the overlays' dim layer, so that
@@ -117,6 +125,12 @@ class StateMachine:
                 if screen is not None:
                     event = uibox.translate_event(event, screen)
             state.handle_event(event)
+
+    def on_display_changed(self) -> None:
+        """Every state on the stack, bottom first, so the run under a pause
+        overlay rebuilds before the overlay redraws over it."""
+        for state in list(self._stack):
+            state.on_display_changed()
 
     def update(self, dt: float) -> None:
         # Walk from the top down; stop once a state says the one below it is

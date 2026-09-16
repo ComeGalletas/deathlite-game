@@ -34,14 +34,26 @@ _LABELS = {"volume": "Master volume", "mute": "Mute", "key_layout": "Key layout"
 
 
 class OptionsState(State):
-    def enter(self, **kwargs) -> None:
+    def enter(self, *, in_run: bool = False, **kwargs) -> None:
+        """`in_run`: pushed from the pause menu over a live run (stage 1b of
+        the native-resolution journal). The Sanctuary row is hidden -- it is
+        the meta shop, not part of a run -- and Back / ESC pop to the pause
+        menu instead of leaving for the main menu."""
         self.audio = self.game.audio
+        self.in_run = bool(in_run)
         self._rows = ("volume", "mute", "key_layout", "display", "resolution",
-                      "sanctuary", "back")
+                      "back") if self.in_run else (
+            "volume", "mute", "key_layout", "display", "resolution", "sanctuary", "back")
         self.sel = 0
+        self._build_fonts()
+
+    def _build_fonts(self) -> None:
         self._title = fonts.heading(40)
         self._row = fonts.body(26)
         self._hint = fonts.body(16)
+
+    def on_display_changed(self) -> None:
+        self._build_fonts()          # the screen that made the change redraws at the new scale
 
     # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -129,6 +141,9 @@ class OptionsState(State):
             self._back()
 
     def _back(self) -> None:
+        if self.in_run:
+            self.game.state_machine.pop()        # back to the pause menu
+            return
         from game.states.menu_state import MenuState
         self.game.state_machine.change(MenuState(self.game))
 
