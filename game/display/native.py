@@ -52,20 +52,37 @@ def _sdl():
     return _lib or None
 
 
+_wrapper = None      # the one `Window` wrapper of the display window, kept alive
+
+
 def _window():
-    """`(sdl, SDL_Window*)` for pygame's display window, or `(None, None)`."""
+    """`(sdl, SDL_Window*)` for pygame's display window, or `(None, None)`.
+
+    The `pygame._sdl2.video.Window` wrapper is created **once** and kept
+    for the life of the process. pygame stores a pointer to the wrapper in
+    the SDL window's own data and resolves window events through it, so a
+    wrapper made per call and dropped leaves that pointer dangling and the
+    next resize event reads freed memory -- an access violation in the
+    event pump that came and went with the heap layout (found 2026-09-15:
+    the Resolution row crashed the game on a fresh save and not on a saved
+    one). The wrapper is remade only if its window is gone (a new
+    `set_mode`)."""
+    global _wrapper
     sdl = _sdl()
     if sdl is None:
         return None, None
     try:
-        from pygame._sdl2.video import Window
-        win_id = Window.from_display_module().id
         sdl.SDL_GetWindowFromID.restype = ctypes.c_void_p
         sdl.SDL_GetWindowFromID.argtypes = [ctypes.c_uint32]
-        ptr = sdl.SDL_GetWindowFromID(win_id)
+        ptr = sdl.SDL_GetWindowFromID(_wrapper.id) if _wrapper is not None else None
+        if not ptr:
+            from pygame._sdl2.video import Window
+            _wrapper = Window.from_display_module()
+            ptr = sdl.SDL_GetWindowFromID(_wrapper.id)
         return (sdl, ptr) if ptr else (None, None)
     except Exception as exc:          # pygame.error, ImportError, AttributeError
         log.info("SDL window handle unavailable (%s)", exc)
+        _wrapper = None
         return None, None
 
 
