@@ -57,6 +57,7 @@ _RECORD_KEYS = ("time", "level", "kills", "damage_dealt")
 # An unknown layout name in the file falls back to the default (CB-5).
 _KEY_LAYOUTS = ("wasd_move", "arrows_move")
 _DEFAULT_KEY_LAYOUT = "wasd_move"
+_DISPLAY_MODES = ("windowed", "borderless")   # game/display/window.MODES
 
 
 @dataclass
@@ -175,6 +176,22 @@ def _coerce(raw: dict) -> SaveData:
         d.settings.update(raw["settings"])
     if d.settings.get("key_layout") not in _KEY_LAYOUTS:
         d.settings["key_layout"] = _DEFAULT_KEY_LAYOUT
+    # The window (game/display/): a mode the game knows and a plausible
+    # size, or nothing -- the desktop can change between sessions, so the
+    # size is clamped when applied, not here.
+    disp = d.settings.get("display")
+    clean: dict = {}
+    if isinstance(disp, dict):
+        if disp.get("mode") in _DISPLAY_MODES:
+            clean["mode"] = disp["mode"]
+        win = disp.get("window")
+        if (isinstance(win, (list, tuple)) and len(win) == 2
+                and all(_is_int(v) and int(v) > 0 for v in win)):
+            clean["window"] = [int(win[0]), int(win[1])]
+    if clean:
+        d.settings["display"] = clean
+    else:
+        d.settings.pop("display", None)
     return d
 
 

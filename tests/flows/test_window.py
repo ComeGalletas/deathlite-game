@@ -49,6 +49,33 @@ class WindowTests(unittest.TestCase):
     def test_the_game_records_what_it_got(self):
         g = Game()
         self.assertIsInstance(g.vsync, bool)
+        # The dummy driver refuses the scaled window, so the manager is
+        # dormant and the window is the plain fixed one.
+        self.assertFalse(g.display.available)
+        self.assertEqual(g.screen.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+
+    def test_the_scaled_window_is_asked_for_resizable(self):
+        real = pygame.display.set_mode
+        calls = []
+
+        def refusing(size, flags=0, *a, **kw):
+            calls.append((flags, kw.get("vsync", 0)))
+            if kw.get("vsync"):
+                raise pygame.error("no vsync here")
+            return real(size)
+
+        from game.display import DisplayWindow
+        with mock.patch.object(config, "VSYNC", True), \
+                mock.patch.object(config, "WINDOW_RESIZABLE", True), \
+                mock.patch("game.display.window.sys.platform", "win32"), \
+                mock.patch.object(pygame.display, "set_mode", refusing):
+            dw = DisplayWindow()
+            surf, on = dw.open()
+        self.assertEqual(calls[0][0] & pygame.RESIZABLE, pygame.RESIZABLE)
+        self.assertEqual(calls[0][0] & pygame.SCALED, pygame.SCALED)
+        self.assertFalse(on)
+        self.assertFalse(dw.available)
+        self.assertEqual(surf.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
 
     def test_the_web_profile_turns_vsync_off(self):
         saved = (config.VSYNC, config.SAVE_ENABLED, config.FPS, config.SCREEN_WIDTH,

@@ -7,9 +7,12 @@ from the project.
 from __future__ import annotations
 
 # --- Display -----------------------------------------------------------------
-# The window / render target. The world is drawn straight to it at this
-# resolution (no intermediate buffer), so a larger screen = more pixels per
-# sprite / tile. 16:9.
+# The render target -- the *logical* size, not the window. The world is drawn
+# straight to a surface this big (no intermediate buffer) and pygame's SCALED
+# window scales that finished frame into whatever size the window is, aspect
+# kept, black bars for the rest (`game/display/`). So the camera, the zoom,
+# the HUD and every click target are the same on every screen; only the
+# window changes. 16:9.
 SCREEN_WIDTH: int = 1600
 SCREEN_HEIGHT: int = 900
 FPS: int = 62
@@ -27,6 +30,34 @@ VERSION: str = "0.5"
 # if the driver refuses (the tests' dummy driver does); `Game.vsync` says
 # which you got. Off in the browser profile, where pygbag owns the canvas.
 VSYNC: bool = True
+
+# The window (journal "Dynamic window scaling", 2026-09-15). Changed only in
+# the Options screen -- there is no hotkey, so nothing changes during a run.
+#   WINDOW_MODE_DEFAULT  "windowed", or "borderless": SDL's desktop fullscreen
+#                        (a borderless window at the desktop size, never a
+#                        display-mode switch).
+#   WINDOW_MIN           the floor for a dragged or saved window; the desktop
+#                        is the ceiling (`fit.clamp_window`).
+#   WINDOW_FIT_FRACTION  first launch: the window is the logical size at the
+#                        display's DPI, shrunk to this share of the usable
+#                        desktop (`fit.fit_window`).
+#   WINDOW_RESOLUTIONS   the Options "Resolution" candidates, filtered at run
+#                        time to those that fit the desktop.
+#   WINDOW_RESIZABLE     the whole feature; the web profile turns it off
+#                        (pygbag owns the canvas).
+#   WINDOW_DPI_AWARE     SDL_WINDOWS_DPI_AWARENESS=permonitorv2 before init:
+#                        without it a 125 % desktop is reported at 80 % size
+#                        and Windows re-stretches the output afterwards.
+#   WINDOW_SCALE_FILTER  SDL_RENDER_SCALE_QUALITY: pygame forces "nearest",
+#                        which at fractional scales duplicates pixel rows.
+WINDOW_MODE_DEFAULT: str = "windowed"
+WINDOW_MIN: tuple[int, int] = (800, 450)
+WINDOW_FIT_FRACTION: float = 0.90
+WINDOW_RESOLUTIONS: tuple[tuple[int, int], ...] = (
+    (1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160))
+WINDOW_RESIZABLE: bool = True
+WINDOW_DPI_AWARE: bool = True
+WINDOW_SCALE_FILTER: str = "linear"
 
 # Largest delta time (seconds) a single frame is allowed to represent. Without
 # this a stall (e.g. window drag) produces a huge dt that tunnels entities
@@ -883,8 +914,10 @@ def apply_web_profile() -> None:
     `PlayingState`), so a plain reassignment here propagates.
     """
     global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
+    global WINDOW_RESIZABLE
     SAVE_ENABLED = False
     VSYNC = False
+    WINDOW_RESIZABLE = False        # pygbag owns the canvas
     FPS = 60
     SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
     CAMERA_ZOOM = 1.25

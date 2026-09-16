@@ -8,10 +8,13 @@
 > resolution and make sure the integrity of the gameplay remains the same. Do
 > not alter the zoom. Confirm, don't touch code.
 
-Status: **proposal only**. No code was changed; the owner asked for
-confirmation first. Everything below was checked against the code and
-against pygame 2.6.1 / SDL 2.28.4 on the owner's machine with throwaway
-probe scripts (kept out of the repo).
+Status: **built** (2026-09-15, "start with the window scaling changes"):
+the scaled window, windowed / borderless, the Resolution row, the fit rule,
+the saved settings and the cursor scale -- see "Built" at the end of the
+proposal. The ultrawide render extent (its own section below) is confirmed
+but not built. Everything here was checked against the code and against
+pygame 2.6.1 / SDL 2.28.4 on the owner's machine with throwaway probe
+scripts (kept out of the repo).
 
 ---
 
@@ -58,6 +61,7 @@ pygame 2.6.1 (SDL 2.28.4) on Windows 11, the owner's 3440x1440 monitor at
 | 9 | A resize posts `VIDEORESIZE`, `WINDOWRESIZED` and `WINDOWSIZECHANGED`. | One handler remembers the windowed size. |
 | 10 | `ctypes.CDLL("SDL2.dll")` after `pygame.init()` binds the SDL already loaded by pygame (Windows returns the loaded module by name), so it works from the PyInstaller onedir without a path. | The shims need no packaging change. |
 | 11 | The hardware cursor (`ui/mouse.install_cursor`) is in screen pixels and does not follow the scale. | Re-install it at `UI_CURSOR_SCALE * window_scale` on each size change. |
+| 12 | (found while building) On the way **out** of fullscreen pygame re-pins the window minimum to the logical size: right after the toggle a 1280x720 request came back as 1600x900 while 1920x1080 went through. | The floor is lifted again before every programmatic size (`DisplayWindow._apply_windowed_size`), not only at open. |
 
 ---
 
@@ -78,7 +82,6 @@ window. New constants, all read at call time:
 | `WINDOW_RESIZABLE` | `True` | `apply_web_profile()` sets it `False`. |
 | `WINDOW_DPI_AWARE` | `True` | Sets `SDL_WINDOWS_DPI_AWARENESS=permonitorv2` before init. |
 | `WINDOW_SCALE_FILTER` | `"linear"` | Sets `SDL_RENDER_SCALE_QUALITY`. |
-| `KEY_TOGGLE_FULLSCREEN` | `K_F11` | Plus Alt+Enter. F1–F8 are the debug keys; F11 is free. |
 
 ### 2. New package `game/display/` (one module per concern)
 
@@ -91,8 +94,8 @@ window. New constants, all read at call time:
   saved or fitted size, installs the cursor at the right scale. Also:
   `toggle_fullscreen()`, `set_windowed_size(w, h)`, `resolution_entries()` /
   `apply_resolution(i)`,
-  `handle_event(event)` (size-changed → remember the windowed size when not
-  fullscreen, re-apply the integer-scale flag, rescale the cursor),
+  `handle_event(event)` (a drag resize → remember the windowed size when
+  not borderless, re-apply the integer-scale flag, rescale the cursor),
   `scale` (window over logical), `settings()` / `restore(settings)`, and
   `available` — `False` when `SCALED` was refused (dummy driver, some remote
   desktops) or on emscripten, in which case every method is a no-op and the
@@ -109,8 +112,9 @@ window. New constants, all read at call time:
 `Game.__init__` calls `prepare()` before `pygame.init()` and `open()` where
 `_open_window` is called now; `_open_window` becomes a thin delegate so
 `tests/flows/test_window.py` keeps its shape. `Game._process_input` routes
-window events to the manager and handles F11 / Alt+Enter globally, next to
-the `M` mute key.
+window events to the manager. There is no hotkey: the owner ruled
+(2026-09-15) that the Options screen is the only place display settings
+change.
 
 ### 3. Fit rule (first launch)
 
@@ -133,12 +137,16 @@ the `M` mute key.
 A saved size is clamped to `[WINDOW_MIN, usable]` when applied, not when
 loaded, because the desktop can change between sessions.
 
-### 4. Fullscreen and the controls
+### 4. Borderless and the controls
 
 - `toggle_fullscreen()`; on the way back to windowed, re-apply the
   integer-scale flag, re-assert the remembered windowed size, rescale the
   cursor, persist the mode.
-- Hotkeys F11 and Alt+Enter anywhere (global, consumed before states).
+- **No hotkey and no pause-menu row** (owner, 2026-09-15): the Options
+  screen, reached from the main menu, is the only place these settings
+  change. A consequence worth its own line: a display change can never
+  happen during a run, so the render width is fixed for the length of a run
+  and nothing in the run has to survive an aspect change.
 - Options screen: two rows above "Sanctuary" (owner's layout, 2026-09-15,
   after a first draft with a single Resolution row).
   - **Display mode** — Windowed / Borderless. Left/Right or ENTER switches.
@@ -151,9 +159,8 @@ loaded, because the desktop can change between sessions.
     (e.g. "3440x1440"), is drawn in `COLOR_TEXT_DIM`, and the cursor skips
     it. The two modes are told apart at a glance by which row is live.
   - Same immediate-persist contract as volume and the key layout.
-- Pause menu: one more wide-button row, **Display mode**, showing Windowed /
-  Borderless on the right like the Key layout row (five rows still end at
-  y ≈ 650 of 900). Resolution changes stay in Options.
+- Pause menu: unchanged. (A Display mode row was proposed and withdrawn the
+  same day: Options only.)
 
 ### 5. Cursor
 
@@ -219,23 +226,77 @@ every state's layout, `apply_web_profile` (it only gains
    is the supported screen range.
 3. Linear scale filter.
 4. DPI awareness on by default.
-5. F11 and Alt+Enter; Display mode and Resolution rows in Options, Display
-   mode alone in the pause menu — **confirmed by the owner 2026-09-15**.
+5. Display mode and Resolution rows in Options and nowhere else: no hotkey,
+   no pause-menu row — **confirmed by the owner 2026-09-15**.
 6. First launch opens windowed and fitted (not fullscreen).
 
 ---
 
+## Built (2026-09-15)
+
+- `game/config.py`: the `SCREEN_*` comment now says "logical size"; the
+  `WINDOW_*` constants as in §1 minus the hotkey; `apply_web_profile` turns
+  `WINDOW_RESIZABLE` off.
+- `game/display/fit.py` (pure arithmetic), `native.py` (the four SDL
+  shims through `ctypes`, each with a fallback), `window.py`
+  (`DisplayWindow`), `__init__.py`.
+- `game/game.py`: `DisplayWindow.prepare()` before `pygame.init()`; the
+  save is read *before* the window opens (its mode and size shape it);
+  `self.display.open()` replaces the old `_open_window` (kept as a delegate
+  for the tests); a drag resize is routed to the manager from
+  `_process_input` and written once at quit (`_close`); `persist` writes
+  `settings["display"]`; the cursor is reinstalled at
+  `UI_CURSOR_SCALE x window scale` whenever the scale changes.
+- `game/save.py`: `_coerce` keeps a known mode and a plausible size, drops
+  the rest.
+- `ui/mouse.py`: `install_cursor(assets, scale=None)`.
+- `game/states/options_state.py`: the Display mode and Resolution rows;
+  the cursor skips the Resolution row in Borderless and both rows when the
+  scaled window was refused; the skipped row is drawn in `COLOR_TEXT_DIM`.
+
+### Verified on the real window (3440x1440 at 125 %)
+
+Booted the actual `Game` with a saved 1920x1080 windowed setting and drove
+the manager as the Options rows do, grabbing the OS window with GDI so the
+pictures show the scaled window, not the logical surface:
+
+| Step | Window | Scale | Resolution row |
+|---|---|---|---|
+| saved 1920x1080, windowed | 1920x1080 | 1.200 | `1920x1080` |
+| Display mode -> Borderless | 3440x1440, fullscreen-desktop | 1.600 | `3440x1440`, dim |
+| back to Windowed | 1920x1080 | 1.200 | `1920x1080` |
+| Resolution row -> 1280x720 | 1280x720 | 0.800 | `1280x720` |
+| dragged to 1734x975 | 1734x975 | 1.083 | `Custom 1734x975` |
+| quit | -- | -- | save holds `[1734, 975]` |
+
+The Resolution list on this desktop: 1280x720, 1600x900, 1920x1080,
+2560x1440. Screenshots delivered: the Options screen at 1920x1080 (1.2x),
+in Borderless on the ultrawide (440 px pillars), and at 1280x720.
+
+### Tests
+
+`tests/display/test_fit.py` (the fit table, clamps, the letterbox, the
+Resolution list), `tests/display/test_window.py` (`DisplayWindow` with the
+shims and pygame's display calls mocked: open, refused, saved borderless,
+mode switches, the Resolution steps from a listed and a custom size, drag
+events, the floor lifted before every size, the settings round trip
+through `save._coerce`), `tests/flows/test_window.py` (+2: the dormant
+manager under the dummy driver; the scaled window asks for `RESIZABLE`),
+`tests/screens/test_options.py` (+5: the rows skipped without a scaled
+window, mode switch and resolution step persisting, the row skipped and
+reading the desktop in Borderless, the save carrying the block).
+
 ## Progress
 
-- [ ] Config constants and the `SCREEN_*` comment
-- [ ] `game/display/` — `fit.py`, `native.py`, `window.py`
-- [ ] `Game` wiring: prepare before init, open, events, hotkeys
-- [ ] Save coercion of `settings["display"]`
-- [ ] Display mode and Resolution rows in Options; Display mode row in the pause menu
-- [ ] Cursor rescale
-- [ ] Web profile flag
-- [ ] Tests listed in §8
-- [ ] Manual checklist and the screenshots (windowed 1.2x, fullscreen ultrawide)
+- [x] Config constants and the `SCREEN_*` comment
+- [x] `game/display/` — `fit.py`, `native.py`, `window.py`
+- [x] `Game` wiring: prepare before init, open, events (no hotkeys: Options only)
+- [x] Save coercion of `settings["display"]`
+- [x] Display mode and Resolution rows in Options
+- [x] Cursor rescale
+- [x] Web profile flag
+- [x] Tests listed in §8
+- [x] Manual checklist and the screenshots (windowed 1.2x, borderless ultrawide, 1280x720)
 
 ---
 
@@ -249,8 +310,9 @@ every state's layout, `apply_web_profile` (it only gains
 > because the spawn master can spawn enemies anywhere it should affect the
 > gameplay. HUD elements must remain static as a 16:9 resolution.
 
-Status: **considered only**, not confirmed and not built. It relaxes the
-"identical gameplay at every size" rule above for ultrawide players.
+Status: **confirmed by the owner 2026-09-15**, not built. It relaxes the
+"identical gameplay at every size" rule above for ultrawide players. The
+owner's rulings on the open points are folded in below.
 
 ### Reading
 
@@ -268,9 +330,17 @@ Status: **considered only**, not confirmed and not built. It relaxes the
   horizontal spawns further out and the player sees more. Accepted by the
   owner as the natural consequence.
 - The HUD is laid out in a centred 1600x900 box and never drifts to the
-  wider edges. **Open:** whether menus and overlays (pause, level-up, run
-  status, title) also stay in that box — assumed yes, with the world or the
-  background showing in the side margins.
+  wider edges. Every other element stays as it is today: menus and the
+  overlay panels keep their layout, centred in the same box (owner,
+  2026-09-15).
+- **The dim layer covers the whole wide surface.** The in-run overlays --
+  pause (`game/states/paused_state.py:90`), run status
+  (`ui/run_status/common.py:114`), level-up (`ui/level_up.py:65`) -- each
+  size their black translucent layer from the surface they are handed. With
+  the UI box a subsurface, the dim must be painted on the **full** surface
+  first and only the panel on the box, or the world would stay bright in the
+  side margins. The owner asked for this to be verified; it is a test (below)
+  and a manual check in the screenshot at 21:9.
 
 ### What it touches
 
@@ -291,22 +361,39 @@ Status: **considered only**, not confirmed and not built. It relaxes the
    Manual aim works in full-surface coordinates and needs nothing.
 4. **The logical size is fixed by `set_mode`.** Probe #5 above: a second
    `set_mode` with the same flags works, one that adds `FULLSCREEN` fails.
-   Changing the logical size at run time needs its own probe. Proposed: two
-   logical widths only, 16:9 (1600) and 21:9 (2100), chosen by the
-   resolution pick or the desktop aspect; a dragged window keeps the current
-   aspect behind bars. A continuously variable width would mean a display
-   re-open on every resize event, which is too fragile.
-5. **Mid-run changes.** A Display mode toggle on an ultrawide desktop changes
-   the aspect while a run is live, so `PlayingState.camera.view_width`, the
-   bake span and the loading prewarm must accept a change at any time, not
-   only at run start.
+   Confirmed: two logical widths only, 16:9 (1600) and 21:9 (2100), chosen
+   by the resolution pick or the desktop aspect; a dragged window keeps the
+   current aspect behind bars. A continuously variable width would mean a
+   display re-open on every resize event, which is too fragile.
+5. **No mid-run changes.** Display settings change only in Options, from
+   the main menu (the owner's ruling above), so the render width is chosen
+   before a run starts and `PlayingState`, the camera, the bake span and the
+   loading prewarm read it once at run start. The remaining work is the
+   change *at the main menu*: a logical-width change there re-opens the
+   display (windowed: a second `set_mode`; borderless: toggle out, re-open,
+   toggle in) and refreshes `game.screen`.
 6. **Tests** that pin layouts to `config.SCREEN_WIDTH` (`tests/screens/`,
    `tests/render/test_render_cull.py`, `tests/entities/ai/test_boss.py`)
-   would need the UI box vs the render width told apart.
+   need the UI box vs the render width told apart. New: at a 2100x900 render
+   the HUD's bars and the boss bar land inside the centred 1600x900 box; the
+   pause, run-status and level-up dim layers darken a pixel in the side
+   margin as much as one in the box; the camera's world span is 1400x600;
+   the menus' hit rects stay where the 16:9 tests pin them, offset by the
+   margin.
 
-### To probe before confirming
+### To probe before building
 
 - A second `set_mode` that changes the logical width (windowed) keeps
   vsync, the renderer and the integer-scale fix.
 - Whether the same works through the borderless toggle, or whether the
   logical width must be chosen before the toggle.
+
+### Progress
+
+- [ ] Logical width from the resolution pick / desktop aspect (16:9 or 21:9)
+- [ ] The UI box: HUD, menus and overlay panels on a centred 1600x900
+      subsurface; mouse events offset for UI hit-testing
+- [ ] Dim layers painted on the full surface before the box
+- [ ] Terrain bake and loading prewarm span the render width
+- [ ] Tests listed in item 6
+- [ ] Screenshot at 21:9 with the pause overlay open

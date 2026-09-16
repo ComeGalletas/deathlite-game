@@ -101,9 +101,11 @@ class MouseNav:
         return None
 
 
-def install_cursor(assets) -> bool:
+def install_cursor(assets, scale: float | None = None) -> bool:
     """Set the hardware cursor to the arrow in `config.UI_CURSOR_IMAGE`:
-    cropped to its ink, scaled by `config.UI_CURSOR_SCALE`, hotspot on the
+    cropped to its ink, scaled by `scale` (default `config.UI_CURSOR_SCALE`;
+    the game passes that times the window scale, since a hardware cursor is
+    in screen pixels and would not follow the scaled frame), hotspot on the
     ink's top-left pixel (the arrow tip). Returns True when installed; a
     missing image or a refusing driver / build leaves the system cursor and
     returns False."""
@@ -114,7 +116,7 @@ def install_cursor(assets) -> bool:
     if ink.width == 0 or ink.height == 0:
         return False
     surf = base.subsurface(ink).copy()
-    scale = float(config.UI_CURSOR_SCALE)
+    scale = float(config.UI_CURSOR_SCALE if scale is None else scale)
     if scale != 1.0:
         surf = pygame.transform.smoothscale(
             surf, (max(1, round(ink.width * scale)), max(1, round(ink.height * scale))))

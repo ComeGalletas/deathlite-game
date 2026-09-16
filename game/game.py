@@ -18,6 +18,7 @@ import pygame
 from game import config, save as save_mod
 from game.assets import get_assets
 from game.content import get_content
+from game.display import DisplayWindow
 from game.events import EventBus, Events
 from game.state import StateMachine
 from progression.meta import MetaCatalog
@@ -30,26 +31,35 @@ log = logging.getLogger(__name__)
 
 class Game:
     def __init__(self, save_path=None) -> None:
+        DisplayWindow.prepare()             # SDL hints: before init
         pygame.init()
         pygame.display.set_caption(config.TITLE)
         self._set_icon()                    # before the window: SDL reads it there
-        self.screen, self.vsync = self._open_window()
+        # Persistent progression (spec 4.7). Load is corruption-tolerant. Read
+        # before the window opens: the saved display mode and size shape it.
+        self.save_path = save_path or save_mod.DEFAULT_PATH
+        self.save = (save_mod.load(self.save_path) if config.SAVE_ENABLED
+                     else save_mod.SaveData())
+        # The window the fixed 1600x900 frame is scaled into (game/display/).
+        self.display = DisplayWindow()
+        self.display.restore(self.save.settings)
+        self.screen, self.vsync = self.display.open()
         self.clock = pygame.time.Clock()
         self.running = False
 
         self.events = EventBus()
 
-        # Persistent progression (spec 4.7). Load is corruption-tolerant.
         self.content = get_content()
         # Sprite/image cache. Lazy -- no disk read until a draw asks for a frame,
         # and a missing file degrades to primitive drawing (never raises).
         self.assets = get_assets()
         # The arrow from assets/ui/pointers as the hardware cursor; a missing
         # file or a refusing build keeps the system arrow (see ui/mouse.py).
-        self.cursor_installed = install_cursor(self.assets)
-        self.save_path = save_path or save_mod.DEFAULT_PATH
-        self.save = (save_mod.load(self.save_path) if config.SAVE_ENABLED
-                     else save_mod.SaveData())
+        # A hardware cursor is in screen pixels, so it follows the window
+        # scale or it shrinks to a third of itself at 3440x1440.
+        self.cursor_installed = install_cursor(self.assets, self._cursor_scale())
+        self.display.on_scale_changed = lambda _s: install_cursor(
+            self.assets, self._cursor_scale())
         self.meta_catalog = MetaCatalog(self.content.meta_upgrades)
 
         self.audio = AudioManager(self.events)
@@ -93,11 +103,16 @@ class Game:
         self.set_key_layout(nxt)
         return nxt
 
+    def _cursor_scale(self) -> float:
+        return float(config.UI_CURSOR_SCALE) * float(self.display.scale)
+
     def persist(self) -> None:
         if not config.SAVE_ENABLED:
             return  # session-only build (browser) -- nothing is written to disk
         self.save.settings["muted"] = self.audio.muted
         self.save.settings["volume"] = self.audio.volume
+        self.save.settings["display"] = self.display.settings()
+        self.display.dirty = False
         try:
             save_mod.save(self.save, self.save_path)
         except OSError:
@@ -141,21 +156,11 @@ class Game:
 
     @staticmethod
     def _open_window():
-        """The window, synced to the display when `config.VSYNC` asks and the
-        driver allows. Returns `(surface, vsync_on)`. A driver that cannot
-        (the headless dummy driver, some remote desktops) raises
-        `pygame.error`, and the plain window is the answer then -- the game
-        must never fail to open over presentation."""
-        size = (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
-        if config.VSYNC:
-            try:
-                surf = pygame.display.set_mode(
-                    size, pygame.SCALED | pygame.DOUBLEBUF, vsync=1)
-                return surf, True
-            except pygame.error as exc:
-                logging.getLogger(__name__).info(
-                    "vsync window refused (%s); plain window", exc)
-        return pygame.display.set_mode(size), False
+        """The bare display surface (`DisplayWindow.open_surface`): synced
+        to the display when `config.VSYNC` asks and the driver allows, the
+        plain window otherwise. Kept as the seam `tests/flows/test_window.py`
+        pins; the game itself opens through `self.display.open()`."""
+        return DisplayWindow.open_surface()
 
     def _start(self) -> None:
         """Push the opening state and arm the loop. Shared by `run` (desktop)
@@ -185,12 +190,18 @@ class Game:
 
         self.debug.record_timing((t1 - t0) * 1000.0, (t2 - t1) * 1000.0)
 
+    def _close(self) -> None:
+        """A dragged window size is written once, here, not per event."""
+        if self.display.dirty:
+            self.persist()
+        pygame.quit()
+
     def run(self) -> None:
         """Desktop entry: a plain blocking loop."""
         self._start()
         while self.running:
             self._step()
-        pygame.quit()
+        self._close()
 
     async def run_async(self) -> None:
         """Browser (pygbag / emscripten) entry: the same loop, but it yields to
@@ -202,7 +213,7 @@ class Game:
         while self.running:
             self._step()
             await asyncio.sleep(0)
-        pygame.quit()
+        self._close()
 
     # --- loop phases ----------------------------------------------
     def _process_input(self) -> None:
@@ -210,6 +221,7 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
                 return
+            self.display.handle_event(event)      # a drag resize; never consumed
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_m:
                     self.audio.toggle_mute()

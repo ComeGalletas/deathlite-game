@@ -1,12 +1,24 @@
-"""OPTIONS: audio settings, the key layout, and the entry point into the
-Sanctuary.
+"""OPTIONS: audio settings, the key layout, the window, and the entry point
+into the Sanctuary.
 
 Start-screen milestone M2. Reached from the menu's "Options" entry. Up / Down
-(also W / S) move the cursor; Left / Right adjust the master volume or cycle
-the key layout (CB-5: WASD move / arrows aim, or the swap); ENTER toggles
-mute, cycles the layout, or opens the selected screen; ESC (or the "Back" row)
-returns to the menu. Every change is persisted immediately, the same as the
-`M` mute key.
+(also W / S) move the cursor; Left / Right adjust the master volume, cycle
+the key layout (CB-5: WASD move / arrows aim, or the swap), switch the
+display mode or step the resolution; ENTER toggles mute, cycles the layout
+or the mode, steps the resolution, or opens the selected screen; ESC (or the
+"Back" row) returns to the menu. Every change is persisted immediately, the
+same as the `M` mute key.
+
+The window rows (journal "Dynamic window scaling", 2026-09-15) are the only
+place the display changes -- no hotkey, nothing in the pause menu:
+
+  * Display mode  -- Windowed / Borderless (`game.display.set_mode`).
+  * Resolution    -- in Windowed, the listed sizes that fit this desktop
+                     (a dragged window reads "Custom WxH"); in Borderless it
+                     reads the desktop size, is drawn dim, and the cursor
+                     skips it. That difference is how the two modes are
+                     told apart at a glance (owner, 2026-09-15). Both rows
+                     read "Unavailable" when the scaled window was refused.
 """
 from __future__ import annotations
 
@@ -16,13 +28,15 @@ from game import config, fonts
 from game.state import State
 
 _LABELS = {"volume": "Master volume", "mute": "Mute", "key_layout": "Key layout",
+           "display": "Display mode", "resolution": "Resolution",
            "sanctuary": "Sanctuary", "back": "Back"}
 
 
 class OptionsState(State):
     def enter(self, **kwargs) -> None:
         self.audio = self.game.audio
-        self._rows = ("volume", "mute", "key_layout", "sanctuary", "back")
+        self._rows = ("volume", "mute", "key_layout", "display", "resolution",
+                      "sanctuary", "back")
         self.sel = 0
         self._title = fonts.heading(40)
         self._row = fonts.body(26)
@@ -36,9 +50,9 @@ class OptionsState(State):
         if k == pygame.K_ESCAPE:
             self._back()
         elif k in (pygame.K_UP, pygame.K_w):
-            self.sel = (self.sel - 1) % len(self._rows)
+            self._move(-1)
         elif k in (pygame.K_DOWN, pygame.K_s):
-            self.sel = (self.sel + 1) % len(self._rows)
+            self._move(+1)
         elif k in (pygame.K_LEFT, pygame.K_a):
             self._nudge(-1)
         elif k in (pygame.K_RIGHT, pygame.K_d):
@@ -49,12 +63,44 @@ class OptionsState(State):
     def _row_id(self) -> str:
         return self._rows[self.sel]
 
+    def _skipped(self, rid: str) -> bool:
+        """A row the cursor passes over: the Resolution row while it is not
+        selectable (borderless), and both window rows when there is no
+        scaled window to change."""
+        if rid == "display":
+            return not self.game.display.available
+        if rid == "resolution":
+            return not self.game.display.resolution_selectable()
+        return False
+
+    def _move(self, direction: int) -> None:
+        for _ in range(len(self._rows)):
+            self.sel = (self.sel + direction) % len(self._rows)
+            if not self._skipped(self._row_id()):
+                return
+
+    def _toggle_display_mode(self) -> None:
+        other = "borderless" if self.game.display.mode == "windowed" else "windowed"
+        if self.game.display.set_mode(other):
+            self.game.persist()
+
+    def _step_resolution(self, direction: int) -> None:
+        if self.game.display.cycle_resolution(direction):
+            self.game.persist()
+
     def _nudge(self, direction: int) -> None:
-        """Left / Right: the volume slider, or the layout cycle (either way
-        round -- there are two layouts)."""
+        """Left / Right: the volume slider, the layout cycle (either way
+        round -- there are two layouts), the display mode (likewise two),
+        or a step through the resolutions."""
         rid = self._row_id()
         if rid == "key_layout":
             self.game.cycle_key_layout()
+            return
+        if rid == "display":
+            self._toggle_display_mode()
+            return
+        if rid == "resolution":
+            self._step_resolution(direction)
             return
         if rid != "volume":
             return
@@ -71,6 +117,10 @@ class OptionsState(State):
             self.game.persist()
         elif rid == "key_layout":
             self.game.cycle_key_layout()
+        elif rid == "display":
+            self._toggle_display_mode()
+        elif rid == "resolution":
+            self._step_resolution(+1)
         elif rid == "sanctuary":
             from game.states.meta_state import MetaState
             self.game.state_machine.change(MetaState(self.game))
@@ -96,6 +146,8 @@ class OptionsState(State):
             y = y0 + i * step
             selected = i == self.sel
             colour = config.COLOR_ACCENT if selected else config.COLOR_TEXT
+            if self._skipped(rid):
+                colour = config.COLOR_TEXT_DIM           # greyed out, not selectable
 
             if selected:
                 mark = self._row.render(">", True, config.COLOR_ACCENT)
@@ -121,6 +173,12 @@ class OptionsState(State):
             elif rid == "key_layout":
                 val = self._row.render(
                     config.KEY_LAYOUT_LABELS[self.game.key_layout], True, colour)
+                surface.blit(val, val.get_rect(midleft=(vx, y)))
+            elif rid == "display":
+                val = self._row.render(self.game.display.mode_label(), True, colour)
+                surface.blit(val, val.get_rect(midleft=(vx, y)))
+            elif rid == "resolution":
+                val = self._row.render(self.game.display.resolution_label(), True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
 
         hint = self._hint.render(
