@@ -178,11 +178,32 @@ for.
       Options change; drags stay soft until then (2026-09-16).
 - [x] Owner adds: Options reachable from the pause menu, so a change
       rebuilds the live run (2026-09-16).
-- [ ] A throwaway probe on the owner's machine: a run at 3440x1440 with the
-      camera at zoom 2.40625 through the existing zoom cache; record
-      update / render ms from `DebugOverlay.record_timing`, the bake memory,
-      and a screenshot next to the 1.6x-scaled one for the sharpness
-      difference. This decides whether the branch continues.
+- [x] A throwaway probe on the owner's machine (2026-09-16): the shipped
+      run (2100x900 scaled 1.6x) against a run rendered at 3440x1440 with
+      the camera at 2.40625 through the existing zoom cache -- no branch
+      code, only the config knobs -- 500 frames of the hero walking on
+      seed 35 in a dev run, timed around `update` and `_render`; the
+      process working set before and after the run; a crop around the
+      hero, the scaled one put through the presenter's linear filter.
+
+      | | scaled 2100x900 @1.6x | native 3440x1440 @2.40625 |
+      |---|---|---|
+      | render ms, median / p95 | 4.9 / 5.5 | 11.9 / 12.9 |
+      | update ms, median | 2.4 | 2.5 |
+      | world load | 2.6 s | 2.7 s |
+      | working set, menu -> run | 116 -> 574 MB | 142 -> 896 MB |
+      | camera span, world px | 1400 x 600 | 1429.6 x 598.4 |
+      | `64 x zoom` | 96 | 154 (whole: no seams) |
+
+      Verdict: **the branch continues.** The native frame is crisp where
+      the scaled one is soft on every edge (screenshot delivered), and it
+      fits the 62 fps budget on the owner's monitor with ~1 ms to spare at
+      the 95th percentile (12.9 + 2.5 of 16.1 ms). The costs are real and
+      recorded: 2.4x the render time, +320 MB of caches at 2.4x, and by
+      pixel count a 4K screen would land near 20 ms, over budget -- option
+      1's integer scaling (or a native-size cap) stays the answer there and
+      is a stage-3 item. The span differs from the design by 0.27 % from
+      the seam snap, as decided.
 
 ### Stage 1 — the world at native resolution (UI composited)
 
