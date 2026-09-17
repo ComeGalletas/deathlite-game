@@ -734,6 +734,42 @@
       }
     }
   },
+  "npc_pig": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      62,
+      79,
+      70,
+      55
+    ],
+    "scale": [
+      27,
+      21
+    ],
+    "anchor": [
+      13,
+      20
+    ],
+    "face": "right",
+    "_note": "the corral's second animal, beside the sheep: content is the union over both strips, scale puts it at the sheep's height with a longer body; its walk is the run strip",
+    "anims": {
+      "idle": {
+        "file": "terrain/npcs/pig/pig_idle.png",
+        "frames": 10,
+        "fps": 6,
+        "loop": true
+      },
+      "walk": {
+        "file": "terrain/npcs/pig/pig_run.png",
+        "frames": 4,
+        "fps": 8,
+        "loop": true
+      }
+    }
+  },
   "dead": {
     "frame": [
       128,

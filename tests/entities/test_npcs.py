@@ -4,7 +4,9 @@ Driven through a real headless run so the NPCs are built from the same
 `Village` records and step against the same map the game uses. One run per
 class, shared, since a boot costs a few seconds.
 """
+import math
 import os
+import random
 import tempfile
 import unittest
 
@@ -19,10 +21,61 @@ from game import config
 from game.content import get_content
 from game.game import Game
 from game.states.menu_state import MenuState
+from game.states.playing.core.npcs import _PEN_TRIES, pen_spot
 from game.states.playing_state import PlayingState
 from tests import worlds as W
 
 
+class PenSpotTests(unittest.TestCase):
+    """`pen_spot`, the draw that keeps the pigs off the animals already in
+    the corral (`game/states/playing/core/npcs.py`). No world: the helper
+    only sees a rectangle, a herd and an rng."""
+
+    PEN = pygame.Rect(0, 0, 115, 58)        # every village's corral interior
+    PAD = 13                                # the pig's radius + 4
+
+    def test_an_empty_pen_takes_the_first_draw(self):
+        want = random.Random(1)
+        got = pen_spot(random.Random(1), self.PEN, self.PAD, [], 9)
+        self.assertEqual(got, (want.uniform(self.PAD, self.PEN.right - self.PAD),
+                               want.uniform(self.PAD, self.PEN.bottom - self.PAD)))
+
+    def test_it_stops_at_the_first_spot_with_the_gap(self):
+        """One animal in a corner: the draw that clears it ends the search,
+        so the rng is left exactly that many draws along."""
+        herd = [(self.PAD, self.PAD, 8)]
+        rng = random.Random(4)
+        x, y = pen_spot(rng, self.PEN, self.PAD, herd, 9)
+        self.assertGreaterEqual(math.hypot(x - herd[0][0], y - herd[0][1]) - herd[0][2], 9)
+
+    def test_a_full_corral_still_seats_the_animal_in_its_roomiest_spot(self):
+        """Every draw is crowded, so none is accepted -- the helper returns
+        the best of the eight it saw rather than giving up or looping."""
+        herd = [(x, y, 8) for x in range(self.PAD, self.PEN.right - self.PAD, 6)
+                for y in range(self.PAD, self.PEN.bottom - self.PAD, 6)]
+        rng = random.Random(9)
+        got = pen_spot(rng, self.PEN, self.PAD, herd, 9)
+
+        draws = random.Random(9)
+        seen = []
+        for _ in range(_PEN_TRIES):
+            x = draws.uniform(self.PAD, self.PEN.right - self.PAD)
+            y = draws.uniform(self.PAD, self.PEN.bottom - self.PAD)
+            seen.append(((x, y), min(math.hypot(x - hx, y - hy) - hr
+                                     for hx, hy, hr in herd)))
+        self.assertEqual(got, max(seen, key=lambda s: s[1])[0])
+
+    def test_the_spot_is_always_inside_the_padded_interior(self):
+        rng = random.Random(3)
+        herd = []
+        for _ in range(40):
+            x, y = pen_spot(rng, self.PEN, self.PAD, herd, 9)
+            self.assertTrue(self.PEN.inflate(-2 * self.PAD, -2 * self.PAD)
+                            .collidepoint(x, y))
+            herd.append((x, y, 9))
+
+
+def fresh_playing():
 SEED = W.pinned(2)
 
 
@@ -50,14 +103,16 @@ class VillagerTests(unittest.TestCase):
     def _by_kind(self, kind):
         return [n for n in self.p.npcs if n.kind == kind]
 
-    def test_every_village_has_a_smith_pawns_guards_and_sheep_where_it_has_a_pen(self):
+    def test_every_village_has_a_smith_pawns_guards_and_stock_where_it_has_a_pen(self):
         p, lay = self.p, self.lay
         self.assertTrue(lay.villages)
         self.assertGreaterEqual(len(self._by_kind("smith")), 1)
         self.assertGreaterEqual(len(self._by_kind("pawn")), 1)
         self.assertGreaterEqual(len(self._by_kind("lancer")), 1)
         if any(v.pen is not None for v in lay.villages):
+            # Both corral animals: the sheep and the pigs that joined them.
             self.assertGreaterEqual(len(self._by_kind("sheep")), 1)
+            self.assertGreaterEqual(len(self._by_kind("pig")), 1)
         for n in p.npcs:
             room = p.game_map.room_at(n.pos)
             self.assertIsNotNone(room, f"{n.kind} stands in the sea")
@@ -203,7 +258,7 @@ class VillagerTests(unittest.TestCase):
             for n in p.npcs:
                 if isinstance(n, SheepNpc):
                     self.assertTrue(n.pen.collidepoint(n.pos.x, n.pos.y),
-                                    "a sheep left the pen")
+                                    f"a {n.kind} left the corral")
                 elif not n.posts:
                     self.assertLessEqual(n.home.distance_to(n.pos), n.leash + 2 * px,
                                          f"{n.kind} strayed off its leash")
