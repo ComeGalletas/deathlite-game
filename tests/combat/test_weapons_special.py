@@ -8,6 +8,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
+from tests import worlds as W
+
+SEED = W.pinned(0)
 
 from combat.weapons import Weapon, FireContext
 from game.content import get_content
@@ -133,12 +136,8 @@ class MainWeaponAttackAnimTests(unittest.TestCase):
         from game.states.playing_state import PlayingState
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        from tests.boot import settle
-        p = settle(g)                  # through the loading screen
-        assert isinstance(p, PlayingState)
+        from tests.boot import start_run
+        p = start_run(g, SEED)         # through the loading screen
         p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(25, 0))   # inside the sword's reach
         return g, p
 

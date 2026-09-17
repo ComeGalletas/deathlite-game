@@ -17,6 +17,9 @@ from game.game import Game
 from game.states.level_up_state import LevelUpState
 from game.states.menu_state import MenuState
 from game.states.playing_state import PlayingState
+from tests import worlds as W
+
+SEED = W.pinned(1)
 from progression.experience import xp_for_level
 
 
@@ -38,15 +41,12 @@ def _click(game, pos):
     _mouse(game, pygame.MOUSEBUTTONUP, pos)
 
 
-def _run():
-    from tests.boot import settle
+def _run(seed=SEED):
+    """A booted run on the pinned world."""
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    for _ in range(2):
-        _key(game, pygame.K_RETURN)
-    ps = settle(game)
-    assert isinstance(ps, PlayingState)
-    return game, ps
+    return game, start_run(game, seed)
 
 
 def _taken(ps) -> int:
