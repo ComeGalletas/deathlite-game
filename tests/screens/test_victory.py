@@ -17,6 +17,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from game import config
 from game.states.character_select_state import CharacterSelectState
 from game.states.menu_state import MenuState
 from game.states.meta_state import MetaState
@@ -57,10 +58,46 @@ class _Recorder:
         self.changed_to = state
 
 
-def _state(stats=None):
+def _state(stats=None, locked=False):
+    """Past the input lock by default; see `test_game_over.py`."""
     s = VictoryState(SimpleNamespace(state_machine=_Recorder()))
     s.enter(stats=stats)
+    if not locked:
+        s.update(config.END_SCREEN_INPUT_LOCK)
     return s
+
+
+class InputLockTests(unittest.TestCase):
+    """VICTORY gets the same lock as GAME OVER -- it is the same frame, and
+    the point of keeping the frame shared is that neither screen can be
+    given a feature the other misses."""
+
+    @classmethod
+    def setUpClass(cls):
+        _display()
+        pygame.font.init()
+
+    def test_enter_does_not_start_a_run_while_locked(self):
+        s = _state(locked=True)
+        self.assertTrue(s._screen.locked)
+        s.handle_event(_key(pygame.K_RETURN))
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+    def test_a_click_does_nothing_while_locked(self):
+        s = _state(locked=True)
+        s.draw(pygame.Surface((1600, 900)))
+        pos = s._mouse.hits.rect_of(0).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1))
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1))
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+    def test_update_lifts_the_lock(self):
+        s = _state(locked=True)
+        for _ in range(int(config.END_SCREEN_INPUT_LOCK * 60) + 1):
+            s.update(1 / 60)
+        self.assertFalse(s._screen.locked)
+        s.handle_event(_key(pygame.K_RETURN))
+        self.assertIsInstance(s.game.state_machine.changed_to, CharacterSelectState)
 
 
 class _Base(unittest.TestCase):

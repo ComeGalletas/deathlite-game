@@ -642,10 +642,21 @@ HUD_BOSS_WIDTH: float = 0.5
 HUD_BOSS_BOTTOM: int = 28
 
 # --- Audio ---------------------------------------------------------------
-# Master-volume step for the Options screen (0..1). The slider snaps to this
-# grid; AudioManager.set_volume() clamps to [0, 1]. Both volume rows -- the
-# cue master and the music level -- step on it.
+# Volume step for the Options screen (0..1). Every slider snaps to this grid;
+# the players clamp to [0, 1]. All three volume rows -- the master, the music
+# level and the sound effects -- step on it.
 VOLUME_STEP: float = 0.05
+
+# The mixer has three levels (journal `audio_mixer_journal.md`, 2026-09-16):
+# one **master** over everything, and a **music** and a **sound effects** level
+# under it. A cue plays at `master * sfx * per-cue gain` and the stream at
+# `master * music`, so the master is the one knob that moves the whole game.
+#
+# The two children keep the levels the game shipped with and the master starts
+# wide open, so a fresh install sounds exactly as it did when the master did
+# not exist. Overridden by save.settings["master_volume"] / ["volume"].
+MASTER_VOLUME_DEFAULT: float = 1.0
+SFX_VOLUME_DEFAULT: float = 0.7
 
 # --- Sound effects (recorded) --------------------------------------------
 # Cues that come from files rather than from the synth in `systems/audio.py`
@@ -696,7 +707,7 @@ MUSIC_TRACKS: dict = {
     "gameplay": "music/gameplay-1.mp3",
 }
 # Music sits *under* the cues rather than beside them, so its default is
-# lower than the cue master's 0.7. Overridden by save.settings["music_volume"].
+# lower than the sound effects' 0.7. Overridden by save.settings["music_volume"].
 MUSIC_VOLUME_DEFAULT: float = 0.5
 # Length of the fade out / fade in when the track changes. `mixer.music` has
 # one stream, so a switch is a gap-fade, never a true crossfade.
@@ -725,7 +736,13 @@ ENEMY_COUNT_HARD_CAP: int = 600
 # simulated (the performance budget -- the time-growing cap above is clamped
 # to it for the director); `ENEMY_COUNT_HARD_CAP` bounds live + dormant, the
 # run's whole population.
-ENEMY_LIVE_CAP: int = 150
+# 2026-09-16 (S12, owner): 150 -> 250. Recorded honestly -- 150 was chosen
+# because it was the last value the frame held: the stress harness measured
+# 146 live at p50 13.4 ms (13 frames of 600 over the 16.7 ms budget), 197 at
+# p50 15.2 (126 over) and 297 at p50 16.5 (250 over). 250 sits between the
+# last two rows, so a crowded frame is expected to miss 60 fps on this
+# machine. The owner asked for the larger crowd knowing that.
+ENEMY_LIVE_CAP: int = 250
 # Spawn master S7: update divisor for enemies that are neither chasing nor
 # on screen. 1 updates every enemy every frame; 2 updates such an enemy
 # every other frame with a doubled `dt` and skips it entirely on the frames
@@ -864,6 +881,15 @@ SPRITE_ANCHOR_DROP: float = 0.83
 # "after playtesting". Milestone 10 playtests: at 900 s a solid run stalls
 # around 7-8 min, so the boss was almost never reached. Pulled to 10 min so a
 # competent run actually finishes the loop; the boss still lands near the end.
+# How long the run-end screens (GAME OVER / VICTORY) refuse every input
+# after they appear, in seconds. A run ends on the frame the player is still
+# playing it -- mid-keypress, and with manual aim usually mid-click -- so
+# without this the summary can be dismissed by an input that was already in
+# flight, before the player has registered the screen at all (owner,
+# 2026-09-16; `documentation/journals/end_screen_input_lock_journal.md`).
+# 0 disables the lock.
+END_SCREEN_INPUT_LOCK: float = 1.5
+
 RUN_DURATION_SECONDS: float = 600.0
 BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
 # Where the boss appears: this far from the hero, on a random side, clamped

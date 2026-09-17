@@ -15,6 +15,13 @@ drifting apart again (owner, 2026-09-12; see
 `EndScreen` owns the selection and the mouse bookkeeping but never acts:
 `handle_event` returns the id of the button to fire and the state decides what
 that means, so the frame knows nothing about states it would have to import.
+
+It also owns the **input lock**: for `config.END_SCREEN_INPUT_LOCK` seconds
+after the screen appears, every input is refused, so the keypress or click
+that was already in flight when the run ended cannot dismiss the summary
+before it has been read (owner, 2026-09-16;
+`documentation/journals/end_screen_input_lock_journal.md`). The state ticks it
+from `update`.
 """
 from __future__ import annotations
 
@@ -71,7 +78,8 @@ def run_subtitle(stats: dict, *, lead: tuple[str, ...] = ()) -> str:
 class EndScreen:
     def __init__(self, stats: dict, *, title: str, title_colour,
                  backdrop, buttons: tuple[Button, ...], subtitle: str = "",
-                 title_px: int = 64, columns: tuple[str, ...] = COLUMNS) -> None:
+                 title_px: int = 64, columns: tuple[str, ...] = COLUMNS,
+                 lock: float | None = None) -> None:
         self.stats = stats
         self.title = title
         self.title_colour = title_colour
@@ -80,6 +88,10 @@ class EndScreen:
         self.subtitle = subtitle
         self.columns = tuple(columns)
         self.sel = 0
+        # Seconds of input lock left (see the module docstring). `lock=0`
+        # is how the frame's own tests ask for an unlocked screen.
+        self.lock_remaining = float(
+            config.END_SCREEN_INPUT_LOCK if lock is None else lock)
         self.mouse = MouseNav()      # button rects registered in draw()
         self._panel = RunSummaryPanel(stats)
         self._title_font = fonts.heading(title_px)
@@ -88,9 +100,25 @@ class EndScreen:
         self._hint_font = fonts.body(16)
 
     # --- input -------------------------------------------------------
+    @property
+    def locked(self) -> bool:
+        return self.lock_remaining > 0.0
+
+    def tick(self, dt: float) -> None:
+        """Run the input lock down. The states call this from `update`."""
+        if self.lock_remaining > 0.0:
+            self.lock_remaining = max(0.0, self.lock_remaining - max(0.0, dt))
+
     def handle_event(self, event: pygame.event.Event) -> str | None:
         """The `bid` of the button to fire, or None. Nothing is acted on
         here -- the state that owns this decides what each id does."""
+        if self.locked and event.type != pygame.MOUSEMOTION:
+            # Refused, not deferred: a press dropped here never reaches
+            # `MouseNav`, so the release that follows it matches nothing and
+            # cannot fire the button late. Motion is the one exception --
+            # it can only move the hover highlight, and letting it through
+            # keeps the screen from looking frozen while the lock runs.
+            return None
         act = self.mouse.event(event)
         if act is not None:
             kind, i = act

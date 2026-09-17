@@ -1,5 +1,10 @@
 """Sound effects: a synthesised core plus a few recorded cues.
 
+One Options row governs the lot (journal `audio_mixer_journal.md`,
+2026-09-16): `self.volume` is the **sound effects** level and covers the
+synthesised cues and the recorded clips alike, including the growl, and
+`self.master` is the level shared with the music stream.
+
 Most effects are built at startup from sine/square/noise primitives into a raw
 16-bit mono buffer and wrapped in a `pygame.mixer.Sound` -- no files, no numpy.
 Since 2026-09-16 a handful of cues are instead *recorded*, loaded from
@@ -163,7 +168,11 @@ class AudioManager:
     def __init__(self, event_bus) -> None:
         self.enabled = False
         self.muted = False
-        self.volume = 0.7
+        # `volume` is the *sound effects* level, one of the mixer's two
+        # children; `master` is the level over both it and the music
+        # (journal `audio_mixer_journal.md`, 2026-09-16).
+        self.volume = float(config.SFX_VOLUME_DEFAULT)
+        self.master = float(config.MASTER_VOLUME_DEFAULT)
         self._sounds: dict[str, pygame.mixer.Sound] = {}
         self._last_play: dict[str, int] = {}
         self._min_gap_ms = {"shoot": 75, "hit": 50, "xp": 45}  # minimum gap between consecutive plays of each sound in milliseconds
@@ -210,15 +219,21 @@ class AudioManager:
         self.muted = not self.muted
 
     def set_volume(self, v: float) -> None:
-        """Master volume, clamped to [0, 1]. `play()` applies it per cue, so a
-        bare assignment would work too -- this is the one place the clamp and
-        the float tidy-up live."""
+        """The sound-effects level, clamped to [0, 1]. `play()` applies it per
+        cue, so a bare assignment would work too -- this is the one place the
+        clamp and the float tidy-up live."""
         self.volume = round(max(0.0, min(1.0, float(v))), 4)
 
+    def set_master(self, v: float) -> None:
+        """The level over the whole mixer, clamped to [0, 1]. `MusicPlayer`
+        holds the same number for the stream; `Game` sets both."""
+        self.master = round(max(0.0, min(1.0, float(v))), 4)
+
     def play(self, name: str, gain: float = 1.0) -> None:
-        """Play a cue. `gain` scales it under the master for this one play --
-        it is how the room growl sounds quieter than the boss growl without a
-        second copy of the same recording."""
+        """Play a cue at `master * volume * gain`. `gain` scales one play under
+        the two settings -- it is how the room growl sounds quieter than the
+        boss growl without a second copy of the same recording, and it keeps
+        that balance wherever the player puts the sliders."""
         if not self.enabled or self.muted:
             return
         snd = self._sounds.get(name)
@@ -229,7 +244,7 @@ class AudioManager:
         if gap is not None and now - self._last_play.get(name, -9999) < gap:
             return
         self._last_play[name] = now
-        level = max(0.0, min(1.0, self.volume * gain))
+        level = max(0.0, min(1.0, self.master * self.volume * gain))
         # Set the level on the *channel* rather than the Sound: a Sound's
         # volume is shared by every play of it, so two cues from one recording
         # at different gains would fight over it.

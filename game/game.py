@@ -67,7 +67,12 @@ class Game:
 
         self.audio = AudioManager(self.events)
         self.audio.muted = bool(self.save.settings.get("muted", False))
-        self.audio.volume = float(self.save.settings.get("volume", 0.7))
+        # `settings["volume"]` is the sound-effects level -- the name predates
+        # the master and keeps its meaning, so a save written before the mixer
+        # existed comes back with its mix intact and the master wide open
+        # (journal `audio_mixer_journal.md`, 2026-09-16).
+        self.audio.set_volume(self.save.settings.get(
+            "volume", config.SFX_VOLUME_DEFAULT))
         # The streamed score shares the device the cue player just opened.
         # Which track plays is not decided here: every state declares it
         # (`State.music`) and `StateMachine` applies the declaration.
@@ -75,6 +80,8 @@ class Game:
         self.music.set_volume(self.save.settings.get(
             "music_volume", config.MUSIC_VOLUME_DEFAULT))
         self.music.set_muted(self.audio.muted)
+        self.set_master_volume(self.save.settings.get(
+            "master_volume", config.MASTER_VOLUME_DEFAULT), persist=False)
 
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
@@ -104,6 +111,17 @@ class Game:
             raise ValueError(f"unknown key layout: {name!r}")
         self.save.settings["key_layout"] = name
         self.persist()
+
+    def set_master_volume(self, v: float, *, persist: bool = True) -> None:
+        """The mixer's master, held by both players so each folds it into the
+        level it computes (journal `audio_mixer_journal.md`, 2026-09-16). One
+        setter rather than two so the two can never drift apart. `persist` is
+        False only while booting, before the save is anything but what was
+        just read."""
+        self.audio.set_master(v)
+        self.music.set_master(self.audio.master)     # the clamped, rounded value
+        if persist:
+            self.persist()
 
     def cycle_key_layout(self) -> str:
         """Advance to the next layout (the pause / options toggle). Returns
@@ -144,8 +162,9 @@ class Game:
         if not config.SAVE_ENABLED:
             return  # session-only build (browser) -- nothing is written to disk
         self.save.settings["muted"] = self.audio.muted
-        self.save.settings["volume"] = self.audio.volume
+        self.save.settings["volume"] = self.audio.volume          # sound effects
         self.save.settings["music_volume"] = self.music.volume
+        self.save.settings["master_volume"] = self.audio.master
         self.save.settings["display"] = self.display.settings()
         self.display.dirty = False
         try:

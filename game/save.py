@@ -75,8 +75,13 @@ class SaveData:
     stash: list[dict] = field(default_factory=list)               # serialised Items
     equipped: dict[str, str | None] = field(default_factory=lambda: {
         "weapon": None, "armor": None, "accessory": None})
+    # The three mixer levels (journal `audio_mixer_journal.md`, 2026-09-16):
+    # "master_volume" is the level over everything, "volume" the sound-effects
+    # level and "music_volume" the stream's. "volume" keeps the name it had
+    # when it *was* the cue level, so a save written before the master existed
+    # loads with its mix unchanged and the master wide open.
     settings: dict = field(default_factory=lambda: {
-        "muted": False, "volume": 0.7, "music_volume": 0.5,
+        "muted": False, "master_volume": 1.0, "volume": 0.7, "music_volume": 0.5,
         "key_layout": _DEFAULT_KEY_LAYOUT})
     # P5 (design §20): per hero, whether the boss has been cleared with that
     # hero (which unlocks the main-weapon choice) and the chosen main weapon.

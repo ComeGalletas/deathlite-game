@@ -148,8 +148,21 @@ class LevelTests(unittest.TestCase):
         p.set_ducked(False)
         self.assertEqual(p.volume, 0.8)
 
-    def test_default_sits_under_the_cue_master(self):
-        self.assertLess(config.MUSIC_VOLUME_DEFAULT, 0.7)
+    def test_default_sits_under_the_sound_effects(self):
+        self.assertLess(config.MUSIC_VOLUME_DEFAULT, config.SFX_VOLUME_DEFAULT)
+
+    def test_the_master_defaults_wide_open_so_the_children_are_heard_as_set(self):
+        self.assertEqual(MusicPlayer(None).master, config.MASTER_VOLUME_DEFAULT)
+        self.assertEqual(config.MASTER_VOLUME_DEFAULT, 1.0)
+
+    def test_the_master_is_clamped_and_leaves_the_stored_volume_alone(self):
+        p = MusicPlayer(None)
+        p.set_volume(0.8)
+        p.set_master(5.0)
+        self.assertEqual(p.master, 1.0)
+        p.set_master(-2.0)
+        self.assertEqual(p.master, 0.0)
+        self.assertEqual(p.volume, 0.8)
 
 
 class StateMachineMusicTests(unittest.TestCase):
@@ -230,6 +243,46 @@ class _FakeMusic:
 
 class _Ready:
     ready = True
+
+
+class AppliedLevelTests(unittest.TestCase):
+    """What actually reaches `mixer.music.set_volume`: `master * volume`, with
+    the pause duck and the mute on top (journal `audio_mixer_journal.md`,
+    2026-09-16)."""
+
+    def setUp(self):
+        self.fake = _FakeMusic()
+        self._real = pygame.mixer.music
+        pygame.mixer.music = self.fake
+        self.p = MusicPlayer(_Ready())
+        self.p._gain = 1.0                 # no fade running
+        self.p.set_volume(0.8)
+
+    def tearDown(self):
+        pygame.mixer.music = self._real
+
+    def test_a_wide_open_master_leaves_the_music_level_as_set(self):
+        self.p.set_master(1.0)
+        self.assertAlmostEqual(self.fake.volume, 0.8, places=6)
+
+    def test_the_master_scales_the_stream(self):
+        self.p.set_master(0.5)
+        self.assertAlmostEqual(self.fake.volume, 0.4, places=6)
+
+    def test_the_duck_multiplies_on_top_of_the_master(self):
+        self.p.set_master(0.5)
+        self.p.set_ducked(True)
+        self.assertAlmostEqual(self.fake.volume, 0.4 * config.MUSIC_DUCK, places=6)
+
+    def test_mute_wins_over_both(self):
+        self.p.set_master(1.0)
+        self.p.set_muted(True)
+        self.assertEqual(self.fake.volume, 0.0)
+
+    def test_a_silent_master_is_silence_whatever_the_music_level(self):
+        self.p.set_master(0.0)
+        self.p.set_volume(1.0)
+        self.assertEqual(self.fake.volume, 0.0)
 
 
 class FadeRampTests(unittest.TestCase):

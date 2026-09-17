@@ -73,6 +73,11 @@ class GameOverState(State):
             from game.states.menu_state import MenuState
             self.game.state_machine.change(MenuState(self.game))
 
+    def update(self, dt: float) -> None:
+        # Only to run the shared frame's input lock down; this screen has
+        # nothing else that moves.
+        self._screen.tick(dt)
+
     # --- render ------------------------------------------------------
     def draw(self, surface: pygame.Surface) -> None:
         self._screen.draw(surface, getattr(self.game, "assets", None))
