@@ -13,19 +13,22 @@ import pygame
 
 from game.game import Game
 from game.states.menu_state import MenuState
-from game.states.playing_state import PlayingState
+from tests import worlds as W
 from world.procedural import SPECIAL_KINDS
 
 
-def fresh_playing():
+SEED = W.pinned(0)
+
+
+def fresh_playing(seed=SEED):
+    """A booted run on the pinned world. Pinned because which special rooms
+    a layout has decides which of these tests run at all: on a random world
+    each one skipped itself whenever its shrine, fountain, treasure, altar or
+    merchant was not generated."""
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    from tests.boot import settle
-    p = settle(game)                       # through the loading screen
-    assert isinstance(p, PlayingState)
-    return game, p
+    return game, start_run(game, seed)
 
 
 class PlacementTests(unittest.TestCase):

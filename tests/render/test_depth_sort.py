@@ -16,16 +16,15 @@ from game.states.playing_state import PlayingState
 from tests import worlds as W
 from world.map import GameMap
 
+SEED = W.pinned(0)
 
-def fresh_playing():
+
+def fresh_playing(seed=SEED):
+    """A booted run on the pinned world. `seed=None` takes a random one."""
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    from tests.boot import settle
-    p = settle(game)                  # through the loading screen
-    assert isinstance(p, PlayingState)
-    return game, p
+    return game, start_run(game, seed)
 
 
 class SceneryDrawablesTests(unittest.TestCase):

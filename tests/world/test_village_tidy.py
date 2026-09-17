@@ -216,14 +216,15 @@ class TidyTests(unittest.TestCase):
 
 
 class CorralTests(unittest.TestCase):
-    """The corral at 0.45: smaller fence, same sheep."""
+    """The corral at 0.45: smaller fence, same stock."""
 
     def test_the_fence_pitch_and_art_are_at_the_same_scale(self):
         self.assertEqual(_V_PEN_SCALE, 0.45)
         self.assertEqual(get_content().terrain["obstacle_decor"]["render_scale"]["fence"], 0.45)
 
-    def test_the_interior_still_seats_the_sheep(self):
-        """The pen's interior holds the sheep the placement wants -- their
+    def test_the_interior_still_seats_the_stock(self):
+        """The pen's interior holds every animal the placement wants -- the
+        sheep and the pigs that share the corral with them, each at its own
         radius plus the placement's pad.
 
         No longer asserts the `npc_sheep` rig's own `scale`: that is art
@@ -231,9 +232,12 @@ class CorralTests(unittest.TestCase):
         test about pen geometry.
         """
         npcs = get_content().npcs
-        sheep = npcs["kinds"]["sheep"]
-        lo, hi = npcs["placement"]["sheep"]
-        pad = sheep["radius"] + 4
+        # (tuning, how many at most) for each animal in the corral
+        stock = [(npcs["kinds"]["sheep"], npcs["placement"]["sheep"][1]),
+                 (npcs["kinds"]["pig"], npcs["placement"]["pigs"][1])]
+        pad = max(spec["radius"] for spec, _hi in stock) + 4
+        # the area a full corral needs: every animal on its own square
+        need = sum(hi * (2 * spec["radius"]) ** 2 for spec, hi in stock)
         pens = 0
         for seed in W.SEEDS:
             for v in W.layout(seed).villages:
@@ -241,7 +245,6 @@ class CorralTests(unittest.TestCase):
                 pens += 1
                 self.assertGreater(v.pen.width, 2 * pad)
                 self.assertGreater(v.pen.height, 2 * pad)
-                # room for `hi` sheep standing apart
-                self.assertGreaterEqual(v.pen.width * v.pen.height,
-                                        hi * (2 * sheep["radius"]) ** 2, f"seed {seed}")
+                # room for a full flock and a full drift standing apart
+                self.assertGreaterEqual(v.pen.width * v.pen.height, need, f"seed {seed}")
         self.assertGreater(pens, 0)

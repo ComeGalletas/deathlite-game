@@ -6,7 +6,7 @@ Reads from `PlayingState`: `game_map`, `camera`, `stats`, `game.assets`.
 Owns `ps.npcs` (the list). Per village: a smith at the forge, a pawn or two
 per house and a couple more wandering the ring, a garrison of four or five
 lancers dealt round the guard posts and walking between barracks and tower,
-and a few sheep in the pen. The lancers fight: an enemy that comes
+and a few sheep and pigs in the corral. The lancers fight: an enemy that comes
 within their aggro radius is charged and thrust at, then they walk back
 to their post (`entities/npc.py`; `_foes` / `_hit` here are the hooks).
 Colours come from a shuffled cycle per kind so no colour repeats before
@@ -16,6 +16,7 @@ Part of `journals/human_island_journal.md`.
 """
 from __future__ import annotations
 
+import math
 import random
 
 import pygame
@@ -25,6 +26,33 @@ from entities.npc import Npc, SheepNpc
 from game import config
 from game.states.playing.core.run_ledger import VILLAGER
 from game.content import get_content
+
+
+# How many spots a pen animal tries before it settles for the roomiest of them.
+_PEN_TRIES = 8
+
+
+def pen_spot(rng, pen, pad: float, herd, clear: float):
+    """A spot in `pen`'s interior for one more animal, kept off the ones
+    already there.
+
+    `herd` is `(x, y, radius)` per animal standing in the pen; `clear` is the
+    gap this animal wants between its own centre and a neighbour's edge. The
+    first draw that has it wins; failing that, the roomiest of `_PEN_TRIES`
+    draws -- a corral that is simply too full for the gap still seats the
+    animal, in the emptiest corner it found, rather than looping forever.
+    """
+    best = None
+    for _ in range(_PEN_TRIES):
+        x = rng.uniform(pen.left + pad, pen.right - pad)
+        y = rng.uniform(pen.top + pad, pen.bottom - pad)
+        room = min((math.hypot(x - hx, y - hy) - hr for hx, hy, hr in herd),
+                   default=float("inf"))
+        if best is None or room > best[1]:
+            best = ((x, y), room)
+        if room >= clear:
+            break
+    return best[0]
 
 
 class _Cycle:
@@ -121,9 +149,13 @@ class Npcs:
                                    posts=stops if len(stops) > 1 else None,
                                    aggro_px=spec["aggro"] * px,
                                    chase_px=spec["chase"] * px))
-            # The sheep, in the pen: 2-4, each on its own spot, stirring
-            # within its leash of it.
+            # The corral: 2-4 sheep and 2-3 pigs, each on its own spot,
+            # stirring within its leash of it. The sheep are dealt first and
+            # exactly as they always were, so the first village's flock stands
+            # where it always did; the pigs' own draws do shift everyone dealt
+            # after them, which on a two-village world is the second village.
             if v.pen is not None:
+                herd: list[tuple[float, float, float]] = []   # x, y, radius
                 spec = kinds["sheep"]
                 pad = spec["radius"] + 4
                 if v.pen.width > 2 * pad and v.pen.height > 2 * pad:
@@ -132,6 +164,19 @@ class Npcs:
                         y = rng.uniform(v.pen.top + pad, v.pen.bottom - pad)
                         ps.npcs.append(SheepNpc(spec["rigs"], x, y, spec, assets, v.pen,
                                                 spec["leash"] * px))
+                        herd.append((x, y, spec["radius"]))
+                # The pigs go in the same pen, but they are dealt last into a
+                # corral that already has animals in it, so each one asks for a
+                # spot off its neighbours: up to seven bodies in a band this
+                # narrow otherwise land on top of each other.
+                spec = kinds["pig"]
+                pad = spec["radius"] + 4
+                if v.pen.width > 2 * pad and v.pen.height > 2 * pad:
+                    for _ in range(rng.randint(*place["pigs"])):
+                        x, y = pen_spot(rng, v.pen, pad, herd, spec["radius"])
+                        ps.npcs.append(SheepNpc(spec["rigs"], x, y, spec, assets, v.pen,
+                                                spec["leash"] * px, kind="pig"))
+                        herd.append((x, y, spec["radius"]))
 
     # --- step ----------------------------------------------------------
     def update(self, dt: float) -> None:

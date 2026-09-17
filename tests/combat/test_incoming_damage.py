@@ -20,7 +20,9 @@ from entities.player import Player
 from game import config
 from game.game import Game
 from game.states.menu_state import MenuState
-from game.states.playing_state import PlayingState
+from tests import worlds as W
+
+SEED = W.pinned(2)
 
 DT = 1.0 / 120.0
 T = config.INCOMING_TICK_INTERVAL          # 0.5 by default
@@ -33,16 +35,11 @@ def _key(game, k):
 _STUB_DIRECTOR = None
 
 
-def _run(hero_index=0):
+def _run(hero_index=0, seed=SEED):
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    _key(game, pygame.K_RETURN)               # -> character select
-    for _ in range(hero_index):
-        _key(game, pygame.K_RIGHT)
-    _key(game, pygame.K_RETURN)               # -> playing
-    from tests.boot import settle
-    p = settle(game)                  # through the loading screen
-    assert isinstance(p, PlayingState)
+    p = start_run(game, seed, keys=(pygame.K_RIGHT,) * hero_index)
     p.player.weapons = []                     # silence the hero's own attacks
     p.player.invulnerable = False
     p.player.trait = "none"                   # drop the Bulwark hook

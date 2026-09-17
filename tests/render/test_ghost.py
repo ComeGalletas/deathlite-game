@@ -15,7 +15,7 @@ from game.content import get_content
 from tests import worlds as W
 from tests.render.test_depth_sort import fresh_playing
 
-SEED = W.SEEDS[0]
+SEED = W.pinned(1)
 
 
 def _tree(gm, kind="tree"):
@@ -211,18 +211,35 @@ class GhostPassTests(unittest.TestCase):
 
 class RunIntegrationTests(unittest.TestCase):
     def test_an_enemy_behind_a_tree_ghosts_in_a_real_frame(self):
-        _game, p = fresh_playing()
+        # Seeded: which tree `_tree` picks, and what else stands around it,
+        # is a property of the world, and an unpinned run drew a new one
+        # every time.
+        _game, p = fresh_playing(seed=SEED)
         gm = p.game_map
         i, o, (ax, ay, aw, ah) = _tree(gm)
         # stand the enemy just behind the trunk, the hero far away
         p.player.pos.update(o.pos.x - 400, o.pos.y)
         p.camera.snap_to(o.pos)
         e = p._spawn_enemy("skull", at=pygame.Vector2(o.pos.x, o.pos.y - 12))
+        self.assertIsNotNone(e)
+        # Let its spawn burst finish. A body is veiled until the ball breaks
+        # (`WorldRenderer.spawn_veiled`) and a veiled body is never drawn, so
+        # it would never reach the ghost queue at all.
+        p.fx.update_spawn_fx(1e9)
         r = gm.renderer
         p.draw(_game.screen)
-        self.assertGreater(len(r._ghost_queue), 0)
-        # the pass ran inside draw(); run it again on a scratch to count
+        # The enemy's own entry, by the ground-contact Y it was recorded on.
+        # The hero is in this queue too, 400 px west, and may be standing
+        # behind art of its own -- counting the whole queue's blits would let
+        # the hero's ghost pass this test with the enemy missing entirely.
+        mine = [t for t in r._ghost_queue if abs(t[2] - e.pos.y) < 0.5]
+        self.assertEqual(len(mine), 1, "the enemy was not drawn")
+        # the pass ran inside draw(); run it again on a scratch, with the
+        # enemy alone recorded, to count what the enemy's body ghosted
         scratch = pygame.Surface(_game.screen.get_size())
+        frame, dest, character_y, cacheable = mine[0]
+        r.begin_frame()
+        r.record_character(frame, dest, character_y, cacheable)
         self.assertGreaterEqual(r.ghost_pass(scratch, p.camera), 1)
 
 

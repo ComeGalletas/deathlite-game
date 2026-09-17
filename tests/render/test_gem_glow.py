@@ -14,22 +14,22 @@ import pygame
 from game import config
 from game.game import Game
 from game.states.menu_state import MenuState
-from game.states.playing_state import PlayingState
+from tests import worlds as W
+
+SEED = W.pinned(2)
 
 
 def _key(game, k):
     game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k))
 
 
-def _run():
-    from tests.boot import settle
+def _run(seed=SEED):
+    """A booted run on the pinned world -- the fixture here is the run, not
+    the world, and an unpinned boot rebuilt a different one every time."""
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    for _ in range(2):
-        _key(game, pygame.K_RETURN)
-    ps = settle(game)
-    assert isinstance(ps, PlayingState)
-    return game, ps
+    return game, start_run(game, seed)
 
 
 class _Spy(pygame.Surface):
