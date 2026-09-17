@@ -49,6 +49,9 @@ def _fixture_tables(duration: float) -> SpawnTables:
     fixture was recorded under."""
     data = copy.deepcopy(get_content().spawn_tables._data)
     data["ramp_seconds"] = duration
+    # Benching an enemy changes the weight list every draw is taken from, so
+    # the `unused` category is tuning like the rest and is wound back too.
+    data["unused"] = []
     for phase, elite in zip(data["phases"], _FIXTURE_ELITE):
         phase["elite"] = elite
     return SpawnTables(data)
@@ -111,15 +114,15 @@ class SpawnDirectorTests(unittest.TestCase):
         # Chasers, plus the elite slot the band now carries from its first
         # second (S12 floored `elite` at 25 %), and nothing else.
         el = get_content().spawn_tables.elites
-        allowed = {"chaser", el["default"], el["rare"]}
+        allowed = {"skull", el["default"], el["rare"]}
         self.assertTrue(set(opening) <= allowed, sorted(set(opening)))
-        self.assertIn("chaser", opening)
+        self.assertIn("skull", opening)
 
     def test_variety_and_elites_appear_later(self):
         d = SpawnDirector(run_duration=1000, rng=random.Random(4))
         late = self._run(d, duration=d.ramp_duration * 2)
         self.assertGreater(len({e for e in late}), 4, "late game should be varied")
-        self.assertIn("elite", late)
+        self.assertIn("bear", late)
 
     def test_respects_phase_soft_cap(self):
         d = SpawnDirector(run_duration=1000, rng=random.Random(5))
@@ -161,13 +164,13 @@ class SpawnDirectorTests(unittest.TestCase):
     def test_tables_can_be_handed_in(self):
         from spawn.tables import SpawnTables
         data = {"phases": [{"until": 1.0, "interval": [0.1, 0.1], "pack": [1, 1],
-                            "elite": 0.0, "types": {"tank": 1.0}}],
-                "elites": {"default": "elite", "rare": "brute", "rare_chance": 0.0}}
+                            "elite": 0.0, "types": {"turtle": 1.0}}],
+                "elites": {"default": "bear", "rare": "troll", "rare_chance": 0.0}}
         d = SpawnDirector(run_duration=100, rng=random.Random(2),
                           tables=SpawnTables(data))
         out = self._run(d, duration=10)
         self.assertTrue(out)
-        self.assertTrue(all(e == "tank" for e in out))
+        self.assertTrue(all(e == "turtle" for e in out))
 
 
 class DifficultyTests(unittest.TestCase):
@@ -205,7 +208,7 @@ class DifficultyTests(unittest.TestCase):
         # the ramp is short, so that instant is early: 15 % of Normal's ramp
         # is 23 % of Super Fast's.
         at = base.ramp_duration * 0.15
-        self.assertEqual(base._phase(at)["types"], {"chaser": 1.0})
+        self.assertEqual(base._phase(at)["types"], {"skull": 1.0})
         self.assertGreater(len(sfast._phase(at)["types"]),
                            len(base._phase(at)["types"]))
 

@@ -31,7 +31,7 @@ class ShippedTablesTests(unittest.TestCase):
         untils = [p["until"] for p in phases]
         self.assertEqual(untils, sorted(untils))
         self.assertGreaterEqual(untils[-1], 1.0)
-        self.assertEqual(phases[0]["types"], {"chaser": 1.0})   # the calm opening
+        self.assertEqual(phases[0]["types"], {"skull": 1.0})   # the calm opening
 
     def test_phase_lookup_by_run_fraction(self):
         t = get_content().spawn_tables
@@ -49,16 +49,16 @@ class ShippedTablesTests(unittest.TestCase):
     def test_a_difficulty_with_its_own_phases_replaces_them(self):
         data = _shipped()
         own = [{"until": 1.0, "interval": [0.5, 0.5], "pack": [1, 1], "elite": 0.0,
-                "types": {"tank": 1.0}}]
+                "types": {"turtle": 1.0}}]
         data["difficulty"]["fast"] = {"phases": own}
         t = SpawnTables(data, enemy_ids=get_content().enemies)
         self.assertEqual(t.phases("fast"), own)
         self.assertIs(t.phases("normal"), t.phases())
-        self.assertEqual(t.phase_at(0.5, "fast")["types"], {"tank": 1.0})
+        self.assertEqual(t.phase_at(0.5, "fast")["types"], {"turtle": 1.0})
 
     def test_groups_are_looked_up_by_name(self):
         t = get_content().spawn_tables
-        self.assertEqual(t.group("husk_pack")["leader"], "chaser")
+        self.assertEqual(t.group("husk_pack")["leader"], "skull")
         with self.assertRaises(TableError):
             t.group("nope")
 

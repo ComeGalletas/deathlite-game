@@ -55,11 +55,11 @@ class RigTests(unittest.TestCase):
     def test_the_art_is_drawn_at_the_damage_diameter(self):
         """`scale` follows `hazard_radius`: the flair can never disagree with
         the circle a player is reading."""
-        radius = get_content().enemies["warlock"]["hazard_radius"]
+        radius = get_content().enemies["hex_shaman"]["hazard_radius"]
         self.assertEqual(get_assets().scale_for(RIG), (2 * radius, 2 * radius))
 
     def test_the_warlock_names_the_rig(self):
-        self.assertEqual(get_content().enemies["warlock"]["hazard_sprite"], RIG)
+        self.assertEqual(get_content().enemies["hex_shaman"]["hazard_sprite"], RIG)
 
 
 class TimingTests(unittest.TestCase):

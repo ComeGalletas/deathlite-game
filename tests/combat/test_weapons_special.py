@@ -139,7 +139,7 @@ class MainWeaponAttackAnimTests(unittest.TestCase):
         from tests.boot import settle
         p = settle(g)                  # through the loading screen
         assert isinstance(p, PlayingState)
-        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(25, 0))   # inside the sword's reach
+        p._spawn_enemy("skull", at=p.player.pos + pygame.Vector2(25, 0))   # inside the sword's reach
         return g, p
 
     def test_main_weapon_fire_beat_triggers_the_anim(self):

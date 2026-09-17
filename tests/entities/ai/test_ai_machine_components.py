@@ -94,14 +94,14 @@ class ActionComponentTests(unittest.TestCase):
         self.assertEqual(len(calls["fire"]), 1)
 
     def test_summon_brood_on_interval(self):
-        sb = SummonBrood(interval=0.3, enemy_id="swarm", count=3)
+        sb = SummonBrood(interval=0.3, enemy_id="bumblebee", count=3)
         sb.key = "sb"
         a = _actor()
         cmb, calls = _spy_combat()
         for _ in range(7):
             sb.tick(a, _per(dt=0.1), cmb, None)
         self.assertGreaterEqual(len(calls["summon"]), 2)
-        self.assertEqual(calls["summon"][0], ("swarm", 3))
+        self.assertEqual(calls["summon"][0], ("bumblebee", 3))
 
     def test_explode_kills_the_actor_in_fuse_range(self):
         ex = Explode(fuse_range=40)

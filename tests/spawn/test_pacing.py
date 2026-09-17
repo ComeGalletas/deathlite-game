@@ -184,7 +184,7 @@ class MasterTests(unittest.TestCase):
                      tags=(), elite=False)
         self.assertEqual(list(m.pacing._damage), [(5.0, 0.25)])
         self.assertEqual(list(m.pacing._kills), [5.0])
-        m.spawn_at("chaser", pygame.Vector2(50, 50))
+        m.spawn_at("skull", pygame.Vector2(50, 50))
         self.assertEqual(list(m.pacing._spawns), [5.0])
 
     def test_cadence_follows_the_condition(self):

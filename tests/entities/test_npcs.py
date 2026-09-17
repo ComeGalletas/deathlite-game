@@ -121,7 +121,7 @@ class VillagerTests(unittest.TestCase):
         p = self.p
         n, spot = self._lancer_with_room()
         n.pos.update(n.base()); n.state = IDLE; n.timer = 0.2; n.foe = None
-        foe = Enemy("tank", get_content().enemy("tank"), spot.x, spot.y)
+        foe = Enemy("turtle", get_content().enemy("turtle"), spot.x, spot.y)
         p.enemies.append(foe)
         try:
             seen, fighters = self._fight(n, foe, 6)
@@ -166,7 +166,7 @@ class VillagerTests(unittest.TestCase):
                 break
         else:
             self.skipTest("no spot clear of every lancer's aggro radius")
-        foe = Enemy("tank", get_content().enemy("tank"), far.x, far.y)
+        foe = Enemy("turtle", get_content().enemy("turtle"), far.x, far.y)
         p.enemies.append(foe)
         try:
             seen, fighters = self._fight(n, foe, 3)

@@ -217,7 +217,7 @@ class RunIntegrationTests(unittest.TestCase):
         # stand the enemy just behind the trunk, the hero far away
         p.player.pos.update(o.pos.x - 400, o.pos.y)
         p.camera.snap_to(o.pos)
-        e = p._spawn_enemy("chaser", at=pygame.Vector2(o.pos.x, o.pos.y - 12))
+        e = p._spawn_enemy("skull", at=pygame.Vector2(o.pos.x, o.pos.y - 12))
         r = gm.renderer
         p.draw(_game.screen)
         self.assertGreater(len(r._ghost_queue), 0)

@@ -82,20 +82,20 @@ class PackTests(unittest.TestCase):
         host = FakeHost()
         m = _master(host)
         host.elapsed = 300.0
-        e = m.spawn_at("chaser", pygame.Vector2(50, 50))
+        e = m.spawn_at("skull", pygame.Vector2(50, 50))
         hp, spd = m.director.stat_multipliers(300.0)
         self.assertEqual((e.hp_mult, e.spd_mult), (hp, spd))
 
     def test_the_event_names_enemy_owner_and_room(self):
         host = FakeHost()
         m = _master(host)
-        m.spawn_at("chaser")
+        m.spawn_at("skull")
         ev, payload = host.events[-1]
         self.assertEqual(ev, ENEMY_SPAWNED)
-        self.assertEqual(payload["enemy_id"], "chaser")
+        self.assertEqual(payload["enemy_id"], "skull")
         self.assertEqual(payload["owner"], "direct")
         self.assertIn(payload["room"], (0, 1))
-        m.spawn_at("chaser", pygame.Vector2(10, 10), owner="summon")
+        m.spawn_at("skull", pygame.Vector2(10, 10), owner="summon")
         self.assertEqual(host.events[-1][1]["owner"], "summon")
         self.assertIsNone(host.events[-1][1]["room"])
 
@@ -106,9 +106,9 @@ class CapTests(unittest.TestCase):
         m = _master(host)
         cap = m.director.enemy_count_cap(0.0)
         for _ in range(cap):
-            host.make_enemy("chaser", 5, 5, 1.0, 1.0)
-        self.assertIsNone(m.spawn_at("chaser"))
-        self.assertIsNone(m.spawn_at("chaser", pygame.Vector2(1, 1)))
+            host.make_enemy("skull", 5, 5, 1.0, 1.0)
+        self.assertIsNone(m.spawn_at("skull"))
+        self.assertIsNone(m.spawn_at("skull", pygame.Vector2(1, 1)))
         self.assertEqual(m.spawn_group("husk_pack"), [])
         _run(m, host, 5.0)
         self.assertEqual(len(host.live), cap)
@@ -118,10 +118,10 @@ class CapTests(unittest.TestCase):
         m = _master(host)
         cap = m.director.enemy_count_cap(0.0)
         for _ in range(cap):
-            host.make_enemy("chaser", 5, 5, 1.0, 1.0)
-        self.assertIsNone(m.spawn_at("elite", pygame.Vector2(1, 1)))          # direct: refused
-        self.assertIsNone(m.spawn_at("elite", pygame.Vector2(1, 1), owner="summon"))
-        scripted = m.spawn_at("elite", pygame.Vector2(1, 1), owner="dev")    # scripted: seated
+            host.make_enemy("skull", 5, 5, 1.0, 1.0)
+        self.assertIsNone(m.spawn_at("bear", pygame.Vector2(1, 1)))          # direct: refused
+        self.assertIsNone(m.spawn_at("bear", pygame.Vector2(1, 1), owner="summon"))
+        scripted = m.spawn_at("bear", pygame.Vector2(1, 1), owner="dev")    # scripted: seated
         self.assertIsNotNone(scripted)
         self.assertEqual(len(host.live), cap + 1)
         pack = m.spawn_group("warband", at=pygame.Vector2(500, 500), owner="dev")
@@ -133,14 +133,14 @@ class CapTests(unittest.TestCase):
         # `placement_review_journal.md`): nothing produces that owner now.
         self.assertEqual(get_content().spawn_tables.owners["cap_exempt"],
                          ["dev", "dummy"])
-        self.assertIsNotNone(m.spawn_at("chaser", pygame.Vector2(1, 1), owner="dev"))
+        self.assertIsNotNone(m.spawn_at("skull", pygame.Vector2(1, 1), owner="dev"))
 
     def test_a_pack_spawns_short_rather_than_over_the_cap(self):
         host = FakeHost()
         m = _master(host)
         cap = m.director.enemy_count_cap(0.0)
         for _ in range(cap - 1):
-            host.make_enemy("chaser", 5, 5, 1.0, 1.0)
+            host.make_enemy("skull", 5, 5, 1.0, 1.0)
         made = m.spawn_group("swarm")                # 1 + 4..6 wanted
         self.assertEqual(len(made), 1)
         self.assertEqual(len(host.live), cap)
@@ -182,9 +182,9 @@ class GroupAndModifierTests(unittest.TestCase):
         m = _master(host)
         made = m.spawn_group("warband")
         ids = [e.enemy_id for e in made]
-        self.assertEqual(ids[0], "elite")
-        self.assertIn(ids.count("chaser"), (2, 3))
-        self.assertIn(ids.count("ranged"), (0, 1))
+        self.assertEqual(ids[0], "bear")
+        self.assertIn(ids.count("skull"), (2, 3))
+        self.assertIn(ids.count("slingshot_gnome"), (0, 1))
         self.assertEqual(host.events[-1][1]["owner"], "group")
 
     def test_a_template_at_a_position_lands_there(self):
@@ -250,7 +250,7 @@ class FallbackTests(unittest.TestCase):
         host = FakeHost(points=[])
         host.fallback = pygame.Vector2(123, 456)
         m = _master(host)
-        e = m.spawn_at("chaser")
+        e = m.spawn_at("skull")
         self.assertEqual((e.pos.x, e.pos.y), (123.0, 456.0))
         host.elapsed = 100.0
         m.update(2.0)
@@ -260,7 +260,7 @@ class FallbackTests(unittest.TestCase):
     def test_no_points_and_no_fallback_spawns_nothing(self):
         host = FakeHost(points=[])
         m = _master(host)
-        self.assertIsNone(m.spawn_at("chaser"))
+        self.assertIsNone(m.spawn_at("skull"))
         self.assertEqual(host.live, [])
 
     def test_the_zone_is_the_players_island_and_its_neighbours(self):
@@ -301,7 +301,7 @@ class TrainingDummyOwnerTests(unittest.TestCase):
         m = _master(host)
         dummy = m.spawn_at("training_dummy", pygame.Vector2(1, 1), owner="dummy")
         self.assertIsNotNone(dummy)
-        other = m.spawn_at("chaser", pygame.Vector2(1, 1), owner="dev")
+        other = m.spawn_at("skull", pygame.Vector2(1, 1), owner="dev")
         self.assertIsNotNone(other)
         # Hibernate with no island active: everything sleepable goes.
         m.population._next_tick = 0.0

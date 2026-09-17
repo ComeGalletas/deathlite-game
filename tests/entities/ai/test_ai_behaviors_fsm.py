@@ -70,7 +70,7 @@ class TimerFreeMoverTests(unittest.TestCase):
             "summoner", {"summon_interval": 0.8, "summon_count": 3},
             360, lambda f: (0.0, -(400 if f < 180 else 120)))
         self.assertGreater(len(c["summon"]), 3)
-        self.assertEqual(c["summon"][0], ("swarm", 3))
+        self.assertEqual(c["summon"][0], ("bumblebee", 3))
         self.assertAlmostEqual(max(sp["move"]), 90, delta=1)   # full-speed retreat
 
     def test_exploder_detonates_inside_the_fuse_range(self):

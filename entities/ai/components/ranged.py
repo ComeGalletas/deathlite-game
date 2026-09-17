@@ -13,13 +13,22 @@ from entities.ai.machine import ATTACK_SLOT, Component, OneShot
 @dataclass
 class FireProjectile(Component):
     """Fire a hostile shot at the player every `interval` s, only while the
-    player is within `max_range` (the old kiter used `prefer_distance * 1.8`)."""
+    player is within `max_range` (the old kiter used `prefer_distance * 1.8`).
+
+    `style` / `rig` / `pierce` are R1 of
+    `journals/enemy_roster_expansion_journal.md`: what the shot is *drawn* as,
+    and whether it passes through a body. Left unset the shot is the red
+    `arrow` every enemy fired before, so no existing enemy moves.
+    """
 
     interval: float = 2.0
     damage: float = 6.0
     speed: float = 220.0
     radius: float = 6.0
     max_range: float = 1.0e9
+    style: str = ""
+    rig: str = ""
+    pierce: int = 0
 
     def tick(self, actor, per, cmb, acc):
         s = actor.bb.slot(self.key)
@@ -32,7 +41,10 @@ class FireProjectile(Component):
         s["t"] = self.interval
         if to.length_squared() > 1e-6:
             cmb.fire_projectile(pos=actor.pos, vel=to.normalize() * self.speed,
-                                damage=self.damage, radius=self.radius)
+                                damage=self.damage, radius=self.radius,
+                                style=self.style,
+                                fx={"rig": self.rig} if self.rig else None,
+                                pierce=int(self.pierce))
 
 
 @dataclass
@@ -40,7 +52,7 @@ class SummonBrood(Component):
     """Spawn `count` of `enemy_id` at the actor every `interval` s."""
 
     interval: float = 4.0
-    enemy_id: str = "swarm"
+    enemy_id: str = "bumblebee"
     count: int = 3
 
     def tick(self, actor, per, cmb, acc):

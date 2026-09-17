@@ -34,7 +34,7 @@ MELEE_ATTACK_RECOVER = 0.15
 MELEE_ATTACK_COOLDOWN = 0.6
 
 
-def _pursuit_stack(cfg: dict) -> list:
+def pursuit_stack(cfg: dict) -> list:
     """Flow-field seek + the local-avoidance stack (separation, obstacle push,
     unstick), ordered so `Unstick` reads the accumulated heading last.
 
@@ -84,14 +84,14 @@ def build_dummy(cfg: dict) -> Behavior:
 
 @behavior("path_chase")
 def build_path_chase(cfg: dict) -> Behavior:
-    return Behavior({"move": _pursuit_stack(cfg)})
+    return Behavior({"move": pursuit_stack(cfg)})
 
 
 @behavior("swarm")
 def build_swarm(cfg: dict) -> Behavior:
     """Identical to `path_chase` today; kept separate as the tuning hook for the
     planned tighter crowd behaviour."""
-    return Behavior({"move": _pursuit_stack(cfg)})
+    return Behavior({"move": pursuit_stack(cfg)})
 
 
 @behavior("path_chase_attack")
@@ -116,7 +116,7 @@ def build_path_chase_attack(cfg: dict) -> Behavior:
         cmb.melee_hit(pos, actor.radius / 2.0, actor._base_contact, active)
 
     return telegraph_cycle(
-        chase=_pursuit_stack(cfg),
+        chase=pursuit_stack(cfg),
         trigger_range=reach,
         telegraph=cfg.get("attack_telegraph", MELEE_ATTACK_TELEGRAPH),
         active=active,

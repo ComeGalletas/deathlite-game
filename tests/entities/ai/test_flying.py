@@ -35,14 +35,14 @@ def _boss(flying=True):
 
 
 def _mite_cfg(flying=True) -> dict:
-    cfg = dict(get_content().enemy("swarm"))
+    cfg = dict(get_content().enemy("bumblebee"))
     if not flying:
         cfg["tags"] = tuple(t for t in cfg.get("tags", ()) if t != "flying")
     return cfg
 
 
 def _mite(flying=True):
-    return Enemy("swarm", _mite_cfg(flying), 0.0, 0.0)
+    return Enemy("bumblebee", _mite_cfg(flying), 0.0, 0.0)
 
 
 class TagTests(unittest.TestCase):
@@ -61,8 +61,8 @@ class TagTests(unittest.TestCase):
         c = get_content()
         boss = c.boss(BOSS_ID)
         brood = next(p for p in boss["patterns"] if p["id"] == "summon_brood")
-        self.assertEqual(brood.get("summon_id", "swarm"), "swarm")
-        self.assertIn("flying", c.enemy("swarm")["tags"])
+        self.assertEqual(brood.get("summon_id", "bumblebee"), "bumblebee")
+        self.assertIn("flying", c.enemy("bumblebee")["tags"])
         self.assertTrue(_mite().flying)
         self.assertFalse(_mite(flying=False).flying)
 

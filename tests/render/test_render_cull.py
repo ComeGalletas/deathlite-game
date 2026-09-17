@@ -20,10 +20,10 @@ from world.map import GameMap
 class ActorCullTests(unittest.TestCase):
     def test_far_enemies_are_not_in_the_actor_pass(self):
         _game, p = fresh_playing()
-        near = p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(120, 0))
-        far = p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(
+        near = p._spawn_enemy("skull", at=p.player.pos + pygame.Vector2(120, 0))
+        far = p._spawn_enemy("skull", at=p.player.pos + pygame.Vector2(
             config.SCREEN_WIDTH / config.CAMERA_ZOOM + 2 * config.RENDER_ACTOR_CULL_PAD + 300, 0))
-        edge = p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(
+        edge = p._spawn_enemy("skull", at=p.player.pos + pygame.Vector2(
             config.SCREEN_WIDTH / config.CAMERA_ZOOM / 2 + config.RENDER_ACTOR_CULL_PAD - 40, 0))
         p.fx.update_spawn_fx(1.0)     # let the spawn bursts out: bodies only
         ys = [d for _lvl, d, _f in p._actor_items()]

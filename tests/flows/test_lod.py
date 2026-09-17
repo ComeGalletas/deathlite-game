@@ -57,8 +57,8 @@ class TickLodTests(unittest.TestCase):
 
     def test_far_idle_enemies_tick_every_other_frame_with_a_doubled_dt(self):
         ps = _run()
-        far = ps.spawn.spawn_enemy("chaser", at=_far_spot(ps))
-        near = ps.spawn.spawn_enemy("chaser", at=ps.player.pos + pygame.Vector2(200, 0))
+        far = ps.spawn.spawn_enemy("skull", at=_far_spot(ps))
+        near = ps.spawn.spawn_enemy("skull", at=ps.player.pos + pygame.Vector2(200, 0))
         with mock.patch.object(config, "ENEMY_LOD_SKIP", 2):
             counts, dts = self._count(ps, 40)
         self.assertEqual(counts[id(near)], 40)
@@ -68,7 +68,7 @@ class TickLodTests(unittest.TestCase):
 
     def test_a_chasing_enemy_far_away_still_ticks_every_frame(self):
         ps = _run()
-        far = ps.spawn.spawn_enemy("chaser", at=_far_spot(ps))
+        far = ps.spawn.spawn_enemy("skull", at=_far_spot(ps))
         _slot(far)["until"] = ps.stats["time"] + 1000.0        # aggro timer running
         with mock.patch.object(config, "ENEMY_LOD_SKIP", 2):
             counts, _ = self._count(ps, 40)
@@ -76,7 +76,7 @@ class TickLodTests(unittest.TestCase):
 
     def test_lod_one_ticks_everyone_every_frame(self):
         ps = _run()
-        far = ps.spawn.spawn_enemy("chaser", at=_far_spot(ps))
+        far = ps.spawn.spawn_enemy("skull", at=_far_spot(ps))
         with mock.patch.object(config, "ENEMY_LOD_SKIP", 1):
             counts, dts = self._count(ps, 30)
         self.assertEqual(counts[id(far)], 30)
@@ -84,7 +84,7 @@ class TickLodTests(unittest.TestCase):
 
     def test_eligibility_is_the_padded_view_and_pursuit(self):
         ps = _run()
-        e = ps.spawn.spawn_enemy("chaser", at=_far_spot(ps))
+        e = ps.spawn.spawn_enemy("skull", at=_far_spot(ps))
         view = ps.camera.visible_rect().inflate(config.ENEMY_LOD_VIEW_PAD,
                                                 config.ENEMY_LOD_VIEW_PAD)
         self.assertTrue(ps.spawn.lod_eligible(e, view))

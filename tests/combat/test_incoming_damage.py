@@ -107,7 +107,7 @@ class ContactBiteTests(unittest.TestCase):
         """Regression for BUG_JOURNAL #1: Aegis (armor 4) was fully immune."""
         game, p = _run(hero_index=0)                    # Aegis, armor 4
         self.assertEqual(p.player.stats["armor"], 4.0)
-        p._spawn_enemy("swarm", at=p.player.pos.copy())  # contact_damage 9
+        p._spawn_enemy("bumblebee", at=p.player.pos.copy())  # contact_damage 9
         hp0 = p.player.hp
         game.state_machine.update(DT)                   # one frame -> one bite
         bite = 9 * T - 4                                # 9*0.5 - armor = 0.5
@@ -116,7 +116,7 @@ class ContactBiteTests(unittest.TestCase):
 
     def test_at_most_one_bite_per_interval_then_another(self):
         game, p = _run(hero_index=1)                    # Kestrel, armor 0
-        p._spawn_enemy("swarm", at=p.player.pos.copy())
+        p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp
         _advance(game, T * 0.6)                         # < one interval past the first
         one_bite = hp0 - p.player.hp
@@ -126,8 +126,8 @@ class ContactBiteTests(unittest.TestCase):
 
     def test_two_enemies_bite_on_independent_timers(self):
         game, p = _run(hero_index=1)                    # armor 0
-        p._spawn_enemy("swarm", at=p.player.pos.copy())
-        p._spawn_enemy("swarm", at=p.player.pos.copy())
+        p._spawn_enemy("bumblebee", at=p.player.pos.copy())
+        p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp
         game.state_machine.update(DT)                   # both bite once this frame
         self.assertAlmostEqual(hp0 - p.player.hp, 2 * (9 * T), places=3)
@@ -136,7 +136,7 @@ class ContactBiteTests(unittest.TestCase):
         """A charge / blink is a discrete impact -- it must land on first overlap
         even if the enemy bit the hero moments earlier."""
         game, p = _run(hero_index=1)
-        p._spawn_enemy("charger", at=p.player.pos.copy())
+        p._spawn_enemy("minotaur", at=p.player.pos.copy())
         charger = p.enemies[-1]
 
         def state():

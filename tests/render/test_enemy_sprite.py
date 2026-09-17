@@ -30,7 +30,7 @@ ALL_ENEMIES = tuple(get_content().enemies)          # every enemy is sprited now
 
 class EnemyRigTests(unittest.TestCase):
     def test_every_enemy_has_an_animator(self):
-        self.assertEqual(make("chaser").anim.rig, "skull")
+        self.assertEqual(make("skull").anim.rig, "skull")
         for eid in ALL_ENEMIES:
             self.assertIsInstance(make(eid).anim, Animator, eid)
 
@@ -38,7 +38,7 @@ class EnemyRigTests(unittest.TestCase):
         def phase(enemy, name):
             enemy.bb.slot("__machine__")["state"] = name
 
-        e = make("charger")
+        e = make("minotaur")
         self.assertEqual(e._anim_name(), "idle")
         phase(e, "telegraph")
         self.assertEqual(e._anim_name(), "attack")
@@ -46,12 +46,12 @@ class EnemyRigTests(unittest.TestCase):
         self.assertEqual(e._anim_name(), "attack")
         phase(e, "recover")
         self.assertEqual(e._anim_name(), "idle")
-        b = make("brute")
+        b = make("troll")
         phase(b, "telegraph")
         self.assertEqual(b._anim_name(), "attack")
 
     def test_hit_sets_the_tint_timer_but_not_a_hurt_anim(self):
-        e = make("chaser")               # skull rig -- no `hurt` strip
+        e = make("skull")               # skull rig -- no `hurt` strip
         self.assertFalse(e._has_hurt)
         e.anim.play("walk")
         e.take_damage(3.0)
@@ -59,7 +59,7 @@ class EnemyRigTests(unittest.TestCase):
         self.assertNotEqual(e.anim.anim, "hurt")   # did NOT pop to a missing anim
 
     def test_anim_name_ignores_hurt_without_a_strip(self):
-        e = make("chaser")
+        e = make("skull")
         e.vel.update(50, 0)
         self.assertEqual(e._anim_name(), "walk")
         e.vel.update(0, 0)
@@ -69,21 +69,21 @@ class EnemyRigTests(unittest.TestCase):
         self.assertEqual(e._anim_name(), "death")
 
     def test_facing_tracks_the_player(self):
-        e = make("chaser", x=200)
+        e = make("skull", x=200)
         e.update(_ctx(player=(0, 0)))
         self.assertEqual(e._facing, -1)
         e.update(_ctx(player=(9999, 0)))
         self.assertEqual(e._facing, 1)
 
     def test_hurt_timer_decays_in_update(self):
-        e = make("chaser")
+        e = make("skull")
         e.take_damage(3.0)
         for _ in range(20):
             e.update(_ctx())
         self.assertEqual(e._hurt_t, 0.0)
 
     def test_dot_does_not_trip_the_tint(self):
-        e = make("chaser")
+        e = make("skull")
         e._status_damage(2.0, _ctx())        # burn tick path
         self.assertEqual(e._hurt_t, 0.0)
 
@@ -136,7 +136,7 @@ class DeathPoofTests(unittest.TestCase):
 
     def test_any_enemy_death_pushes_one_dead_poof(self):
         g, p = self._playing()
-        for eid in ("chaser", "ranged"):        # sprited + primitive both poof
+        for eid in ("skull", "slingshot_gnome"):        # sprited + primitive both poof
             p._death_fx.clear()
             kills0 = p.stats["kills"]
             e = self._kill_one(p, eid)
@@ -150,7 +150,7 @@ class DeathPoofTests(unittest.TestCase):
 
     def test_poof_clears_when_the_one_shot_finishes(self):
         g, p = self._playing()
-        self._kill_one(p, "chaser")
+        self._kill_one(p, "skull")
         for _ in range(90):                     # 1.5 s
             p._update_death_fx(1 / 60)
         self.assertEqual(p._death_fx, [])
@@ -169,7 +169,7 @@ class DeathPoofTests(unittest.TestCase):
 
     def test_enemy_poof_carries_the_enemy_radius(self):
         g, p = self._playing()
-        e = self._kill_one(p, "tank")
+        e = self._kill_one(p, "turtle")
         self.assertEqual(p._death_fx[-1][4], e.radius)
         pygame.quit()
 
@@ -330,7 +330,7 @@ class SpriteAnchorDropTests(unittest.TestCase):
 
     def test_depth_sort_key_is_still_the_unshifted_entity_y(self):
         g, p = self._playing()
-        p._spawn_enemy("chaser", at=pygame.Vector2(p.player.pos.x, p.player.pos.y + 40))
+        p._spawn_enemy("skull", at=pygame.Vector2(p.player.pos.x, p.player.pos.y + 40))
         e = p.enemies[-1]
         keys = {round(y, 3) for y, _ in p._depth_items()}
         self.assertIn(round(e.pos.y, 3), keys)
@@ -370,7 +370,7 @@ class EnemyStateRingsTests(unittest.TestCase):
     def test_sprited_elite_draws_no_ring_by_default_but_does_when_flag_on(self):
         from game import config
         g, p = self._playing()
-        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(80, 0))
+        p._spawn_enemy("skull", at=p.player.pos + pygame.Vector2(80, 0))
         e = p.enemies[-1]
         e.is_elite = True
         self.assertIsNotNone(e.anim)                       # sprited
@@ -387,7 +387,7 @@ class EnemyStateRingsTests(unittest.TestCase):
     def test_primitive_enemy_always_shows_its_state_rings(self):
         from game import config
         g, p = self._playing()
-        p._spawn_enemy("chaser", at=p.player.pos + pygame.Vector2(80, 0))
+        p._spawn_enemy("skull", at=p.player.pos + pygame.Vector2(80, 0))
         e = p.enemies[-1]
         e.anim = None                                     # force the primitive path
         e.is_elite = True

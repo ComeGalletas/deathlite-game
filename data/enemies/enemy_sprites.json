@@ -1,4 +1,37 @@
 {
+  "gnoll": {
+    "frame": [192, 192], "content": [18, 25, 130, 110], "scale": [60, 51], "anchor": [36, 51], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/gnoll/idle.png", "frames": 6, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/gnoll/walk.png", "frames": 8, "fps": 12, "loop": true},
+      "attack": {"file": "enemies/gnoll/throw.png", "frames": 8, "fps": 14, "loop": false}
+    }
+  },
+  "harpoon_shark": {
+    "frame": [192, 192], "content": [32, 48, 98, 89], "scale": [55, 50], "anchor": [29, 49], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/harpoon_shark/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/harpoon_shark/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/harpoon_shark/throw.png", "frames": 8, "fps": 12, "loop": false}
+    }
+  },
+  "gnoll_bone": {
+    "frame": [64, 64], "content": [10, 9, 47, 47], "scale": [26, 26], "anchor": [13, 13],
+    "anims": {
+      "spin": {"file": "enemies/gnoll/bone.png", "frames": 4, "fps": 16, "loop": true}
+    }
+  },
+  "harpoon_spear": {
+    "file": "enemies/harpoon_shark/harpoon.png",
+    "frame": [64, 64], "content": [3, 1, 58, 62], "scale": [32, 34], "anchor": [16, 17],
+    "heading_deg": -45
+  },
+  "acorn": {
+    "frame": [64, 64], "content": [24, 20, 16, 19], "scale": [14, 17], "anchor": [7, 8],
+    "anims": {
+      "spin": {"file": "enemies/slingshot_gnome/acorn_projectile.png", "frames": 4, "fps": 14, "loop": true}
+    }
+  },
   "skull": {
     "frame": [192, 192], "content": [52, 52, 121, 78], "scale": [56, 36], "anchor": [20, 33], "face": "right",
     "anims": {
@@ -24,7 +57,7 @@
     }
   },
   "bumblebee": {
-    "frame": [192, 192], "content": [47, 1, 102, 154], "scale": [23, 35], "anchor": [12, 34], "face": "right",
+    "frame": [192, 192], "content": [47, 1, 102, 154], "scale": [30, 46], "anchor": [16, 45], "face": "right",
     "anims": {
       "idle":   {"file": "enemies/bumblebee/idle.png", "frames": 8, "fps": 10, "loop": true},
       "walk":   {"file": "enemies/bumblebee/move.png", "frames": 4, "fps": 14, "loop": true},
@@ -63,12 +96,20 @@
       "attack": {"file": "enemies/bear/attack.png", "frames": 9, "fps": 12, "loop": false}
     }
   },
-  "gnome": {
+  "torch_goblin": {
+    "frame": [192, 192], "content": [29, 50, 131, 83], "scale": [76, 48], "anchor": [32, 48], "face": "right",
+    "anims": {
+      "idle":   {"file": "enemies/torch_goblin/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/torch_goblin/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/torch_goblin/attack.png", "frames": 8, "fps": 12, "loop": false}
+    }
+  },
+  "hammer_gnome": {
     "frame": [192, 192], "content": [43, 55, 124, 75], "scale": [85, 51], "anchor": [32, 49], "face": "right",
     "anims": {
-      "idle":   {"file": "enemies/gnome/idle.png", "frames": 8, "fps": 8, "loop": true},
-      "walk":   {"file": "enemies/gnome/run.png", "frames": 6, "fps": 11, "loop": true},
-      "attack": {"file": "enemies/gnome/attack.png", "frames": 7, "fps": 14, "loop": false}
+      "idle":   {"file": "enemies/hammer_gnome/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":   {"file": "enemies/hammer_gnome/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack": {"file": "enemies/hammer_gnome/attack.png", "frames": 7, "fps": 14, "loop": false}
     }
   },
   "troll": {

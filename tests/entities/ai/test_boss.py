@@ -75,7 +75,7 @@ class BossTests(unittest.TestCase):
             if sink["summoned"]:
                 break
         self.assertTrue(sink["summoned"])
-        self.assertEqual(sink["summoned"][0][0], "swarm")
+        self.assertEqual(sink["summoned"][0][0], "bumblebee")
 
 
 class BossVisionTests(unittest.TestCase):

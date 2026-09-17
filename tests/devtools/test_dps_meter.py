@@ -225,7 +225,7 @@ class InvulnerableEnemyTests(unittest.TestCase):
 
     def test_a_normal_enemy_is_unaffected_by_all_of_this(self):
         from entities.enemy import Enemy
-        e = Enemy("chaser", get_content().enemies["chaser"], 0.0, 0.0)
+        e = Enemy("skull", get_content().enemies["skull"], 0.0, 0.0)
         hp = e.hp
         e.take_damage(5.0, source="sword")
         self.assertLess(e.hp, hp)
@@ -363,7 +363,7 @@ class BenchArenaTests(unittest.TestCase):
         from tools.benchmarks import dps_bench
         game, ps = dps_bench._start_dev_run()
         dummy = dps_bench._arm_dummy(game, ps)
-        other = ps.spawn.spawn_enemy("chaser", at=dummy.pos, owner="dev")
+        other = ps.spawn.spawn_enemy("skull", at=dummy.pos, owner="dev")
         self.assertIsNotNone(other)
         dps_bench._isolate(ps, dummy)
         self.assertFalse(other.alive)

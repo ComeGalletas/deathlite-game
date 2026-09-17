@@ -1,5 +1,5 @@
 {
-  "chaser": {
+  "skull": {
     "name": "Husk", "hp": 20, "speed": 75,
     "aggro_range": 420,
     "pursuit_seconds": 6.0, "contact_damage": 13, "radius": 10,
@@ -8,7 +8,7 @@
     "tags": ["basic"], "sprite": "skull", "contact_damage_enabled": false,
     "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
-  "fast": {
+  "spider": {
     "name": "Skitter", "hp": 10, "speed": 100,
     "aggro_range": 480,
     "pursuit_seconds": 5.0, "contact_damage": 11, "radius": 10,
@@ -16,8 +16,8 @@
     "experience_reward": 3, "behavior": "path_chase", "color": [240, 150, 90],
     "tags": ["fast"], "sprite": "spider"
   },
-  "tank": {
-    "name": "Lumberer", "hp": 80, "speed": 55,
+  "turtle": {
+    "name": "Shellback", "hp": 80, "speed": 55,
     "aggro_range": 360,
     "pursuit_seconds": 9.0, "contact_damage": 21, "radius": 24,
     "weight": 14,
@@ -25,25 +25,25 @@
     "tags": ["tank"], "sprite": "turtle", "contact_damage_enabled": false,
     "attack_telegraph": 0.3306, "attack_active": 0.6694
   },
-  "swarm": {
-    "name": "Mite", "hp": 5, "speed": 120,
+  "bumblebee": {
+    "name": "Stinger", "hp": 5, "speed": 120,
     "aggro_range": 400,
-    "pursuit_seconds": 5.0, "contact_damage": 9, "radius": 7,
+    "pursuit_seconds": 5.0, "contact_damage": 9, "radius": 9,
     "weight": 3,
     "experience_reward": 1, "behavior": "path_chase", "color": [180, 200, 110],
     "tags": ["swarm", "flying"], "sprite": "bumblebee"
   },
-  "ranged": {
-    "name": "Spitter", "hp": 17, "speed": 45,
+  "slingshot_gnome": {
+    "name": "Slinger", "hp": 17, "speed": 45,
     "aggro_range": 560,
     "pursuit_seconds": 6.0, "contact_damage": 10, "radius": 13,
     "weight": 6,
     "experience_reward": 6, "behavior": "kite_shoot", "color": [110, 200, 170],
     "tags": ["ranged"], "sprite": "slingshot_gnome", "contact_damage_enabled": false,
     "prefer_distance": 260, "shoot_interval": 2.1, "shoot_damage": 7,
-    "shot_speed": 230
+    "shot_speed": 230, "shot_style": "spin", "shot_rig": "acorn"
   },
-  "exploder": {
+  "bomb_fish": {
     "name": "Bloat", "hp": 29, "speed": 50,
     "aggro_range": 460,
     "pursuit_seconds": 6.0, "contact_damage": 11, "radius": 16,
@@ -52,8 +52,8 @@
     "tags": ["exploder"], "sprite": "bomb_fish", "contact_damage_enabled": false,
     "explode_radius": 90, "explode_damage": 24, "fuse_range": 34
   },
-  "shielded": {
-    "name": "Bulwark", "hp": 33, "speed": 60,
+  "panda": {
+    "name": "Stoutpaw", "hp": 33, "speed": 60,
     "aggro_range": 400,
     "pursuit_seconds": 8.0, "contact_damage": 15, "radius": 16,
     "weight": 8,
@@ -62,7 +62,7 @@
     "shield_hp": 41,
     "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
-  "elite": {
+  "bear": {
     "name": "Ravager", "hp": 125, "speed": 70,
     "aggro_range": 520,
     "pursuit_seconds": 9.0, "contact_damage": 25, "radius": 22,
@@ -71,17 +71,28 @@
     "tags": ["elite"], "is_elite": true, "sprite": "bear", "contact_damage_enabled": false,
     "attack_telegraph": 0.3306, "attack_active": 0.4194
   },
-  "summoner": {
-    "name": "Broodmother", "hp": 87, "speed": 55,
-    "aggro_range": 540,
-    "pursuit_seconds": 8.0, "contact_damage": 13, "radius": 20,
-    "weight": 10,
-    "experience_reward": 18, "behavior": "summoner", "color": [90, 150, 120],
-    "tags": ["summoner"], "sprite": "gnome", "contact_damage_enabled": false,
-    "summon_id": "swarm", "summon_interval": 4.0, "summon_count": 3
+  "hammer_gnome": {
+    "name": "Hammer Gnome", "hp": 26, "speed": 60,
+    "aggro_range": 420,
+    "pursuit_seconds": 6.0, "contact_damage": 18, "radius": 16,
+    "weight": 11,
+    "experience_reward": 5, "behavior": "path_chase_attack", "color": [214, 120, 70],
+    "tags": ["basic"], "sprite": "hammer_gnome", "contact_damage_enabled": false,
+    "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
-  "brute": {
-    "name": "Warden", "hp": 290, "speed": 65,
+  "torch_goblin": {
+    "name": "Beekeeper", "hp": 87, "speed": 55,
+    "aggro_range": 540,
+    "pursuit_seconds": 8.0, "contact_damage": 8, "radius": 16,
+    "weight": 10,
+    "experience_reward": 18, "behavior": "path_chase_summon", "color": [230, 160, 60],
+    "tags": ["summoner"], "sprite": "torch_goblin", "contact_damage_enabled": false,
+    "attack_telegraph": 0.35, "attack_active": 0.45,
+    "attack_recover": 0.2, "attack_cooldown": 3.2,
+    "summon_id": "bumblebee", "summon_count": 3
+  },
+  "troll": {
+    "name": "Grudge", "hp": 290, "speed": 65,
     "aggro_range": 420,
     "pursuit_seconds": 10.0, "contact_damage": 29, "radius": 26,
     "weight": 80,
@@ -91,8 +102,8 @@
     "slam_interval": 3.5, "slam_range": 60, "slam_radius": 60,
     "slam_damage": 30, "slam_telegraph": 0.9
   },
-  "charger": {
-    "name": "Gorehound", "hp": 55, "speed": 90,
+  "minotaur": {
+    "name": "Gorehorn", "hp": 55, "speed": 90,
     "aggro_range": 560,
     "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 15,
     "weight": 8,
@@ -102,7 +113,7 @@
     "charge_recover": 1.1, "charge_interval": 1.1, "charge_speed": 660,
     "charge_damage": 31
   },
-  "teleporter": {
+  "thief": {
     "name": "Blink", "hp": 36, "speed": 95,
     "aggro_range": 600,
     "pursuit_seconds": 8.0, "contact_damage": 12, "radius": 13,
@@ -113,8 +124,30 @@
     "blink_recover": 0.9, "blink_interval": 2.4, "blink_range": 70,
     "blink_damage": 20
   },
-  "warlock": {
-    "name": "Blight Caller", "hp": 64, "speed": 48,
+  "gnoll": {
+    "name": "Bonepicker", "hp": 46, "speed": 82,
+    "aggro_range": 520,
+    "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 14,
+    "weight": 7,
+    "experience_reward": 8, "behavior": "kite_shoot", "color": [214, 186, 82],
+    "tags": ["ranged"], "sprite": "gnoll", "contact_damage_enabled": false,
+    "prefer_distance": 190, "shoot_interval": 2.6, "shoot_damage": 12,
+    "shot_speed": 190, "shot_radius": 9,
+    "shot_style": "spin", "shot_rig": "gnoll_bone"
+  },
+  "harpoon_shark": {
+    "name": "Gaffjaw", "hp": 58, "speed": 40,
+    "aggro_range": 640,
+    "pursuit_seconds": 8.0, "contact_damage": 15, "radius": 15,
+    "weight": 8,
+    "experience_reward": 11, "behavior": "kite_shoot", "color": [86, 170, 168],
+    "tags": ["ranged"], "sprite": "harpoon_shark", "contact_damage_enabled": false,
+    "prefer_distance": 360, "shoot_interval": 3.4, "shoot_damage": 19,
+    "shot_speed": 300, "shot_radius": 8,
+    "shot_style": "thrown", "shot_rig": "harpoon_spear", "shot_pierce": 2
+  },
+  "hex_shaman": {
+    "name": "Hexcaller", "hp": 64, "speed": 48,
     "aggro_range": 560,
     "pursuit_seconds": 8.0, "contact_damage": 11, "radius": 15,
     "weight": 7,
@@ -124,7 +157,7 @@
     "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8,
     "cast_duration": 0.2, "cast_recover": 1.8, "cast_interval": 3.2,
     "hazard_sprite": "hex_shaman_explosion_spell",
-    "hazard_radius": 92, "hazard_dps": 23, "hazard_duration": 3.5
+    "hazard_radius": 92, "hazard_dps": 23, "hazard_duration": 1.8
   },
   "training_dummy": {
     "name": "Training Dummy", "hp": 1, "speed": 0,

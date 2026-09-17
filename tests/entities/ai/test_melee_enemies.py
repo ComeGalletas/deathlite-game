@@ -16,14 +16,14 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 from entities.ai import build_behavior
 from game.content import get_content
 
-MELEE = ("chaser", "shielded", "elite", "tank")
+MELEE = ("skull", "panda", "bear", "turtle")
 WINDUP_BONUS = 1.15
 
 # Every behaviour that carries its own damage, so an enemy may hand its
 # contact bite over to one.
 ATTACKING = frozenset({"path_chase_attack", "brute", "fsm_charger",
                        "fsm_teleporter", "fsm_warlock", "exploder",
-                       "summoner", "kite_shoot"})
+                       "summoner", "kite_shoot", "path_chase_summon"})
 
 
 def _sprites() -> dict:
@@ -57,13 +57,13 @@ class MeleeRosterTests(unittest.TestCase):
     def test_the_shielded_one_keeps_the_chasers_timing_exactly(self):
         """Asked for by name: the bulwark swings on the chaser's beat, not
         the elite's and the tank's longer wind-up."""
-        chaser, shielded = self.enemies["chaser"], self.enemies["shielded"]
+        chaser, shielded = self.enemies["skull"], self.enemies["panda"]
         self.assertEqual(shielded["attack_telegraph"], chaser["attack_telegraph"])
         self.assertEqual(shielded["attack_active"], chaser["attack_active"])
 
     def test_the_new_windup_is_15_percent_over_the_chaser(self):
-        chaser = self.enemies["chaser"]["attack_telegraph"]
-        for eid in ("elite", "tank"):
+        chaser = self.enemies["skull"]["attack_telegraph"]
+        for eid in ("bear", "turtle"):
             with self.subTest(eid):
                 self.assertAlmostEqual(self.enemies[eid]["attack_telegraph"],
                                        chaser * WINDUP_BONUS, places=3)
@@ -72,7 +72,7 @@ class MeleeRosterTests(unittest.TestCase):
         """Wind-up plus swing covers the rig's attack strip, so the art
         plays out instead of being cut back to `walk` mid-swing."""
         rigs = _sprites()
-        for eid in ("elite", "tank"):
+        for eid in ("bear", "turtle"):
             with self.subTest(eid):
                 cfg = self.enemies[eid]
                 strip = rigs[cfg["sprite"]]["anims"]["attack"]

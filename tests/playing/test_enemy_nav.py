@@ -153,7 +153,7 @@ class PlayingStateNavWiringTests(unittest.TestCase):
              if p.game_map.is_walkable(p.player.pos + pygame.Vector2(dx, dy), 14)),
             None)
         self.assertIsNotNone(spot, "no walkable spawn near the player")
-        p._spawn_enemy("chaser", at=spot)
+        p._spawn_enemy("skull", at=spot)
         e = p.enemies[-1]
         self.assertEqual(e.behavior, "path_chase_attack")
         ctx = p._enemy_context(1 / 60)

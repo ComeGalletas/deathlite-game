@@ -30,7 +30,7 @@ def ctx(dt=1 / 30, player=(0, 0), **cb):
 
 class ChargerTests(unittest.TestCase):
     def test_cycles_states_and_bumps_damage_on_the_dash(self):
-        e = make("charger", x=180)
+        e = make("minotaur", x=180)
         states = set()
         dashed_damage = 0.0
         for _ in range(600):
@@ -44,7 +44,7 @@ class ChargerTests(unittest.TestCase):
         self.assertGreater(dashed_damage, e._base_contact)
 
     def test_telegraphs_before_attacking(self):
-        e = make("charger", x=150)
+        e = make("minotaur", x=150)
         seq = []
         for _ in range(400):
             c, _ = ctx(player=(0, 0))
@@ -58,7 +58,7 @@ class ChargerTests(unittest.TestCase):
 
 class TeleporterTests(unittest.TestCase):
     def test_blinks_close_to_the_player(self):
-        e = make("teleporter", x=800)
+        e = make("thief", x=800)
         for _ in range(500):
             c, _ = ctx(player=(0, 0))
             e.update(c)
@@ -69,7 +69,7 @@ class TeleporterTests(unittest.TestCase):
 
 class WarlockTests(unittest.TestCase):
     def test_spawns_a_hazard_after_a_telegraph(self):
-        e = make("warlock", x=260)
+        e = make("hex_shaman", x=260)
         saw_telegraph = False
         hazards = []
         for _ in range(500):

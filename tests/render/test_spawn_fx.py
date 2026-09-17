@@ -104,7 +104,7 @@ class RunTests(unittest.TestCase):
                 pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
         return g, settle(g)
 
-    def _spawn(self, p, eid="chaser", dx=80):
+    def _spawn(self, p, eid="skull", dx=80):
         p._spawn_fx.clear()
         e = p._spawn_enemy(eid, at=p.player.pos + pygame.Vector2(dx, 0))
         self.assertIsNotNone(e)
@@ -156,7 +156,7 @@ class RunTests(unittest.TestCase):
         self.assertAlmostEqual(cy, sy - ay * z + r.sprite_drop(e.radius) + bh * z / 2,
                                places=4)
         # a bigger rig -> a bigger ring
-        big = self._spawn(p, "brute", dx=-120)
+        big = self._spawn(p, "troll", dx=-120)
         self.assertGreater(r.spawn_fx_geometry(big)[2], d)
         # no rig -> the collider
         e.anim = None

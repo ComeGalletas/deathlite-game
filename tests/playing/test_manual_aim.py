@@ -608,7 +608,7 @@ class FullFrameTests(unittest.TestCase):
 
     def test_auto_off_with_an_enemy_in_reach_stays_silent(self):
         self.ps.auto_attack = False
-        e = self.ps.spawn.spawn_enemy("chaser", at=self.ps.player.pos + pygame.Vector2(60, 0),
+        e = self.ps.spawn.spawn_enemy("skull", at=self.ps.player.pos + pygame.Vector2(60, 0),
                                       owner="dev")
         self.assertIsNotNone(e)
         shots = self._frame(n=30)
@@ -616,7 +616,7 @@ class FullFrameTests(unittest.TestCase):
         self.ps.enemies.clear()
 
     def test_held_arrow_beats_auto_aim_on_an_enemy(self):
-        e = self.ps.spawn.spawn_enemy("chaser", at=self.ps.player.pos + pygame.Vector2(80, 0),
+        e = self.ps.spawn.spawn_enemy("skull", at=self.ps.player.pos + pygame.Vector2(80, 0),
                                       owner="dev")
         self.assertIsNotNone(e)
         shots = self._frame(keys(pygame.K_LEFT))                # enemy right, aim left

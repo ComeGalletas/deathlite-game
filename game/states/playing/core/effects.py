@@ -41,12 +41,26 @@ class TransientFx:
         self.ps = ps
 
     # --- hostile projectiles ----------------------------------
-    def fire_hostile(self, *, pos, vel, damage, radius) -> None:
+    def fire_hostile(self, *, pos, vel, damage, radius, style: str = "",
+                     fx: dict | None = None, pierce: int = 0) -> None:
+        """One enemy shot.
+
+        `style` / `fx` / `pierce` were added in R1 of
+        `journals/enemy_roster_expansion_journal.md`. Until then this method
+        dropped them, which is why *every* hostile shot in the game was the
+        same red-tinted `arrow` -- the slingshot gnome's own acorn art had sat
+        unread since it was delivered. `Projectile.reset` had always taken all
+        three; this call site was the only thing in the way.
+
+        The defaults are exactly the old behaviour, so an enemy whose JSON
+        block names no shot art still fires the red arrow.
+        """
         proj = self.ps.hostiles.acquire()
         if proj is None:
             return
         proj.reset(pos=pos, vel=vel, damage=damage, radius=radius,
-                   lifetime=6.0, color=(255, 110, 90), hostile=True)
+                   lifetime=6.0, color=(255, 110, 90), hostile=True,
+                   style=style, fx=fx, pierce=int(pierce))
         self.stamp_fire_level(proj)
 
     def stamp_fire_level(self, proj) -> None:

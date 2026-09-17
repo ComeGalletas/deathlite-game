@@ -276,7 +276,7 @@ class Boss:
             d = ctx.player_pos - self.pos
             self._charge_dir = d.normalize() if d.length_squared() > 1 else pygame.Vector2(1, 0)
         elif pid == "summon_brood":
-            ctx.summon(self.pattern.get("summon_id", "swarm"), self.pos,
+            ctx.summon(self.pattern.get("summon_id", "bumblebee"), self.pos,
                        int(self.pattern.get("summon_count", 6)))
         elif pid == "sweep":
             # A ring of melee centred on the boss, for a weapon that swings all

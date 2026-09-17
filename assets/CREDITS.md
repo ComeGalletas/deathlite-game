@@ -41,7 +41,9 @@ Tiny Swords supplies the main art of the game:
   shared death poof and the hero summons drawn from the same sheets.
 - **Enemies** — `assets/enemies/`: every enemy variant and the boss are Tiny
   Swords mobs (skull, spider, turtle, bumblebee, gnomes, bomb fish, panda, bear,
-  troll, minotaur, thief, hex shaman, pig rider, giant bat).
+  troll, minotaur, thief, hex shaman, gnoll, harpoon shark, torch goblin,
+  pig rider, giant bat), together with the projectiles three of them throw (the slingshot
+  gnome's acorn, the gnoll's bone, the harpoon shark's spear).
 - **Interface** — `assets/ui/`: the buttons, ribbons and pointer cursors of the
   menus come from the Tiny Swords UI sheets.
 

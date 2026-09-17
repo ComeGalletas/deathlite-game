@@ -24,7 +24,7 @@ def _master(host, seed: int = 3) -> SpawnMaster:
     return m
 
 
-def _spawn(host, room_x: float, n: int, owner="director", eid="chaser"):
+def _spawn(host, room_x: float, n: int, owner="director", eid="skull"):
     return [host.make_enemy(eid, room_x + 40 * i, 500 + 40 * i, 1.0, 1.0, owner)
             for i in range(n)]
 
@@ -39,7 +39,7 @@ class HibernateTests(unittest.TestCase):
         exempt = _spawn(host, 2500, 1, owner="dummy")
         chasing = _spawn(host, 2500, 1, owner="director")
         host.pursuing = {id(chasing[0])}
-        bridge = host.make_enemy("chaser", *BRIDGE.center, 1.0, 1.0, "director")
+        bridge = host.make_enemy("skull", *BRIDGE.center, 1.0, 1.0, "director")
         slept = pop.hibernate(host, {0}, 1.0)
         self.assertEqual(slept, {1: 3})
         self.assertEqual(set(map(id, host.live)),
@@ -64,11 +64,11 @@ class HibernateTests(unittest.TestCase):
         host = FakeHost()
         host.pursuing = set()
         pop = _pop()
-        e = host.make_enemy("tank", 2500, 500, 1.7, 1.2, "director")
+        e = host.make_enemy("turtle", 2500, 500, 1.7, 1.2, "director")
         e.hp, e.shield_hp, e.status = 3.5, 2.0, "burning"
         pop.hibernate(host, set(), 0.0)
         rec = pop.dormant[1][0]
-        self.assertEqual((rec.enemy_id, rec.x, rec.y), ("tank", 2500.0, 500.0))
+        self.assertEqual((rec.enemy_id, rec.x, rec.y), ("turtle", 2500.0, 500.0))
         self.assertEqual((rec.hp, rec.max_hp, rec.shield_hp), (3.5, 17.0, 2.0))
         self.assertAlmostEqual(rec.speed, 120.0)
         self.assertEqual(rec.status, "burning")
@@ -77,7 +77,7 @@ class HibernateTests(unittest.TestCase):
                       _master(host).placement, 1.0)
         w = host.live[0]
         self.assertEqual((w.enemy_id, w.hp, w.max_hp, w.shield_hp, w.speed, w.status),
-                         ("tank", 3.5, 17.0, 2.0, 120.0, "burning"))
+                         ("turtle", 3.5, 17.0, 2.0, 120.0, "burning"))
         self.assertEqual((w.pos.x, w.pos.y), (2500.0, 500.0))
 
 
@@ -243,9 +243,9 @@ class CapAndSwitchTests(unittest.TestCase):
         _spawn(host, 2500, 4)
         m.update(0.0)                                          # tick 0: they sleep
         self.assertEqual(m.population.total_dormant, 4)
-        self.assertIsNotNone(m.spawn_at("chaser", pygame.Vector2(50, 50)))     # 4 + 1 = 5
-        self.assertIsNone(m.spawn_at("chaser", pygame.Vector2(50, 50)))        # over
-        self.assertIsNotNone(m.spawn_at("elite", pygame.Vector2(50, 50), owner="dev"))
+        self.assertIsNotNone(m.spawn_at("skull", pygame.Vector2(50, 50)))     # 4 + 1 = 5
+        self.assertIsNone(m.spawn_at("skull", pygame.Vector2(50, 50)))        # over
+        self.assertIsNotNone(m.spawn_at("bear", pygame.Vector2(50, 50), owner="dev"))
 
     def test_frozen_stops_the_director_but_not_the_zone(self):
         host = FakeHost()

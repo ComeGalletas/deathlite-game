@@ -66,3 +66,4 @@ from game.states.playing.visual.projectiles import arcane as _arcane    # noqa: 
 from game.states.playing.visual.projectiles import blast as _blast      # noqa: E402,F401
 from game.states.playing.visual.projectiles import bomb as _bomb        # noqa: E402,F401
 from game.states.playing.visual.projectiles import thrown as _thrown    # noqa: E402,F401
+from game.states.playing.visual.projectiles import spin as _spin        # noqa: E402,F401

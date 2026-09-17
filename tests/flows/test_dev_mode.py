@@ -195,7 +195,7 @@ class DevMenuTests(unittest.TestCase):
         self.assertTrue(playing._dev_unlimited_hp)
         _key(game, pygame.K_BACKQUOTE)                  # close, resume
         hp0 = playing.player.hp
-        playing._spawn_enemy("tank", at=playing.player.pos.copy())   # constant contact
+        playing._spawn_enemy("turtle", at=playing.player.pos.copy())   # constant contact
         for _ in range(30):
             game.state_machine.update(1 / 60)
         self.assertGreaterEqual(playing.player.hp, hp0)
@@ -211,7 +211,7 @@ class DevMenuTests(unittest.TestCase):
         # be over a drop. See `tests/nearby.py`.
         spot = spots_near(playing, want=1, radius=22.0)
         self.assertTrue(spot, "nowhere beside the hero to stand a tank")
-        playing._spawn_enemy("tank", at=spot[0])
+        playing._spawn_enemy("turtle", at=spot[0])
         d0 = playing.stats["damage_dealt"]
         for _ in range(90):
             game.state_machine.update(1 / 60)
@@ -230,7 +230,7 @@ class DevMenuTests(unittest.TestCase):
         self.assertTrue(playing._dev_no_damage)
         self.assertFalse(playing._dev_no_attack)           # weapons still fire
         _key(game, pygame.K_BACKQUOTE)
-        playing._spawn_enemy("tank", at=playing.player.pos + pygame.Vector2(30, 0))
+        playing._spawn_enemy("turtle", at=playing.player.pos + pygame.Vector2(30, 0))
         e = playing.enemies[-1]
         hp0 = e.hp
         attacked = False
@@ -310,7 +310,7 @@ class DevMenuTests(unittest.TestCase):
         self.assertTrue(playing._dev_show_colliders)
         self.assertIn("[ON]", menu._row_label("colliders"))
         _key(game, pygame.K_BACKQUOTE)                  # close, resume
-        playing._spawn_enemy("chaser", at=playing.player.pos + pygame.Vector2(60, 0))
+        playing._spawn_enemy("skull", at=playing.player.pos + pygame.Vector2(60, 0))
         playing.draw(game.screen)                       # overlay path must not raise
         menu._activate("colliders")                     # via the menu again
         self.assertFalse(playing._dev_show_colliders)
@@ -420,9 +420,9 @@ class DevMenuTests(unittest.TestCase):
         playing, menu = _open_dev_menu(game)
         cap = playing.director.enemy_count_cap(playing.stats["time"])
         for _ in range(cap + 20):
-            menu._spawn("chaser")
+            menu._spawn("skull")
         self.assertEqual(len(playing.enemies), cap + 20)
-        self.assertIn(f"spawned {cap + 20} x chaser", menu._status)
+        self.assertIn(f"spawned {cap + 20} x skull", menu._status)
         self.assertTrue(all(e.spawn_owner == "dev" for e in playing.enemies))
         # F2 goes the same way
         n = len(playing.enemies)
@@ -492,21 +492,21 @@ class DevSpawnMenuTests(unittest.TestCase):
 
     def test_enter_spawns_exactly_one_of_the_selected_enemy(self):
         game, playing, menu = self._spawn_page()
-        menu.sel = menu._enemy_ids.index("warlock")
+        menu.sel = menu._enemy_ids.index("hex_shaman")
         n0 = len(playing.enemies)
         _key(game, pygame.K_RETURN)
         self.assertEqual(len(playing.enemies), n0 + 1)
-        self.assertEqual(playing.enemies[-1].enemy_id, "warlock")
-        self.assertEqual(menu._spawn_counts["warlock"], 1)
+        self.assertEqual(playing.enemies[-1].enemy_id, "hex_shaman")
+        self.assertEqual(menu._spawn_counts["hex_shaman"], 1)
 
     def test_page_stays_open_for_repeat_spawns(self):
         game, playing, menu = self._spawn_page()
-        menu.sel = menu._enemy_ids.index("chaser")
+        menu.sel = menu._enemy_ids.index("skull")
         for _ in range(6):
             _key(game, pygame.K_RETURN)
         self.assertEqual(menu.page, "enemies")
         self.assertEqual(len(playing.enemies), 6)
-        self.assertEqual(menu._spawn_counts["chaser"], 6)
+        self.assertEqual(menu._spawn_counts["skull"], 6)
 
     def test_escape_returns_to_root_without_closing_the_menu(self):
         game, playing, menu = self._spawn_page()
@@ -790,7 +790,7 @@ class DevRemoveWeaponMenuTests(unittest.TestCase):
         # The ring only orbits with an enemy in reach; the wolf forms anyway.
         spot = spots_near(playing, want=1, radius=22.0)
         self.assertTrue(spot, "nowhere beside the hero to stand a tank")
-        playing._spawn_enemy("tank", at=spot[0])
+        playing._spawn_enemy("turtle", at=spot[0])
         playing._dev_unlimited_hp = True
         playing._dev_hp_floor = playing.player.hp
         for _ in range(120):

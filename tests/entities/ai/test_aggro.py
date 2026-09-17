@@ -71,17 +71,17 @@ class AggroDataTests(unittest.TestCase):
 
 class AggroBehaviourTests(unittest.TestCase):
     def test_a_distant_enemy_does_not_pursue(self):
-        e = _enemy("chaser", 2000.0)
+        e = _enemy("skull", 2000.0)
         travel, _ = _run(e, 0.0, 4.0)
-        speed = get_content().enemy("chaser")["speed"]
+        speed = get_content().enemy("skull")["speed"]
         # it drifts (the idle wander) but nothing like a chase
         self.assertLess(travel, speed * 4.0 * 0.5)
         self.assertGreater(e.pos.x, 1800.0, "it closed on the player anyway")
 
     def test_an_enemy_inside_the_ring_pursues(self):
-        cfg = get_content().enemy("chaser")
+        cfg = get_content().enemy("skull")
         start = cfg["aggro_range"] * 0.7
-        e = _enemy("chaser", start)
+        e = _enemy("skull", start)
         travel, _ = _run(e, 0.0, 4.0)
         # It closes the gap and then stops to attack, so the distance travelled
         # is the gap itself -- not four seconds of running.
@@ -89,15 +89,15 @@ class AggroBehaviourTests(unittest.TestCase):
         self.assertLess(e.pos.x, 40.0, "it never reached the player")
 
     def test_being_attacked_provokes_from_out_of_range(self):
-        e = _enemy("chaser", 2000.0)
+        e = _enemy("skull", 2000.0)
         e.take_damage(1.0)
         travel, _ = _run(e, 0.0, 3.0)
-        self.assertGreater(travel, get_content().enemy("chaser")["speed"] * 3.0 * 0.8)
+        self.assertGreater(travel, get_content().enemy("skull")["speed"] * 3.0 * 0.8)
 
     def test_the_timer_refreshes_in_range_then_counts_down_on_leaving(self):
-        cfg = get_content().enemy("chaser")
+        cfg = get_content().enemy("skull")
         secs = cfg["pursuit_seconds"]
-        e = _enemy("chaser", cfg["aggro_range"] * 0.7)
+        e = _enemy("skull", cfg["aggro_range"] * 0.7)
         left_at = 2.0
         now = 0.0
         dropped = None
@@ -114,8 +114,8 @@ class AggroBehaviourTests(unittest.TestCase):
         self.assertAlmostEqual(dropped - left_at, secs, delta=3 * DT)
 
     def test_giving_up_leaves_it_wandering_not_frozen(self):
-        cfg = get_content().enemy("chaser")
-        e = _enemy("chaser", 50000.0)
+        cfg = get_content().enemy("skull")
+        e = _enemy("skull", 50000.0)
         travel, _ = _run(e, 0.0, 6.0)
         self.assertGreater(travel, 0.0, "an idle enemy is a statue")
         self.assertLess(travel, cfg["speed"] * 6.0 * 0.5)

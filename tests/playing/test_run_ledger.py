@@ -110,10 +110,10 @@ class KillTests(unittest.TestCase):
     def test_kills_are_counted_per_type_with_the_name_kept(self):
         led = RunLedger()
         for _ in range(3):
-            led.kill(SimpleNamespace(enemy_id="chaser", name="Husk"))
-        led.kill(SimpleNamespace(enemy_id="tank", name="Brute"))
-        self.assertEqual(led.kills, {"chaser": 3, "tank": 1})
-        self.assertEqual(led.kill_names, {"chaser": "Husk", "tank": "Brute"})
+            led.kill(SimpleNamespace(enemy_id="skull", name="Husk"))
+        led.kill(SimpleNamespace(enemy_id="turtle", name="Brute"))
+        self.assertEqual(led.kills, {"skull": 3, "turtle": 1})
+        self.assertEqual(led.kill_names, {"skull": "Husk", "turtle": "Brute"})
         self.assertEqual(led.total_kills, 4)
 
     def test_the_boss_counts_under_its_own_id(self):
@@ -123,10 +123,10 @@ class KillTests(unittest.TestCase):
 
     def test_kill_rows_are_biggest_first_then_by_id(self):
         led = RunLedger()
-        led.kill(SimpleNamespace(enemy_id="tank", name="Brute"))
+        led.kill(SimpleNamespace(enemy_id="turtle", name="Brute"))
         for _ in range(2):
-            led.kill(SimpleNamespace(enemy_id="fast", name="Skitter"))
-        led.kill(SimpleNamespace(enemy_id="chaser", name="Husk"))
+            led.kill(SimpleNamespace(enemy_id="spider", name="Skitter"))
+        led.kill(SimpleNamespace(enemy_id="skull", name="Husk"))
         self.assertEqual(led.kill_rows(),
                          [("Skitter", 2), ("Husk", 1), ("Brute", 1)])
 

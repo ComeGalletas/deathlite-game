@@ -33,7 +33,7 @@ def _sample(dog, host, times: int) -> list:
 
 def _off_screen(host, x=300.0, y=300.0):
     """An enemy on island 0, well outside the view (centred at 1000, 2000)."""
-    return host.make_enemy("chaser", x, y, 1.0, 1.0, "director")
+    return host.make_enemy("skull", x, y, 1.0, 1.0, "director")
 
 
 class VerdictTests(unittest.TestCase):
@@ -79,7 +79,7 @@ class VerdictTests(unittest.TestCase):
     def test_in_contact_range_of_the_player_is_not_stuck(self):
         host, dog = FakeHost(), _dog()
         host.view = pygame.Rect(0, 0, 10, 10)                 # nothing on screen
-        e = host.make_enemy("chaser", host.player.x + 20, host.player.y, 1.0, 1.0, "director")
+        e = host.make_enemy("skull", host.player.x + 20, host.player.y, 1.0, 1.0, "director")
         e.moving = True
         self.assertEqual(_sample(dog, host, dog.window + 3), [])
 
@@ -108,12 +108,12 @@ class VerdictTests(unittest.TestCase):
     def test_a_bridge_is_floor(self):
         host, dog = FakeHost(), _dog()
         host.blocked = [(pygame.Vector2(BRIDGE.center), 30.0)]   # the fake floor test says no
-        e = host.make_enemy("chaser", *BRIDGE.center, 1.0, 1.0, "director")
+        e = host.make_enemy("skull", *BRIDGE.center, 1.0, 1.0, "director")
         self.assertEqual(_sample(dog, host, 2), [])
 
     def test_a_visible_verdict_is_held_then_poofs(self):
         host, dog = FakeHost(), _dog()
-        e = host.make_enemy("chaser", host.player.x + 300, host.player.y, 1.0, 1.0, "director")
+        e = host.make_enemy("skull", host.player.x + 300, host.player.y, 1.0, 1.0, "director")
         host.blocked = [(pygame.Vector2(e.pos), 50.0)]           # embedded, on screen
         held = _sample(dog, host, 2)
         self.assertEqual(held, [])
@@ -125,7 +125,7 @@ class VerdictTests(unittest.TestCase):
 
     def test_leaving_the_view_releases_the_hold_without_a_poof(self):
         host, dog = FakeHost(), _dog()
-        e = host.make_enemy("chaser", host.player.x + 300, host.player.y, 1.0, 1.0, "director")
+        e = host.make_enemy("skull", host.player.x + 300, host.player.y, 1.0, 1.0, "director")
         host.blocked = [(pygame.Vector2(e.pos), 50.0)]
         _sample(dog, host, 2)
         host.view.center = (3000, 3000)                          # camera moved away
@@ -153,13 +153,13 @@ class RecycleTests(unittest.TestCase):
         self.assertNotIn(e, host.live)
         self.assertEqual(len(host.live), 1)
         w = host.live[0]
-        self.assertEqual((w.hp, w.shield_hp, w.enemy_id, w.owner), (3.0, 1.5, "chaser", "director"))
+        self.assertEqual((w.hp, w.shield_hp, w.enemy_id, w.owner), (3.0, 1.5, "skull", "director"))
         self.assertEqual(w.recycles, 1)
         pts = {(p.x, p.y) for p in m.index.by_room[0]}
         self.assertIn((w.pos.x, w.pos.y), pts)
         self.assertEqual(m.recycled, 1)
         ev, payload = host.events[-1]
-        self.assertEqual((ev, payload["enemy_id"], payload["reason"]), (ENEMY_RECYCLED, "chaser", "stuck"))
+        self.assertEqual((ev, payload["enemy_id"], payload["reason"]), (ENEMY_RECYCLED, "skull", "stuck"))
         self.assertEqual(host.poofs, [])
 
     def test_a_poof_is_fired_where_the_body_was(self):

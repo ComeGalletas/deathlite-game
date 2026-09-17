@@ -60,7 +60,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(len(spots), 5,
                          "no room to stand five enemies next to the player")
         for at in spots:
-            playing._spawn_enemy("chaser", at=at)
+            playing._spawn_enemy("skull", at=at)
 
         # advance ~15s: the starting weapon auto-fires, projectiles hit, enemies
         # die. The third kill is usually enough XP to level up, which pushes an
@@ -163,7 +163,7 @@ class SmokeTest(unittest.TestCase):
         playing = game.state_machine.current
         self.assertIsInstance(playing, PlayingState)
         for at in spots_near(playing, 5):
-            playing._spawn_enemy("chaser", at=at)
+            playing._spawn_enemy("skull", at=at)
         for _ in range(600):
             game.state_machine.update(1 / 60)
             while isinstance(game.state_machine.current, LevelUpState):
@@ -225,7 +225,7 @@ class SmokeTest(unittest.TestCase):
         for frame in range(60 * 120):
             if frame % 120 == 0 and isinstance(game.state_machine.current, PlayingState):
                 for at in spots_near(playing, 6):
-                    playing._spawn_enemy("chaser", at=at)
+                    playing._spawn_enemy("skull", at=at)
             game.state_machine.update(1 / 60)
             while isinstance(game.state_machine.current, LevelUpState):
                 key(pygame.K_1)

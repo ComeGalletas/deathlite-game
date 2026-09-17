@@ -34,7 +34,7 @@
         "telegraph": 0.7,
         "duration": 0.2,
         "recover": 2.2,
-        "summon_id": "swarm",
+        "summon_id": "bumblebee",
         "summon_count": 8
       }
     ]

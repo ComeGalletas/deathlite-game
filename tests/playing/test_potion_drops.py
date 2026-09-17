@@ -107,14 +107,14 @@ class DropWiringTests(unittest.TestCase):
         _g, p = _run()
         p.rng = random.Random(7)
         for _ in range(60):
-            p._roll_potion_drop("brute", p.player.pos + pygame.Vector2(400, 0))
+            p._roll_potion_drop("troll", p.player.pos + pygame.Vector2(400, 0))
         self.assertGreater(len(p.potions), 0)
 
     def test_a_dropped_potion_carries_its_rarity_heal(self):
         _g, p = _run()
         p.rng = random.Random(7)
         for _ in range(60):
-            p._roll_potion_drop("brute", p.player.pos + pygame.Vector2(400, 0))
+            p._roll_potion_drop("troll", p.player.pos + pygame.Vector2(400, 0))
         for drop in p.potions:
             self.assertEqual(drop.heal, float(T["potions"][drop.rarity]["heal"]))
 
@@ -122,7 +122,7 @@ class DropWiringTests(unittest.TestCase):
         _g, p = _run()
         p.rng = random.Random(3)
         for _ in range(200):
-            p._roll_potion_drop("brute", p.player.pos + pygame.Vector2(400, 0))
+            p._roll_potion_drop("troll", p.player.pos + pygame.Vector2(400, 0))
         self.assertNotIn("common", {d.rarity for d in p.potions})
 
     def test_an_unknown_enemy_id_drops_nothing(self):
@@ -138,7 +138,7 @@ class DropWiringTests(unittest.TestCase):
             p.game.events.publish(
                 Events.ENEMY_KILLED, pos=p.player.pos + pygame.Vector2(400, 0),
                 color=(200, 90, 90), xp=1, tags=("elite",), elite=True,
-                enemy_id="brute")
+                enemy_id="troll")
         self.assertGreater(len(p.potions), before)
 
     def test_a_kill_event_without_an_enemy_id_still_works(self):
@@ -156,7 +156,7 @@ class DropWiringTests(unittest.TestCase):
             if drop is not None:
                 drop.reset(far, "common", 15.0)
         self.assertEqual(len(p.potions), int(T["pool_size"]))
-        p._roll_potion_drop("brute", far)          # must not raise
+        p._roll_potion_drop("troll", far)          # must not raise
         self.assertEqual(len(p.potions), int(T["pool_size"]))
 
 

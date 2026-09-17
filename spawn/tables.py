@@ -8,6 +8,12 @@ run and checks the enemy sequence is the one the literal produced.
 
 Sections:
 
+    unused      enemies benched from the run: an id here keeps its block,
+                its art and its weights, but is filtered out of the phase
+                types and the group followers as the tables are read, so the
+                director can never roll it. Deliberately *disabled*, not
+                deleted -- `spawn_at` / `spawn_group` / the dev menu still
+                seat one on request.
     ramp_seconds
                 S12: how long the phase schedule takes to walk from its
                 first band to its last, on Normal; a difficulty divides it
@@ -105,14 +111,19 @@ class SpawnTables:
         problems = self.validate(data, ids)
         if problems:
             raise TableError("spawn_tables.json: " + "; ".join(problems))
-        self._phases: list = data["phases"]
+        self.unused: frozenset = frozenset(data.get("unused", ()))
+        self._phases: list = self._enabled_phases(data["phases"])
         # S12: the schedule's own clock. Defaulted here only so tables
         # handed in by a test (and the pre-S12 fixture) stay constructible;
         # the shipped tables always carry it.
         self.ramp_seconds: float = float(data.get("ramp_seconds", 600.0))
-        self._overrides: dict = data.get("difficulty", {})
+        self._overrides: dict = {
+            lvl: ({**over, "phases": self._enabled_phases(over["phases"])}
+                  if "phases" in over else over)
+            for lvl, over in data.get("difficulty", {}).items()}
         self.elites: dict = data["elites"]
-        self.groups: dict = data.get("groups", {})
+        self.groups: dict = {name: self._enabled_group(g)
+                             for name, g in data.get("groups", {}).items()}
         self.placement: dict = data.get("placement", {})
         self.owners: dict = data.get("owners", {})
         self.locality: dict = data.get("locality", {})
@@ -121,12 +132,55 @@ class SpawnTables:
         self.residents: dict = data.get("residents", {})
         self.pacing: dict = data.get("pacing", {})
 
+    # --- the unused category -------------------------------------------
+    def _enabled_phases(self, phases: list) -> list:
+        """`phases` with every benched enemy dropped from its `types`.
+
+        Filtered once, here, rather than on every lookup: `phase_at` hands the
+        same dict back each call and callers compare phases by identity.
+        """
+        if not self.unused:
+            return phases
+        return [{**p, "types": {k: v for k, v in p["types"].items()
+                                if k not in self.unused}}
+                for p in phases]
+
+    def _enabled_group(self, group: dict) -> dict:
+        if not self.unused or not group.get("followers"):
+            return group
+        return {**group, "followers": {k: v for k, v in group["followers"].items()
+                                       if k not in self.unused}}
+
     # --- checks --------------------------------------------------------
     @staticmethod
     def validate(data: dict, enemy_ids=None) -> list[str]:
         """Every problem, as a sentence each; empty when the tables are sound."""
         bad: list[str] = []
         _check_phases(data.get("phases"), "phases", enemy_ids, bad)
+        unused = data.get("unused", [])
+        if not (isinstance(unused, list)
+                and all(isinstance(x, str) for x in unused)):
+            bad.append("`unused` must be a list of enemy ids")
+        else:
+            disabled = set(unused)
+            for eid in unused:
+                if enemy_ids is not None and eid not in enemy_ids:
+                    bad.append(f"unused: unknown enemy {eid!r}")
+            # Benching must not empty a band, orphan a group or silence the
+            # elite slot -- those are table errors, not tuning.
+            for i, p in enumerate(data.get("phases") or []):
+                types = p.get("types")
+                if isinstance(types, dict) and types and not (set(types) - disabled):
+                    bad.append(f"phases: phase {i} has nothing left once "
+                               f"{sorted(disabled & set(types))} are unused")
+            for name, g in data.get("groups", {}).items():
+                if g.get("leader") in disabled:
+                    bad.append(f"group {name!r}: its leader {g['leader']!r} is unused")
+            el = data.get("elites")
+            if isinstance(el, dict):
+                for key in ("default", "rare"):
+                    if el.get(key) in disabled:
+                        bad.append(f"elites: `{key}` names the unused {el[key]!r}")
         ramp = data.get("ramp_seconds", 600.0)
         if not (isinstance(ramp, (int, float)) and ramp > 0):
             bad.append("`ramp_seconds` must be a number > 0")

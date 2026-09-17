@@ -58,7 +58,7 @@ class StatusFamilyTests(unittest.TestCase):
 
 class FrozenEnemyTests(unittest.TestCase):
     def _chaser(self):
-        return Enemy("chaser", get_content().enemies["chaser"], 100, 0)
+        return Enemy("skull", get_content().enemies["skull"], 100, 0)
 
     def test_a_stunned_chaser_does_not_move_or_bite(self):
         e = self._chaser()

@@ -23,14 +23,14 @@ def make(enemy_id, x=200, y=0):
 
 class ShieldTests(unittest.TestCase):
     def test_shield_absorbs_before_hp(self):
-        e = make("shielded")
+        e = make("panda")
         shield, hp = e.shield_hp, e.hp
         e.take_damage(shield - 5)
         self.assertAlmostEqual(e.shield_hp, 5)
         self.assertEqual(e.hp, hp)
 
     def test_overkill_spills_into_hp(self):
-        e = make("shielded")
+        e = make("panda")
         e.take_damage(e.shield_hp + 10)
         self.assertEqual(e.shield_hp, 0)
         self.assertAlmostEqual(e.hp, e.max_hp - 10)
@@ -38,13 +38,13 @@ class ShieldTests(unittest.TestCase):
 
 class BehaviorTests(unittest.TestCase):
     def test_chaser_moves_toward_player(self):
-        e = make("chaser")
+        e = make("skull")
         c, _ = ctx(player=(0, 0))
         e.update(c)
         self.assertLess(e.pos.x, 200)                   # moved toward the origin
 
     def test_ranged_enemy_fires_projectile(self):
-        e = make("ranged")
+        e = make("slingshot_gnome")
         e.pos = pygame.Vector2(150, 0)                  # inside firing range
         fired = []
         for _ in range(200):
@@ -55,24 +55,30 @@ class BehaviorTests(unittest.TestCase):
         self.assertIn("damage", fired[0])
 
     def test_exploder_dies_when_it_reaches_player(self):
-        e = make("exploder")
+        e = make("bomb_fish")
         e.pos = pygame.Vector2(10, 0)
         c, _ = ctx(player=(0, 0))
         e.update(c)
         self.assertFalse(e.alive)
 
     def test_summoner_spawns_brood_on_interval(self):
-        e = make("summoner")
+        """`summoner` is the timer-driven summon, kept as a behaviour after the
+        Beekeeper moved to `path_chase_summon` (`journals/gnome_split_journal.md`).
+        No shipped enemy runs it today, so it is driven from a literal block
+        rather than a roster id."""
+        e = Enemy("test_summoner", {**get_content().enemy("torch_goblin"),
+                                    "behavior": "summoner",
+                                    "summon_interval": 1.0}, 200, 0)
         summoned = []
         for _ in range(300):
             c, _ = ctx(dt=1 / 30, player=(0, 0),
                        summon=lambda eid, pos, n: summoned.append((eid, n)))
             e.update(c)
         self.assertTrue(summoned)
-        self.assertEqual(summoned[0][0], "swarm")
+        self.assertEqual(summoned[0][0], "bumblebee")
 
     def test_brute_telegraphs_then_slams(self):
-        e = make("brute")
+        e = make("troll")
         e.pos = pygame.Vector2(40, 0)                   # within slam_range
         exploded = []
         saw_telegraph = False

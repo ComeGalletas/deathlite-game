@@ -16,7 +16,17 @@ from entities.ai.machine import Behavior, Transition
 def telegraph_cycle(*, chase, trigger_range, telegraph, active, recover, cooldown,
                     attack=None, on_windup_start=None, on_windup_end=None,
                     recover_via="nav", recover_weight=0.3) -> Behavior:
+    """`trigger_range=None` drops the distance gate: the wind-up then starts
+    on the cooldown alone, wherever the actor is standing. That is what the
+    Beekeeper wants -- it swings on a timer and the bees are the point, so
+    waiting until it is touching the player would hold the summon hostage to a
+    melee range it has no reason to reach (owner, 2026-09-17). Aggro still
+    gates the whole behaviour, so it does not swing at a player it has not
+    noticed.
+    """
     cd = Cooldown(seconds=cooldown, start_ready=False)
+    ready = _ready(cd)
+    start = ready if trigger_range is None else all_of(in_range(trigger_range), ready)
 
     def enter_attack(actor, per, cmb):
         if hasattr(actor, "contact_cd"):
@@ -33,9 +43,7 @@ def telegraph_cycle(*, chase, trigger_range, telegraph, active, recover, cooldow
             "recover": [SeekTarget(via=recover_via, slew=0.0, weight=recover_weight)],
         },
         transitions=[
-            Transition("chase", "telegraph",
-                       when=all_of(in_range(trigger_range), _ready(cd)),
-                       on=on_windup_start),
+            Transition("chase", "telegraph", when=start, on=on_windup_start),
             Transition("telegraph", "attack", when=after(telegraph), on=enter_attack),
             Transition("attack", "recover", when=after(active)),
             Transition("recover", "chase", when=after(recover),

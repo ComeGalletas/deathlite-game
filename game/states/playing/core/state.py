@@ -371,7 +371,7 @@ class PlayingState(State):
             self.player.invulnerable = not self.player.invulnerable
             log.info("debug: invulnerable = %s", self.player.invulnerable)
         elif key == keys["spawn_enemy"]:
-            self.spawn.spawn_enemy("elite" if self.rng.random() < 0.3 else "chaser",
+            self.spawn.spawn_enemy("bear" if self.rng.random() < 0.3 else "skull",
                                    owner="dev")
         elif key == keys["grant_xp"]:
             self.levels.add_xp(25)

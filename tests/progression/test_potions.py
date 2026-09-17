@@ -114,8 +114,8 @@ class ChanceTests(unittest.TestCase):
     def test_a_tougher_enemy_is_meaningfully_likelier(self):
         # The squared curve exists so the cap means something: the Warden must
         # be several times the Husk, not a few points above it.
-        husk = P.drop_chance(base_hp("chaser"), T)
-        warden = P.drop_chance(base_hp("brute"), T)
+        husk = P.drop_chance(base_hp("skull"), T)
+        warden = P.drop_chance(base_hp("troll"), T)
         self.assertGreater(warden, husk * 5.0)
 
 
@@ -183,7 +183,7 @@ class ExclusionTests(unittest.TestCase):
         self.assertEqual(float(w["rare"]["common"]), 0.0)
 
     def test_uncommon_enemies_can_drop_all_three(self):
-        self.assertEqual(self._seen("tank"), set(ORDER))
+        self.assertEqual(self._seen("turtle"), set(ORDER))
 
     def test_a_roll_only_ever_returns_a_weighted_rarity(self):
         rng = random.Random(1)
@@ -201,7 +201,7 @@ class RollTests(unittest.TestCase):
         class Rng:
             def random(self):
                 return 0.999
-        self.assertIsNone(P.roll(base_hp("swarm"), T, Rng()))
+        self.assertIsNone(P.roll(base_hp("bumblebee"), T, Rng()))
 
     def test_roll_returns_a_rarity_when_the_chance_hits(self):
         class Rng:
@@ -211,7 +211,7 @@ class RollTests(unittest.TestCase):
             def random(self):
                 self._n += 1
                 return 0.0 if self._n == 1 else 0.5
-        self.assertIn(P.roll(base_hp("brute"), T, Rng()), ORDER)
+        self.assertIn(P.roll(base_hp("troll"), T, Rng()), ORDER)
 
     def test_the_observed_rate_matches_the_curve_at_both_ends(self):
         """`roll` honours `drop_chance` -- the contract -- rather than

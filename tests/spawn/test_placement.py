@@ -89,7 +89,7 @@ class FilterTests(unittest.TestCase):
         pl = _placement(host)
         before = pl.candidates(_req(host), host, 0.0)
         target = before[0][0]
-        host.make_enemy("chaser", target.x + 5, target.y, 1.0, 1.0)
+        host.make_enemy("skull", target.x + 5, target.y, 1.0, 1.0)
         after = pl.candidates(_req(host), host, 0.0)
         self.assertNotIn(target, [p for p, _w in after])
         self.assertEqual(len(after), len(before) - 1)
