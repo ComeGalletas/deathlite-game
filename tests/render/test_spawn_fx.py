@@ -14,6 +14,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
+from tests import worlds as W
+
+SEED = W.pinned(0)
 
 from game.assets import get_assets
 
@@ -93,16 +96,13 @@ class RunTests(unittest.TestCase):
         if pygame.display.get_surface() is None:
             pygame.display.set_mode((1, 1))
 
-    def _playing(self):
+    def _playing(self, seed=SEED):
         from game.game import Game
         from game.states.menu_state import MenuState
-        from tests.boot import settle
+        from tests.boot import start_run
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        return g, settle(g)
+        return g, start_run(g, seed)
 
     def _spawn(self, p, eid="chaser", dx=80):
         p._spawn_fx.clear()

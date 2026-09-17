@@ -17,6 +17,9 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from tests.nearby import spots_near
+from tests import worlds as W
+
+SEED = W.pinned(2)
 
 from game import save as save_mod
 from game.game import Game
@@ -47,12 +50,21 @@ def _settle(game, limit=5000):
     return game.state_machine.current
 
 
-def _start_dev_run(game):
+def _start_dev_run(game, seed=SEED):
+    """A developer-mode run on the pinned world. Pinned because the tests
+    below stand enemies beside the hero and then let the run tick: on an
+    unpinned world that spot is a coin flip (see `tests/nearby.py`)."""
+    from tests.boot import start_run
     game.state_machine.change(MenuState(game))
-    _key(game, pygame.K_DOWN)        # -> "Start new developer mode game"
-    _key(game, pygame.K_RETURN)      # -> character select (dev)
-    _key(game, pygame.K_RETURN)      # -> loading (dev) -> playing (dev)
-    return _settle(game)
+    return start_run(game, seed, dev=True)
+
+
+def _start_regular_run(game, seed=SEED):
+    """The same, without the developer-mode row -- the contrast the dev
+    checks are made against."""
+    from tests.boot import start_run
+    game.state_machine.change(MenuState(game))
+    return start_run(game, seed)
 
 
 class DevFlagPropagationTests(unittest.TestCase):
@@ -167,9 +179,7 @@ class DevMenuTests(unittest.TestCase):
         from game.states.dev_menu_state import DevMenuState
         # regular run -- backquote does nothing
         game = _game()
-        game.state_machine.change(MenuState(game))
-        _key(game, pygame.K_RETURN)
-        _key(game, pygame.K_RETURN)
+        _start_regular_run(game)
         playing = _settle(game)
         _key(game, pygame.K_BACKQUOTE)
         self.assertIs(game.state_machine.current, playing)
@@ -230,7 +240,12 @@ class DevMenuTests(unittest.TestCase):
         self.assertTrue(playing._dev_no_damage)
         self.assertFalse(playing._dev_no_attack)           # weapons still fire
         _key(game, pygame.K_BACKQUOTE)
-        playing._spawn_enemy("tank", at=playing.player.pos + pygame.Vector2(30, 0))
+        # Not a fixed offset, for the reason `tests/nearby.py` gives: a tank
+        # 30 px east can be over a drop, and one that walks off is never hit,
+        # so the sanity check at the end sees no damage at all.
+        spot = spots_near(playing, want=1, radius=24.0)
+        self.assertTrue(spot, "nowhere beside the hero to stand a tank")
+        playing._spawn_enemy("tank", at=spot[0])
         e = playing.enemies[-1]
         hp0 = e.hp
         attacked = False
@@ -318,9 +333,7 @@ class DevMenuTests(unittest.TestCase):
     def test_f7_toggles_the_overlay_only_in_a_dev_run(self):
         # regular run: F7 (routed through the game-loop debug-key handler) is inert
         game = _game()
-        game.state_machine.change(MenuState(game))
-        _key(game, pygame.K_RETURN)
-        _key(game, pygame.K_RETURN)
+        _start_regular_run(game)
         regular = _settle(game)
         self.assertIsInstance(regular, PlayingState)
         self.assertFalse(game._handle_debug_key(pygame.K_F7))   # not consumed
@@ -451,9 +464,7 @@ class DevMenuTests(unittest.TestCase):
 
     def test_f8_toggles_the_spawn_overlay_only_in_a_dev_run(self):
         game = _game()
-        game.state_machine.change(MenuState(game))
-        _key(game, pygame.K_RETURN)
-        _key(game, pygame.K_RETURN)
+        _start_regular_run(game)
         regular = _settle(game)
         self.assertIsInstance(regular, PlayingState)
         self.assertFalse(game._handle_debug_key(pygame.K_F8))   # not consumed
