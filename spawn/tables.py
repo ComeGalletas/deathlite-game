@@ -8,8 +8,13 @@ run and checks the enemy sequence is the one the literal produced.
 
 Sections:
 
-    phases      run-fraction bands: `until` (exclusive upper bound),
-                `interval` [at band start, at run end], `pack` [lo, hi],
+    ramp_seconds
+                S12: how long the phase schedule takes to walk from its
+                first band to its last, on Normal; a difficulty divides it
+                by `timeline_pace`. This is the schedule's own clock, not
+                the run's -- the boss still keys off `run_duration`.
+    phases      ramp-fraction bands: `until` (exclusive upper bound),
+                `interval` [at ramp start, at ramp end], `pack` [lo, hi],
                 `elite` chance per slot, `types` id -> weight
     elites      what an elite slot rolls: `default`, and `rare` at
                 `rare_chance` (one `random()` draw, `< chance` -> rare)
@@ -101,6 +106,10 @@ class SpawnTables:
         if problems:
             raise TableError("spawn_tables.json: " + "; ".join(problems))
         self._phases: list = data["phases"]
+        # S12: the schedule's own clock. Defaulted here only so tables
+        # handed in by a test (and the pre-S12 fixture) stay constructible;
+        # the shipped tables always carry it.
+        self.ramp_seconds: float = float(data.get("ramp_seconds", 600.0))
         self._overrides: dict = data.get("difficulty", {})
         self.elites: dict = data["elites"]
         self.groups: dict = data.get("groups", {})
@@ -118,6 +127,9 @@ class SpawnTables:
         """Every problem, as a sentence each; empty when the tables are sound."""
         bad: list[str] = []
         _check_phases(data.get("phases"), "phases", enemy_ids, bad)
+        ramp = data.get("ramp_seconds", 600.0)
+        if not (isinstance(ramp, (int, float)) and ramp > 0):
+            bad.append("`ramp_seconds` must be a number > 0")
         el = data.get("elites")
         if not isinstance(el, dict):
             bad.append("`elites` must be an object")
@@ -199,8 +211,8 @@ class SpawnTables:
         return over.get("phases", self._phases)
 
     def phase_at(self, fraction: float, difficulty: str | None = None) -> dict:
-        """The band a run fraction (0..1) falls in; the last band past the
-        end, so a run that overstays keeps its final mix."""
+        """The band a ramp fraction (0..1) falls in; the last band past the
+        end, so the rest of the run keeps the final mix."""
         phases = self.phases(difficulty)
         for phase in phases:
             if fraction < phase["until"]:

@@ -6,7 +6,15 @@ test is the proof the move changed nothing: `director_sequence.json` was
 written by the old `world.spawning` module before it was touched, from a
 scripted 600 s run under a fixed RNG, and the new director must reproduce
 it draw for draw on every difficulty.
+
+The fixture replays against the *shipped* tables with only the knobs the
+owner has since re-tuned wound back to their recorded values (see
+`_fixture_tables`). Everything the proof is actually about -- the phase
+boundaries, the type weights, the intervals, the pack spans, how the cap
+enters the pack roll, where the boss lands -- still comes from the JSON, so
+the test keeps proving the table move while surviving tuning.
 """
+import copy
 import json
 import random
 import unittest
@@ -16,6 +24,7 @@ from unittest import mock
 from game import config
 from game.content import get_content
 from spawn.budget import SpawnDirector
+from spawn.tables import SpawnTables
 
 _SEQUENCE = Path(__file__).with_name("director_sequence.json")
 
@@ -27,6 +36,22 @@ _SEQUENCE = Path(__file__).with_name("director_sequence.json")
 # game would otherwise rewrite the sequence and the proof with it.
 _FIXTURE_COUNT_BASE = 40
 _FIXTURE_COUNT_STEP = 5
+# The same immunity for the two knobs S12 re-tuned (owner, 2026-09-16). The
+# elite chance decides an already-drawn `random()` per slot, so restoring it
+# changes which id is appended, never the draw order; and the phase schedule
+# used to run on the run length itself, which `ramp_seconds = duration`
+# restores.
+_FIXTURE_ELITE = (0.0, 0.02, 0.05, 0.10, 0.14)
+
+
+def _fixture_tables(duration: float) -> SpawnTables:
+    """The shipped tables with the S12 tuning wound back to what the
+    fixture was recorded under."""
+    data = copy.deepcopy(get_content().spawn_tables._data)
+    data["ramp_seconds"] = duration
+    for phase, elite in zip(data["phases"], _FIXTURE_ELITE):
+        phase["elite"] = elite
+    return SpawnTables(data)
 
 
 def _scripted_run(difficulty: str, duration: float = 600.0, seed: int = 11) -> list:
@@ -35,12 +60,12 @@ def _scripted_run(difficulty: str, duration: float = 600.0, seed: int = 11) -> l
     schedule of the day."""
     with mock.patch.multiple(config, ENEMY_COUNT_BASE=_FIXTURE_COUNT_BASE,
                              ENEMY_COUNT_STEP=_FIXTURE_COUNT_STEP):
-        return _replay(difficulty, duration, seed)
+        return _replay(difficulty, duration, seed, tables=_fixture_tables(duration))
 
 
-def _replay(difficulty: str, duration: float, seed: int) -> list:
+def _replay(difficulty: str, duration: float, seed: int, tables=None) -> list:
     d = SpawnDirector(run_duration=duration, rng=random.Random(seed),
-                      difficulty=difficulty)
+                      difficulty=difficulty, tables=tables)
     spawned, elapsed, active, frame = [], 0.0, 0, 0
     dt = 1 / 30
     while elapsed < duration:
@@ -79,13 +104,20 @@ class SpawnDirectorTests(unittest.TestCase):
 
     def test_only_chasers_in_the_opening_phase(self):
         d = SpawnDirector(run_duration=1000, rng=random.Random(3))
-        opening = self._run(d, duration=180)  # first 18% of the run
+        # The opening band is the first 20 % of the *ramp*, not of the run
+        # (S12): on Normal that is the first nine seconds, not the first 200.
+        opening = self._run(d, duration=d.ramp_duration * 0.15)
         self.assertTrue(opening)
-        self.assertTrue(all(e == "chaser" for e in opening))
+        # Chasers, plus the elite slot the band now carries from its first
+        # second (S12 floored `elite` at 25 %), and nothing else.
+        el = get_content().spawn_tables.elites
+        allowed = {"chaser", el["default"], el["rare"]}
+        self.assertTrue(set(opening) <= allowed, sorted(set(opening)))
+        self.assertIn("chaser", opening)
 
     def test_variety_and_elites_appear_later(self):
         d = SpawnDirector(run_duration=1000, rng=random.Random(4))
-        late = self._run(d, duration=800)
+        late = self._run(d, duration=d.ramp_duration * 2)
         self.assertGreater(len({e for e in late}), 4, "late game should be varied")
         self.assertIn("elite", late)
 
@@ -168,11 +200,41 @@ class DifficultyTests(unittest.TestCase):
         sfast = SpawnDirector(run_duration=1000, difficulty="super_fast")
         self.assertAlmostEqual(fast.boss_time(), base.boss_time() / 1.25)
         self.assertAlmostEqual(sfast.boss_time(), base.boss_time() / 1.5)
-        # a mid-run instant that is still the chaser-only opening on Normal has
-        # already moved on to a varied composition on Super Fast
-        self.assertEqual(base._phase(150)["types"], {"chaser": 1.0})
-        self.assertGreater(len(sfast._phase(150)["types"]),
-                           len(base._phase(150)["types"]))
+        # an instant that is still the chaser-only opening on Normal has
+        # already moved on to a varied composition on Super Fast. Since S12
+        # the ramp is short, so that instant is early: 15 % of Normal's ramp
+        # is 23 % of Super Fast's.
+        at = base.ramp_duration * 0.15
+        self.assertEqual(base._phase(at)["types"], {"chaser": 1.0})
+        self.assertGreater(len(sfast._phase(at)["types"]),
+                           len(base._phase(at)["types"]))
+
+    def test_the_phase_schedule_runs_on_the_ramp_not_the_run(self):
+        """S12: `ramp_seconds` is the schedule's own clock. The last band
+        is reached at `ramp_duration` and held for the rest of the run."""
+        tables = get_content().spawn_tables
+        d = SpawnDirector(run_duration=600, difficulty="normal")
+        self.assertAlmostEqual(d.ramp_duration, tables.ramp_seconds)
+        self.assertLess(d.ramp_duration, d.run_duration)
+        last = tables.phases("normal")[-1]
+        self.assertIs(d._phase(d.ramp_duration), last)
+        self.assertIs(d._phase(d.run_duration), last)
+        # the interval lerp tops out on the same clock
+        self.assertAlmostEqual(d._interval(d.ramp_duration),
+                               d._interval(d.run_duration))
+
+    def test_the_ramp_compresses_with_pace_but_the_boss_does_not_follow_it(self):
+        """The two clocks were one number before S12. Shortening the ramp
+        must not drag the boss forward with it."""
+        base = SpawnDirector(run_duration=600, difficulty="normal")
+        fast = SpawnDirector(run_duration=600, difficulty="fast")
+        sfast = SpawnDirector(run_duration=600, difficulty="super_fast")
+        self.assertAlmostEqual(fast.ramp_duration, base.ramp_duration / 1.25)
+        self.assertAlmostEqual(sfast.ramp_duration, base.ramp_duration / 1.5)
+        # the boss keys off the run length, which the ramp never touches
+        self.assertAlmostEqual(base.boss_time(), config.BOSS_FRACTION * 600)
+        for d in (base, fast, sfast):
+            self.assertGreater(d.boss_time(), d.ramp_duration * 5)
 
     def test_stat_ramp_accelerates_but_still_tops_out_at_run_end(self):
         base = SpawnDirector(run_duration=600, difficulty="normal")

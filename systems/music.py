@@ -56,6 +56,10 @@ class MusicPlayer:
         # every method below short-circuits, exactly like `AudioManager`.
         self.enabled = bool(backend is not None and getattr(backend, "ready", False))
         self.volume = float(config.MUSIC_VOLUME_DEFAULT)
+        # The mixer's master, shared with the cue player (journal
+        # `audio_mixer_journal.md`, 2026-09-16): the stream plays at
+        # `master * volume`, the duck and the mute on top.
+        self.master = float(config.MASTER_VOLUME_DEFAULT)
         self.muted = False
         self.ducked = False
 
@@ -120,9 +124,16 @@ class MusicPlayer:
 
     # --- levels -----------------------------------------------------------
     def set_volume(self, v: float) -> None:
-        """Music volume, clamped to [0, 1]. Independent of the cue master in
-        `AudioManager`; the Options screen has a row for each."""
+        """The music level, clamped to [0, 1]. Independent of the sound-effects
+        level in `AudioManager` -- they are the master's two children, and the
+        Options screen has a row for each."""
         self.volume = round(max(0.0, min(1.0, float(v))), 4)
+        self._apply_volume()
+
+    def set_master(self, v: float) -> None:
+        """The level over the whole mixer, clamped to [0, 1]. `AudioManager`
+        holds the same number for the cues; `Game` sets both."""
+        self.master = round(max(0.0, min(1.0, float(v))), 4)
         self._apply_volume()
 
     def set_muted(self, muted: bool) -> None:
@@ -202,7 +213,7 @@ class MusicPlayer:
     def _apply_volume(self) -> None:
         if not self.enabled:
             return
-        level = 0.0 if self.muted else self.volume * self._gain
+        level = 0.0 if self.muted else self.master * self.volume * self._gain
         if self.ducked:
             level *= float(config.MUSIC_DUCK)
         try:

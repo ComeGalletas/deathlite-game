@@ -1112,3 +1112,203 @@ tests deselected (11m44s).
 - [x] `world/map.py` fallback
 - [x] Boss ring comment
 - [x] Tests replaced
+
+---
+
+## S12 — a 45 s ramp, a 250 crowd, elites from the first minute (owner, 2026-09-16)
+
+### Requirement
+
+Raised after a review of the spawn rate over a 10 minute run
+(the curve of scheduled demand against the live cap, per difficulty):
+
+> "increase the pacing. lower the 300s requirement to ramp up to 45 seconds
+> base for normal. increase the enemy live cap to 250. increase the elite
+> chance by a base of 15%, all around, so it starts from 25%. keep everything
+> else. confirm"
+
+### What the review found first, because it frames all four items
+
+The director's *scheduled demand* and the *delivered* spawn rate are two
+different numbers, about 5x apart:
+
+| | normal | fast | super fast |
+|---|---|---|---|
+| demand at 0 s | 12.5 /s | 15.6 /s | 18.8 /s |
+| demand at 300 s | 50.7 /s | 65.1 /s | 121.6 /s |
+| demand before the boss | 85.0 /s | 106.4 /s | 127.2 /s |
+| placement ceiling (S10, measured) | ~17 /s | ~17 /s | ~17 /s |
+
+`pacing.base` is 15, so a table interval of "one pack every 1.2 s" is really
+one pack every 80 ms. Placement can seat about 17 a second and the live cap
+holds the field at 100..150, so **the director has been saturated from the
+first second of every run** and the schedule's 7x rise across a run never
+reached the player.
+
+That is why the request lands where it does: the knobs that still bite are
+the ones this entry moves.
+
+### Confirmed reading
+
+Three of the four items were unambiguous; two were put to the owner and
+answered:
+
+- **"increase the pacing"** — the headline for the ramp change below, *not*
+  a change to `pacing.base`. Confirmed: `pacing.base` stays 15. Raising it
+  would not show on the field while placement is the ceiling.
+- **"lower the 300s requirement to ramp up to 45 seconds"** — the **phase
+  schedule** is what ramps in 45 s (chosen over the cap ramp and the stat
+  ramp). There is no 300 s constant in the code; the 300 s is the review's
+  observation that the heavy phase lands at 270 s on normal.
+- **"45 seconds base for normal"** — 45 s is the Normal figure, divided by
+  `timeline_pace` like `run_duration` is, so fast ramps in 36 s and super
+  fast in 30 s.
+- **The boss does not move.** The phase schedule is keyed to `run_duration`
+  today, and `boss_time()` is `BOSS_FRACTION * run_duration` off the same
+  number. Compressing the run to 45 s would arm the boss at 43 s, which is
+  plainly not the ask. The two clocks are therefore **decoupled**: a new
+  `ramp_seconds` drives the phase schedule and the interval lerp;
+  `run_duration` keeps the boss at 570 / 456 / 380 s.
+- **elite "+15%, so it starts from 25%"** — did not resolve as stated
+  (+15 points on the opening 0% is 15%, not 25%). Owner chose: **floor the
+  opening at 25% and add 15 points to the rest**, giving
+  0 / 2 / 5 / 10 / 14 -> **25 / 25 / 25 / 25 / 29**.
+- **`ENEMY_LIVE_CAP` 150 -> 250.** Taken as stated.
+
+### Concern recorded, and proceeding anyway
+
+250 live is past the wall the S7/S8 profile measured on this machine. From
+the 2026-09-03 harness run (the pessimistic case, every body packed into the
+zone around the hero):
+
+| live | p50 | p90 | p99 | frames over 16.7 ms |
+|---|---|---|---|---|
+| 146 | 13.35 | 15.39 | 17.75 | 13 / 600 |
+| 197 | 15.22 | 17.80 | 23.06 | 126 / 600 |
+| 297 | 16.47 | 18.41 | 30.03 | 250 / 600 |
+
+150 was chosen as "the last value that holds". 250 sits between the 197 and
+297 rows, so a crowded frame is expected to miss 60 fps. The owner asked for
+250; it is built, and the actual cost is re-measured below rather than
+argued about.
+
+### Also worth knowing, not changed ("keep everything else")
+
+Raising `ENEMY_LIVE_CAP` alone does not put 250 bodies on the field. The
+director's own ceiling still climbs `ENEMY_COUNT_BASE` (100) by
+`ENEMY_COUNT_STEP` (5) every `ENEMY_COUNT_STEP_PERIOD` (20 s), so reaching
+250 takes 600 s on normal — the boss arrives at 570 s with the cap at 245.
+Fast reaches 250 at 380 s, super fast at 300 s. If the crowd is meant to
+ramp on the 45 s clock too, `ENEMY_COUNT_STEP` / `STEP_PERIOD` are the knobs;
+left alone here by the owner's "keep everything else".
+
+### Proposal
+
+- `data/enemies/spawn_tables.json`
+  - new top-level `ramp_seconds: 45.0`, beside `phases`, with a comment
+    saying it is the Normal figure and that the boss is on the other clock.
+    It lives in the data, not in `config.py`, because the schedule it scales
+    lives here (the project's "no tuning defaults in code" rule).
+  - `phases[*].elite` -> 0.25 / 0.25 / 0.25 / 0.25 / 0.29.
+- `spawn/tables.py` — read and validate `ramp_seconds` (a number > 0),
+  expose it as `SpawnTables.ramp_seconds`, and document it in the section
+  list.
+- `spawn/budget.py` — `SpawnDirector.ramp_duration = ramp_seconds /
+  timeline_pace`, set in `set_difficulty` next to `run_duration`.
+  `_phase()` and `_interval()` take their fraction from `ramp_duration`;
+  `boss_time()` and `stat_multipliers()` are untouched.
+- `game/config.py` — `ENEMY_LIVE_CAP` 150 -> 250, with the frame-budget
+  note above kept honest in the comment.
+- Tests — the S2 sequence fixture is made immune to this tuning the same way
+  it was made immune to the count knobs; the two tests that sample the phase
+  schedule at a wall-clock instant are re-pointed at the 45 s ramp; new
+  tests pin that the ramp completes at `ramp_seconds` and that the boss does
+  **not** move with it.
+
+### Built
+
+- `data/enemies/spawn_tables.json` — `ramp_seconds: 45.0` and a
+  `_ramp_comment` saying it is the Normal figure and that the boss keeps its
+  own clock; `phases[*].elite` 0 / 2 / 5 / 10 / 14 -> **25 / 25 / 25 / 25 /
+  29**, with an `_elite_comment` recording the owner's reading.
+- `spawn/tables.py` — `SpawnTables.ramp_seconds`, validated as a number > 0.
+  It carries a 600 s fallback so a table literal handed in by a test stays
+  constructible; the shipped tables always name it.
+- `spawn/budget.py` — `ramp_duration = ramp_seconds / timeline_pace`, set
+  beside `run_duration`. A new `_ramp(elapsed)` returns the 0..1 fraction
+  that `_phase` and the `_interval` lerp both take. `boss_time()`,
+  `stat_multipliers()` and `enemy_count_cap()` are untouched.
+- `game/config.py` — `ENEMY_LIVE_CAP` 150 -> **250**, with the frame-budget
+  table above copied into the comment so the next reader knows the number
+  was chosen over a measured objection, not in ignorance of one.
+
+### Measured after
+
+Phase bands, on the wall clock, and the elite chance that goes with them:
+
+| | ramp | bands at | elite from | boss |
+|---|---|---|---|---|
+| normal | 45 s | 9 / 20 / 32 / 43 s | 25 % at 0 s, 29 % at 45 s | 570 s |
+| fast | 36 s | 7 / 16 / 25 / 34 s | 25 % at 0 s, 29 % at 36 s | 456 s |
+| super fast | 30 s | 6 / 14 / 21 / 29 s | 25 % at 0 s, 29 % at 30 s | 380 s |
+
+Scheduled demand (enemies/s, neutral pacing) — it now tops out on the ramp
+instead of at the boss:
+
+| | 0 s | 10 s | 30 s | 45 s | 60 s+ |
+|---|---|---|---|---|---|
+| normal | 12.5 | 23.4 | 52.6 | 84.0 | 119.3 |
+| fast | 15.6 | 29.6 | 103.5 | 149.1 | 149.1 |
+| super fast | 18.8 | 35.9 | 179.0 | 179.0 | 179.0 |
+
+(The Normal row still climbs between 45 s and 60 s because the *last* band's
+interval is the shortest and the lerp reaches it right at the ramp's end.)
+
+Demand was already 5x past what placement can seat before this change, so
+these numbers do not mean five times the enemies. What the player actually
+gets is the **composition** arriving three quarters of a minute in instead of
+five minutes in, elites from the first spawn, and a ceiling that keeps
+climbing past 150.
+
+The cap reaches 250 at 600 s (normal) / 380 s (fast) / 300 s (super fast) —
+so on Normal the boss arrives with the cap at 245 and the full 250 is never
+seen. Flagged above; the count schedule was left alone as asked.
+
+### Tests
+
+`tests/spawn/test_budget.py`:
+
+- The S2 sequence fixture is made immune to this tuning the same way it was
+  made immune to the count knobs in 2026-09-03. `_fixture_tables(duration)`
+  deep-copies the shipped tables and winds back only `ramp_seconds`
+  (to the run length, which is what the schedule used to run on) and the
+  five elite chances. The elite chance decides an already-drawn `random()`,
+  so restoring it changes which id is appended and never the draw order.
+  Everything the proof is about — phase boundaries, weights, intervals, pack
+  spans, the cap in the pack roll, the boss — still comes from the JSON.
+- `test_only_chasers_in_the_opening_phase` **was wrong after the change and
+  is rewritten, not re-pinned**: the opening band carries a 25 % elite slot
+  now, so "only chasers" is no longer true of it. It asserts the band's
+  composition instead — chaser plus the two elite ids, and nothing else.
+- The two tests that sampled the schedule at a wall-clock instant (180 s,
+  150 s) now sample a fraction of `ramp_duration`.
+- Two new tests: the schedule reaches its last band at `ramp_duration` and
+  holds it (interval lerp included), and the ramp compresses with
+  `timeline_pace` while `boss_time()` does not follow it — the regression
+  the split exists to prevent.
+
+### Progress
+
+- [x] `ramp_seconds` and the elite chances in `spawn_tables.json`
+- [x] `spawn/tables.py` reads and validates it
+- [x] `spawn/budget.py` ramps the schedule on it, boss on `run_duration`
+- [x] `ENEMY_LIVE_CAP` 250
+- [x] Tests updated (`tests/spawn` 134 passed)
+- [x] Re-measured curve delivered
+- [ ] Frame cost at 250 live re-measured with `tools/benchmarks/spawn_stress.py`
+      -- not run here; the 150 -> 250 raise is expected to cost frames
+
+### Suite
+
+2,389 passed, 8 sweep tests deselected, 487 subtests passed (12 min 53 s).
+`tests/spawn` alone: 134 passed.

@@ -14,6 +14,13 @@ multipliers -- `spawn_rate` (spawn cadence), `timeline_pace` (how fast the
 phase schedule and the boss arrive), `stat_ramp_pace` (the HP/speed ramp)
 and `enemy_count_step_scale` (crowd growth). Normal leaves every one at 1.0.
 
+S12 (owner, 2026-09-16) split the director's two clocks apart. The phase
+schedule and its interval lerp run on `ramp_duration` -- `ramp_seconds`
+from the tables (45 s on Normal) over `timeline_pace` -- so the mix reaches
+its endgame composition three quarters of a minute in. `run_duration` is
+now only the boss's clock. They were one number until this entry, which is
+why shortening the ramp used to drag the boss forward with it.
+
 Spawn master S2: moved here from `world/spawning.py` unchanged in behaviour
 -- `tests/spawn/test_budget.py` replays a scripted run against the sequence
 the old module produced. The tables are handed in, or read from the loaded
@@ -54,9 +61,10 @@ class SpawnDirector:
 
     def set_difficulty(self, difficulty: str) -> None:
         """(Re)bind the four difficulty factors. Safe to call mid-run (the
-        dev-menu live switch does): the phase schedule and the boss re-key off
-        the new `run_duration` immediately -- raising the pace late can arm the
-        boss on the next frame, which is intentional (dev testing)."""
+        dev-menu live switch does): the phase ramp and the boss re-key off the
+        new `ramp_duration` / `run_duration` immediately -- raising the pace
+        late can arm the boss on the next frame, which is intentional (dev
+        testing)."""
         if difficulty not in config.DIFFICULTIES:
             difficulty = config.DIFFICULTY_DEFAULT
         f = config.DIFFICULTIES[difficulty]
@@ -65,22 +73,28 @@ class SpawnDirector:
         self._timeline_pace = f["timeline_pace"]
         self._stat_ramp_pace = f["stat_ramp_pace"]
         self._enemy_count_step_scale = f["enemy_count_step_scale"]
-        # Harder enemy types + the boss arrive sooner: the whole phase schedule
-        # is compressed by dividing the run length it is measured against.
+        # Harder enemy types + the boss arrive sooner: both clocks are
+        # compressed by the same factor. `run_duration` is the boss's;
+        # `ramp_duration` is the phase schedule's, and is much the shorter
+        # of the two (S12).
         self.run_duration = max(1.0, self._base_run_duration / self._timeline_pace)
+        self.ramp_duration = max(1.0, self.tables.ramp_seconds / self._timeline_pace)
 
     # --- schedule lookup ------------------------------------
+    def _ramp(self, elapsed: float) -> float:
+        """How far the phase schedule has walked, 0..1. Reaches 1 at
+        `ramp_duration` and stays there for the rest of the run."""
+        return min(1.0, max(0.0, elapsed) / self.ramp_duration)
+
     def _phase(self, elapsed: float) -> dict:
-        f = min(1.0, elapsed / self.run_duration)
-        return self.tables.phase_at(f, self.difficulty)
+        return self.tables.phase_at(self._ramp(elapsed), self.difficulty)
 
     def _interval(self, elapsed: float) -> float:
         p = self._phase(elapsed)
-        # Lerp the interval across the whole run so it tightens smoothly, then
+        # Lerp the interval across the ramp so it tightens smoothly, then
         # divide by the spawn-rate factor so a harder run spawns more often.
-        f = min(1.0, elapsed / self.run_duration)
         lo, hi = p["interval"]
-        return (lo + (hi - lo) * f) / self._spawn_rate
+        return (lo + (hi - lo) * self._ramp(elapsed)) / self._spawn_rate
 
     def stat_multipliers(self, elapsed: float) -> tuple[float, float]:
         """(hp_mult, speed_mult) for enemies spawned at `elapsed`.
@@ -156,7 +170,7 @@ class SpawnDirector:
         return out
 
     def roll_pack(self, elapsed: float) -> list[str]:
-        """One pack for this moment of the run, drawn off-schedule: the
+        """One pack for this moment of the ramp, drawn off-schedule: the
         timer and the cap are not consulted. S4's residents use it, so an
         island's first population is the mix the run would spawn anyway."""
         phase = self._phase(elapsed)

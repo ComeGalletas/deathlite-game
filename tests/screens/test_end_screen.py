@@ -34,10 +34,91 @@ def _key(k):
     return pygame.event.Event(pygame.KEYDOWN, key=k)
 
 
-def _screen(buttons=BUTTONS, stats=None):
+def _screen(buttons=BUTTONS, stats=None, lock=0.0):
+    """`lock=0` by default: every test below is about the frame's input
+    contract, which is what the screen does *after* the input lock has run
+    out. `InputLockTests` is the one that asks for the lock."""
     return EndScreen(dict(STATS if stats is None else stats), title="Title",
                      title_colour=(255, 255, 255), backdrop=(10, 10, 10),
-                     buttons=buttons, subtitle="sub")
+                     buttons=buttons, subtitle="sub", lock=lock)
+
+
+class InputLockTests(unittest.TestCase):
+    """The lock the run-end screens get so the keypress or click already in
+    flight when the run ended cannot dismiss the summary (owner, 2026-09-16;
+    `documentation/journals/end_screen_input_lock_journal.md`)."""
+
+    @classmethod
+    def setUpClass(cls):
+        pygame.display.init()
+        pygame.display.set_mode((64, 64))
+        pygame.font.init()
+
+    def _locked(self, **kw):
+        return _screen(lock=config.END_SCREEN_INPUT_LOCK, **kw)
+
+    def test_the_shipped_screen_starts_locked_for_the_configured_time(self):
+        s = _screen(lock=None)
+        self.assertGreater(config.END_SCREEN_INPUT_LOCK, 0.0)
+        self.assertEqual(s.lock_remaining, config.END_SCREEN_INPUT_LOCK)
+        self.assertTrue(s.locked)
+
+    def test_confirm_and_the_direct_keys_do_nothing_while_locked(self):
+        s = self._locked()
+        for k in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_m, pygame.K_ESCAPE):
+            self.assertIsNone(s.handle_event(_key(k)), pygame.key.name(k))
+
+    def test_the_cursor_does_not_move_while_locked(self):
+        s = self._locked()
+        s.handle_event(_key(pygame.K_RIGHT))
+        s.handle_event(_key(pygame.K_d))
+        self.assertEqual(s.sel, 0)
+
+    def test_the_lock_runs_out_on_ticks_and_the_keys_come_back(self):
+        s = self._locked()
+        s.tick(config.END_SCREEN_INPUT_LOCK / 2)
+        self.assertTrue(s.locked)
+        self.assertIsNone(s.handle_event(_key(pygame.K_RETURN)))
+        s.tick(config.END_SCREEN_INPUT_LOCK)
+        self.assertFalse(s.locked)
+        self.assertEqual(s.lock_remaining, 0.0)      # never goes negative
+        self.assertEqual(s.handle_event(_key(pygame.K_RETURN)), "first")
+
+    def test_a_press_made_while_locked_does_not_fire_when_the_lock_lifts(self):
+        """The reason the press is dropped rather than deferred: `MouseNav`
+        never records what it landed on, so the release matches nothing."""
+        s = self._locked()
+        s.draw(pygame.Surface((1600, 900)), None)
+        pos = s.mouse.hits.rect_of(0).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1))
+        s.tick(config.END_SCREEN_INPUT_LOCK)
+        self.assertFalse(s.locked)
+        self.assertIsNone(s.mouse.pressed_on)
+        self.assertIsNone(s.handle_event(
+            pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1)))
+
+    def test_a_whole_click_while_locked_fires_nothing(self):
+        s = self._locked()
+        s.draw(pygame.Surface((1600, 900)), None)
+        pos = s.mouse.hits.rect_of(1).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1))
+        self.assertIsNone(s.handle_event(
+            pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1)))
+
+    def test_hover_still_tracks_while_locked(self):
+        """Motion is the one input let through: it can only move the
+        highlight, and without it the screen looks frozen for 1.5 s."""
+        s = self._locked()
+        s.draw(pygame.Surface((1600, 900)), None)
+        pos = s.mouse.hits.rect_of(2).center
+        s.handle_event(pygame.event.Event(
+            pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)))
+        self.assertEqual(s.sel, 2)
+
+    def test_a_zero_lock_is_open_from_the_first_frame(self):
+        s = _screen(lock=0.0)
+        self.assertFalse(s.locked)
+        self.assertEqual(s.handle_event(_key(pygame.K_RETURN)), "first")
 
 
 class SubtitleTests(unittest.TestCase):

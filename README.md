@@ -139,11 +139,11 @@ the interactables.
 | WASD | Move (menus: navigate). **Key layout** in Options / pause swaps this with the arrows |
 | Arrow keys | **Aim** while held: the hero attacks that way, auto attack on or off (menus: navigate) |
 | Left click | In a run: attack toward the cursor — tap for one attack, hold to keep attacking; beats auto-aim and a held aim key |
-| Mouse (menus) | Hover to highlight, click to pick, on every menu — start, hero select, pause, level-up, dev menu (wheel scrolls, right click backs out). On the hero select the first click on a card selects it and a second click begins; or click **Begin** |
+| Mouse (menus) | Hover to highlight, click to pick, on every menu — start, hero select, pause, level-up, Options, dev menu (the dev menu alone takes the wheel and the right button). On the hero select the first click on a card selects it and a second click begins; or click **Begin**. In Options the three volume bars **drag** |
 | Q | Toggle **auto attack** (on by default). No indicator: read it from the hero |
 | ENTER or SPACE | Confirm / start / select a menu entry / buy / equip |
 | ← → (hero select) | Choose the hero · ↑ ↓ choose the **difficulty** (Normal / Fast / Super Fast), or click the difficulty ribbon to step it |
-| ← → (Options) | Adjust the master volume |
+| ← → (Options) | Adjust the selected volume — master, music or sound effects (or drag the bar with the mouse) |
 | E | Use a special location you're standing on (shrine, chest, fountain, altar, merchant) |
 | ESC | Pause (in game) / back / quit (from the start menu) · the pause menu has Resume / Key layout / Quit to menu |
 | S (run summary) | Open the **Sanctuary** (meta upgrades + item stash) — from the start menu it's under **Options** |
@@ -194,9 +194,12 @@ A keyboard-navigated menu: **Start new game** → hero + difficulty select → r
 sandbox run with the dev overlay (backtick / tilde: HP / attack / overlay
 toggles, spawn any enemy, grant any blessing, item or weapon, apply any
 Forging, remove owned weapons, reset the run); **Rankings**; **Options**;
-**Exit**. Options holds the **master volume** (← → in 5% steps), a **mute**
-toggle, and the entry point into the **Sanctuary** — all persisted to
-`save.json` immediately. If `assets/ui/title.png` exists it fills the screen
+**Exit**. Options holds the three-level **mixer** — a **master volume** over a
+**music** and a **sound effects** level, each ← → in 5% steps or dragged with
+the mouse — a **mute** toggle, the **key layout**, the **window** rows, and the
+entry point into the **Sanctuary** — all persisted to `save.json` immediately.
+The sound-effects level covers every cue the game plays, the synthesised ones
+and the recorded clips (footsteps, the monster growl) alike. If `assets/ui/title.png` exists it fills the screen
 as the backdrop (with a translucent panel behind the menu for legibility);
 without it the screen is plain black with the title as white text. The game
 instructions sit in their own smaller column to the left of the menu.
@@ -297,7 +300,9 @@ deathlite-game/
   Fast) drives four independent knobs — spawn rate, how fast the phase schedule
   and boss arrive, the enemy HP/speed ramp, and the enemy-count growth — with a
   separate best-run ranking per difficulty
-- Procedurally synthesised sound effects (no audio files)
+- Procedurally synthesised sound effects alongside a few recorded cues, and
+  two streamed music tracks; a three-level mixer (master over music and sound
+  effects) in Options
 - Animated sprites for all 3 heroes, all 13 enemies + the boss, and enemy shots;
   a red hit-tint and a shared skull death-poof stand in for the missing
   hurt/death strips. A data-driven `if sprite: … else: shape` layer keeps the

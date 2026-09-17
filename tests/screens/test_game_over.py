@@ -21,6 +21,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from game import config
 from game.states.character_select_state import CharacterSelectState
 from game.states.game_over_state import GameOverState
 from game.states.menu_state import MenuState
@@ -60,11 +61,54 @@ class _Recorder:
         self.changed_to = state
 
 
-def _state(stats=None):
+def _state(stats=None, locked=False):
+    """Past the input lock by default -- every test here is about what the
+    screen does once it accepts input. `locked=True` leaves it on, which is
+    what `InputLockTests` wants."""
     game = SimpleNamespace(state_machine=_Recorder())
     s = GameOverState(game)
     s.enter(stats=stats)
+    if not locked:
+        s.update(config.END_SCREEN_INPUT_LOCK)
     return s
+
+
+class InputLockTests(unittest.TestCase):
+    """GAME OVER refuses input until the lock runs out. The frame's own
+    behaviour is covered in `test_end_screen.py`; this is the wiring --
+    that the state gets the lock and that `update` is what lifts it."""
+
+    @classmethod
+    def setUpClass(cls):
+        _display()
+        pygame.font.init()
+
+    def test_enter_does_not_start_a_run_while_locked(self):
+        s = _state(locked=True)
+        self.assertTrue(s._screen.locked)
+        s.handle_event(_key(pygame.K_RETURN))
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+    def test_escape_does_not_leave_while_locked(self):
+        s = _state(locked=True)
+        s.handle_event(_key(pygame.K_ESCAPE))
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+    def test_a_click_does_nothing_while_locked(self):
+        s = _state(locked=True)
+        s.draw(pygame.Surface((1600, 900)))
+        pos = s._mouse.hits.rect_of(0).center
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1))
+        s.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1))
+        self.assertIsNone(s.game.state_machine.changed_to)
+
+    def test_update_lifts_the_lock_and_the_screen_answers_again(self):
+        s = _state(locked=True)
+        for _ in range(int(config.END_SCREEN_INPUT_LOCK * 60) + 1):
+            s.update(1 / 60)
+        self.assertFalse(s._screen.locked)
+        s.handle_event(_key(pygame.K_RETURN))
+        self.assertIsInstance(s.game.state_machine.changed_to, CharacterSelectState)
 
 
 class SummaryTests(unittest.TestCase):
