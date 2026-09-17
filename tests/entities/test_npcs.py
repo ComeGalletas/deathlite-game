@@ -20,17 +20,21 @@ from game.content import get_content
 from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.playing_state import PlayingState
+from tests import worlds as W
 
 
-def fresh_playing():
+SEED = W.pinned(2)
+
+
+def fresh_playing(seed=SEED):
+    """A booted run on the pinned world. Pinned because the assertions here
+    read what the world happened to grow -- a villager standing in the open,
+    a spot clear of every lancer's aggro radius -- and skipped themselves on
+    a world that grew neither."""
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    for _ in range(2):
-        game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    from tests.boot import settle
-    p = settle(game)
-    assert isinstance(p, PlayingState)
-    return game, p
+    return game, start_run(game, seed)
 
 
 class VillagerTests(unittest.TestCase):

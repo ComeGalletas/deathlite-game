@@ -16,18 +16,18 @@ from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.paused_state import PausedState
 from game.states.playing_state import PlayingState
+from tests import worlds as W
+
+SEED = W.pinned(2)
 
 
 def _paused():
     """A real run, paused. One world build per call -- the tests that need
     it are few."""
-    from tests.boot import settle
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    for _ in range(2):
-        _key(game, pygame.K_RETURN)
-    ps = settle(game)
-    assert isinstance(ps, PlayingState)
+    ps = start_run(game, SEED)
     _key(game, pygame.K_ESCAPE)
     assert isinstance(game.state_machine.current, PausedState)
     return game, ps, game.state_machine.current

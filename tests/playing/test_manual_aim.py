@@ -28,6 +28,9 @@ from game import config
 from game.content import get_content
 from game.states.playing.core.aim import AimInput, mouse_direction, read_aim
 from systems.camera import Camera
+from tests import worlds as W
+
+SEED = W.pinned(1)
 
 WASD = config.KEY_LAYOUTS["wasd_move"]
 ARROWS_MOVE = config.KEY_LAYOUTS["arrows_move"]
@@ -159,19 +162,15 @@ class FacingOverrideTests(unittest.TestCase):
 
 
 # --- state wiring ----------------------------------------------------------
-def _fresh_playing():
+def _fresh_playing(seed=SEED):
+    """A booted run on the pinned world -- an unseeded boot took a new one
+    every time, and these classes share theirs across their whole run."""
     from game.game import Game
     from game.states.menu_state import MenuState
-    from game.states.playing_state import PlayingState
-    from tests.boot import settle
+    from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
-    for _ in range(2):                       # menu -> hero select -> loading
-        game.state_machine.handle_event(
-            pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    ps = settle(game)
-    assert isinstance(ps, PlayingState)
-    return game, ps
+    return game, start_run(game, seed)
 
 
 class ManualAimStateTests(unittest.TestCase):

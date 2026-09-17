@@ -8,6 +8,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
+from tests import worlds as W
+
+SEED = W.pinned(1)
 
 from world.elevation import NONE as NO_LEVEL
 
@@ -115,16 +118,13 @@ class HitTintTests(unittest.TestCase):
 
 
 class DeathPoofTests(unittest.TestCase):
-    def _playing(self):
+    def _playing(self, seed=SEED):
         from game.game import Game
         from game.states.menu_state import MenuState
+        from tests.boot import start_run
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        from tests.boot import settle
-        return g, settle(g)                # through the loading screen
+        return g, start_run(g, seed)       # through the loading screen
 
     def _kill_one(self, p, eid):
         p._spawn_enemy(eid, at=p.player.pos + pygame.Vector2(60, 0))
@@ -178,16 +178,13 @@ class ProjectileTrailTests(unittest.TestCase):
     """A player projectile carrying `fx.trail` sheds a fading one-shot dust
     puff every `spacing` px; a plain projectile sheds nothing."""
 
-    def _playing(self):
+    def _playing(self, seed=SEED):
         from game.game import Game
         from game.states.menu_state import MenuState
+        from tests.boot import start_run
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        from tests.boot import settle
-        return g, settle(g)                # through the loading screen
+        return g, start_run(g, seed)       # through the loading screen
 
     def _shoot(self, p, **kw):
         """Fire east from the hero, with the LD-9 D10 elevation rule switched
@@ -278,16 +275,13 @@ class SpriteAnchorDropTests(unittest.TestCase):
     """The character sprite is drawn `SPRITE_ANCHOR_DROP * radius` below the
     collider centre so more of it sits inside the collision circle. Render-only."""
 
-    def _playing(self):
+    def _playing(self, seed=SEED):
         from game.game import Game
         from game.states.menu_state import MenuState
+        from tests.boot import start_run
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        from tests.boot import settle
-        return g, settle(g)                # through the loading screen
+        return g, start_run(g, seed)       # through the loading screen
 
     def test_sprite_drop_is_fraction_of_radius_times_zoom(self):
         from game import config
@@ -343,16 +337,13 @@ class EnemyStateRingsTests(unittest.TestCase):
     collision circle. config.SHOW_ENEMY_STATE_RINGS gates them for sprited
     enemies (default off); a primitive-fallback enemy always keeps them."""
 
-    def _playing(self):
+    def _playing(self, seed=SEED):
         from game.game import Game
         from game.states.menu_state import MenuState
+        from tests.boot import start_run
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        from tests.boot import settle
-        return g, settle(g)                # through the loading screen
+        return g, start_run(g, seed)       # through the loading screen
 
     def _circles(self, p, e):
         """Count pygame.draw.circle calls made by _draw_one_enemy(e)."""

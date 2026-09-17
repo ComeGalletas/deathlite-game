@@ -8,6 +8,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
+from tests import worlds as W
+
+SEED = W.pinned(1)
 
 from game import config
 from ui.damage_numbers import DamageNumbers, _BASE_PT, _IN_PT
@@ -53,12 +56,8 @@ class HeroDamageTests(unittest.TestCase):
 
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
-        for _ in range(2):
-            g.state_machine.handle_event(
-                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        from tests.boot import settle
-        p = settle(g)                  # through the loading screen
-        assert isinstance(p, PlayingState)
+        from tests.boot import start_run
+        p = start_run(g, SEED)         # through the loading screen
 
         before = len(p.damage_numbers)
         p._on_player_damaged(amount=8.0)

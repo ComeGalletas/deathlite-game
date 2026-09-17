@@ -39,6 +39,29 @@ from world.pathfinding import NavField
 # stays small; a statistical sweep that needs more says so with a marker.
 SEEDS = (35, 7, 1234, 42)
 
+# How many of them the run-booting modules divide between themselves. One seed
+# shaping every assertion in the suite is its own hazard: a quirk of that world
+# would be invisible, because nothing would disagree with it. Three worlds do
+# disagree, and each module still names exactly one, so a failure stays
+# reproducible from the module alone (owner, 2026-09-17).
+PINNED = 3
+
+
+def pinned(index: int) -> int:
+    """The world a run-booting module pins, `index` spreading the modules over
+    `SEEDS[:PINNED]`.
+
+    `DEATHLITE_TEST_SEED` overrides every one of them, which is how the suite
+    is re-run on a world it has never seen:
+
+        DEATHLITE_TEST_SEED=99 python -m pytest -q
+
+    A module that only holds on one particular world is a module asserting
+    something about that world by accident; the override is what finds it.
+    """
+    forced = os.environ.get("DEATHLITE_TEST_SEED")
+    return int(forced) if forced else SEEDS[index % PINNED]
+
 _MAPS: dict = {}
 _NAV: dict = {}
 
