@@ -111,3 +111,46 @@ class DifficultyKeyTests(unittest.TestCase):
                      self.tables["residents"]["difficulty_scale"]):
             stray = set(slot) & enemy_ids
             self.assertFalse(stray, f"enemy id in a difficulty slot: {stray}")
+
+
+class ShippedArtTests(unittest.TestCase):
+    """`assets/enemies/` ships only what the game loads.
+
+    Added after the imp was delivered (2026-09-17) with an `.aseprite` source
+    and a portrait `avatar.png` that nothing reads, and four folders moved in
+    earlier the same day carried the same stray portrait. Source art and
+    unread art belong under `assets/unused/`, which the desktop build prunes;
+    anything left here is shipped to every player.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[2]
+        rigs = json.loads((DATA / "enemy_sprites.json").read_text(encoding="utf-8"))
+        cls.referenced = set()
+        for rig in rigs.values():
+            for anim in rig.get("anims", {}).values():
+                cls.referenced.add(anim["file"])
+            if "file" in rig:
+                cls.referenced.add(rig["file"])
+
+    def test_every_shipped_enemy_file_is_referenced_by_a_rig(self):
+        art = self.root / "assets" / "enemies"
+        stray = [f"enemies/{d.name}/{f.name}"
+                 for d in sorted(art.iterdir()) if d.is_dir()
+                 for f in sorted(d.iterdir()) if f.is_file()]
+        stray = [rel for rel in stray if rel not in self.referenced]
+        self.assertEqual(stray, [], f"unreferenced art is being shipped: {stray}")
+
+    def test_no_editor_sources_are_shipped(self):
+        art = self.root / "assets" / "enemies"
+        self.assertEqual(sorted(p.name for p in art.rglob("*.aseprite")), [])
+
+    def test_enemy_art_paths_are_lowercase(self):
+        """A rig names `enemies/imp/idle.png`; the imp arrived in a folder
+        called `Imp`, which Windows resolves and Linux does not. Case is a
+        silent, platform-specific break, so it is pinned."""
+        art = self.root / "assets" / "enemies"
+        wrong = [p.relative_to(art).as_posix() for p in art.rglob("*")
+                 if p.name != p.name.lower()]
+        self.assertEqual(wrong, [], f"not lowercase: {wrong}")

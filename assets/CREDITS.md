@@ -15,8 +15,11 @@ effects in `assets/sound_effects/`.
 
 **Most PNGs under `assets/` are from the "Tiny Swords" asset pack by Pixel Frog**
 (itch.io); the remaining art comes from the purchased packs listed at the end of
-this file. `.aseprite` editor sources and `.DS_Store` files were removed; only
-sprites the game loads (plus a set of reserve packs kept for future use) remain.
+this file. `.DS_Store` files were removed, and `.aseprite` editor sources are kept
+out of the shipped folders -- the one that came with the imp is archived under
+`assets/unused/enemies/imp/` rather than deleted, which is where source art lives
+in this project. `assets/enemies/` and its siblings hold only sprites the game
+loads, plus a set of reserve packs kept for future use.
 
 | Field | Value |
 |-------|-------|
@@ -43,7 +46,7 @@ Tiny Swords supplies the main art of the game:
 - **Enemies** — `assets/enemies/`: every enemy variant and the boss are Tiny
   Swords mobs (skull, spider, turtle, bumblebee, gnomes, bomb fish, panda, bear,
   troll, minotaur, thief, hex shaman, gnoll, harpoon shark, torch goblin,
-  pig rider, giant bat), together with the projectiles three of them throw (the slingshot
+  spear goblin, imp, pig rider, giant bat), together with the projectiles three of them throw (the slingshot
   gnome's acorn, the gnoll's bone, the harpoon shark's spear).
 - **Interface** — `assets/ui/`: the buttons, ribbons and pointer cursors of the
   menus come from the Tiny Swords UI sheets.

@@ -6,6 +6,7 @@ from __future__ import annotations
 import pygame
 
 from entities.ai.behaviors._telegraph import telegraph_cycle
+from entities.ai.behaviors.simple import pursuit_stack
 from entities.ai.components import (Charge, Cooldown, Explode, SeekTarget, after,
                                     all_of, in_range)
 from entities.ai.machine import ATTACK_SLOT, Behavior, Transition
@@ -113,4 +114,108 @@ def build_warlock(cfg: dict) -> Behavior:
         cooldown=cfg.get("cast_interval", 3.4),
         on_windup_start=snapshot,
         on_windup_end=cast,
+    )
+
+
+@behavior("path_chase_sweep")
+def build_path_chase_sweep(cfg: dict) -> Behavior:
+    """chase -> telegraph (rooted) -> a hitbox centred on the body -> recover.
+
+    The Whirlspear (`journals/spear_goblin_journal.md`). Every other melee
+    enemy pokes: `path_chase_attack` drops its hitbox at
+    `pos + facing * radius` with radius `radius / 2`, a small disc in front.
+    This art is a full 360 degree sweep of the spear, so the damage is a disc
+    centred on the actor instead -- there is no safe side, only a safe
+    distance. That is also why the wind-up is longer than a poke's: a ring
+    cannot be side-stepped, it has to be backed out of.
+
+    Two swings, alternating. Every `strong_every`-th one is the heavy whirl:
+    a wider ring, more damage, and a longer wind-up, playing the rig's
+    `attack_strong` strip. The choice is made when the wind-up *starts*, so
+    the telegraph the player reads is the one that lands.
+    """
+    reach = float(cfg["sweep_reach"])
+    strong_reach = float(cfg["strong_reach"])
+    strong_mult = float(cfg["strong_damage_mult"])
+    fast_windup = float(cfg["attack_telegraph"])
+    strong_windup = float(cfg["strong_telegraph"])
+    strong_every = max(1, int(cfg["strong_every"]))
+    active = float(cfg["attack_active"])
+
+    def pick(actor, per, cmb):
+        slot = actor.bb.slot(ATTACK_SLOT)
+        n = slot.get("swings", 0) + 1
+        slot["swings"] = n
+        strong = n % strong_every == 0
+        slot["strong"] = strong
+        slot["anim"] = "attack_strong" if strong else "attack"
+
+    def windup_for(actor) -> float:
+        return strong_windup if actor.bb.slot(ATTACK_SLOT).get("strong") else fast_windup
+
+    def sweep(actor, per, cmb):
+        strong = actor.bb.slot(ATTACK_SLOT).get("strong")
+        radius = actor.radius + (strong_reach if strong else reach)
+        damage = actor._base_contact * (strong_mult if strong else 1.0)
+        cmb.melee_hit(pygame.Vector2(actor.pos), radius, damage, active)
+
+    return telegraph_cycle(
+        chase=pursuit_stack(cfg),
+        trigger_range=cfg.get("attack_range", cfg["radius"] + reach),
+        telegraph=windup_for,
+        active=active,
+        recover=float(cfg["attack_recover"]),
+        cooldown=float(cfg["attack_cooldown"]),
+        on_windup_start=pick,
+        on_windup_end=sweep,
+    )
+
+
+@behavior("path_chase_breath")
+def build_path_chase_breath(cfg: dict) -> Behavior:
+    """chase -> wind up -> spit a pool of fire -> watch it burn out.
+
+    The Imp (`journals/imp_journal.md`). Its art is the only three-part attack
+    in the game -- `attack_start` rears it back, `attack_loop` holds the
+    stream while the flame pools on the ground, `attack_end` breaks the pool
+    into embers -- so the three strips map onto the three states the cycle
+    already has: telegraph, attack, recover.
+
+    The damage is a `Hazard`, not a hitbox: the flame lands in front, sits
+    there and bites over time, which is what the animation shows. It carries
+    **no sprite**, because the imp's own frames already draw it -- a hazard
+    sprite on top would double the flame.
+
+    The hazard outlives the `attack` state on purpose: `hazard_duration`
+    covers the loop *and* the embers, so the burning stops exactly when the
+    last ember fades rather than while flame is still drawn.
+    """
+    reach = float(cfg["breath_offset"])
+
+    def rear_back(actor, per, cmb):
+        actor.bb.slot(ATTACK_SLOT)["anim"] = "attack_start"
+
+    def spit(actor, per, cmb):
+        actor.bb.slot(ATTACK_SLOT)["anim"] = "attack_loop"
+        d = per.player_pos - actor.pos
+        facing = d.normalize() if d.length_squared() > 1e-6 else pygame.Vector2(1, 0)
+        at = actor.pos + facing * (actor.radius + reach)
+        cmb.spawn_hazard(pygame.Vector2(at), float(cfg["hazard_radius"]),
+                         float(cfg["hazard_dps"]), float(cfg["hazard_duration"]),
+                         float(cfg["hazard_tick"]), None)
+
+    def embers(actor, per, cmb):
+        actor.bb.slot(ATTACK_SLOT)["anim"] = "attack_end"
+
+    return telegraph_cycle(
+        chase=pursuit_stack(cfg),
+        trigger_range=cfg.get("attack_range",
+                              cfg["radius"] + reach + cfg["hazard_radius"]),
+        telegraph=float(cfg["attack_telegraph"]),
+        active=float(cfg["attack_active"]),
+        recover=float(cfg["attack_recover"]),
+        cooldown=float(cfg["attack_cooldown"]),
+        on_windup_start=rear_back,
+        on_windup_end=spit,
+        on_recover_start=embers,
     )

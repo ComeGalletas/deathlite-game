@@ -29,6 +29,10 @@ class FireProjectile(Component):
     style: str = ""
     rig: str = ""
     pierce: int = 0
+    tint: tuple | None = None
+    lifetime: float = 6.0
+    stop_after: float = 0.0
+    blast_radius: float = 0.0
 
     def tick(self, actor, per, cmb, acc):
         s = actor.bb.slot(self.key)
@@ -40,11 +44,19 @@ class FireProjectile(Component):
             return                              # timer stays <= 0: fire on re-entry
         s["t"] = self.interval
         if to.length_squared() > 1e-6:
+            fx = {}
+            if self.rig:
+                fx["rig"] = self.rig
+            if self.tint:
+                fx["tint"] = tuple(self.tint)
             cmb.fire_projectile(pos=actor.pos, vel=to.normalize() * self.speed,
                                 damage=self.damage, radius=self.radius,
-                                style=self.style,
-                                fx={"rig": self.rig} if self.rig else None,
-                                pierce=int(self.pierce))
+                                style=self.style, fx=fx or None,
+                                pierce=int(self.pierce),
+                                lifetime=self.lifetime,
+                                stop_after=self.stop_after,
+                                blast_radius=self.blast_radius,
+                                inert=self.blast_radius > 0.0)
 
 
 @dataclass

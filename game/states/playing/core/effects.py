@@ -42,7 +42,9 @@ class TransientFx:
 
     # --- hostile projectiles ----------------------------------
     def fire_hostile(self, *, pos, vel, damage, radius, style: str = "",
-                     fx: dict | None = None, pierce: int = 0) -> None:
+                     fx: dict | None = None, pierce: int = 0,
+                     lifetime: float = 6.0, stop_after: float = 0.0,
+                     blast_radius: float = 0.0, inert: bool = False) -> None:
         """One enemy shot.
 
         `style` / `fx` / `pierce` were added in R1 of
@@ -59,8 +61,10 @@ class TransientFx:
         if proj is None:
             return
         proj.reset(pos=pos, vel=vel, damage=damage, radius=radius,
-                   lifetime=6.0, color=(255, 110, 90), hostile=True,
-                   style=style, fx=fx, pierce=int(pierce))
+                   lifetime=lifetime, color=(255, 110, 90), hostile=True,
+                   style=style, fx=fx, pierce=int(pierce),
+                   stop_after=stop_after, blast_radius=blast_radius,
+                   inert=inert)
         self.stamp_fire_level(proj)
 
     def stamp_fire_level(self, proj) -> None:
@@ -138,6 +142,14 @@ class TransientFx:
             else:
                 self.block_on_obstacle(p)
                 self.block_on_terrain(p)
+            # An enemy bomb blows up where it stopped. The hero's bombs go
+            # through `detonate`, which spawns the blast into the *player's*
+            # projectile pool and would hurt enemies; a hostile one is an
+            # `explosion`, which is the enemy side's area damage and hits the
+            # player (`journals/bomb_fish_journal.md`).
+            if p.blast_radius > 0.0 and not p.active and not p.detonated:
+                p.detonated = True
+                self.explosion(pygame.Vector2(p.pos), p.blast_radius, p.damage)
         ps.hostiles.sweep()
 
     # --- bombs (six-weapon system P1) ----------------------

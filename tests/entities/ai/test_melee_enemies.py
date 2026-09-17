@@ -23,7 +23,8 @@ WINDUP_BONUS = 1.15
 # contact bite over to one.
 ATTACKING = frozenset({"path_chase_attack", "brute", "fsm_charger",
                        "fsm_teleporter", "fsm_warlock", "exploder",
-                       "summoner", "kite_shoot", "path_chase_summon"})
+                       "summoner", "kite_shoot", "path_chase_summon",
+                       "path_chase_sweep", "path_chase_breath"})
 
 
 def _sprites() -> dict:

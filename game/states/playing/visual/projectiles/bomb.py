@@ -44,7 +44,18 @@ def bomb(surface, sx, sy, p, ctx) -> None:
         bw, bh = a.scale_for(_RIG)
         sc = p.fx.get("scale") or (bw, bh)         # weapon_visuals.json fine-tune
         size = (max(1, round(sc[0] * z)), max(1, round(sc[1] * z)))
-        spr = a.frame(_RIG, anim, idx, size=size)
+        tint = p.fx.get("tint")
+        if tint:
+            # An enemy's bomb is tinted the hostile red, the same way the
+            # hostile arrow is, so a thrown bomb reads as incoming at a
+            # glance (owner, 2026-09-17). `frame_rotated` at zero degrees is
+            # the *additive* tint path -- plain `frame(tint=)` multiplies,
+            # which on a dark bomb gives near-black rather than red. Zero
+            # snaps to the identity rotation bucket, so nothing turns.
+            spr = a.frame_rotated(_RIG, anim, idx, 0.0, size=size,
+                                  tint=tuple(tint))
+        else:
+            spr = a.frame(_RIG, anim, idx, size=size)
     if spr is None:
         pygame.draw.circle(surface, p.color, (int(sx), int(sy)),
                            max(2, round(p.radius * z)))

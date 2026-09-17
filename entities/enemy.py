@@ -13,6 +13,7 @@ from combat.damage import apply_armor
 from combat.status import StatusState
 from entities.ai import Blackboard, build_behavior
 from entities.ai.components.aggro import provoke
+from entities.ai.machine import ATTACK_SLOT
 from game import config
 from game.assets import get_assets
 from systems.animation import Animator
@@ -91,6 +92,14 @@ class Enemy:
         # the rig actually has one (the current packs do not -- the renderer
         # red-tints the live frame instead).
         self._has_hurt = self.anim is not None and get_assets().frame_count(rig, "hurt") > 0
+        # An enemy with more than one swing (the Whirlspear's fast sweep and
+        # its heavy whirl) names the strip it wants in `ATTACK_SLOT["anim"]`.
+        # Cached per body rather than probed every frame, and checked against
+        # what the rig actually declares so a typo or a missing sheet falls
+        # back to plain "attack" instead of animating nothing.
+        self._attack_anims = frozenset(
+            a for a in (get_assets().rig(rig) or {}).get("anims", ())
+            if a.startswith("attack") and a != "attack") if rig else frozenset()
         self._hurt_t = 0.0
         self._facing = -1
 
@@ -186,6 +195,14 @@ class Enemy:
             return "death"
         if self._hurt_t > 0.0 and self._has_hurt:
             return "hurt"
+        # A multi-strip enemy names the strip it wants, and it wins wherever
+        # the machine currently is -- the Imp's flame breaks up over its
+        # *recover* state, which is not an attacking state, so gating this on
+        # `_attacking` would have dropped the tail of its animation. The
+        # cycle clears the name on its way back to chase (`telegraph_cycle`).
+        want = self.bb.slot(ATTACK_SLOT).get("anim")
+        if want in self._attack_anims:
+            return want
         if self._attacking:
             return "attack"                 # FSM wind-up + strike / brute slam
         return "walk" if self.vel.length_squared() > 1.0 else "idle"

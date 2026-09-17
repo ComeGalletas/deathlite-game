@@ -27,7 +27,11 @@ def build_kite_shoot(cfg: dict) -> Behavior:
                        max_range=pref * 1.8,
                        style=cfg.get("shot_style", ""),
                        rig=cfg.get("shot_rig", ""),
-                       pierce=cfg.get("shot_pierce", 0)),
+                       pierce=cfg.get("shot_pierce", 0),
+                       tint=cfg.get("shot_tint"),
+                       lifetime=cfg.get("shot_lifetime", 6.0),
+                       stop_after=cfg.get("shot_stop_after", 0.0),
+                       blast_radius=cfg.get("shot_blast_radius", 0.0)),
     ]})
 
 

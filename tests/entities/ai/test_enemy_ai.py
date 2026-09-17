@@ -55,8 +55,12 @@ class BehaviorTests(unittest.TestCase):
         self.assertIn("damage", fired[0])
 
     def test_exploder_dies_when_it_reaches_player(self):
-        e = make("bomb_fish")
-        e.pos = pygame.Vector2(10, 0)
+        """`exploder` is the suicide rush, kept as a behaviour after the Bloat
+        moved to `kite_shoot` and started throwing its bomb instead
+        (`journals/bomb_fish_journal.md`). No shipped enemy runs it today, so
+        it is driven from a literal block rather than a roster id."""
+        e = Enemy("test_exploder", {**get_content().enemy("bomb_fish"),
+                                    "behavior": "exploder"}, 10, 0)
         c, _ = ctx(player=(0, 0))
         e.update(c)
         self.assertFalse(e.alive)

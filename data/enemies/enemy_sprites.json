@@ -96,6 +96,16 @@
       "attack": {"file": "enemies/bear/attack.png", "frames": 9, "fps": 12, "loop": false}
     }
   },
+  "spear_goblin": {
+    "_scale_comment": "256 px frames, not the 192 the rest of the pack uses. `content` is the union ink over all four strips and is much wider than the goblin -- the heavy whirl reaches 236 px across while the body is only 88 x 126 -- so `scale` is sized from the BODY (drawn about 30 x 48, between Blink and Gorehorn) rather than from the union, which would have drawn a tiny goblin inside a large empty cell.",
+    "frame": [256, 256], "content": [17, 46, 236, 151], "scale": [80, 58], "anchor": [37, 50], "face": "right",
+    "anims": {
+      "idle":          {"file": "enemies/spear_goblin/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":          {"file": "enemies/spear_goblin/run.png", "frames": 6, "fps": 11, "loop": true},
+      "attack":        {"file": "enemies/spear_goblin/attack_fast.png", "frames": 7, "fps": 16, "loop": false},
+      "attack_strong": {"file": "enemies/spear_goblin/attack_strong.png", "frames": 8, "fps": 12, "loop": false}
+    }
+  },
   "torch_goblin": {
     "frame": [192, 192], "content": [29, 50, 131, 83], "scale": [76, 48], "anchor": [32, 48], "face": "right",
     "anims": {
@@ -118,6 +128,18 @@
       "idle":   {"file": "enemies/troll/idle.png", "frames": 12, "fps": 6, "loop": true},
       "walk":   {"file": "enemies/troll/walk.png", "frames": 10, "fps": 9, "loop": true},
       "attack": {"file": "enemies/troll/attack.png", "frames": 6, "fps": 10, "loop": false}
+    }
+  },
+  "imp": {
+    "_scale_comment": "Delivered by the owner 2026-09-17 with capitalised filenames and an .aseprite source; the sheets were renamed to the convention the other rigs use and the source archived under assets/unused/enemies/imp/. `content` is the union ink over all five strips and reaches well right of the body because the flame pools in front, so `scale` is sized from the BODY (76 x 104 of the 152 x 124 union), drawn about 39 x 45.",
+    "frame": [192, 192], "content": [34, 41, 152, 124], "scale": [78, 54], "anchor": [34, 48], "face": "right",
+    "anims": {
+      "idle":         {"file": "enemies/imp/idle.png", "frames": 8, "fps": 8, "loop": true},
+      "walk":         {"file": "enemies/imp/walk.png", "frames": 6, "fps": 11, "loop": true},
+      "attack":       {"file": "enemies/imp/attack_loop.png", "frames": 4, "fps": 12, "loop": true},
+      "attack_start": {"file": "enemies/imp/attack_start.png", "frames": 4, "fps": 12, "loop": false},
+      "attack_loop":  {"file": "enemies/imp/attack_loop.png", "frames": 4, "fps": 12, "loop": true},
+      "attack_end":   {"file": "enemies/imp/attack_end.png", "frames": 4, "fps": 12, "loop": false}
     }
   },
   "minotaur": {

@@ -48,8 +48,13 @@
     "aggro_range": 460,
     "pursuit_seconds": 6.0, "contact_damage": 11, "radius": 16,
     "weight": 8,
-    "experience_reward": 6, "behavior": "exploder", "color": [230, 120, 60],
-    "tags": ["exploder"], "sprite": "bomb_fish", "contact_damage_enabled": false,
+    "experience_reward": 6, "behavior": "kite_shoot", "color": [230, 120, 60],
+    "tags": ["exploder", "ranged"], "sprite": "bomb_fish", "contact_damage_enabled": false,
+    "_bomb_comment": "It throws its bomb now instead of being one (owner, 2026-09-17). The art was always a fish LOBBING a bomb -- `shoot.png` has been wired as its `attack` strip since it shipped, and `exploder` never enters a telegraph/attack state, so those 7 frames had never once played. `shot_stop_after` halts the bomb mid-flight so the `bomb` rig swaps from `spin` to its lit `fuse`, then `shot_lifetime` runs out and `shot_blast_radius` detonates it on the player's side of the fight. `shot_tint` is HOSTILE_ARROW_TINT, the same red the hostile arrow wears, so an incoming bomb reads as incoming. `explode_radius` / `explode_damage` stay: they are the corpse blast the cull pass makes when it dies, which is still true of a fish full of bombs.",
+    "prefer_distance": 210, "shoot_interval": 2.8, "shoot_damage": 18,
+    "shot_speed": 200, "shot_radius": 9,
+    "shot_style": "bomb", "shot_tint": [150, 26, 12],
+    "shot_stop_after": 0.55, "shot_lifetime": 1.35, "shot_blast_radius": 62,
     "explode_radius": 90, "explode_damage": 24, "fuse_range": 34
   },
   "panda": {
@@ -80,6 +85,19 @@
     "tags": ["basic"], "sprite": "hammer_gnome", "contact_damage_enabled": false,
     "attack_telegraph": 0.2875, "attack_active": 0.4375
   },
+  "spear_goblin": {
+    "name": "Whirlspear", "hp": 42, "speed": 80,
+    "aggro_range": 460,
+    "pursuit_seconds": 6.5, "contact_damage": 13, "radius": 14,
+    "weight": 8,
+    "experience_reward": 9, "behavior": "path_chase_sweep", "color": [150, 170, 150],
+    "tags": ["basic"], "sprite": "spear_goblin", "contact_damage_enabled": false,
+    "_reach_comment": "Both rings are sized from the ART, not chosen: measured off the widest frame of each strip, the fast sweep's blade reaches about 33 world px from the anchor and the heavy whirl's about 43. radius 14 + 20 = 34 and 14 + 30 = 44 match those. The first numbers tried (40 and 60) gave the heavy whirl 17 px of reach with no blade drawn in it, which is a hit the player cannot see coming.",
+    "sweep_reach": 20, "attack_telegraph": 0.3, "attack_active": 0.4,
+    "attack_recover": 0.18, "attack_cooldown": 1.4,
+    "strong_every": 3, "strong_reach": 30,
+    "strong_damage_mult": 1.6, "strong_telegraph": 0.55
+  },
   "torch_goblin": {
     "name": "Beekeeper", "hp": 87, "speed": 55,
     "aggro_range": 540,
@@ -101,6 +119,19 @@
     "contact_damage_enabled": false,
     "slam_interval": 3.5, "slam_range": 60, "slam_radius": 60,
     "slam_damage": 30, "slam_telegraph": 0.9
+  },
+  "imp": {
+    "name": "Cinder", "hp": 34, "speed": 86,
+    "aggro_range": 480,
+    "pursuit_seconds": 6.0, "contact_damage": 10, "radius": 13,
+    "weight": 6,
+    "experience_reward": 10, "behavior": "path_chase_breath", "color": [214, 104, 58],
+    "tags": ["exploder"], "sprite": "imp", "contact_damage_enabled": false,
+    "_breath_comment": "Measured off the art, not chosen. In every `attack_loop` frame the flame pool's pixels centre 25.5 world px ahead of the anchor with a half-width of about 17, so radius 13 + `breath_offset` 12 = 25 puts the hazard on the pool and `hazard_radius` sits on it rather than claiming ground the fire never reaches. The first values tried (offset 16, radius 30) put the burn 3.5 px too far out and made it nearly twice the drawn flame; 19 matched the pool's edge. The owner then asked for 35 % less AREA (2026-09-17) -- a percentage on a size means area in this project, not the linear knob -- so the radius scales by sqrt(0.65): 19 -> 15.3, which is 35.2 % less area. The burn now covers 10-40 px ahead and sits a little inside the drawn pool instead of matching its edge, so the fire reads slightly wider than it bites. `hazard_duration` deliberately spans the loop (0.65) AND the embers (0.4), so the damage stops on the last drawn frame rather than while flame is still on screen. No hazard sprite: the imp's own strips draw the fire.",
+    "breath_offset": 12, "attack_telegraph": 0.4, "attack_active": 0.65,
+    "attack_recover": 0.4, "attack_cooldown": 2.6,
+    "hazard_radius": 15.3, "hazard_dps": 16,
+    "hazard_duration": 1.05, "hazard_tick": 0.25
   },
   "minotaur": {
     "name": "Gorehorn", "hp": 55, "speed": 90,
