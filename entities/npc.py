@@ -1,4 +1,4 @@
-"""Village NPCs (HI-3): pawns, the smith, the lancers and the sheep.
+"""Village NPCs (HI-3): pawns, the smith, the lancers and the corral animals.
 
 An `Npc` is scenery that moves. It has no health, no collider anyone else
 tests against and no effect on the run beyond a lancer's lance: the hero
@@ -6,8 +6,8 @@ and the enemies walk through it, it never blocks a shot. What it has is a
 rig, an `Animator`, a home and a small state machine -- stand for a while,
 pick a spot near home the terrain accepts, walk there in a straight line
 sliding round whatever is in the way, stand again. A lancer's home
-alternates between the two guard posts it patrols; a sheep's is the pen,
-and its "walk" is the bounce.
+alternates between the two guard posts it patrols; a pen animal's is the
+corral, and its "walk" is the sheep's bounce or the pig's trot.
 
 A kind with `aggro` in its tuning fights (the lancers): an enemy inside its
 aggro radius is charged, thrust at while its edge is within the lance's
@@ -279,13 +279,20 @@ class Npc:
 
 
 class SheepNpc(Npc):
-    """A sheep stirs: a short hop within its own leash of where it stands,
-    clamped to the pen's interior rectangle so it never bounces into the
-    fence. Slight movement, not a wander."""
+    """A pen animal stirs: a short hop within its own leash of where it
+    stands, clamped to the pen's interior rectangle so it never bounces into
+    the fence. Slight movement, not a wander.
+
+    The corral holds two kinds of them -- the sheep and, since the pig was
+    added, the pigs -- and they behave identically, so `kind` only names
+    which tuning `Npcs.update` reads. Left out, it is the sheep it was
+    written for.
+    """
     __slots__ = ("pen",)
 
-    def __init__(self, rig, x, y, spec, assets, pen: pygame.Rect, leash_px: float) -> None:
-        super().__init__("sheep", rig, x, y, spec, assets, leash_px=leash_px)
+    def __init__(self, rig, x, y, spec, assets, pen: pygame.Rect, leash_px: float,
+                 kind: str = "sheep") -> None:
+        super().__init__(kind, rig, x, y, spec, assets, leash_px=leash_px)
         self.pen = pen
 
     def _choose(self, rng, world) -> None:

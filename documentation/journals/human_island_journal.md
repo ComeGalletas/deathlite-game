@@ -110,6 +110,8 @@ Data:
   0.8 (forge), 0 (fence). Buildings and the forge join the ghost kinds.
 - `character_sprites.json`: `npc_pawn_<c>`, `npc_smith_<c>` (hammer strips,
   plus a one-shot `work`), `npc_lancer_<c>` for four colours; `npc_sheep`.
+  (`npc_pig` joined it later and shares the corral with the sheep --
+  `pig_npc_journal.md`.)
 
 Deviations from the plan:
 - No `wall` kind: a test wants every obstacle kind skinned, and satellites

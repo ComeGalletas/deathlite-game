@@ -35,7 +35,8 @@ Tiny Swords supplies the main art of the game:
   animations and the plank bridge that build every island, plus the trees,
   bushes, rocks, stumps, decorations, clouds and animals scattered over them.
   The village buildings in `assets/buildings/`, the forge and healing facilities
-  and the sheep NPCs are also from this pack.
+  and the corral animals (the sheep and pigs in `assets/terrain/npcs/`) are also
+  from this pack.
 - **Characters** — `assets/characters/`: the three heroes are Tiny Swords units
   (Aegis = blue Warrior, Kestrel = yellow Archer, Nihil = purple Monk), with the
   shared death poof and the hero summons drawn from the same sheets.
