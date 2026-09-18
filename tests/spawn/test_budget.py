@@ -49,32 +49,52 @@ def _run(director, seconds: float, dt: float = 1 / 30) -> list[tuple[float, str]
 class LadderTests(unittest.TestCase):
     """The two cooldowns, and the step they share."""
 
-    def test_the_ladders_match_the_settled_table(self):
-        # owner, 2026-09-17. Normal: common 5 -> 1 (-1 every 2 min), elite
-        # 15 -> 3 (-3), both flooring at minute eight.
+    def test_each_ladder_walks_its_own_table_from_start_to_floor(self):
+        """The shape, read off `cooldowns` rather than restated here.
+
+        The numbers are tuning and have already moved once (the common base
+        went 5 -> 2 on 2026-09-18), so pinning them would mean editing this
+        test every time the game is balanced. What must hold is that each
+        ladder starts at its declared value, drops by its decay once per
+        step, and stops at its floor.
+        """
         d = _director()
-        want = {0: (5.0, 15.0), 2: (4.0, 12.0), 4: (3.0, 9.0),
-                6: (2.0, 6.0), 8: (1.0, 3.0), 10: (1.0, 3.0), 14: (1.0, 3.0)}
-        for minute, (common, elite) in want.items():
+        cd = get_content().spawn_tables.cooldowns
+        for name, fn in (("common", d.common_cooldown), ("elite", d.elite_cooldown)):
+            start, decay = cd[name], cd[f"{name}_decay"]
+            floor = cd[f"{name}_floor"]
+            for steps in range(0, 8):
+                t = steps * cd["step_seconds"]
+                with self.subTest(ladder=name, steps=steps):
+                    self.assertAlmostEqual(fn(t), max(floor, start - decay * steps),
+                                           places=6)
+            self.assertAlmostEqual(fn(1e6), floor, places=6)
+
+    def test_the_elite_gate_stays_the_slower_of_the_two(self):
+        """The shape the design depends on: elite companies are rarer than
+        common ones at every point in the run, however the two are tuned."""
+        d = _director()
+        for minute in range(0, 16, 2):
             t = minute * 60.0
             with self.subTest(minute=minute):
-                self.assertAlmostEqual(d.common_cooldown(t), common, places=6)
-                self.assertAlmostEqual(d.elite_cooldown(t), elite, places=6)
+                self.assertGreater(d.elite_cooldown(t), d.common_cooldown(t))
 
     def test_the_step_and_the_values_both_compress_with_pace(self):
-        """The whole ladder scales together rather than just its numbers."""
-        want = {"normal": (120.0, 5.0, 15.0, 1.0, 3.0, 60.0),
-                "fast": (96.0, 4.0, 12.0, 0.8, 2.4, 48.0),
-                "super_fast": (80.0, 10 / 3, 10.0, 2 / 3, 2.0, 40.0)}
-        for level, (step, c0, e0, cf, ef, unlock) in want.items():
+        """The whole ladder scales together rather than just its numbers --
+        the step, the starts, the floors and the hard unlock all divide by
+        `timeline_pace`. Derived from Normal rather than listed, so the
+        relationship is what is pinned and not the tuning."""
+        base = _director()
+        for level, pace in (("normal", 1.0), ("fast", 1.25), ("super_fast", 1.5)):
             d = _director(difficulty=level)
             with self.subTest(level=level):
-                self.assertAlmostEqual(d.step_seconds, step, places=6)
-                self.assertAlmostEqual(d.common_cooldown(0.0), c0, places=6)
-                self.assertAlmostEqual(d.elite_cooldown(0.0), e0, places=6)
-                self.assertAlmostEqual(d.common_cooldown(1e5), cf, places=6)
-                self.assertAlmostEqual(d.elite_cooldown(1e5), ef, places=6)
-                self.assertAlmostEqual(d.elite_unlock, unlock, places=6)
+                self.assertAlmostEqual(d.step_seconds, base.step_seconds / pace, places=6)
+                self.assertAlmostEqual(d.elite_unlock, base.elite_unlock / pace, places=6)
+                for fn in ("common_cooldown", "elite_cooldown"):
+                    self.assertAlmostEqual(getattr(d, fn)(0.0),
+                                           getattr(base, fn)(0.0) / pace, places=6)
+                    self.assertAlmostEqual(getattr(d, fn)(1e5),
+                                           getattr(base, fn)(1e5) / pace, places=6)
 
     def test_every_difficulty_reaches_the_same_elite_count_at_its_boss(self):
         """The step and the boss time scale by the same factor and cancel,

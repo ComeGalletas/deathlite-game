@@ -11,20 +11,20 @@
   "_groups_comment": "The six social groups a company is drawn from (G2, owner 2026-09-17). A company is ONE group: a count rolled in `common_range`, each body drawn by `commons` weight, plus -- on the two groups that have them -- elites drawn by `elites` weight. `elite_range` is [base minimum, ceiling] and `elite_step` is how much the minimum climbs every `cooldowns.step_seconds`, so an elite group's count is deterministic and growing while WHICH elites appear stays random. Weights are relative within their own half of a group and need not sum to anything. This replaced the old leader+followers templates outright, which is why the key is reused rather than renamed: a company has no leader, only a body that happens to be seated first. Clearance is no longer declared per group -- placement derives it from the largest body in the company, which is what the old `clearance` knob was approximating.",
   "groups": {
     "dark": {
-      "commons": {"skull": 5, "thief": 3, "imp": 2},
-      "common_range": [5, 30]
+      "commons": {"skull": 6, "thief": 3, "imp": 1},
+      "common_range": [10, 30]
     },
     "swarm": {
       "commons": {"spider": 6, "bumblebee": 4},
-      "common_range": [20, 30]
+      "common_range": [25, 30]
     },
     "marine": {
       "commons": {"bomb_fish": 2, "harpoon_shark": 8},
-      "common_range": [5, 30]
+      "common_range": [5, 20]
     },
     "gnomes": {
       "commons": {"hammer_gnome": 6, "slingshot_gnome": 4},
-      "common_range": [5, 30]
+      "common_range": [5, 20]
     },
     "goblin": {
       "commons": {"spear_goblin": 6, "torch_goblin": 4},
@@ -44,7 +44,7 @@
 
   "_cooldowns_comment": "The two ladders (G2, owner 2026-09-17). `common` is how long before the next company of any kind; `elite` is a gate on ELIGIBILITY -- an elite-bearing group can only be picked when it is ready, and picking one resets both timers, so an elite and a common company never land back to back. Every `step_seconds` the common cadence drops by `common_decay` and the elite gate by `elite_decay`, flooring at `common_floor` / `elite_floor`; the gate falls three times as fast and floors three times higher, so elite companies go from about one in three to roughly one in one-and-a-bit by minute eight. `elite_unlock` is a hard gate: no elite group at all before then, whatever the ladder says. `cap_retry` is how long the master waits before re-counting when a prepared company does not fit under the live cap. Everything here is in Normal seconds and is divided by `timeline_pace` -- the STEP as well as the values, so the whole ladder compresses together rather than just its numbers. Because the step and the boss time scale by the same factor, every difficulty reaches the same elite count at its boss: harder means the same elites sooner, not more of them.",
   "cooldowns": {
-    "common": 5.0,
+    "common": 2.0,
     "common_decay": 1.0,
     "common_floor": 1.0,
     "elite": 15.0,
@@ -111,7 +111,7 @@
     "boss": 0,
     "special": 1,
     "village": 0,
-    "combat": [2, 3],
+    "combat": 1,
     "difficulty_scale": {"normal": 1.0, "fast": 1.0, "super_fast": 1.5}
   }
 }

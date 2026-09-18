@@ -192,7 +192,11 @@ class MasterZoneTests(unittest.TestCase):
         host.pursuing = set()
         table = get_content().spawn_tables.residents
         self.assertEqual(table["start"], 0)
-        lo, hi = table["combat"]
+        # `combat` may be a [lo, hi] span or a flat count -- both are valid
+        # table shapes and it has been each of them (it became a flat 1 on
+        # 2026-09-18, when residents started meaning whole companies).
+        spec = table["combat"]
+        lo, hi = spec if isinstance(spec, list) else (spec, spec)
         counts = []
         for seed in range(6):
             h = FakeHost(seed=seed)

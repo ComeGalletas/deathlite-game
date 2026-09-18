@@ -44,7 +44,7 @@
     "shot_speed": 230, "shot_style": "spin", "shot_rig": "acorn"
   },
   "bomb_fish": {
-    "name": "Bloat", "hp": 29, "speed": 50,
+    "name": "Bloat", "hp": 13, "speed": 50,
     "aggro_range": 460,
     "pursuit_seconds": 6.0, "contact_damage": 11, "radius": 16,
     "weight": 8,
@@ -156,7 +156,7 @@
     "blink_damage": 20
   },
   "gnoll": {
-    "name": "Bonepicker", "hp": 46, "speed": 82,
+    "name": "Bonepicker", "hp": 20, "speed": 32,
     "aggro_range": 520,
     "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 14,
     "weight": 7,
@@ -167,7 +167,7 @@
     "shot_style": "spin", "shot_rig": "gnoll_bone"
   },
   "harpoon_shark": {
-    "name": "Gaffjaw", "hp": 58, "speed": 40,
+    "name": "Gaffjaw", "hp": 20, "speed": 33,
     "aggro_range": 640,
     "pursuit_seconds": 8.0, "contact_damage": 15, "radius": 15,
     "weight": 8,
