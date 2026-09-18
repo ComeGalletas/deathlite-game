@@ -261,6 +261,11 @@ class CapAndSwitchTests(unittest.TestCase):
         host = FakeHost()
         host.pursuing = set()
         m = _master(host)
+        # G3: the first company is chosen and placed immediately, so a bare
+        # `update` now seats one. These two tests are about the zone and
+        # hibernation, so the director is frozen out of them -- `frozen`
+        # stops companies and residents without stopping the zone tick.
+        m.frozen = True
         _spawn(host, 2500, 2)
         m.update(0.0)
         self.assertEqual(m.population.dormant_in(1), 2)
@@ -277,6 +282,7 @@ class CapAndSwitchTests(unittest.TestCase):
         host.pursuing = set()
         m = _master(host)
         m.use_locality = False
+        m.frozen = True                 # see the note above
         _spawn(host, 2500, 2)
         for _ in range(3):
             host.elapsed += 1.0

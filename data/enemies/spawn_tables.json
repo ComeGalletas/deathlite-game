@@ -1,36 +1,12 @@
 {
-  "_ramp_comment": "S12 (owner, 2026-09-16): `ramp_seconds` is how long the phase schedule below takes to run from its first band to its last, on Normal; a difficulty divides it by `timeline_pace` (36 s on fast, 30 s on super fast) exactly as it divides the run length. It is NOT the run: `run_duration` still keys the boss (95 % of 600 s), so the mix reaches its endgame composition about three quarters of a minute in while the boss still arrives at 9:30. The two used to be one number, which is why compressing the ramp used to drag the boss with it. `interval` below is lerped on the same ramp fraction.",
-  "ramp_seconds": 45.0,
 
   "_stagger_comment": "G0b (owner, 2026-09-17): how long a company takes to materialise, in seconds. Everything that decides the company -- its point, its packed spots, the cap it pays -- happens when it is seated; this spreads only *when* each body appears, oldest first, with the last landing as the window closes. 0 is a supported value and means the whole company on one frame. The point is that forty bodies appearing on a single frame is a pop however well spaced they are; 0.35 s is short enough to read as an arrival rather than a trickle. A number to revisit in the balance pass now that companies are the unit.",
   "company_stagger": 0.35,
 
-  "_elite_comment": "S12 (owner, 2026-09-16): the opening band is floored at 25 % and every later band carries +15 points over what it used to (0 / 2 / 5 / 10 / 14). Elites are a first-minute enemy now, not a late-run one.",
-  "phases": [
-    {"until": 0.20, "interval": [1.20, 1.00], "pack": [1, 1], "elite": 0.25,
-     "types": {"skull": 1.0}},
-    {"until": 0.45, "interval": [1.00, 0.82], "pack": [1, 2], "elite": 0.25,
-     "types": {"skull": 0.6, "spider": 0.25, "bumblebee": 0.15}},
-    {"until": 0.70, "interval": [0.82, 0.66], "pack": [2, 3], "elite": 0.25,
-     "types": {"skull": 0.28, "spider": 0.16, "bumblebee": 0.1,
-               "turtle": 0.1, "slingshot_gnome": 0.12, "bomb_fish": 0.07,
-               "panda": 0.04, "minotaur": 0.08, "thief": 0.05}},
-    {"until": 0.95, "interval": [0.66, 0.52], "pack": [2, 4], "elite": 0.25,
-     "types": {"skull": 0.18, "spider": 0.12, "bumblebee": 0.09,
-               "turtle": 0.12, "slingshot_gnome": 0.1, "bomb_fish": 0.09,
-               "panda": 0.07, "torch_goblin": 0.08,
-               "minotaur": 0.09, "thief": 0.06, "hex_shaman": 0.06}},
-    {"until": 1.01, "interval": [0.54, 0.44], "pack": [3, 4], "elite": 0.29,
-     "types": {"skull": 0.14, "spider": 0.12, "turtle": 0.13,
-               "slingshot_gnome": 0.1, "bomb_fish": 0.1, "panda": 0.09,
-               "torch_goblin": 0.1, "bumblebee": 0.05,
-               "minotaur": 0.1, "thief": 0.08, "hex_shaman": 0.08}}
-  ],
 
   "_unused_comment": "Enemies benched from the run (owner, 2026-09-17). An id listed here keeps its block in `enemies.json`, its art, its rig, its weights in the bands below and every reference the code and the tests make to it -- it is *disabled*, not deleted. `SpawnTables` drops it from the phase types and the group followers when it reads them, so the director can never roll it; `spawn_at`, `spawn_group` and the dev menu can still seat one deliberately. Re-enabling is deleting a string from this list. Being absent from every band is NOT the same thing: Bonepicker, Gaffjaw and the Hammer Gnome are built and waiting for a band weight, which is pending work rather than a decision to bench them. The list is EMPTY as of G1 (owner, 2026-09-17): Stoutpaw was unbenched to join the Wild beasts group, and nothing is benched today. The mechanism stays -- it is one string away from being needed again -- and `tests/spawn/test_unused_category.py` exercises it against a synthetic table so it keeps working while the shipped list is empty.",
   "unused": [],
 
-  "elites": {"default": "bear", "rare": "troll", "rare_chance": 0.15},
 
   "_groups_comment": "The six social groups a company is drawn from (G2, owner 2026-09-17). A company is ONE group: a count rolled in `common_range`, each body drawn by `commons` weight, plus -- on the two groups that have them -- elites drawn by `elites` weight. `elite_range` is [base minimum, ceiling] and `elite_step` is how much the minimum climbs every `cooldowns.step_seconds`, so an elite group's count is deterministic and growing while WHICH elites appear stays random. Weights are relative within their own half of a group and need not sum to anything. This replaced the old leader+followers templates outright, which is why the key is reused rather than renamed: a company has no leader, only a body that happens to be seated first. Clearance is no longer declared per group -- placement derives it from the largest body in the company, which is what the old `clearance` knob was approximating.",
   "groups": {
@@ -43,7 +19,7 @@
       "common_range": [20, 30]
     },
     "marine": {
-      "commons": {"bomb_fish": 5, "harpoon_shark": 5},
+      "commons": {"bomb_fish": 2, "harpoon_shark": 8},
       "common_range": [5, 30]
     },
     "gnomes": {
@@ -137,22 +113,5 @@
     "village": 0,
     "combat": [2, 3],
     "difficulty_scale": {"normal": 1.0, "fast": 1.0, "super_fast": 1.5}
-  },
-
-  "pacing": {
-    "base": 15.0,
-    "bounds": [0.6, 1.5],
-    "tau": 8.0,
-    "dead_band": 0.1,
-    "window": 10.0,
-    "lull_seconds": 20.0,
-    "damage_rate_full": 0.1,
-    "weights": {
-      "hp_fraction": 0.5,
-      "damage_rate": 0.3,
-      "kill_rate": 0.4,
-      "crowd": 0.2,
-      "lull": 0.2
-    }
   }
 }

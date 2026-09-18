@@ -1504,6 +1504,146 @@ Suite green: 209 in `tests/spawn`.
 
 ---
 
+---
+
+## G3 built: the director is the two ladders (2026-09-18)
+
+The phase schedule is gone. `SpawnDirector.update(dt, elapsed, blocked)` now
+returns **a group name or None**; it no longer says which enemies, and no
+longer looks at the live count.
+
+### What went
+
+`_ramp`, `_phase`, `_interval`, `roll_pack`, `roll_elite`, `_roll_slots`,
+`ramp_duration` and the `min(pack, cap - active)` clipping. From the tables:
+`phases`, `ramp_seconds`, the top-level `elites` slot and `pacing`, plus
+`phases()`, `phase_at()`, `_enabled_phases` and the validation behind all of
+it. `spawn/pacing.py` was deleted outright, and with it `SpawnMaster`'s
+`pressure`, `set_modifier` / `clear_modifier` / `modifiers`, the two event
+subscriptions that only fed it, the dev menu's "Spawn pressure" row and the
+`pressure` dev metric.
+
+`spawn_rate` stops being read. It stays in `config.DIFFICULTIES` because it
+is part of a difficulty's description, but nothing multiplies by it now --
+`timeline_pace` is the only factor the ladder consults.
+
+### The ladders, measured against the settled table
+
+Every value matches the design exactly, per minute and per difficulty:
+
+| minute | 0 | 2 | 4 | 6 | 8 | 10+ |
+|---|---|---|---|---|---|---|
+| common | 5 | 4 | 3 | 2 | 1 | 1 |
+| elite gate | 15 | 12 | 9 | 6 | 3 | 3 |
+
+| | step | start (c/e) | floor (c/e) | unlock |
+|---|---|---|---|---|
+| normal | 120 s | 5 / 15 | 1 / 3 | 60 s |
+| fast | 96 s | 4 / 12 | 0.8 / 2.4 | 48 s |
+| super fast | 80 s | 3.33 / 10 | 0.67 / 2 | 40 s |
+
+There is a test that every difficulty reaches the **same elite count at its
+boss**, which is the non-obvious consequence of compressing the step as well
+as the values.
+
+### The cap gate
+
+`SpawnMaster._tick_companies` prepares, counts, and seats only if the whole
+company fits; otherwise it waits `cap_retry` and asks again, on the in-game
+clock. While one waits the director is called with `blocked=True`: its
+timers run on but the cadence is **not consumed**, so the queue does not pay
+the wait twice.
+
+The old per-body clipping is untouched for the *other* entry points -- a
+dev `spawn_group` still spawns short rather than over the cap -- because the
+atomicity rule is about the director's companies, and the gate in front of
+them means the clip never fires there.
+
+### Measured on a real booted run, ten minutes, pinned world
+
+| | idle player | clearing 2 bodies/s |
+|---|---|---|
+| companies seated | 12 | **70** |
+| cap waits | 286 | 269 |
+| bodies spawned | 232 | **1435** |
+| field at the end | 232 | 235 |
+| **live + in-flight over the cap** | **0** | **0** |
+| elite share of the field | 11 % | 16 % |
+| distinct enemy kinds seen | 14 | **16** of 18 |
+
+The two columns are the design working. With nobody dying the field pins at
+the cap and the gate simply holds -- 286 waits, twelve companies, never an
+overshoot. Once the player clears bodies the same run lands seventy
+companies and fourteen hundred bodies through the same cap. "Clear about
+twenty, receive about twenty", exactly as predicted, and self-limiting
+without a lull rule.
+
+Sixteen of eighteen enemy kinds in one run is the variety the groups were
+for; the old bands produced far less because five enemies had no weight at
+all.
+
+### One consequence that needs a decision, not a quiet re-tune
+
+**Residents are companies now**, per the owner's "an island's first company
+is chosen and placed like any other". The `residents` counts therefore mean
+*companies* rather than packs of one to four, and the magnitude changed a
+lot. Measured per island on the pinned world:
+
+| island | kind | bodies seeded |
+|---|---|---|
+| 1 | combat | **68** |
+| 3 | shrine | 27 |
+| 5 | altar | 19 |
+| 2 | treasure | 16 |
+| 0 / 6 | start / boss | 0 |
+
+A combat island used to greet the player with something like four to twelve
+bodies. Sixty-eight is a different thing. The data was left exactly as it
+is -- `combat: [2, 3]` -- because that is tuning and the owner's call;
+dropping it to `[1, 1]` would bring it to roughly twenty-five, which is one
+company and probably the intent. **Raised for G6, not changed here.**
+
+Worth noting alongside it: resident companies go through `_place_pack`
+directly, so they are still clipped by the cap per body rather than being
+atomic. Only the director's companies get the whole-or-wait guarantee. That
+is defensible -- seeding is not paced -- but it is a difference, not an
+oversight.
+
+### Tests
+
+**`tests/spawn/test_pacing.py` and `tests/spawn/director_sequence.json` are
+deleted.** The sequence fixture replayed the pre-move `world.spawning`
+module draw for draw; there is no draw sequence left to replay, and it had
+already been wound back three times to survive tuning. This is where that
+proof ends rather than being re-recorded against a unit that no longer
+exists.
+
+`test_budget.py` is rewritten around the ladders: the table match per
+minute and per difficulty, the same elite count at every boss, the ladder
+never climbing backwards, the first company arriving immediately, no elite
+group before the hard unlock, the pools staying separate, an elite company
+resetting the common cadence, the elite share rising late, a blocked master
+not losing its turn, and an empty pool falling back to the other one.
+
+Retired elsewhere: the phase and elite-slot checks in `test_tables.py` and
+`test_data_integrity.py`, the band tests in `test_unused_category.py`, the
+modifier test in `test_master.py`, and the dev menu's pressure-row test.
+
+Two tests in `test_population.py` needed isolating rather than changing:
+they used `m.update(0.0)` to tick the zone without spawning, which stopped
+working when the first company started arriving immediately. They now set
+`frozen`, which stops companies and residents without stopping the zone --
+the same lever `_settle` uses.
+
+`test_unused_category.py`'s director pair now drives the **master** rather
+than the director, because there is no id sequence on the director to
+inspect. Both halves use the same 700 s window: Stoutpaw is a Wild beasts
+common, Wild beasts is behind the elite unlock *and* the cap gate, so a
+shorter window can miss it for reasons that have nothing to do with
+benching.
+
+---
+
 ## Progress
 
 - [x] Groups and ranks confirmed against the roster (all 18 placed, after
@@ -1521,6 +1661,12 @@ Suite green: 209 in `tests/spawn`.
 - [x] G2a - the group check fails soft: `spawn/roster.py` resolves once per
       run, skips or demotes what it cannot use, logs every decision, and
       never refuses to load
+- [x] G3 + G4 - the director is the two ladders, the master holds the cap
+      gate, pacing is deleted; the phase schedule and its tables are gone.
+      Measured: 70 companies and 1435 bodies over ten minutes against a
+      player clearing two a second, never over the cap, 16 of 18 kinds seen
+- [ ] G6 - `residents.combat` now means 2-3 *companies* (68 bodies on a
+      combat island, against 4-12 before). Left as data; needs a decision
 - [x] Retire the potion/elite coupling test; potions.py itself unchanged
 - [x] Stoutpaw unbenched; three enemies gain `is_elite`; Shellback +70 HP
 - [x] Old `groups` deleted, new `groups` defined with two spans each

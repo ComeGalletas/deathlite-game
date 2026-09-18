@@ -215,12 +215,12 @@ class Content:
         log.info("content loaded: %d weapons, %d enemies, %d bosses, "
                  "%d characters, %d blessings, %d affixes, %d meta upgrades, "
                  "%d sprite rigs, %d terrain rigs, %d ui rigs, "
-                 "%d spawn phases",
+                 "%d spawn groups",
                  len(self.weapons), len(self.enemies), len(self.bosses),
                  len(self.characters), len(self.blessings),
                  len(self.items.get("affixes", {})), len(self.meta_upgrades),
                  len(self.sprites), len(self.terrain.get("rigs", {})),
-                 len(self.ui_sprites), len(self.spawn_tables.phases()))
+                 len(self.ui_sprites), len(self.spawn_tables.groups))
 
     def weapon(self, weapon_id: str) -> dict:
         try:

@@ -443,24 +443,11 @@ class DevMenuTests(unittest.TestCase):
         self.assertEqual(len(playing.enemies), n + 1)
         self.assertEqual(playing.enemies[-1].spawn_owner, "dev")
 
-    def test_pressure_row_cycles_the_dev_modifier(self):
-        from game.states.dev_menu_state import _PRESSURE_STEPS
-        game = _game()
-        playing, menu = _open_dev_menu(game)
-        m = playing.spawn.master
-        self.assertEqual(m.modifiers, {})
-        self.assertIn("[x1]", menu._row_label("pressure"))
-        seen = []
-        for _ in range(len(_PRESSURE_STEPS)):
-            menu._activate("pressure")
-            seen.append(m.modifiers.get("dev_menu", 1.0))
-        self.assertEqual(seen, list(_PRESSURE_STEPS[1:]) + [1.0])
-        self.assertEqual(m.modifiers, {})                    # x1 clears it
-        menu._activate("pressure")
-        self.assertAlmostEqual(m.pressure, m.pacing.base * m.pacing.value * 2.0)
-        _key(game, pygame.K_BACKQUOTE)
-        playing.update(1 / 60)
-        playing._report_debug()                              # the pressure line renders
+    # `test_pressure_row_cycles_the_dev_modifier` lived here. G3 retired the
+    # pacing multiplier and its named modifiers, so the row it drove is gone
+    # from the dev menu -- there is no cadence knob to cycle any more. The
+    # cadence is the cooldown ladder now, and `freeze` remains for stopping
+    # spawns outright.
 
     def test_f8_toggles_the_spawn_overlay_only_in_a_dev_run(self):
         game = _game()

@@ -62,17 +62,6 @@ class ShippedTests(unittest.TestCase):
         # the rest of this module is the place to look for what it costs.
         self.assertEqual(set(self.tables.unused), set())
 
-    def test_no_band_can_roll_a_benched_enemy(self):
-        for i, phase in enumerate(self.tables.phases(), 1):
-            with self.subTest(band=i):
-                self.assertFalse(set(phase["types"]) & self.tables.unused)
-
-    def test_no_difficulty_override_can_roll_one_either(self):
-        for level in ("normal", "fast", "super_fast"):
-            for i, phase in enumerate(self.tables.phases(level), 1):
-                with self.subTest(level=level, band=i):
-                    self.assertFalse(set(phase["types"]) & self.tables.unused)
-
     def test_no_group_member_can_be_a_benched_enemy(self):
         for name in self.tables.groups:
             with self.subTest(group=name):
@@ -84,8 +73,6 @@ class ShippedTests(unittest.TestCase):
         """The other side of G1: unbenching is one string, and this is what
         that string bought. Since G2 it is a Wild beasts common."""
         self.assertNotIn(BENCHED, self.tables.unused)
-        self.assertTrue(any(BENCHED in p["types"] for p in self.tables.phases()),
-                        "Stoutpaw is back but no band weights it")
         self.assertIn(BENCHED, self.tables.group(GROUP)["commons"])
 
 
@@ -101,17 +88,6 @@ class MechanismTests(unittest.TestCase):
     def test_the_benched_enemy_is_listed(self):
         self.assertIn(BENCHED, self.tables.unused)
 
-    def test_no_band_offers_it(self):
-        for i, phase in enumerate(self.tables.phases(), 1):
-            with self.subTest(band=i):
-                self.assertNotIn(BENCHED, phase["types"])
-
-    def test_no_difficulty_override_offers_it(self):
-        for level in ("normal", "fast", "super_fast"):
-            for i, phase in enumerate(self.tables.phases(level), 1):
-                with self.subTest(level=level, band=i):
-                    self.assertNotIn(BENCHED, phase["types"])
-
     def test_a_group_that_lists_it_survives_short(self):
         """Wild beasts lists the panda; the group keeps working without it."""
         g = self.tables.group(GROUP)
@@ -122,14 +98,11 @@ class MechanismTests(unittest.TestCase):
     def test_the_weights_are_filtered_not_rewritten(self):
         """Disabled, not deleted: the numbers stay on disk, so re-enabling is
         removing one string rather than re-deriving them."""
-        weighted = [p["types"][BENCHED] for p in self.raw["phases"]
-                    if BENCHED in p["types"]]
-        self.assertTrue(weighted, "the panda's weights were deleted")
         self.assertIn(BENCHED, self.raw["groups"][GROUP]["commons"])
+        self.assertGreater(self.raw["groups"][GROUP]["commons"][BENCHED], 0)
 
     def test_clearing_the_list_brings_it_straight_back(self):
         back = _tables(unused=[])
-        self.assertTrue(any(BENCHED in p["types"] for p in back.phases()))
         self.assertIn(BENCHED, back.group(GROUP)["commons"])
 
 
@@ -157,20 +130,6 @@ class SurvivalTests(unittest.TestCase):
             self.assertGreater(assets.frame_count(BENCHED, anim), 0)
 
 
-class IdentityTests(unittest.TestCase):
-    """Filtering happens once, at construction. Callers compare phases by
-    identity (`_phase(x) is _phase(y)`), so rebuilding them per lookup would
-    break the director's tests in a way that is tedious to trace. Worth
-    pinning on a table that actually filters, not only on the empty one."""
-
-    def test_a_phase_lookup_returns_the_same_object_every_time(self):
-        for label, t in (("shipped", get_content().spawn_tables),
-                         ("filtered", _tables(unused=[BENCHED]))):
-            with self.subTest(table=label):
-                self.assertIs(t.phase_at(0.5), t.phase_at(0.5))
-                self.assertIs(t.phases()[-1], t.phase_at(1.0))
-
-
 class ValidationTests(unittest.TestCase):
     """Benching is tuning, but it can express things that are table errors.
     Each is named rather than left to fail later as an empty draw."""
@@ -179,11 +138,6 @@ class ValidationTests(unittest.TestCase):
         problems = SpawnTables.validate(
             {**_raw(), "unused": ["no_such_enemy"]}, {"skull", BENCHED})
         self.assertTrue(any("unknown enemy" in p for p in problems), problems)
-
-    def test_benching_cannot_empty_a_band(self):
-        with self.assertRaises(TableError) as caught:
-            _tables(unused=["skull"])           # band 1 is skull-only
-        self.assertIn("nothing left", str(caught.exception))
 
     def test_benching_a_whole_half_costs_the_group_not_the_run(self):
         """G2a (owner, 2026-09-17): benching that leaves a half with nothing
@@ -199,23 +153,13 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(len(r.names()), 5, "the others are untouched")
         self.assertTrue(any("wild_beasts" in n for n in r.notes), r.notes)
 
-        # Benching a group's whole *elite* half cannot be expressed through
-        # `unused` today: Goblin's elites are Hexcaller and Grudge, and
-        # Wild beasts' include Ravager, so either bench also empties the
-        # top-level `elites` default / rare slot -- and that check is still
-        # a load error until G3 retires the slot. The equivalent case is
-        # covered directly in `test_roster.py`
-        # (`test_a_broken_elite_ladder_leaves_a_common_only_group`).
-        with self.assertRaises(TableError) as caught:
-            _tables(unused=["hex_shaman", "troll"])
-        self.assertIn("elites", str(caught.exception))
-
-    def test_benching_cannot_silence_the_elite_slot(self):
-        for eid in ("bear", "troll"):
-            with self.subTest(elite=eid):
-                with self.assertRaises(TableError) as caught:
-                    _tables(unused=[eid])
-                self.assertIn("elites", str(caught.exception))
+        # G3 retired the top-level `elites` slot that used to make this
+        # case unreachable through `unused`, so it can be asserted now.
+        t = _tables(unused=["hex_shaman", "troll"])     # Goblin elites
+        r = resolve_groups(t.groups, enemies)
+        self.assertIsNotNone(r.get("goblin"), "the group survives")
+        self.assertFalse(r.get("goblin").has_elites, "as common-only")
+        self.assertEqual(r.names(elite=True), ["wild_beasts"])
 
     def test_the_list_must_be_strings(self):
         problems = SpawnTables.validate({**_raw(), "unused": [7]}, None)
@@ -226,38 +170,43 @@ class ValidationTests(unittest.TestCase):
         data.pop("unused", None)
         t = SpawnTables(data)
         self.assertEqual(t.unused, frozenset())
-        self.assertTrue(any(BENCHED in p["types"] for p in t.phases()))
+        self.assertIn(BENCHED, t.group(GROUP)["commons"])
 
 
 class DirectorTests(unittest.TestCase):
-    """End to end: a long scripted run on a table that benches an enemy never
-    emits it. Driven off a synthetic table, because the shipped one benches
-    nothing -- on the shipped table the same run *should* produce Stoutpaw,
-    and the second test asserts exactly that."""
+    """End to end: a run on a table that benches an enemy never seats it,
+    while the shipped table does. Driven through the master, because since
+    G3 the director names a *group* and the master composes the bodies --
+    there is no id sequence to inspect on the director alone."""
 
-    def _director(self, tables, seed: int) -> SpawnDirector:
-        return SpawnDirector(run_duration=600.0, rng=random.Random(seed),
-                             tables=tables)
+    def _bodies(self, tables, seed: int, seconds: float = 700.0) -> set:
+        import pygame
+        from spawn import SpawnMaster
+        from tests.spawn.fakehost import FakeHost
+        host = FakeHost(seed=seed)
+        director = SpawnDirector(run_duration=600.0, rng=random.Random(seed),
+                                 tables=tables)
+        m = SpawnMaster(host, director, tables=tables)
+        t, dt = 0.0, 1 / 30
+        while t < seconds:
+            m.update(dt)
+            t += dt
+            host.elapsed = t
+        return {e.enemy_id for e in host.live}
 
-    def _long_run(self, tables, seed: int) -> set:
-        d = self._director(tables, seed)
-        seen, t = set(), 0.0
-        while t < 600.0:
-            seen.update(d.update(1 / 30, t, 0))
-            t += 1 / 30
-        for t in range(0, 600, 5):
-            seen.update(self._director(tables, seed + 1).roll_pack(float(t)))
-        return seen
-
-    def test_a_long_run_never_rolls_a_benched_enemy(self):
-        seen = self._long_run(_tables(unused=[BENCHED]), 7)
-        self.assertTrue(seen, "the director emitted nothing")
+    def test_a_long_run_never_seats_a_benched_enemy(self):
+        seen = self._bodies(_tables(unused=[BENCHED]), 7)
+        self.assertTrue(seen, "nothing spawned at all")
         self.assertNotIn(BENCHED, seen)
 
-    def test_the_same_run_does_roll_it_once_it_is_unbenched(self):
-        """Without this the test above could pass because the director never
-        reaches the bands the panda is weighted in."""
-        seen = self._long_run(get_content().spawn_tables, 7)
+    def test_the_same_run_does_seat_it_once_it_is_unbenched(self):
+        """Without this the test above could pass because the run never
+        reaches the group the panda belongs to. Stoutpaw is a Wild beasts
+        common, and Wild beasts is an elite group behind the one-minute
+        unlock and the cap gate, so the window has to be long enough for
+        one of its companies to actually land -- which is why both halves
+        of this pair use the same 700 s."""
+        seen = self._bodies(_tables(unused=[]), 7)
         self.assertIn(BENCHED, seen)
 
 

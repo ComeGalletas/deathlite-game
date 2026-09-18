@@ -41,11 +41,9 @@ from ui import scale
 from ui.mouse import MouseNav
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
-# The "Spawn pressure" row cycles the master's `dev_menu` modifier through these.
-_PRESSURE_STEPS = (1.0, 2.0, 4.0, 0.0, 0.5)
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
-              "aim_line", "all_rooms", "freeze", "pressure", "difficulty",
+              "aim_line", "all_rooms", "freeze", "difficulty",
               "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
               "reset", "exit", "close")
 
@@ -58,7 +56,6 @@ _LABELS = {
     "aim_line":     "Aim line",
     "all_rooms":    "Activate all rooms",
     "freeze":       "Freeze spawns",
-    "pressure":     "Spawn pressure",
     "difficulty":   "Difficulty",
     "dummy":        "Training dummy",
     "spawn":        "Spawn enemy...",
@@ -256,16 +253,6 @@ class DevMenuState(State):
             m = p.spawn.master
             m.frozen = not m.frozen
             self._status = f"Spawns {'FROZEN' if m.frozen else 'running'}"
-        elif rid == "pressure":
-            m = p.spawn.master
-            cur = m.modifiers.get("dev_menu", 1.0)
-            nxt = _PRESSURE_STEPS[(_PRESSURE_STEPS.index(cur) + 1) % len(_PRESSURE_STEPS)
-                                  if cur in _PRESSURE_STEPS else 0]
-            if nxt == 1.0:
-                m.clear_modifier("dev_menu")
-            else:
-                m.set_modifier("dev_menu", nxt)
-            self._status = f"Spawn pressure modifier x{nxt:g}"
         elif rid == "difficulty":
             order = config.DIFFICULTY_ORDER
             nxt = order[(order.index(p.difficulty) + 1) % len(order)]
@@ -558,8 +545,6 @@ class DevMenuState(State):
             label += "   [ON]" if p.spawn.master.all_active else "   [  ]"
         elif rid == "freeze" and p is not None:
             label += "   [ON]" if p.spawn.master.frozen else "   [  ]"
-        elif rid == "pressure" and p is not None:
-            label += f"   [x{p.spawn.master.modifiers.get('dev_menu', 1.0):g}]"
         elif rid == "difficulty" and p is not None:
             label += f"   [{config.DIFFICULTY_LABELS[p.difficulty]}]"
         elif rid == "dummy" and p is not None:

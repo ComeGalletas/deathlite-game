@@ -51,7 +51,16 @@ class SpawnDirector:
         self._base_run_duration = max(1.0, run_duration)
         self.rng = rng or random.Random()
         self.tables = tables if tables is not None else _default_tables()
-        self._timer = 0.8
+        self._cd = dict(self.tables.cooldowns)
+        # G3: the two ladders. The common cadence starts expired, so the
+        # first company is chosen and placed like any other rather than
+        # after an opening pause (owner, 2026-09-17). The elite gate starts
+        # at its full length, and the hard unlock is later still.
+        self._common_timer = 0.0
+        self._elite_timer = float(self._cd.get("elite", 0.0))
+        # Set by the master, which owns the resolved roster: the director
+        # picks *which group*, the master composes it.
+        self.roster = None
         self.boss_spawned = False
         # S4: the simulated-enemy budget. `None` leaves the schedule alone
         # (the isolated director the tests pin); the master sets it from
@@ -69,32 +78,50 @@ class SpawnDirector:
             difficulty = config.DIFFICULTY_DEFAULT
         f = config.DIFFICULTIES[difficulty]
         self.difficulty = difficulty
-        self._spawn_rate = f["spawn_rate"]
         self._timeline_pace = f["timeline_pace"]
         self._stat_ramp_pace = f["stat_ramp_pace"]
         self._enemy_count_step_scale = f["enemy_count_step_scale"]
-        # Harder enemy types + the boss arrive sooner: both clocks are
-        # compressed by the same factor. `run_duration` is the boss's;
-        # `ramp_duration` is the phase schedule's, and is much the shorter
-        # of the two (S12).
+        # G3: `spawn_rate` is no longer read. The cadence is the cooldown
+        # ladder, and `timeline_pace` is the only difficulty factor it
+        # consults -- the factor stays in `config.DIFFICULTIES` because it
+        # is a difficulty's description, but nothing multiplies by it now.
         self.run_duration = max(1.0, self._base_run_duration / self._timeline_pace)
-        self.ramp_duration = max(1.0, self.tables.ramp_seconds / self._timeline_pace)
+        # The ladder's own clock. Compressing the step as well as the values
+        # is what makes every difficulty reach the same elite count at its
+        # boss: the step and the boss time scale by the same factor and
+        # cancel, so harder means the same elites sooner, not more of them.
+        self.step_seconds = max(0.001, float(self._cd.get("step_seconds", 120.0))
+                                / self._timeline_pace)
+        self.elite_unlock = float(self._cd.get("elite_unlock", 0.0)) / self._timeline_pace
+        self.cap_retry = float(self._cd.get("cap_retry", 2.0)) / self._timeline_pace
 
-    # --- schedule lookup ------------------------------------
-    def _ramp(self, elapsed: float) -> float:
-        """How far the phase schedule has walked, 0..1. Reaches 1 at
-        `ramp_duration` and stays there for the rest of the run."""
-        return min(1.0, max(0.0, elapsed) / self.ramp_duration)
+    # --- the two ladders (G3) -------------------------------
+    def steps(self, elapsed: float) -> int:
+        """How many rungs of the ladder the run has climbed. One every
+        `step_seconds`, compressed by `timeline_pace` like everything else
+        time-shaped, so the whole ladder scales together rather than just
+        its values."""
+        return int(max(0.0, elapsed) // self.step_seconds)
 
-    def _phase(self, elapsed: float) -> dict:
-        return self.tables.phase_at(self._ramp(elapsed), self.difficulty)
+    def common_cooldown(self, elapsed: float) -> float:
+        """How long before the next company of any kind."""
+        cd = self._cd
+        return max(cd["common_floor"],
+                   cd["common"] - cd["common_decay"] * self.steps(elapsed)) / self._timeline_pace
 
-    def _interval(self, elapsed: float) -> float:
-        p = self._phase(elapsed)
-        # Lerp the interval across the ramp so it tightens smoothly, then
-        # divide by the spawn-rate factor so a harder run spawns more often.
-        lo, hi = p["interval"]
-        return (lo + (hi - lo) * self._ramp(elapsed)) / self._spawn_rate
+    def elite_cooldown(self, elapsed: float) -> float:
+        """How long an elite-bearing group stays ineligible after one is
+        picked. Falls three times as fast as the common cadence and floors
+        three times higher, so elite companies go from about one in three at
+        the start to roughly one in one-and-a-bit by minute eight."""
+        cd = self._cd
+        return max(cd["elite_floor"],
+                   cd["elite"] - cd["elite_decay"] * self.steps(elapsed)) / self._timeline_pace
+
+    def elite_unlocked(self, elapsed: float) -> bool:
+        """The hard gate: no elite group at all before `elite_unlock`,
+        whatever the ladder says."""
+        return elapsed >= self.elite_unlock and self._elite_timer <= 0.0
 
     def stat_multipliers(self, elapsed: float) -> tuple[float, float]:
         """(hp_mult, speed_mult) for enemies spawned at `elapsed`.
@@ -130,49 +157,50 @@ class SpawnDirector:
     def mark_boss_spawned(self) -> None:
         self.boss_spawned = True
 
-    def roll_elite(self) -> str:
-        """An elite slot: the rare one on a single draw under `rare_chance`,
-        else the default. One `random()` either way, as it always was."""
-        el = self.tables.elites
-        return el["rare"] if self.rng.random() < el["rare_chance"] else el["default"]
+    # --- choosing a company (G3) -----------------------------
+    def pool(self, elapsed: float) -> list[str]:
+        """The groups eligible right now.
 
-    # --- per-frame -------------------------------------------
-    def update(self, dt: float, elapsed: float, active_count: int) -> list[str]:
-        """Return a list of enemy ids to spawn this frame (possibly empty).
-        Respects the time-growing concurrency cap (spec 6.3)."""
+        The two pools are **separate** (owner, 2026-09-17): while the elite
+        gate is open the draw is from the elite-bearing groups, and
+        otherwise from the common ones. If the pool that should be used is
+        empty -- which the roster allows, since a group whose data did not
+        hold up is simply absent -- the other one is used rather than
+        spawning nothing.
+        """
+        if self.roster is None:
+            return []
+        if self.elite_unlocked(elapsed):
+            return self.roster.names(elite=True) or self.roster.names(elite=False)
+        return self.roster.names(elite=False) or self.roster.names(elite=True)
+
+    def update(self, dt: float, elapsed: float, blocked: bool = False) -> str | None:
+        """The group to spawn a company of this frame, or `None`.
+
+        The director no longer says *which enemies*: a company is one group,
+        and the master composes it from the roster. It no longer looks at
+        the live count either -- the cap is a gate the master holds, and a
+        company that does not fit waits whole rather than arriving short.
+
+        `blocked` is the master saying it is still holding a company the cap
+        refused. The timers keep running, and the cadence is left expired
+        rather than consumed, so the moment the gate opens the next company
+        goes immediately instead of paying the wait twice.
+        """
         if self.boss_spawned:
-            return []  # stop the tide while the boss fight is on
-        phase = self._phase(elapsed)
-        cap = self.enemy_count_cap(elapsed)
-        if active_count >= cap:
-            return []
-
-        self._timer -= dt
-        if self._timer > 0.0:
-            return []
-        self._timer += self._interval(elapsed)
-
-        lo, hi = phase["pack"]
-        pack = self.rng.randint(lo, hi)
-        return self._roll_slots(phase, min(pack, cap - active_count))
-
-    def _roll_slots(self, phase: dict, n: int) -> list[str]:
-        """`n` enemy ids for this phase, one draw per slot (an elite check,
-        then the weighted type)."""
-        out: list[str] = []
-        ids = list(phase["types"].keys())
-        weights = list(phase["types"].values())
-        for _ in range(n):
-            if self.rng.random() < phase["elite"]:
-                out.append(self.roll_elite())
-            else:
-                out.append(self.rng.choices(ids, weights=weights, k=1)[0])
-        return out
-
-    def roll_pack(self, elapsed: float) -> list[str]:
-        """One pack for this moment of the ramp, drawn off-schedule: the
-        timer and the cap are not consulted. S4's residents use it, so an
-        island's first population is the mix the run would spawn anyway."""
-        phase = self._phase(elapsed)
-        lo, hi = phase["pack"]
-        return self._roll_slots(phase, self.rng.randint(lo, hi))
+            return None                     # stop the tide during the fight
+        self._common_timer -= dt
+        self._elite_timer -= dt
+        if blocked or self._common_timer > 0.0:
+            return None
+        pool = self.pool(elapsed)
+        if not pool:
+            return None
+        name = self.rng.choice(pool)
+        self._common_timer = self.common_cooldown(elapsed)
+        if self.roster is not None and self.roster.get(name) is not None \
+                and self.roster.get(name).has_elites:
+            # Spawning an elite company resets the common cadence too, so an
+            # elite and a common company never land back to back.
+            self._elite_timer = self.elite_cooldown(elapsed)
+        return name

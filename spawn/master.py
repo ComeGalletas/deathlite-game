@@ -8,15 +8,12 @@ the `Host` protocol (`spawn/host.py`). It is the one place enemies are
 brought into the run:
 
     update(dt)                    locality, hibernation, waking, debt, and
-                                  the director's tick; a pack it emits is
-                                  placed together on one point
+                                  the company gate: the director names a
+                                  group, the master composes it and seats it
+                                  whole once the cap has room
     spawn_at(enemy_id, pos, owner)   one enemy, at `pos` or at a chosen point
-    spawn_group(name, at, owner)  a template from the tables' `groups`
-    set_modifier / clear_modifier named factors; `pressure` is the standing
-                                  base (`pacing.base`) times the pacing
-                                  value (`spawn/pacing.py`, read off the
-                                  run's condition) times their product,
-                                  and scales the director's cadence
+    compose(name, steps)          the bodies of one company of that group
+    spawn_group(name, at, owner)  compose one and place it now
 
 **Zone.** The islands in play are the player's, the one they are heading
 to (weight `heading_weight`) and the one just left (`grace_weight`).
@@ -27,9 +24,18 @@ test world, or the knob at 0 -- places through `host.fallback_point()`.
 
 **Population.** When an island joins the zone its dormant records are
 queued to wake a few per frame, and on its first visit it is seeded with
-residents (`residents` in the tables, packs rolled off the director's
-current phase, owner `resident`). Every `population.tick` seconds the
-idle enemies outside the zone are put to sleep.
+residents (`residents` in the tables, companies chosen the way any company
+is, owner `resident`). Every `population.tick` seconds the idle enemies
+outside the zone are put to sleep.
+
+**The company gate (G3).** The director names a group when its cooldown
+ladder is ready; the master composes the company and seats it **only if all
+of it fits** under the live cap, asking again every `cap_retry` seconds
+otherwise. A company that does not fit does not arrive at all until it
+does, which is what replaced the director clipping a pack to the headroom
+and letting it arrive short. While one waits, the director is told it is
+blocked: its timers run on but the cadence is not consumed, so the wait is
+not paid twice.
 
 **Debt.** A pack the placement cannot seat this frame is queued, oldest
 first, and retried every tick; past `relax_after` the view rule loosens
@@ -76,7 +82,6 @@ from game import config
 from spawn.locality import Locality
 from spawn.placement import Placement, SpawnRequest
 from spawn.points import PointIndex
-from spawn.pacing import Pacing
 from spawn.population import Population
 from spawn.roster import resolve_groups
 from spawn.watchdog import Watchdog
@@ -109,15 +114,16 @@ class SpawnMaster:
         self.roster = resolve_groups(self.tables.groups, self._enemy_defs())
         for note in self.roster.notes:
             log.warning("spawn roster: %s", note)
+        # The director picks *which group* off this; the master composes it.
+        director.roster = self.roster
+        # G3: the company waiting on the cap gate, and when to ask again.
+        self._prepared: tuple | None = None
+        self._retry_at = 0.0
+        self.companies = 0          # seated whole
+        self.gate_waits = 0         # times the cap refused one
         self.locality = Locality(self.tables.locality)
         self.population = Population(self.tables.population, owners.get("never_sleep", ()))
         self.watchdog = Watchdog(self.tables.watchdog)
-        self.pacing = Pacing(self.tables.pacing)
-        # The two run signals pacing cannot see from here. Event names are
-        # the bus's strings; the payloads are the run's (`amount`, and the
-        # kill's `pos` / `xp` / ... which pacing ignores).
-        host.subscribe("player_damaged", self._on_player_damaged)
-        host.subscribe("enemy_killed", self._on_enemy_killed)
         self.use_locality = True
         self.all_active = False
         self.frozen = False
@@ -126,7 +132,6 @@ class SpawnMaster:
         self.world_cap = int(config.ENEMY_COUNT_HARD_CAP)
         self._active: set[int] = set()
         self._small, self._large = self._class_radii()
-        self._modifiers: dict[str, float] = {}
         # (queued_at, ids, owner, stagger)
         self._debt: list[tuple[float, list[str], str, bool]] = []
         # A company already committed, materialising body by body:
@@ -153,37 +158,12 @@ class SpawnMaster:
         radii = sorted(float(c[3]) for c in _NAV_CLASSES)
         return radii[0], radii[-1]
 
-    # --- modifiers ----------------------------------------------------
-    def set_modifier(self, name: str, factor: float) -> None:
-        self._modifiers[name] = max(0.0, float(factor))
-
-    def clear_modifier(self, name: str) -> None:
-        self._modifiers.pop(name, None)
-
-    @property
-    def modifiers(self) -> dict:
-        return dict(self._modifiers)
-
-    @property
-    def modifier_product(self) -> float:
-        p = 1.0
-        for f in self._modifiers.values():
-            p *= f
-        return p
-
-    @property
-    def pressure(self) -> float:
-        """The cadence multiplier: the standing base (`pacing.base`, 5), times
-        the pacing value, times every modifier."""
-        return self.pacing.base * self.pacing.value * self.modifier_product
-
-    # --- pacing signals (S6) --------------------------------------------
-    def _on_player_damaged(self, amount: float = 0.0, **_kw) -> None:
-        max_hp = self.host.player_max_hp()
-        self.pacing.on_damage(self.host.elapsed, (amount / max_hp) if max_hp > 0 else 0.0)
-
-    def _on_enemy_killed(self, **_kw) -> None:
-        self.pacing.on_kill(self.host.elapsed)
+    # G3 (owner, 2026-09-17): the pacing multiplier and its named modifiers
+    # are gone, and `spawn/pacing.py` with them. The cooldown ladder is the
+    # cadence now, and the live cap is the other half of it -- two knobs
+    # that pull the same way instead of a feedback loop layered on a
+    # schedule. `pressure`, `set_modifier` / `clear_modifier` / `modifiers`
+    # and the two event subscriptions that only fed pacing came out here.
 
     # --- zone -----------------------------------------------------------
     def _locality_on(self) -> bool:
@@ -256,14 +236,55 @@ class SpawnMaster:
                 self.population.wake_some(host, self.index, self.placement, now)
         for v in self.watchdog.update(host, now):
             self.recycle(v.enemy, v.reason, v.poof)
-        self.pacing.update(dt, now, host.player_hp_fraction(), host.live_count(),
-                           self.director.enemy_count_cap(now))
         if self.frozen:
             return
         self._retry_debt(now)
-        ids = self.director.update(dt * self.pressure, now, host.live_count())
-        if ids:
-            self._place_pack(ids, "director", now, stagger=True)
+        self._tick_companies(dt, now)
+
+    # --- the company gate (G3) ------------------------------------------
+    def _tick_companies(self, dt: float, now: float) -> None:
+        """Prepare a company, count it, and seat it only if it fits.
+
+        The owner's rule (2026-09-17): a company that does not fit under the
+        live cap **does not arrive at all** until it does -- a Swarm of
+        twenty is twenty or nothing -- and the master asks again every
+        `cap_retry` seconds of in-game time. That replaces the director's
+        old `min(pack, cap - active)`, which let a pack arrive short.
+
+        While a prepared company is waiting the director is told it is
+        blocked: its timers keep running but the cadence is not consumed, so
+        the queue does not pay the wait twice. Head-of-line blocking is
+        deliberate -- a queued twenty-body company holds its place while a
+        smaller one that would have fit is not considered, because the
+        group is already committed.
+        """
+        if self._prepared is not None:
+            self.director.update(dt, now, blocked=True)     # timers only
+            if now >= self._retry_at:
+                self._seat_prepared(now)
+            return
+        name = self.director.update(dt, now)
+        if name is None:
+            return
+        ids = self.compose(name, self.director.steps(now))
+        if not ids:
+            return
+        self._prepared = (name, ids)
+        self._seat_prepared(now)
+
+    def _seat_prepared(self, now: float) -> bool:
+        """Seat the waiting company if the cap has room for all of it."""
+        name, ids = self._prepared
+        room = self._cap_room("director")
+        if room is not None and room < len(ids):
+            self._retry_at = now + self.director.cap_retry
+            self.gate_waits += 1
+            return False
+        self._prepared = None
+        made = self._place_pack(ids, "director", now, stagger=True)
+        if made is not None:
+            self.companies += 1
+        return made is not None
 
     def _tick_zone(self, now: float) -> None:
         host = self.host
@@ -283,9 +304,18 @@ class SpawnMaster:
             host.publish(ROOM_DORMANT, room=rid, slept=n)
 
     def _seed_residents(self, room_id: int, now: float) -> int:
-        """An island's first population: `residents` packs off the director's
-        current phase, seated on that island only (in the placement band
-        around the hero). Returns how many enemies were made."""
+        """An island's first population: `residents` companies, chosen the
+        way any company is and seated on that island only. Returns how many
+        enemies were made.
+
+        G3 (owner, 2026-09-17): "an island's first company is chosen and
+        placed like any other, immediately on arrival. No separate seeding
+        path." So this rolls a group off the same pool the director would
+        draw from and composes it with `compose`, rather than the retired
+        `roll_pack`. The counts in `residents` now mean *companies* rather
+        than packs of one to four, which is a large step up in bodies --
+        flagged for the balance pass rather than quietly re-tuned here.
+        """
         table = self.tables.residents
         if not table:
             return 0
@@ -295,9 +325,14 @@ class SpawnMaster:
         n = self.host.rng.randint(int(spec[0]), int(spec[1])) if isinstance(spec, list) else int(spec)
         scale = table.get("difficulty_scale", {}).get(self.host.difficulty, 1.0)
         n = int(round(n * float(scale)))
+        pool = self.director.pool(now)
+        if not pool:
+            return 0
         made = 0
         for _ in range(n):
-            ids = self.director.roll_pack(now)
+            ids = self.compose(self.host.rng.choice(pool), self.director.steps(now))
+            if not ids:
+                continue
             got = self._place_pack(ids, "resident", now, room_weights={room_id: 1.0},
                                    queue=False)
             made += len(got or ())
@@ -528,6 +563,5 @@ class SpawnMaster:
         hp_mult, spd_mult = self.director.stat_multipliers(self.host.elapsed)
         enemy = self.host.make_enemy(enemy_id, x, y, hp_mult, spd_mult, owner)
         self.spawned += 1
-        self.pacing.on_spawn(self.host.elapsed)
         self.host.publish(ENEMY_SPAWNED, enemy_id=enemy_id, owner=owner, room=room_id)
         return enemy

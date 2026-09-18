@@ -40,18 +40,16 @@ class EnemyIdTests(unittest.TestCase):
         cls.bosses = _load("bosses.json")
         cls.ids = set(cls.enemies)
 
-    def test_every_band_names_enemies_that_exist(self):
-        for i, phase in enumerate(self.tables["phases"], 1):
-            for eid in phase["types"]:
-                with self.subTest(band=i, enemy=eid):
-                    self.assertIn(eid, self.ids)
-
     def test_every_difficulty_override_names_enemies_that_exist(self):
         for level, over in self.tables.get("difficulty", {}).items():
             for i, phase in enumerate(over.get("phases", []), 1):
                 for eid in phase["types"]:
                     with self.subTest(level=level, band=i, enemy=eid):
                         self.assertIn(eid, self.ids)
+
+    # G3 retired `phases` and the top-level `elites` slot, so the two tests
+    # that walked them are gone. `groups` is the only place the tables name
+    # an enemy now, and the check below is the whole surface.
 
     def test_every_group_names_enemies_that_exist(self):
         """G2: a group is two weight tables, `commons` and (sometimes)
@@ -64,11 +62,6 @@ class EnemyIdTests(unittest.TestCase):
                 for half in ("commons", "elites"):
                     for eid in g.get(half, {}):
                         self.assertIn(eid, self.ids, f"{name} {half} {eid}")
-
-    def test_the_elite_slots_name_enemies_that_exist(self):
-        for key in ("default", "rare"):
-            with self.subTest(slot=key):
-                self.assertIn(self.tables["elites"][key], self.ids)
 
     def test_every_summon_names_an_enemy_that_exists(self):
         """Both the enemy blocks and `bosses.json`, which the tables'
