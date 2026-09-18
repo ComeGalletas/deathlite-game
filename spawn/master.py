@@ -333,8 +333,8 @@ class SpawnMaster:
     def _place_pack(self, ids: list, owner: str, queued_at: float, at=None,
                     prefer: tuple = (), clearance: str | None = None, queue: bool = True,
                     room_weights: dict | None = None):
-        """Seat `ids` together: the leader on a point (or `at`), the rest on
-        a ring round it. Returns the enemies made, or None when nothing
+        """Seat `ids` together: the leader on a point (or `at`), the rest
+        packed around it. Returns the enemies made, or None when nothing
         could be seated (queued as debt when `queue`)."""
         host = self.host
         now = host.elapsed
@@ -360,7 +360,7 @@ class SpawnMaster:
         if followers:
             centre = made[0].pos
             radii = [host.enemy_radius(e) for e in followers]
-            spots = self.placement.ring(centre, host.enemy_radius(leader), radii,
+            spots = self.placement.pack(centre, host.enemy_radius(leader), radii,
                                         host.is_walkable, host.rng)
             for eid, spot in zip(followers, spots):
                 if spot is None or not self._under_cap(owner):

@@ -2,6 +2,7 @@
 together on one vetted point, the cap holds for every entry point, debt
 is kept and retried, templates roll, modifiers scale the cadence, the
 event fires, and a world with no points falls back."""
+import math
 import random
 import unittest
 
@@ -17,6 +18,18 @@ from world.layout import SpawnPoint
 def _master(host, seed: int = 3, duration: float = 600.0) -> SpawnMaster:
     director = SpawnDirector(run_duration=duration, rng=random.Random(seed))
     return SpawnMaster(host, director)
+
+
+def _reach(master, biggest: float = 26.0, followers: int = 3) -> float:
+    """How far from its leader the furthest body of a director pack can sit.
+    The packer's own bound -- the ring limit it derives for the company, plus
+    one cell of jitter -- rather than a number copied out of it."""
+    pl = master.placement
+    start = biggest + biggest + pl.pack_gap
+    step = 2.0 * biggest + pl.pack_gap
+    limit = min(pl.pack_max_radius,
+                max(start + step, start + step * pl.pack_spread * math.sqrt(followers)))
+    return limit + pl.pack_jitter * step
 
 
 def _run(master, host, seconds: float, dt: float = 1 / 30) -> None:
@@ -37,7 +50,7 @@ class PackTests(unittest.TestCase):
         points = {(p.x, p.y) for p in host.layout.spawn_points}
         leader = host.live[0]
         self.assertIn((leader.pos.x, leader.pos.y), points)
-        reach = 2 * (26.0 + 26.0 + m.placement.ring_gap) * 1.6
+        reach = _reach(m)
         for e in host.live[1:]:
             self.assertLess((e.pos - leader.pos).length(), reach)
             self.assertNotIn((e.pos.x, e.pos.y), points)      # followers ring, not stack
@@ -58,7 +71,7 @@ class PackTests(unittest.TestCase):
         _run(m, host, 60.0)
         self.assertGreater(len(host.live), 10)
         keep = m.placement.starved_min_distance
-        ring = 2 * (26.0 + 26.0 + m.placement.ring_gap) * 1.6   # a follower's reach
+        ring = _reach(m)                   # how far a follower can sit from its leader
         for e in host.live:
             self.assertGreaterEqual((e.pos - host.player).length(), keep - ring,
                                     f"{e.pos} is inside the keep-away")

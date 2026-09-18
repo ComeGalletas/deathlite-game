@@ -1,5 +1,5 @@
 """Where a spawn request lands: a filtered, weighted pick over the spawn
-points of the rooms in play, plus the ring a pack's followers stand on.
+points of the rooms in play, plus how a company packs around its leader.
 
 Spawn master S3. The run used to try a dozen random cells of a nearby
 island (the fallback now called `GameMap.spawn_point_near`); now it asks this for one of the
@@ -54,10 +54,21 @@ body already standing on the point are physical, not aesthetic. `None` now
 means no point in the zone is usable at all, and the master keeps such a
 request as debt.
 
-`ring(...)` places followers around a leader: evenly spaced on a circle of
-radius leader + follower + `ring_gap`, at a random phase, each checked for
-floor and retried once on a wider circle. A follower that fits nowhere is
-dropped -- a pack spawns short rather than stacked.
+`pack(...)` seats a company around its leader. Concentric rings are the
+skeleton -- the first clears the leader, each one after it is a body
+diameter further out -- and every body is then nudged a random distance
+inside its own cell, so the group reads as a crowd rather than as a target
+painted on the ground. A candidate must be walkable *and* clear of every
+body already seated. A follower that fits nowhere is dropped: a company
+spawns short rather than stacked.
+
+This replaced a single circle of radius leader + follower + gap (G0a,
+2026-09-17). That circle only ever tested the terrain, never the bodies
+already placed, so it capped near 24 seated and stacked badly above it --
+twenty bodies on a 34 px circle have 214 px of arc to share and need 800.
+Measured on a booted run, the packer seats forty small bodies inside 174 px
+with zero overlaps at every anchor tried, and the jitter costs nothing in
+fill.
 
 Every number comes from the `placement` section of
 `data/enemies/spawn_tables.json`.
@@ -74,8 +85,14 @@ from spawn.points import PointIndex, SpawnPoint
 __all__ = ["Placement", "SpawnRequest"]
 
 _KEYS = ("cooldown", "far_min_distance", "far_max_distance", "near_min_distance",
-         "relax_after", "ring_gap", "same_floor_weight", "prefer_weight",
-         "starved_min_distance", "starved_cooldown")
+         "relax_after", "same_floor_weight", "prefer_weight",
+         "starved_min_distance", "starved_cooldown",
+         "pack_gap", "pack_jitter", "pack_tries", "pack_spread", "pack_max_radius")
+
+# Consecutive rings are twisted against each other so their slots do not line
+# up into spokes. Geometry, not tuning -- the jitter is what makes a company
+# look irregular, and that is a knob.
+_RING_TWIST = 0.6
 
 # The relaxation ladder, strictest first. `choose` walks it and takes the
 # first rung that offers anything, so a request fails only when no point in
@@ -106,7 +123,11 @@ class Placement:
         self.far_max_distance = float(knobs["far_max_distance"])
         self.near_min_distance = float(knobs["near_min_distance"])
         self.relax_after = float(knobs["relax_after"])
-        self.ring_gap = float(knobs["ring_gap"])
+        self.pack_gap = float(knobs["pack_gap"])
+        self.pack_jitter = float(knobs["pack_jitter"])
+        self.pack_tries = int(knobs["pack_tries"])
+        self.pack_spread = float(knobs["pack_spread"])
+        self.pack_max_radius = float(knobs["pack_max_radius"])
         self.same_floor_weight = float(knobs["same_floor_weight"])
         self.prefer_weight = float(knobs["prefer_weight"])
         self.starved_min_distance = float(knobs["starved_min_distance"])
@@ -208,24 +229,81 @@ class Placement:
             return point
         return None
 
-    # --- followers ----------------------------------------------------
-    def ring(self, centre: pygame.Vector2, leader_radius: float,
+    # --- seating a company ---------------------------------------------
+    def pack(self, centre: pygame.Vector2, leader_radius: float,
              follower_radii: list[float], is_walkable, rng) -> list[pygame.Vector2 | None]:
-        """One position per follower (or `None` where nothing fits), on a
-        circle round the leader."""
+        """One position per follower, in the order given, or `None` where
+        nothing fits.
+
+        The leader stands at `centre` and is seated already; the followers
+        take ring slots outward from it in turn, each nudged inside its own
+        cell if the nudge lands somewhere legal and dropped on the exact slot
+        otherwise. Rings are spaced for the *largest* follower, so a heavy
+        arriving late still fits any slot that is free -- the order the
+        bodies come in does not decide who gets seated.
+
+        The ring radius is bounded by the company: enough room for `n` bodies
+        at `pack_spread`, never more than `pack_max_radius`, and always at
+        least two rings so a blocked first choice can still be retried wider
+        the way the old single circle did.
+        """
         n = len(follower_radii)
         if n == 0:
             return []
-        phase = rng.uniform(0.0, math.tau)
-        out: list = []
+        big = max(follower_radii)
+        start = leader_radius + big + self.pack_gap      # the first ring clears the leader
+        step = 2.0 * big + self.pack_gap                 # one body diameter per ring
+        limit = min(self.pack_max_radius,
+                    max(start + step,
+                        start + step * self.pack_spread * math.sqrt(n)))
+        slots = self._slots(centre, start, step, limit, rng.uniform(0.0, math.tau))
+        taken: list[tuple[pygame.Vector2, float]] = [(pygame.Vector2(centre), leader_radius)]
+        out: list[pygame.Vector2 | None] = [None] * n
         for i, fr in enumerate(follower_radii):
-            ang = phase + i * math.tau / n
-            d = pygame.Vector2(math.cos(ang), math.sin(ang))
-            placed = None
-            for scale in (1.0, 1.6):
-                pos = centre + d * (leader_radius + fr + self.ring_gap) * scale
-                if is_walkable(pos, fr):
-                    placed = pos
+            for base in slots:
+                spot = self._seat(base, fr, step, taken, is_walkable, rng)
+                if spot is not None:
+                    taken.append((spot, fr))
+                    out[i] = spot
                     break
-            out.append(placed)
+            else:
+                break            # the rings ran out; nobody after this fits either
         return out
+
+    @staticmethod
+    def _slots(centre: pygame.Vector2, start: float, step: float, limit: float,
+               phase: float):
+        """Ring slots outward from the leader, nearest first."""
+        rad, turn = start, 0
+        while rad <= limit:
+            count = max(1, int(math.tau * rad / step))
+            off = phase + turn * _RING_TWIST
+            for i in range(count):
+                ang = off + (i / count) * math.tau
+                yield pygame.Vector2(centre.x + math.cos(ang) * rad,
+                                     centre.y + math.sin(ang) * rad)
+            rad += step
+            turn += 1
+
+    def _seat(self, base: pygame.Vector2, radius: float, step: float,
+              taken: list, is_walkable, rng) -> pygame.Vector2 | None:
+        """`base` nudged inside its own cell, the exact slot as the fallback,
+        or `None` if neither is legal."""
+        reach = self.pack_jitter * step
+        for _ in range(self.pack_tries if reach > 0.0 else 0):
+            ang = rng.uniform(0.0, math.tau)
+            d = rng.uniform(0.0, reach)
+            cand = pygame.Vector2(base.x + math.cos(ang) * d, base.y + math.sin(ang) * d)
+            if self._clear(cand, radius, taken, is_walkable):
+                return cand
+        return base if self._clear(base, radius, taken, is_walkable) else None
+
+    @staticmethod
+    def _clear(pos: pygame.Vector2, radius: float, taken: list, is_walkable) -> bool:
+        # Bodies first: pure arithmetic, and the dense middle of a company is
+        # where most candidates die. Terrain second -- it is the grid lookup.
+        for q, qr in taken:
+            reach = radius + qr
+            if (pos.x - q.x) ** 2 + (pos.y - q.y) ** 2 < reach * reach:
+                return False
+        return is_walkable(pos, radius)

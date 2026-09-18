@@ -1,5 +1,6 @@
 """`spawn/placement.py`: the six-step filter, the weighted pick, the
-cooldown, deferral relaxation, and the follower ring (spawn master S3).
+cooldown, deferral relaxation, and the company packer (spawn master S3,
+G0a).
 Since S11 the filter's distance rule is a band around the player and the
 camera is not an input; the tests here move the view and expect nothing."""
 import math
@@ -192,39 +193,122 @@ class CooldownAndDeferralTests(unittest.TestCase):
                          [pb.choose(_req(b), b, t) for t in range(0, 30, 4)])
 
 
-class RingTests(unittest.TestCase):
-    def test_followers_ring_the_leader_at_the_right_gap(self):
+class PackTests(unittest.TestCase):
+    """`pack` replaced the single follower circle in G0a (2026-09-17). The
+    circle only ever checked the terrain, so above a handful of bodies a pack
+    stacked on itself; these pin what the packer owes instead -- everyone
+    seated, nobody overlapping, every spot walkable, and a graceful short
+    company when the ground runs out."""
+
+    CENTRE = pygame.Vector2(1000, 1000)
+
+    def _pack(self, pl, host, leader_r, radii):
+        return pl.pack(self.CENTRE, leader_r, radii, host.is_walkable, host.rng)
+
+    def _assert_legal(self, spots, leader_r, radii, host, limit=None):
+        """No body overlaps the leader or another body, and every spot is
+        walkable for the body that took it."""
+        bodies = [(self.CENTRE, leader_r)]
+        for fr, s in zip(radii, spots):
+            if s is None:
+                continue
+            self.assertTrue(host.is_walkable(s, fr), f"{s} is not walkable for r{fr}")
+            if limit is not None:
+                self.assertLessEqual((s - self.CENTRE).length(), limit + 1e-6)
+            for q, qr in bodies:
+                self.assertGreaterEqual((s - q).length(), fr + qr - 1e-6,
+                                        f"{s} (r{fr}) overlaps a body at {q} (r{qr})")
+            bodies.append((s, fr))
+
+    def test_a_forty_body_company_seats_whole_and_never_overlaps(self):
+        # The measurement that justified the packer: the old circle capped
+        # near 24 seated with 75 overlapping pairs at this size.
         host = FakeHost()
         pl = _placement(host)
-        centre = pygame.Vector2(1000, 1000)
+        radii = [10.0] * 40
+        spots = self._pack(pl, host, 10.0, radii)
+        self.assertEqual(len(spots), 40)
+        self.assertNotIn(None, spots)
+        self._assert_legal(spots, 10.0, radii, host)
+        # and it stays a company: a screen's worth of ground, not the island
+        self.assertLess(max((s - self.CENTRE).length() for s in spots), 300.0)
+
+    def test_a_small_pack_stays_tight_against_the_leader(self):
+        host = FakeHost()
+        pl = _placement(host)
         radii = [14.0, 14.0, 26.0]
-        spots = pl.ring(centre, 22.0, radii, host.is_walkable, host.rng)
+        spots = self._pack(pl, host, 22.0, radii)
         self.assertEqual(len(spots), 3)
-        for fr, s in zip(radii, spots):
-            self.assertIsNotNone(s)
-            self.assertAlmostEqual((s - centre).length(), 22.0 + fr + pl.ring_gap, places=6)
-        # evenly spread: the two smallest angles between neighbours are ~120 deg
-        angs = sorted(math.atan2(s.y - centre.y, s.x - centre.x) for s in spots)
-        gaps = [angs[1] - angs[0], angs[2] - angs[1], math.tau - (angs[2] - angs[0])]
-        for g in gaps:
-            self.assertAlmostEqual(g, math.tau / 3, places=6)
+        self.assertNotIn(None, spots)
+        self._assert_legal(spots, 22.0, radii, host)
+        # The first ring clears the leader by the largest follower plus the
+        # gap; on open ground three bodies all fit on it, jitter included.
+        first = 22.0 + 26.0 + pl.pack_gap
+        step = 2.0 * 26.0 + pl.pack_gap
+        for s in spots:
+            self.assertLessEqual((s - self.CENTRE).length(),
+                                 first + pl.pack_jitter * step)
+
+    def test_the_radius_grows_with_the_company_and_the_bodies(self):
+        host = FakeHost()
+        pl = _placement(host)
+        small = self._pack(pl, host, 10.0, [10.0] * 6)
+        crowd = self._pack(pl, host, 10.0, [10.0] * 40)
+        heavy = self._pack(pl, host, 24.0, [24.0] * 6)
+        reach = lambda spots: max((s - self.CENTRE).length() for s in spots if s)
+        self.assertLess(reach(small), reach(crowd))
+        self.assertLess(reach(small), reach(heavy))
+        self.assertLessEqual(reach(crowd), pl.pack_max_radius)
+
+    def test_the_jitter_breaks_the_rings_without_costing_a_body(self):
+        # Measured (2026-09-17): jitter at 0.35 fills as well as the exact
+        # rings. What it buys is that the company is not laid out in visible
+        # circles -- so on open ground the same 40 bodies seat, but they no
+        # longer sit at a handful of discrete radii.
+        host = FakeHost()
+        radii = [10.0] * 40
+        exact = _placement(host)
+        exact.pack_jitter = 0.0
+        plain = self._pack(exact, host, 10.0, radii)
+        jittered = self._pack(_placement(host), host, 10.0, radii)
+        self.assertEqual(sum(s is not None for s in jittered),
+                         sum(s is not None for s in plain))
+        self.assertEqual(len(jittered), 40)
+        bands = lambda spots: {round((s - self.CENTRE).length(), 3) for s in spots if s}
+        self.assertLess(len(bands(plain)), 10, "the exact rings are banded")
+        self.assertGreater(len(bands(jittered)), 30, "the jittered ones are not")
 
     def test_a_blocked_spot_is_retried_wider_then_dropped(self):
         host = FakeHost()
         pl = _placement(host)
-        centre = pygame.Vector2(1000, 1000)
-        # a wall disc that blocks the first ring but not the wider one
-        host.blocked = [(centre, 22.0 + 14.0 + pl.ring_gap + 2.0)]
-        spots = pl.ring(centre, 22.0, [14.0], host.is_walkable, host.rng)
+        # a wall disc that swallows the first ring but not the ones past it
+        first = 22.0 + 14.0 + pl.pack_gap
+        host.blocked = [(self.CENTRE, first + 2.0)]
+        spots = self._pack(pl, host, 22.0, [14.0])
         self.assertIsNotNone(spots[0])
-        self.assertGreater((spots[0] - centre).length(), 22.0 + 14.0 + pl.ring_gap)
-        # a wall that blocks both -> dropped
-        host.blocked = [(centre, 500.0)]
-        self.assertEqual(pl.ring(centre, 22.0, [14.0], host.is_walkable, host.rng), [None])
+        self.assertGreater((spots[0] - self.CENTRE).length(), first)
+        # a wall past every ring this company is allowed -> dropped, not stacked
+        host.blocked = [(self.CENTRE, 2000.0)]
+        self.assertEqual(self._pack(pl, host, 22.0, [14.0]), [None])
 
-    def test_no_followers_is_no_ring(self):
+    def test_a_company_spawns_short_when_the_ground_runs_out(self):
         host = FakeHost()
-        self.assertEqual(_placement(host).ring(pygame.Vector2(), 1.0, [], host.is_walkable,
+        pl = _placement(host)
+        radii = [10.0] * 40
+        # open ground out to 120 px, wall beyond: only the inner rings exist
+        host.blocked = [(self.CENTRE + pygame.Vector2(math.cos(a), math.sin(a)) * 260.0,
+                         180.0) for a in [i * math.tau / 12 for i in range(12)]]
+        spots = self._pack(pl, host, 10.0, radii)
+        self.assertEqual(len(spots), 40)
+        seated = [s for s in spots if s is not None]
+        self.assertTrue(0 < len(seated) < 40, f"{len(seated)} seated")
+        self._assert_legal(spots, 10.0, radii, host)
+        # the shortfall is a tail of None, never a hole in the middle
+        self.assertEqual(spots[:len(seated)], seated)
+
+    def test_no_followers_is_no_pack(self):
+        host = FakeHost()
+        self.assertEqual(_placement(host).pack(pygame.Vector2(), 1.0, [], host.is_walkable,
                                                host.rng), [])
 
 

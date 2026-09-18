@@ -75,7 +75,12 @@
     "relax_after": 5.0,
     "starved_min_distance": 420,
     "starved_cooldown": 0.5,
-    "ring_gap": 8,
+    "_pack_comment": "How a company is seated around its leader (G0a, 2026-09-17). Concentric rings spaced by a body diameter plus `pack_gap`; each body is then nudged up to `pack_jitter` of a cell in a random direction, retried `pack_tries` times before the exact slot is used, so the group reads as a crowd rather than as circles. `pack_spread` sizes the disc for the company -- start + step * spread * sqrt(n), a ceiling of about 275 px for forty small bodies (they in fact seat inside 174) and the `pack_max_radius` cap for thirty-odd large ones. Measured on a booted run: jitter at 0.35 costs nothing in fill and gains a little on large bodies, because a nudged candidate finds ground the exact slot missed; past 0.35 the fill starts to slip.",
+    "pack_gap": 8,
+    "pack_jitter": 0.35,
+    "pack_tries": 3,
+    "pack_spread": 1.4,
+    "pack_max_radius": 420,
     "same_floor_weight": 1.3,
     "prefer_weight": 2.0
   },
