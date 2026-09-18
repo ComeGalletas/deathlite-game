@@ -238,7 +238,7 @@ class CapTests(unittest.TestCase):
             host.make_enemy("skull", 5, 5, 1.0, 1.0)
         self.assertIsNone(m.spawn_at("skull"))
         self.assertIsNone(m.spawn_at("skull", pygame.Vector2(1, 1)))
-        self.assertEqual(m.spawn_group("husk_pack"), [])
+        self.assertEqual(m.spawn_group("dark"), [])
         _run(m, host, 5.0)
         self.assertEqual(len(host.live), cap)
 
@@ -253,7 +253,7 @@ class CapTests(unittest.TestCase):
         scripted = m.spawn_at("bear", pygame.Vector2(1, 1), owner="dev")    # scripted: seated
         self.assertIsNotNone(scripted)
         self.assertEqual(len(host.live), cap + 1)
-        pack = m.spawn_group("warband", at=pygame.Vector2(500, 500), owner="dev")
+        pack = m.spawn_group("wild_beasts", at=pygame.Vector2(500, 500), owner="dev")
         self.assertGreaterEqual(len(pack), 3)                                # whole pack lands
         # The exact list, deliberately: the cap is a performance guard, so an
         # owner that bypasses it has to be added on purpose and seen here.
@@ -270,7 +270,7 @@ class CapTests(unittest.TestCase):
         cap = m.director.enemy_count_cap(0.0)
         for _ in range(cap - 1):
             host.make_enemy("skull", 5, 5, 1.0, 1.0)
-        made = m.spawn_group("swarm")                # 1 + 4..6 wanted
+        made = m.spawn_group("swarm")                # 20..30 wanted
         self.assertEqual(len(made), 1)
         self.assertEqual(len(host.live), cap)
 
@@ -305,39 +305,83 @@ class DebtTests(unittest.TestCase):
         self.assertLessEqual(m.debt, 20)
 
 
-class GroupAndModifierTests(unittest.TestCase):
-    def test_a_template_rolls_its_followers_in_span(self):
-        host = FakeHost()
-        m = _master(host)
-        made = m.spawn_group("warband")
-        ids = [e.enemy_id for e in made]
-        self.assertEqual(ids[0], "bear")
-        self.assertIn(ids.count("skull"), (2, 3))
-        self.assertIn(ids.count("slingshot_gnome"), (0, 1))
-        self.assertEqual(host.events[-1][1]["owner"], "group")
+class CompanyTests(unittest.TestCase):
+    """G2: a company is one social group -- a count rolled in the group's
+    `common_range`, drawn by weight, plus the elites its ladder allows.
 
-    def test_a_template_at_a_position_lands_there(self):
+    The leader+followers templates these tests used to drive are gone; a
+    company has no leader, only a body that happens to be seated first.
+    `test_a_group_that_prefers_upper_lands_upper` went with them: `prefer`
+    was a per-template placement hint and no group declares one now, so
+    there is nothing left to assert. The `prefer` machinery in `Placement`
+    is untouched and still covered by `test_placement.py`.
+    """
+
+    def test_a_company_is_sized_in_its_span_and_drawn_from_its_group(self):
         host = FakeHost()
         m = _master(host)
-        made = m.spawn_group("husk_pack", at=pygame.Vector2(300, 300), owner="dev")
+        members = set(m.roster.get("dark").commons)
+        lo, hi = m.roster.get("dark").common_range
+        for _ in range(12):
+            ids = m.compose("dark")
+            self.assertLessEqual(lo, len(ids))
+            self.assertLessEqual(len(ids), hi)
+            self.assertTrue(set(ids) <= members, set(ids) - members)
+
+    def test_an_elite_company_carries_the_ladder_count(self):
+        host = FakeHost()
+        m = _master(host)
+        g = m.roster.get("goblin")
+        commons, elites = set(g.commons), set(g.elites)
+        lo, hi = g.common_range
+        for steps in (0, 1, 4, 99):
+            ids = m.compose("goblin", steps=steps)
+            want = g.elite_count(steps)
+            got = sum(1 for e in ids if e in elites)
+            with self.subTest(steps=steps):
+                self.assertEqual(got, want)
+                self.assertLessEqual(lo, len(ids) - got)
+                self.assertLessEqual(len(ids) - got, hi)
+                self.assertTrue(set(ids) <= commons | elites)
+
+    def test_a_common_group_never_produces_an_elite(self):
+        host = FakeHost()
+        m = _master(host)
+        every_elite = set()
+        for name in m.roster.names(elite=True):
+            every_elite |= set(m.roster.get(name).elites)
+        for name in m.roster.names(elite=False):
+            for steps in (0, 99):
+                ids = m.compose(name, steps=steps)
+                self.assertEqual(set(ids) & every_elite, set(), f"{name} @ {steps}")
+
+    def test_the_elites_are_not_all_left_on_the_rim(self):
+        """`_place_pack` seats the first id on the point and packs the rest
+        outward, so an unshuffled company would put every elite outside.
+        Over many companies the elites must appear at many positions."""
+        host = FakeHost()
+        m = _master(host)
+        elites = set(m.roster.get("goblin").elites)
+        seen = set()
+        for _ in range(40):
+            ids = m.compose("goblin", steps=3)
+            seen.update(i for i, e in enumerate(ids) if e in elites)
+        self.assertGreater(len(seen), 6, f"elites clustered at {sorted(seen)}")
+        self.assertIn(True, [i < 3 for i in seen], "no elite ever seated early")
+
+    def test_a_company_lands_together_and_reports_its_owner(self):
+        host = FakeHost()
+        m = _master(host)
+        made = m.spawn_group("dark", at=pygame.Vector2(300, 300), owner="dev")
         self.assertEqual((made[0].pos.x, made[0].pos.y), (300.0, 300.0))
         self.assertTrue(all(e is not None for e in made))
         self.assertEqual(host.events[-1][1]["owner"], "dev")
 
-    def test_a_group_that_prefers_upper_lands_upper(self):
-        def floor_of(x, y):
-            return 1 if y < 2000 else 0
-        from tests.spawn.fakehost import ROOM0, ROOM1, grid_points
-        pts = grid_points(0, ROOM0, floor_of=floor_of) + grid_points(1, ROOM1, floor_of=floor_of)
-        pts = [p._replace(tags=frozenset({"upper"}) if p.floor == 1 else frozenset()) for p in pts]
-        host = FakeHost(points=pts)
-        host.player = pygame.Vector2(1000, 2300)          # on floor 0; the band reaches both floors
-        host.view.center = (1000, 2300)
-        m = _master(host)
-        # with the weighting only, both floors are possible; make it certain
-        m.placement.prefer_weight = 1e9
-        made = m.spawn_group("artillery")
-        self.assertLess(made[0].pos.y, 2000)
+    def test_the_same_seed_composes_the_same_company(self):
+        a, b = FakeHost(seed=9), FakeHost(seed=9)
+        ma, mb = _master(a), _master(b)
+        self.assertEqual(ma.compose("wild_beasts", steps=2),
+                         mb.compose("wild_beasts", steps=2))
 
     def test_modifiers_multiply_and_scale_the_cadence(self):
         host = FakeHost()

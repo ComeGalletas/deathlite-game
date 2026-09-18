@@ -54,11 +54,16 @@ class EnemyIdTests(unittest.TestCase):
                         self.assertIn(eid, self.ids)
 
     def test_every_group_names_enemies_that_exist(self):
+        """G2: a group is two weight tables, `commons` and (sometimes)
+        `elites`, rather than a leader and followers."""
         for name, g in self.tables["groups"].items():
+            if name.startswith("_"):            # a comment, not a group
+                continue
             with self.subTest(group=name):
-                self.assertIn(g["leader"], self.ids)
-                for eid in g.get("followers", {}):
-                    self.assertIn(eid, self.ids, f"{name} follower {eid}")
+                self.assertTrue(g.get("commons"), f"{name} has no commons")
+                for half in ("commons", "elites"):
+                    for eid in g.get(half, {}):
+                        self.assertIn(eid, self.ids, f"{name} {half} {eid}")
 
     def test_the_elite_slots_name_enemies_that_exist(self):
         for key in ("default", "rare"):

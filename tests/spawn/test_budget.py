@@ -165,7 +165,18 @@ class SpawnDirectorTests(unittest.TestCase):
         from spawn.tables import SpawnTables
         data = {"phases": [{"until": 1.0, "interval": [0.1, 0.1], "pack": [1, 1],
                             "elite": 0.0, "types": {"turtle": 1.0}}],
-                "elites": {"default": "bear", "rare": "troll", "rare_chance": 0.0}}
+                "elites": {"default": "bear", "rare": "troll", "rare_chance": 0.0},
+                # G2: `groups` and `cooldowns` are required sections, like
+                # `phases` and `elites`, so a hand-made table carries a
+                # minimal pair. Neither is read by the phase schedule this
+                # test exercises.
+                "groups": {"only": {"commons": {"turtle": 1.0},
+                                    "common_range": [1, 1]}},
+                "cooldowns": {"common": 5.0, "common_decay": 1.0,
+                              "common_floor": 1.0, "elite": 15.0,
+                              "elite_decay": 3.0, "elite_floor": 3.0,
+                              "step_seconds": 120.0, "elite_unlock": 60.0,
+                              "cap_retry": 2.0}}
         d = SpawnDirector(run_duration=100, rng=random.Random(2),
                           tables=SpawnTables(data))
         out = self._run(d, duration=10)

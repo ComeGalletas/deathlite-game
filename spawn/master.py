@@ -78,6 +78,7 @@ from spawn.placement import Placement, SpawnRequest
 from spawn.points import PointIndex
 from spawn.pacing import Pacing
 from spawn.population import Population
+from spawn.roster import resolve_groups
 from spawn.watchdog import Watchdog
 
 __all__ = ["SpawnMaster", "ENEMY_SPAWNED", "ROOM_ACTIVATED", "ROOM_DORMANT", "ENEMY_RECYCLED"]
@@ -101,6 +102,13 @@ class SpawnMaster:
         self.placement = Placement(self.index, self.tables.placement)
         owners = self.tables.owners
         self._cap_exempt = frozenset(owners.get("cap_exempt", ()))
+        # G2a: what a company may actually be drawn from, decided once here
+        # -- the owner's call, since nothing edits the data mid-run. A group
+        # or a member that does not hold up is skipped or demoted rather
+        # than refused at load, and every decision is logged (`roster.py`).
+        self.roster = resolve_groups(self.tables.groups, self._enemy_defs())
+        for note in self.roster.notes:
+            log.warning("spawn roster: %s", note)
         self.locality = Locality(self.tables.locality)
         self.population = Population(self.tables.population, owners.get("never_sleep", ()))
         self.watchdog = Watchdog(self.tables.watchdog)
@@ -129,6 +137,15 @@ class SpawnMaster:
         self.deferred = 0
         self.recycled = 0
         self.discarded = 0
+
+    @staticmethod
+    def _enemy_defs() -> dict:
+        """The loaded `enemies.json`. The roster needs the definitions rather
+        than the ids, because the rank pass reads each member's `is_elite`.
+        Imported here, like `spawn/budget.py` reads its default tables, so
+        the package does not depend on the content at import time."""
+        from game.content import get_content
+        return get_content().enemies
 
     @staticmethod
     def _class_radii() -> tuple[float, float]:
@@ -371,17 +388,54 @@ class SpawnMaster:
             return self._make(enemy_id, point.x, point.y, owner, point.room_id)
         return self._make(enemy_id, pos.x, pos.y, owner, None)
 
-    def spawn_group(self, name: str, at=None, owner: str = "group") -> list:
-        """A template from the tables: the leader plus each follower kind
-        rolled in its span, placed together."""
-        g = self.tables.group(name)
-        ids = [g["leader"]]
-        for eid, (lo, hi) in g.get("followers", {}).items():
-            ids.extend([eid] * self.host.rng.randint(lo, hi))
-        prefer = tuple(g.get("prefer", ()))
-        clearance = g.get("clearance")
-        return self._place_pack(ids, owner, self.host.elapsed, at=at,
-                                prefer=prefer, clearance=clearance, queue=False) or []
+    def compose(self, name: str, steps: int = 0) -> list[str]:
+        """The bodies of one company of group `name` (G2).
+
+        A count rolled in the group's `common_range`, each body drawn by
+        `commons` weight, plus however many elites the ladder allows at
+        `steps`, drawn by `elites` weight. The count of elites is
+        deterministic and the identities are not, which is the shape the
+        owner asked for: an elite company is *guaranteed* elites, growing,
+        rather than a company that sometimes contains one.
+
+        The result is shuffled. `_place_pack` seats the first id on the
+        point and packs the rest outward, so an unshuffled company would put
+        every elite on the rim; a company has no leader, only a body that
+        happens to be seated first.
+
+        `steps` is the ladder position and comes from the caller, because
+        the run clock belongs to the director rather than to the tables.
+
+        Drawn from the **resolved** roster, not the declared table: a group
+        whose data did not hold up may be common-only or absent altogether,
+        and an unusable group returns nothing rather than raising (G2a).
+        """
+        g = self.roster.get(name)
+        if g is None:
+            return []
+        rng = self.host.rng
+        lo, hi = g.common_range
+        ids = self._draw(g.commons, rng.randint(lo, hi), rng)
+        elites = g.elite_count(steps)
+        if elites:
+            ids.extend(self._draw(g.elites, elites, rng))
+        rng.shuffle(ids)
+        return ids
+
+    @staticmethod
+    def _draw(weights: dict, n: int, rng) -> list[str]:
+        """`n` ids drawn with replacement by weight. Sorted first so the
+        draw is a function of the seed and not of dict ordering."""
+        if not weights or n <= 0:
+            return []
+        ids = sorted(weights)
+        return rng.choices(ids, weights=[weights[i] for i in ids], k=n)
+
+    def spawn_group(self, name: str, at=None, owner: str = "group",
+                    steps: int = 0) -> list:
+        """One whole company of group `name`, placed together."""
+        return self._place_pack(self.compose(name, steps), owner,
+                                self.host.elapsed, at=at, queue=False) or []
 
     # --- placing a pack -------------------------------------------------
     def _place_pack(self, ids: list, owner: str, queued_at: float, at=None,

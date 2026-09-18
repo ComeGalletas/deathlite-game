@@ -703,13 +703,17 @@ Independent of the spawn model; can land green on their own.
 
 ### G2 - The new tables
 
-- [ ] `groups`: six entries with `members` (id -> weight), `commons:
-      [min, max]`, and where present `elites` (id -> weight),
-      `elite_range: [min, max]`, `elite_step`
-- [ ] `cooldowns`: common 5, elite 15, decay 1 / 3, floors 1 / 3,
+- [x] `groups`: six entries with `commons` (id -> weight) and
+      `common_range: [min, max]`, and where present `elites` (id -> weight),
+      `elite_range: [min, max]`, `elite_step`. Renamed from the sketch's
+      `members` / `commons` so the two halves are spelled the same way
+- [x] `cooldowns`: common 5, elite 15, decay 1 / 3, floors 1 / 3,
       `step_seconds` 120, `elite_unlock` 60, `cap_retry` 2
-- [ ] `company_stagger`
-- [ ] Delete `phases`, `ramp_seconds`, `elites`, `pacing`, old `groups`
+- [x] `company_stagger` *(landed in G0b)*
+- [x] Old `groups` templates deleted. **`phases`, `ramp_seconds`, `elites`
+      and `pacing` deliberately kept** - the director still reads them, so
+      they go in G3 with the rewrite that stops. This is why G2 stayed
+      green
 - [ ] `SpawnTables`: parse and validate; drop `phase_at`, `phases()`,
       `group()`, `ramp_seconds`, `elites`, `pacing`. Validation: member ids
       exist, weights > 0, `min <= max`, a group's elites are all `is_elite`
@@ -1253,6 +1257,253 @@ Suite green.
 
 ---
 
+---
+
+## G2 built: the new tables (2026-09-17)
+
+`groups` and `cooldowns` are in `spawn_tables.json`, parsed and validated.
+**The suite never went red** - see "what was deliberately not deleted"
+below, which is the reason.
+
+### `groups`
+
+Six entries, one per social group. Each carries `commons` (id -> weight) and
+`common_range` [min, max]; the two elite-bearing groups add `elites`
+(id -> weight), `elite_range` [base minimum, ceiling] and `elite_step`.
+
+I deviated from the todo's naming, which said `members` / `commons`. That
+paired a roster with a count under two different conventions while the
+elite half used `elites` / `elite_range`, so the same idea was spelled two
+ways in one object. It is now symmetric - `commons` / `common_range` beside
+`elites` / `elite_range` - and the todo's names were my own earlier sketch
+rather than anything the owner said.
+
+`clearance` and `prefer` are **not** carried over from the old templates.
+Placement derives clearance from the largest body in the company, which is
+what the old per-group knob was approximating, and no group declares a
+placement preference now.
+
+### `cooldowns`
+
+The nine numbers the ladders need: `common` 5 / `common_decay` 1 /
+`common_floor` 1, `elite` 15 / `elite_decay` 3 / `elite_floor` 3,
+`step_seconds` 120, `elite_unlock` 60, `cap_retry` 2. Nothing reads them
+yet - that is G3 - but they are validated now so G3 cannot be written
+against a table that does not hold up.
+
+### Validation
+
+`member ids exist`, `weights > 0`, `min <= max`, `elite_step >= 1`,
+`elite_range` / `elite_step` refused without `elites`, neither half left
+empty once `unused` is filtered, and the cooldown keys present, numeric,
+non-negative, with each floor at or below its start.
+
+The one worth calling out: **a group's ranks must agree with
+`enemies.json`**. An `is_elite` enemy listed among a group's `commons`, or a
+non-elite among its `elites`, is named as a table error. That check needs
+the enemy *definitions* rather than just their ids, and it gets them for
+free because `game/content.py` already passes the loaded `enemies` dict; a
+test that hands in a bare set of ids has the rank checks skipped rather
+than guessed at, which `_elite_ids` says in as many words.
+
+### Measured on a booted run
+
+| group | declared commons | elites at step 0 / 4 | rolled size | seated |
+|---|---|---|---|---|
+| dark | [5, 30] | - | 9-28 | whole |
+| gnomes | [5, 30] | - | 7-29 | whole |
+| marine | [5, 30] | - | 5-28 | whole |
+| swarm | [20, 30] | - | 20-29 | whole |
+| goblin | [5, 30] | 2 / 10 | 16-33 | whole |
+| wild_beasts | [5, 20] | 1 / 9 | 14-29 | whole |
+
+Every company seated **whole** - 35 of 35 for a step-4 Goblin company, 27
+of 27 for Wild beasts - which is G0a's packer earning its keep on the sizes
+this model actually asks for. The elite counts came out exactly on the
+ladder, and the group ladders match the journal's table above:
+Goblin 2, 4, 6, 8, 10, 12, 14, 15; Wild beasts 1, 3, 5, 7, 9, 11, 13.
+
+**All eighteen combat enemies are reachable through a group, none missing.**
+The five that could never spawn - Bonepicker, Gaffjaw, Hammer Gnome,
+Whirlspear, Cinder - each have a home now (`wild_beasts`, `marine`,
+`gnomes`, `goblin`, `dark`). That was the original argument for categories
+and it is now literally true rather than projected.
+
+### What was deliberately not deleted
+
+The todo had G2 delete `phases`, `ramp_seconds`, `elites` and `pacing`. I
+kept all four, because **the director still reads them** until G3 replaces
+it: deleting them here would break `spawn/budget.py` immediately and leave
+the suite red across two steps for no gain. They go in G3, with the rewrite
+that stops reading them. The only old section actually removed is the
+`groups` templates, because the key is reused - and that cost nothing in
+shipped behaviour, because `spawn_group` turns out to have **no production
+callers at all**: the dev menu spawns through `spawn_at`, and only tests
+used the templates.
+
+Note the temporary oddity this leaves: a top-level `elites` (the old
+`default` / `rare` / `rare_chance` slot) alongside a per-group `elites`
+weight table. Different keys at different levels, and the top-level one
+dies in G3.
+
+### `spawn_group` was ported rather than left broken
+
+`SpawnMaster.compose(name, steps)` rolls a company: a count in
+`common_range`, bodies drawn by `commons` weight, plus `elite_count(name,
+steps)` elites drawn by `elites` weight. `spawn_group(name)` places one.
+
+Two details worth recording. The draw sorts the ids first, so a company is
+a function of the seed and not of dict ordering. And the result is
+**shuffled**: `_place_pack` seats the first id on the point and packs the
+rest outward, so an unshuffled company would put every elite on the rim -
+a company has no leader, only a body that happens to be seated first.
+There is a test that the elites appear at many positions rather than
+clustering at the end.
+
+`steps` comes from the caller and defaults to 0, because the run clock
+belongs to the director. G3 supplies the real ladder position.
+
+### Tests
+
+`GroupAndModifierTests` became `CompanyTests`: a company is sized in its
+span and drawn from its group, an elite company carries exactly the
+ladder's count, a common group never produces an elite at any step, the
+elites are not all left on the rim, a company lands together and reports
+its owner, and the same seed composes the same company.
+
+`test_a_group_that_prefers_upper_lands_upper` is **deleted**. `prefer` was
+a per-template placement hint and no group declares one now, so there was
+nothing left to assert. The `prefer` machinery in `Placement` is untouched
+and still covered by `test_placement.py` - worth stating, so a later reader
+does not conclude the feature was dropped.
+
+`test_benching_cannot_orphan_a_group_leader` became
+`test_benching_cannot_empty_half_a_group` - a group has two halves now and
+benching must not leave either with nothing to draw. New coverage for the
+pools being separate, the ladder's shape, the group span validation, the
+rank-contradiction check and the cooldown ladder. `test_budget.py`'s one
+hand-made table gained a minimal `groups` / `cooldowns` pair, since both
+are required sections like `phases` and `elites`.
+
+Suite green: 187 in `tests/spawn`.
+
+---
+
+---
+
+## G2a: the group check fails soft (owner, 2026-09-17)
+
+> "do a simple check before the spawn decides. simple function to read the
+> list of enemies in a certain group. if one of them contains elite metadata
+> then check a flag instead of requiring at load ... in case the data is
+> corrupted or simply inadequate skip whichever enemy or group contains it"
+
+G2 shipped a load-time check that refused to boot when a group's declared
+rank contradicted `enemies.json`. The owner reversed the failure mode: a
+corrupt or inadequate group should cost the offending **enemy or group**,
+never the run. The reasoning is worth keeping - a data mistake that stops
+the game from starting is worse than one that quietly costs a group, because
+the second still leaves something playable to look at.
+
+Settled in the same exchange: **log every skip** ("A. log it"), and resolve
+**once before a run begins** rather than per spawn, since nothing edits the
+data mid-run ("B ... only required once, before a run begins").
+
+### The new module
+
+`spawn/roster.py`. `resolve_groups(groups, enemies)` reads each member's
+block and returns a `Roster` of `ResolvedGroup`s plus a note for every
+decision. `SpawnMaster` calls it once in `__init__` - which is per run - and
+logs each note at `warning`. `compose` draws from the **resolved** roster,
+not the declared table, and returns nothing for an unusable group instead of
+raising.
+
+`group_names` and `elite_count` moved off `SpawnTables` onto the roster.
+They read the declared table, and the draw has to read the resolved one: a
+group whose members did not hold up may be common-only or absent, and an
+accessor on the table could not know that.
+
+### Nothing spawnable is thrown away
+
+This is the rule that is easy to get backwards, and the owner's follow-up
+settled it: "if the available data is enough to spawn it as a common enemy
+do it, this obviously requires to scan the required elite metadata". So the
+two rank mismatches resolve **differently**:
+
+| filed as | actually | outcome |
+|---|---|---|
+| `elites` | not `is_elite` | **demoted into `commons`** - still spawns, never fills an elite slot |
+| `commons` | `is_elite` | **stays, spawns as a common** - counts toward the common total, not the elite count |
+
+The demotion is what protects the elite guarantee. An elite company is
+*guaranteed* elites and growing; letting a plain body fill a slot would
+break that silently, which is exactly the class of bug the check exists to
+catch. Keeping the real elite in `commons` costs nothing by contrast - it is
+a good body, and its own flag still earns it the gold ring, the doubled gold
+and the item roll when it dies, because those are properties of the body
+rather than of the slot it was drawn from.
+
+`is_elite` remains the only authority. An enemy carrying the `"elite"`
+string in `tags` without the flag is still a common - one source of truth,
+the same one the ring, the drop and the blessing bonus switch on.
+
+### What each corruption costs, measured
+
+Every case boots.
+
+| broken input | cost |
+|---|---|
+| a non-elite under `elites` | demoted to `commons` |
+| an `is_elite` under `commons` | kept, spawns as a common |
+| an id with no block in `enemies.json` | that member |
+| a weight that is not a positive number | that member |
+| a malformed `common_range` | the group |
+| a `commons` half with nothing usable | the group |
+| a broken `elite_range` / `elite_step` | the elite half only; the group survives common-only |
+| an `elites` half with nothing usable | the elite half only |
+| a group that is not an object | the group |
+| every group unusable | logged as "no enemies will spawn"; still boots |
+
+A group listed in both halves keeps its `commons` weight and the elite
+listing is ignored, rather than being counted twice.
+
+### What stays fatal at load
+
+Only `groups` missing or not a non-empty object. There is no enemy to skip
+in that case and no company could be built either way. `_check_groups`
+shrank to that one line, and `_elite_ids`, `_check_weights` and `_check_span`
+went with the rest.
+
+The shipped data resolves with **zero notes**, on a real booted run, and all
+six groups compose.
+
+### Tests
+
+New `tests/spawn/test_roster.py` - 23 tests. The shipped groups resolve
+cleanly and their ladders hold; the two rank cases resolve differently; each
+corruption costs exactly what the table above says; every decision leaves a
+note naming the group; and a master built on bad tables logs as it resolves,
+asserted through the real constructor rather than by re-logging by hand.
+
+In `test_tables.py`, `test_a_rank_that_contradicts_enemies_json_is_refused`
+and `test_a_group_must_have_members_and_a_sane_span` are **replaced** by
+`test_bad_group_members_do_not_refuse_to_load`, which walks the same seven
+mutations and asserts each one is *not* a load error - the same inputs,
+pinning the opposite behaviour, which is the honest way to record a reversed
+decision. `test_a_missing_groups_section_is_still_fatal` pins what is left.
+
+**One thing the change turned up.** Benching a group's whole *elite* half
+cannot be expressed through `unused` at all: Goblin's elites are Hexcaller
+and Grudge and Wild beasts' include Ravager, so either bench also empties
+the top-level `elites` default / rare slot - and *that* check is still a load
+error until G3 retires the slot. `test_unused_category.py` now says so in
+place of asserting a soft failure it cannot reach, and points at the roster
+test that covers the equivalent case directly.
+
+Suite green: 209 in `tests/spawn`.
+
+---
+
 ## Progress
 
 - [x] Groups and ranks confirmed against the roster (all 18 placed, after
@@ -1265,9 +1516,14 @@ Suite green.
 - [x] G0b - `company_stagger` built, measured and tested; suite green
 - [x] G1 - roster changes: five elites, Shellback 150 hp, Stoutpaw
       unbenched, the potion/elite coupling test retired
+- [x] G2 - `groups` and `cooldowns` tables, parsed, validated and measured;
+      all 18 enemies reachable through a group; suite stayed green
+- [x] G2a - the group check fails soft: `spawn/roster.py` resolves once per
+      run, skips or demotes what it cannot use, logs every decision, and
+      never refuses to load
 - [x] Retire the potion/elite coupling test; potions.py itself unchanged
 - [x] Stoutpaw unbenched; three enemies gain `is_elite`; Shellback +70 HP
-- [ ] Old `groups` renamed, new `groups` defined with two spans each
+- [x] Old `groups` deleted, new `groups` defined with two spans each
 - [ ] Two ladders: common 5 s (-1, floor 1), elite gate 15 s (-3, floor 3),
       elite `min` +1, all stepping every 2 min and scaled by timeline_pace
 - [ ] Cap gate: prepare, count, spawn or retry every 2 s; companies atomic

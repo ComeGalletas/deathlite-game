@@ -32,15 +32,51 @@
 
   "elites": {"default": "bear", "rare": "troll", "rare_chance": 0.15},
 
+  "_groups_comment": "The six social groups a company is drawn from (G2, owner 2026-09-17). A company is ONE group: a count rolled in `common_range`, each body drawn by `commons` weight, plus -- on the two groups that have them -- elites drawn by `elites` weight. `elite_range` is [base minimum, ceiling] and `elite_step` is how much the minimum climbs every `cooldowns.step_seconds`, so an elite group's count is deterministic and growing while WHICH elites appear stays random. Weights are relative within their own half of a group and need not sum to anything. This replaced the old leader+followers templates outright, which is why the key is reused rather than renamed: a company has no leader, only a body that happens to be seated first. Clearance is no longer declared per group -- placement derives it from the largest body in the company, which is what the old `clearance` knob was approximating.",
   "groups": {
-    "husk_pack": {"leader": "skull", "followers": {"skull": [1, 2]}},
-    "runners":   {"leader": "spider", "followers": {"spider": [1, 2]}},
-    "swarm":     {"leader": "bumblebee", "followers": {"bumblebee": [4, 6]},
-                  "clearance": "small"},
-    "warband":   {"leader": "bear", "followers": {"skull": [2, 3], "slingshot_gnome": [0, 1]}},
-    "brute":     {"leader": "troll", "followers": {}},
-    "artillery": {"leader": "hex_shaman", "followers": {"panda": [1, 2]},
-                  "prefer": ["upper"]}
+    "dark": {
+      "commons": {"skull": 5, "thief": 3, "imp": 2},
+      "common_range": [5, 30]
+    },
+    "swarm": {
+      "commons": {"spider": 6, "bumblebee": 4},
+      "common_range": [20, 30]
+    },
+    "marine": {
+      "commons": {"bomb_fish": 5, "harpoon_shark": 5},
+      "common_range": [5, 30]
+    },
+    "gnomes": {
+      "commons": {"hammer_gnome": 6, "slingshot_gnome": 4},
+      "common_range": [5, 30]
+    },
+    "goblin": {
+      "commons": {"spear_goblin": 6, "torch_goblin": 4},
+      "common_range": [5, 30],
+      "elites": {"hex_shaman": 7, "troll": 3},
+      "elite_range": [2, 15],
+      "elite_step": 2
+    },
+    "wild_beasts": {
+      "commons": {"gnoll": 5, "panda": 5},
+      "common_range": [5, 20],
+      "elites": {"minotaur": 4, "turtle": 4, "bear": 2},
+      "elite_range": [1, 13],
+      "elite_step": 2
+    }
+  },
+
+  "_cooldowns_comment": "The two ladders (G2, owner 2026-09-17). `common` is how long before the next company of any kind; `elite` is a gate on ELIGIBILITY -- an elite-bearing group can only be picked when it is ready, and picking one resets both timers, so an elite and a common company never land back to back. Every `step_seconds` the common cadence drops by `common_decay` and the elite gate by `elite_decay`, flooring at `common_floor` / `elite_floor`; the gate falls three times as fast and floors three times higher, so elite companies go from about one in three to roughly one in one-and-a-bit by minute eight. `elite_unlock` is a hard gate: no elite group at all before then, whatever the ladder says. `cap_retry` is how long the master waits before re-counting when a prepared company does not fit under the live cap. Everything here is in Normal seconds and is divided by `timeline_pace` -- the STEP as well as the values, so the whole ladder compresses together rather than just its numbers. Because the step and the boss time scale by the same factor, every difficulty reaches the same elite count at its boss: harder means the same elites sooner, not more of them.",
+  "cooldowns": {
+    "common": 5.0,
+    "common_decay": 1.0,
+    "common_floor": 1.0,
+    "elite": 15.0,
+    "elite_decay": 3.0,
+    "elite_floor": 3.0,
+    "step_seconds": 120.0,
+    "elite_unlock": 60.0,
+    "cap_retry": 2.0
   },
 
   "owners": {"cap_exempt": ["dev", "dummy"],

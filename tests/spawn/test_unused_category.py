@@ -34,6 +34,7 @@ from spawn.tables import SpawnTables, TableError
 
 DATA = Path(__file__).resolve().parents[2] / "data" / "enemies"
 BENCHED = "panda"          # the synthetic bench, not the shipped one
+GROUP = "wild_beasts"      # the group Stoutpaw joined in G1
 
 
 def _raw():
@@ -72,19 +73,20 @@ class ShippedTests(unittest.TestCase):
                 with self.subTest(level=level, band=i):
                     self.assertFalse(set(phase["types"]) & self.tables.unused)
 
-    def test_no_group_follower_can_be_a_benched_enemy(self):
+    def test_no_group_member_can_be_a_benched_enemy(self):
         for name in self.tables.groups:
             with self.subTest(group=name):
-                followers = self.tables.group(name).get("followers", {})
-                self.assertFalse(set(followers) & self.tables.unused)
+                g = self.tables.group(name)
+                members = set(g.get("commons", {})) | set(g.get("elites", {}))
+                self.assertFalse(members & self.tables.unused)
 
     def test_the_unbenched_stoutpaw_is_rollable_again(self):
         """The other side of G1: unbenching is one string, and this is what
-        that string bought."""
+        that string bought. Since G2 it is a Wild beasts common."""
         self.assertNotIn(BENCHED, self.tables.unused)
         self.assertTrue(any(BENCHED in p["types"] for p in self.tables.phases()),
                         "Stoutpaw is back but no band weights it")
-        self.assertIn(BENCHED, self.tables.group("artillery")["followers"])
+        self.assertIn(BENCHED, self.tables.group(GROUP)["commons"])
 
 
 class MechanismTests(unittest.TestCase):
@@ -111,10 +113,11 @@ class MechanismTests(unittest.TestCase):
                     self.assertNotIn(BENCHED, phase["types"])
 
     def test_a_group_that_lists_it_survives_short(self):
-        """`artillery` lists the panda; the group keeps working without it."""
-        g = self.tables.group("artillery")
-        self.assertNotIn(BENCHED, g.get("followers", {}))
-        self.assertEqual(g["leader"], "hex_shaman")
+        """Wild beasts lists the panda; the group keeps working without it."""
+        g = self.tables.group(GROUP)
+        self.assertNotIn(BENCHED, g["commons"])
+        self.assertTrue(g["commons"], "the group emptied")
+        self.assertTrue(g["elites"], "the elites were filtered too")
 
     def test_the_weights_are_filtered_not_rewritten(self):
         """Disabled, not deleted: the numbers stay on disk, so re-enabling is
@@ -122,12 +125,12 @@ class MechanismTests(unittest.TestCase):
         weighted = [p["types"][BENCHED] for p in self.raw["phases"]
                     if BENCHED in p["types"]]
         self.assertTrue(weighted, "the panda's weights were deleted")
-        self.assertIn(BENCHED, self.raw["groups"]["artillery"]["followers"])
+        self.assertIn(BENCHED, self.raw["groups"][GROUP]["commons"])
 
     def test_clearing_the_list_brings_it_straight_back(self):
         back = _tables(unused=[])
         self.assertTrue(any(BENCHED in p["types"] for p in back.phases()))
-        self.assertIn(BENCHED, back.group("artillery")["followers"])
+        self.assertIn(BENCHED, back.group(GROUP)["commons"])
 
 
 class SurvivalTests(unittest.TestCase):
@@ -182,10 +185,30 @@ class ValidationTests(unittest.TestCase):
             _tables(unused=["skull"])           # band 1 is skull-only
         self.assertIn("nothing left", str(caught.exception))
 
-    def test_benching_cannot_orphan_a_group_leader(self):
+    def test_benching_a_whole_half_costs_the_group_not_the_run(self):
+        """G2a (owner, 2026-09-17): benching that leaves a half with nothing
+        used to be a load error. It now loads, and the roster drops what it
+        cannot use -- the group when its commons are gone, only the elite
+        half when its elites are."""
+        from spawn.roster import resolve_groups
+        enemies = get_content().enemies
+
+        t = _tables(unused=["gnoll", "panda"])          # Wild beasts commons
+        r = resolve_groups(t.groups, enemies)
+        self.assertIsNone(r.get("wild_beasts"), "the group should be skipped")
+        self.assertEqual(len(r.names()), 5, "the others are untouched")
+        self.assertTrue(any("wild_beasts" in n for n in r.notes), r.notes)
+
+        # Benching a group's whole *elite* half cannot be expressed through
+        # `unused` today: Goblin's elites are Hexcaller and Grudge, and
+        # Wild beasts' include Ravager, so either bench also empties the
+        # top-level `elites` default / rare slot -- and that check is still
+        # a load error until G3 retires the slot. The equivalent case is
+        # covered directly in `test_roster.py`
+        # (`test_a_broken_elite_ladder_leaves_a_common_only_group`).
         with self.assertRaises(TableError) as caught:
-            _tables(unused=["hex_shaman"])      # leads `artillery`
-        self.assertIn("leader", str(caught.exception))
+            _tables(unused=["hex_shaman", "troll"])
+        self.assertIn("elites", str(caught.exception))
 
     def test_benching_cannot_silence_the_elite_slot(self):
         for eid in ("bear", "troll"):
