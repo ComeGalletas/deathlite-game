@@ -670,30 +670,36 @@ production files and 8 spawn test modules.
       250 px, zero overlaps
 - [x] Measure random scatter (fills worse, especially on awkward ground) and
       jittered concentric (full fill, not banded)
-- [ ] **G0a - the packer.** Replace `Placement.ring`: concentric rings as the
-      skeleton, each body jittered ~0.35 of a cell, radius from the company
-      size and the bodies (about 250 px small / 400 px large). Keeps the
-      existing guarantees - walkable spots only, clearance class, terrace
-      margin, per-body cap check. Tests: N land, none overlap, all walkable,
-      jitter costs no fill, degrades gracefully when the ground runs out.
-- [ ] **G0b - the stagger.** `company_stagger` seconds, 0 = one frame.
-      Positions computed up front, cap checked once, bodies released over the
-      window. Tests: 0 lands everything on one frame; a non-zero window
-      releases the same bodies at the same spots, just later; a company
-      interrupted mid-release (island left, boss spawned, run ended) does not
-      leak or double-spawn.
+- [x] **G0a - the packer.** Done: `Placement.pack` replaces
+      `Placement.ring`. Concentric rings sized for the largest follower,
+      each body jittered up to `pack_jitter` of a cell, radius derived as
+      `start + step * pack_spread * sqrt(n)` under `pack_max_radius`. Both
+      guarantees kept and one added - a candidate must also be clear of
+      every body already seated. Measured: 40 small bodies seat whole with
+      zero overlaps inside 174 px, Wild beasts at its real size (20, or 26
+      with elites) seats whole at every anchor, ~2 ms per company
+- [x] **G0b - the stagger.** Done: `company_stagger` 0.35 s, 0 still a
+      supported value. Positions and the point decided up front; the cap
+      gate moved to `_cap_room`, settled once per company, with bodies in
+      flight counting as live so nothing overshoots. Only the director's
+      companies stagger. Measured over 180 s of real run: no frame landed
+      more than one body, and live + in-flight never passed the cap
 
 ### G1 - Roster changes that stand alone
 
 Independent of the spawn model; can land green on their own.
 
-- [ ] `spawn_tables.json`: `unused` -> `[]` (Stoutpaw back)
-- [ ] `enemies.json`: `is_elite` on `hex_shaman`, `minotaur`, `turtle`;
+- [x] `spawn_tables.json`: `unused` -> `[]` (Stoutpaw back)
+- [x] `enemies.json`: `is_elite` on `hex_shaman`, `minotaur`, `turtle`;
       `turtle.hp` 80 -> 150
-- [ ] Delete `test_the_rare_band_is_exactly_the_elite_enemies` - the rule is
-      retired, potions keep HP bands, elites are a tag. **Delete, not re-pin**
-- [ ] Check what else switches on for three more elites: the gold elite ring,
-      `tag_bonus`'s elite multiplier, rare potion drops
+- [x] Deleted `test_the_rare_band_is_exactly_the_elite_enemies`, not
+      re-pinned. Also had to rewrite `test_uncommon_enemies_can_drop_all_three`
+      (it named the turtle as its uncommon exemplar) and
+      `test_unused_category.py` (emptying the list made it vacuous)
+- [x] Audited: six things ride on `is_elite`, and the 18 % item drop is the
+      one that matters - elite share of bodies 28.8 % -> 48.8 %, item income
+      +69 %, kill gold +15.5 %. Left alone deliberately; **balance call for
+      G6**
 
 ### G2 - The new tables
 
@@ -1067,6 +1073,186 @@ Suite green.
 
 ---
 
+---
+
+## G0b built: `company_stagger` (2026-09-17)
+
+A company no longer has to appear on one frame. `company_stagger` is a
+number of seconds in `spawn_tables.json`; the shipped value is **0.35**.
+
+**What is decided up front, and what is not.** Everything that decides the
+company still happens the moment it is seated - its point, its packed
+spots, the cap it pays. The stagger spreads only *when* each body appears:
+the leader lands immediately, the followers are queued oldest first, and
+the last one lands as the window closes. `_release_pending` makes them and
+re-decides nothing, because there is nothing left to decide.
+
+**The cap gate had to move, and this is the interesting part.** It used to
+be re-checked per follower, inside the seating loop, which is how a pack
+"spawned short rather than over the cap". Under a stagger that is wrong:
+the same company would arrive whole at 0 and arrive truncated at 0.35,
+depending on what else spawned while it was in the air. So the gate is now
+settled once, by `_cap_room(owner)`, for the whole company - what does not
+fit is dropped *now* rather than discovered halfway through an arrival.
+
+The other half of that: **a body still in flight counts as live** for every
+later check. Without it the run would overshoot the cap by the size of
+every company in the air. Measured over 180 s of real run, live + in-flight
+never exceeded the cap on any frame.
+
+Note this keeps the old *behaviour* - a company still spawns short rather
+than over the cap - while changing *when* the shortfall is computed. The
+`min(pack, cap - active)` clipping in the director is a separate thing and
+still waiting for G3.
+
+**0 stays first-class.** At 0 the branch is skipped entirely and bodies are
+made in the seating loop exactly as before, which is why the whole suite
+stayed green before the shipped value was raised off 0.
+
+**Which spawns stagger.** Only the director's companies. `spawn_at`,
+`spawn_group`, the dev menu, residents and the arena keep landing whole -
+they have synchronous callers that count what came back, and a dev spawn
+wants its bodies now. A deferred company carries its stagger through the
+debt queue, so a company that had to wait still arrives the way it would
+have.
+
+### Measured on a booted run, pinned world, 180 s at 60 fps
+
+| | |
+|---|---|
+| bodies spawned | 141 |
+| frames that landed a body | 141 of 10800 |
+| **biggest single-frame arrival** | **1 body** |
+| live + in-flight over the cap, worst frame | **0** |
+
+Not one frame landed more than a single body. That is the whole point of
+the knob: at today's pack sizes (2-4) a 0.35 s window puts bodies about
+120 ms apart, and the window divides by the company, so a company of 30
+lands about one body per frame at 60 fps rather than thirty at once.
+
+**The spawn burst comes free.** `PlayingHost.make_enemy` already calls
+`fx.spawn_spawn_fx(enemy)` per body, so spreading the arrivals spreads the
+bursts with them - a company now visibly materialises instead of blinking
+in, with no new effect code.
+
+### Tests
+
+New `StaggerTests` in `tests/spawn/test_master.py`:
+
+* at 0 the whole company lands on one frame;
+* at 0.35 only the leader has landed, and once the window closes the
+  company is at **the same spots in the same order** as the un-staggered
+  run of the same seed - staggering changes the clock and nothing else;
+* the bodies arrive across the window rather than in one jump;
+* each body lands exactly once, the queue empties, and no two bodies share
+  a spot;
+* a body in flight already counts against the cap;
+* `drop_pending()` stops the rest of a company from landing;
+* a `frozen` run still finishes a company it has already paid for.
+
+**One existing test had gone quietly vacuous** and this is worth recording,
+because nothing failed to reveal it. `test_the_director_pack_lands_together_on_a_point`
+asserted over `host.live[1:]`; with the stagger on, the followers had not
+landed yet, so that loop iterated an empty list and every assertion in it
+was skipped while the test still passed. It now waits for the company and
+asserts the full count first.
+
+The draining helper is `_settle`, which uses `frozen` rather than a zero
+`dt`. A zero `dt` does **not** hold the director: its timer is already
+negative after a tick, so it fires again whatever `dt` says - worth knowing
+before writing any test that wants to advance time without spawning.
+
+Suite green.
+
+---
+
+---
+
+## G1 built: the roster changes (2026-09-17)
+
+Three data edits and the test work they force. Nothing here touches the
+spawn model - it is the roster the new model will draw from.
+
+**`enemies.json`.** `is_elite: true` on `hex_shaman` (Hexcaller),
+`minotaur` (Gorehorn) and `turtle` (Shellback), and Shellback's hp 80 ->
+**150**. The elite roster is now Ravager, Grudge, Hexcaller, Gorehorn and
+Shellback - five, where it was two.
+
+Only the flag was set; the `tags` arrays were left alone. Ravager and Grudge
+carry a redundant `"elite"` tag, but nothing reads it: `is_elite` is what
+every consumer switches on, and enemy tags are only used for the `flying`
+check and for the kill event's payload. Adding a second source of truth for
+"is this an elite" would be the wrong kind of tidy.
+
+**`spawn_tables.json`.** `unused` is now `[]` - Stoutpaw is unbenched and
+nothing is benched today. The mechanism stays; see the test note below.
+
+### What three more elites switch on
+
+The todo asked what else rides on the flag. Six things, and one of them
+matters:
+
+| | |
+|---|---|
+| gold per kill | **x2** instead of x1 |
+| item drop | **18 % chance**, scaling with run time |
+| screen shake | 0.18 on death |
+| death particles | 16 at 200 speed, instead of 10 at 160 |
+| the gold ring | drawn round the body while it lives |
+| `tag_bonus` | the `elite` blessing's damage bonus applies |
+
+**The item drop is the material one.** Items come from elites and the boss
+and nothing else - the meta screen says so in as many words ("beat elites /
+the boss"). Measured over 40 seeds of the current director across a
+10-minute run:
+
+| | before G1 | after G1 |
+|---|---|---|
+| elite share of bodies | 28.8 % | **48.8 %** |
+| items from elites (at 18 %) | 236 | **400** (+69 %) |
+| gold from kills | 5870 | 6780 (+15.5 %) |
+
+*(Absolute counts are inflated - the director emits more than the live cap
+seats - but the ratios hold.)*
+
+Nothing was changed in response. The 18 % and the x2 are balance numbers
+and the owner's call, and the whole point of the new model is that elites
+become a rank rather than a rarity, so item income rising is a consequence
+of the design rather than a bug in it. **Flagging it for G6**, where it
+should be decided with the companies actually running.
+
+### Tests
+
+**Deleted: `test_the_rare_band_is_exactly_the_elite_enemies`.** It asserted
+that an enemy is rare-band exactly when it is `is_elite`, which held while
+"elite" meant the two toughest bodies on the roster. Hexcaller (64) and
+Gorehorn (55) are now elites in the *uncommon* band, so the rule is not
+true any more. The owner settled the replacement in advance - "potions can
+keep the same check by hp" - so there is no coupling left to pin and the
+test is gone rather than re-pinned, with a comment in its place saying why.
+
+**Rewritten: `test_uncommon_enemies_can_drop_all_three`.** It named
+`turtle` as its uncommon exemplar; Shellback at 150 hp is rare-band now, so
+the test failed for a reason that had nothing to do with what it was
+checking. It reads the middle band off the roster instead. Its own sibling
+test already carried a note about hand-listed cases going stale whenever an
+enemy moves band - this was that, again.
+
+**Rewritten: `test_unused_category.py`.** Emptying `unused` would have left
+every assertion in it vacuous - the exact failure mode G0b turned up
+elsewhere. It is now in two halves: `ShippedTests` checks what must hold of
+the shipped table whatever its list contains (and that Stoutpaw is
+genuinely rollable again), and `MechanismTests` / `DirectorTests` exercise
+the filtering against a *synthetic* table that benches the panda the way
+the shipped one used to. `DirectorTests` also gained the control it never
+had: the same long run on the shipped table **does** roll Stoutpaw, so the
+benched case cannot pass merely because the director never reaches those
+bands.
+
+Suite green.
+
+---
+
 ## Progress
 
 - [x] Groups and ranks confirmed against the roster (all 18 placed, after
@@ -1075,8 +1261,12 @@ Suite green.
 - [x] Open questions answered; cooldowns, elite counts and arrival settled
 - [x] Placement prototype - G0 passed; the fix is a packer in place of
       `Placement.ring`, no architecture change
-- [ ] Retire the potion/elite coupling test; potions.py itself unchanged
-- [ ] Stoutpaw unbenched; three enemies gain `is_elite`; Shellback +70 HP
+- [x] G0a - `Placement.pack` built, measured and tested; suite green
+- [x] G0b - `company_stagger` built, measured and tested; suite green
+- [x] G1 - roster changes: five elites, Shellback 150 hp, Stoutpaw
+      unbenched, the potion/elite coupling test retired
+- [x] Retire the potion/elite coupling test; potions.py itself unchanged
+- [x] Stoutpaw unbenched; three enemies gain `is_elite`; Shellback +70 HP
 - [ ] Old `groups` renamed, new `groups` defined with two spans each
 - [ ] Two ladders: common 5 s (-1, floor 1), elite gate 15 s (-3, floor 3),
       elite `min` +1, all stepping every 2 min and scaled by timeline_pace

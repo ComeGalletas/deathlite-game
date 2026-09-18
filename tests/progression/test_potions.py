@@ -140,14 +140,14 @@ class EnemyRarityTests(unittest.TestCase):
                 for e in sorted(ROSTER, key=base_hp)]
         self.assertEqual(seen, sorted(seen))
 
-    def test_the_rare_band_is_exactly_the_elite_enemies(self):
-        """The design rule. The HP thresholds are only how it is expressed, so
-        this is what must hold after any rebalance -- if it breaks, the bounds
-        need moving, not this test.
-        """
-        for eid in ROSTER:
-            rare = P.enemy_rarity(base_hp(eid), T) == "rare"
-            self.assertEqual(rare, bool(C.enemies[eid].get("is_elite")), eid)
+    # `test_the_rare_band_is_exactly_the_elite_enemies` lived here and was
+    # deleted in G1 (owner, 2026-09-17), not re-pinned. It asserted that an
+    # enemy is rare-band exactly when it is `is_elite`, which held while
+    # elite meant "one of the two toughest". Elite is now a tag five
+    # enemies carry and three of them are mid-roster -- Hexcaller 64 and
+    # Gorehorn 55 are elites in the uncommon band -- so the rule is simply
+    # not true any more. The owner's call is that potion rarity keeps its
+    # HP check and nothing else; there is no coupling left to pin.
 
     def test_the_bands_are_read_off_the_thresholds(self):
         bands = T["enemy_rarity_hp"]
@@ -183,7 +183,16 @@ class ExclusionTests(unittest.TestCase):
         self.assertEqual(float(w["rare"]["common"]), 0.0)
 
     def test_uncommon_enemies_can_drop_all_three(self):
-        self.assertEqual(self._seen("turtle"), set(ORDER))
+        """The middle band is the only one with no exclusion. Read off the
+        roster rather than naming an enemy: `turtle` was the exemplar until
+        Shellback became an elite with 150 hp (G1, 2026-09-17) and moved to
+        the rare band, which is exactly the staleness the sibling test above
+        was rewritten to avoid.
+        """
+        mid = [e for e in ROSTER if P.enemy_rarity(base_hp(e), T) == "uncommon"]
+        self.assertTrue(mid, "no enemy sits in the uncommon band")
+        for eid in mid:
+            self.assertEqual(self._seen(eid), set(ORDER), eid)
 
     def test_a_roll_only_ever_returns_a_weighted_rarity(self):
         rng = random.Random(1)

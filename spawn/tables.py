@@ -19,6 +19,12 @@ Sections:
                 first band to its last, on Normal; a difficulty divides it
                 by `timeline_pace`. This is the schedule's own clock, not
                 the run's -- the boss still keys off `run_duration`.
+    company_stagger
+                G0b: how long a company takes to materialise, in seconds.
+                The positions, the point and the cap are all decided when
+                the company is seated; this only spreads *when* each body
+                appears. 0 means the whole company on one frame, which is a
+                supported setting rather than a degenerate one.
     phases      ramp-fraction bands: `until` (exclusive upper bound),
                 `interval` [at ramp start, at ramp end], `pack` [lo, hi],
                 `elite` chance per slot, `types` id -> weight
@@ -117,6 +123,9 @@ class SpawnTables:
         # handed in by a test (and the pre-S12 fixture) stay constructible;
         # the shipped tables always carry it.
         self.ramp_seconds: float = float(data.get("ramp_seconds", 600.0))
+        # G0b: 0 is a first-class value (the whole company on one frame),
+        # so it is also the default a hand-made test table gets.
+        self.company_stagger: float = float(data.get("company_stagger", 0.0))
         self._overrides: dict = {
             lvl: ({**over, "phases": self._enabled_phases(over["phases"])}
                   if "phases" in over else over)
@@ -184,6 +193,9 @@ class SpawnTables:
         ramp = data.get("ramp_seconds", 600.0)
         if not (isinstance(ramp, (int, float)) and ramp > 0):
             bad.append("`ramp_seconds` must be a number > 0")
+        stagger = data.get("company_stagger", 0.0)
+        if not (isinstance(stagger, (int, float)) and stagger >= 0):
+            bad.append("`company_stagger` must be a number >= 0")
         el = data.get("elites")
         if not isinstance(el, dict):
             bad.append("`elites` must be an object")

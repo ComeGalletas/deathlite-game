@@ -17,12 +17,12 @@
     "tags": ["fast"], "sprite": "spider"
   },
   "turtle": {
-    "name": "Shellback", "hp": 80, "speed": 55,
+    "name": "Shellback", "hp": 150, "speed": 55,
     "aggro_range": 360,
     "pursuit_seconds": 9.0, "contact_damage": 21, "radius": 24,
     "weight": 14,
     "experience_reward": 9, "behavior": "path_chase_attack", "color": [130, 90, 150],
-    "tags": ["tank"], "sprite": "turtle", "contact_damage_enabled": false,
+    "tags": ["tank"], "is_elite": true, "sprite": "turtle", "contact_damage_enabled": false,
     "attack_telegraph": 0.3306, "attack_active": 0.6694
   },
   "bumblebee": {
@@ -139,7 +139,7 @@
     "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 15,
     "weight": 8,
     "experience_reward": 8, "behavior": "fsm_charger", "color": [230, 110, 70],
-    "tags": ["charger"], "sprite": "minotaur",
+    "tags": ["charger"], "is_elite": true, "sprite": "minotaur",
     "charge_range": 330, "charge_telegraph": 0.65, "charge_duration": 0.5,
     "charge_recover": 1.1, "charge_interval": 1.1, "charge_speed": 660,
     "charge_damage": 31
@@ -183,7 +183,7 @@
     "pursuit_seconds": 8.0, "contact_damage": 11, "radius": 15,
     "weight": 7,
     "experience_reward": 12, "behavior": "fsm_warlock", "color": [150, 90, 200],
-    "tags": ["caster", "area-denial"], "sprite": "hex_shaman",
+    "tags": ["caster", "area-denial"], "is_elite": true, "sprite": "hex_shaman",
     "contact_damage_enabled": false,
     "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8,
     "cast_duration": 0.2, "cast_recover": 1.8, "cast_interval": 3.2,

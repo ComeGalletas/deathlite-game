@@ -35,6 +35,20 @@ idle enemies outside the zone are put to sleep.
 first, and retried every tick; past `relax_after` the view rule loosens
 (`Placement`). The queue is capped so a stuck run does not bank a flood.
 
+**The stagger (G0b).** A company the director emits materialises over
+`company_stagger` seconds rather than appearing on one frame: the leader
+lands at once and the followers are released oldest first, the last as the
+window closes. Nothing about the company is decided during that window --
+its point, its packed spots and the cap it pays are all settled when it is
+seated, so it arrives at the same places whatever the knob says, and `0`
+(the whole company on one frame) is a supported setting. The cap is
+therefore charged once, by `_cap_room`, and a body still in flight counts
+as live for every check made meanwhile, so a run cannot overshoot by the
+size of the companies in the air. Only the director's companies stagger:
+`spawn_at`, `spawn_group`, the residents and the dev menu have callers
+that count what came back, and land whole. `drop_pending()` abandons a
+company mid-arrival; a `frozen` run still finishes one it has paid for.
+
 **Caps.** Two: the director's time-growing cap clamped to
 `config.ENEMY_LIVE_CAP` bounds what is simulated, and
 `config.ENEMY_COUNT_HARD_CAP` bounds live + dormant. Every entry point
@@ -105,7 +119,12 @@ class SpawnMaster:
         self._active: set[int] = set()
         self._small, self._large = self._class_radii()
         self._modifiers: dict[str, float] = {}
-        self._debt: list[tuple[float, list[str], str]] = []   # (queued_at, ids, owner)
+        # (queued_at, ids, owner, stagger)
+        self._debt: list[tuple[float, list[str], str, bool]] = []
+        # A company already committed, materialising body by body:
+        # (due, enemy_id, x, y, owner, room_id). See `company_stagger`.
+        self._pending: list[tuple[float, str, float, float, str, object]] = []
+        self.company_stagger = float(self.tables.company_stagger)
         self.spawned = 0
         self.deferred = 0
         self.recycled = 0
@@ -176,10 +195,44 @@ class SpawnMaster:
     def debt(self) -> int:
         return len(self._debt)
 
+    @property
+    def pending(self) -> int:
+        """Bodies of a committed company that have not landed yet."""
+        return len(self._pending)
+
+    # --- the stagger ----------------------------------------------------
+    def _release_pending(self, now: float) -> None:
+        """Land the bodies of a committed company whose turn has come.
+
+        Nothing is re-decided here. The spots were packed and the cap was
+        paid when the company was seated, and a body still waiting counts as
+        live for every check made since, so a staggered arrival can neither
+        overshoot the cap nor land on top of something. Each entry is made
+        exactly once and leaves the queue as it does.
+        """
+        if not self._pending:
+            return
+        due = [p for p in self._pending if p[0] <= now]
+        if not due:
+            return
+        self._pending = [p for p in self._pending if p[0] > now]
+        for _due, eid, x, y, owner, rid in due:
+            self._make(eid, x, y, owner, rid)
+
+    def drop_pending(self) -> int:
+        """Forget a company still materialising without making the rest of
+        it. Returns how many bodies were dropped."""
+        n = len(self._pending)
+        self._pending.clear()
+        return n
+
     # --- per frame ------------------------------------------------------
     def update(self, dt: float) -> None:
         host = self.host
         now = host.elapsed
+        # Before anything looks at the world, and before the `frozen` gate:
+        # these bodies are already committed, so they finish arriving.
+        self._release_pending(now)
         if self._locality_on():
             self._tick_zone(now)
             if self.population.waking:
@@ -193,7 +246,7 @@ class SpawnMaster:
         self._retry_debt(now)
         ids = self.director.update(dt * self.pressure, now, host.live_count())
         if ids:
-            self._place_pack(ids, "director", now)
+            self._place_pack(ids, "director", now, stagger=True)
 
     def _tick_zone(self, now: float) -> None:
         host = self.host
@@ -296,10 +349,11 @@ class SpawnMaster:
         # Retries never re-queue themselves (`queue=False`); what still
         # cannot be seated goes back in its old place, so the list holds
         # each pack once and the oldest keeps its age.
-        pending, self._debt = self._debt, []
-        for queued_at, ids, owner in pending:
-            if self._place_pack(ids, owner, queued_at, queue=False) is None:
-                self._debt.append((queued_at, ids, owner))
+        waiting, self._debt = self._debt, []
+        for queued_at, ids, owner, stagger in waiting:
+            if self._place_pack(ids, owner, queued_at, queue=False,
+                                stagger=stagger) is None:
+                self._debt.append((queued_at, ids, owner, stagger))
 
     # --- entry points ---------------------------------------------------
     def spawn_at(self, enemy_id: str, pos=None, owner: str = "direct"):
@@ -332,10 +386,18 @@ class SpawnMaster:
     # --- placing a pack -------------------------------------------------
     def _place_pack(self, ids: list, owner: str, queued_at: float, at=None,
                     prefer: tuple = (), clearance: str | None = None, queue: bool = True,
-                    room_weights: dict | None = None):
+                    room_weights: dict | None = None, stagger: bool = False):
         """Seat `ids` together: the leader on a point (or `at`), the rest
         packed around it. Returns the enemies made, or None when nothing
-        could be seated (queued as debt when `queue`)."""
+        could be seated (queued as debt when `queue`).
+
+        `stagger` lets the company materialise over `company_stagger`
+        seconds instead of landing on one frame. Everything that decides the
+        company still happens here and now -- the point, the packed spots,
+        the cap -- so the only difference is when each body appears. The
+        return value is therefore what has landed *so far*, the leader; the
+        rest is counted by `pending`.
+        """
         host = self.host
         now = host.elapsed
         if not ids or not self._under_cap(owner):
@@ -349,7 +411,7 @@ class SpawnMaster:
                 fb = host.fallback_point() if not self.index.spawn else None
                 if fb is None:
                     if queue and len(self._debt) < _MAX_DEBT:
-                        self._debt.append((queued_at, list(ids), owner))
+                        self._debt.append((queued_at, list(ids), owner, stagger))
                         self.deferred += 1
                     return None
                 cx, cy, rid = fb.x, fb.y, None
@@ -362,10 +424,24 @@ class SpawnMaster:
             radii = [host.enemy_radius(e) for e in followers]
             spots = self.placement.pack(centre, host.enemy_radius(leader), radii,
                                         host.is_walkable, host.rng)
-            for eid, spot in zip(followers, spots):
-                if spot is None or not self._under_cap(owner):
-                    continue
-                made.append(self._make(eid, spot.x, spot.y, owner, rid))
+            seats = [(eid, s) for eid, s in zip(followers, spots) if s is not None]
+            # The cap is settled once, here, for the whole company: what does
+            # not fit is dropped now rather than discovered halfway through
+            # an arrival, so a company lands the same way whether it is
+            # staggered or not.
+            room = self._cap_room(owner)
+            if room is not None:
+                seats = seats[:room]
+            wait = self.company_stagger if stagger else 0.0
+            if wait > 0.0 and seats:
+                # Oldest first, the last body landing as the window closes.
+                step = wait / len(seats)
+                for i, (eid, spot) in enumerate(seats):
+                    self._pending.append((now + (i + 1) * step, eid,
+                                          spot.x, spot.y, owner, rid))
+            else:
+                made.extend(self._make(eid, spot.x, spot.y, owner, rid)
+                            for eid, spot in seats)
         return made
 
     def _choose(self, ids: list, debt_age: float, prefer: tuple = (),
@@ -380,13 +456,19 @@ class SpawnMaster:
                            prefer=prefer, player_floor=self.host.player_floor())
         return self.placement.choose(req, self.host, self.host.elapsed, debt_age)
 
-    def _under_cap(self, owner: str) -> bool:
+    def _cap_room(self, owner: str) -> int | None:
+        """How many more bodies this owner may seat, or `None` when it is
+        exempt. A body committed but not yet landed counts as live, so a
+        company still materialising cannot be double-spent."""
         if owner in self._cap_exempt:
-            return True
-        live = self.host.live_count()
-        if live >= self.director.enemy_count_cap(self.host.elapsed):
-            return False
-        return live + self.population.total_dormant < self.world_cap
+            return None
+        live = self.host.live_count() + len(self._pending)
+        return max(0, min(self.director.enemy_count_cap(self.host.elapsed) - live,
+                          self.world_cap - live - self.population.total_dormant))
+
+    def _under_cap(self, owner: str) -> bool:
+        room = self._cap_room(owner)
+        return room is None or room > 0
 
     def _make(self, enemy_id: str, x: float, y: float, owner: str, room_id):
         hp_mult, spd_mult = self.director.stat_multipliers(self.host.elapsed)

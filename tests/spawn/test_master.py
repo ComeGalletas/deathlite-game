@@ -40,6 +40,21 @@ def _run(master, host, seconds: float, dt: float = 1 / 30) -> None:
         host.elapsed = t
 
 
+def _settle(master, host) -> None:
+    """Let a committed company finish materialising (G0b) without letting
+    the director emit another one.
+
+    `frozen` is the run's own "emit nothing new" switch, and a release
+    happens before that gate because the company has already been decided
+    and paid for. A zero `dt` would not do: the director's timer is already
+    negative after a tick, so it fires again whatever `dt` says.
+    """
+    was, master.frozen = master.frozen, True
+    host.elapsed += master.company_stagger
+    master.update(0.0)
+    master.frozen = was
+
+
 class PackTests(unittest.TestCase):
     def test_the_director_pack_lands_together_on_a_point(self):
         host = FakeHost()
@@ -47,13 +62,18 @@ class PackTests(unittest.TestCase):
         host.elapsed = 400.0                        # late: packs of 2-4
         m.update(1.0)                               # one tick past the timer
         self.assertTrue(host.live)
+        company = len(host.live) + m.pending
+        self.assertGreater(company, 1, "a late pack has followers")
+        _settle(m, host)
+        self.assertEqual(m.pending, 0)
+        self.assertEqual(len(host.live), company)
         points = {(p.x, p.y) for p in host.layout.spawn_points}
         leader = host.live[0]
         self.assertIn((leader.pos.x, leader.pos.y), points)
         reach = _reach(m)
         for e in host.live[1:]:
             self.assertLess((e.pos - leader.pos).length(), reach)
-            self.assertNotIn((e.pos.x, e.pos.y), points)      # followers ring, not stack
+            self.assertNotIn((e.pos.x, e.pos.y), points)      # followers pack, not stack
         self.assertEqual(m.spawned, len(host.live))
 
     def test_no_spawn_lands_on_top_of_the_player(self):
@@ -111,6 +131,102 @@ class PackTests(unittest.TestCase):
         m.spawn_at("skull", pygame.Vector2(10, 10), owner="summon")
         self.assertEqual(host.events[-1][1]["owner"], "summon")
         self.assertIsNone(host.events[-1][1]["room"])
+
+
+class StaggerTests(unittest.TestCase):
+    """`company_stagger` (G0b, owner 2026-09-17): a company materialises
+    over a window instead of appearing on one frame. Everything that decides
+    the company -- its point, its packed spots, the cap it pays -- still
+    happens when it is seated, so the only difference is *when* each body
+    shows up. 0 is a supported value, not a degenerate one."""
+
+    def _commit(self, stagger: float):
+        host = FakeHost()
+        m = _master(host)
+        m.company_stagger = stagger
+        host.elapsed = 400.0                       # late: packs of 2-4
+        m.update(1.0)
+        return host, m
+
+    def test_a_company_lands_on_one_frame_at_zero(self):
+        host, m = self._commit(0.0)
+        self.assertEqual(m.pending, 0)
+        self.assertGreater(len(host.live), 1)
+        self.assertEqual(m.spawned, len(host.live))
+
+    def test_the_same_company_arrives_at_the_same_spots_just_later(self):
+        # The owner's requirement in one assertion: staggering changes the
+        # clock and nothing else. Same seed, same world, same company.
+        at_once, m0 = self._commit(0.0)
+        spread, m1 = self._commit(0.35)
+        self.assertGreater(m1.pending, 0, "the followers are still waiting")
+        self.assertEqual(len(spread.live), 1, "only the leader has landed")
+        _settle(m1, spread)
+        self.assertEqual(m1.pending, 0)
+        seats = lambda live: [(e.enemy_id, e.pos.x, e.pos.y) for e in live]
+        self.assertEqual(seats(spread.live), seats(at_once.live))
+
+    def test_the_bodies_arrive_spread_across_the_window(self):
+        host, m = self._commit(0.35)
+        waiting = m.pending
+        self.assertGreater(waiting, 1)
+        m.frozen = True                            # release only, emit nothing
+        seen = [len(host.live)]
+        for _ in range(8):
+            host.elapsed += 0.35 / 7
+            m.update(0.0)
+            seen.append(len(host.live))
+        self.assertEqual(m.pending, 0)
+        self.assertEqual(seen[-1], waiting + 1)
+        # not all on one frame: the count climbed more than once
+        steps = sum(1 for a, b in zip(seen, seen[1:]) if b > a)
+        self.assertGreater(steps, 1, f"arrived in one jump: {seen}")
+
+    def test_each_body_lands_once_and_the_queue_empties(self):
+        host, m = self._commit(0.35)
+        m.frozen = True
+        for _ in range(20):
+            host.elapsed += 0.05
+            m.update(0.0)
+        self.assertEqual(m.pending, 0, "no body is left stranded")
+        self.assertEqual(m.spawned, len(host.live), "and none landed twice")
+        spots = [(e.pos.x, e.pos.y) for e in host.live]
+        self.assertEqual(len(set(spots)), len(spots), "two bodies share a spot")
+
+    def test_a_waiting_body_already_counts_against_the_cap(self):
+        # The gate is paid once, when the company is seated. A body still in
+        # flight has to count as live or the run would overshoot the cap by
+        # the size of every company in the air.
+        host = FakeHost()
+        m = _master(host)
+        cap = m.director.enemy_count_cap(0.0)
+        _run(m, host, 40.0)
+        self.assertGreater(m.spawned, 10)
+        self.assertLessEqual(len(host.live) + m.pending, cap)
+
+    def test_dropping_a_company_stops_the_rest_from_landing(self):
+        host, m = self._commit(0.35)
+        waiting, landed = m.pending, len(host.live)
+        self.assertEqual(m.drop_pending(), waiting)
+        self.assertEqual(m.pending, 0)
+        m.frozen = True
+        for _ in range(10):
+            host.elapsed += 0.1
+            m.update(0.0)
+        self.assertEqual(len(host.live), landed)
+
+    def test_a_frozen_run_still_finishes_a_committed_company(self):
+        # `frozen` is the dev switch for "emit nothing new". A company whose
+        # cap has been paid and whose spots are reserved is not new, so it
+        # finishes rather than being stranded until the run thaws.
+        host, m = self._commit(0.35)
+        waiting = m.pending
+        self.assertGreater(waiting, 0)
+        m.frozen = True
+        host.elapsed += m.company_stagger
+        m.update(1.0)                              # a real tick, still frozen
+        self.assertEqual(m.pending, 0)
+        self.assertEqual(m.spawned, waiting + 1)
 
 
 class CapTests(unittest.TestCase):
