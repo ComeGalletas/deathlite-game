@@ -1,31 +1,53 @@
-"""The spawn budget: how often, how many, and which (spec 3.4 / 3.8).
+"""The spawn budget: when a company arrives and which group it is
+(spec 3.4 / 3.8).
 
-`SpawnDirector` drives difficulty over the length of a run through the phase
-schedule in `data/enemies/spawn_tables.json` (`spawn/tables.py`). Each phase defines
-its enemy composition, spawn interval, pack size and elite chance.
-Concurrency is limited by `enemy_count_cap`, which grows with in-game time.
-Separately, `stat_multipliers` ramps enemy HP and speed with elapsed time.
-Difficulty therefore rises through several independent knobs, not one
-master number (spec 3.4: "Do not increase every variable simultaneously
-without reason").
+`SpawnDirector.update(dt, elapsed, blocked)` returns **a group name or
+None**. It does not say which enemies -- a company is one social group and
+the master composes it from the resolved roster (`spawn/roster.py`) -- and
+it does not look at the live count, because the cap is a gate the master
+holds.
 
-The run's chosen difficulty (`config.DIFFICULTIES`) feeds four independent
-multipliers -- `spawn_rate` (spawn cadence), `timeline_pace` (how fast the
-phase schedule and the boss arrive), `stat_ramp_pace` (the HP/speed ramp)
-and `enemy_count_step_scale` (crowd growth). Normal leaves every one at 1.0.
+**Two ladders**, both read from `cooldowns` in
+`data/enemies/spawn_tables.json`:
 
-S12 (owner, 2026-09-16) split the director's two clocks apart. The phase
-schedule and its interval lerp run on `ramp_duration` -- `ramp_seconds`
-from the tables (45 s on Normal) over `timeline_pace` -- so the mix reaches
-its endgame composition three quarters of a minute in. `run_duration` is
-now only the boss's clock. They were one number until this entry, which is
-why shortening the ramp used to drag the boss forward with it.
+* the **common cadence**, how long before the next company of any kind;
+* the **elite gate**, which decides when an elite-bearing group is
+  *eligible*. Picking one resets the common cadence too, so an elite and a
+  common company never land back to back.
 
-Spawn master S2: moved here from `world/spawning.py` unchanged in behaviour
--- `tests/spawn/test_budget.py` replays a scripted run against the sequence
-the old module produced. The tables are handed in, or read from the loaded
-content when they are not; the director draws every random number from the
-`rng` it is given, in the same order as before.
+Both step down every `step_seconds` and stop at their floors. The gate
+falls faster and floors higher, so elite companies go from roughly one in
+three at the start to one in one-and-a-bit late. A hard `elite_unlock`
+keeps elites out of the opening whatever the ladder says. The two pools are
+drawn from separately: while the gate is shut only the common groups are
+eligible.
+
+Concurrency is `enemy_count_cap`, which grows with in-game time; the master
+gates whole companies against it. `stat_multipliers` ramps enemy HP and
+speed with elapsed time. Difficulty therefore rises through several
+independent knobs, not one master number (spec 3.4: "Do not increase every
+variable simultaneously without reason").
+
+**Difficulty.** `config.DIFFICULTIES` carries four factors, of which this
+module reads three: `timeline_pace` (the run clock and the whole ladder),
+`stat_ramp_pace` (the HP/speed ramp) and `enemy_count_step_scale` (crowd
+growth). `spawn_rate` is **no longer read** -- it stays in config as part of
+a difficulty's description, but nothing multiplies by it since the cadence
+became the cooldown ladder (G3).
+
+Everything time-shaped divides by `timeline_pace`, the ladder's *step*
+included. That is what makes every difficulty reach the same elite count at
+its boss: the step and the boss time scale by the same factor and cancel,
+so harder means the same elites sooner rather than more of them.
+
+**History.** This was a phase schedule until G3 (2026-09-18) -- ramp-fraction
+bands of enemy weights, pack sizes and lerped intervals, with `ramp_seconds`
+as its own clock and `min(pack, cap - active)` clipping a pack that did not
+fit. All of it went with the company model, along with the S2 sequence
+fixture that had replayed the pre-move `world/spawning.py` draw for draw.
+The tables are still handed in, or read from the loaded content when they
+are not, and the director still draws every random number from the `rng` it
+is given.
 """
 from __future__ import annotations
 
@@ -69,11 +91,12 @@ class SpawnDirector:
         self.set_difficulty(difficulty)
 
     def set_difficulty(self, difficulty: str) -> None:
-        """(Re)bind the four difficulty factors. Safe to call mid-run (the
-        dev-menu live switch does): the phase ramp and the boss re-key off the
-        new `ramp_duration` / `run_duration` immediately -- raising the pace
+        """(Re)bind the difficulty factors. Safe to call mid-run (the
+        dev-menu live switch does): the ladder, the elite unlock and the boss
+        all re-key off the new `timeline_pace` immediately -- raising the pace
         late can arm the boss on the next frame, which is intentional (dev
-        testing)."""
+        testing). The ladder timers already running are left alone; only the
+        lengths they are reset to change."""
         if difficulty not in config.DIFFICULTIES:
             difficulty = config.DIFFICULTY_DEFAULT
         f = config.DIFFICULTIES[difficulty]

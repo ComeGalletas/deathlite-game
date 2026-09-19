@@ -52,7 +52,12 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
     m.frozen = True                              # the population is ours to set
     m.update(0.0)                                # settle the zone
     config.ENEMY_LOD_SKIP = lod
-    ids = list(ps.content.spawn_tables.phase_at(0.5)["types"])
+    # Every body the master could field, from the resolved roster. This read
+    # `phase_at(0.5)["types"]` until G3 deleted the phase schedule; the group
+    # model's equivalent of "what a mid-run crowd is made of" is the roster,
+    # elites included -- which also keeps the big radii in the mix.
+    ids = sorted({eid for g in m.roster.groups.values()
+                  for eid in (*g.commons, *g.elites)})
     # Live bodies, seated on the zone's own spawn points with a spread.
     # They used to go through `m.spawn_at` with no position, which is
     # placement's job -- and placement's 3 s point cooldown meant a tight

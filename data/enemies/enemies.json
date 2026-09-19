@@ -46,16 +46,16 @@
   "bomb_fish": {
     "name": "Bloat", "hp": 13, "speed": 50,
     "aggro_range": 460,
-    "pursuit_seconds": 6.0, "contact_damage": 11, "radius": 16,
+    "pursuit_seconds": 6.0, "contact_damage": 5, "radius": 16,
     "weight": 8,
-    "experience_reward": 6, "behavior": "kite_shoot", "color": [230, 120, 60],
+    "experience_reward": 10, "behavior": "kite_shoot", "color": [230, 120, 60],
     "tags": ["exploder", "ranged"], "sprite": "bomb_fish", "contact_damage_enabled": false,
     "_bomb_comment": "It throws its bomb now instead of being one (owner, 2026-09-17). The art was always a fish LOBBING a bomb -- `shoot.png` has been wired as its `attack` strip since it shipped, and `exploder` never enters a telegraph/attack state, so those 7 frames had never once played. `shot_stop_after` halts the bomb mid-flight so the `bomb` rig swaps from `spin` to its lit `fuse`, then `shot_lifetime` runs out and `shot_blast_radius` detonates it on the player's side of the fight. `shot_tint` is HOSTILE_ARROW_TINT, the same red the hostile arrow wears, so an incoming bomb reads as incoming. `explode_radius` / `explode_damage` stay: they are the corpse blast the cull pass makes when it dies, which is still true of a fish full of bombs.",
     "prefer_distance": 210, "shoot_interval": 2.8, "shoot_damage": 18,
     "shot_speed": 200, "shot_radius": 9,
     "shot_style": "bomb", "shot_tint": [150, 26, 12],
     "shot_stop_after": 0.55, "shot_lifetime": 1.35, "shot_blast_radius": 62,
-    "explode_radius": 90, "explode_damage": 24, "fuse_range": 34
+    "explode_radius": 90, "explode_damage": 5, "fuse_range": 34
   },
   "panda": {
     "name": "Stoutpaw", "hp": 33, "speed": 60,
@@ -169,11 +169,11 @@
   "harpoon_shark": {
     "name": "Gaffjaw", "hp": 20, "speed": 33,
     "aggro_range": 640,
-    "pursuit_seconds": 8.0, "contact_damage": 15, "radius": 15,
+    "pursuit_seconds": 8.0, "contact_damage": 5, "radius": 15,
     "weight": 8,
     "experience_reward": 11, "behavior": "kite_shoot", "color": [86, 170, 168],
     "tags": ["ranged"], "sprite": "harpoon_shark", "contact_damage_enabled": false,
-    "prefer_distance": 360, "shoot_interval": 3.4, "shoot_damage": 19,
+    "prefer_distance": 360, "shoot_interval": 3.4, "shoot_damage": 7,
     "shot_speed": 300, "shot_radius": 8,
     "shot_style": "thrown", "shot_rig": "harpoon_spear", "shot_pierce": 2
   },

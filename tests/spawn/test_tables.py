@@ -27,9 +27,15 @@ class ShippedTablesTests(unittest.TestCase):
             self.assertIn(eid, content.enemies)
 
     def test_groups_are_looked_up_by_name(self):
+        """The lookup, not the tuning. The spans are balance numbers and
+        have already moved once (dark went [5, 30] -> [10, 30] on
+        2026-09-19), so what is pinned here is that a name resolves to a
+        group with the right shape and an unknown name raises."""
         t = get_content().spawn_tables
-        self.assertEqual(t.group("dark")["common_range"], [5, 30])
-        self.assertIn("skull", t.group("dark")["commons"])
+        dark = t.group("dark")
+        lo, hi = dark["common_range"]
+        self.assertTrue(1 <= lo <= hi)
+        self.assertIn("skull", dark["commons"])
         with self.assertRaises(TableError):
             t.group("nope")
 

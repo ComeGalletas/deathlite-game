@@ -656,6 +656,12 @@ real run.
 
 ## Todo
 
+**State (2026-09-19): G0a through G4 are built, committed and green.** G5 was
+never a separate step -- each deletion and rewrite landed with the change that
+caused it, which is why the suite only went red inside G3 and came back green
+in the same step. What is left is G6, the balance pass, plus the separate
+despawn-by-distance feature in `enemy_despawn_journal.md`.
+
 Revised after G0. Ordered so each step lands on a green suite where it can.
 The surface was measured, not guessed: the symbols that disappear touch 9
 production files and 8 spawn test modules.
@@ -714,7 +720,7 @@ Independent of the spawn model; can land green on their own.
       and `pacing` deliberately kept** - the director still reads them, so
       they go in G3 with the rewrite that stops. This is why G2 stayed
       green
-- [ ] `SpawnTables`: parse and validate; drop `phase_at`, `phases()`,
+- [x] `SpawnTables`: parse and validate; drop `phase_at`, `phases()`,
       `group()`, `ramp_seconds`, `elites`, `pacing`. Validation: member ids
       exist, weights > 0, `min <= max`, a group's elites are all `is_elite`
       and its commons are not, `elite_step >= 1`, no group empties once
@@ -727,56 +733,56 @@ Keep `enemy_count_cap`, `stat_multipliers`, `boss_time`, `should_spawn_boss`,
 `roll_pack`, `roll_elite`, `_roll_slots`, and the `min(pack, cap - active)`
 clipping. Add:
 
-- [ ] the two cooldown ladders, stepped on `120 / timeline_pace`
-- [ ] the 1-minute elite hard unlock (`60 / timeline_pace`)
-- [ ] group choice: random within the eligible pool, pools separate
-- [ ] composition: commons by weight, elites by the step ladder and weight
-- [ ] the cap gate: prepare -> count -> spawn if it fits, else retry in 2 s,
+- [x] the two cooldown ladders, stepped on `120 / timeline_pace`
+- [x] the 1-minute elite hard unlock (`60 / timeline_pace`)
+- [x] group choice: random within the eligible pool, pools separate
+- [x] composition: commons by weight, elites by the step ladder and weight
+- [x] the cap gate: prepare -> count -> spawn if it fits, else retry in 2 s,
       on the in-game clock
-- [ ] `spawn_rate` stops being read here
+- [x] `spawn_rate` stops being read here
 
 ### G4 - The master
 
-- [ ] Delete `spawn/pacing.py`; drop `Pacing` from `spawn/__init__.py`
-- [ ] Remove `self.pacing`, `pressure`, `set_modifier` / `clear_modifier` /
+- [x] Delete `spawn/pacing.py`; drop `Pacing` from `spawn/__init__.py`
+- [x] Remove `self.pacing`, `pressure`, `set_modifier` / `clear_modifier` /
       `modifiers`, the two subscriptions that only fed pacing, `spawn_group`
-- [ ] `update()` drives the director with plain `dt`
-- [ ] `_place_pack` becomes company seating on G0a, plus the G0b release queue
-- [ ] `_seed_residents` places a chosen company immediately
-- [ ] Drop the `pressure` dev metric (`core/state.py`) and the modifier
+- [x] `update()` drives the director with plain `dt`
+- [x] `_place_pack` becomes company seating on G0a, plus the G0b release queue
+- [x] `_seed_residents` places a chosen company immediately
+- [x] Drop the `pressure` dev metric (`core/state.py`) and the modifier
       control (`dev_menu_state.py`)
 
 ### G5 - Tests
 
 Deletions - what they pin no longer exists:
 
-- [ ] `tests/spawn/test_pacing.py`, whole module
-- [ ] `director_sequence.json` and the S2 sequence test. It replays the old
+- [x] `tests/spawn/test_pacing.py`, whole module
+- [x] `director_sequence.json` and the S2 sequence test. It replays the old
       unit and has been wound back three times; this is where that proof ends
-- [ ] The phase / interval / ramp / elite-slot tests in `test_budget.py` and
+- [x] The phase / interval / ramp / elite-slot tests in `test_budget.py` and
       `test_tables.py`
-- [ ] `spawn_group` and pressure / modifier tests in `test_master.py`
+- [x] `spawn_group` and pressure / modifier tests in `test_master.py`
 
 Rewrites:
 
-- [ ] `test_unused_category.py` - it benches Stoutpaw and drives `roll_pack`;
+- [x] `test_unused_category.py` - it benches Stoutpaw and drives `roll_pack`;
       point it at a synthetic table so the mechanism is still covered with the
       list empty
-- [ ] `test_data_integrity.py` - band and elite-slot checks move to groups;
+- [x] `test_data_integrity.py` - band and elite-slot checks move to groups;
       add "every member exists and is on the right side of `is_elite`"
-- [ ] `fakehost.py`, `test_population.py`, `test_watchdog.py` build a
+- [x] `fakehost.py`, `test_population.py`, `test_watchdog.py` build a
       `SpawnDirector` - check the constructor calls still hold
 
 New coverage:
 
-- [ ] ladders step, floor, and scale by `timeline_pace`
-- [ ] no elite group before the hard unlock, one immediately after
-- [ ] pools stay separate while the gate is shut
-- [ ] a company is one family, sized in its span, weighted, elite count per
+- [x] ladders step, floor, and scale by `timeline_pace`
+- [x] no elite group before the hard unlock, one immediately after
+- [x] pools stay separate while the gate is shut
+- [x] a company is one family, sized in its span, weighted, elite count per
       the ladder
-- [ ] the cap gate waits and retries, and the company **arrives whole rather
+- [x] the cap gate waits and retries, and the company **arrives whole rather
       than clipped** - the behaviour replacing the old truncation
-- [ ] residents place a company on first visit
+- [x] residents place a company on first visit
 
 ### G6 - Balance pass
 
@@ -975,12 +981,9 @@ should be per-group from the start.
 - [x] Measure concentric packing around one point
 - [x] Measure random scatter vs concentric, and jittered concentric
 - [x] Wild beasts re-measured (r24, 32 bodies: 400 px radius, median 32 seated)
-- [ ] Replace `Placement.ring` with the jittered packer, with tests: N bodies
-      land, none overlap, all walkable, radius grows with body size and
-      company size, jitter never costs fill, degrades gracefully when the
-      ground runs out
-- [ ] Decide `company_stagger` - whether a company materialises over a few
-      tenths of a second rather than on one frame
+- [x] Replace `Placement.ring` with the jittered packer *(G0a; the revised
+      todo below carries the detail)*
+- [x] Decide `company_stagger` *(G0b: 0.35 s, 0 still supported)*
 
 ---
 
@@ -1665,13 +1668,18 @@ benching.
       gate, pacing is deleted; the phase schedule and its tables are gone.
       Measured: 70 companies and 1435 bodies over ten minutes against a
       player clearing two a second, never over the cap, 16 of 18 kinds seen
-- [ ] G6 - `residents.combat` now means 2-3 *companies* (68 bodies on a
-      combat island, against 4-12 before). Left as data; needs a decision
+- [x] G6 first pass - `residents.combat` -> 1 (68 bodies down to 29) and the
+      common cadence base 5 -> 2, which front-loads the run rather than
+      speeding it up (field at 15 s: 46 -> 91). Committed as `e383f7e`
+- [ ] G6 remainder - the common ladder is now flat (2 -> 1 after one step;
+      `common_decay` 0.25 would restore the gradient), elite item income is
+      up ~69 % since G1, and the proposed group weights have never been
+      reviewed
 - [x] Retire the potion/elite coupling test; potions.py itself unchanged
 - [x] Stoutpaw unbenched; three enemies gain `is_elite`; Shellback +70 HP
 - [x] Old `groups` deleted, new `groups` defined with two spans each
-- [ ] Two ladders: common 5 s (-1, floor 1), elite gate 15 s (-3, floor 3),
-      elite `min` +1, all stepping every 2 min and scaled by timeline_pace
-- [ ] Cap gate: prepare, count, spawn or retry every 2 s; companies atomic
-- [ ] Remove `min(pack, cap - active)` clipping from the director
-- [ ] Build
+- [x] Two ladders, stepping every 2 min and scaled by timeline_pace
+      *(the common base later moved 5 -> 2; the tables are the record)*
+- [x] Cap gate: prepare, count, spawn or retry every 2 s; companies atomic
+- [x] Remove `min(pack, cap - active)` clipping from the director
+- [x] Build - G0a through G4 are in, on a green suite
