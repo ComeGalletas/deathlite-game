@@ -1002,6 +1002,10 @@ DEBUG_OVERLAY_DEFAULT: bool = False
 # a tuple so a layout may bind more than one key to it.
 AUTO_ATTACK_DEFAULT: bool = True      # `Q` toggles it in-run; no HUD element
 KEY_TOGGLE_AUTO_ATTACK: int = 113     # K_q
+# The one key that uses whatever the hero stands on (chest, shrine, forge,
+# sanctuary...). The prompt draws its keycap from this binding
+# (`ui/keycap.py`), so the key shown and the key handled cannot disagree.
+KEY_INTERACT: int = 101               # K_e
 
 # Half-angle of the fire-time aim-assist cone: a manual attack targets the
 # closest enemy inside this cone (out to the weapon's reach) and fires

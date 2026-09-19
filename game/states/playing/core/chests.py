@@ -60,9 +60,6 @@ class Chests:
                 best, best_d = chest, d
         return best
 
-    def prompt(self, chest) -> str:
-        return f"E  {chest.rarity.capitalize()} chest - open it"
-
     # --- opening -------------------------------------------------
     def activate_nearby(self) -> bool:
         """Open the chest the hero is standing on. Returns True if one was."""

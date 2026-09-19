@@ -47,10 +47,12 @@ from world.map import GameMap
 from world.pathfinding import NavField
 from spawn.budget import SpawnDirector
 from game.states.playing.visual import rendering as _rendering
+from game.states.playing.visual import key_marker
 from game.states.playing.visual.rendering import WorldRenderer
 from game.states.playing.core.combat import CombatResolver
 from game.states.playing.core.physics import BumpResolver
 from game.states.playing.core.chests import Chests
+from game.states.playing.core import interactions
 from game.states.playing.core.locations import SpecialLocations
 from game.states.playing.core.npcs import Npcs
 from game.states.playing.core.effects import TransientFx
@@ -313,14 +315,12 @@ class PlayingState(State):
             from game.states.paused_state import PausedState
             self._suspend_mouse()
             self.game.state_machine.push(PausedState(self.game))
-        elif event.key == pygame.K_e:
-            # Special locations first -- they were here before chests, and a
-            # chest can never be seated inside a special island's clear disc,
-            # so the two prompts cannot both be live.
-            if self.locations.nearby() is not None:
-                self.locations.activate_nearby()
-            else:
-                self.chest_manager.activate_nearby()
+        elif event.key == config.KEY_INTERACT:
+            # The closest usable chest or location within reach -- the one
+            # the keycap is floating over (journal: key_icons_journal.md).
+            target = interactions.nearest(self)
+            if target is not None:
+                interactions.activate(self, target)
         elif event.key == pygame.K_BACKQUOTE and self.dev_mode:
             from game.states.dev_menu_state import DevMenuState
             self._suspend_mouse()
@@ -1092,6 +1092,7 @@ class PlayingState(State):
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
             self.renderer.aim_overlay(surface)          # dev-only, same layer
+            key_marker.draw(surface, self)              # the interact cap, over its element
         finally:
             self.camera.pos += offset
 
