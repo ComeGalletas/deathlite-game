@@ -66,10 +66,13 @@
     "grace_weight": 0.5
   },
 
+  "_population_comment": "The ring (owner, 2026-09-18/19). A live body further than `despawn_radius` from the hero is hibernated whatever island it stands on and whether or not it is chasing -- distance wins, which is what stops a tail of abandoned bodies holding live-cap slots the player will never meet. A record is woken again when the hero comes within `wake_radius`. The gap between the two is hysteresis: without it a body pacing the boundary would sleep and wake on alternate ticks. 1400 clears every floor it has to -- placement seats a company at most 1100 px out, the 16:9 camera half-diagonal is 612, and the widest `aggro_range` in the roster is 640 -- so nothing is ever released inside the view or while it could still see the hero. 1100 is `far_max_distance` itself, so a record wakes exactly when it re-enters the band a company would be seated into.",
   "population": {
     "tick": 0.5,
     "wake_budget": 8,
-    "scatter_after": 45.0
+    "scatter_after": 45.0,
+    "despawn_radius": 1400,
+    "wake_radius": 1100
   },
 
   "watchdog": {
@@ -84,8 +87,8 @@
     "_band_comment": "Placement is a distance band around the hero, regardless of the camera (owner, 2026-09-15): the same request lands the same way at 16:9, 21:9, or with the view anywhere. The strict rung (FAR) takes a point between `far_min_distance` and `far_max_distance` from the hero -- 700 sits just past the 16:9 half-diagonal of 612 world px plus the old 96 px pad, so a 16:9 player still sees nothing appear, while a wider view may see an arrival at its edge; 1100 keeps the walk short. The middle rung (NEAR: a pack whose debt has aged past `relax_after`, or the strict rung empty) drops the ceiling and keeps `near_min_distance` as the keep-away.",
     "_starved_comment": "The last rung of the relaxation ladder, used only when no point passes the stricter rules -- which is what a player who camps on one island produces: its handful of points are all either on cooldown or inside the keep-away, and every pack becomes debt. At this rung the point cooldown shortens, so the same few points can be reused, and `starved_min_distance` is the only keep-away, so an enemy arrives at the edge of the screen rather than in the hero's lap; candidates here are also weighted by distance, which biases the draw outward.",
     "cooldown": 3.0,
-    "far_min_distance": 700,
-    "far_max_distance": 1100,
+    "far_min_distance": 620,
+    "far_max_distance": 850,
     "near_min_distance": 480,
     "relax_after": 5.0,
     "starved_min_distance": 420,

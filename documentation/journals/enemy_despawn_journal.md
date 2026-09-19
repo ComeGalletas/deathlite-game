@@ -4,7 +4,7 @@ The spawn master removes live bodies that are far from the player, so the
 frame is cheaper and the live cap is spent on enemies the player can actually
 meet.
 
-**Status: confirmed, not built.** The owner asked to confirm only.
+**Status: built and green (2026-09-19).** See *Built* at the foot.
 
 ---
 
@@ -621,3 +621,142 @@ Down to two, from five:
   enough hysteresis that a player pacing a boundary does not flap bodies in and
   out, and far enough out that they materialise before entering the view.
   Suggest waking at ~1,300 px, giving a 400 px dead zone.
+
+---
+
+## Built (2026-09-19)
+
+**Status: built and green.** Two changes went in together, and the second
+turned out to matter more than the first.
+
+### The ring
+
+| knob | value | why |
+|---|---|---|
+| `population.despawn_radius` | **1400** | the owner's call on the day, over the 1700 recorded above |
+| `population.wake_radius` | **1100** | `far_max_distance` at the time, so a record woke exactly as it re-entered the band |
+
+`Population.hibernate` now sleeps a body when **either** rule fires: the
+ring (beyond `despawn_radius`, no exemption for a chase and none for the
+hero's own island) or the older zone rule (a whole island the hero left,
+pursuit lapsed). An owner in `never_sleep` is exempt from both, and a body
+on a bridge is left alone because a record is filed by island and there is
+none to file it under.
+
+`Population.wake_nearby` is the other half, and it is what made the ring
+usable: `activate` only fires when an island *enters* the zone, which never
+happens for the island underfoot, so a body the ring slept there would have
+been stranded for the rest of the run. A `wake_radius` at or above
+`despawn_radius` now raises at construction rather than flapping bodies
+between the two states every tick.
+
+`_cap_room` no longer counts `total_dormant`, per the 2026-09-18 answer.
+
+### What the ring alone was worth
+
+Measured on a fully ticking run -- `ps.update`, not the master alone. The
+first pass ticked only the master, so bodies never moved and the
+standing-still case was inert by construction; that measurement was wrong
+and is not reported here.
+
+| 4 minutes, hero walking a patrol | ring off | ring on |
+|---|---|---|
+| bodies within a screen, median | 10 | **21** |
+| within a screen, p90 | 23 | **46** |
+| released by the ring | 0 | 591 |
+| re-woken by distance | 217 | 516 |
+
+Good for a moving player. **For a standing one the ring did nothing at
+all** -- `ringed` 0, median 5 bodies within a screen out of 152 live.
+
+### The real fault the measurement exposed
+
+The ring could not have fixed that at any radius, and the reason is a gap
+between two numbers that had drifted apart:
+
+```
+placement band     700 .. 1100     where a company was seated
+widest aggro_range 640             Gaffjaw; most of the roster 360-480
+```
+
+**A company was seated outside every enemy's aggro range.** A standing hero
+never drew those bodies in, and they sat between 1100 and the 1400 ring
+for the rest of the run -- too far to notice the hero, too near to be
+released. 152 live, five of them met. That is the owner's "constantly
+dealing with enemies" failing, and no despawn radius addresses it:
+shrinking the ring below 1100 would have despawned the company the master
+had just seated.
+
+### The fix (owner, 2026-09-19)
+
+> "increase the aggro range substantially so that far enemies are aggroed
+> closer, however also consider spawning enemies even closer to the player"
+
+Both levers, set against each other so that two invariants hold at once:
+
+```
+far_max_distance  <  min(aggro_range)     every arrival can see the hero
+max(aggro_range)  <  despawn_radius       a released body cannot re-aggro
+```
+
+The second is the invariant the ring's whole design rests on, and it was
+the constraint on how far the first could go.
+
+* **Aggro**: the roster's span `[360, 640]` mapped linearly onto
+  `[880, 1200]`, so ordering and relative spread survive -- Shellback
+  360 -> 880, Husk 420 -> 950, Gaffjaw 640 -> 1200. Roughly a doubling.
+* **Band**: `far_min_distance` 700 -> **620**, `far_max_distance`
+  1100 -> **850**.
+
+850 < 880 and 1200 < 1400, so both hold with room.
+
+### Measured again, after both
+
+| 4 minutes, full run tick | before | after |
+|---|---|---|
+| **hero standing still**, within a screen (median) | 5 | **111** |
+| standing still, p90 | 7 | **143** |
+| hero walking, within a screen (median) | 21 | **63** |
+| walking, p90 | 46 | **106** |
+
+The camping case goes from five bodies met to a hundred and eleven. Note
+what this does to the ring's own contribution: `ringed` fell from 591 to
+52, because with aggro raised almost nothing is left behind to collect.
+**The ring is now the safety net and the aggro range is the mechanism** --
+worth recording, because the ring looked like the feature and was not.
+
+### Consequences to carry into the balance pass
+
+* **This is a large difficulty increase.** The field went from 5 enemies
+  engaged to ~111, on top of G1's +69 % elite item income and the
+  front-loaded cadence from `e383f7e`. Nothing here was compensated for.
+* **`far_min` 620 is 8 px past the 16:9 camera half-diagonal (612).**
+  Arrivals now land at the very edge of the screen where 700 kept them
+  clear -- S11 set that margin deliberately. The band could go back to
+  700..850 and still satisfy both invariants; only the closeness would be
+  lost.
+* **Still unbuilt from the plan above**: a bound on dormant records (a
+  safety rail now, since records are bounded by what the player generated),
+  and an update **+ render** measurement. Only `ps.update` has been timed,
+  and the ring makes "everything packed near the hero" the normal case,
+  which is exactly where draw cost lives.
+
+### Tests
+
+New in `tests/spawn/test_population.py`: the ring and the zone rule each
+taking their own with the geometry chosen so one rule decides each body; a
+body on the hero's own island sleeping once it is far enough (the case that
+did not exist before); the ring beating a chase; a record waking when the
+hero walks back to it; the wake band sitting inside the ring; and a
+`wake_radius` outside the ring being refused outright.
+
+`test_the_world_cap_counts_the_dormant` became
+`test_the_world_cap_no_longer_counts_the_dormant`, asserting the reversal
+directly rather than being deleted.
+
+Three tests elsewhere needed adjusting, none of them hiding a defect:
+`tests/flows/test_lod.py` had its deliberately-distant enemy eaten by the
+ring (the ring is held off there, since those tests measure the LOD),
+`test_an_enemy_inside_the_ring_pursues` hard-coded four seconds for what is
+now nearly nine seconds of walking, and the placement band test wrote out
+700 / 1100. All three now read the data instead.

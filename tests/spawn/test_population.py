@@ -30,25 +30,103 @@ def _spawn(host, room_x: float, n: int, owner="director", eid="skull"):
 
 
 class HibernateTests(unittest.TestCase):
-    def test_idle_enemies_outside_the_zone_sleep_and_the_rest_stay(self):
+    def test_the_ring_and_the_zone_rule_each_take_their_own(self):
+        """Both hibernation rules at once, with the geometry chosen so each
+        body is decided by exactly one of them.
+
+        The hero stands at (1000, 2000) and `despawn_radius` is 1400, so the
+        cases that matter are: on the hero's *own*, active island but beyond
+        the ring (the case that did not exist before), and on a left island
+        but still inside it.
+        """
         host = FakeHost()
         host.pursuing = set()
         pop = _pop()
-        inside = _spawn(host, 300, 2, owner="director")            # island 0
-        outside = _spawn(host, 2500, 3, owner="director")          # island 1
-        exempt = _spawn(host, 2500, 1, owner="dummy")
-        chasing = _spawn(host, 2500, 1, owner="director")
-        host.pursuing = {id(chasing[0])}
+        at = lambda x, y, owner="director": host.make_enemy(
+            "skull", x, y, 1.0, 1.0, owner)
+
+        near_own = at(1200, 2000)          # island 0, active, 200 px -> stays
+        far_own = at(100, 500)             # island 0, active, 1749 px -> RING
+        near_left = at(2150, 2000)         # island 1, idle, 1150 px -> ZONE
+        near_chaser = at(2150, 2100)       # island 1, chasing, inside -> stays
+        far_chaser = at(2600, 2000)        # island 1, chasing, 1600 px -> RING
+        exempt = at(2600, 2100, owner="dummy")     # never_sleep -> stays
         bridge = host.make_enemy("skull", *BRIDGE.center, 1.0, 1.0, "director")
+        host.pursuing = {id(near_chaser), id(far_chaser)}
+
         slept = pop.hibernate(host, {0}, 1.0)
-        self.assertEqual(slept, {1: 3})
+
+        self.assertEqual(slept, {0: 1, 1: 2})
         self.assertEqual(set(map(id, host.live)),
-                         set(map(id, inside + exempt + chasing + [bridge])))
-        self.assertEqual(pop.dormant_in(1), 3)
-        self.assertEqual(pop.total_dormant, 3)
+                         set(map(id, [near_own, near_chaser, exempt, bridge])))
         self.assertEqual(pop.slept, 3)
-        for rec in pop.dormant[1]:
-            self.assertEqual((rec.room_id, rec.slept_at, rec.owner), (1, 1.0, "director"))
+        self.assertEqual(pop.ringed, 2, "the ring took the two far bodies")
+        self.assertEqual(pop.dormant_in(0), 1)
+        self.assertEqual(pop.dormant_in(1), 2)
+        for recs in pop.dormant.values():
+            for rec in recs:
+                self.assertEqual((rec.slept_at, rec.owner), (1.0, "director"))
+
+    def test_a_body_on_the_heros_own_island_sleeps_once_it_is_far_enough(self):
+        """The whole point of the ring. Before it, the hero's island was
+        always in the zone, so a body three screens away on it stayed fully
+        simulated for the rest of the run."""
+        host = FakeHost()
+        host.pursuing = set()
+        pop = _pop()
+        ring = pop.despawn_radius
+        near = host.make_enemy("skull", 1000 + ring - 50, 2000, 1.0, 1.0)
+        far = host.make_enemy("skull", 1000 + ring + 50, 2000, 1.0, 1.0)
+        pop.hibernate(host, {0, 1}, 1.0)       # every island active
+        self.assertIn(near, host.live)
+        self.assertNotIn(far, host.live)
+
+    def test_the_ring_beats_a_chase(self):
+        """owner, 2026-09-19: no pursuit exemption -- distance wins. A body
+        that far cannot re-aggro anyway; the widest `aggro_range` is 640."""
+        host = FakeHost()
+        pop = _pop()
+        chaser = host.make_enemy("skull", 1000 + pop.despawn_radius + 100, 2000,
+                                 1.0, 1.0)
+        host.pursuing = {id(chaser)}
+        pop.hibernate(host, {0, 1}, 1.0)
+        self.assertNotIn(chaser, host.live)
+
+    def test_a_record_wakes_when_the_hero_comes_back_to_it(self):
+        """The ring's other half: `activate` only fires on a zone entry, so
+        a body slept on the island underfoot would otherwise be stranded."""
+        host = FakeHost()
+        host.pursuing = set()
+        pop = _pop()
+        body = host.make_enemy("skull", 1000 + pop.despawn_radius + 100, 2000,
+                               1.0, 1.0)
+        spot = pygame.Vector2(body.pos)
+        pop.hibernate(host, {0, 1}, 1.0)
+        self.assertEqual(pop.total_dormant, 1)
+
+        # still out of reach: nothing is queued
+        self.assertEqual(pop.wake_nearby(host, 2.0), 0)
+        self.assertEqual(pop.waking, 0)
+
+        # walk the hero to within the wake band
+        host.player = pygame.Vector2(spot.x - pop.wake_radius + 50, spot.y)
+        self.assertEqual(pop.wake_nearby(host, 3.0), 1)
+        self.assertEqual(pop.waking, 1)
+        self.assertEqual(pop.total_dormant, 1, "queued still counts as dormant")
+
+    def test_the_wake_band_sits_inside_the_ring_so_nothing_flaps(self):
+        """Without the gap a body on the boundary would sleep and wake on
+        alternate ticks for as long as the hero stood there."""
+        pop = _pop()
+        self.assertLess(pop.wake_radius, pop.despawn_radius)
+
+    def test_a_wake_band_outside_the_ring_is_refused_outright(self):
+        from spawn.population import Population
+        knobs = dict(get_content().spawn_tables.population)
+        knobs["wake_radius"] = knobs["despawn_radius"]
+        with self.assertRaises(ValueError) as caught:
+            Population(knobs)
+        self.assertIn("flap", str(caught.exception))
 
     def test_the_tick_spaces_the_sweeps(self):
         host = FakeHost()
@@ -221,10 +299,16 @@ class MasterZoneTests(unittest.TestCase):
             m.update(0.0)
         self.assertEqual(m.zone(), {0: 1.0, 1: m.locality.heading_weight})
 
-    def test_pursuers_stay_live_across_the_zone_edge(self):
+    def test_pursuers_stay_live_across_the_zone_edge_while_inside_the_ring(self):
+        """The zone rule still exempts a chase -- but only inside the ring.
+        Beyond it distance wins (`test_the_ring_beats_a_chase`), so the
+        chaser here is placed on the left island *within* the ring, which is
+        what the exemption was always for: the fight the player is watching
+        as they cross a bridge."""
         host = FakeHost()
         m = _master(host)
-        chaser = _spawn(host, 2500, 1)[0]
+        ring = m.population.despawn_radius
+        chaser = host.make_enemy("skull", 1000 + ring - 200, 2000, 1.0, 1.0)
         host.pursuing = {id(chaser)}
         for _ in range(4):
             host.elapsed += m.population.tick
@@ -239,17 +323,29 @@ class CapAndSwitchTests(unittest.TestCase):
         self.assertEqual(m.director.live_cap, config.ENEMY_LIVE_CAP)
         self.assertEqual(m.director.enemy_count_cap(10_000.0), config.ENEMY_LIVE_CAP)
 
-    def test_the_world_cap_counts_the_dormant(self):
+    def test_the_world_cap_no_longer_counts_the_dormant(self):
+        """Reversed on 2026-09-18. Dormant records used to come off
+        `world_cap`, so a run that had banked records across several islands
+        throttled live spawning everywhere -- which is precisely what the
+        ring now produces, since its whole job is to turn distant bodies
+        into records. A sleeping body is a ledger entry, not a claim on the
+        field, and only live bodies are counted."""
         host = FakeHost()
         host.pursuing = set()
         m = _master(host)
+        m.frozen = True                      # no companies; the point is the cap
         m.world_cap = 5
         _spawn(host, 2500, 4)
-        m.update(0.0)                                          # tick 0: they sleep
-        self.assertEqual(m.population.total_dormant, 4)
-        self.assertIsNotNone(m.spawn_at("skull", pygame.Vector2(50, 50)))     # 4 + 1 = 5
-        self.assertIsNone(m.spawn_at("skull", pygame.Vector2(50, 50)))        # over
-        self.assertIsNotNone(m.spawn_at("bear", pygame.Vector2(50, 50), owner="dev"))
+        host.elapsed += m.population.tick
+        m.update(0.0)
+        self.assertEqual(m.population.total_dormant, 4, "the ring slept them")
+        self.assertEqual(host.live_count(), 0)
+        # All five slots are still there: the four records claim none of them.
+        made = [m.spawn_at("skull", pygame.Vector2(1000, 2000)) for _ in range(5)]
+        self.assertTrue(all(e is not None for e in made), made)
+        self.assertIsNone(m.spawn_at("skull", pygame.Vector2(1000, 2000)))
+        self.assertIsNotNone(m.spawn_at("bear", pygame.Vector2(1000, 2000),
+                                        owner="dev"))
 
     def test_frozen_stops_the_director_but_not_the_zone(self):
         host = FakeHost()

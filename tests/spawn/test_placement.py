@@ -65,8 +65,14 @@ class FilterTests(unittest.TestCase):
                              want[tier])
 
     def test_the_ceiling_drops_at_the_near_rung(self):
-        inside = SpawnPoint(0, 0, 1000.0, 2000.0 + 900.0)
-        beyond = SpawnPoint(0, 0, 1000.0, 2000.0 - 1500.0)
+        # Read off the band rather than written out: it was 700..1100 and
+        # became 620..850 on 2026-09-19, when companies were pulled inside
+        # every enemy's aggro range.
+        band = get_content().spawn_tables.placement
+        mid = (band["far_min_distance"] + band["far_max_distance"]) / 2.0
+        past = band["far_max_distance"] + 400.0
+        inside = SpawnPoint(0, 0, 1000.0, 2000.0 + mid)
+        beyond = SpawnPoint(0, 0, 1000.0, 2000.0 - past)
         host = FakeHost(points=[inside, beyond])
         pl = _placement(host)
         self.assertEqual([p for p, _w in pl.candidates(_req(host), host, 0.0, tier=FAR)],

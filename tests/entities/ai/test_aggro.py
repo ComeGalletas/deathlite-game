@@ -81,10 +81,16 @@ class AggroBehaviourTests(unittest.TestCase):
     def test_an_enemy_inside_the_ring_pursues(self):
         cfg = get_content().enemy("skull")
         start = cfg["aggro_range"] * 0.7
+        # Long enough for the body to actually cross that gap. The four
+        # seconds this used to hard-code stopped being enough when the aggro
+        # ranges were roughly doubled on 2026-09-19 and the speeds were not:
+        # a Husk walks 75 px/s, so 0.7 of a 950 px ring is nearly nine
+        # seconds of running.
+        seconds = start / cfg["speed"] * 1.5 + 1.0
         e = _enemy("skull", start)
-        travel, _ = _run(e, 0.0, 4.0)
-        # It closes the gap and then stops to attack, so the distance travelled
-        # is the gap itself -- not four seconds of running.
+        travel, _ = _run(e, 0.0, seconds)
+        # It closes the gap and then stops to attack, so the distance
+        # travelled is the gap itself -- not the whole window of running.
         self.assertGreater(travel, start * 0.9)
         self.assertLess(e.pos.x, 40.0, "it never reached the player")
 

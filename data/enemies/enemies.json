@@ -1,7 +1,7 @@
 {
   "skull": {
     "name": "Husk", "hp": 20, "speed": 75,
-    "aggro_range": 420,
+    "aggro_range": 950,
     "pursuit_seconds": 6.0, "contact_damage": 13, "radius": 10,
     "weight": 7,
     "experience_reward": 3, "behavior": "path_chase_attack", "color": [200, 90, 90],
@@ -10,7 +10,7 @@
   },
   "spider": {
     "name": "Skitter", "hp": 10, "speed": 100,
-    "aggro_range": 480,
+    "aggro_range": 1020,
     "pursuit_seconds": 5.0, "contact_damage": 11, "radius": 10,
     "weight": 5,
     "experience_reward": 3, "behavior": "path_chase", "color": [240, 150, 90],
@@ -18,7 +18,7 @@
   },
   "turtle": {
     "name": "Shellback", "hp": 150, "speed": 55,
-    "aggro_range": 360,
+    "aggro_range": 880,
     "pursuit_seconds": 9.0, "contact_damage": 21, "radius": 24,
     "weight": 14,
     "experience_reward": 9, "behavior": "path_chase_attack", "color": [130, 90, 150],
@@ -27,7 +27,7 @@
   },
   "bumblebee": {
     "name": "Stinger", "hp": 5, "speed": 120,
-    "aggro_range": 400,
+    "aggro_range": 930,
     "pursuit_seconds": 5.0, "contact_damage": 9, "radius": 9,
     "weight": 3,
     "experience_reward": 1, "behavior": "path_chase", "color": [180, 200, 110],
@@ -35,7 +35,7 @@
   },
   "slingshot_gnome": {
     "name": "Slinger", "hp": 17, "speed": 45,
-    "aggro_range": 560,
+    "aggro_range": 1110,
     "pursuit_seconds": 6.0, "contact_damage": 10, "radius": 13,
     "weight": 6,
     "experience_reward": 6, "behavior": "kite_shoot", "color": [110, 200, 170],
@@ -45,7 +45,7 @@
   },
   "bomb_fish": {
     "name": "Bloat", "hp": 13, "speed": 50,
-    "aggro_range": 460,
+    "aggro_range": 990,
     "pursuit_seconds": 6.0, "contact_damage": 5, "radius": 16,
     "weight": 8,
     "experience_reward": 10, "behavior": "kite_shoot", "color": [230, 120, 60],
@@ -59,7 +59,7 @@
   },
   "panda": {
     "name": "Stoutpaw", "hp": 33, "speed": 60,
-    "aggro_range": 400,
+    "aggro_range": 930,
     "pursuit_seconds": 8.0, "contact_damage": 15, "radius": 16,
     "weight": 8,
     "experience_reward": 8, "behavior": "path_chase_attack", "color": [150, 170, 210],
@@ -69,7 +69,7 @@
   },
   "bear": {
     "name": "Ravager", "hp": 125, "speed": 70,
-    "aggro_range": 520,
+    "aggro_range": 1060,
     "pursuit_seconds": 9.0, "contact_damage": 25, "radius": 22,
     "weight": 30,
     "experience_reward": 30, "behavior": "path_chase_attack", "color": [255, 80, 120],
@@ -78,7 +78,7 @@
   },
   "hammer_gnome": {
     "name": "Hammer Gnome", "hp": 26, "speed": 60,
-    "aggro_range": 420,
+    "aggro_range": 950,
     "pursuit_seconds": 6.0, "contact_damage": 18, "radius": 16,
     "weight": 11,
     "experience_reward": 5, "behavior": "path_chase_attack", "color": [214, 120, 70],
@@ -87,7 +87,7 @@
   },
   "spear_goblin": {
     "name": "Whirlspear", "hp": 42, "speed": 80,
-    "aggro_range": 460,
+    "aggro_range": 990,
     "pursuit_seconds": 6.5, "contact_damage": 13, "radius": 14,
     "weight": 8,
     "experience_reward": 9, "behavior": "path_chase_sweep", "color": [150, 170, 150],
@@ -100,7 +100,7 @@
   },
   "torch_goblin": {
     "name": "Beekeeper", "hp": 87, "speed": 55,
-    "aggro_range": 540,
+    "aggro_range": 1090,
     "pursuit_seconds": 8.0, "contact_damage": 8, "radius": 16,
     "weight": 10,
     "experience_reward": 18, "behavior": "path_chase_summon", "color": [230, 160, 60],
@@ -111,7 +111,7 @@
   },
   "troll": {
     "name": "Grudge", "hp": 290, "speed": 65,
-    "aggro_range": 420,
+    "aggro_range": 950,
     "pursuit_seconds": 10.0, "contact_damage": 29, "radius": 26,
     "weight": 80,
     "experience_reward": 60, "behavior": "brute", "color": [200, 60, 60],
@@ -122,7 +122,7 @@
   },
   "imp": {
     "name": "Cinder", "hp": 34, "speed": 86,
-    "aggro_range": 480,
+    "aggro_range": 1020,
     "pursuit_seconds": 6.0, "contact_damage": 10, "radius": 13,
     "weight": 6,
     "experience_reward": 10, "behavior": "path_chase_breath", "color": [214, 104, 58],
@@ -135,7 +135,7 @@
   },
   "minotaur": {
     "name": "Gorehorn", "hp": 55, "speed": 90,
-    "aggro_range": 560,
+    "aggro_range": 1110,
     "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 15,
     "weight": 8,
     "experience_reward": 8, "behavior": "fsm_charger", "color": [230, 110, 70],
@@ -146,7 +146,7 @@
   },
   "thief": {
     "name": "Blink", "hp": 36, "speed": 95,
-    "aggro_range": 600,
+    "aggro_range": 1150,
     "pursuit_seconds": 8.0, "contact_damage": 12, "radius": 13,
     "weight": 6,
     "experience_reward": 9, "behavior": "fsm_teleporter", "color": [170, 120, 240],
@@ -157,7 +157,7 @@
   },
   "gnoll": {
     "name": "Bonepicker", "hp": 20, "speed": 32,
-    "aggro_range": 520,
+    "aggro_range": 1060,
     "pursuit_seconds": 7.0, "contact_damage": 14, "radius": 14,
     "weight": 7,
     "experience_reward": 8, "behavior": "kite_shoot", "color": [214, 186, 82],
@@ -168,7 +168,7 @@
   },
   "harpoon_shark": {
     "name": "Gaffjaw", "hp": 20, "speed": 33,
-    "aggro_range": 640,
+    "aggro_range": 1200,
     "pursuit_seconds": 8.0, "contact_damage": 5, "radius": 15,
     "weight": 8,
     "experience_reward": 11, "behavior": "kite_shoot", "color": [86, 170, 168],
@@ -179,7 +179,7 @@
   },
   "hex_shaman": {
     "name": "Hexcaller", "hp": 64, "speed": 48,
-    "aggro_range": 560,
+    "aggro_range": 1110,
     "pursuit_seconds": 8.0, "contact_damage": 11, "radius": 15,
     "weight": 7,
     "experience_reward": 12, "behavior": "fsm_warlock", "color": [150, 90, 200],

@@ -7,18 +7,48 @@ cost). The conversion is the host's business -- `host.sleep(enemy)` and
 `host.wake(record, x, y)` -- because only the run knows what an `Enemy`
 is; this module decides *when*.
 
-**Hibernate**, every `tick` seconds: a live enemy whose island is not in
-the active zone, whose owner is not in `never_sleep`, and whose pursuit
-timer has lapsed, becomes a record. An enemy still chasing stays live
-wherever it is; that is the chase the player is watching. One on a bridge
-(no island under it) is left alone.
+**The ring** (owner, 2026-09-18/19) is the rule that matters most. A live
+body further than `despawn_radius` from the hero is hibernated **whatever
+island it stands on and whether or not it is chasing** -- distance wins.
+That is what stops a tail of abandoned bodies holding live-cap slots the
+player will never meet: before it, a body could stand three screens away on
+the hero's own island, fully simulated, for the whole run, because the
+hero's island is always in the zone.
 
-**Wake** when an island enters the zone: its records are queued, farthest
-from the player first, and woken `wake_budget` per frame so a full island
+**Hibernate**, every `tick` seconds, sleeps a body when either rule fires:
+
+1. the **ring** -- it is beyond `despawn_radius`; or
+2. the **zone** -- its island is not in the active zone *and* its pursuit
+   timer has lapsed. Inside the ring a chaser still stays live, because that
+   is the chase the player is watching and it is close enough to matter.
+
+An owner in `never_sleep` is exempt from both. One on a bridge (no island
+under it) is left alone, because a record is filed by island and there is
+none to file it under.
+
+**Wake** happens two ways, and the second is what the ring made necessary:
+
+* when an **island enters the zone**, its records are queued farthest from
+  the player first;
+* when the hero comes within `wake_radius` of a record, wherever it is
+  filed. Without this, a body the ring slept on an island the hero never
+  left would be stranded: `activate` only fires on a zone *entry*, which
+  that island never makes.
+
+`wake_radius` sits **inside** `despawn_radius` on purpose. The gap is
+hysteresis -- without it a body pacing the boundary would sleep and wake on
+alternate ticks.
+
+Either way the queue is drained `wake_budget` per frame so a full island
 never lands on one frame. A record's spot is checked for floor and a
 blocked one moves to the nearest free spawn point on its floor; a record
 asleep longer than `scatter_after` is re-placed on a random point of its
 island instead, so the player cannot memorise where the threats stood.
+
+Waking does **not** consult the live cap. It may push the live count past
+it, and when that happens the company gate simply refuses until the
+overflow drains through kills -- nothing force-despawns to claw back under
+(owner, 2026-09-18).
 
 Dormant records **freeze**: no movement, no healing, no regrouping.
 
@@ -30,7 +60,8 @@ import pygame
 
 __all__ = ["DormantEnemy", "Population"]
 
-_KEYS = ("tick", "wake_budget", "scatter_after")
+_KEYS = ("tick", "wake_budget", "scatter_after",
+         "despawn_radius", "wake_radius")
 
 
 class DormantEnemy:
@@ -69,13 +100,24 @@ class Population:
         self.tick = float(knobs["tick"])
         self.wake_budget = int(knobs["wake_budget"])
         self.scatter_after = float(knobs["scatter_after"])
+        # The ring. `wake_radius` must stay inside `despawn_radius` or a body
+        # on the boundary flaps between the two states every tick.
+        self.despawn_radius = float(knobs["despawn_radius"])
+        self.wake_radius = float(knobs["wake_radius"])
+        if self.wake_radius >= self.despawn_radius:
+            raise ValueError(
+                f"spawn_tables.json `population`: wake_radius "
+                f"({self.wake_radius}) must be inside despawn_radius "
+                f"({self.despawn_radius}), or bodies flap at the boundary")
         self.never_sleep = frozenset(never_sleep)
         self.dormant: dict[int, list[DormantEnemy]] = {}
         self.seeded: set[int] = set()          # islands that got their residents
         self._queue: list[DormantEnemy] = []   # waiting to wake, farthest first
         self._next_tick = 0.0
+        self._next_wake_scan = 0.0
         self.slept = 0
         self.woken = 0
+        self.ringed = 0          # slept by the ring rather than by the zone
 
     # --- counts -----------------------------------------------------------
     @property
@@ -91,11 +133,19 @@ class Population:
 
     # --- hibernate --------------------------------------------------------
     def hibernate(self, host, active, now: float) -> dict[int, int]:
-        """Put the out-of-zone, idle enemies to sleep. Runs every `tick`
-        seconds; returns `{room_id: count}` of what slept this call."""
+        """Sleep what the hero has left behind. Runs every `tick` seconds;
+        returns `{room_id: count}` of what slept this call.
+
+        Two rules, either of which fires: the **ring** (beyond
+        `despawn_radius`, no exemption for a chaser or for the hero's own
+        island) and the older **zone** rule (a whole island the hero left,
+        with its pursuit timer lapsed).
+        """
         if now < self._next_tick:
             return {}
         self._next_tick = now + self.tick
+        ppos = host.player_pos()
+        ring_sq = self.despawn_radius * self.despawn_radius
         slept: dict[int, int] = {}
         for e in list(host.live_enemies()):
             if not getattr(e, "alive", True):
@@ -103,10 +153,16 @@ class Population:
             if host.owner_of(e) in self.never_sleep:
                 continue
             room = host.room_at(e.pos)
-            if room is None or room.id in active:
-                continue
-            if host.is_pursuing(e):
-                continue
+            if room is None:
+                continue                  # on a bridge: nowhere to file it
+            beyond = ((e.pos.x - ppos.x) ** 2
+                      + (e.pos.y - ppos.y) ** 2) > ring_sq
+            if not beyond:
+                # Inside the ring the old rule still decides, chase and all.
+                if room.id in active or host.is_pursuing(e):
+                    continue
+            else:
+                self.ringed += 1
             rec = host.sleep(e)
             rec.room_id = room.id
             rec.floor = host.floor_at(e.pos)
@@ -127,6 +183,42 @@ class Population:
         recs.sort(key=lambda r: -((r.x - p.x) ** 2 + (r.y - p.y) ** 2))
         self._queue.extend(recs)
         return len(recs)
+
+    def wake_nearby(self, host, now: float) -> int:
+        """Queue every record the hero has come within `wake_radius` of.
+
+        The ring's other half. `activate` only fires when an island *enters*
+        the zone, which never happens for the island the hero is standing
+        on, so without this a body the ring slept underfoot would stay a
+        record for the rest of the run.
+
+        Nearest first, because these are the ones about to come into view --
+        the opposite of `activate`, which takes an island's far side first
+        so the near ground is not crowded on arrival.
+        """
+        if now < self._next_wake_scan:
+            return 0
+        self._next_wake_scan = now + self.tick
+        if not self.dormant:
+            return 0
+        ppos = host.player_pos()
+        band_sq = self.wake_radius * self.wake_radius
+        queued = 0
+        for rid in list(self.dormant):
+            near, far = [], []
+            for rec in self.dormant[rid]:
+                d = (rec.x - ppos.x) ** 2 + (rec.y - ppos.y) ** 2
+                (near if d <= band_sq else far).append(rec)
+            if not near:
+                continue
+            if far:
+                self.dormant[rid] = far
+            else:
+                del self.dormant[rid]
+            near.sort(key=lambda r: (r.x - ppos.x) ** 2 + (r.y - ppos.y) ** 2)
+            self._queue.extend(near)
+            queued += len(near)
+        return queued
 
     def wake_some(self, host, index, placement, now: float) -> int:
         """Wake up to `wake_budget` queued records. Returns how many woke."""

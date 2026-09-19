@@ -25,6 +25,12 @@ def _run():
     ps.player.invulnerable = True
     ps._dev_no_attack = True
     ps.spawn.master.frozen = True
+    # The despawn ring would take the far enemy these tests depend on -- it
+    # is deliberately placed outside the padded view, which on this world is
+    # also outside `despawn_radius`. Held off here so the LOD is what is
+    # being measured; `tests/spawn/test_population.py` owns the ring.
+    ps.spawn.master.population.despawn_radius = float("inf")
+    ps.spawn.master.population.wake_radius = float("inf")
     return ps
 
 

@@ -240,7 +240,10 @@ class CapTests(unittest.TestCase):
         self.assertIsNone(m.spawn_at("skull", pygame.Vector2(1, 1)))
         self.assertEqual(m.spawn_group("dark"), [])
         _run(m, host, 5.0)
-        self.assertEqual(len(host.live), cap)
+        # `<=` rather than `==` since the ring landed: these bodies are parked
+        # at (5, 5), far from the hero, so hibernation takes some of them as
+        # the run ticks. What the cap owes is that nothing got *past* it.
+        self.assertLessEqual(len(host.live), cap)
 
     def test_scripted_owners_are_always_seated(self):
         host = FakeHost()

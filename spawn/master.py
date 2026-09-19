@@ -232,6 +232,11 @@ class SpawnMaster:
         self._release_pending(now)
         if self._locality_on():
             self._tick_zone(now)
+            # The ring's other half: records the hero has walked back to.
+            # `activate` only fires on a zone entry, which never happens for
+            # the island underfoot, so without this a body slept by the ring
+            # on the hero's own island would never come back.
+            self.population.wake_nearby(host, now)
             if self.population.waking:
                 self.population.wake_some(host, self.index, self.placement, now)
         for v in self.watchdog.update(host, now):
@@ -548,12 +553,20 @@ class SpawnMaster:
     def _cap_room(self, owner: str) -> int | None:
         """How many more bodies this owner may seat, or `None` when it is
         exempt. A body committed but not yet landed counts as live, so a
-        company still materialising cannot be double-spent."""
+        company still materialising cannot be double-spent.
+
+        **Dormant records are not counted** (owner, 2026-09-18). They used to
+        come off `world_cap`, which meant a run that had banked records across
+        several islands throttled live spawning everywhere -- exactly the
+        thing the ring is meant to stop, since the ring's whole job is to
+        turn distant bodies into records. A sleeping body is a ledger entry,
+        not a claim on the field.
+        """
         if owner in self._cap_exempt:
             return None
         live = self.host.live_count() + len(self._pending)
         return max(0, min(self.director.enemy_count_cap(self.host.elapsed) - live,
-                          self.world_cap - live - self.population.total_dormant))
+                          self.world_cap - live))
 
     def _under_cap(self, owner: str) -> bool:
         room = self._cap_room(owner)
