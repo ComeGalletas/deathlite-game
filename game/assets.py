@@ -103,7 +103,10 @@ class Assets:
         spec = self._anim(rig, anim)
         if not r or spec is None:
             return None
-        sheet = self._load_image(spec["file"])
+        # An anim names its own sheet; a one-sheet rig (the end banners) may
+        # name it once at rig level instead, where `image()` also finds it.
+        path = spec.get("file", r.get("file"))
+        sheet = self._load_image(path) if path else None
         if sheet is None:
             return None
         fw, fh = r.get("frame", [sheet.get_height(), sheet.get_height()])
@@ -114,9 +117,13 @@ class Assets:
         # `row` picks a strip out of a grid sheet (one directional / state anim
         # per row). Omitted -> row 0, i.e. the plain horizontal strip.
         row_y = int(spec.get("row", 0)) * fh
+        # `cols` wraps one long anim over several rows, `cols` frames per row
+        # starting at `row`: the end banners (44 frames of 416 px) would
+        # otherwise be an 18 000 px strip. Omitted -> one row, as before.
+        cols = int(spec.get("cols", 0)) or int(spec["frames"])
         out: list[pygame.Surface] = []
         for i in range(int(spec["frames"])):
-            rect = pygame.Rect(i * fw, row_y, fw, fh)
+            rect = pygame.Rect((i % cols) * fw, row_y + (i // cols) * fh, fw, fh)
             if not sheet.get_rect().contains(rect):
                 break                                   # declared count overruns the sheet
             fr = sheet.subsurface(rect)

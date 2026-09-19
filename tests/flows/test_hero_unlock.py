@@ -18,6 +18,17 @@ from game.states.playing_state import PlayingState
 from tests.boot import settle
 
 
+
+def _ride_out_banner(game, limit=700):
+    """The end banner plays between the boss kill and the victory screen
+    (journal: end_banner_journal.md, 2026-09-19): step until it has."""
+    from game.states.end_banner_state import EndBannerState
+    for _ in range(limit):
+        if not isinstance(game.state_machine.current, EndBannerState):
+            break
+        game.state_machine.update(1 / 60)
+    return game.state_machine.current
+
 def _game():
     return Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
 
@@ -86,7 +97,7 @@ class UnlockOnVictoryTests(unittest.TestCase):
         p._on_boss_killed()
 
         from game.states.victory_state import VictoryState
-        state = game.state_machine.current
+        state = _ride_out_banner(game)
         self.assertIsInstance(state, VictoryState)
         s = state.stats
         self.assertTrue(s["victory"])
@@ -115,7 +126,7 @@ class UnlockOnVictoryTests(unittest.TestCase):
         p.player.invulnerable = True
         p.spawn.spawn_boss()
         p._on_boss_killed()
-        self.assertFalse(game.state_machine.current.stats["first_clear"])
+        self.assertFalse(_ride_out_banner(game).stats["first_clear"])
         pygame.quit()
 
 

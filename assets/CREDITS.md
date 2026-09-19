@@ -149,3 +149,11 @@ fill when a file is missing.
 | Free RPG Maker Chests | franjatesa | https://franjatesa.itch.io/free-rpgmaker-chests |
 | 750+ Effect and FX Pixel All | BDragon1727 | https://bdragon1727.itch.io/750-effect-and-fx-pixel-all |
 | Goth | ansimuz | https://ansimuz.itch.io/goth |
+
+### Where the additional packs are used
+
+- **Super Pixel Effects Gigapack** — the end banners in `assets/ui/end_banners/`:
+  `game_over.png` is the pack's `symbol_game_over_text_001` (large, red) and
+  `you_won.png` its `symbol_you_won_text_001` (large, yellow), each re-laid as a
+  grid sheet by `tools/asset_pipeline/cut_end_banners.py`. The pack itself is
+  kept unmodified under `assets/unused/` and is not read at run time.

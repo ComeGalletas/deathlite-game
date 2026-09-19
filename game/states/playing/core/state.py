@@ -156,7 +156,10 @@ class PlayingState(State):
         # Per-hero accent colour (primitive fallback + any HUD tint); the shared
         # config default covers characters with no `color`.
         self._hero_color = tuple(cdef.get("color", config.COLOR_PLAYER))
-        self._death_seq_t: float | None = None   # window held open for the hero death poof
+        # Set the frame the outcome is decided (HP at zero, or the boss down):
+        # the run stops taking input and fighting, keeps animating its effects
+        # under the end banner, and hands off when the banner is done.
+        self._ending: bool = False
 
         # Meta-progression + equipped items applied before the run starts.
         self._apply_persistent_bonuses()
@@ -393,8 +396,8 @@ class PlayingState(State):
 
     # --- pipeline ---------------------------------------------
     def update(self, dt: float) -> None:
-        if self._death_seq_t is not None:
-            self._run_death_sequence(dt)
+        if self._ending:
+            self._run_ending_sequence(dt)
             return
 
         self._phase_input()
@@ -408,10 +411,12 @@ class PlayingState(State):
         self.dps.update(dt)
         self._apply_dev_unlimited_hp()
         if not self.player.alive:
-            # Hold the run open for the shared death poof, then end.
+            # The shared death poof, then the end banner over the scene: the
+            # run keeps animating its effects under it and hands off to the
+            # summary when the banner has played (journal: end_banner_journal.md).
             self.fx.spawn_death_fx(self.player.pos, getattr(self.player, "_facing", 1),
                                    radius=self.player.radius)
-            self._death_seq_t = 1.05
+            self._begin_end(victory=False)
         self._report_debug()
 
     def _apply_dev_unlimited_hp(self) -> None:
@@ -435,18 +440,12 @@ class PlayingState(State):
         self.difficulty = name
         self.director.set_difficulty(name)
 
-    def _run_death_sequence(self, dt: float) -> None:
-        if self.dev_mode and self._dev_unlimited_hp:
-            # Unlimited HP switched on mid-death-animation: cancel the end.
-            self._death_seq_t = None
-            self._death_fx.clear()
-            self._trail_fx.clear()
-            self.fx.update_spawn_fx(1e9)          # let any running burst out
-            self.player.alive = True
-            self.player.hp = max(self.player.hp, self._dev_hp_floor,
-                                 self.player.max_hp * 0.5)
-            return
-        self._death_seq_t -= dt
+    def _run_ending_sequence(self, dt: float) -> None:
+        """The run under the end banner's wait phase: no input, no combat, no
+        enemy motion and no clock -- only what is already in flight plays
+        out (the hero's last animation, the death poof, the boss burst,
+        particles, damage numbers, the shake). The banner overlay stops
+        calling this once its sprite starts, and ends the run itself."""
         self._update_hero_anim(dt)
         self.fx.update_death_fx(dt)
         self.fx.update_trail_fx(dt)
@@ -455,9 +454,6 @@ class PlayingState(State):
         self.particles.update(dt)
         self.damage_numbers.update(dt)
         self.shake.update(dt)
-        if self._death_seq_t <= 0.0:
-            self._death_seq_t = None
-            self._end_run(victory=False)
 
     def _main_weapon_for(self, cdef: dict) -> str:
         """The hero's starting weapon (P5, design §20): the data's default,
@@ -941,7 +937,7 @@ class PlayingState(State):
         # tells two wins apart.
         self._boss_defeated = (self.boss.boss_id, self.boss.name)
         self.boss = None
-        self._end_run(victory=True)
+        self._begin_end(victory=True)
 
     # --- gold -------------------------------------
     # The balance and the run total move together here rather than at each
@@ -968,7 +964,28 @@ class PlayingState(State):
         return True
 
     # --- run end ----------------------------------
+    # Three steps (journal: end_banner_journal.md, 2026-09-19). `_begin_end`
+    # is what the hero's death and the boss kill call: it snapshots the
+    # summary *now* -- the time and gold the screens show are the run's at
+    # the moment the outcome was decided -- and pushes the end banner over
+    # the run, which calls `_hand_off` when its sprite has played. `_end_run`
+    # is the two back to back with no banner, for callers that want the
+    # summary screen at once (tests, mostly).
+    def _begin_end(self, *, victory: bool) -> None:
+        if self._ending:
+            return
+        self._ending = True
+        summary = self._snapshot_summary(victory)
+        from game.states.end_banner_state import EndBannerState
+        self.game.state_machine.push(
+            EndBannerState(self.game), victory=victory,
+            on_done=lambda: self._hand_off(summary, victory))
+
     def _end_run(self, *, victory: bool) -> None:
+        self._ending = True
+        self._hand_off(self._snapshot_summary(victory), victory)
+
+    def _snapshot_summary(self, victory: bool) -> dict:
         summary = dict(self.stats)
         summary["weapons"] = [(w.name, w.level) for w in self.player.weapons]
         summary["seed"] = self.run_seed
@@ -1017,6 +1034,9 @@ class PlayingState(State):
         summary["equipment"] = [
             {"name": it.name, "rarity": it.rarity, "slot": it.slot, "level": it.level}
             for it in getattr(self.player, "equipment", ())]
+        return summary
+
+    def _hand_off(self, summary: dict, victory: bool) -> None:
         self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
                                  dev=self.dev_mode)
         if self.dev_mode:

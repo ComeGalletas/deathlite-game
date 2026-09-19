@@ -134,6 +134,15 @@ class DevRunDoesNotSaveTests(unittest.TestCase):
             if game.state_machine.current is not playing:
                 break
 
+        # A dev run shows the end banner as well (owner, 2026-09-19), then
+        # resets instead of opening a summary.
+        from game.states.end_banner_state import EndBannerState
+        self.assertIsInstance(game.state_machine.current, EndBannerState)
+        for _ in range(700):
+            if not isinstance(game.state_machine.current, EndBannerState):
+                break
+            game.state_machine.update(1 / 60)
+            game._render()
         fresh = _settle(game)                            # the restart loads first
         self.assertIsInstance(fresh, PlayingState)
         self.assertIsNot(fresh, playing)
