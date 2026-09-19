@@ -760,3 +760,95 @@ ring (the ring is held off there, since those tests measure the LOD),
 `test_an_enemy_inside_the_ring_pursues` hard-coded four seconds for what is
 now nearly nine seconds of walking, and the placement band test wrote out
 700 / 1100. All three now read the data instead.
+
+---
+
+## The dormant bound, and the frame budget (2026-09-19)
+
+The two items the build left open.
+
+### The bound: a rail, sized from play
+
+`population.dormant_cap` is **4000**, past which the **oldest-slept** record
+is dropped -- so the island abandoned longest ago is the one that forgets
+its population, which is both the least likely to be walked back into and
+the one whose records are most stale.
+
+It is deliberately several times above anything play produces. Measured over
+five minutes on the pinned world:
+
+| hero | peak dormant | ends at |
+|---|---|---|
+| standing still | 20 | 20 |
+| patrolling | 22 | 3 |
+| **touring every island** (teleporting every 20 s) | **1304** | 1250 |
+
+The touring row is the pessimistic case and is not a real play pattern -- a
+player walks -- yet it still lands at a quarter of the cap. At ~515 bytes a
+record the cap is about 2 MB, and `total_dormant` is O(islands) rather than
+O(records), so holding them costs nothing per frame.
+
+`_evict` rescans to find each victim rather than keeping a heap. That is
+deliberate: it should never run, and an index maintained on every sleep
+would cost more in the case that actually happens than the scan costs in
+the case that does not.
+
+### The frame budget: the ring has a cost, and it is not where it was expected
+
+`tools/benchmarks/spawn_stress` gained `--render`, which times `ps.draw`
+alongside `ps.update` and reports the pair against the 16.7 ms budget. This
+is the measurement the build entry said was missing.
+
+| live | update p50 | draw p50 | **update + draw p50** | frames over 16.7 ms |
+|---|---|---|---|---|
+| 104 | 5.94 | 6.99 | 12.58 | 14 / 400 |
+| 155 | 6.89 | 7.59 | **13.93** | 66 / 400 (17 %) |
+| 201 | 7.93 | 8.02 | **16.00** | 164 / 400 (41 %) |
+| 247 | 11.82 | 8.73 | **20.96** | 551 / 600 (92 %) |
+
+*(seed 35, lod 2, elapsed 900 s, hero jittering.)*
+
+A real run settles around 150 live, so roughly **one frame in six is over
+budget**, with p90 already past it. `ENEMY_LIVE_CAP = 250` is no longer
+reachable at 60 fps: 92 % of frames miss.
+
+This retires the claim in the build entry above that "the objection
+recorded against `ENEMY_LIVE_CAP = 250` no longer holds". It held again the
+moment aggro was raised -- that measurement was update-only *and* taken
+before the aggro change.
+
+### Why: the tick LOD has been switched off by accident
+
+| lod | update p50 at 200 live |
+|---|---|
+| 1 -- everyone, every frame | 6.94 |
+| 2 -- the shipped value | 6.80 |
+| 4 | 6.70 |
+
+Three per cent between "every frame" and "every fourth frame". **The LOD is
+doing nothing.**
+
+`SpawningSystem.lod_eligible` exempts any body that `is_pursuing`, on the
+reasoning that what the player is fighting must tick every frame. With
+aggro at 880-1200 and the ring at 1400, *almost every live body is
+pursuing*, so the exemption is now universal and the LOD never fires. That
+is the whole of the update regression: 6.22 ms at 250 live before the aggro
+change, 11.82 ms after.
+
+### The lever, not taken here
+
+Let the LOD apply to pursuers the player **cannot see**. A body chasing from
+off screen is still chasing; stepping it at half rate is imperceptible, and
+it would restore most of the saving without touching difficulty, the ring,
+or the aggro ranges.
+
+Not done, because it is a design change and the owner is mid-way through
+difficulty testing -- and because the alternative (lowering
+`ENEMY_LIVE_CAP`) trades the same frames for a smaller crowd, which is a
+different answer to the same question and theirs to pick.
+
+**One caveat on the draw figures.** The harness is headless and pygame
+reports *no fast renderer available*, so those are software blits. The
+update numbers are real; the draw numbers are likely pessimistic against a
+real machine. The shape -- draw scaling with bodies in view, which went
+from ~15 to 40-69 -- holds either way.

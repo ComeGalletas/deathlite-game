@@ -45,6 +45,12 @@ blocked one moves to the nearest free spawn point on its floor; a record
 asleep longer than `scatter_after` is re-placed on a random point of its
 island instead, so the player cannot memorise where the threats stood.
 
+Records are bounded by `dormant_cap`, past which the **oldest-slept** is
+dropped. That is a rail rather than a mechanism: the measured peak in play
+is 20 records for a hero standing still, 22 for one patrolling and 1304 for
+one touring every island, against a cap several times higher. It exists so
+that a run nobody anticipated cannot grow the list forever.
+
 Waking does **not** consult the live cap. It may push the live count past
 it, and when that happens the company gate simply refuses until the
 overflow drains through kills -- nothing force-despawns to claw back under
@@ -61,7 +67,7 @@ import pygame
 __all__ = ["DormantEnemy", "Population"]
 
 _KEYS = ("tick", "wake_budget", "scatter_after",
-         "despawn_radius", "wake_radius")
+         "despawn_radius", "wake_radius", "dormant_cap")
 
 
 class DormantEnemy:
@@ -109,6 +115,11 @@ class Population:
                 f"spawn_tables.json `population`: wake_radius "
                 f"({self.wake_radius}) must be inside despawn_radius "
                 f"({self.despawn_radius}), or bodies flap at the boundary")
+        # A rail, not a target. Measured peaks in play are 20 standing
+        # still, 22 patrolling and 1304 for a hero touring every island for
+        # five minutes, so this should never fire; it exists so an unbounded
+        # list cannot grow forever in a run nobody expected.
+        self.dormant_cap = int(knobs["dormant_cap"])
         self.never_sleep = frozenset(never_sleep)
         self.dormant: dict[int, list[DormantEnemy]] = {}
         self.seeded: set[int] = set()          # islands that got their residents
@@ -118,6 +129,7 @@ class Population:
         self.slept = 0
         self.woken = 0
         self.ringed = 0          # slept by the ring rather than by the zone
+        self.evicted = 0         # records dropped at `dormant_cap`
 
     # --- counts -----------------------------------------------------------
     @property
@@ -170,7 +182,37 @@ class Population:
             self.dormant.setdefault(room.id, []).append(rec)
             slept[room.id] = slept.get(room.id, 0) + 1
             self.slept += 1
+        self._evict()
         return slept
+
+    def _evict(self) -> int:
+        """Drop the oldest-slept records once past `dormant_cap`.
+
+        Oldest-slept rather than farthest or fewest, so the island the
+        player abandoned longest ago is the one that forgets its
+        population -- the one they are least likely to walk back into, and
+        the one whose records are most stale anyway.
+
+        Deliberately not clever: it rescans to find each victim, which is
+        fine because it should never run. The cap sits several times above
+        the worst behaviour measured in play.
+        """
+        dropped = 0
+        while self.total_dormant > self.dormant_cap:
+            oldest_room, oldest_i, oldest_at = None, -1, None
+            for rid, recs in self.dormant.items():
+                for i, rec in enumerate(recs):
+                    if oldest_at is None or rec.slept_at < oldest_at:
+                        oldest_room, oldest_i, oldest_at = rid, i, rec.slept_at
+            if oldest_room is None:
+                break                     # only the wake queue is left
+            recs = self.dormant[oldest_room]
+            recs.pop(oldest_i)
+            if not recs:
+                del self.dormant[oldest_room]
+            dropped += 1
+            self.evicted += 1
+        return dropped
 
     # --- wake ---------------------------------------------------------------
     def activate(self, room_id: int, host) -> int:

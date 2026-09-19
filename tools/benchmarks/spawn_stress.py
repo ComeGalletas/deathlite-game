@@ -9,6 +9,7 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
 
     python -m tools.benchmarks.spawn_stress                         # 100 live, 400 dormant, 1200 frames
     python -m tools.benchmarks.spawn_stress --live 200 --lod 2      # a heavier crowd, half-rate LOD
+    python -m tools.benchmarks.spawn_stress --render                # time the draw as well
     python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
 
 Headless: the dummy SDL drivers are set before pygame is imported, so
@@ -89,21 +90,39 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
     return game, ps
 
 
-def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60) -> list:
+def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
+        render: bool = False) -> tuple:
     """Frame times in milliseconds for `frames` updates with the hero
-    jittering by up to `jitter` px each frame."""
+    jittering by up to `jitter` px each frame.
+
+    With `render`, `ps.draw` is timed too and returned separately. That
+    matters since the despawn ring landed: it makes "the whole live
+    population packed within `despawn_radius` of the hero" the normal case
+    rather than the pessimistic one, and draw cost scales with bodies *in
+    view* where update cost scales with bodies alive.
+    """
     import random
     import pygame
     rng = random.Random(1)
     home = pygame.Vector2(ps.player.pos)
-    times = []
+    surface = pygame.display.get_surface()
+    if render and surface is None:
+        surface = pygame.Surface((1280, 720)).convert_alpha()
+    times, draws, in_view = [], [], []
     for _ in range(frames):
         ps.player.pos.update(home.x + rng.uniform(-jitter, jitter),
                              home.y + rng.uniform(-jitter, jitter))
         t0 = time.perf_counter()
         ps.update(dt)
         times.append((time.perf_counter() - t0) * 1000.0)
-    return times
+        if render:
+            view = ps.camera.visible_rect()
+            in_view.append(sum(1 for e in ps.enemies
+                               if view.collidepoint(e.pos.x, e.pos.y)))
+            t1 = time.perf_counter()
+            ps.draw(surface)
+            draws.append((time.perf_counter() - t1) * 1000.0)
+    return times, draws, in_view
 
 
 def report(times: list, ps) -> str:
@@ -124,24 +143,38 @@ def main(argv=None) -> int:
     ap.add_argument("--lod", type=int, default=None,
                     help="behaviour tick divisor for out-of-aggro, off-view enemies "
                          "(default: config.ENEMY_LOD_SKIP)")
+    ap.add_argument("--render", action="store_true",
+                    help="time ps.draw as well, and report update + draw "
+                         "together against the 16.7 ms frame budget")
     ap.add_argument("--profile", action="store_true")
     args = ap.parse_args(argv)
     from game import config
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod)
-    run(ps, 60)                                      # warm the caches
+    run(ps, 60, render=args.render)                  # warm the caches
     if args.profile:
         import cProfile
         import pstats
         prof = cProfile.Profile()
         prof.enable()
-        times = run(ps, args.frames)
+        times, draws, in_view = run(ps, args.frames, render=args.render)
         prof.disable()
         print(report(times, ps))
         pstats.Stats(prof).sort_stats("cumulative").print_stats(28)
     else:
-        times = run(ps, args.frames)
+        times, draws, in_view = run(ps, args.frames, render=args.render)
         print(f"seed {args.seed} lod {lod}  " + report(times, ps))
+        if args.render:
+            d, v = sorted(draws), sorted(in_view)
+            print(f"  draw   p50 {_percentile(d, 0.5):.2f}  "
+                  f"p90 {_percentile(d, 0.9):.2f}  p99 {_percentile(d, 0.99):.2f}  "
+                  f"max {d[-1]:.2f} ms  |  in view p50 {_percentile(v, 0.5)} "
+                  f"max {v[-1]}")
+            both = sorted(a + b for a, b in zip(times, draws))
+            over = sum(1 for x in both if x > 16.7)
+            print(f"  update + draw   p50 {_percentile(both, 0.5):.2f}  "
+                  f"p90 {_percentile(both, 0.9):.2f}  p99 {_percentile(both, 0.99):.2f}  "
+                  f"max {both[-1]:.2f} ms  |  over 16.7 ms: {over} / {len(both)}")
     return 0
 
 

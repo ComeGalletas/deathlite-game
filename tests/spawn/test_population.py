@@ -120,6 +120,37 @@ class HibernateTests(unittest.TestCase):
         pop = _pop()
         self.assertLess(pop.wake_radius, pop.despawn_radius)
 
+    def test_the_dormant_cap_drops_the_oldest_slept_first(self):
+        """A rail, not a mechanism. It should never fire in play -- the
+        measured peak is 1304 records for a hero touring every island, well
+        under the cap -- so this drives it directly rather than trying to
+        generate four thousand records."""
+        from spawn.population import DormantEnemy
+        pop = _pop()
+        pop.dormant_cap = 5
+        for i in range(8):
+            rec = DormantEnemy("skull", i * 10.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+                               room_id=i % 2, slept_at=float(i))
+            pop.dormant.setdefault(rec.room_id, []).append(rec)
+        self.assertEqual(pop.total_dormant, 8)
+        pop._evict()
+        self.assertEqual(pop.total_dormant, 5)
+        self.assertEqual(pop.evicted, 3)
+        # the three oldest (slept_at 0, 1, 2) are the ones gone
+        left = sorted(r.slept_at for recs in pop.dormant.values() for r in recs)
+        self.assertEqual(left, [3.0, 4.0, 5.0, 6.0, 7.0])
+
+    def test_under_the_cap_nothing_is_evicted(self):
+        from spawn.population import DormantEnemy
+        pop = _pop()
+        for i in range(10):
+            pop.dormant.setdefault(0, []).append(
+                DormantEnemy("skull", 0.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+                             room_id=0, slept_at=float(i)))
+        self.assertEqual(pop._evict(), 0)
+        self.assertEqual(pop.evicted, 0)
+        self.assertEqual(pop.total_dormant, 10)
+
     def test_a_wake_band_outside_the_ring_is_refused_outright(self):
         from spawn.population import Population
         knobs = dict(get_content().spawn_tables.population)

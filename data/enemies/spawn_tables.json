@@ -66,13 +66,14 @@
     "grace_weight": 0.5
   },
 
-  "_population_comment": "The ring (owner, 2026-09-18/19). A live body further than `despawn_radius` from the hero is hibernated whatever island it stands on and whether or not it is chasing -- distance wins, which is what stops a tail of abandoned bodies holding live-cap slots the player will never meet. A record is woken again when the hero comes within `wake_radius`. The gap between the two is hysteresis: without it a body pacing the boundary would sleep and wake on alternate ticks. 1400 clears every floor it has to -- placement seats a company at most 1100 px out, the 16:9 camera half-diagonal is 612, and the widest `aggro_range` in the roster is 640 -- so nothing is ever released inside the view or while it could still see the hero. 1100 is `far_max_distance` itself, so a record wakes exactly when it re-enters the band a company would be seated into.",
+  "_population_comment": "The ring (owner, 2026-09-18/19). A live body further than `despawn_radius` from the hero is hibernated whatever island it stands on and whether or not it is chasing -- distance wins, which is what stops a tail of abandoned bodies holding live-cap slots the player will never meet. A record is woken again when the hero comes within `wake_radius`. The gap between the two is hysteresis: without it a body pacing the boundary would sleep and wake on alternate ticks. 1400 clears every floor it has to -- placement seats a company at most 1100 px out, the 16:9 camera half-diagonal is 612, and the widest `aggro_range` in the roster is 640 -- so nothing is ever released inside the view or while it could still see the hero. 1100 is `far_max_distance` itself, so a record wakes exactly when it re-enters the band a company would be seated into. `dormant_cap` is a safety rail rather than a tuning number: records are bounded in practice by what the player has generated and walked away from, and the measured peak is 20 for a hero who stands still, 22 for one who patrols and 1304 for one teleporting between every island for five minutes -- the pessimistic case, and still a quarter of the cap. Past it the oldest-slept record is dropped, so an island abandoned longest ago is the one that forgets its population. At ~515 bytes a record the cap is about 2 MB.",
   "population": {
     "tick": 0.5,
     "wake_budget": 8,
     "scatter_after": 45.0,
     "despawn_radius": 1400,
-    "wake_radius": 1100
+    "wake_radius": 1100,
+    "dormant_cap": 4000
   },
 
   "watchdog": {
