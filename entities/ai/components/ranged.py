@@ -34,6 +34,32 @@ class FireProjectile(Component):
     stop_after: float = 0.0
     blast_radius: float = 0.0
 
+    def fire(self, actor, per, cmb) -> bool:
+        """Loose one shot at the player, ignoring the timer and the range.
+
+        Split out of `tick` so a telegraphed kiter can fire from the
+        wind-up's end transition instead (`kite_shoot`), which is what makes
+        the shot and the animation one event. One definition of what a shot
+        *is*, whichever path releases it.
+        """
+        to = per.player_pos - actor.pos
+        if to.length_squared() <= 1e-6:
+            return False
+        fx = {}
+        if self.rig:
+            fx["rig"] = self.rig
+        if self.tint:
+            fx["tint"] = tuple(self.tint)
+        cmb.fire_projectile(pos=actor.pos, vel=to.normalize() * self.speed,
+                            damage=self.damage, radius=self.radius,
+                            style=self.style, fx=fx or None,
+                            pierce=int(self.pierce),
+                            lifetime=self.lifetime,
+                            stop_after=self.stop_after,
+                            blast_radius=self.blast_radius,
+                            inert=self.blast_radius > 0.0)
+        return True
+
     def tick(self, actor, per, cmb, acc):
         s = actor.bb.slot(self.key)
         s["t"] = s.get("t", self.interval) - per.dt
@@ -43,20 +69,7 @@ class FireProjectile(Component):
         if to.length() > self.max_range:
             return                              # timer stays <= 0: fire on re-entry
         s["t"] = self.interval
-        if to.length_squared() > 1e-6:
-            fx = {}
-            if self.rig:
-                fx["rig"] = self.rig
-            if self.tint:
-                fx["tint"] = tuple(self.tint)
-            cmb.fire_projectile(pos=actor.pos, vel=to.normalize() * self.speed,
-                                damage=self.damage, radius=self.radius,
-                                style=self.style, fx=fx or None,
-                                pierce=int(self.pierce),
-                                lifetime=self.lifetime,
-                                stop_after=self.stop_after,
-                                blast_radius=self.blast_radius,
-                                inert=self.blast_radius > 0.0)
+        self.fire(actor, per, cmb)
 
 
 @dataclass
