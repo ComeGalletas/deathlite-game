@@ -62,6 +62,10 @@ Sections:
                 *factors* stay in `config.DIFFICULTIES`.
     residents   S4: how many companies are seeded into an island on first
                 visit, by room kind, and a per-difficulty scale
+    common_cap  G8: the most commons a company may carry, `start` +
+                `step` per director step up to `ceiling`; a group's
+                `common_range` is clipped to it at composition. Fails
+                soft: a bad block costs the cap, not the run.
 
 G3 retired `phases`, `ramp_seconds`, the top-level `elites` slot and
 `pacing`: the six groups and the cooldown ladder replaced them outright.
@@ -71,9 +75,14 @@ fails soft on.
 """
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 __all__ = ["SpawnTables", "TableError"]
+
+log = logging.getLogger(__name__)
+
+_COMMON_CAP_KEYS = ("start", "step", "ceiling")
 
 
 class TableError(ValueError):
@@ -147,6 +156,42 @@ class SpawnTables:
         self.population: dict = data.get("population", {})
         self.watchdog: dict = data.get("watchdog", {})
         self.residents: dict = data.get("residents", {})
+        # G8: the cap on commons per company, a ladder like the elites'.
+        # Fails soft (G2a): a bad block costs the cap, not the run.
+        self._common_cap: dict | None = self._read_common_cap(data.get("common_cap"))
+
+    # --- the common cap (G8) --------------------------------------------
+    @staticmethod
+    def _read_common_cap(block) -> dict | None:
+        """`{start, step, ceiling}` as whole numbers, or `None` with a log
+        line when the block is missing or does not hold up."""
+        if block is None:
+            return None
+        if not isinstance(block, dict):
+            log.warning("spawn_tables: `common_cap` ignored, not an object")
+            return None
+        out = {}
+        for key in _COMMON_CAP_KEYS:
+            v = block.get(key)
+            if not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0:
+                log.warning("spawn_tables: `common_cap` ignored, `%s` %r is not "
+                            "a number >= 0", key, v)
+                return None
+            out[key] = int(v)
+        if out["start"] < 1 or out["ceiling"] < out["start"]:
+            log.warning("spawn_tables: `common_cap` ignored, start %d / ceiling %d "
+                        "is not a ladder", out["start"], out["ceiling"])
+            return None
+        return out
+
+    def common_cap(self, steps: int = 0) -> int | None:
+        """The most commons a company may carry after `steps` of the
+        director's ladder: `start + step * steps`, never above `ceiling`.
+        `None` when the tables declare no cap."""
+        c = self._common_cap
+        if c is None:
+            return None
+        return min(c["start"] + c["step"] * max(0, int(steps)), c["ceiling"])
 
     # --- the unused category -------------------------------------------
     def _enabled_group(self, group: dict) -> dict:

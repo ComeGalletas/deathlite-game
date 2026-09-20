@@ -42,10 +42,12 @@
     }
   },
 
+  "_common_cap_comment": "G8 (owner, 2026-09-20): the most commons a company may carry, climbing through the run the way the elite ladder does. The cap is `start` + `step` per director step (`cooldowns.step_seconds`, compressed by the difficulty's timeline pace like everything else), never above `ceiling`; at composition a group's `common_range` is clipped to it at both ends, so early companies are small whatever the group declares and the declared range is reached once the cap passes it. Elite counts are not touched by this. A missing or malformed block means no cap, logged, never a refusal to load.",
+  "common_cap": {"start": 5, "step": 5, "ceiling": 30},
   "_cooldowns_comment": "The two ladders (G2, owner 2026-09-17). `common` is how long before the next company of any kind; `elite` is a gate on ELIGIBILITY -- an elite-bearing group can only be picked when it is ready, and picking one resets both timers, so an elite and a common company never land back to back. Every `step_seconds` the common cadence drops by `common_decay` and the elite gate by `elite_decay`, flooring at `common_floor` / `elite_floor`; the gate falls three times as fast and floors three times higher, so elite companies go from about one in three to roughly one in one-and-a-bit by minute eight. `elite_unlock` is a hard gate: no elite group at all before then, whatever the ladder says. `cap_retry` is how long the master waits before re-counting when a prepared company does not fit under the live cap. Everything here is in Normal seconds and is divided by `timeline_pace` -- the STEP as well as the values, so the whole ladder compresses together rather than just its numbers. Because the step and the boss time scale by the same factor, every difficulty reaches the same elite count at its boss: harder means the same elites sooner, not more of them.",
   "cooldowns": {
-    "common": 2.0,
-    "common_decay": 1.0,
+    "common": 5.0,
+    "common_decay": 0.5,
     "common_floor": 1.0,
     "elite": 15.0,
     "elite_decay": 3.0,

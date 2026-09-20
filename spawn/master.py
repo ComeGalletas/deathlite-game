@@ -431,9 +431,10 @@ class SpawnMaster:
     def compose(self, name: str, steps: int = 0) -> list[str]:
         """The bodies of one company of group `name` (G2).
 
-        A count rolled in the group's `common_range`, each body drawn by
-        `commons` weight, plus however many elites the ladder allows at
-        `steps`, drawn by `elites` weight. The count of elites is
+        A count rolled in the group's `common_range` clipped to the
+        tables' `common_cap` at `steps` (G8), each body drawn by `commons`
+        weight, plus however many elites the ladder allows at `steps`,
+        drawn by `elites` weight. The count of elites is
         deterministic and the identities are not, which is the shape the
         owner asked for: an elite company is *guaranteed* elites, growing,
         rather than a company that sometimes contains one.
@@ -455,6 +456,12 @@ class SpawnMaster:
             return []
         rng = self.host.rng
         lo, hi = g.common_range
+        # G8: the common cap climbs with the ladder like the elite count
+        # does; the group's own span is clipped to it at both ends, so an
+        # early company is small whatever the group declares.
+        cap = self.tables.common_cap(steps)
+        if cap is not None:
+            lo, hi = min(lo, cap), min(hi, cap)
         ids = self._draw(g.commons, rng.randint(lo, hi), rng)
         elites = g.elite_count(steps)
         if elites:

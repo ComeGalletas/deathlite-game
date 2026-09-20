@@ -320,24 +320,52 @@ class CompanyTests(unittest.TestCase):
     is untouched and still covered by `test_placement.py`.
     """
 
+    @staticmethod
+    def _capped(m, g, steps):
+        """The group's span clipped to the tables' common cap (G8)."""
+        lo, hi = g.common_range
+        cap = m.tables.common_cap(steps)
+        return (lo, hi) if cap is None else (min(lo, cap), min(hi, cap))
+
     def test_a_company_is_sized_in_its_span_and_drawn_from_its_group(self):
         host = FakeHost()
         m = _master(host)
         members = set(m.roster.get("dark").commons)
-        lo, hi = m.roster.get("dark").common_range
-        for _ in range(12):
-            ids = m.compose("dark")
-            self.assertLessEqual(lo, len(ids))
-            self.assertLessEqual(len(ids), hi)
-            self.assertTrue(set(ids) <= members, set(ids) - members)
+        for steps in (0, 2, 99):
+            lo, hi = self._capped(m, m.roster.get("dark"), steps)
+            for _ in range(12):
+                ids = m.compose("dark", steps=steps)
+                self.assertLessEqual(lo, len(ids))
+                self.assertLessEqual(len(ids), hi)
+                self.assertTrue(set(ids) <= members, set(ids) - members)
+
+    def test_the_common_cap_starts_at_five_and_climbs_with_the_ladder(self):
+        """G8 (owner, 2026-09-20): at the start no group fields more than
+        five commons, swarm's 25-30 included; by the time the cap passes a
+        group's span the span is back in charge."""
+        host = FakeHost()
+        m = _master(host)
+        self.assertEqual(m.tables.common_cap(0), 5)
+        for name in m.roster.names():
+            g = m.roster.get(name)
+            elites = set(g.elites)
+            for _ in range(8):
+                ids = m.compose(name, steps=0)
+                commons = [e for e in ids if e not in elites]
+                self.assertEqual(len(commons), 5, f"{name} fielded {len(commons)} at the start")
+        late = m.tables.common_cap(99)
+        for name in m.roster.names():
+            g = m.roster.get(name)
+            self.assertGreaterEqual(late, g.common_range[1],
+                                    f"the ceiling never reaches {name}'s span")
 
     def test_an_elite_company_carries_the_ladder_count(self):
         host = FakeHost()
         m = _master(host)
         g = m.roster.get("goblin")
         commons, elites = set(g.commons), set(g.elites)
-        lo, hi = g.common_range
         for steps in (0, 1, 4, 99):
+            lo, hi = self._capped(m, g, steps)
             ids = m.compose("goblin", steps=steps)
             want = g.elite_count(steps)
             got = sum(1 for e in ids if e in elites)
