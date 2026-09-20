@@ -167,7 +167,18 @@ class Projectile:
             self.active = False
 
     def on_hit(self) -> None:
+        if self.is_orbiter:
+            # Persistent by design: it scores again every `rehit_interval`
+            # rather than being spent. A base weapon's `pierce` (the Rod's 0
+            # under the Arcane Storm forge) must not turn each mote into a
+            # one-hit shot that the weapon replaces at the hero's feet every
+            # frame -- that read as 1500 dps on the training dummy.
+            return
         if self.pierce_left > 0:
             self.pierce_left -= 1
         else:
             self.active = False
+
+    @property
+    def is_orbiter(self) -> bool:
+        return self.orbit_speed != 0.0 and self.anchor is not None
