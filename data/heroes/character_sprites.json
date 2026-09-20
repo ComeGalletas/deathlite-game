@@ -799,5 +799,185 @@
         "loop": false
       }
     }
+  },
+  "npc_fish_hut": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      21,
+      18,
+      148,
+      161
+    ],
+    "scale": [
+      104,
+      113
+    ],
+    "anchor": [
+      52,
+      102
+    ],
+    "face": "right",
+    "_note": "the fish hut moored beside a bridge (journals/fish_hut_journal.md): one bobbing loop at 0.70 of the sheet (owner asked for 30% over the first 0.54 cut, 2026-09-20), drawn through the character layer so the boats sort against it; the anchor is the waterline, nine tenths down the raft. Its `walk` is the same strip because a hut never moves; it is declared so the NPC animator's contract holds",
+    "anims": {
+      "idle": {
+        "file": "terrain/npcs/fish_hut/fish_hut.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      },
+      "walk": {
+        "file": "terrain/npcs/fish_hut/fish_hut.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      }
+    }
+  },
+  "npc_seahorse_boat_idle": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      62,
+      67,
+      81,
+      85
+    ],
+    "scale": [
+      36,
+      38
+    ],
+    "anchor": [
+      18,
+      34
+    ],
+    "face": "right",
+    "_note": "an empty seahorse boat: one bobbing loop at the boats' shared 0.45 factor so the hull is the same size whoever rides in it; `walk` is the same strip, a drifting boat bobs like a resting one",
+    "anims": {
+      "idle": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_idle.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      },
+      "walk": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_idle.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      }
+    }
+  },
+  "npc_seahorse_boat_bomb_fish": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      51,
+      51,
+      92,
+      101
+    ],
+    "scale": [
+      41,
+      45
+    ],
+    "anchor": [
+      20,
+      40
+    ],
+    "face": "right",
+    "_note": "the seahorse boat with a Bloat aboard -- art only, never an enemy: one bobbing loop at the boats' shared 0.45 factor so the hull is the same size whoever rides in it; `walk` is the same strip, a drifting boat bobs like a resting one",
+    "anims": {
+      "idle": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_bomb_fish.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      },
+      "walk": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_bomb_fish.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      }
+    }
+  },
+  "npc_seahorse_boat_harpoon_shark": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      34,
+      45,
+      109,
+      107
+    ],
+    "scale": [
+      49,
+      48
+    ],
+    "anchor": [
+      24,
+      43
+    ],
+    "face": "right",
+    "_note": "the seahorse boat with a harpoon shark aboard -- art only, never an enemy: one bobbing loop at the boats' shared 0.45 factor so the hull is the same size whoever rides in it; `walk` is the same strip, a drifting boat bobs like a resting one",
+    "anims": {
+      "idle": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_harpoon_shark.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      },
+      "walk": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_harpoon_shark.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      }
+    }
+  },
+  "npc_seahorse_boat_paddle_shark": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      41,
+      38,
+      102,
+      114
+    ],
+    "scale": [
+      46,
+      51
+    ],
+    "anchor": [
+      23,
+      46
+    ],
+    "face": "right",
+    "_note": "the seahorse boat with a paddle shark aboard -- art only, never an enemy: one bobbing loop at the boats' shared 0.45 factor so the hull is the same size whoever rides in it; `walk` is the same strip, a drifting boat bobs like a resting one",
+    "anims": {
+      "idle": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_paddle_shark.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      },
+      "walk": {
+        "file": "terrain/npcs/seahorse_boat/seahorse_boat_paddle_shark.png",
+        "frames": 8,
+        "fps": 6,
+        "loop": true
+      }
+    }
   }
 }

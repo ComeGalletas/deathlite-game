@@ -39,7 +39,9 @@ Tiny Swords supplies the main art of the game:
   bushes, rocks, stumps, decorations, clouds and animals scattered over them.
   The village buildings in `assets/buildings/`, the forge and healing facilities
   and the corral animals (the sheep and pigs in `assets/terrain/npcs/`) are also
-  from this pack.
+  from this pack, as are the fish huts moored beside the bridges and the
+  seahorse boats drifting round them (`assets/terrain/npcs/fish_hut/`,
+  `assets/terrain/npcs/seahorse_boat/`).
 - **Characters** — `assets/characters/`: the three heroes are Tiny Swords units
   (Aegis = blue Warrior, Kestrel = yellow Archer, Nihil = purple Monk), with the
   shared death poof and the hero summons drawn from the same sheets.

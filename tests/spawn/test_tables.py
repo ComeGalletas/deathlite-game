@@ -50,6 +50,38 @@ class ShippedTablesTests(unittest.TestCase):
         self.assertTrue(all(g.get("commons") for g in t.groups.values()))
 
 
+class CommonCapTests(unittest.TestCase):
+    """G8: the cap on commons per company, `start` + `step` per director
+    step up to `ceiling`, and fail-soft like the groups."""
+
+    def test_the_shipped_cap_walks_five_to_thirty(self):
+        t = get_content().spawn_tables
+        self.assertEqual([t.common_cap(s) for s in range(0, 7)],
+                         [5, 10, 15, 20, 25, 30, 30])
+
+    def test_no_block_means_no_cap(self):
+        data = _shipped()
+        data.pop("common_cap")
+        self.assertIsNone(SpawnTables(data).common_cap(0))
+
+    def test_a_bad_block_costs_the_cap_not_the_run(self):
+        cases = {
+            "not an object": "five",
+            "a missing key": {"start": 5, "step": 5},
+            "a negative step": {"start": 5, "step": -1, "ceiling": 30},
+            "a ceiling under the start": {"start": 5, "step": 5, "ceiling": 3},
+            "a zero start": {"start": 0, "step": 5, "ceiling": 30},
+        }
+        for label, block in cases.items():
+            with self.subTest(case=label):
+                data = _shipped()
+                data["common_cap"] = block
+                self.assertEqual(SpawnTables.validate(data, set(get_content().enemies)), [])
+                with self.assertLogs("spawn.tables", level="WARNING"):
+                    t = SpawnTables(data)
+                self.assertIsNone(t.common_cap(0))
+
+
 class ValidationTests(unittest.TestCase):
     """G3 left almost nothing fatal here. The phase, elite-slot and pacing
     checks went with their sections, and the group members are resolved per
