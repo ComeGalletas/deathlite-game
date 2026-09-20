@@ -205,12 +205,24 @@ class RigTests(unittest.TestCase):
         self.assertEqual(e._anim_name(), "attack_end")
 
     def test_the_editor_source_is_not_shipped(self):
-        """`.aseprite` sources live in `assets/unused/`, per CREDITS."""
+        """`.aseprite` sources live in `assets/unused/`, per CREDITS.
+
+        Two claims, and only the first is checkable everywhere. That the
+        source does not ship beside the strip is a statement about tracked
+        content, so it holds in any checkout. That it is *over in*
+        `assets/unused/` is not: that folder is gitignored
+        (`.gitignore:46`), so it exists in a working copy that carries the
+        reserve art and in no fresh clone or `git worktree` at all. Asserted
+        unconditionally it passed on one machine and failed everywhere else,
+        CI included, which says nothing about the imp.
+        """
         from pathlib import Path
         root = Path(__file__).resolve().parents[3]
         self.assertFalse(list((root / "assets" / "enemies" / "imp").glob("*.aseprite")))
-        self.assertTrue((root / "assets" / "unused" / "enemies" / "imp"
-                         / "Imp.aseprite").exists())
+        unused = root / "assets" / "unused"
+        if not unused.is_dir():
+            self.skipTest("assets/unused/ is gitignored and absent from this checkout")
+        self.assertTrue((unused / "enemies" / "imp" / "Imp.aseprite").exists())
 
 
 class RosterTests(unittest.TestCase):

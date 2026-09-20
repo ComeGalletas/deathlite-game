@@ -332,11 +332,25 @@ class ScatterMixTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pygame.init()
+        # Only the kinds a biome's own table draws. `layout.obstacles` is the
+        # world's whole standing inventory, and three passes fill it before
+        # the scatter ever runs: the houses, the gnome huts, and the buff
+        # buildings with their satellites and collider company (journal:
+        # buff_buildings_journal.md). None of those are drawn from these
+        # weights, so counting them measures where *they* landed rather than
+        # the mix. On these twelve seeds they are 244 of the 1724 obstacles
+        # standing on forest terraces, and counting them alone drags the tree
+        # share from 0.731 to 0.628 without one tree having been displaced.
+        cls.scatter_kinds = {
+            k for sheet in get_assets().terrain["sheet_biomes"]
+            for k in ((scatter_mix(sheet) or ((),))[0])}
         cls.tally = {}
         px = config.TILE_PX
         for seed in cls.SEEDS:
             layout = W.layout(seed)
             for o in layout.obstacles:
+                if o.kind not in cls.scatter_kinds:
+                    continue
                 for room in layout.rooms:
                     if not room.rect.collidepoint(o.pos.x, o.pos.y):
                         continue
@@ -362,6 +376,16 @@ class ScatterMixTests(unittest.TestCase):
 
     def test_a_forest_terrace_is_mostly_trees(self):
         """Back at 0.7 -- and now with margin it did not have before.
+
+        2026-09-20: the buff buildings merge (PR #16) appeared to break this
+        at 0.628. Nothing about the scatter moved -- the buildings, their
+        satellites and their collider company simply joined
+        `layout.obstacles`, and this tally counted every one of them as a
+        not-tree. Restricting it to the kinds the biome table declares puts
+        the pooled share at 0.731 over these twelve seeds, one of them below
+        0.7 individually. The residual gap to the 0.772 below is real but
+        small -- buildings do take slots a tree might have had -- and sits
+        inside the 0.040 standard deviation recorded there.
 
         This briefly had to be lowered. The uphill keep-back rejects trees far
         more often than anything else (a canopy reaches four tiles north where
