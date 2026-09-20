@@ -174,11 +174,14 @@ class DamageScaleTests(unittest.TestCase):
         self.assertAlmostEqual(up["total"] / base["total"], 1.2, places=6)
 
 
-# The fifteen blessings whose number is damage (owner, 2026-09-19).
+# The seventeen blessings whose number is damage. Broadhead and Arcane Focus
+# joined the fifteen when the six-blessings pass gave the Bow and the Rod a
+# damage card of their own (2026-09-19).
 DAMAGE_BLESSINGS = {
     "iron_arm", "keen_eye",
     "sword_sharpened_edge", "sword_heavy_blade", "hammer_crushing_blow",
-    "daggers_sharpened_blades", "bow_heavy_draw", "bomb_explosive_force",
+    "daggers_sharpened_blades", "bow_broadhead", "bow_heavy_draw",
+    "magic_rod_arcane_focus", "bomb_explosive_force",
     "ember_ring_ember_heat", "grave_totem_spectral_bolts", "spirit_wolf_savage_bite",
     "twin_daggers_dual_wield", "greatsword_cleaver", "ballista_siege_bolt",
     "arcane_lance_impale",
@@ -190,7 +193,7 @@ class BlessingDamageScaleTests(unittest.TestCase):
     these blessings, nothing else on the same card, and the catalog is put
     back afterwards."""
 
-    def test_the_set_is_exactly_these_fifteen(self):
+    def test_the_set_is_exactly_these_seventeen(self):
         catalog = get_catalog(get_content())
         self.assertEqual(dps_bench.damage_blessings(catalog), DAMAGE_BLESSINGS)
 
@@ -213,7 +216,7 @@ class BlessingDamageScaleTests(unittest.TestCase):
                         self.assertEqual(e_new, e_old, f"{bid}: a non-damage effect moved")
             # Heavy Blade: damage up, its weight and slower swing untouched.
             hb = catalog.by_id["sword_heavy_blade"]
-            self.assertAlmostEqual(hb.effects[0].levels[-1], 32 * 1.25)
+            self.assertAlmostEqual(hb.effects[0].levels[-1], 20 * 1.25)
             self.assertEqual(hb.effects[1].levels, before["sword_heavy_blade"].effects[1].levels)
             self.assertEqual(hb.effects[2].levels, before["sword_heavy_blade"].effects[2].levels)
         finally:
@@ -245,8 +248,8 @@ class BlessingDamageScaleTests(unittest.TestCase):
             finally:
                 restore()
 
-        self.assertAlmostEqual(sword_plus_edge(1.0), 17.0)
-        self.assertAlmostEqual(sword_plus_edge(1.25), 17.0 * 1.25)
+        self.assertAlmostEqual(sword_plus_edge(1.0), 15.0)
+        self.assertAlmostEqual(sword_plus_edge(1.25), 15.0 * 1.25)
 
 
 class MeasurementTests(unittest.TestCase):

@@ -203,7 +203,7 @@ class MeleeForgeTests(unittest.TestCase):
         c = craters[0]
         self.assertAlmostEqual(c["radius"], 64)
         self.assertAlmostEqual(c["duration"], 2.5)
-        self.assertAlmostEqual(c["dps"], 27 * 0.35)
+        self.assertAlmostEqual(c["dps"], float(w.definition["damage"]) * 0.35)   # the Forge's lighter blow
         self.assertAlmostEqual(c["pos"].x, 40.0)          # CR1: at the circle's centre
         self.assertEqual(c["weapon_id"], "hammer")
         self.assertIn("crater", c["source_tags"])

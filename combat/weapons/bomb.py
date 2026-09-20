@@ -16,6 +16,10 @@ scale it in steps. The `area` this module passes to `spawn_projectile` is a
 different thing -- the thrown ball's own collider, which stops it on obstacles
 and trips a Minefield mine -- and stays small.
 
+Sticky Bomb (2026-09-19): a bomb thrown with the `sticky` effect attaches to
+the first enemy it overlaps (`CombatResolver.stick`) and rides on it until the
+fuse; its blast is heavier by `sticky_damage_mult`.
+
 All numbers are the weapon's data fields; nothing here has a default.
 """
 from __future__ import annotations
@@ -62,7 +66,7 @@ def throw_bombs(weapon, ctx, aim: pygame.Vector2, candidates, area: float,
         direction = pygame.Vector2(math.cos(base_angle + step * i),
                                    math.sin(base_angle + step * i))
         dmg = outgoing_damage(weapon._volley_damage(ctx), ctx.damage_multiplier,
-                              weapon._crit_chance(ctx), ctx.crit_multiplier, ctx.rng)
+                              weapon._crit_chance(ctx), weapon._crit_multiplier(ctx), ctx.rng)
         ctx.spawn_projectile(
             pos=ctx.origin, vel=direction * speed, damage=dmg.amount,
             radius=area, lifetime=fuse, pierce=weapon._pierce(),
@@ -72,4 +76,6 @@ def throw_bombs(weapon, ctx, aim: pygame.Vector2, candidates, area: float,
             inert=True, stop_after=stop_after,
             blast_radius=weapon._blast_radius(ctx.area_multiplier),
             blast_lifetime=float(d["blast_lifetime"]),
-            mine=mine, arm_delay=float(weapon.effects.get("mine_arm_delay", 0.0)))
+            mine=mine, arm_delay=float(weapon.effects.get("mine_arm_delay", 0.0)),
+            # Sticky Bomb: the resolver attaches it to the first enemy it touches.
+            sticky=bool(weapon.effects.get("sticky", 0)))

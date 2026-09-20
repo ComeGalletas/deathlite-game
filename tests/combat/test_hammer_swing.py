@@ -261,7 +261,8 @@ class ForgeTests(unittest.TestCase):
         run(w, SW + 0.05, spawn_hazard=lambda **kw: craters.append(kw))
         self.assertEqual(len(craters), 1)
         self.assertAlmostEqual(craters[0]["pos"].x, 40.0)
-        self.assertAlmostEqual(craters[0]["dps"], 27 * 0.35)
+        self.assertAlmostEqual(craters[0]["dps"],
+                               float(w.definition["damage"]) * 0.35)   # the Forge's lighter blow
 
 
 class VisualTests(unittest.TestCase):

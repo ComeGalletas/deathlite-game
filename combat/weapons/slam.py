@@ -61,7 +61,7 @@ def land(weapon, ctx) -> None:
     src_weight = weapon._weight()
     weapon._begin_attack()
     dmg = outgoing_damage(weapon._volley_damage(ctx), ctx.damage_multiplier,
-                          weapon._crit_chance(ctx), ctx.crit_multiplier, ctx.rng)
+                          weapon._crit_chance(ctx), weapon._crit_multiplier(ctx), ctx.rng)
     ctx.spawn_projectile(
         pos=pos, vel=pygame.Vector2(), damage=dmg.amount, radius=radius,
         lifetime=float(d["projectile_lifetime"]), pierce=weapon._pierce(),
@@ -76,7 +76,7 @@ def land(weapon, ctx) -> None:
     if weapon.effect("shockwave_radius") > 0.0:
         base = weapon._volley_damage(ctx) * float(fx.get("shockwave_damage_mult", 0.5))
         sdmg = outgoing_damage(base, ctx.damage_multiplier,
-                               weapon._crit_chance(ctx), ctx.crit_multiplier, ctx.rng)
+                               weapon._crit_chance(ctx), weapon._crit_multiplier(ctx), ctx.rng)
         ctx.spawn_projectile(
             pos=pos, vel=pygame.Vector2(), damage=sdmg.amount,
             radius=weapon.effect("shockwave_radius"), lifetime=0.15, pierce=999,

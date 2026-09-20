@@ -42,7 +42,8 @@ class Projectile:
         "fire_level",
         "weapon_id", "age", "stop_after", "inert", "blast_radius",
         "blast_lifetime", "detonated", "stun_chance", "stun_duration",
-        "no_block", "mine", "arm_delay", "swing", "bounces_left",
+        "no_block", "mine", "arm_delay", "swing", "sticky", "stuck_to",
+        "bounces_left",
     )
 
     def __init__(self) -> None:
@@ -92,6 +93,8 @@ class Projectile:
         self.mine = False            # P3 Minefield: detonates when an enemy steps on it
         self.arm_delay = 0.0         # ...once this old
         self.swing = 0               # CR2: the attack's ordinal (1 = first); picks the slash
+        self.sticky = False          # Sticky Bomb: attaches to the first enemy it touches...
+        self.stuck_to = None         # ...and this is the enemy it rides on
         # Buff buildings: a pinball reflects off obstacles, cliffs and the
         # shoreline this many more times before it is spent; 0 for every
         # ordinary shot, which the blocks kill on contact as before.
@@ -109,7 +112,8 @@ class Projectile:
               blast_radius: float = 0.0, blast_lifetime: float = 0.0,
               stun_chance: float = 0.0, stun_duration: float = 0.0,
               no_block: bool = False, mine: bool = False,
-              arm_delay: float = 0.0, swing: int = 0, bounces: int = 0) -> None:
+              arm_delay: float = 0.0, swing: int = 0, sticky: bool = False,
+              bounces: int = 0) -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
@@ -150,6 +154,8 @@ class Projectile:
         self.mine = mine
         self.arm_delay = arm_delay
         self.swing = swing
+        self.sticky = sticky
+        self.stuck_to = None
         self.bounces_left = int(bounces)
 
     def update(self, dt: float) -> None:

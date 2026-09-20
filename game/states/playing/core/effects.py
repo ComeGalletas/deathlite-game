@@ -177,6 +177,7 @@ class TransientFx:
         for p in ps.projectiles:
             before = pygame.Vector2(p.pos)
             p.update(dt)
+            self.ride_stuck(p)
             if p.bounces_left > 0:
                 self.bounce(p, before)
             else:
@@ -220,7 +221,7 @@ class TransientFx:
             pos=pos, vel=pygame.Vector2(), damage=bomb.damage,
             radius=bomb.blast_radius, lifetime=bomb.blast_lifetime,
             pierce=999, src_weight=bomb.src_weight, weapon_id=bomb.weapon_id,
-            source_tags=bomb.source_tags, is_crit=bomb.is_crit,
+            source_tags=tuple(bomb.source_tags) + ("blast",), is_crit=bomb.is_crit,
             style="blast", color=(255, 190, 110), no_block=True)
         if blast is not None:
             blast.fire_level = bomb.fire_level
@@ -229,6 +230,34 @@ class TransientFx:
         ps.particles.burst(pos, (255, 160, 80), count=18, speed=240, life=0.45)
         ps.shake.add(0.3)
         self.scatter_bomblets(bomb, pos)
+
+    def ride_stuck(self, p) -> None:
+        """Sticky Bomb: a bomb stuck to an enemy rides on it; when the enemy
+        dies the bomb drops where it was and burns the rest of its fuse."""
+        host = p.stuck_to
+        if host is None:
+            return
+        if getattr(host, "alive", False):
+            p.pos.update(host.pos)
+        else:
+            p.stuck_to = None
+
+    def keg_burst(self, pos, shot, frac: float, weapon_id: str, lifetime: float) -> None:
+        """Powder Keg: an enemy the Bomb's blast killed bursts for `frac` of
+        that blast's damage in 60 % of its radius. `shot` is the killing
+        blast's `(tags, damage, radius)`. The burst carries the `keg` tag and
+        never bursts again."""
+        ps = self.ps
+        tags, damage, radius = shot
+        radius = radius * 0.6
+        at = pygame.Vector2(pos)
+        ps._spawn_projectile(
+            pos=at, vel=pygame.Vector2(), damage=damage * frac,
+            radius=radius, lifetime=lifetime, pierce=999, src_weight=0.0,
+            weapon_id=weapon_id, source_tags=tuple(tags) + ("keg",),
+            style="blast", color=(255, 190, 110), no_block=True)
+        ps._explosions.append(self.burst_visual(at, radius, rig=self._BOMBLET_BURST_RIG))
+        ps.particles.burst(at, (255, 160, 80), count=10, speed=180, life=0.35)
 
     _BURST_RIG = "explosion"
     # A Cluster Bomb bomblet gets the small sibling of that sheet (owner,

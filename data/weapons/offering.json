@@ -2,7 +2,7 @@
   "choices": 3,
   "kind_weights": {
     "stat": 10,
-    "weapon": 7,
+    "weapon": 10,
     "grant": 10,
     "forge": 8
   },

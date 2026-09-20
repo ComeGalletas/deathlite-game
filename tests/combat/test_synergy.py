@@ -49,7 +49,7 @@ class WindowTests(unittest.TestCase):
 
     def test_every_synergy_card_states_the_window(self):
         syn = [b for b in CAT.by_id.values() if b.category == "synergy"]
-        self.assertEqual(len(syn), 6 + 2, "the six of §10 plus Weak Point / Demolitionist")
+        self.assertEqual(len(syn), 6, "the six of §10; Weak Point / Demolitionist are behaviour")
         timed = ("syn_after_", "syn_vs_marked", "crossfire_", "hunters_")
         for b in syn:
             if any(e.key.startswith(timed) for e in b.effects):

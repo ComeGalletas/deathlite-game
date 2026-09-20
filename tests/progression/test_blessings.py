@@ -132,51 +132,13 @@ class CatalogTests(unittest.TestCase):
 
     def test_rules_load(self):
         self.assertEqual(RULES.choices, 3)
-        self.assertGreater(RULES.kind_weights["stat"], RULES.kind_weights["weapon"])
+        # 2026-09-20: the weapon kind was raised to parity with stat and grant,
+        # paying for the six cards a weapon now owns (six_blessings_journal.md).
+        self.assertEqual(RULES.kind_weights["stat"], RULES.kind_weights["weapon"])
         self.assertEqual(RULES.kind_weights["grant"], RULES.kind_weights["stat"])
         self.assertLess(RULES.summon_factor, 1.0)
         self.assertEqual(RULES.falloff(1), 1.0)
         self.assertEqual(RULES.falloff(99), RULES.level_falloff[-1])
-
-
-class BlastAmplifierTests(unittest.TestCase):
-    """2026-09-12: the Bomb's radius blessing grows the blast in 15% steps,
-    stacked on the flat "Bigger Explosion" and on the area system."""
-
-    BID = "bomb_blast_amplifier"
-
-    def test_the_card_reads_in_fifteen_point_steps(self):
-        b = CAT.get(self.BID)
-        self.assertEqual([b.describe(lv) for lv in range(1, 6)],
-                         ["The explosion is +15% bigger.",
-                          "The explosion is +30% bigger.",
-                          "The explosion is +45% bigger.",
-                          "The explosion is +60% bigger.",
-                          "The explosion is +75% bigger."])
-
-    def test_each_level_leaves_the_running_total_at_the_table_value(self):
-        p = hero("bomb")
-        w = weapon(p, "bomb")
-        for level, total in enumerate((1.15, 1.30, 1.45, 1.60, 1.75), start=1):
-            self.assertEqual(apply_blessing(p, CAT.get(self.BID)), level)
-            self.assertAlmostEqual(w.bonus["blast_radius_mult"], total)
-
-    def test_it_widens_the_blast_the_fire_path_produces(self):
-        p = hero("bomb")
-        w = weapon(p, "bomb")
-        base = w._blast_radius(1.0)
-        for _ in range(5):
-            apply_blessing(p, CAT.get(self.BID))
-        self.assertAlmostEqual(w._blast_radius(1.0), base * 1.75)
-
-    def test_it_stacks_with_the_flat_bigger_explosion(self):
-        p = hero("bomb")
-        w = weapon(p, "bomb")
-        for _ in range(5):
-            apply_blessing(p, CAT.get("bomb_bigger_explosion"))
-            apply_blessing(p, CAT.get(self.BID))
-        flat = C.weapon("bomb")["blast_radius"] + 60
-        self.assertAlmostEqual(w._blast_radius(1.0), flat * 1.75)
 
 
 class ApplyTests(unittest.TestCase):
@@ -326,7 +288,7 @@ class GatingTests(unittest.TestCase):
         self.assertEqual(u.rarity, "common")
         self.assertEqual(u.kind, "weapon")
         self.assertEqual(u.weapon, "sword")
-        self.assertIn("+6", u.description)
+        self.assertIn("+5", u.description)          # level II of the x1.15 curve
         self.assertIn("Sword", u.tags)
 
 
@@ -379,8 +341,10 @@ class WeightTests(unittest.TestCase):
     def _w(self, bid, level=1):
         return blessing_weight(CAT.get(bid), level, CAT, RULES)
 
-    def test_stat_outweighs_weapon_at_equal_rarity_and_level(self):
-        self.assertGreater(self._w("vitality"), self._w("sword_sharpened_edge"))
+    def test_stat_and_weapon_weigh_the_same_at_equal_rarity_and_level(self):
+        """Parity since 2026-09-20: a weapon card is worth exactly what a stat
+        card is, so the six cards a weapon owns are not drowned out."""
+        self.assertAlmostEqual(self._w("vitality"), self._w("sword_sharpened_edge"))
 
     def test_a_grant_shares_the_stat_weight_while_slots_are_open(self):
         g = next(u for u in grant_offers(hero("sword"), C, random.Random(0)) if u.id == "grant:bow")
@@ -400,14 +364,20 @@ class WeightTests(unittest.TestCase):
         self.assertGreater(self._w("sword_sharpened_edge"), self._w("sword_critical_edge"))
         self.assertGreater(self._w("sword_critical_edge"), self._w("sword_heavy_blade"))
 
-    def test_stat_blessings_land_in_nearly_every_offering(self):
+    def test_stat_blessings_land_in_most_offerings(self):
+        """Was "nearly every offering" (> 90 %) until 2026-09-20, when the owner
+        traded that floor for weapon-card parity: at weapon weight 10 a stat
+        card shows in about 87 % of level-ups and a weapon card in about 84 %,
+        against 93 % / 75 % at weight 7. The floor is kept as a guard against a
+        weight change that would push stat cards out of the offering, not as
+        the old rule."""
         p = hero("sword", "bow", "bomb")                      # slots full: no grants
         hits = 0
         n = 300
         for seed in range(n):
             offer = roll_offering(p, C, random.Random(seed))
             hits += any(u.kind == "stat" for u in offer)
-        self.assertGreater(hits / n, 0.9)
+        self.assertGreater(hits / n, 0.85)
 
 
 class RollTests(unittest.TestCase):

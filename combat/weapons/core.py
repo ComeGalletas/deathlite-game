@@ -135,6 +135,12 @@ class Weapon:
         "aim_assist_deg": 0.0,
         "chain_count": 0, "chain_range": 0.0, "cone_half_angle": 0.0,
         "summon_lifetime": 0.0,
+        # Six blessings per weapon (2026-09-19, `six_blessings_journal.md`):
+        # crit damage, the reach ring, the ember ring's radius and rehit,
+        # and the summons' bite interval / run speed / leash.
+        "crit_damage": 0.0, "reach": 0.0, "orbit_radius": 0.0, "rehit_mult": 1.0,
+        "orbit_speed_mult": 1.0,
+        "attack_interval_mult": 1.0, "summon_speed": 0.0, "summon_reach": 0.0,
     })
     # Behaviour hooks the hit resolver / fire path read by key (P2): totals
     # set by `weapon_effect` blessings -- executioner_mult, split_count, ...
@@ -154,6 +160,10 @@ class Weapon:
     # Seconds left before another summon may be planted after one left the
     # field (`summon_replant_delay`, scaled by the weapon's cooldown bonus).
     _replant_t: float = field(default=0.0, init=False)
+    # Flurry (Daggers): the stacks taken from the target's hit streak on the
+    # last hit, and the seconds left before they go cold (the synergy window).
+    _flurry_stacks: int = field(default=0, init=False)
+    _flurry_t: float = field(default=0.0, init=False)
 
     def __post_init__(self) -> None:
         if self.definition.get("category") not in CATEGORIES:
@@ -223,6 +233,33 @@ class Weapon:
     def _crit_chance(self, ctx: FireContext) -> float:
         return ctx.crit_chance + self.bonus["crit_chance"]
 
+    def _crit_multiplier(self, ctx: FireContext) -> float:
+        """The hero's crit multiplier plus the weapon's own `crit_damage`
+        bonus (Critical Edge)."""
+        return ctx.crit_multiplier + self.bonus["crit_damage"]
+
+    # --- Flurry (Daggers) ---------------------------------------
+    def _flurry_rate(self) -> float:
+        """`1 + flurry_per_hit x stacks` while the streak is warm, else 1."""
+        per_hit = float(self.effects.get("flurry_per_hit", 0.0))
+        if per_hit <= 0.0 or self._flurry_t <= 0.0 or self._flurry_stacks <= 0:
+            return 1.0
+        return 1.0 + per_hit * self._flurry_stacks
+
+    def note_flurry(self, streak: int, window: float) -> None:
+        """A hit landed on a target whose consecutive-hit streak by this
+        weapon is now `streak` (this hit included); the stacks stay warm for
+        `window` seconds and are capped by `flurry_max`."""
+        if "flurry_per_hit" not in self.effects:
+            return
+        cap = int(self.effects.get("flurry_max", 5))
+        self._flurry_stacks = max(0, min(int(streak), cap))
+        self._flurry_t = float(window)
+
+    @property
+    def flurry_stacks(self) -> int:
+        return self._flurry_stacks if self._flurry_t > 0.0 else 0
+
     def _weight(self) -> float:
         return float(self.definition["weight"]) + self.bonus["weight"]
 
@@ -241,6 +278,7 @@ class Weapon:
         base = float(self.definition["cooldown"]) * self.bonus["cooldown_mult"]
         if ctx is not None:
             base *= ctx.mods_for(self).cooldown_mult
+        base /= self._flurry_rate()
         if self.special == "slam":
             # CR1: attack speed shortens the *swing*; the rest between blows
             # answers only to the cooldown bonuses and trait mods.
@@ -302,7 +340,8 @@ class Weapon:
             return self._area(area_multiplier)
         if "reach" not in self.definition:
             return float("inf")
-        return (float(self.definition["reach"]) + self.bonus["area"]) * area_multiplier
+        return ((float(self.definition["reach"]) + self.bonus["area"]
+                 + self.bonus["reach"]) * area_multiplier)
 
     @staticmethod
     def _within_reach(enemies, origin, reach: float) -> list:
@@ -325,6 +364,8 @@ class Weapon:
         (a straight / chain / cone fire beat). Orbit + summon never report an
         attack -- they are not a hero "swing" -- so the attack animation, which
         only syncs to the main weapon, stays meaningful."""
+        if self._flurry_t > 0.0:
+            self._flurry_t -= dt
         if self.special == "orbit":
             self._maintain_orbit(ctx)
             return False
@@ -402,11 +443,9 @@ class Weapon:
         self._cd -= dt
         self._replant_t = max(0.0, self._replant_t - dt)
         max_count = self._projectile_count(ctx)
+        self._refresh_summons(ctx)
         if self._cd > 0.0 or self._replant_t > 0.0 or len(self._summons) >= max_count:
             return
-        # CB-2: the summon gets a leash ring centred on the hero -- it only
-        # targets enemies inside it and idles when it is empty.
-        reach = float(d["summon_reach"])
         # A non-positive `summon_lifetime` means "never expires" -- the spirit
         # wolf stays on field indefinitely; the totem keeps its 8 s.
         raw_life = float(d["summon_lifetime"])
@@ -419,13 +458,43 @@ class Weapon:
             lifetime=lifetime,
             weapon_id=self.weapon_id,
             tags=self.tags,
-            speed=float(d["summon_speed"]),
+            speed=self._summon_speed(),
             attack_range=float(d["summon_attack_range"]),
-            attack_interval=float(d["summon_attack_interval"]),
-            reach=reach * ctx.area_multiplier)
+            attack_interval=self._summon_attack_interval(),
+            reach=self._summon_reach(ctx.area_multiplier))
         if s is not None:
             self._summons.append(s)
         self._cd = self._cooldown(ctx.attack_speed_multiplier, ctx)
+
+    def _summon_speed(self) -> float:
+        return float(self.definition["summon_speed"]) + self.bonus["summon_speed"]
+
+    def _summon_attack_interval(self) -> float:
+        return (float(self.definition["summon_attack_interval"])
+                * self.bonus["attack_interval_mult"])
+
+    def _summon_reach(self, area_multiplier: float) -> float:
+        """CB-2: the leash ring centred on the hero -- the summon only targets
+        enemies inside it and idles when it is empty. Long Stride widens it."""
+        return ((float(self.definition["summon_reach"]) + self.bonus["summon_reach"])
+                * area_multiplier)
+
+    def _refresh_summons(self, ctx: FireContext) -> None:
+        """Live summons pick up damage, run speed, bite interval and leash the
+        frame a blessing changes them, the way the orbiters do."""
+        if not self._summons:
+            return
+        dmg = self._damage(ctx)
+        speed = self._summon_speed()
+        interval = self._summon_attack_interval()
+        reach = self._summon_reach(ctx.area_multiplier)
+        for s in self._summons:
+            s.damage = dmg
+            s.speed = speed
+            if s.attack_interval != interval:
+                s.attack_interval = interval
+                s.attack_cd = min(s.attack_cd, interval)
+            s.reach = reach
 
     # --- straight / chain / cone ----------------------------
     def _pick_aim(self, ctx: FireContext, forced: bool):
@@ -501,7 +570,7 @@ class Weapon:
             direction = pygame.Vector2(math.cos(base_angle + step * i),
                                        math.sin(base_angle + step * i))
             dmg = outgoing_damage(self._volley_damage(ctx), ctx.damage_multiplier,
-                                  self._crit_chance(ctx), ctx.crit_multiplier, ctx.rng)
+                                  self._crit_chance(ctx), self._crit_multiplier(ctx), ctx.rng)
             ctx.spawn_projectile(
                 pos=ctx.origin, vel=direction * speed, damage=dmg.amount,
                 radius=area, lifetime=lifetime, pierce=self._pierce(),
@@ -529,7 +598,7 @@ class Weapon:
         stun_duration = float(d.get("stun_duration", 0.0)) + self.bonus["stun_duration"]
         for direction in self._cone_directions(cone_dir):
             dmg = outgoing_damage(self._volley_damage(ctx), ctx.damage_multiplier,
-                                  self._crit_chance(ctx), ctx.crit_multiplier, ctx.rng)
+                                  self._crit_chance(ctx), self._crit_multiplier(ctx), ctx.rng)
             ctx.spawn_projectile(
                 pos=ctx.origin, vel=pygame.Vector2(),
                 damage=dmg.amount, radius=area,
@@ -545,7 +614,7 @@ class Weapon:
         if self.effect("shockwave_radius") > 0.0:
             base = self._volley_damage(ctx) * float(fx.get("shockwave_damage_mult", 0.5))
             dmg = outgoing_damage(base, ctx.damage_multiplier,
-                                  self._crit_chance(ctx), ctx.crit_multiplier, ctx.rng)
+                                  self._crit_chance(ctx), self._crit_multiplier(ctx), ctx.rng)
             ctx.spawn_projectile(
                 pos=impact, vel=pygame.Vector2(), damage=dmg.amount,
                 radius=self.effect("shockwave_radius"), lifetime=0.15, pierce=999,
@@ -570,9 +639,9 @@ class Weapon:
         if not ctx.click_held and not self._within_reach(
                 ctx.enemies, ctx.origin, self._reach(ctx.area_multiplier)):
             desired = 0
-        radius = float(self.definition["orbit_radius"])
-        orbit_speed = float(self.definition["orbit_speed"])
-        rehit = float(self.definition["rehit_interval"])
+        radius = float(self.definition["orbit_radius"]) + self.bonus["orbit_radius"]
+        orbit_speed = float(self.definition["orbit_speed"]) * self.bonus["orbit_speed_mult"]
+        rehit = float(self.definition["rehit_interval"]) * self.bonus["rehit_mult"]
         area = self._area(ctx.area_multiplier)
         dmg = outgoing_damage(self._damage(ctx), ctx.damage_multiplier).amount
 
@@ -616,3 +685,6 @@ class Weapon:
             o.radius = area
             o.orbit_radius = radius
             o.orbit_speed = orbit_speed
+            if o.rehit_interval != rehit:         # Fanned Flames
+                o.rehit_interval = rehit
+                o.rehit_timer = min(o.rehit_timer, rehit)
