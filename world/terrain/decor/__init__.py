@@ -6,6 +6,7 @@ Each leaf answers one question:
   `spacing`         -- is anything already too close to here?
   `budget`          -- how many props does this terrace get, and of what tiers?
   `obstacle_skins`  -- which rig skins this obstacle, on which clock?
+  `dressing`        -- the props round a buff building
   `shadows`         -- the soft shade under a tree
   `scatter_room`    -- where may a prop stand on an island's floor?
   `scatter_water`   -- ...and on the sea, the shoreline and the lakes
@@ -21,6 +22,7 @@ from world.terrain.decor.budget import (
     FEATURE, GROUND_COVER, LANDMARK, TIERS,
     _cell_biomes, _terraces, _tier_scales,
 )
+from world.terrain.decor.dressing import build_building_dressing
 from world.terrain.decor.obstacle_skins import build_obstacle_decor
 from world.terrain.decor.rigs import load_rig
 from world.terrain.decor.scatter_room import build_decor_scatter
@@ -30,6 +32,7 @@ from world.rules.spacing import _Neighbourhood
 
 __all__ = [
     "FEATURE", "GROUND_COVER", "LANDMARK", "TIERS",
-    "build_decor_scatter", "build_obstacle_decor", "build_tree_shadows",
+    "build_building_dressing", "build_decor_scatter", "build_obstacle_decor",
+    "build_tree_shadows",
     "build_water_decor", "load_rig",
 ]

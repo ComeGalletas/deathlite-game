@@ -32,7 +32,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(set(registered()),
                          {"bolt", "arrow", "cone", "orbit", "melee", "thunder",
                           "arcane", "blast", "bomb", "hidden", "thrown",
-                          "totem_bolt", "spin"})
+                          "totem_bolt", "spin", "pinball"})
 
     def test_classify_routes_by_the_projectile_fields(self):
         cone = SimpleNamespace(style="", cone_half_angle=0.5, orbit_speed=0.0, anchor=None)

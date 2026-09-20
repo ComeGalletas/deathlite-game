@@ -340,6 +340,8 @@ class PainterTests(unittest.TestCase):
             fx, fy = opaque_point(foot)
             seen = 0
             styles = set()
+            sheets = gm._sheets
+            piece = sheets.ramp_slots.get("n") or sheets.ramp_slots.get("s")
             for room, (c, r), cell in _north_flights(gm.layout):
                 self.assertEqual(_shadow_casts(room.grid, c, r, cell, 0, 0, px),
                                  [])
@@ -347,17 +349,53 @@ class PainterTests(unittest.TestCase):
                 x0 = room.rect.x + c * px
                 y0 = room.rect.y + r * px
                 sx = px // 2
-                # the rim's upper half carries the top half of the sprite
-                self.assertTrue(close(baked(gm, cell.level, x0 + tx, y0 + ty),
-                                      tuple(top.get_at((tx, ty)))),
-                                f"seed {seed}: no top step on the rim at {(c, r)}")
-                # the landing's lower half carries the foot half
-                self.assertTrue(close(baked(gm, low, x0 + fx, y0 - px // 2 + fy),
-                                      tuple(foot.get_at((fx, fy)))),
-                                f"seed {seed}: no foot on the landing at {(c, r)}")
-                # and beyond the sprite both tiles are opaque ground
-                self.assertEqual(baked(gm, cell.level, x0 + sx, y0 + 3 * px // 4)[3],
-                                 255)
+                # NS-7: one thing or the other, never both.
+                channel = sheets.cell(sheets.sheet_for(cell.level, room.kind, room),
+                                      piece[-1])
+                if cell.tag == "rock":
+                    # the rim's upper half carries the top half of the sprite
+                    self.assertTrue(close(baked(gm, cell.level, x0 + tx, y0 + ty),
+                                          tuple(top.get_at((tx, ty)))),
+                                    f"seed {seed}: no top step on the rim at {(c, r)}")
+                    # the landing's lower half carries the foot half
+                    self.assertTrue(close(baked(gm, low, x0 + fx, y0 - px // 2 + fy),
+                                          tuple(foot.get_at((fx, fy)))),
+                                    f"seed {seed}: no foot on the landing at {(c, r)}")
+                    # and below the stone the rim is plain plateau ground,
+                    # not the channel: no side lip where the channel has one
+                    self.assertNotEqual(baked(gm, cell.level, x0 + 2, y0 + 3 * px // 4),
+                                        tuple(channel.get_at((2, 3 * px // 4))),
+                                        f"seed {seed}: channel under the stone at {(c, r)}")
+                    self.assertEqual(baked(gm, cell.level, x0 + sx, y0 + 3 * px // 4)[3],
+                                     255)
+                else:
+                    # a grass flight: plain plateau grass on the rim cell's
+                    # lower half, and the channel straddling the seam --
+                    # its lower half on the rim's upper half (plateau band),
+                    # its upper half on the landing's lower half (low band)
+                    plain = sheets.cell(sheets.sheet_for(cell.level, room.kind, room),
+                                        sheets.interior)
+                    self.assertEqual(baked(gm, cell.level, x0 + sx, y0 + 3 * px // 4),
+                                     tuple(plain.get_at((sx, 3 * px // 4))),
+                                     f"seed {seed}: rim under the channel is not plain "
+                                     f"grass at {(c, r)}")
+                    # the lip: the first opaque pixel in from the tile's
+                    # left edge on that row (the margin outside it is clear)
+                    def lip(row):
+                        return next(xx for xx in range(px // 2)
+                                    if channel.get_at((xx, row)).a == 255)
+                    lx = lip(px // 2 + px // 4)
+                    self.assertEqual(baked(gm, cell.level, x0 + lx, y0 + px // 4),
+                                     tuple(channel.get_at((lx, px // 2 + px // 4))),
+                                     f"seed {seed}: no channel lip on the rim at {(c, r)}")
+                    lx = lip(px // 4)
+                    self.assertEqual(baked(gm, low, x0 + lx, y0 - px // 4),
+                                     tuple(channel.get_at((lx, px // 4))),
+                                     f"seed {seed}: no channel lip on the landing at {(c, r)}")
+                    self.assertEqual(baked(gm, cell.level, x0 + tx, y0 + ty),
+                                     tuple(channel.get_at((tx, px // 2 + ty))),
+                                     f"seed {seed}: stone on a grass flight at {(c, r)}")
+                # and the landing beyond the sprite is opaque ground
                 self.assertEqual(baked(gm, low, x0 + sx, y0 - px + px // 4)[3],
                                  255)
                 styles.add(cell.tag)

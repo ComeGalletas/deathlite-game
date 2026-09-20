@@ -19,6 +19,8 @@ primitive rectangles the HUD drew before, the same degrade contract as
 """
 from __future__ import annotations
 
+import math
+
 import pygame
 
 from game import config, fonts
@@ -152,12 +154,44 @@ class HUD:
         name = self._font.render(boss.name, True, config.COLOR_TEXT)
         surface.blit(name, name.get_rect(midbottom=(w // 2, by - scale.px(4))))
 
+    # --- buff row (under the top-left cluster) ----------------------
+    def _draw_buffs(self, surface: pygame.Surface, buffs) -> None:
+        """One icon per active buff (journal: buff_buildings_journal.md),
+        under the HP / XP cluster: the buff's still inside a dark disc, and
+        a ring in the buff's colour that drains clockwise as the time runs
+        out. Nothing is drawn when no buff is active."""
+        if not buffs:
+            return
+        assets = get_assets()
+        side = scale.px(config.HUD_BUFF_ICON_PX)
+        gap = scale.px(8)
+        left = scale.px(16)
+        top = scale.px(config.HUD_LEFT_TOP) + scale.px(config.HUD_GEM_PX) + scale.px(10)
+        ring_w = max(2, scale.px(3))
+        for i, (kind, frac, rig, colour) in enumerate(buffs):
+            x = left + i * (side + gap)
+            rect = pygame.Rect(x, top, side, side)
+            disc = pygame.Surface((side, side), pygame.SRCALPHA)
+            pygame.draw.circle(disc, (18, 20, 26, 170), (side // 2, side // 2), side // 2)
+            surface.blit(disc, rect.topleft)
+            inner = side - 2 * ring_w - 2
+            icon = assets.image(rig, size=(inner, inner)) if rig else None
+            if icon is not None:
+                surface.blit(icon, icon.get_rect(center=rect.center))
+            if frac > 0.0:
+                # pygame arcs run counter-clockwise from `start` to `end`;
+                # ending at the top makes the ring drain clockwise.
+                start = math.pi / 2 - 2 * math.pi * frac
+                pygame.draw.arc(surface, colour, rect.inflate(-ring_w, -ring_w),
+                                start, math.pi / 2, ring_w)
+
     def draw(self, surface: pygame.Surface, player, stats: dict,
-             xp_fraction: float | None = None, boss=None) -> None:
+             xp_fraction: float | None = None, boss=None, buffs=()) -> None:
         w = surface.get_width()
 
         if not self._draw_meters(surface, player, stats, xp_fraction):
             self._draw_flat_meters(surface, player, xp_fraction)
+        self._draw_buffs(surface, buffs)
 
         # --- timer (top-centre) ----------------------------------
         t = int(stats.get("time", 0.0))

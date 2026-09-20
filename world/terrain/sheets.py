@@ -187,6 +187,22 @@ class TileSheets:
             self._cell_cache[key] = img
         return self._cell_cache[key]
 
+    def channel_halves(self, sheet: str, idx: int):
+        """A grass channel tile cut at its middle into `(upper, lower)`,
+        each `px` wide and half a tile tall, for a grass north flight that
+        straddles the seam the way the stone flight does: the upper half
+        lies on the landing's lower half, the lower half on the rim's upper
+        half. The tile is symmetric top to bottom, so no flip. Cached."""
+        key = ("channel-halves", sheet, idx)
+        if key not in self._cell_cache:
+            tile = self.cell(sheet, idx)
+            w, h = tile.get_size()
+            half = h // 2
+            self._cell_cache[key] = (
+                tile.subsurface(pygame.Rect(0, 0, w, half)).copy(),
+                tile.subsurface(pygame.Rect(0, half, w, h - half)).copy())
+        return self._cell_cache[key]
+
     def vstair_seam(self, drop: int = 1):
         """The north flight as it is painted: the flipped sprite cut at its
         middle into `(foot_half, top_half)`, each `px` wide and half a

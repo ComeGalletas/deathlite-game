@@ -259,3 +259,50 @@ the pinned seeds, both styles required. Re-rendered against the baseline
 worktree: the flight tiles and their wall rows are pixel-identical; what
 still differs in the crops is an obstacle or two moved by the north
 flights' keep-outs. Digests re-pinned.
+
+### NS-7 -- the grass channel on the rim (2026-09-20)
+
+**Request.** Reviewing the north flights beside the buff-building work,
+the owner noted they are the inverted stairs between two level tiles and
+asked whether the grass n/s tile could join them. Confirmed reading: the
+rim cell wears the south flight's grass channel piece, grass flights are
+the channel alone, rock flights the channel with the flipped stone on top
+-- the south rule, carried to the back rim.
+
+**What landed.**
+
+- `terrain.json` `slots.ramp.n = [17, 17]`: the north channel slot, the
+  south piece by default, so a north-specific tile can be authored later
+  without touching code (the ramp vocabulary already gained "n" for the
+  tile metadata).
+- `grid_paint` pass 4: every north flight blits the `ramp.n` piece over its
+  autotiled rim tile on the plateau's band -- the rim's north lip goes and
+  the two side lips of the channel take over, so the gateway reads as a cut
+  through the edge. A grass flight stops there. A rock flight goes on to
+  the seam halves as before: foot half on the landing's band, top half over
+  the channel on the plateau's band.
+- The painter test reads the channel's own pixel at the rim cell's lower
+  quarter for both styles, the top step and the foot for rock only, and
+  the channel where the top step would be for grass. Bake and draw digests
+  re-pinned; layouts untouched. Screenshot delivered: seed 35, island 0,
+  a rock and a grass north flight.
+
+**Amended the same day.** The owner wants one thing or the other: a
+grass flight is the channel alone, a rock flight the stone alone on its
+ordinary rim tile, never the stone in a channel. The painter now lays the
+channel only for grass flights; the rock branch is byte-for-byte the NS-6
+painting again. The test checks the rock flight's rim below the stone is
+plain plateau ground (no channel lip at its side) and the grass flight's
+rim is the channel with no stone. Digests re-pinned; screenshot delivered.
+
+**Amended again the same day: the grass flight straddles the seam.** From
+a marked screenshot: the upper floor's grass should run past the rim line
+onto the lower floor the way the stone does, not stop at the rim. Two
+steps, as the owner laid them out: the rim cell first becomes the sheet's
+plain interior tile (no lips), then the channel piece is cut at its middle
+(`TileSheets.channel_halves`) and centred on the seam -- its upper half on
+the landing's lower half, on the low band after the landing's grass; its
+lower half on the rim's upper half, on the plateau band. The rock flight
+is unchanged. The test reads plain grass on the rim's lower quarter, the
+channel's lip on the rim's upper quarter and on the landing's lower
+quarter, and no stone. Digests re-pinned; screenshot delivered.

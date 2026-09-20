@@ -39,6 +39,8 @@ KEY_LIFT = {
     "shrine": 26, "altar": 26, "merchant": 26, "treasure": 24,
     "fountain": 40,
     "forge": 56,
+    # The buff buildings, when their skin is missing and the ring stands in.
+    "magnet": 40, "turbo": 40, "haste": 40, "pinball": 40, "vampire": 40,
 }
 CLEAR_PX = 4            # design px between the art's top and the cap's bottom
 
@@ -122,8 +124,8 @@ def art_box(ps, obj):
     kind = interactions.kind_of(obj)
     if kind == "chest":
         return _chest_box(ps, obj)
-    if kind == "forge":
-        return _obstacle_box(ps, obj)
+    if kind == "forge" or ps.buffs.is_buff(kind):
+        return _obstacle_box(ps, obj)     # the obstacle skin carries the art
     return None
 
 

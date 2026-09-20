@@ -100,7 +100,10 @@ class Summon:
             return
         self._t += dt
         self._bite_t = max(0.0, self._bite_t - dt)
-        self.attack_cd -= dt
+        # Haste (buff buildings) doubles a summon's cadence the way it halves
+        # the weapons' cooldowns: the interval is paced by the hero's live
+        # multiplier, handed in on the context.
+        self.attack_cd -= dt * float(getattr(ctx, "attack_speed_mult", 1.0))
         target = self._acquire_target(ctx)
 
         if self.kind == "wolf":

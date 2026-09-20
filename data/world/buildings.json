@@ -1,0 +1,183 @@
+{
+  "_doc": [
+    "Buff buildings (journal: buff_buildings_journal.md). Five interactive",
+    "buildings scattered over the islands, each granting a short timed buff.",
+    "`buffs` is the per-kind tuning; `obstacles`, `obstacle_decor` and `rigs`",
+    "are merged into terrain.json's blocks at load (game/content.py) so the",
+    "generator, the bake and the renderer see the buildings as ordinary",
+    "obstacle kinds, and `image_rigs` (single images: the HUD stills, the",
+    "pinball) into the UI rigs. `dressing` lists the non-colliding props",
+    "scattered round each building at bake time and `colliders` the ordinary",
+    "obstacles the generator seats beside it."
+  ],
+  "placement": {
+    "per_island": [2, 5],
+    "min_room_cells": 40,
+    "min_room_tiles": 5,
+    "building_gap_tiles": 3.0,
+    "dressing_ring_tiles": [1.4, 2.8],
+    "dressing_count": [3, 6]
+  },
+  "feedback": {
+    "tint_peak_alpha": 55,
+    "tint_seconds": 0.9,
+    "hero_fx_seconds": 2.0,
+    "banner_seconds": 7.0
+  },
+  "buffs": {
+    "magnet": {
+      "name": "Magnet",
+      "duration": 5.0,
+      "palette": [[255, 214, 90], [255, 170, 40], [200, 120, 20]],
+      "fx_rig": "fx_buff_magnet",
+      "icon_rig": "hud_buff_magnet",
+      "used_rig": "building_magnet_used",
+      "colliders": ["rock", "rock"],
+      "dressing": ["deco_gold_1", "deco_gold_2", "deco_gold_3", "deco_gold_4",
+                   "deco_gold_5", "deco_gold_6"]
+    },
+    "turbo": {
+      "name": "Turbo",
+      "duration": 5.0,
+      "palette": [[255, 150, 60], [240, 80, 40], [180, 40, 30]],
+      "fx_rig": "fx_buff_turbo",
+      "icon_rig": "hud_buff_turbo",
+      "speed_add": 300.0,
+      "armor_add": 20.0,
+      "contact_dps": 5.0,
+      "contact_tick": 0.5,
+      "colliders": ["rock"],
+      "dressing": ["deco_wood", "deco_tool_1", "deco_tool_2", "deco_tool_3", "deco_tool_4"]
+    },
+    "haste": {
+      "name": "Haste",
+      "duration": 5.0,
+      "palette": [[120, 220, 255], [60, 140, 255], [40, 80, 200]],
+      "fx_rig": "fx_buff_haste",
+      "icon_rig": "hud_buff_haste",
+      "attack_speed_add": 1.0,
+      "colliders": ["tree"],
+      "dressing": ["deco_bush_1", "deco_bush_2", "deco_bush_3", "deco_bush_4",
+                   "deco_ground_pumpkin_1", "deco_ground_pumpkin_2"]
+    },
+    "pinball": {
+      "name": "Pinball",
+      "duration": 10.0,
+      "palette": [[190, 120, 255], [255, 120, 200], [140, 60, 200]],
+      "fx_rig": "fx_buff_pinball",
+      "icon_rig": "hud_buff_pinball",
+      "pinball": {
+        "damage": 40.0,
+        "speed": 260.0,
+        "weight": 400.0,
+        "radius": 10.0,
+        "bounces": 10,
+        "lifetime": 10.0,
+        "every": 2.0,
+        "rehit": 0.5
+      },
+      "colliders": ["rock", "rock"],
+      "dressing": ["deco_rock_1", "deco_rock_2", "deco_rock_3", "deco_rock_4"]
+    },
+    "vampire": {
+      "name": "Vampire",
+      "duration": 7.0,
+      "palette": [[230, 40, 60], [140, 10, 40], [40, 0, 12]],
+      "fx_rig": "fx_buff_vampire",
+      "icon_rig": "hud_buff_vampire",
+      "damage_add": 0.10,
+      "heal_per_hit": 1.0,
+      "colliders": ["tree"],
+      "dressing": ["deco_bones_1", "deco_bones_2", "deco_bones_3",
+                   "deco_skull_spike_1", "deco_skull_spike_2"]
+    }
+  },
+  "obstacles": {
+    "magnet":  {"radius": 38, "blocks_projectiles": true, "color": [120, 160, 150]},
+    "turbo":   {"radius": 36, "blocks_projectiles": true, "color": [150, 120, 90],
+                "satellites": [[-34, 6, 22], [34, 6, 22]]},
+    "haste":   {"radius": 36, "blocks_projectiles": true, "color": [170, 110, 190],
+                "satellites": [[-34, 6, 22], [34, 6, 22]]},
+    "pinball": {"radius": 36, "blocks_projectiles": true, "color": [110, 150, 140],
+                "satellites": [[-34, 6, 22], [34, 6, 22]]},
+    "vampire": {"radius": 36, "blocks_projectiles": true, "color": [110, 80, 60],
+                "satellites": [[-34, 6, 22], [34, 6, 22]]}
+  },
+  "obstacle_decor": {
+    "rigs": {
+      "magnet": ["building_magnet"],
+      "turbo": ["building_turbo"],
+      "haste": ["building_haste"],
+      "pinball": ["building_pinball"],
+      "vampire": ["building_vampire"]
+    },
+    "sprite_drop": {"magnet": 1.0, "turbo": 1.0, "haste": 1.0, "pinball": 1.0, "vampire": 1.0},
+    "render_scale": {"vampire": 0.4, "turbo": 0.914, "haste": 1.03, "pinball": 0.83},
+    "ghost_kinds": ["magnet", "turbo", "haste", "pinball", "vampire"]
+  },
+  "dressing_scale": {
+    "deco_gold_1": 0.5, "deco_gold_2": 0.5, "deco_gold_3": 0.5, "deco_gold_4": 0.5,
+    "deco_gold_5": 0.5, "deco_gold_6": 0.5,
+    "deco_wood": 0.7, "deco_tool_1": 0.7, "deco_tool_2": 0.7, "deco_tool_3": 0.7, "deco_tool_4": 0.7,
+    "deco_bones_1": 0.7, "deco_bones_2": 0.7, "deco_bones_3": 0.7,
+    "deco_skull_spike_1": 0.6, "deco_skull_spike_2": 0.6,
+    "deco_bush_1": 0.5, "deco_bush_2": 0.5, "deco_bush_3": 0.5, "deco_bush_4": 0.5,
+    "deco_ground_pumpkin_1": 0.5, "deco_ground_pumpkin_2": 0.5,
+    "deco_rock_1": 0.45, "deco_rock_2": 0.45, "deco_rock_3": 0.45, "deco_rock_4": 0.45
+  },
+  "image_rigs": {
+    "hud_buff_magnet": {"file": "ui/hud/buffs/magnet.png"},
+    "hud_buff_turbo": {"file": "ui/hud/buffs/turbo.png"},
+    "hud_buff_haste": {"file": "ui/hud/buffs/haste.png"},
+    "hud_buff_pinball": {"file": "ui/hud/buffs/pinball.png"},
+    "hud_buff_vampire": {"file": "ui/hud/buffs/vampire.png"},
+    "pinball": {"file": "projectiles/pinball.png", "frame": [32, 32], "scale": [22, 22], "anchor": [11, 11]}
+  },
+  "rigs": {
+    "building_magnet": {
+      "frame": [192, 128], "anchor": [96, 126], "paint": [12, 5, 169, 121], "footprint": 169,
+      "anims": {"loop": {"file": "buildings/general/magnet.png", "frames": 1, "fps": 0, "loop": false}}
+    },
+    "building_magnet_used": {
+      "frame": [192, 128], "anchor": [96, 126], "paint": [12, 5, 169, 121], "footprint": 169,
+      "anims": {"loop": {"file": "buildings/general/magnet_used.png", "frames": 1, "fps": 0, "loop": false}}
+    },
+    "building_turbo": {
+      "frame": [192, 256], "anchor": [96, 241], "paint": [26, 26, 140, 215], "footprint": 140,
+      "anims": {"loop": {"file": "buildings/general/turbo.png", "frames": 16, "fps": 8, "loop": true}}
+    },
+    "building_haste": {
+      "frame": [128, 256], "anchor": [64, 230], "paint": [2, 68, 124, 162], "footprint": 124,
+      "anims": {"loop": {"file": "buildings/general/haste.png", "frames": 1, "fps": 0, "loop": false}}
+    },
+    "building_pinball": {
+      "frame": [192, 192], "anchor": [99, 173], "paint": [22, 50, 154, 123], "footprint": 154,
+      "anims": {"loop": {"file": "buildings/general/pinball.png", "frames": 8, "fps": 6, "loop": true}}
+    },
+    "building_vampire": {
+      "frame": [384, 320], "anchor": [184, 315], "paint": [20, 5, 328, 310], "footprint": 328,
+      "anims": {"loop": {"file": "buildings/general/vampire.png", "frames": 1, "fps": 0, "loop": false}}
+    },
+    "deco_gold_1": {"frame": [128, 128], "anchor": [64, 79], "anims": {"loop": {"file": "buildings/dressing/gold_1.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_gold_2": {"frame": [128, 128], "anchor": [65, 75], "anims": {"loop": {"file": "buildings/dressing/gold_2.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_gold_3": {"frame": [128, 128], "anchor": [63, 88], "anims": {"loop": {"file": "buildings/dressing/gold_3.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_gold_4": {"frame": [128, 128], "anchor": [66, 86], "anims": {"loop": {"file": "buildings/dressing/gold_4.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_gold_5": {"frame": [128, 128], "anchor": [65, 100], "anims": {"loop": {"file": "buildings/dressing/gold_5.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_gold_6": {"frame": [128, 128], "anchor": [63, 98], "anims": {"loop": {"file": "buildings/dressing/gold_6.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_wood": {"frame": [64, 64], "anchor": [32, 46], "anims": {"loop": {"file": "buildings/dressing/wood.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_tool_1": {"frame": [64, 64], "anchor": [34, 45], "anims": {"loop": {"file": "buildings/dressing/tool_1.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_tool_2": {"frame": [64, 64], "anchor": [31, 43], "anims": {"loop": {"file": "buildings/dressing/tool_2.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_tool_3": {"frame": [64, 64], "anchor": [32, 42], "anims": {"loop": {"file": "buildings/dressing/tool_3.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_tool_4": {"frame": [64, 64], "anchor": [32, 44], "anims": {"loop": {"file": "buildings/dressing/tool_4.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_bones_1": {"frame": [64, 64], "anchor": [33, 49], "anims": {"loop": {"file": "buildings/dressing/bones_1.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_bones_2": {"frame": [64, 64], "anchor": [31, 46], "anims": {"loop": {"file": "buildings/dressing/bones_2.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_bones_3": {"frame": [64, 64], "anchor": [33, 45], "anims": {"loop": {"file": "buildings/dressing/bones_3.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_skull_spike_1": {"frame": [64, 128], "anchor": [34, 95], "anims": {"loop": {"file": "buildings/dressing/skull_spike_1.png", "frames": 1, "fps": 0, "loop": false}}},
+    "deco_skull_spike_2": {"frame": [64, 128], "anchor": [34, 107], "anims": {"loop": {"file": "buildings/dressing/skull_spike_2.png", "frames": 1, "fps": 0, "loop": false}}},
+    "fx_buff_magnet": {"frame": [128, 128], "anchor": [64, 96], "anims": {"loop": {"file": "effects/buffs/magnet.png", "frames": 31, "fps": 15.5, "loop": false}}},
+    "fx_buff_turbo": {"frame": [128, 128], "anchor": [64, 96], "anims": {"loop": {"file": "effects/buffs/turbo.png", "frames": 30, "fps": 15, "loop": false}}},
+    "fx_buff_haste": {"frame": [128, 128], "anchor": [64, 96], "anims": {"loop": {"file": "effects/buffs/haste.png", "frames": 29, "fps": 14.5, "loop": false}}},
+    "fx_buff_pinball": {"frame": [128, 128], "anchor": [64, 96], "anims": {"loop": {"file": "effects/buffs/pinball.png", "frames": 22, "fps": 11, "loop": false}}},
+    "fx_buff_vampire": {"frame": [128, 128], "anchor": [64, 96], "anims": {"loop": {"file": "effects/buffs/vampire.png", "frames": 18, "fps": 9, "loop": false}}}
+  }
+}

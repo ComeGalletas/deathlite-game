@@ -22,6 +22,14 @@ KINDS = {
     "forge":       (44, (230, 150, 80)),
     "altar":       (26, (210, 110, 210)),
     "merchant":    (26, (220, 190, 120)),
+    # Buff buildings (journal: buff_buildings_journal.md): the interactable
+    # stands on the building obstacle, which carries the art; the radius is
+    # the reach round the building the interact key answers from.
+    "magnet":      (38, (255, 214, 90)),
+    "turbo":       (36, (255, 150, 60)),
+    "haste":       (36, (120, 220, 255)),
+    "pinball":     (36, (190, 120, 255)),
+    "vampire":     (36, (230, 40, 60)),
 }
 
 

@@ -36,8 +36,11 @@ class PlacementTests(unittest.TestCase):
         _, p = fresh_playing()
         lay = p.game_map.layout
         specials = [r for r in lay.rooms if r.kind in SPECIAL_KINDS]
-        # HI-2: plus a forge and a sanctuary heal per village.
-        self.assertEqual(len(p.interactables), len(specials) + 2 * len(lay.villages))
+        # HI-2: plus a forge and a sanctuary heal per village, and one per
+        # buff building (journal: buff_buildings_journal.md).
+        buildings = lay.buff_buildings(p.buffs.kinds)
+        self.assertEqual(len(p.interactables),
+                         len(specials) + 2 * len(lay.villages) + len(buildings))
         by_kind = {it.kind: it for it in p.interactables}
         for room in specials:
             it = by_kind[room.kind]

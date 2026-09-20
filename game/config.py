@@ -627,6 +627,9 @@ HUD_LEVEL_NUDGE: tuple[int, int] = (-1, 0)
 # and the primitive rectangles that stand in when the sheets are missing. Sat
 # at 14 until the same 25 px drop (owner, 2026-09-12).
 HUD_LEFT_TOP: int = 39
+# The buff row (journal: buff_buildings_journal.md): one icon per active
+# buff under the cluster, this many design px a side.
+HUD_BUFF_ICON_PX: int = 32
 # The boss bar, bottom centre: the same hex family as the hero's bars (owner,
 # 2026-09-12), framed, with the boss name above it. Its width is a fraction of
 # the screen so it stays half the frame at any resolution, and HUD_BOSS_BOTTOM

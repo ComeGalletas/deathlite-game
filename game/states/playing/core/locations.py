@@ -42,6 +42,10 @@ class SpecialLocations:
         for v in getattr(ps.game_map.layout, "villages", ()):
             ps.interactables.append(Interactable("forge", v.forge.x, v.forge.y))
             ps.interactables.append(Interactable("fountain", v.heal.x, v.heal.y))
+        # The buff buildings (journal: buff_buildings_journal.md): one
+        # interactable on each building obstacle, which carries the art.
+        for o in ps.game_map.layout.buff_buildings(ps.buffs.kinds):
+            ps.interactables.append(Interactable(o.kind, o.pos.x, o.pos.y))
 
     def nearby(self):
         ps = self.ps
@@ -53,6 +57,9 @@ class SpecialLocations:
     def use(self, it) -> None:
         """Run `it`'s per-kind handler (the interact key, via
         `core/interactions.py`)."""
+        if self.ps.buffs.is_buff(it.kind):
+            self.ps.buffs.activate(it)
+            return
         handler = getattr(self, f"use_{it.kind}", None)
         if handler is not None:
             handler(it)
