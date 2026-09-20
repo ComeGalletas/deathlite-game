@@ -55,7 +55,7 @@
     "shot_speed": 200, "shot_radius": 9,
     "shot_style": "bomb", "shot_tint": [150, 26, 12],
     "shot_stop_after": 0.55, "shot_lifetime": 1.35, "shot_blast_radius": 62,
-    "explode_radius": 90, "explode_damage": 5, "fuse_range": 34
+    "explode_radius": 30, "explode_damage": 5, "fuse_range": 34
   },
   "panda": {
     "name": "Stoutpaw", "hp": 33, "speed": 60,

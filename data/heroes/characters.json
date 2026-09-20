@@ -13,7 +13,7 @@
       "max_hp": 160,
       "move_speed": 150,
       "armor": 4,
-      "pickup_radius": 80,
+      "pickup_radius": 150,
       "block_chance": 0.30
     }
   },
@@ -31,7 +31,7 @@
       "max_hp": 92,
       "move_speed": 170,
       "armor": 0,
-      "pickup_radius": 110,
+      "pickup_radius": 150,
       "evasion_chance": 0.10
     }
   },
@@ -49,7 +49,7 @@
       "max_hp": 96,
       "move_speed": 140,
       "armor": 0,
-      "pickup_radius": 100,
+      "pickup_radius": 190,
       "luck": 2
     }
   }
