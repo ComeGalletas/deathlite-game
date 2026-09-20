@@ -123,6 +123,15 @@ class Game:
         if persist:
             self.persist()
 
+    @property
+    def tutorials(self) -> bool:
+        """The Options "Tutorials" row: the run's opening keycap hints."""
+        return bool(self.save.settings.get("tutorials", True))
+
+    def set_tutorials(self, on: bool) -> None:
+        self.save.settings["tutorials"] = bool(on)
+        self.persist()
+
     def cycle_key_layout(self) -> str:
         """Advance to the next layout (the pause / options toggle). Returns
         the new name."""

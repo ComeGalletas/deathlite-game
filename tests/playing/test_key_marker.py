@@ -186,6 +186,7 @@ class MarkerTests(unittest.TestCase):
         nothing is written where the old prompt sat."""
         p = self.p
         chest = _chest(p)
+        p.hints.dismiss()                      # the opening hints draw caps of their own
         with mock.patch.object(keycap, "draw_keycap", wraps=keycap.draw_keycap) as m:
             p.draw(self.surface)
         self.assertEqual(m.call_count, 1)

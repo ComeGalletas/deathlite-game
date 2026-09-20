@@ -7,8 +7,8 @@ WASD and the arrows on the Key layout row re-labels the Move and Aim rows
 at once; the rest come from the same constants the run handles
 (`KEY_INTERACT`, `KEY_TOGGLE_AUTO_ATTACK`) or the keys `PlayingState`
 answers to (TAB, ESC). Reference caps are grey -- the blue cap is reserved
-for "press this now" -- and a word (`TAB`, `ESC`, `CLICK`) takes the wide
-cap.
+for "press this now" -- a word (`TAB`, `ESC`) takes the wide cap, and the
+mouse is the cursor arrow on a square one (`keycap.MOUSE`).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ CAP_GAP = 6             # between caps of one cluster (W A S D)
 LABEL_GAP = 16          # cluster -> word
 ROW_STEP = 44
 HEADING_GAP = 40        # heading baseline -> first row
-CLICK = "CLICK"         # the mouse has no keycode; the attack row's wide cap says this
+CLICK = keycap.MOUSE    # the mouse has no keycode; the attack row's cap draws the cursor
 
 _DIRECTIONS = ("up", "left", "down", "right")
 

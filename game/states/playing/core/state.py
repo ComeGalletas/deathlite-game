@@ -47,12 +47,14 @@ from world.map import GameMap
 from world.pathfinding import NavField
 from spawn.budget import SpawnDirector
 from game.states.playing.visual import rendering as _rendering
+from game.states.playing.visual import hints as hints_draw
 from game.states.playing.visual import key_marker
 from game.states.playing.visual.rendering import WorldRenderer
 from game.states.playing.core.combat import CombatResolver
 from game.states.playing.core.physics import BumpResolver
 from game.states.playing.core.chests import Chests
 from game.states.playing.core import interactions
+from game.states.playing.core.hints import RunHints
 from game.states.playing.core.locations import SpecialLocations
 from game.states.playing.core.npcs import Npcs
 from game.states.playing.core.effects import TransientFx
@@ -92,6 +94,9 @@ class PlayingState(State):
         self._init_scaffold()
         self._init_nav()
         self._subscribe_events()
+        # The opening Move / Attack keycap hints (journal: key_icons_journal.md):
+        # last, since they read the hero's spawn.
+        self.hints = RunHints(self)
 
     # --- enter() steps ---------------------------------------------
     def _init_run(self, seed, dev, difficulty) -> None:
@@ -313,6 +318,7 @@ class PlayingState(State):
             self.game.state_machine.push(RunStatusState(self.game), playing=self)
         elif event.key == pygame.K_ESCAPE:
             from game.states.paused_state import PausedState
+            self.hints.dismiss()             # the pause menu lists every key
             self._suspend_mouse()
             self.game.state_machine.push(PausedState(self.game))
         elif event.key == config.KEY_INTERACT:
@@ -398,6 +404,7 @@ class PlayingState(State):
             return
 
         self._phase_input()
+        self.hints.update(dt)
         self._phase_update(dt)
         self._phase_combat(dt)
         self._phase_progression(dt)
@@ -1093,6 +1100,7 @@ class PlayingState(State):
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
             self.renderer.aim_overlay(surface)          # dev-only, same layer
             key_marker.draw(surface, self)              # the interact cap, over its element
+            hints_draw.draw(surface, self)              # the opening Move / Attack hints
         finally:
             self.camera.pos += offset
 

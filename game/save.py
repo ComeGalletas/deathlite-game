@@ -82,7 +82,10 @@ class SaveData:
     # loads with its mix unchanged and the master wide open.
     settings: dict = field(default_factory=lambda: {
         "muted": False, "master_volume": 1.0, "volume": 0.7, "music_volume": 0.5,
-        "key_layout": _DEFAULT_KEY_LAYOUT})
+        "key_layout": _DEFAULT_KEY_LAYOUT,
+        # Options "Tutorials": the run's opening keycap hints (owner,
+        # 2026-09-19 -- every run, until switched off here).
+        "tutorials": True})
     # P5 (design §20): per hero, whether the boss has been cleared with that
     # hero (which unlocks the main-weapon choice) and the chosen main weapon.
     heroes: dict[str, dict] = field(default_factory=dict)

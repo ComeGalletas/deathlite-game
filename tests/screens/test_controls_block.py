@@ -42,7 +42,7 @@ class RowTests(unittest.TestCase):
 
     def test_words_are_wide_letters_and_arrows_are_not(self):
         self.assertTrue(keycap.is_wide("TAB"))
-        self.assertTrue(keycap.is_wide(controls_block.CLICK))
+        self.assertFalse(keycap.is_wide(controls_block.CLICK))      # the mouse glyph is square
         self.assertFalse(keycap.is_wide("E"))
         self.assertFalse(keycap.is_wide("↑"))
         self.assertEqual(controls_block.cluster_width(["W", "A", "S", "D"]),
@@ -128,7 +128,36 @@ class DrawTests(unittest.TestCase):
         with mock.patch.object(keycap, "draw_keycap", wraps=keycap.draw_keycap) as m:
             controls_block.draw(self.surface, self.assets, (20, 20), _Game())
         wide = [c.args[3] for c in m.call_args_list if c.kwargs["wide"]]
-        self.assertEqual(wide, [controls_block.CLICK, "TAB", "ESC"])
+        self.assertEqual(wide, ["TAB", "ESC"])
+
+    def test_the_mouse_cap_draws_the_cursor_arrow(self):
+        calls = []
+
+        class _Font:
+            def render(self, *a):
+                calls.append(a)
+                return pygame.Surface((4, 4))
+        with mock.patch.object(keycap, "mouse_glyph", wraps=keycap.mouse_glyph) as m:
+            r = keycap.draw_keycap(self.surface, self.assets, (60, 60), keycap.MOUSE,
+                                   colour="grey", font=_Font())
+        self.assertEqual(m.call_count, 1)
+        self.assertEqual(calls, [])                        # no word was typed
+        self.assertEqual(r.size, (32, 32))                 # a square cap
+        glyph = keycap.mouse_glyph(self.assets, 20)
+        self.assertIsNotNone(glyph)
+        self.assertEqual(glyph.get_height(), 20)
+
+    def test_without_the_cursor_file_the_mouse_cap_says_click(self):
+        calls = []
+
+        class _Font:
+            def render(self, *a):
+                calls.append(a)
+                return pygame.Surface((4, 4))
+        with mock.patch.object(keycap, "mouse_glyph", return_value=None):
+            keycap.draw_keycap(self.surface, self.assets, (60, 60), keycap.MOUSE,
+                               colour="grey", font=_Font())
+        self.assertEqual([a[0] for a in calls], [keycap.MOUSE_WORD])
 
 
 if __name__ == "__main__":

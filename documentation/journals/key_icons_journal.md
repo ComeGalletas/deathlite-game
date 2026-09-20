@@ -537,3 +537,147 @@ Decisions taken (say if you want them changed):
   `test_the_controls_block_sits_right_of_the_buttons` in `test_pause.py`.
   Focused set (block, pause, keycap, marker): 49 + 37 passed.
 * Full suite (imp editor-source test deselected, pre-existing): **2619 passed**, 9 deselected, 638 subtests, 14:42.
+
+---
+
+## Pass 5 — first-run movement hints, and the mouse glyph (owner, 2026-09-19)
+
+> "prepare the first run movement hints and what glyph for the mouse
+> would you use?"
+
+### The mouse glyph
+
+There is no mouse or cursor art in the tracked tree or the reserve:
+`assets/ui/pointers/` holds only the cursor arrow, `unused/ui/pointers/`
+the selection brackets, `unused/ui/icons/` cart / close / settings / sound
+/ plus / minus / 1 2 3 / unlock, and the Gigapack's Symbols folder has no
+cursor, hand or click. Three ways to show "click":
+
+1. **The game's own cursor on a square cap** (recommended): the arrow the
+   player is already pointing with (`ui/pointers/arrow.png`, 64 px, the
+   shipped Tiny Swords cursor), cropped to its ink and drawn at ~18 design
+   px on the grey / blue square cap where a letter would go. Shipped art,
+   square like every other key, and it is literally the thing they click
+   with.
+2. A code-drawn mini mouse (rounded outline, split top, left button
+   filled), like the arrows are drawn -- honest but a new shape in a game
+   whose UI is otherwise all pack art.
+3. Keep the wide `CLICK` word (what ships today).
+
+Proposal: (1), as `keycap.MOUSE` -- a label constant the cap draws as the
+cursor glyph, the way `ARROWS` are drawn -- used by the Controls block in
+place of `CLICK` and by the attack hint below.
+
+### What "first-run movement hints" means
+
+The save has no run counter (`SaveData` holds currency, unlocks, meta,
+best / records, stash, settings, heroes), so "first run" is a flag of its
+own: `settings["hints_done"]`, set once the hints have run their course.
+Until then every run opens with the hints; in the browser build (no save)
+that is every run, which is right for a page a stranger opens.
+
+Two hints, one after the other, each a cluster of **blue** caps -- these
+are "press this now" prompts, and blue has the pressed frame, so each cap
+**sinks while its key is actually held**, which is the teaching:
+
+1. **Move** — the layout's four move keys as a keyboard-shaped cluster
+   (W above, A S D below, or the four arrows) with the word "Move" beside
+   it, floating above the hero's head and following them. Done once the
+   hero has travelled 96 world px (three tiles) from the spawn.
+2. **Attack** — after Move: the mouse cap ("Attack") beside the aim
+   arrows ("Aim"), same place. Done on the first attack the player aims
+   (a click, or an aim key held), or after 8 s -- auto attack is on by
+   default, so the hero may already be fighting.
+
+There is no Interact hint: the floating `E` over a chest is already that.
+The block goes away for good when both are done (`hints_done`), or at
+once on ESC → the pause menu, which lists everything anyway.
+
+Placement: like the key marker, anchored to the **hero's drawn art** --
+the sprite frame's ink top from `renderer.hero_sprite_frame()` and its
+anchor -- the cluster's bottom 6 px above it, so it clears the helmet on
+every hero. Drawn after the world, inside the shake offset, before the
+HUD. It fades over its last 0.4 s rather than vanishing.
+
+### Proposal
+
+* `game/states/playing/core/hints.py`: `FirstRunHints(ps)` — `stage`
+  (`"move"` / `"attack"` / `None`), `spawn`, `timer`, `update(dt)` with
+  the completion checks, `dismiss()`; sets `game.save.settings["hints_done"]`
+  and saves. `config.FIRST_RUN_HINTS = True` master switch; the dev menu
+  gets a "Replay hints" row that clears the flag.
+* `game/states/playing/visual/hints.py`: `draw(surface, ps)` — the
+  cluster layout, `keycap.draw_keycap(..., colour="blue",
+  state="pressed" if held else "raised")` per key, the word in the body
+  face with the shadowed style the notice uses, alpha over the fade.
+* `ui/keycap.py`: `MOUSE` label drawn as the cursor glyph.
+* `ui/controls_block.py`: Attack row uses `keycap.MOUSE`.
+* Tests: `tests/playing/test_first_run_hints.py` — a fresh save shows
+  Move; travelling 96 px moves on to Attack; a click or a held aim key
+  completes it; the timeout completes it; the flag persists and the next
+  run shows nothing; ESC dismisses; the cluster sits above the hero's
+  art; a held move key draws its cap pressed. `test_controls_block.py`:
+  the Attack row is the mouse glyph, square not wide.
+
+### Change of rule (owner, 2026-09-19)
+
+> "change the hints behavior to show for every run, however add an option
+> to the options menu to turn off tutorials and control this visibility
+> there"
+
+So: no `hints_done` flag, no first-run gating, no dev-menu replay row.
+**Every run opens with the hints**; the player switches them off with a
+**Tutorials** row in Options (`settings["tutorials"]`, on by default,
+persisted like the other settings, shown in the in-run Options too). A
+hint still ends early within a run once its action is done -- that is the
+per-run courtesy, not persistence. The mouse glyph: option 1 (the cursor
+arrow on a square cap), no objection raised.
+
+### Todo
+
+- [x] 1. `keycap.MOUSE` (cursor glyph on a cap); Controls block uses it.
+- [x] 2. `core/hints.py` stage machine; `config.TUTORIAL_HINTS`;
+      `settings["tutorials"]`, `game.tutorials` / `set_tutorials`.
+- [x] 3. `visual/hints.py` drawing, hooked after the key marker.
+- [x] 4. Options "Tutorials" row (replaces the dev-menu replay row).
+- [x] 5. Tests; suite; screenshots of both hints; results here.
+
+### Results (2026-09-19)
+
+* `ui/keycap.py`: `MOUSE` label drawn as the game's cursor
+  (`config.UI_CURSOR_IMAGE` cropped to its ink, 20 design px tall on the
+  cap), cached per size; `MOUSE_WORD = "CLICK"` when the file is missing;
+  `is_wide` keeps it square. The Controls block's Attack row uses it.
+* `game/states/playing/core/hints.py`: `RunHints` -- `stage` (`move` →
+  `attack` → None), `spawn`, `t`, `fading` (the finished clusters and the
+  seconds left), `update`, `dismiss`, `clusters(stage)` (the keyboard-shaped
+  cluster: up over left / down / right, from the layout), `keycodes_for`,
+  `held` (keys and the left button, False headless). Built at the end of
+  `PlayingState.enter` (it reads the hero's spawn), ticked after
+  `_phase_input` so it sees this frame's `_aim`, dismissed on ESC.
+* `game/states/playing/visual/hints.py`: `hero_top` (the sprite's ink top
+  from the same anchor / drop maths the hero painter uses), `layout`, `draw`
+  -- blue caps, pressed while held, the word shadowed in the body face at
+  18 px; a fading stage is drawn on a full-size SRCALPHA layer with
+  `set_alpha`, the next stage waits for it. Drawn right after the key
+  marker.
+* Config: `TUTORIAL_HINTS`, `HINT_MOVE_DISTANCE = 96`,
+  `HINT_ATTACK_SECONDS = 8`, `HINT_FADE = 0.4`. Save: `settings["tutorials"]`
+  defaults True. Options: row "Tutorials" after Key layout, ENTER / Left /
+  Right / click toggle it; ten rows now, so `_ROW_TOP, _ROW_STEP` went from
+  200 / 74 to 180 / 68 to keep the last row clear of the hint line.
+* Tests: `tests/playing/test_run_hints.py` 19 -- opens on Move, arrows
+  layout, Tutorials off / build switch off show nothing, three tiles moves
+  on (and starts the fade), an aimed attack finishes Attack (auto-aim does
+  not), the timeout, the fade running out, ESC dismisses, the whole update
+  ticks it, held keys / mouse read through; the setting persists and
+  defaults on; the Options row toggles and persists and is in the in-run
+  rows; four blue caps over the hero (bottom `CLEAR_PX` above the art top,
+  centred), the hero top is above the collider, a held key sinks its cap,
+  the Attack stage shows mouse + arrows, a fading stage is translucent then
+  gone, a whole frame reaches the hints. `test_controls_block.py` +2 (the
+  mouse cap draws the cursor; says CLICK without the file);
+  `test_options.py` renamed to ten rows; `test_key_marker.py`'s whole-frame
+  test dismisses the hints first. Focused set: 157 passed.
+* Screenshots delivered: the six hint states and the Options screen.
+* Full suite (imp editor-source test deselected, pre-existing): **2640 passed**, 9 deselected, 638 subtests, 11:44.

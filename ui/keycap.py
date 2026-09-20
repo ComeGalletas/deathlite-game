@@ -70,6 +70,30 @@ _NAMES = {
 
 
 ARROWS = {"↑": (0, -1), "↓": (0, 1), "←": (-1, 0), "→": (1, 0)}
+# The mouse: a label the cap draws as the game's own cursor arrow
+# (`config.UI_CURSOR_IMAGE`, cropped to its ink) -- there is no mouse art
+# in the pack, and the arrow is the thing the player clicks with. Falls
+# back to the word when the cursor file is missing.
+MOUSE = ""
+MOUSE_WORD = "CLICK"
+MOUSE_PX = 20           # the cursor glyph's height at CAP_PX
+_glyphs: dict[tuple, pygame.Surface | None] = {}
+
+
+def mouse_glyph(assets, height: int) -> pygame.Surface | None:
+    """The cursor arrow at `height` native px (aspect kept), or None."""
+    key = (id(assets), height)
+    if key not in _glyphs:
+        pic = assets.picture(config.UI_CURSOR_IMAGE) if assets is not None else None
+        out = None
+        if pic is not None:
+            ink = pic.get_bounding_rect(min_alpha=8)
+            if ink.width and ink.height:
+                crop = pic.subsurface(ink)
+                w = max(1, round(ink.width * height / ink.height))
+                out = pygame.transform.scale(crop, (w, max(1, height)))
+        _glyphs[key] = out
+    return _glyphs[key]
 
 
 def draw_arrow(surface: pygame.Surface, center, direction, size: int, colour) -> None:
@@ -103,8 +127,9 @@ def label_for(keycode: int) -> str:
 
 
 def is_wide(label: str) -> bool:
-    """A word needs the wide cap; a letter, digit or arrow fits the square."""
-    return len(label) > 1
+    """A word needs the wide cap; a letter, digit, arrow or the mouse glyph
+    fits the square."""
+    return len(label) > 1 and label != MOUSE
 
 
 def _spec(colour: str, state: str):
@@ -172,7 +197,13 @@ def draw_keycap(surface: pygame.Surface, assets, face_center, label: str, *,
         ink, at = fallback_colour, (rect.centerx, int(face_center[1]))
     if label in ARROWS:
         draw_arrow(surface, at, ARROWS[label], int(round(ARROW_PX * size / CAP_PX)), ink)
-    else:
-        text = font.render(label, True, ink)
-        surface.blit(text, text.get_rect(center=at))
+        return rect
+    if label == MOUSE:
+        glyph = mouse_glyph(assets, scale.px(MOUSE_PX * size / CAP_PX))
+        if glyph is not None:
+            surface.blit(glyph, glyph.get_rect(center=at))
+            return rect
+        label = MOUSE_WORD
+    text = font.render(label, True, ink)
+    surface.blit(text, text.get_rect(center=at))
     return rect
