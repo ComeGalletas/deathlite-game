@@ -809,7 +809,8 @@ is the measurement the build entry said was missing.
 *(seed 35, lod 2, elapsed 900 s, hero jittering.)*
 
 A real run settles around 150 live, so roughly **one frame in six is over
-budget**, with p90 already past it. `ENEMY_LIVE_CAP = 250` is no longer
+budget**, with p90 already past it. *(Superseded -- these figures were
+measured on a contended machine. See the correction at the foot.)* `ENEMY_LIVE_CAP = 250` is no longer
 reachable at 60 fps: 92 % of frames miss.
 
 This retires the claim in the build entry above that "the objection
@@ -852,3 +853,67 @@ reports *no fast renderer available*, so those are software blits. The
 update numbers are real; the draw numbers are likely pessimistic against a
 real machine. The shape -- draw scaling with bodies in view, which went
 from ~15 to 40-69 -- holds either way.
+
+---
+
+## The LOD fixed, and the frame-budget numbers corrected (2026-09-19)
+
+### The fault
+
+`SpawningSystem.lod_eligible` asked two questions -- in the padded view, or
+pursuing -- and exempted a chase wherever it happened. Raising the aggro
+ranges made that exemption universal: with aggro at 660-900 almost every
+live body is pursuing, so almost nothing was eligible and the LOD stopped
+firing whatever `ENEMY_LOD_SKIP` said.
+
+It now asks one question: **can the player see it?** A body chasing from off
+screen is still chasing, the player cannot watch it do so, and it arrives at
+the same moment either way because the skipped frames are paid back in the
+next tick's `dt`. Anything inside the padded view still ticks every frame,
+chasing or not -- that was the half of the rule worth protecting.
+
+### Measured on a quiet machine, two repeats each
+
+The LOD's own contribution, 200 live, update only:
+
+| lod | p50 |
+|---|---|
+| 1 -- every frame | 7.16 / 6.87 ms |
+| **2 -- shipped** | **6.31 / 6.00 ms** |
+| 4 | 5.80 / 5.63 ms |
+
+About **12 %** at the shipped value, against 2 % before. Since nearly every
+body was pursuing, the game had effectively been running at lod 1, so
+7.0 -> 6.15 is what the fix recovers.
+
+Update + draw against the 16.7 ms budget:
+
+| live | update p50 | draw p50 | total p50 | p90 | over 16.7 ms |
+|---|---|---|---|---|---|
+| 150 | 5.7 | 6.1 | **11.5** | 13.9 | 23 / 400, 10 / 400 |
+| 250 | 7.3 | 6.8 | **14.0** | 16.2 | 27 / 400, 32 / 400 |
+
+**Back inside budget.** At ~150 live, where a run settles, about 4 % of
+frames miss; at the 250 cap about 7 %.
+
+### Correcting the entry above
+
+The previous entry reported "one frame in six over budget" at 150 live and
+92 % missed at the 250 cap, and concluded that `ENEMY_LIVE_CAP = 250` was
+unreachable at 60 fps. **Those numbers were taken on a contended machine** --
+three pytest processes from another session were burning some 850 s of CPU
+at the time -- and they are not trustworthy.
+
+The LOD exemption was a real fault and this is a real fix, but the gap it
+appeared to close was partly contention that should have been checked for
+before any of it was quoted. The lesson is cheap and worth writing down: a
+timing run is only a measurement if the machine was idle, and on a box that
+other sessions share that has to be verified rather than assumed.
+
+What survives from that entry: the *shape* is right -- draw scales with
+bodies in view (38 at 150 live, 54 at 250), update scales with bodies alive,
+and the ring makes "everything packed near the hero" the normal case. The
+absolute figures did not.
+
+Caveat unchanged: the harness is headless with no fast renderer, so the draw
+figures are software blits and likely pessimistic against a real machine.
