@@ -23,5 +23,12 @@
   "bar_hex_empty":        {"file": "ui/hud/bar_hex_empty.png",       "caps": [2, 2]},
 
   "gem_socket_blue":      {"file": "ui/hud/gem_socket_blue.png"},
-  "gem_core_blue":        {"file": "ui/hud/gem_core_blue.png"}
+  "gem_core_blue":        {"file": "ui/hud/gem_core_blue.png"},
+
+  "end_banner_loss": {"file": "ui/end_banners/game_over.png", "frame": [416, 128],
+                      "anims": {"show": {"frames": 44, "fps": 15, "loop": false, "cols": 5}},
+                      "_note": "GAME OVER, red: symbol_game_over_text_001 of the Super Pixel Effects Gigapack, cut to a 5-column grid by tools/asset_pipeline/cut_end_banners.py. Played once between the hero death and the game-over summary."},
+  "end_banner_win":  {"file": "ui/end_banners/you_won.png", "frame": [288, 128],
+                      "anims": {"show": {"frames": 42, "fps": 15, "loop": false, "cols": 7}},
+                      "_note": "You Won!, yellow: symbol_you_won_text_001 of the same pack, 7 columns. Played once between the boss kill and the victory summary."}
 }

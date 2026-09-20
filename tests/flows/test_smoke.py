@@ -137,7 +137,11 @@ class SmokeTest(unittest.TestCase):
             while isinstance(game.state_machine.current, LevelUpState):
                 key(pygame.K_1)
         playing.boss.take_damage(10 ** 9)
-        game.state_machine.update(1 / 60)
+        for _ in range(600):                      # the end banner plays first
+            game.state_machine.update(1 / 60)
+            game._render()
+            if isinstance(game.state_machine.current, VictoryState):
+                break
         self.assertIsInstance(game.state_machine.current, VictoryState)
         self.assertGreater(game.state_machine.current.stats["currency"], 0)
 
@@ -175,8 +179,9 @@ class SmokeTest(unittest.TestCase):
         while playing.player.alive:
             playing.player.take_damage(10 ** 9)
         from game.states.game_over_state import GameOverState
-        for _ in range(600):                      # the death poof holds the run open
+        for _ in range(600):                      # the end banner holds the run open
             game.state_machine.update(1 / 60)
+            game._render()                        # the banner draws over the live scene
             if isinstance(game.state_machine.current, GameOverState):
                 break
         over = game.state_machine.current

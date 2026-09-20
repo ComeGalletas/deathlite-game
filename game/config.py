@@ -890,6 +890,19 @@ SPRITE_ANCHOR_DROP: float = 0.83
 # 0 disables the lock.
 END_SCREEN_INPUT_LOCK: float = 1.5
 
+# The end banner (owner, 2026-09-19; `documentation/journals/end_banner_journal.md`):
+# the run is held for `END_BANNER_WAIT` seconds with the world still
+# animating (the death poof, the boss burst), then the "GAME OVER" /
+# "You Won!" sprite plays once over the frozen, dimmed scene, then the last
+# frame holds `END_BANNER_HOLD` seconds before the summary screen comes up.
+# No key or click shortens it. `END_BANNER_SCALE` is the art's integer draw
+# scale in design pixels (416 x 128 -> 832 x 256 on the 1600-wide box).
+END_BANNER_WAIT: float = 3.0
+END_BANNER_HOLD: float = 2.0
+END_BANNER_SCALE: int = 2
+END_BANNER_DIM_ALPHA: int = 150      # the pause overlay's dim, for one family
+END_BANNER_DIM_FADE: float = 0.4     # seconds the dim takes to settle
+
 RUN_DURATION_SECONDS: float = 600.0
 BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
 # Where the boss appears: this far from the hero, on a random side, clamped
