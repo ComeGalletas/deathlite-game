@@ -252,7 +252,7 @@ class VillageLayoutTests(unittest.TestCase):
                 # ... the village's wide buildings, and the dead tree of the
                 # buff buildings (journal: buff_buildings_journal.md, rev. 3).
                 self.assertIn(o.kind, ("barracks", "archery", "monastery", "castle",
-                                       "vampire", "turbo", "haste", "pinball"))
+                                       "vampire", "turbo", "haste", "pinball", "magnet"))
                 self.assertGreater(o.radius, 0)
 
     def test_no_two_village_circles_overlap(self):

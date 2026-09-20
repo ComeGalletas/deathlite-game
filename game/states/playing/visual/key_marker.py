@@ -28,6 +28,7 @@ import pygame
 
 from game import config
 from game.states.playing.core import interactions
+from game.states.playing.visual.glow import GlowCache, pulse_alpha, quantise
 from progression import chests as _chests
 from ui import keycap, scale
 
@@ -42,7 +43,18 @@ KEY_LIFT = {
     # The buff buildings, when their skin is missing and the ring stands in.
     "magnet": 40, "turbo": 40, "haste": 40, "pinball": 40, "vampire": 40,
 }
-CLEAR_PX = 4            # design px between the art's top and the cap's bottom
+# Pass 4 (owner, 2026-09-20): the cap rests on the sprite's edge -- its
+# bottom on the top of the sprite's *body* (`ink_of` skips wisps of smoke
+# and thin tips) with no gap -- over the XP orbs' breathing glow, in the
+# buff's colour on a buff building and white everywhere else.
+CLEAR_PX = 0            # design px between the body's top and the cap's bottom
+CAP_PX = 42             # the marker's cap, 30 % over the interface's 32 (owner, 2026-09-20)
+# 0.3, not 0.25: the goblin hut's chimney pipe is exactly a quarter of its
+# width, which made the pipe the body's top row and hung the cap over it,
+# right of centre (owner, 2026-09-20). The forge's chimney is over a third
+# wide and stays the top, as pass 3 wanted.
+BODY_FRACTION = 0.3     # a row is the body once this much of the ink width is opaque
+GLOW_SCALE = 1.6        # the glow's diameter as a multiple of the cap's width
 
 # (rig, size) -> (ink rect in the frame, x of the highest ink column). A
 # rig's closed / first frame is measured once per drawn size.
@@ -59,18 +71,38 @@ def interact_held() -> bool:
 
 
 def ink_of(frame: pygame.Surface, key=None) -> tuple[pygame.Rect, int]:
-    """The opaque box of `frame` and the x (in the frame) of its highest
-    opaque column -- the peak the cap sits over. Cached under `key`."""
+    """The opaque box of `frame`'s *body* and the x (in the frame) of the
+    peak the cap sits over. The box's top is the first row, from the top,
+    where at least `BODY_FRACTION` of the ink's width is opaque: a chimney's
+    smoke, a flag's tip or a clasp poking above a lid does not count, a
+    roof, a crown or the lid itself does. The peak is the middle of that
+    row's *longest* opaque run -- the roof, not the roof plus a pipe
+    standing beside it. Cached under `key`."""
     if key is not None and key in _ink_cache:
         return _ink_cache[key]
     box = frame.get_bounding_rect(min_alpha=8)
     peak = box.centerx
     if box.width and box.height:
+        need = max(1, int(box.width * BODY_FRACTION))
         top = box.top
-        cols = [x for x in range(box.left, box.right)
-                if frame.get_at((x, top)).a >= 8]
+        cols: list = []
+        for row in range(box.top, box.bottom):
+            cols = [x for x in range(box.left, box.right)
+                    if frame.get_at((x, row)).a >= 8]
+            if len(cols) >= need:
+                top = row
+                break
         if cols:
-            peak = (cols[0] + cols[-1]) // 2
+            runs, start, prev = [], cols[0], cols[0]
+            for x in cols[1:]:
+                if x != prev + 1:
+                    runs.append((start, prev))
+                    start = x
+                prev = x
+            runs.append((start, prev))
+            a, b = max(runs, key=lambda r: r[1] - r[0])
+            peak = (a + b) // 2
+        box = pygame.Rect(box.left, top, box.width, box.bottom - top)
     out = (box, peak)
     if key is not None:
         _ink_cache[key] = out
@@ -133,7 +165,7 @@ def anchor(ps, obj) -> tuple[int, int]:
     """Where the cap's raised face centre goes for `obj`: over the peak of
     its art, the cap's bottom edge `CLEAR_PX` above the art's top; or, with
     nothing to measure, over `pos` lifted by the kind's `KEY_LIFT`."""
-    drop = keycap.cap_rect((0, 0)).bottom        # face centre -> cap bottom
+    drop = keycap.cap_rect((0, 0), CAP_PX).bottom    # face centre -> cap bottom
     found = art_box(ps, obj)
     if found is not None:
         box, peak = found
@@ -143,10 +175,30 @@ def anchor(ps, obj) -> tuple[int, int]:
     return (int(round(sx)), int(round(sy - lift - scale.px(CLEAR_PX) - drop)))
 
 
+_glow = GlowCache()
+
+
+def glow_colour(ps, obj):
+    """The halo's colour: the buff's first palette colour on a buff
+    building, the orbs' own white on everything else."""
+    kind = interactions.kind_of(obj)
+    if ps.buffs.is_buff(kind):
+        return tuple(ps.buffs.palette(kind)[0])
+    return tuple(config.XP_GLOW["colour"])
+
+
 def draw(surface: pygame.Surface, ps) -> None:
     obj = interactions.nearest(ps)
     if obj is None:
         return
-    keycap.draw_keycap(surface, ps.game.assets, anchor(ps, obj),
-                       keycap.label_for(config.KEY_INTERACT),
+    at = anchor(ps, obj)
+    # The XP orbs' breathing glow under the cap (pass 4), on the run clock.
+    cap = keycap.cap_rect(at, CAP_PX)
+    d = int(round(cap.width * GLOW_SCALE))
+    halo = _glow.surface(d, quantise(pulse_alpha(float(ps.stats.get("time", 0.0)))),
+                         glow_colour(ps, obj))
+    if halo is not None:
+        surface.blit(halo, halo.get_rect(center=cap.center))
+    keycap.draw_keycap(surface, ps.game.assets, at,
+                       keycap.label_for(config.KEY_INTERACT), size=CAP_PX,
                        state="pressed" if interact_held() else "raised")

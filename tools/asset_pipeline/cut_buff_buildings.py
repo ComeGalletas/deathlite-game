@@ -61,6 +61,7 @@ COPIES = {
     "buildings/general/haste.png": "enemies/extra/gnome_buildings/gnome_tower.png",
     "buildings/general/pinball.png": "enemies/extra/cave/cave_idle.png",
     "buildings/general/vampire.png": "enemies/extra/dead_tree/dead_tree.png",
+    "buildings/general/gnome_hut.png": "enemies/extra/gnome_buildings/gnome_hut.png",
     "projectiles/pinball.png": "orbs/orb_yellow.png",
     "buildings/dressing/wood.png": "terrain/resources/wood/wood_resource.png",
 }

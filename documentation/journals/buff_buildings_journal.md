@@ -685,3 +685,92 @@ body (footprint 140) and paints the union of every frame so the smoke never
 clips; `render_scale.turbo = 0.914` keeps it two tiles wide (128×194 px).
 Collider, interactable, dressing (tools and logs) and the Turbo buff are
 unchanged. Digests regenerated. The cutter's `COPIES` and `FRAME_W` follow.
+
+---
+
+## Revision 6 (owner, 2026-09-20): seven tweaks after the first commit
+
+Committed as `d4c92be` first, then the owner asked for:
+
+1. Haste and Vampire hero effects 30 % smaller.
+2. The buff timers drawn over the character instead of the HUD row, same
+   icon and draining ring.
+3. The mushroom tower 30 % smaller, with the gnome hut beside it as
+   dressing (confirmed reading: a colliding, non-interactive companion,
+   drawn smaller than the tower).
+4. Every buff lasts 10 s.
+5. Turbo's speed bonus 300 → 150.
+6. Never more than two buildings close together: within a 500 px ring
+   round any building at most one other building; spread the rest out.
+7. The magnet mine 30 % bigger.
+
+### Todo
+
+- [x] T1 Data: durations 10 s, `speed_add 150`, per-buff `fx_scale` (haste,
+      vampire 0.7), `render_scale` haste 0.72 / magnet 0.73 with matching
+      compound bases, the `gnome_hut` obstacle kind and rig, the haste
+      building's `colliders` gaining it, the `cluster` placement rule.
+- [x] T2 Assets: `gnome_hut.png` copied into `assets/buildings/general/`
+      by the cutter.
+- [x] T3 Generation: the cluster check in `_spot` (a candidate is rejected
+      when it or any building within the ring would end up with two
+      neighbours inside it); the company pass seats the hut.
+- [x] T4 Run side: `hero_fx` carries the buff's scale; the marks over the
+      hero (`ui/buff_marks.py`) replace the HUD row; the flying name starts
+      above them.
+- [x] T5 Tests: numbers read from the data; the cluster rule and the hut on
+      the pinned seeds; the families and satellite allowlists; digests
+      re-pinned.
+- [ ] T6 Full suite, screenshots (an active buff with the marks over the
+      hero; the tower with its hut; the bigger mine).
+
+### What landed (rev. 6)
+
+- `buildings.json`: every buff 10 s; `speed_add 150`; `fx_scale 0.7` on
+  Haste and Vampire; `render_scale` haste 0.72 (1.4 tiles, base r 30 +
+  satellites at ±24) and magnet 0.73 (1.9 tiles, base r 36 + satellites at
+  ±30); the `gnome_hut` obstacle kind (r 22, `building_gnome_hut`, scale
+  0.63, about one tile wide) on the Haste building's `colliders`; the
+  placement's `cluster_ring_px 500` / `cluster_max_neighbours 1`.
+- `world/gen/buildings.py` `_crowds`: a candidate spot is rejected when it,
+  or any building inside the ring round it, would end up with more than
+  one neighbour inside its own ring. On the pinned seeds the islands now
+  seat 1–5 (seed 1234's island 0 seats one), so the placement test allows
+  up to half the islands to sit under the minimum.
+- `ui/buff_marks.py` draws the timers over the hero, following it, in
+  screen space at the interface size; `ui/hud.py` lost its buff row and
+  `BUFF_MARK_PX` replaced `HUD_BUFF_ICON_PX`. The flying name starts 96
+  design px up so it clears the marks.
+- `hero_fx` entries carry the buff's `fx_scale`; the renderer scales the
+  strip by it.
+- Tests read the numbers from the data; new checks for the cluster rule
+  and the hut; the mine's narrower base loosened the base-width check;
+  `magnet` and `gnome_hut` joined the satellite and family allowlists.
+  Digests re-pinned.
+- Screenshots delivered from seed 35: Vampire active with the mark over
+  the hero and the smaller sword; the Haste tower with its gnome hut; the
+  bigger mine.
+
+### Rev. 6, addendum: the goblin hut 20 % smaller (owner, 2026-09-20)
+
+`render_scale.turbo` 0.914 → 0.731 (the hut paints 102×155 px, 1.6 tiles
+wide) with its base scaled to match (r 32, satellites at ±27 r 18).
+Digests re-pinned.
+
+### Rev. 6, addendum: houses keep their ring (2026-09-20)
+
+The full suite after the seven tweaks lost `test_houses`' flag-on check on
+seed 35: the island's only scatter house stood 130 px from a Turbo hut
+compound, the two sealed a route between them, and the unseal repair took
+the house. The buildings pass now keeps a buff building a full building
+ring (`building_gap_tiles`) from a house, as from another buff building,
+not merely off its collider. Seed 35 keeps its house; digests re-pinned.
+
+### Rev. 6, addendum: a world-dependent trail test (2026-09-20)
+
+The full suite after the house fix lost `test_enemy_sprite`'s puff-count
+test: it fires 300 px east from the hero on the pinned seed and, with
+buff buildings on every island, that world now has an obstacle inside the
+shot's path, so the shot died at three puffs. The test measures shedding,
+not blocking, so its shot now opts out of the obstacle block (`no_block`)
+the way it already opts out of the elevation rule.

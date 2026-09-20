@@ -45,7 +45,7 @@ class BuffSystem:
         self._contact_cd: dict[int, float] = {}
         self._pinball_t = 0.0
         # Feedback state. `tint` is `[seconds_left, palette]`; `hero_fx` a
-        # list of `[rig, age]`; `banners` the flying names.
+        # list of `[rig, age, scale]`; `banners` the flying names.
         self.tint: list | None = None
         self.hero_fx: list[list] = []
         self.banners = BuffBanners(float(self.feedback.get("banner_seconds", 7.0)))
@@ -102,7 +102,8 @@ class BuffSystem:
         self.active[kind] = float(spec["duration"])
         palette = self.palette(kind)
         self.tint = [float(self.feedback.get("tint_seconds", 0.9)), palette]
-        self.hero_fx.append([spec.get("fx_rig", ""), 0.0])
+        self.hero_fx.append([spec.get("fx_rig", ""), 0.0,
+                             float(spec.get("fx_scale", 1.0))])
         self.banners.add(str(spec.get("name", kind.title())), palette[0])
 
     def _apply(self, kind: str, spec: dict) -> None:

@@ -25,6 +25,7 @@ from game.states.playing.visual.projectiles import draw_projectile
 from game.states.playing.visual.summons import draw_summon
 from progression import chests as _chests
 from progression import potions as _potions
+from ui import buff_marks
 from ui.text import shadowed
 
 # CB-5 dev aim line: length for a main weapon with no finite reach.
@@ -136,8 +137,11 @@ class WorldRenderer:
         # A buff's screen-wide tint (journal: buff_buildings_journal.md): the
         # buff's palette as a vertical gradient, light and brief.
         self.buff_tint(surface)
-        # ... and the buff's flying name, over the hero, in world space.
-        ps.buffs.banners.draw(surface, ps.camera.world_to_screen(ps.player.pos))
+        # ... the timers over the hero (rev. 6: here, not on the HUD), and
+        # the buff's flying name above them, all following the hero.
+        hero = ps.camera.world_to_screen(ps.player.pos)
+        buff_marks.draw(surface, ps.game.assets, hero, ps.buffs.rows())
+        ps.buffs.banners.draw(surface, hero)
 
         surface = box if box is not None else surface
         w, h = surface.get_size()
@@ -202,19 +206,20 @@ class WorldRenderer:
         a = ps.game.assets
         z = ps.camera.zoom
         drop = self.sprite_drop(ps.player.radius)
-        for rig, age in fx_list:
+        for rig, age, scale in fx_list:
             meta = a.rig(rig)
             if not meta:
                 continue
+            k = z * scale                      # the buff's own draw scale
             fw, fh = meta["frame"]
-            size = (max(1, round(fw * z)), max(1, round(fh * z)))
+            size = (max(1, round(fw * k)), max(1, round(fh * k)))
             frs = a.frames(rig, "loop", size=size)
             if not frs:
                 continue
             fps = a.fps(rig, "loop") or 12.0
             idx = min(len(frs) - 1, int(age * fps))
             ax, ay = a.anchor(rig)
-            surface.blit(frs[idx], (round(sx - ax * z), round(sy - ay * z + drop)))
+            surface.blit(frs[idx], (round(sx - ax * k), round(sy - ay * k + drop)))
 
     # --- world props ----------------------------------------------
     def _off_band(self, level, pos) -> bool:

@@ -90,6 +90,8 @@ class ActivationTests(_BuffCase):
         self.use("vampire")
         self.assertIsNotNone(p.buffs.tint)
         self.assertEqual(len(p.buffs.hero_fx), 1)
+        self.assertEqual(p.buffs.hero_fx[0][2], p.buffs.spec("vampire").get("fx_scale", 1.0),
+                         "the effect carries the buff's own draw scale")
         self.assertEqual([b.text for b in p.buffs.banners.items], ["Vampire"])
         self.assertEqual(p.buffs.banners.items[0].colour, tuple(p.buffs.palette("vampire")[0]))
         p.buffs.update(1.0)
@@ -108,9 +110,10 @@ class ActivationTests(_BuffCase):
         kind, frac, rig, colour = rows[0]
         self.assertEqual((kind, rig), ("magnet", "hud_buff_magnet"))
         self.assertAlmostEqual(frac, 1.0)
-        p.buffs.update(2.5)
+        full = p.buffs.spec("magnet")["duration"]
+        p.buffs.update(full / 2)
         self.assertAlmostEqual(p.buffs.rows()[0][1], 0.5)
-        p.buffs.update(3.0)
+        p.buffs.update(full / 2 + 0.1)
         self.assertEqual(p.buffs.rows(), [])
 
     def test_the_mine_goes_dark_once_used(self):
@@ -134,11 +137,12 @@ class StatTests(_BuffCase):
     def test_turbo_adds_speed_armor_and_weight_then_gives_them_back(self):
         p = self.p
         speed, armor = p.player.move_speed, p.player.stats["armor"]
+        spec = p.buffs.spec("turbo")
         self.use("turbo")
-        self.assertEqual(p.player.move_speed, speed + 300)
-        self.assertEqual(p.player.stats["armor"], armor + 20)
+        self.assertEqual(p.player.move_speed, speed + spec["speed_add"])
+        self.assertEqual(p.player.stats["armor"], armor + spec["armor_add"])
         self.assertTrue(math.isinf(p.player.weight))
-        p.buffs.update(5.01)
+        p.buffs.update(spec["duration"] + 0.01)
         self.assertEqual(p.player.move_speed, speed)
         self.assertEqual(p.player.stats["armor"], armor)
         self.assertEqual(p.player.weight, config.PLAYER_WEIGHT)
@@ -151,7 +155,7 @@ class StatTests(_BuffCase):
         self.assertAlmostEqual(w._cooldown(2.0), w._cooldown(1.0) / 2.0)
         fast = dict(BOLT, cooldown=0.06)
         self.assertEqual(Weapon("bolt", fast)._cooldown(2.0), 0.05, "never below the floor")
-        p.buffs.update(6.0)
+        p.buffs.update(p.buffs.spec("haste")["duration"] + 0.1)
         self.assertEqual(p.player.stats["attack_speed_multiplier"], 1.0)
 
     def test_haste_paces_the_summons_too(self):
@@ -172,17 +176,18 @@ class StatTests(_BuffCase):
         base = p.player.stats["damage_multiplier"]
         self.use("vampire")
         self.assertAlmostEqual(p.player.stats["damage_multiplier"], base + 0.10)
-        p.buffs.update(7.01)
+        p.buffs.update(p.buffs.spec("vampire")["duration"] + 0.01)
         self.assertAlmostEqual(p.player.stats["damage_multiplier"], base)
 
     def test_a_refresh_does_not_stack(self):
         p = self.p
         speed = p.player.move_speed
+        spec = p.buffs.spec("turbo")
         self.use("turbo")
         p.buffs.update(3.0)
         p.buffs.start("turbo")
-        self.assertEqual(p.player.move_speed, speed + 300)
-        self.assertAlmostEqual(p.buffs.active["turbo"], 5.0)
+        self.assertEqual(p.player.move_speed, speed + spec["speed_add"])
+        self.assertAlmostEqual(p.buffs.active["turbo"], spec["duration"])
 
 
 class MagnetTests(_BuffCase):
@@ -202,10 +207,10 @@ class MagnetTests(_BuffCase):
         fresh = self._gem(-far)
         p.buffs.on_gem(fresh)
         self.assertTrue(fresh.homing, "a gem dropped meanwhile is pulled too")
-        p.buffs.update(6.0)
+        p.buffs.update(p.buffs.spec("magnet")["duration"] + 0.1)
         later = self._gem(far)
         p.buffs.on_gem(later)
-        self.assertFalse(later.homing, "after the five seconds gems wait again")
+        self.assertFalse(later.homing, "once the buff is over gems wait again")
         for g in (stranded, fresh, later):
             g.active = False
 
@@ -262,7 +267,7 @@ class ContactAndHitTests(_BuffCase):
             self.assertAlmostEqual(p.player.hp, p.player.max_hp - 9, "a summon's hit heals nothing")
         finally:
             p.player.weapons.pop()
-        p.buffs.update(8.0)
+        p.buffs.update(p.buffs.spec("vampire")["duration"] + 0.1)
         self._hit(main)
         self.assertAlmostEqual(p.player.hp, p.player.max_hp - 9, "no heal once expired")
 

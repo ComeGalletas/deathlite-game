@@ -120,6 +120,37 @@ class MarkerTests(unittest.TestCase):
         self.assertEqual(m.call_args[0][3], "E")
         self.assertEqual(m.call_args[1]["state"], "raised")
 
+    def test_the_body_top_skips_a_wisp(self):
+        """Pass 4: a thin spike above a wide body (a chimney's smoke, a
+        clasp) is not the top the cap rests on; the body's first wide row
+        is, and the peak is that row's middle."""
+        frame = pygame.Surface((40, 40), pygame.SRCALPHA)
+        pygame.draw.rect(frame, (200, 100, 50, 255), (4, 20, 32, 20))   # the body
+        pygame.draw.rect(frame, (200, 200, 200, 255), (30, 2, 2, 18))   # a wisp
+        box, peak = key_marker.ink_of(frame)
+        self.assertEqual(box.top, 20)
+        self.assertEqual(box.bottom, 40)
+        self.assertEqual(peak, (4 + 35) // 2)
+
+    def test_the_peak_is_the_longest_run_not_the_span(self):
+        """A pipe standing beside the roof on the body's top row does not
+        pull the cap toward it: the peak is the roof run's middle."""
+        frame = pygame.Surface((60, 40), pygame.SRCALPHA)
+        pygame.draw.rect(frame, (200, 100, 50, 255), (4, 10, 30, 30))    # the roof
+        pygame.draw.rect(frame, (120, 120, 120, 255), (44, 10, 6, 30))   # a pipe
+        box, peak = key_marker.ink_of(frame)
+        self.assertEqual(box.top, 10)
+        self.assertEqual(peak, (4 + 33) // 2)
+
+    def test_the_glow_is_white_on_a_chest_and_the_buff_colour_on_a_building(self):
+        p = self.p
+        chest = _chest(p)
+        self.assertEqual(key_marker.glow_colour(p, chest),
+                         tuple(config.XP_GLOW["colour"]))
+        magnet = Interactable("magnet", 0.0, 0.0)      # the hand-built map seats none
+        self.assertEqual(key_marker.glow_colour(p, magnet),
+                         tuple(p.buffs.palette("magnet")[0]))
+
     def test_the_cap_sits_clear_above_the_chest_lid(self):
         """Pass 3: measured from the drawn chest, not a table -- the cap's
         bottom is `CLEAR_PX` above the closed chest's ink, centred on the
@@ -132,7 +163,7 @@ class MarkerTests(unittest.TestCase):
                 box, peak = key_marker.art_box(p, chest)
                 ax, ay = key_marker.anchor(p, chest)
                 self.assertEqual(ax, peak)
-                self.assertEqual(ay + keycap.cap_rect((0, 0)).bottom,
+                self.assertEqual(ay + keycap.cap_rect((0, 0), key_marker.CAP_PX).bottom,
                                  box.top - key_marker.CLEAR_PX)
                 # The lid's peak is the chest's centre column, give or take a pixel.
                 self.assertLessEqual(abs(peak - box.centerx), 1)
@@ -153,7 +184,7 @@ class MarkerTests(unittest.TestCase):
         self.assertLess(box.top, sy)
         ax, ay = key_marker.anchor(full, forge)
         self.assertEqual(ax, peak)
-        self.assertEqual(ay + keycap.cap_rect((0, 0)).bottom, box.top - key_marker.CLEAR_PX)
+        self.assertEqual(ay + keycap.cap_rect((0, 0), key_marker.CAP_PX).bottom, box.top - key_marker.CLEAR_PX)
 
     def test_a_ring_falls_back_to_the_kind_lift(self):
         p = self.p
@@ -163,7 +194,7 @@ class MarkerTests(unittest.TestCase):
         ax, ay = key_marker.anchor(p, shrine)
         self.assertEqual(ax, round(sx))
         lift = key_marker.KEY_LIFT["shrine"] * p.camera.zoom
-        self.assertEqual(ay + keycap.cap_rect((0, 0)).bottom,
+        self.assertEqual(ay + keycap.cap_rect((0, 0), key_marker.CAP_PX).bottom,
                          round(sy - lift - key_marker.CLEAR_PX))
 
     def test_the_cap_follows_the_element_not_the_hero(self):

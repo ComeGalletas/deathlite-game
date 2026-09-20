@@ -40,7 +40,29 @@ def _placement(buildings: dict) -> dict:
         "min_tiles": int(p.get("min_room_tiles", _BUFF_MIN_ROOM_TILES)),
         "gap": float(p.get("building_gap_tiles", _BUFF_GAP_TILES)),
         "ring": tuple(p.get("dressing_ring_tiles", _BUFF_RING_TILES)),
+        # Never more than two close together (owner, 2026-09-20): inside a
+        # ring of `cluster_ring_px` round any building at most
+        # `cluster_max_neighbours` other buildings.
+        "cluster_ring": float(p.get("cluster_ring_px", 0.0)),
+        "cluster_max": int(p.get("cluster_max_neighbours", 1)),
     }
+
+
+def _crowds(x, y, primaries, ring2: float, max_nb: int) -> bool:
+    """Would a building at `(x, y)` make a cluster: itself, or any building
+    inside the ring round it, ending up with more than `max_nb` neighbours
+    inside their own rings?"""
+    if ring2 <= 0.0:
+        return False
+    near = [o for o in primaries if (x - o.pos.x) ** 2 + (y - o.pos.y) ** 2 < ring2]
+    if len(near) > max_nb:
+        return True
+    for o in near:
+        others = sum(1 for q in primaries
+                     if q is not o and (q.pos - o.pos).length_squared() < ring2)
+        if others + 1 > max_nb:
+            return True
+    return False
 
 
 def _inland(cellset, col, row) -> bool:
@@ -82,6 +104,8 @@ def _scatter_buildings(rooms, all_doors, rng, boss_id, out, reach, buildings,
     place = _placement(buildings)
     lo, hi = place["per_island"]
     gap = place["gap"] * px
+    ring2 = place["cluster_ring"] ** 2
+    max_nb = place["cluster_max"]
     ring_lo, ring_hi = (r * px for r in place["ring"])
     door_pad = int(2 * max(_footprint(k, radius_of(k)) for k in kinds))
     fat_doors = [d.inflate(door_pad, door_pad) for d in all_doors]
@@ -119,10 +143,18 @@ def _scatter_buildings(rooms, all_doors, rng, boss_id, out, reach, buildings,
                 if not uphill_ok(room, x, y, kind, reach, px):
                     continue
                 # Off every obstacle already standing, and a full ring from
-                # the other buildings so each keeps its own dressing.
+                # the other buildings -- the scatter's houses included, so a
+                # buff building never crowds a house into a choke the repair
+                # then has to open by taking the house away (seed 35 lost
+                # its only house that way, rev. 6) -- so each keeps its own
+                # dressing.
                 if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
-                       < (gap if o.kind in kinds else o.radius + r_k + _OBSTACLE_GAP) ** 2
+                       < (gap if (o.kind in kinds or o.kind == "house")
+                          else o.radius + r_k + _OBSTACLE_GAP) ** 2
                        for o in out):
+                    continue
+                if _crowds(x, y, [o for o in out if o.kind in kinds and o.skin],
+                           ring2, max_nb):
                     continue
                 return x, y
             return None

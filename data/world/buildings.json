@@ -16,7 +16,9 @@
     "min_room_tiles": 5,
     "building_gap_tiles": 3.0,
     "dressing_ring_tiles": [1.4, 2.8],
-    "dressing_count": [3, 6]
+    "dressing_count": [3, 6],
+    "cluster_ring_px": 500,
+    "cluster_max_neighbours": 1
   },
   "feedback": {
     "tint_peak_alpha": 55,
@@ -27,7 +29,7 @@
   "buffs": {
     "magnet": {
       "name": "Magnet",
-      "duration": 5.0,
+      "duration": 10.0,
       "palette": [[255, 214, 90], [255, 170, 40], [200, 120, 20]],
       "fx_rig": "fx_buff_magnet",
       "icon_rig": "hud_buff_magnet",
@@ -38,11 +40,11 @@
     },
     "turbo": {
       "name": "Turbo",
-      "duration": 5.0,
+      "duration": 10.0,
       "palette": [[255, 150, 60], [240, 80, 40], [180, 40, 30]],
       "fx_rig": "fx_buff_turbo",
       "icon_rig": "hud_buff_turbo",
-      "speed_add": 300.0,
+      "speed_add": 150.0,
       "armor_add": 20.0,
       "contact_dps": 5.0,
       "contact_tick": 0.5,
@@ -51,12 +53,13 @@
     },
     "haste": {
       "name": "Haste",
-      "duration": 5.0,
+      "duration": 10.0,
       "palette": [[120, 220, 255], [60, 140, 255], [40, 80, 200]],
       "fx_rig": "fx_buff_haste",
       "icon_rig": "hud_buff_haste",
+      "fx_scale": 0.7,
       "attack_speed_add": 1.0,
-      "colliders": ["tree"],
+      "colliders": ["tree", "gnome_hut"],
       "dressing": ["deco_bush_1", "deco_bush_2", "deco_bush_3", "deco_bush_4",
                    "deco_ground_pumpkin_1", "deco_ground_pumpkin_2"]
     },
@@ -81,10 +84,11 @@
     },
     "vampire": {
       "name": "Vampire",
-      "duration": 7.0,
+      "duration": 10.0,
       "palette": [[230, 40, 60], [140, 10, 40], [40, 0, 12]],
       "fx_rig": "fx_buff_vampire",
       "icon_rig": "hud_buff_vampire",
+      "fx_scale": 0.7,
       "damage_add": 0.10,
       "heal_per_hit": 1.0,
       "colliders": ["tree"],
@@ -93,11 +97,13 @@
     }
   },
   "obstacles": {
-    "magnet":  {"radius": 38, "blocks_projectiles": true, "color": [120, 160, 150]},
-    "turbo":   {"radius": 36, "blocks_projectiles": true, "color": [150, 120, 90],
-                "satellites": [[-34, 6, 22], [34, 6, 22]]},
-    "haste":   {"radius": 36, "blocks_projectiles": true, "color": [170, 110, 190],
-                "satellites": [[-34, 6, 22], [34, 6, 22]]},
+    "magnet":  {"radius": 36, "blocks_projectiles": true, "color": [120, 160, 150],
+                "satellites": [[-30, 4, 20], [30, 4, 20]]},
+    "turbo":   {"radius": 32, "blocks_projectiles": true, "color": [150, 120, 90],
+                "satellites": [[-27, 5, 18], [27, 5, 18]]},
+    "haste":   {"radius": 30, "blocks_projectiles": true, "color": [170, 110, 190],
+                "satellites": [[-24, 4, 16], [24, 4, 16]]},
+    "gnome_hut": {"radius": 22, "blocks_projectiles": true, "color": [120, 150, 90]},
     "pinball": {"radius": 36, "blocks_projectiles": true, "color": [110, 150, 140],
                 "satellites": [[-34, 6, 22], [34, 6, 22]]},
     "vampire": {"radius": 36, "blocks_projectiles": true, "color": [110, 80, 60],
@@ -109,11 +115,14 @@
       "turbo": ["building_turbo"],
       "haste": ["building_haste"],
       "pinball": ["building_pinball"],
-      "vampire": ["building_vampire"]
+      "vampire": ["building_vampire"],
+      "gnome_hut": ["building_gnome_hut"]
     },
-    "sprite_drop": {"magnet": 1.0, "turbo": 1.0, "haste": 1.0, "pinball": 1.0, "vampire": 1.0},
-    "render_scale": {"vampire": 0.4, "turbo": 0.914, "haste": 1.03, "pinball": 0.83},
-    "ghost_kinds": ["magnet", "turbo", "haste", "pinball", "vampire"]
+    "sprite_drop": {"magnet": 1.0, "turbo": 1.0, "haste": 1.0, "pinball": 1.0, "vampire": 1.0,
+                    "gnome_hut": 1.0},
+    "render_scale": {"vampire": 0.4, "turbo": 0.731, "haste": 0.72, "pinball": 0.83,
+                     "magnet": 0.73, "gnome_hut": 0.63},
+    "ghost_kinds": ["magnet", "turbo", "haste", "pinball", "vampire", "gnome_hut"]
   },
   "dressing_scale": {
     "deco_gold_1": 0.5, "deco_gold_2": 0.5, "deco_gold_3": 0.5, "deco_gold_4": 0.5,
@@ -157,6 +166,10 @@
     "building_vampire": {
       "frame": [384, 320], "anchor": [184, 315], "paint": [20, 5, 328, 310], "footprint": 328,
       "anims": {"loop": {"file": "buildings/general/vampire.png", "frames": 1, "fps": 0, "loop": false}}
+    },
+    "building_gnome_hut": {
+      "frame": [128, 192], "anchor": [64, 148], "paint": [13, 38, 102, 110], "footprint": 102,
+      "anims": {"loop": {"file": "buildings/general/gnome_hut.png", "frames": 1, "fps": 0, "loop": false}}
     },
     "deco_gold_1": {"frame": [128, 128], "anchor": [64, 79], "anims": {"loop": {"file": "buildings/dressing/gold_1.png", "frames": 1, "fps": 0, "loop": false}}},
     "deco_gold_2": {"frame": [128, 128], "anchor": [65, 75], "anims": {"loop": {"file": "buildings/dressing/gold_2.png", "frames": 1, "fps": 0, "loop": false}}},

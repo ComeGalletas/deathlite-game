@@ -681,3 +681,38 @@ arrow on a square cap), no objection raised.
   test dismisses the hints first. Focused set: 157 passed.
 * Screenshots delivered: the six hint states and the Options screen.
 * Full suite (imp editor-source test deselected, pre-existing): **2640 passed**, 9 deselected, 638 subtests, 11:44.
+
+
+## Pass 4 -- the cap on the edge, over the orbs' glow (2026-09-20)
+
+**Request.** Reviewing the cap over the buff buildings, the owner wanted it
+closer to the top of the sprite, not floating far above it, and the
+experience orb's glow added to it. Confirmed: the cap rests on the edge
+(its bottom on the top of the sprite's body, no gap) to try, and the glow
+takes the buff's colour on a buff building.
+
+**What landed** (`visual/key_marker.py`).
+
+- `ink_of` measures the sprite's *body*: the box's top is the first row
+  from the top where at least a quarter of the ink's width is opaque, and
+  the peak is the middle of that row's opaque run. The goblin hut's smoke,
+  a thin tip or a clasp above a lid no longer lift the cap; a roof, a
+  crown or the lid itself still do.
+- `CLEAR_PX` is 0: the cap's bottom sits on that row.
+- `draw` blits the XP orbs' breathing glow (`GlowCache`, the same
+  `pulse_alpha` / `quantise` curve on the run clock) under the cap at 1.6
+  times the cap's width -- the buff's first palette colour on a buff
+  building, white elsewhere -- then the cap.
+- Tests: the wisp is skipped and the peak is the body's; the colour rule.
+  The chest and forge placement tests hold through `CLEAR_PX`.
+
+**Addendum (2026-09-20).** The marker's cap is 30 % bigger than the
+interface's: `key_marker.CAP_PX = 42` (the menus and the hints keep
+`keycap.CAP_PX = 32`). The anchor, the glow and the tests size off it.
+
+**Addendum (2026-09-20): the hut's cap leaned right.** The goblin hut's
+chimney pipe is exactly a quarter of the hut's width, so it counted as the
+body's top row and the cap centred on the pipe's span. `BODY_FRACTION` is
+0.3 (the forge's chimney, over a third wide, still counts) and the peak is
+the middle of the top row's *longest* opaque run, so a pipe beside the
+roof no longer pulls the cap. Test added.

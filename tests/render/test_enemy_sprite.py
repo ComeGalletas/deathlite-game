@@ -201,9 +201,14 @@ class ProjectileTrailTests(unittest.TestCase):
         against the 4-6 the spacing predicts. `fire_level = NONE` is the
         documented way to opt a projectile out; the rule has its own coverage in
         `tests/playing/test_projectile_elevation.py`.
+
+        The obstacle block is switched off the same way (`no_block`): with
+        the buff buildings on every island the pinned world grew an obstacle
+        inside the shot's 300 px, and the count collapsed to 3. Blocking has
+        its own coverage in `tests/playing/test_buffs.py` and the bomb tests.
         """
         base = dict(pos=pygame.Vector2(p.player.pos), vel=pygame.Vector2(300, 0),
-                    damage=1, radius=4, lifetime=9.0)
+                    damage=1, radius=4, lifetime=9.0, no_block=True)
         base.update(kw)
         pr = p._spawn_projectile(**base)
         if pr is not None:

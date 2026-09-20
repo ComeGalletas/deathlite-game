@@ -60,7 +60,8 @@ class ShrubRetiredTests(unittest.TestCase):
         self.assertTrue(seen.issubset(
             {"tree", "rock", "pillar", "house", "sign", "scarecrow",
              "forge", "barracks", "tower", "archery", "monastery", "castle",
-             "fence", "magnet", "turbo", "haste", "pinball", "vampire"}), seen)
+             "fence", "magnet", "turbo", "haste", "pinball", "vampire",
+             "gnome_hut"}), seen)
 
 
 class TreeColliderTests(unittest.TestCase):

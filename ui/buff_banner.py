@@ -17,7 +17,7 @@ from ui.text import shadowed
 
 RISE_PX = 44           # design px the name climbs in its first second
 RISE_SECONDS = 1.0
-LIFT_PX = 54           # design px above the hero's centre the name starts
+LIFT_PX = 96           # design px above the hero's centre the name starts (clear of the marks)
 LINE_PX = 30           # design px between stacked names
 FONT_PX = 26
 

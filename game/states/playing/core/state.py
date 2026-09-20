@@ -1135,8 +1135,7 @@ class PlayingState(State):
         # render); the interface stays in the centred 16:9 box.
         box = uibox.box(surface)
         self.hud.draw(box, self.player, self.stats,
-                      xp_fraction=self.levels.progress_fraction, boss=self.boss,
-                      buffs=self.buffs.rows())
+                      xp_fraction=self.levels.progress_fraction, boss=self.boss)
         self.renderer.feedback_overlays(surface, box)
     # --- render: scene composition ---------------
     def _depth_items(self) -> list:
