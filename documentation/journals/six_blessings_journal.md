@@ -454,7 +454,7 @@ dominate until the slots fill, by design.
 ## Progress
 
 - [x] Journal written, reading confirmed
-- [x] Forge card overrides re-based; post-Forge gate verified, bench brought under it; weapon weight proposed (awaiting the owner's number)
+- [x] Forge card overrides re-based; post-Forge gate verified, bench brought under it; weapon weight proposed and set to 10 by the owner (2026-09-20)
 - [x] Data: damage / speed / coverage re-sized, new data-only cards, Blast Amplifier removed, re-tags
 - [x] Engine: crit damage, rehit / orbit speed / interval / orbit / reach / summon bonuses
 - [x] Engine: on-hit statuses (Lacerate, Scorch, Chilling Bolts)
@@ -462,3 +462,61 @@ dominate until the slots fill, by design.
 - [x] Engine: Sticky Bomb, Powder Keg
 - [x] Tests
 - [x] Tables regenerated, bench before / after, per-level ladder measured
+
+## Owner's ruling and the merge (2026-09-20)
+
+> use the weights as 10, merge the six-blessings worktree into main but first
+> confirm that it wont break anything currently.
+
+**Weapon weight: 10.** Set in `data/weapons/offering.json`, parity with the
+`stat` and `grant` kinds, as recommended above.
+
+The number has a consequence the proposal did not measure: it retires the
+2026-09-09 rule that a stat card shows up in practically every level-up.
+Measured over 600 offerings with three weapons held and no grants:
+
+| weapon weight | >=1 stat card | >=1 weapon card |
+|---:|---:|---:|
+| 7 (before) | 93.0 % | 74.5 % |
+| 8 | 91.5 % | 78.2 % |
+| 9 | 88.8 % | 81.5 % |
+| **10 (chosen)** | **87.2 %** | **84.2 %** |
+
+The owner was shown the trade and chose to keep 10 and relax the rule, so
+three assertions in `tests/progression/test_blessings.py` moved with it:
+`test_rules_load` now asserts stat and weapon weigh the same,
+`test_stat_outweighs_weapon_at_equal_rarity_and_level` became
+`test_stat_and_weapon_weigh_the_same_at_equal_rarity_and_level`, and the
+90 % stat-card floor became 85 %, kept as a guard against a future weight
+change pushing stat cards out of the offering rather than as the old rule.
+
+**The merge.** The branch turned out to be an ancestor of `main` with the
+work uncommitted on top, so this was not a branch merge but twenty commits of
+`main` merged into the work. Four files conflicted, all of them where `main`'s
+buff-buildings pass touched the same lines:
+
+| File | Conflict | Resolution |
+|---|---|---|
+| `entities/projectile.py` | Sticky Bomb's `sticky` / `stuck_to` against the pinball's `bounces_left`, in four places | union; a sticky bomb never bounces and a pinball is never sticky |
+| `game/states/playing/core/combat.py` | Flurry's hit hook against the Vampire buff's | union, Flurry first |
+| `game/states/playing/core/effects.py` | `ride_stuck` against the pinball's bounce branch | `ride_stuck` first, then `main`'s bounce / block branch |
+| `tools/benchmarks/dps_bench.py` | this pass's "draw cards through `blessing_offers`" against `main`'s by-hero-level rewrite | `main`'s entirely: `offer_cards` -> `valid_offers` already enforces the same gate, and by hero level is the owner's 2026-09-19 decision |
+
+Two stale literals in tests that the Forge re-base invalidated, both missed by
+the build pass because they live outside the files it touched:
+`tests/combat/test_hammer_swing.py` pinned the Meteor Hammer's crater at
+`27 * 0.35` (now reads the Forge's own damage, as its sibling in
+`test_forge.py` already did), and `tests/devtools/test_dps_bench.py` pinned a
+fifteen-id damage-blessing set and Sharpened Edge V at 17 (now seventeen ids
+-- Broadhead and Arcane Focus joined -- and 15).
+
+**Verification.** Full suite on the merged tree: **2761 passed, 12 failed**
+before these fixes; after them every failure is either fixed or reproduces on
+clean `main`. Baselined on `main` at `cf015dc`:
+`tests/screens/test_menu.py::MenuHasNoScrollPanelTests::test_no_banner_rigs_are_declared`
+and the three `tests/world/test_digest.py` failures are **pre-existing** --
+the digest ones because an unresolved merge-conflict marker was committed
+into `tests/world/digests.json` at `34f48ee`, which is a separate bug.
+`tests/entities/ai/test_imp.py::RigTests::test_the_editor_source_is_not_shipped`
+passes on `main` and fails only inside the worktree, which does not carry the
+untracked `assets/unused/` source the test looks for.

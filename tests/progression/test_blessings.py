@@ -132,7 +132,9 @@ class CatalogTests(unittest.TestCase):
 
     def test_rules_load(self):
         self.assertEqual(RULES.choices, 3)
-        self.assertGreater(RULES.kind_weights["stat"], RULES.kind_weights["weapon"])
+        # 2026-09-20: the weapon kind was raised to parity with stat and grant,
+        # paying for the six cards a weapon now owns (six_blessings_journal.md).
+        self.assertEqual(RULES.kind_weights["stat"], RULES.kind_weights["weapon"])
         self.assertEqual(RULES.kind_weights["grant"], RULES.kind_weights["stat"])
         self.assertLess(RULES.summon_factor, 1.0)
         self.assertEqual(RULES.falloff(1), 1.0)
@@ -339,8 +341,10 @@ class WeightTests(unittest.TestCase):
     def _w(self, bid, level=1):
         return blessing_weight(CAT.get(bid), level, CAT, RULES)
 
-    def test_stat_outweighs_weapon_at_equal_rarity_and_level(self):
-        self.assertGreater(self._w("vitality"), self._w("sword_sharpened_edge"))
+    def test_stat_and_weapon_weigh_the_same_at_equal_rarity_and_level(self):
+        """Parity since 2026-09-20: a weapon card is worth exactly what a stat
+        card is, so the six cards a weapon owns are not drowned out."""
+        self.assertAlmostEqual(self._w("vitality"), self._w("sword_sharpened_edge"))
 
     def test_a_grant_shares_the_stat_weight_while_slots_are_open(self):
         g = next(u for u in grant_offers(hero("sword"), C, random.Random(0)) if u.id == "grant:bow")
@@ -360,14 +364,20 @@ class WeightTests(unittest.TestCase):
         self.assertGreater(self._w("sword_sharpened_edge"), self._w("sword_critical_edge"))
         self.assertGreater(self._w("sword_critical_edge"), self._w("sword_heavy_blade"))
 
-    def test_stat_blessings_land_in_nearly_every_offering(self):
+    def test_stat_blessings_land_in_most_offerings(self):
+        """Was "nearly every offering" (> 90 %) until 2026-09-20, when the owner
+        traded that floor for weapon-card parity: at weapon weight 10 a stat
+        card shows in about 87 % of level-ups and a weapon card in about 84 %,
+        against 93 % / 75 % at weight 7. The floor is kept as a guard against a
+        weight change that would push stat cards out of the offering, not as
+        the old rule."""
         p = hero("sword", "bow", "bomb")                      # slots full: no grants
         hits = 0
         n = 300
         for seed in range(n):
             offer = roll_offering(p, C, random.Random(seed))
             hits += any(u.kind == "stat" for u in offer)
-        self.assertGreater(hits / n, 0.9)
+        self.assertGreater(hits / n, 0.85)
 
 
 class RollTests(unittest.TestCase):
