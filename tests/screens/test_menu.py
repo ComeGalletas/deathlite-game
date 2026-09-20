@@ -286,11 +286,17 @@ class MenuHasNoScrollPanelTests(unittest.TestCase):
         self.assertFalse([r for r in asked if "banner" in str(r) or "scroll" in str(r)],
                          f"menu still reaches for the scroll art: {asked}")
 
-    def test_no_banner_rigs_are_declared(self):
+    def test_no_scroll_panel_rigs_are_declared(self):
+        """The three `ui_banner_*` rigs over `assets/ui/banners/scroll_*.png`
+        went with the panel. Named, not matched on "banner": the end-of-run
+        banners (`end_banner_win`/`end_banner_loss`) are unrelated art that
+        the menu never touches, and a substring ban catches them too."""
         _, _ = _menu()
         from game.assets import Assets
         meta = Assets().meta
-        self.assertFalse([k for k in meta if "banner" in k])
+        self.assertFalse([k for k in meta if k.startswith("ui_banner")])
+        self.assertFalse([k for k, r in meta.items()
+                          if str(r.get("file", "")).startswith("ui/banners/")])
 
     def test_panels_module_has_no_three_slice_builder(self):
         from ui import panels
