@@ -95,6 +95,49 @@ class OrbitTests(unittest.TestCase):
             self.assertAlmostEqual(g, math.tau / len(shots), places=3)
 
 
+    def test_an_orbiter_is_never_spent_by_a_hit(self):
+        """`pierce` is a shot's budget; an orbiter has none to spend. The
+        Rod carries `pierce: 0` into the Arcane Storm forge, and before this
+        each mote died on its first touch and was replanted at the hero's
+        feet next frame -- 2 787 hits in ten seconds on the dummy."""
+        from entities.projectile import Projectile
+        anchor = pygame.Vector2(0, 0)
+        o = Projectile()
+        o.reset(pos=anchor, vel=pygame.Vector2(), damage=5, radius=8, lifetime=999,
+                pierce=0, anchor=anchor, orbit_radius=100, orbit_speed=2.0,
+                rehit_interval=0.5, weapon_id="magic_rod")
+        o.active = True
+        for _ in range(3):
+            o.on_hit()
+        self.assertTrue(o.active)
+        self.assertTrue(o.is_orbiter)
+        s = Projectile()
+        s.reset(pos=anchor, vel=pygame.Vector2(1, 0), damage=5, radius=8,
+                lifetime=1.0, pierce=0, weapon_id="bow")
+        s.active = True
+        s.on_hit()
+        self.assertFalse(s.active)                     # a plain shot still is
+
+    def test_a_recycled_orbiter_is_not_reclaimed(self):
+        """Projectiles are pooled. An orbiter retired by something other
+        than the weapon can be handed to another weapon and come back
+        `active`; the maintainer must not treat it as its own and rewrite
+        its radius and damage -- that is how the Hammer's blow became a 6 px
+        mote and never landed."""
+        w = Weapon("ember_ring", get_content().weapon("ember_ring"))
+        want = w._projectile_count()
+        shots = []
+        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        gone = shots[0]
+        gone.active = False                            # retired from outside
+        gone.active = True                             # ...and recycled:
+        gone.weapon_id, gone.orbit_speed, gone.radius, gone.damage = "hammer", 0.0, 65.0, 40.0
+        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        self.assertEqual(len(shots), want + 1)         # a fresh mote replaced it
+        self.assertNotIn(gone, w._orbiters)
+        self.assertEqual((gone.radius, gone.damage), (65.0, 40.0))
+
+
 class ChainTests(unittest.TestCase):
     def test_chain_weapon_tags_projectile_with_chain_charges(self):
         w, d = chain_weapon()

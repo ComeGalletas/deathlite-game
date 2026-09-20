@@ -576,7 +576,15 @@ class Weapon:
         area = self._area(ctx.area_multiplier)
         dmg = outgoing_damage(self._damage(ctx), ctx.damage_multiplier).amount
 
-        self._orbiters = [o for o in self._orbiters if getattr(o, "active", False)]
+        # `active` alone is not enough: projectiles are pooled, so an orbiter
+        # retired by anything but this weapon (terrain, the dev menu) can be
+        # handed to another weapon and come back `active` as, say, the
+        # Hammer's blow -- which the refresh below would then shrink to a
+        # mote. Keep only objects that are still *this weapon's* orbiters.
+        self._orbiters = [o for o in self._orbiters
+                          if getattr(o, "active", False)
+                          and o.weapon_id == self.weapon_id
+                          and o.orbit_speed != 0.0]
 
         while len(self._orbiters) < desired:
             o = ctx.spawn_projectile(
