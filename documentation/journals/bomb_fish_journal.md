@@ -125,3 +125,46 @@ for.
 - [x] Tests (13)
 - [ ] A telegraph so `shoot.png` actually animates
 - [ ] A band weight is unaffected — it already has one and spawns today
+
+---
+
+## Follow-up: the thrown bomb stops shaking the screen (owner, 2026-09-19)
+
+> "review the bombfish enemy. remove the screenshake from the attack of bomb
+> but dont delete the functionality, comment it as unusued but ready to
+> implement. confirm first"
+
+Confirmed before the change, with one question answered: the corpse blast on
+death **keeps** its shake; only the thrown bomb goes quiet.
+
+### What the review found
+
+Since this journal was written the Bloat gained a wind-up
+(`attack_telegraph` / `attack_active` / `attack_recover`, commit `fd8a276`),
+so the "left undone" item below is done and `shoot.png` plays. The throw
+interval is now 4.48 s, not 2.8 s. The `_bomb_comment` in the data still
+tells the old `exploder` story; harmless, but stale.
+
+Both the thrown bomb and the corpse blast detonate through the same hostile
+helper, `TransientFx.explosion`, which added a 0.4 shake for either. The Bloat
+is the only enemy on either path.
+
+### The change
+
+`explosion` takes `shake: bool = True`. The bomb detonation in
+`update_projectiles` passes `shake=False`; the death pop in `combat.py` names
+nothing and keeps the default. Inside the helper the shake line is still there
+behind the switch, with a comment marking the thrown-bomb shake as unused and
+saying how to bring it back (drop the argument, or give the bomb its own
+lighter amplitude).
+
+Two tests in `ShakeTests`: a spent bomb driven through the real hostile loop
+bursts without touching `ps.shake`, and the helper called the way `combat.py`
+calls it still shakes once.
+
+### Progress
+
+- [x] `shake` switch on the hostile `explosion` helper
+- [x] Thrown bomb detonates without a shake; death pop unchanged
+- [x] Tests (2)
+- [x] A telegraph so `shoot.png` actually animates (done separately, `fd8a276`)

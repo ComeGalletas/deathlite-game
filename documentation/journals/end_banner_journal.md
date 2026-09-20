@@ -195,3 +195,21 @@ and read the victory screen on the next line, so they now ride the banner
 out first (`_ride_out_banner`), and the module passes (12); the unit
 tier 1493 passed with one pre-existing failure (`test_imp` asserts an
 untracked file under `assets/unused/`, which this worktree does not carry).
+
+---
+
+## Follow-up: a shorter wait (owner, 2026-09-20)
+
+> "review the current wait time for the game over screen. reduce the wait
+> time for the game over sprite animation to 1 second. confirm"
+
+Reviewed: wait 3.0 s, banner 2.93 s (loss) / 2.80 s (win), hold 2.0 s, then
+the summary with its own 1.5 s input lock -- about 7.9 s from the last hit to
+the summary. Confirmed reading: the "wait" is the phase before the sprite
+starts; the sprite's own length is the rig's and the 2 s hold stays.
+
+`END_BANNER_WAIT` 3.0 -> 1.0, for both outcomes (one constant covers both;
+the owner chose to keep them together). The death poof is about a second, so
+it still finishes inside the wait. The timing tests read the constant, so
+they moved with it: a loss now hands off at 5.93 s, a win at 5.80 s.
+

@@ -1683,3 +1683,136 @@ benching.
 - [x] Cap gate: prepare, count, spawn or retry every 2 s; companies atomic
 - [x] Remove `min(pack, cap - active)` clipping from the director
 - [x] Build - G0a through G4 are in, on a green suite
+
+---
+
+## G7: the base company cooldown back to 5 s (owner, 2026-09-20)
+
+> "review the base cooldown for companies/groups by the spawn master and
+> confirm a way to increase the base cooldown for the spawning of companies"
+> ... "try with base 5 seconds"
+
+### Reviewed
+
+The director's common cadence (`spawn/budget.py`, `common_cooldown`) is
+`cooldowns.common` minus `common_decay` per `step_seconds`, floored at
+`common_floor`, all divided by the difficulty's `timeline_pace`. Since the
+18 September tuning it was 2 / 1 / 1 over a 120 s step: 2 s for two minutes,
+then 1 s. The timer starts expired, so the first company is immediate. Once
+the field is at the live cap the cap paces the run, not the cadence: a
+company that does not fit waits on `cap_retry` and the cadence is not
+consumed meanwhile. The island's resident company is outside the cadence.
+
+### Changed
+
+`cooldowns.common` 2.0 -> 5.0, and on a second word from the owner
+`common_decay` 1.0 -> 0.5. `common_floor` stays 1.0. The ladder now walks
+5 / 4.5 / 4 / 3.5 / 3 / 2.5 across a ten-minute Normal run and never
+reaches its floor. Data only; the ladder tests derive from the table.
+
+One guard was relaxed: `test_the_elite_gate_stays_the_slower_of_the_two`
+asserted the elite gate strictly slower than the common cadence at every
+minute, and at minute 8 the two now meet at 3 s (common 5 - 0.5 x 4, elite
+at its floor). The test asserts "never faster" instead. What the tie means
+in play: for that two-minute window an elite-bearing group is eligible on
+every draw, so the elite share of companies for that stretch is the plain
+pool draw (two of six groups) rather than gated below it. From minute 10 the
+gate is slower again.
+
+### Measured, booted run on the pinned world, hero standing still and kept
+### alive, clearing two bodies a second
+
+| t | field (2 s) | field (5 s) | companies (2 s) | companies (5 s) | cap waits (2 s) | cap waits (5 s) |
+|---|---|---|---|---|---|---|
+| 15 s | 96 | **16** | 7 | 3 | 2 | 0 |
+| 30 s | 79 | **43** | 8 | 6 | 9 | 0 |
+| 60 s | 102 | 98 | 13 | 12 | 24 | 0 |
+| 120 s | 100 | 119 | 16 | 18 | 54 | 22 |
+| 180 s | 124 | 134 | 21 | 21 | 84 | 51 |
+| 300 s | 146 | 156 | 33 | 31 | 144 | 110 |
+| 420 s | 197 | 183 | 38 | 39 | 203 | 170 |
+
+(The 5 s column is the final 5 / 0.5 / 1 table; with decay 1.0 the numbers
+were within a few bodies of these.)
+
+The difference is the opening: the field builds over the first minute
+instead of arriving in fifteen seconds, and no company has to wait on the
+cap in that minute. From minute two on the cap is the binding constraint
+and the two runs converge -- the same companies, the same field, the 5 s
+run waiting on the cap a little less because it reaches it later.
+
+---
+
+## G8: a cap on commons per company that climbs through the run (owner, 2026-09-20)
+
+> "similar to how the max amount of elites are being controlled, now we need
+> to limit the max amount of common enemies given the different bands of
+> progression through the run. review how is the min and max amount of common
+> enemies calculated and placed, and propose a way to limit the max amount by
+> the settings to make common enemies start at a max of 5 enemies per group at
+> the start of the gameplay run."
+
+### Reviewed
+
+`SpawnMaster.compose` rolls the common count as a plain `randint` inside the
+group's own `common_range` (10-30 dark, 25-30 swarm, 5-20 marine / gnomes /
+wild beasts, 5-30 goblin), and that range never moves across the run, so the
+first company of a run can already be thirty bodies. Elites, by contrast,
+climb a ladder: `elite_range` [base, ceiling] plus `elite_step` per director
+step (`ResolvedGroup.elite_count`), deterministic and capped. Commons had no
+such ladder. Every entry point composes the same way -- the director's paced
+companies, an island's resident company, the dev spawn.
+
+### Confirmed reading and proposal ("journal it and go with your values")
+
+A `common_cap` block in `data/enemies/spawn_tables.json` -- `start` 5,
+`step` 5, `ceiling` 30 -- on the director's `step_seconds` clock: the cap is
+`min(start + step x steps, ceiling)`, so on Normal it walks 5 / 10 / 15 / 20
+/ 25 / 30 across the run and climbs sooner on the faster difficulties, the
+way the elite ladder already does. At composition the group's `common_range`
+is clipped to the cap at both ends, so at the start every group rolls exactly
+five commons (swarm included) and by minute ten each is back to its declared
+range. Per-group ranges stay as the group's identity; elite counts are
+untouched. The cap runs through `compose`, so resident and dev companies obey
+it too. A missing or malformed block means no cap, logged, never a refusal
+to load (the G2a rule).
+
+### Built
+
+- `spawn/tables.py`: `SpawnTables.common_cap(steps)` reads the block; a
+  malformed one is logged and ignored (`None`, no cap).
+- `spawn/master.py`: `compose` clips `common_range` to the cap for the
+  `steps` it is given.
+- Tests: `test_master` composes at the cap for each step; `test_tables`
+  pins the ladder and the fail-soft.
+
+### Measured, booted run on the pinned world, hero standing still and kept
+alive, cadence 5 / 0.5 / 1, cap off against cap on
+
+Clearing half a body a second:
+
+| t | field, no cap | field, cap | companies, no cap | companies, cap |
+|---|---|---|---|---|
+| 15 s | 22 | **7** | 3 | 3 |
+| 30 s | 67 | **13** | 6 | 6 |
+| 60 s | 97 | **25** | 10 | 12 |
+| 120 s | 104 | 83 | 16 | 24 |
+| 180 s | 132 | 132 | 18 | 33 |
+| 300 s | 163 | 168 | 23 | 39 |
+
+Clearing two bodies a second:
+
+| t | field, no cap | field, cap | companies, no cap | companies, cap |
+|---|---|---|---|---|
+| 15-120 s | 16 / 40 / 80 / 114 | **0** | 3 / 6 / 12 / 19 | 3 / 6 / 12 / 24 |
+| 180 s | 132 | 49 | 25 | 38 |
+| 300 s | 164 | 159 | 28 | 62 |
+| 420 s | 199 | 192 | 38 | 76 |
+
+Same companies in the opening, a fifth of the bodies: five every five
+seconds is one body a second, so a player clearing faster than that keeps
+the field empty until the cap's second rung at minute two, and one
+clearing slower sees a field that builds over two minutes instead of
+thirty seconds. From minute three the live cap binds and the two runs meet;
+the capped run lands many more, smaller companies to get there.
+

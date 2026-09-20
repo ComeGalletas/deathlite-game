@@ -200,7 +200,11 @@ class TransientFx:
             # player (`journals/bomb_fish_journal.md`).
             if p.blast_radius > 0.0 and not p.active and not p.detonated:
                 p.detonated = True
-                self.explosion(pygame.Vector2(p.pos), p.blast_radius, p.damage)
+                # No screen-shake for the thrown bomb (owner, 2026-09-19):
+                # the Bloat lobs one every few seconds and a shake per landing
+                # was too much. The corpse blast on death keeps its shake.
+                self.explosion(pygame.Vector2(p.pos), p.blast_radius, p.damage,
+                               shake=False)
         ps.hostiles.sweep()
 
     # --- bombs (six-weapon system P1) ----------------------
@@ -365,12 +369,23 @@ class TransientFx:
         ps.melee_hitboxes = [h for h in ps.melee_hitboxes if h.alive]
 
     # --- blast visuals -------------------------------------
-    def explosion(self, pos: pygame.Vector2, radius: float, damage: float) -> None:
+    def explosion(self, pos: pygame.Vector2, radius: float, damage: float,
+                  shake: bool = True) -> None:
+        """The enemy side's area damage: ring, burst, and a hit on the player
+        if they stand inside `radius`. `shake` is on for the corpse blast an
+        exploder leaves when it dies, and off for the Bloat's thrown bomb."""
         ps = self.ps
         ps._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
                                "t": 0.0, "dur": 0.35})
         ps.particles.burst(pos, (255, 160, 80), count=22, speed=260, life=0.5)
-        ps.shake.add(0.4)
+        if shake:
+            ps.shake.add(0.4)
+        # UNUSED, ready to implement: the thrown-bomb detonation used to shake
+        # the screen too (owner removed it, 2026-09-19). To bring it back drop
+        # `shake=False` from the bomb call in `update_projectiles`, or give the
+        # bomb its own lighter amplitude here:
+        # elif <this is a thrown bomb>:
+        #     ps.shake.add(0.2)
         if (ps.player.pos - pos).length() <= radius + ps.player.radius:
             taken = ps.player.take_damage(damage)
             if taken > 0:
