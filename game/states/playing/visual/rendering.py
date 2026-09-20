@@ -25,6 +25,7 @@ from game.states.playing.visual.projectiles import draw_projectile
 from game.states.playing.visual.summons import draw_summon
 from progression import chests as _chests
 from progression import potions as _potions
+from ui import buff_marks
 from ui.text import shadowed
 
 # CB-5 dev aim line: length for a main weapon with no finite reach.
@@ -133,6 +134,15 @@ class WorldRenderer:
             flash.fill((200, 30, 30, a))
             surface.blit(flash, (0, 0))
 
+        # A buff's screen-wide tint (journal: buff_buildings_journal.md): the
+        # buff's palette as a vertical gradient, light and brief.
+        self.buff_tint(surface)
+        # ... the timers over the hero (rev. 6: here, not on the HUD), and
+        # the buff's flying name above them, all following the hero.
+        hero = ps.camera.world_to_screen(ps.player.pos)
+        buff_marks.draw(surface, ps.game.assets, hero, ps.buffs.rows())
+        ps.buffs.banners.draw(surface, hero)
+
         surface = box if box is not None else surface
         w, h = surface.get_size()
 
@@ -153,6 +163,63 @@ class WorldRenderer:
         # There is no interaction prompt here any more: the interact keycap
         # floats over the element itself, in the world layer
         # (`visual/key_marker.py`, journal: key_icons_journal.md).
+
+    def buff_tint(self, surface: pygame.Surface) -> None:
+        tint = self.ps.buffs.tint
+        if tint is None:
+            return
+        left, palette = tint
+        fb = self.ps.buffs.feedback
+        seconds = float(fb.get("tint_seconds", 0.9))
+        peak = int(fb.get("tint_peak_alpha", 55))
+        alpha = int(peak * max(0.0, min(1.0, left / seconds)))
+        if alpha <= 0:
+            return
+        w, h = surface.get_size()
+        key = (w, h, tuple(palette))
+        cached = getattr(self, "_tint_cache", None)
+        if cached is None or cached[0] != key:
+            # A one-column gradient through the palette, stretched to the
+            # frame: built once per activation, faded with `set_alpha`.
+            steps = 64
+            column = pygame.Surface((1, steps), pygame.SRCALPHA)
+            for i in range(steps):
+                t = i / (steps - 1) * (len(palette) - 1)
+                k, f = int(t), t - int(t)
+                a_col = palette[min(k, len(palette) - 1)]
+                b_col = palette[min(k + 1, len(palette) - 1)]
+                column.set_at((0, i), tuple(int(a_col[c] + (b_col[c] - a_col[c]) * f)
+                                            for c in range(3)) + (255,))
+            self._tint_cache = cached = (key, pygame.transform.smoothscale(column, (w, h)))
+        grad = cached[1]
+        grad.set_alpha(alpha)
+        surface.blit(grad, (0, 0))
+
+    def hero_fx(self, surface, sx: float, sy: float) -> None:
+        """The buff activation effects over the hero (journal:
+        buff_buildings_journal.md): each strip plays once, feet-anchored,
+        at its own frame rate, drawn right after the hero's sprite."""
+        ps = self.ps
+        fx_list = ps.buffs.hero_fx
+        if not fx_list:
+            return
+        a = ps.game.assets
+        z = ps.camera.zoom
+        drop = self.sprite_drop(ps.player.radius)
+        for rig, age, scale in fx_list:
+            meta = a.rig(rig)
+            if not meta:
+                continue
+            k = z * scale                      # the buff's own draw scale
+            fw, fh = meta["frame"]
+            size = (max(1, round(fw * k)), max(1, round(fh * k)))
+            frs = a.frames(rig, "loop", size=size)
+            if not frs:
+                continue
+            fps = a.fps(rig, "loop") or 12.0
+            idx = min(len(frs) - 1, int(age * fps))
+            ax, ay = a.anchor(rig)
+            surface.blit(frs[idx], (round(sx - ax * k), round(sy - ay * k + drop)))
 
     # --- world props ----------------------------------------------
     def _off_band(self, level, pos) -> bool:
@@ -187,6 +254,8 @@ class WorldRenderer:
                 continue
             if it.kind == "forge" and self._forge_skinned():
                 continue        # the forge obstacle carries the art
+            if ps.buffs.is_buff(it.kind):
+                continue        # a buff building: the obstacle draws it
             if it.kind == "fountain":
                 heal = self._heal_frames(z)
                 if heal is not None:
@@ -647,6 +716,7 @@ class WorldRenderer:
             pygame.draw.circle(surface, body, (sx, sy), round(pr))
             pygame.draw.circle(surface, config.COLOR_PLAYER_OUTLINE, (sx, sy),
                                round(pr), width=2)
+        self.hero_fx(surface, sx, sy)
 
     def _hero_flip(self) -> bool:
         ps = self.ps

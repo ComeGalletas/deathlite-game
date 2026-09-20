@@ -123,3 +123,32 @@ def build_obstacle_decor(store, a) -> None:
 
     if config.TERRAIN_SHADOWS:
         build_tree_shadows(store, conf)
+
+
+def reskin_obstacle(store, a, index: int, rig: str) -> bool:
+    """Swap obstacle `index`'s skin for `rig`, at the size its kind draws at
+    -- a used buff building showing its dark door (journal:
+    buff_buildings_journal.md). `store` is the baked terrain or the
+    `GameMap` that fronts it. False when the rig or its art is missing, in
+    which case the old skin stays."""
+    obstacles = getattr(store, "obstacles", ())
+    if index >= len(obstacles):
+        return False
+    o = obstacles[index]
+    meta = a.rig(rig)
+    if not meta:
+        return False
+    conf = a.terrain.get("obstacle_decor", {})
+    boost = float(conf.get("size_boost", 1.25))
+    draw_r = float(conf.get("render_radius", {}).get(o.kind, o.radius))
+    scale = frontier.rig_scale(meta, draw_r, boost, conf.get("render_scale", {}).get(o.kind))
+    fw, fh = meta["frame"]
+    size = (max(1, round(fw * scale)), max(1, round(fh * scale)))
+    frs = a.frames(rig, "loop", size=size)
+    if not frs:
+        return False
+    ax0, ay0 = a.anchor(rig)
+    fps = a.fps(rig, "loop") if len(frs) > 1 else 0.0
+    decos = store._decos if hasattr(store, "_decos") else store.decos
+    decos[index] = (ax0 * scale, ay0 * scale, fps, frs, 0)
+    return True

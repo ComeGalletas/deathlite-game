@@ -249,7 +249,10 @@ class VillageLayoutTests(unittest.TestCase):
             sats = [o for o in w.obstacles if not o.skin]
             self.assertTrue(sats, f"seed {seed}: no compound building")
             for o in sats:
-                self.assertIn(o.kind, ("barracks", "archery", "monastery", "castle"))
+                # ... the village's wide buildings, and the dead tree of the
+                # buff buildings (journal: buff_buildings_journal.md, rev. 3).
+                self.assertIn(o.kind, ("barracks", "archery", "monastery", "castle",
+                                       "vampire", "turbo", "haste", "pinball", "magnet"))
                 self.assertGreater(o.radius, 0)
 
     def test_no_two_village_circles_overlap(self):

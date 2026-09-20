@@ -264,6 +264,16 @@ class WorldLayout:
     def room(self, rid: int) -> Room:
         return self.rooms[rid]
 
+    def buff_buildings(self, kinds) -> list:
+        """The buff buildings (journal: buff_buildings_journal.md): every
+        obstacle whose kind is one of the buff `kinds`, in scatter order --
+        the primaries only, never a wide building's collide-only satellites.
+        Read off the obstacles rather than kept as a list of its own, so a
+        building the repair pass took back is gone here too."""
+        kinds = set(kinds)
+        return [o for o in self.obstacles
+                if o.kind in kinds and getattr(o, "skin", True)]
+
     def walkable_rects(self) -> list[pygame.Rect]:
         return [r.rect for r in self.rooms] + [c.rect for c in self.corridors]
 

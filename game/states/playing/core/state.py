@@ -56,6 +56,7 @@ from game.states.playing.core.chests import Chests
 from game.states.playing.core import interactions
 from game.states.playing.core.hints import RunHints
 from game.states.playing.core.locations import SpecialLocations
+from game.states.playing.core.buffs import BuffSystem
 from game.states.playing.core.npcs import Npcs
 from game.states.playing.core.fish_huts import FishHuts
 from game.states.playing.core.effects import TransientFx
@@ -130,6 +131,8 @@ class PlayingState(State):
         self.game_map = (self._prebuilt.game_map if self._prebuilt is not None
                          else GameMap(seed=self.run_seed))
         self.locations = SpecialLocations(self)
+        # The buff buildings' timed buffs (journal: buff_buildings_journal.md).
+        self.buffs = BuffSystem(self)
         self.locations.build()
         # CB-9: the treasure chests the seed seated across the islands.
         self.chest_manager = Chests(self)
@@ -570,6 +573,7 @@ class PlayingState(State):
             self.boss.update(ectx)
 
         self.bump.resolve()          # CB-3: overlapping bodies shove each other
+        self.buffs.update(dt)        # timers, Turbo's bites, Pinball's throws
 
         self.fx.update_projectiles(dt)
 
@@ -768,7 +772,8 @@ class PlayingState(State):
     def _update_summons(self, dt: float) -> None:
         sctx = SimpleNamespace(enemies=self._targetables(),
                                spawn_projectile=self._spawn_projectile,
-                               player_pos=self.player.pos)
+                               player_pos=self.player.pos,
+                               attack_speed_mult=self.buffs.attack_speed_mult())
         for s in self.summons:
             s.update(dt, sctx)
         self.summons.sweep()
@@ -809,6 +814,7 @@ class PlayingState(State):
                 gem = self.gems.acquire()
                 if gem is not None:
                     gem.reset(enemy.pos, int(amount) or 3, is_soul=True)
+                    self.buffs.on_gem(gem)
             elif effect == "heal":
                 self.player.heal(amount)
             elif effect == "fire_nova" and "burn" in enemy.status:
@@ -871,6 +877,7 @@ class PlayingState(State):
         gem = self.gems.acquire()
         if gem is not None:
             gem.reset(pos, xp)
+            self.buffs.on_gem(gem)          # Magnet pulls a fresh drop at once
 
     def _collect_potions(self, dt: float) -> None:
         """CB-8: advance the dropped potions and heal on pickup.

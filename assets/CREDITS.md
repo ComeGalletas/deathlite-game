@@ -154,6 +154,17 @@ fill when a file is missing.
 
 ### Where the additional packs are used
 
+- **Super Pixel Effects Gigapack** — the buff buildings' feedback
+  (`documentation/journals/buff_buildings_journal.md`): the five hero
+  activation strips in `assets/effects/buffs/` (`spell_absorb_001` yellow,
+  `spell_buff_001` orange, `spell_haste_001` blue, `spell_dispel_001` violet,
+  `spell_attack_up_001` red, all large) and the HUD stills in
+  `assets/ui/hud/buffs/` (one frame each of those, plus `symbol_defense_up_001`
+  and `symbol_attack_up_001` small), packed by
+  `tools/asset_pipeline/cut_buff_buildings.py`. The buildings themselves
+  (`assets/buildings/general/`), their dressing (`assets/terrain/props/dressing/`)
+  and the pinball (`assets/projectiles/pinball.png`) are Tiny Swords pieces from
+  the reserve, copied by the same script.
 - **Super Pixel Effects Gigapack** — the end banners in `assets/ui/end_banners/`:
   `game_over.png` is the pack's `symbol_game_over_text_001` (large, red) and
   `you_won.png` its `symbol_you_won_text_001` (large, yellow), each re-laid as a

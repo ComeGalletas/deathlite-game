@@ -318,6 +318,29 @@ def _open_villages(grid, layout, killers) -> None:
                     killers[row * grid.cols + col] = ()
 
 
+def _compound_groups(obstacles) -> dict:
+    """`index -> every index of its compound`, for the wide buildings: a
+    primary (`skin`) followed by its collide-only satellites of the same
+    kind, in the order the village pass and the buff-building pass append
+    them. A compound is taken back whole: dropping one root of the dead
+    tree would leave its art standing on a base the hero can walk through
+    on one side (journal: buff_buildings_journal.md, rev. 4)."""
+    groups: dict = {}
+    i, n = 0, len(obstacles)
+    while i < n:
+        kind = obstacles[i].kind
+        j = i + 1
+        while (j < n and not getattr(obstacles[j], "skin", True)
+               and obstacles[j].kind == kind):
+            j += 1
+        if j - i > 1:
+            members = tuple(range(i, j))
+            for k in members:
+                groups[k] = members
+        i = j
+    return groups
+
+
 def unseal(layout, rounds: int = 40):
     """Drop the obstacles that cut part of `layout` off, in place.
 
@@ -368,6 +391,8 @@ def unseal(layout, rounds: int = 40):
             if not hit:
                 break                 # sealed by terrain, not by obstacles
             drop = set(hit)
+        groups = _compound_groups(obstacles)
+        drop = {j for i in drop for j in groups.get(i, (i,))}
         removed.extend(obstacles[i] for i in sorted(drop))
         obstacles[:] = [o for i, o in enumerate(obstacles) if i not in drop]
     return removed

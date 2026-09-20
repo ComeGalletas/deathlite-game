@@ -40,8 +40,10 @@ class SceneryDrawablesTests(unittest.TestCase):
         cam = Camera(gm.width, gm.height)
         cam.snap_to(gm.center)
         view = cam.visible_rect().inflate(320, 320)
+        # A compound building's satellites collide only and draw nothing
+        # (the village buildings, the buff buildings' dead tree).
         want = {round(o.pos.y) for o in gm.obstacles
-                if view.collidepoint(o.pos.x, o.pos.y)}
+                if o.skin and view.collidepoint(o.pos.x, o.pos.y)}
         got = {round(y) for y, fn in gm.renderer.scenery_drawables(cam)}
         self.assertTrue(want)
         self.assertTrue(want.issubset(got), "an in-view obstacle is missing a drawable")

@@ -181,6 +181,23 @@ def _same_floor(ng, a, b) -> bool:
     return ng.level[ia] == ng.level[ib] or bool(ng.flight[ia]) or bool(ng.flight[ib])
 
 
+def _step_allowed(ff, ng, a, b) -> bool:
+    """May a mover cross from `a`'s cell into `b`'s? The same `step_mask`
+    gate `direction_at` applies: a diagonal that would clip an obstacle's
+    clearance is closed, and a cell whose only open sides face the other way
+    (a pocket the fill reached the long way round) cannot be entered from
+    here. A walker that ignored the mask could clip into such a pocket and
+    read a cost jump the real mover never sees."""
+    ca, cb = ng.cell_of(a.x, a.y), ng.cell_of(b.x, b.y)
+    if ca == cb:
+        return True
+    dc, dr = cb[0] - ca[0], cb[1] - ca[1]
+    for ndc, ndr, _w, bit in ff._NEI:
+        if (ndc, ndr) == (dc, dr):
+            return bool(ng.step_mask[ng.idx(*ca)] & bit)
+    return True
+
+
 def _follow(ff, ng, start_world, max_steps=8000):
     """Walk the flow field from `start_world` the way an enemy does: a short
     hop along `steer_at`, sliding along one axis when the full hop would
@@ -197,7 +214,8 @@ def _follow(ff, ng, start_world, max_steps=8000):
         step = d * (ng.cell * 0.5)
         for cand in (p + step, pygame.Vector2(p.x + step.x, p.y),
                      pygame.Vector2(p.x, p.y + step.y)):
-            if ff.cost_at(cand) < _INF and _same_floor(ng, p, cand):
+            if (ff.cost_at(cand) < _INF and _same_floor(ng, p, cand)
+                    and _step_allowed(ff, ng, p, cand)):
                 p = cand
                 break
         else:
