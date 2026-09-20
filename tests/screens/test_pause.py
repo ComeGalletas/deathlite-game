@@ -373,6 +373,27 @@ class PauseTextTests(unittest.TestCase):
         for i in range(len(_ROWS)):
             self.assertFalse(self._has_colour(screen, self._row(i), config.COLOR_TEXT))
 
+    def test_the_controls_block_sits_right_of_the_buttons(self):
+        """Pass 4 (key_icons_journal.md): the bindings as grey keycaps,
+        drawn once per frame, clear of every button, following the layout."""
+        from unittest import mock
+        from ui import controls_block
+        seen = []
+        real = controls_block.draw
+
+        def spy(*a, **k):
+            seen.append(real(*a, **k))
+            return seen[-1]
+        with mock.patch.object(controls_block, "draw", side_effect=spy) as m:
+            self.pause.draw(self.game.screen)
+        self.assertEqual(m.call_count, 1)
+        rect = seen[0]
+        from game.states.paused_state import _ROWS
+        for i in range(len(_ROWS)):
+            self.assertGreater(rect.left, self._row(i).right)
+        self.assertLessEqual(rect.right, self.game.screen.get_width())
+        self.assertIs(m.call_args.args[3], self.game)
+
     def test_labels_are_lifted_by_label_dy(self):
         from ui import widgets
 

@@ -173,6 +173,64 @@ def _check_chests(data: dict[str, Any], potions: dict[str, Any]) -> dict[str, An
     return data
 
 
+BUFF_FIELDS = ("name", "duration", "palette", "fx_rig", "icon_rig")
+
+
+def _check_buildings(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `buildings.json`: every buff names what the run, the HUD and
+    the feedback read, and every building kind has an obstacle entry and a
+    skin, so a half-declared kind fails at boot rather than as a bare
+    circle on some island."""
+    buffs = data.get("buffs")
+    if not isinstance(buffs, dict) or not buffs:
+        raise ContentError("buildings.json: `buffs` must be a non-empty object")
+    obstacles = data.get("obstacles", {})
+    skins = data.get("obstacle_decor", {}).get("rigs", {})
+    rigs = data.get("rigs", {})
+    for kind, spec in buffs.items():
+        for field in BUFF_FIELDS:
+            if field not in spec:
+                raise ContentError(f"buildings.json: buff {kind!r} has no {field!r}")
+        if float(spec["duration"]) <= 0.0:
+            raise ContentError(f"buildings.json: buff {kind!r} lasts {spec['duration']}")
+        if len(spec["palette"]) < 2:
+            raise ContentError(f"buildings.json: buff {kind!r} needs two palette colours")
+        if kind not in obstacles:
+            raise ContentError(f"buildings.json: no `obstacles` entry for {kind!r}")
+        if not skins.get(kind):
+            raise ContentError(f"buildings.json: no skin rig listed for {kind!r}")
+        images = data.get("image_rigs", {})
+        for rig in (*skins[kind], spec["fx_rig"], spec["icon_rig"], *spec.get("dressing", ())):
+            if rig not in rigs and rig not in images and not rig.startswith("deco_"):
+                raise ContentError(f"buildings.json: buff {kind!r} names unknown rig {rig!r}")
+    return data
+
+
+def _merge_buildings(terrain: dict[str, Any], ui_sprites: dict[str, Any],
+                     buildings: dict[str, Any]) -> None:
+    """Fold the buildings' obstacle kinds, skins and rigs into the terrain
+    blocks, and its single-image rigs (the HUD stills, the pinball) into the
+    UI rigs. A kind or rig already declared elsewhere is left alone."""
+    for rig, meta in buildings.get("image_rigs", {}).items():
+        ui_sprites.setdefault(rig, meta)
+    for kind, spec in buildings.get("obstacles", {}).items():
+        terrain.setdefault("obstacles", {}).setdefault(kind, spec)
+    decor = terrain.setdefault("obstacle_decor", {})
+    bdecor = buildings.get("obstacle_decor", {})
+    for kind, names in bdecor.get("rigs", {}).items():
+        decor.setdefault("rigs", {}).setdefault(kind, list(names))
+    for kind, drop in bdecor.get("sprite_drop", {}).items():
+        decor.setdefault("sprite_drop", {}).setdefault(kind, drop)
+    for kind, scale in bdecor.get("render_scale", {}).items():
+        decor.setdefault("render_scale", {}).setdefault(kind, scale)
+    ghost = decor.setdefault("ghost", {}).setdefault("kinds", [])
+    for kind in bdecor.get("ghost_kinds", ()):
+        if kind not in ghost:
+            ghost.append(kind)
+    for rig, meta in buildings.get("rigs", {}).items():
+        terrain.setdefault("rigs", {}).setdefault(rig, meta)
+
+
 class Content:
     """Immutable-ish container for all loaded definitions."""
 
@@ -201,7 +259,13 @@ class Content:
             "heroes/character_sprites.json", "enemies/enemy_sprites.json",
             "weapons/weapon_sprites.json", "loot/prop_sprites.json")
         self.terrain: dict = _load("world/terrain.json")
+        # Buff buildings (journal: buff_buildings_journal.md): the five
+        # interactive buildings and their timed buffs. Their obstacle kinds,
+        # skins and rigs are folded into the terrain blocks here so the
+        # generator, the bake and the renderer treat them as any other kind.
+        self.buildings: dict = _check_buildings(_load("world/buildings.json"))
         self.ui_sprites: dict[str, dict] = _load("ui/ui_sprites.json")
+        _merge_buildings(self.terrain, self.ui_sprites, self.buildings)
         # Village NPC tuning (HI-3): speeds, idle bands, leashes, counts.
         self.npcs: dict = _load("village/npcs.json")
         # The spawn schedule (spawn master S2). Checked here, against the

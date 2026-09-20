@@ -1,4 +1,5 @@
-"""Village NPCs (HI-3): pawns, the smith, the lancers and the corral animals.
+"""Village NPCs (HI-3): pawns, the smith, the lancers, the corral animals --
+and, on the water, the seahorse boats round the fish huts.
 
 An `Npc` is scenery that moves. It has no health, no collider anyone else
 tests against and no effect on the run beyond a lancer's lance: the hero
@@ -15,6 +16,10 @@ reach, and followed no further than `chase` from the post it left. The foe
 dying or getting away sends the lancer back to that post, and the ordinary
 patrol resumes from there. Hits reach the world through the `on_hit`
 callback the manager hands in; this module never touches an enemy itself.
+
+A `WaterNpc` is the same machine on the sea (`journals/fish_hut_journal.md`):
+it accepts a target only on open water and glides straight to it, because
+nothing on the sea blocks. It never fights.
 
 Tuning per kind is `data/village/npcs.json`; this module keeps only the machine.
 """
@@ -310,3 +315,48 @@ class SheepNpc(Npc):
         self._stuck = 0.0
         if self.anim is not None:
             self.anim.play(WALK)
+
+
+class WaterNpc(Npc):
+    """A seahorse boat: a pen animal whose pen is the sea round its fish hut.
+
+    It drifts within its leash of `home` -- a spot dealt on the water near
+    the hut -- and a target is accepted only if `world.is_open_water` says
+    so, which keeps it off the beach, the planks and the hut's island. The
+    walk is a straight glide: the collider's obstacle sliding is for land,
+    and on open water there is nothing to slide round. No aggro, ever; the
+    riders some sheets draw are art.
+    """
+    __slots__ = ()
+
+    def __init__(self, kind: str, rig: str, x: float, y: float, spec: dict,
+                 assets, *, leash_px: float) -> None:
+        super().__init__(kind, rig, x, y, spec, assets, leash_px=leash_px)
+
+    def _choose(self, rng, world) -> None:
+        for _ in range(6):
+            ang = rng.uniform(0.0, 6.283185307)
+            d = rng.uniform(0.3, 1.0) * self.leash
+            cand = self.home + pygame.Vector2(d, 0).rotate_rad(ang)
+            if world.is_open_water(cand.x, cand.y):
+                self.target = cand
+                break
+        else:
+            self.timer = 0.6
+            return
+        self.state = WALK
+        self._stuck = 0.0
+        if self.anim is not None:
+            self.anim.play(WALK)
+
+    def _step_toward(self, goal, speed: float, dt: float, world) -> bool:
+        to = goal - self.pos
+        dist = to.length()
+        if dist <= _ARRIVE_PX:
+            return True
+        step = to * (min(dist, speed * dt) / dist)
+        if abs(step.x) > 1e-3:
+            self.facing = 1 if step.x > 0 else -1
+        self.pos += step
+        return False
+

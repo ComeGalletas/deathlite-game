@@ -71,13 +71,16 @@ class LadderTests(unittest.TestCase):
             self.assertAlmostEqual(fn(1e6), floor, places=6)
 
     def test_the_elite_gate_stays_the_slower_of_the_two(self):
-        """The shape the design depends on: elite companies are rarer than
-        common ones at every point in the run, however the two are tuned."""
+        """The shape the design depends on: elite companies are never more
+        frequent than common ones at any point in the run, however the two
+        are tuned. Not strictly rarer: with the common ladder at 5 / 0.5 / 1
+        (owner, 2026-09-20) the two meet at 3 s for the minute-8 step, and
+        the owner chose that tuning knowing it."""
         d = _director()
         for minute in range(0, 16, 2):
             t = minute * 60.0
             with self.subTest(minute=minute):
-                self.assertGreater(d.elite_cooldown(t), d.common_cooldown(t))
+                self.assertGreaterEqual(d.elite_cooldown(t), d.common_cooldown(t))
 
     def test_the_step_and_the_values_both_compress_with_pace(self):
         """The whole ladder scales together rather than just its numbers --

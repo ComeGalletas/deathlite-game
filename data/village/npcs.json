@@ -1,5 +1,5 @@
 {
-  "_note": "Village NPCs (HI-3, journals/human_island_journal.md). Tuning per kind: `speed` px/s, `idle` seconds between walks (min, max), `leash` tiles from home a wander target may stray (a pen animal's -- sheep or pig -- is clamped to its corral as well), `radius` px for the walkability probe. `rigs` name the character rigs by colour; `work` is the smith's one-shot flourish (chance per idle). A kind with `aggro` fights: it charges an enemy within `aggro` tiles at `charge` px/s, keeps within `chase` tiles of home, thrusts for `damage` when the foe's edge is inside `reach` px (landing on `hit_frame` of the attack strip, `cooldown` s apart, pushing `knock` through the weight split at `weight`) and walks back when the foe dies or gets away. Counts per village are the placement's (`lancers` is the garrison, dealt round the guard posts); colours are drawn per NPC from a shuffled cycle, never one colour per village.",
+  "_note": "Village NPCs (HI-3, journals/human_island_journal.md). Tuning per kind: `speed` px/s, `idle` seconds between walks (min, max), `leash` tiles from home a wander target may stray (a pen animal's -- sheep or pig -- is clamped to its corral as well), `radius` px for the walkability probe. `rigs` name the character rigs by colour; `work` is the smith's one-shot flourish (chance per idle). A kind with `aggro` fights: it charges an enemy within `aggro` tiles at `charge` px/s, keeps within `chase` tiles of home, thrusts for `damage` when the foe's edge is inside `reach` px (landing on `hit_frame` of the attack strip, `cooldown` s apart, pushing `knock` through the weight split at `weight`) and walks back when the foe dies or gets away. Counts per village are the placement's (`lancers` is the garrison, dealt round the guard posts); colours are drawn per NPC from a shuffled cycle, never one colour per village. The seahorse boats (journals/fish_hut_journal.md) are the water counterpart of the pen animals: `kinds.seahorse_boat` drifts within `leash` tiles of a home spot on open water, a home dealt `boat_ring` tiles out from its fish hut; `placement.boats` per hut. `rigs` for a boat is a list, one sheet drawn at random per boat -- the riders are art, never enemies. `placement.fish_huts` is how many huts an island rolls; where they moor is generation's (`world/gen/fish_huts.py`).",
   "colours": ["blue", "red", "yellow", "purple"],
   "kinds": {
     "pawn": {
@@ -46,6 +46,13 @@
       "idle": [2.0, 7.0],
       "leash": 0.6,
       "radius": 9
+    },
+    "seahorse_boat": {
+      "rigs": ["npc_seahorse_boat_idle", "npc_seahorse_boat_bomb_fish", "npc_seahorse_boat_harpoon_shark", "npc_seahorse_boat_paddle_shark"],
+      "speed": 14,
+      "idle": [2.0, 6.0],
+      "leash": 0.3,
+      "radius": 10
     }
   },
   "placement": {
@@ -53,6 +60,9 @@
     "extra_pawns": [1, 2],
     "lancers": [4, 5],
     "sheep": [2, 4],
-    "pigs": [2, 3]
+    "pigs": [2, 3],
+    "fish_huts": [1, 3],
+    "boats": [2, 4],
+    "boat_ring": [0.7, 1.0]
   }
 }

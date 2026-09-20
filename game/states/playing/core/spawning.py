@@ -246,12 +246,25 @@ class EnemyControl:
         self.host.close()
 
     def lod_eligible(self, enemy, view) -> bool:
-        """May this enemy tick at the reduced rate (S7)? Only one that is
-        neither chasing nor inside the padded view: what the player can see
-        or is fighting always ticks every frame."""
-        if view.collidepoint(enemy.pos.x, enemy.pos.y):
-            return False
-        return not self.host.is_pursuing(enemy)
+        """May this enemy tick at the reduced rate (S7)? Anything outside the
+        padded view: what the player can *see* ticks every frame.
+
+        The chase used to be exempt as well, on the reasoning that what the
+        player is fighting must never be stepped coarsely. That exemption
+        quietly switched the whole LOD off on 2026-09-19, when the aggro
+        ranges were roughly doubled and then cut to 660-1200: almost every
+        live body is pursuing now, so almost nothing was eligible. Measured
+        at 200 live, update p50 was 6.94 ms at lod 1 against 6.70 at lod 4 --
+        three per cent across the entire range, which is the LOD doing
+        nothing at all.
+
+        A body chasing from off screen is still chasing; the player simply
+        cannot see it do so, and it arrives at the same moment either way
+        because the skipped frames are paid back in the next tick's `dt`.
+        The view is what the exemption was really protecting, and the view
+        is what it keeps.
+        """
+        return not view.collidepoint(enemy.pos.x, enemy.pos.y)
 
     def tick_director(self, dt: float) -> None:
         ps = self.ps

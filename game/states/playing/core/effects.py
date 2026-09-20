@@ -121,6 +121,54 @@ class TransientFx:
                                life=0.2, radius=2)
             proj.active = False
 
+    def _terrain_stops(self, proj, pos) -> bool:
+        """Would a bouncing shot at `pos` be stopped by the terrain: a
+        terrace above the floor it was fired from (the D10 rule), or ground
+        it cannot roll on at all -- a cliff face, the shoreline, the sea?"""
+        gm = self.ps.game_map
+        levels = getattr(gm, "_levels", None)
+        if levels is not None and proj.fire_level != _NO_LEVEL:
+            here = levels.top_at_point(pos.x, pos.y)
+            if here != _NO_LEVEL and here > proj.fire_level:
+                return True
+        return not gm.is_walkable(pos, proj.radius)
+
+    def bounce(self, proj, before) -> None:
+        """A pinball (buff buildings) reflects off what an ordinary shot dies
+        against: an obstacle, about the normal from the obstacle's centre;
+        terrain, about the axis it crossed (probed one axis at a time, both
+        at a corner). Each bounce costs one of `bounces_left`; the last one
+        spends the ball."""
+        ps = self.ps
+        if not proj.active:
+            return
+        hit = ps.game_map.blocking_obstacle_hit(proj.pos, proj.radius)
+        if hit is not None:
+            n = proj.pos - hit.pos
+            if n.length_squared() < 1e-6:
+                n = -proj.vel
+            n = n.normalize()
+            proj.vel -= 2.0 * proj.vel.dot(n) * n
+            proj.pos.update(hit.pos + n * (hit.radius + proj.radius + 1.0))
+        elif self._terrain_stops(proj, proj.pos):
+            along_x = pygame.Vector2(proj.pos.x, before.y)
+            along_y = pygame.Vector2(before.x, proj.pos.y)
+            flip_x = self._terrain_stops(proj, along_x)
+            flip_y = self._terrain_stops(proj, along_y)
+            if not flip_x and not flip_y:
+                flip_x = flip_y = True                    # a corner: straight back
+            if flip_x:
+                proj.vel.x = -proj.vel.x
+            if flip_y:
+                proj.vel.y = -proj.vel.y
+            proj.pos.update(before)
+        else:
+            return
+        proj.bounces_left -= 1
+        ps.particles.burst(proj.pos, proj.color, count=4, speed=90, life=0.25, radius=2)
+        if proj.bounces_left <= 0:
+            proj.active = False
+
     def update_projectiles(self, dt: float) -> None:
         """Advance both projectile pools, block them on obstacles, and drop
         hostile shots that leave the world margin. A player projectile carrying
@@ -130,8 +178,11 @@ class TransientFx:
             before = pygame.Vector2(p.pos)
             p.update(dt)
             self.ride_stuck(p)
-            self.block_on_obstacle(p)
-            self.block_on_terrain(p)
+            if p.bounces_left > 0:
+                self.bounce(p, before)
+            else:
+                self.block_on_obstacle(p)
+                self.block_on_terrain(p)
             self._shed_trail(p, (p.pos - before).length())
             if p.blast_radius > 0.0 and not p.active and not p.detonated:
                 self.detonate(p)        # fuse ran out, or the bomb was blocked
@@ -150,7 +201,11 @@ class TransientFx:
             # player (`journals/bomb_fish_journal.md`).
             if p.blast_radius > 0.0 and not p.active and not p.detonated:
                 p.detonated = True
-                self.explosion(pygame.Vector2(p.pos), p.blast_radius, p.damage)
+                # No screen-shake for the thrown bomb (owner, 2026-09-19):
+                # the Bloat lobs one every few seconds and a shake per landing
+                # was too much. The corpse blast on death keeps its shake.
+                self.explosion(pygame.Vector2(p.pos), p.blast_radius, p.damage,
+                               shake=False)
         ps.hostiles.sweep()
 
     # --- bombs (six-weapon system P1) ----------------------
@@ -343,12 +398,23 @@ class TransientFx:
         ps.melee_hitboxes = [h for h in ps.melee_hitboxes if h.alive]
 
     # --- blast visuals -------------------------------------
-    def explosion(self, pos: pygame.Vector2, radius: float, damage: float) -> None:
+    def explosion(self, pos: pygame.Vector2, radius: float, damage: float,
+                  shake: bool = True) -> None:
+        """The enemy side's area damage: ring, burst, and a hit on the player
+        if they stand inside `radius`. `shake` is on for the corpse blast an
+        exploder leaves when it dies, and off for the Bloat's thrown bomb."""
         ps = self.ps
         ps._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
                                "t": 0.0, "dur": 0.35})
         ps.particles.burst(pos, (255, 160, 80), count=22, speed=260, life=0.5)
-        ps.shake.add(0.4)
+        if shake:
+            ps.shake.add(0.4)
+        # UNUSED, ready to implement: the thrown-bomb detonation used to shake
+        # the screen too (owner removed it, 2026-09-19). To bring it back drop
+        # `shake=False` from the bomb call in `update_projectiles`, or give the
+        # bomb its own lighter amplitude here:
+        # elif <this is a thrown bomb>:
+        #     ps.shake.add(0.2)
         if (ps.player.pos - pos).length() <= radius + ps.player.radius:
             taken = ps.player.take_damage(damage)
             if taken > 0:

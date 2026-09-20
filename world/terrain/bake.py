@@ -107,6 +107,10 @@ def bake_steps(layout):
     if config.TERRAIN_DECOR:
         terrain_decor.build_decor_scatter(t, a)
         yield "clutter"
+        # The dressing round each buff building (journal:
+        # buff_buildings_journal.md): scenery, on top of the clutter.
+        terrain_decor.build_building_dressing(t, a)
+        yield "dressing"
         terrain_decor.build_water_decor(t, a)
         yield "water scenery"
 

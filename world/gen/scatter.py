@@ -10,6 +10,7 @@ from world.rules import frontier
 from world.rules import biome as biomes
 from world.gen.height.graph import walk_links
 from world.gen.settings import settings_or_config
+from world.gen.buildings import _scatter_buildings
 from world.layout import VSTAIR, EWSTAIR
 from world.gen.tuning import (
     SPECIAL_KINDS, VILLAGE_KIND, _OBSTACLE_GAP, _PAIR_GAPS,
@@ -237,6 +238,14 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
     # via the shared `(o.radius + 46)` check.
     if settings_or_config(settings).buildings:
         _scatter_houses(rooms, all_doors, rng, boss_id, out, reach)
+        # The buff buildings (journal: buff_buildings_journal.md), on the
+        # same footing as the houses: seated before the trees so the small
+        # obstacles below space off them too.
+        from game.content import get_content
+        _scatter_buildings(rooms, all_doors, rng, boss_id, out, reach,
+                           get_content().buildings, blocks=_blocks,
+                           doors_near=_doors_near, uphill_ok=_uphill_ok,
+                           radius_of=_radius, keep_pad=pad, biome_at=_biome_at)
 
     for room in rooms:
         if room.kind == VILLAGE_KIND:

@@ -229,6 +229,17 @@ class Village:
     company: int = 0
 
 
+class FishHut(NamedTuple):
+    """A fish hut moored beside a bridge (`world/gen/fish_huts.py`,
+    journals/fish_hut_journal.md): on open water, `_FH_OUT` tiles off the
+    side of `corridor`'s span near where it meets island `room_id`. The run
+    draws the hut here and deals its seahorse boats round it."""
+    room_id: int
+    corridor: int
+    x: float
+    y: float
+
+
 @dataclass
 class WorldLayout:
     seed: int
@@ -246,9 +257,22 @@ class WorldLayout:
     # CB-9: the treasure chests, seated on the resource anchors above by the
     # last stage of generation. In island order.
     chests: list = field(default_factory=list)
+    # The fish huts moored beside the bridges, one to three per island that
+    # has one (`world/gen/fish_huts.py`). In island order.
+    fish_huts: list = field(default_factory=list)
 
     def room(self, rid: int) -> Room:
         return self.rooms[rid]
+
+    def buff_buildings(self, kinds) -> list:
+        """The buff buildings (journal: buff_buildings_journal.md): every
+        obstacle whose kind is one of the buff `kinds`, in scatter order --
+        the primaries only, never a wide building's collide-only satellites.
+        Read off the obstacles rather than kept as a list of its own, so a
+        building the repair pass took back is gone here too."""
+        kinds = set(kinds)
+        return [o for o in self.obstacles
+                if o.kind in kinds and getattr(o, "skin", True)]
 
     def walkable_rects(self) -> list[pygame.Rect]:
         return [r.rect for r in self.rooms] + [c.rect for c in self.corridors]

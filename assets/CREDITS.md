@@ -39,7 +39,9 @@ Tiny Swords supplies the main art of the game:
   bushes, rocks, stumps, decorations, clouds and animals scattered over them.
   The village buildings in `assets/buildings/`, the forge and healing facilities
   and the corral animals (the sheep and pigs in `assets/terrain/npcs/`) are also
-  from this pack.
+  from this pack, as are the fish huts moored beside the bridges and the
+  seahorse boats drifting round them (`assets/terrain/npcs/fish_hut/`,
+  `assets/terrain/npcs/seahorse_boat/`).
 - **Characters** — `assets/characters/`: the three heroes are Tiny Swords units
   (Aegis = blue Warrior, Kestrel = yellow Archer, Nihil = purple Monk), with the
   shared death poof and the hero summons drawn from the same sheets.
@@ -145,7 +147,26 @@ fill when a file is missing.
 | Pixel Art Potion Pack 32x32 | xnaxlzz | https://xnaxlzz.itch.io/pixel-art-potion-pack-32x32 |
 | 32x32 RPG Swords with Evolutions | maasa | https://maasa.itch.io/32x32-rpg-swords-with-evolutions |
 | Combat FX | RagnaPixel | https://ragnapixel.itch.io/combat-fx |
-| Super Pixel Effects Gigapack | Untied Games | https://untiedgames.itch.io/super-pixel-effects-gigapack |
+| Super Pixel Effects Gigapack | Untied Games | https://untiedgames.itch.io/super-pixel-effects-gigapack — used for the sanctuary heal loop (`assets/terrain/facilities/heal_effect.png`, cut from `spell_heal_002_large_green` by `tools/asset_pipeline/cut_heal_effect.py`); credit line per the pack licence: "Super Pixel Effects Gigapack - Will Tice / unTied Games" |
 | Free RPG Maker Chests | franjatesa | https://franjatesa.itch.io/free-rpgmaker-chests |
 | 750+ Effect and FX Pixel All | BDragon1727 | https://bdragon1727.itch.io/750-effect-and-fx-pixel-all |
 | Goth | ansimuz | https://ansimuz.itch.io/goth |
+
+### Where the additional packs are used
+
+- **Super Pixel Effects Gigapack** — the buff buildings' feedback
+  (`documentation/journals/buff_buildings_journal.md`): the five hero
+  activation strips in `assets/effects/buffs/` (`spell_absorb_001` yellow,
+  `spell_buff_001` orange, `spell_haste_001` blue, `spell_dispel_001` violet,
+  `spell_attack_up_001` red, all large) and the HUD stills in
+  `assets/ui/hud/buffs/` (one frame each of those, plus `symbol_defense_up_001`
+  and `symbol_attack_up_001` small), packed by
+  `tools/asset_pipeline/cut_buff_buildings.py`. The buildings themselves
+  (`assets/buildings/general/`), their dressing (`assets/terrain/props/dressing/`)
+  and the pinball (`assets/projectiles/pinball.png`) are Tiny Swords pieces from
+  the reserve, copied by the same script.
+- **Super Pixel Effects Gigapack** — the end banners in `assets/ui/end_banners/`:
+  `game_over.png` is the pack's `symbol_game_over_text_001` (large, red) and
+  `you_won.png` its `symbol_you_won_text_001` (large, yellow), each re-laid as a
+  grid sheet by `tools/asset_pipeline/cut_end_banners.py`. The pack itself is
+  kept unmodified under `assets/unused/` and is not read at run time.

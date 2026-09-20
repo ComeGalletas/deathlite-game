@@ -294,6 +294,41 @@ class RangedForgeTests(unittest.TestCase):
         self.assertGreater(s[0].damage, 3 * C.weapon("magic_rod")["damage"])
 
 
+class ArcaneStormOnTheDummyTests(unittest.TestCase):
+    """The level-25 bench row that read 1510 dps (`dps_report_2026-09-19`):
+    a Rod forged into Arcane Storm beside a Hammer. Two faults, one cause --
+    the motes carried the Rod's `pierce: 0`, died on every touch, were
+    replanted at the hero's feet each frame (thousands of hits), and their
+    recycled pool objects came back as the Hammer's blow, which the orbit
+    refresh then shrank to a 6 px mote that never landed."""
+
+    def test_motes_rehit_on_their_interval_and_the_hammer_still_lands(self):
+        from tools.benchmarks import dps_bench
+        game, ps = dps_bench._start_dev_run()
+        rod = Weapon("magic_rod", C.weapon("magic_rod"))
+        apply_forge(rod, F.get("arcane_storm"))
+        ps.player.weapons[:] = [Weapon("hammer", C.weapon("hammer")), rod]
+        dummy = dps_bench._arm_dummy(game, ps)
+        ps.player.pos.update(dummy.pos.x - dps_bench.STANDOFF, dummy.pos.y)
+        hits: dict = {}
+        record = ps.dps.record
+        def sink(amount, source=None):
+            hits[source] = hits.get(source, 0) + 1
+            record(amount, source)
+        dummy.damage_sink = sink
+        seconds = 5.0
+        for _ in range(int(seconds / dps_bench.DT)):
+            dps_bench._isolate(ps, dummy)
+            ps.update(dps_bench.DT)
+            ps.player.pos.update(dummy.pos.x - dps_bench.STANDOFF, dummy.pos.y)
+        motes = rod._projectile_count()
+        rehit = float(rod.definition["rehit_interval"])
+        ceiling = motes * (seconds / rehit + 1)        # every mote, every interval
+        self.assertGreater(hits.get("magic_rod", 0), 0)
+        self.assertLessEqual(hits["magic_rod"], ceiling)
+        self.assertGreaterEqual(hits.get("hammer", 0), 2)
+
+
 class BombForgeTests(unittest.TestCase):
     def _bomb_projectile(self, ps, wid_forge, **extra):
         w = Weapon("bomb", C.weapon("bomb"))

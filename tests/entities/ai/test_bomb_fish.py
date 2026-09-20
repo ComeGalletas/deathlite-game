@@ -198,3 +198,44 @@ class RigTests(unittest.TestCase):
         c = get_content().enemies["bomb_fish"]
         self.assertGreater(c["explode_radius"], 0)
         self.assertGreater(c["explode_damage"], 0)
+
+
+class ShakeTests(unittest.TestCase):
+    """The thrown bomb no longer shakes the screen (owner, 2026-09-19); the
+    corpse blast on death still does. Both go through the same hostile
+    `explosion` helper, so this pins which side of the `shake` switch each
+    caller is on."""
+
+    def _ps(self):
+        from tests.combat.fakes import fake_ps
+        ps = fake_ps()
+        ps.shakes = []
+        ps.shake = SimpleNamespace(add=lambda amt: ps.shakes.append(amt))
+        # far enough that neither blast reaches the hero: only the shake matters
+        ps.player.pos = pygame.Vector2(10_000, 10_000)
+        return ps
+
+    def test_a_landed_bomb_detonates_without_a_shake(self):
+        """Driven through the hostile loop, as in play: a spent bomb in
+        `ps.hostiles` bursts on the player's side and leaves the screen
+        still."""
+        ps = self._ps()
+        c = get_content().enemies["bomb_fish"]
+        p = ps.hostiles.acquire()
+        p.reset(pos=pygame.Vector2(0, 0), vel=pygame.Vector2(),
+                damage=c["shoot_damage"], radius=c["shot_radius"],
+                lifetime=DT / 2, hostile=True, style="bomb",
+                blast_radius=c["shot_blast_radius"], inert=True)
+        ps.fx.update_projectiles(DT)
+        self.assertTrue(p.detonated, "the spent bomb never went off")
+        self.assertEqual(len(ps._explosions), 1)
+        self.assertEqual(ps.shakes, [])
+
+    def test_the_corpse_blast_still_shakes(self):
+        """`combat.py` calls the helper with no `shake` argument for the
+        death pop, and that default stays on."""
+        ps = self._ps()
+        c = get_content().enemies["bomb_fish"]
+        ps.fx.explosion(pygame.Vector2(0, 0), c["explode_radius"],
+                        c["explode_damage"])
+        self.assertEqual(len(ps.shakes), 1)

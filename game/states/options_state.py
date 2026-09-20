@@ -13,9 +13,11 @@ change; Mute silences the lot.
 
 Start-screen milestone M2. Reached from the menu's "Options" entry. Up / Down
 (also W / S) move the cursor; Left / Right adjust the master volume, cycle
-the key layout (CB-5: WASD move / arrows aim, or the swap), switch the
-display mode or step the resolution; ENTER toggles mute, cycles the layout
-or the mode, steps the resolution, or opens the selected screen; ESC (or the
+the key layout (CB-5: WASD move / arrows aim, or the swap), toggle the
+Tutorials (the run's opening keycap hints -- journal key_icons_journal.md,
+pass 5), switch the display mode or step the resolution; ENTER toggles mute
+or the tutorials, cycles the layout or the mode, steps the resolution, or
+opens the selected screen; ESC (or the
 "Back" row) returns to the menu. Every change is persisted immediately, the
 same as the `M` mute key.
 
@@ -57,6 +59,7 @@ from ui.mouse import BUTTON_LEFT, MouseNav
 
 _LABELS = {"master": "Master volume", "music": "Music volume",
            "sfx": "Sound effects", "mute": "Mute", "key_layout": "Key layout",
+           "tutorials": "Tutorials",
            "display": "Display mode", "resolution": "Resolution",
            "sanctuary": "Sanctuary", "back": "Back"}
 
@@ -67,7 +70,7 @@ _SLIDER_ROWS = ("master", "music", "sfx")
 # right of it; the mouse band spans from just left of the `>` marker to past
 # the percentage, and is exactly `_ROW_STEP` tall so bands touch but never
 # overlap.
-_ROW_TOP, _ROW_STEP = 200, 74        # nine rows from here still clear the hint
+_ROW_TOP, _ROW_STEP = 180, 68        # ten rows from here still clear the hint (pass 5)
 _LABEL_DX, _VALUE_DX = -250, 250
 _BAR_W, _BAR_H, _PCT_DX = 220, 22, 236
 _BAND_DX, _BAND_W = -40, 590         # from the label column
@@ -92,9 +95,9 @@ class OptionsState(State):
         self.in_run = bool(in_run)
         if self.in_run:
             self.music = MUSIC_INHERIT   # keep the run's track playing
-        self._rows = ("master", "music", "sfx", "mute", "key_layout", "display",
-                      "resolution", "back") if self.in_run else (
-            "master", "music", "sfx", "mute", "key_layout", "display",
+        self._rows = ("master", "music", "sfx", "mute", "key_layout", "tutorials",
+                      "display", "resolution", "back") if self.in_run else (
+            "master", "music", "sfx", "mute", "key_layout", "tutorials", "display",
             "resolution", "sanctuary", "back")
         self.sel = 0
         self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
@@ -243,6 +246,9 @@ class OptionsState(State):
         if rid == "key_layout":
             self.game.cycle_key_layout()
             return
+        if rid == "tutorials":
+            self.game.set_tutorials(not self.game.tutorials)
+            return
         if rid == "display":
             self._toggle_display_mode()
             return
@@ -269,6 +275,8 @@ class OptionsState(State):
             self.game.persist()
         elif rid == "key_layout":
             self.game.cycle_key_layout()
+        elif rid == "tutorials":
+            self.game.set_tutorials(not self.game.tutorials)
         elif rid == "display":
             self._toggle_display_mode()
         elif rid == "resolution":
@@ -347,6 +355,11 @@ class OptionsState(State):
             elif rid == "key_layout":
                 val = self._row.render(
                     config.KEY_LAYOUT_LABELS[self.game.key_layout], True, colour)
+                surface.blit(val, val.get_rect(midleft=(vx, y)))
+            elif rid == "tutorials":
+                # The run's opening keycap hints (journal: key_icons_journal.md,
+                # pass 5). Every run while On; Off hides them.
+                val = self._row.render("On" if self.game.tutorials else "Off", True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
             elif rid == "display":
                 val = self._row.render(self.game.display.mode_label(), True, colour)

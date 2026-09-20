@@ -162,6 +162,12 @@ class GameMap:
             return self._rects[0].collidepoint(x, y)
         return floor_rules.point_on_floor(self.layout, x, y)
 
+    def is_open_water(self, x: float, y: float) -> bool:
+        """Off every island cell and every bridge: where a seahorse boat may
+        drift (`entities/npc.py`, `WaterNpc`). The floor rule's complement,
+        through the same one body of it."""
+        return not self._point_ok(x, y)
+
     def _room_of(self, x: float, y: float):
         """The island whose floor the point actually stands on, or `None`."""
         if self.layout is None:

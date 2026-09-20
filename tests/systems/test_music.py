@@ -53,6 +53,7 @@ class TrackDeclarationTests(unittest.TestCase):
         # this test rather than at module load.
         from game.states.character_select_state import CharacterSelectState
         from game.states.dev_menu_state import DevMenuState
+        from game.states.end_banner_state import EndBannerState
         from game.states.game_over_state import GameOverState
         from game.states.level_up_state import LevelUpState
         from game.states.loading_state import LoadingState
@@ -65,7 +66,7 @@ class TrackDeclarationTests(unittest.TestCase):
         from game.states.run_status_state import RunStatusState
         from game.states.victory_state import VictoryState
 
-        every = (CharacterSelectState, DevMenuState, GameOverState, LevelUpState,
+        every = (CharacterSelectState, DevMenuState, EndBannerState, GameOverState, LevelUpState,
                  LoadingState, MenuState, MetaState, OptionsState, PausedState,
                  PlayingState, RankingsState, RunStatusState, VictoryState)
         for cls in every:
@@ -98,10 +99,14 @@ class TrackDeclarationTests(unittest.TestCase):
             self.assertIs(cls.music, MUSIC_INHERIT, cls.__name__)
 
     def test_both_end_screens_fade_to_silence(self):
+        from game.states.end_banner_state import EndBannerState
         from game.states.game_over_state import GameOverState
         from game.states.victory_state import VictoryState
         self.assertIsNone(GameOverState.music)
         self.assertIsNone(VictoryState.music)
+        # ...and the banner in front of them, so the fade starts the moment
+        # the outcome is decided, as it did when the screens came up at once.
+        self.assertIsNone(EndBannerState.music)
 
 
 class SilentBackendTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-"""CB-9 in the run: the chest props, the `E` prompt, and what opening one
+"""CB-9 in the run: the chest props, the interact key, and what opening one
 actually pays out.
 
 Covers `entities.chest.Chest` against a stub hero and its animation clock,
@@ -14,6 +14,7 @@ import unittest
 import pygame
 
 from entities.chest import Chest
+from game import config
 from game.content import get_content
 from game.game import Game
 from game.states.playing.core.state import PlayingState
@@ -122,12 +123,6 @@ class ProximityTests(unittest.TestCase):
         _put(p, "common")
         p.chest_manager.activate_nearby()
         self.assertIsNone(p.chest_manager.nearby())
-
-    def test_the_prompt_names_the_tier(self):
-        _g, p = _run()
-        p.chests = []
-        chest = _put(p, "epic")
-        self.assertIn("Epic", p.chest_manager.prompt(chest))
 
 
 class PayoutTests(unittest.TestCase):
@@ -258,25 +253,26 @@ class KeyTests(unittest.TestCase):
         _g, p = _run()
         p.chests = []
         chest = _put(p, "common")
-        p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_e))
+        p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=config.KEY_INTERACT))
         self.assertTrue(chest.opened)
 
     def test_e_away_from_anything_does_nothing(self):
         _g, p = _run()
         p.chests = []
-        p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_e))
+        p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=config.KEY_INTERACT))
         self.assertEqual(p.stats["chests"], 0)
 
-    def test_a_special_location_still_wins_the_key(self):
-        """Locations are asked first; a chest can never be seated inside a
-        special island's clear disc, so this only pins the ordering."""
+    def test_a_special_location_wins_a_tie(self):
+        """The key goes to the closest element; at an equal distance the
+        location wins, as it always did. A chest can never be seated inside
+        a special island's clear disc, so this only pins the tie rule."""
         _g, p = _run()
         p.chests = []
         it = next((i for i in p.interactables if i.kind == "shrine"), None)
         self.assertIsNotNone(it, "seed 1234 has no shrine")
         p.player.pos.update(it.pos)
         chest = _put(p, "epic", it.pos)
-        p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_e))
+        p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=config.KEY_INTERACT))
         self.assertTrue(it.used)
         self.assertFalse(chest.opened)
 

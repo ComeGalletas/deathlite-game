@@ -60,6 +60,20 @@ _HOUSE_MIN_ROOM_CELLS = 60
 _HOUSE_GLOBAL_CAP = 7
 _VILLAGE_MIN_ROOM_CELLS = 100
 _VILLAGE_EXTRA = (1, 3)                 # extra buildings beyond the first
+
+# Buff buildings (journal: buff_buildings_journal.md): `world/gen/buildings.py`
+# seats two to five interactive buildings on every island but the village
+# and the boss arena, right after the houses. The kinds, radii and dressing
+# come from data/world/buildings.json; these are the placement knobs the
+# owner asked to be parametrisable (2026-09-19), read as defaults when the
+# data's `placement` block leaves one out.
+_BUFF_PER_ISLAND = (2, 5)               # buildings per eligible island
+_BUFF_MIN_ROOM_CELLS = 40               # an island smaller than this gets none
+_BUFF_MIN_ROOM_TILES = 5                # ... or narrower than this
+_BUFF_GAP_TILES = 3.0                   # centre-to-centre, building to building
+_BUFF_RING_TILES = (1.4, 2.8)           # the dressing ring round a building
+_BUFF_DRESSING = (3, 6)                 # non-colliding props per building
+_BUFF_PLACE_TRIES = 24
 _VILLAGE_RADIUS = (3, 5)               # cluster spread, in tiles, from the first
 
 # --- the village pass (`world/gen/village.py`, HI-2) -------------------------
@@ -259,3 +273,14 @@ _GRID_BOSS_CLEAR_RADIUS = 512.0        # 8 tiles
 # bubble around the pixel the hero spawns at, big enough for the widest
 # obstacle radius (34) plus the player's (16) plus a margin.
 _GRID_SPAWN_CLEAR = 96.0               # 1.5 tiles
+
+# --- fish huts (journals/fish_hut_journal.md) -------------------------------
+# A hut moors beside a bridge: `_FH_ALONG` tiles along the span out from where
+# it meets the island, `_FH_OUT` tiles off the bridge's centre line to one side.
+# `_FH_CLEAR` is the disc of open water a hut needs round it (its own art plus
+# the ring its boats drift on), and two huts keep `_FH_APART` tiles apart.
+# How many an island rolls is the NPC data's `placement.fish_huts`.
+_FH_ALONG = (1.0, 3.0)
+_FH_OUT = 2.4
+_FH_CLEAR = 1.7
+_FH_APART = 3.6

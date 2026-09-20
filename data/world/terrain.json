@@ -92,6 +92,10 @@
       "s": [
         17,
         17
+      ],
+      "n": [
+        17,
+        17
       ]
     },
     "raised": {
@@ -3452,28 +3456,28 @@
       }
     },
     "fx_heal": {
-      "frame": [
-        192,
-        192
-      ],
-      "anchor": [
-        96,
-        140
-      ],
-      "paint": [
-        47,
-        18,
-        98,
-        128
-      ],
-      "anims": {
-        "loop": {
-          "file": "terrain/facilities/heal_effect.png",
-          "frames": 11,
-          "fps": 12,
-          "loop": true
+        "frame": [
+          128,
+          128
+        ],
+        "anchor": [
+          64,
+          64
+        ],
+        "paint": [
+          31,
+          0,
+          66,
+          95
+        ],
+        "anims": {
+          "loop": {
+            "file": "terrain/facilities/heal_effect.png",
+            "frames": 36,
+            "fps": 15,
+            "loop": true
+          }
         }
       }
-    }
   }
 }

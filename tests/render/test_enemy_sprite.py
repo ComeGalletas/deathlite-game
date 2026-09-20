@@ -164,7 +164,11 @@ class DeathPoofTests(unittest.TestCase):
         self.assertGreaterEqual(len(p._death_fx), 1)
         self.assertEqual(p._death_fx[-1][3], 1.0)          # hero poof at full size
         self.assertEqual(p._death_fx[-1][4], p.player.radius)   # carries the radius
-        self.assertIsNotNone(p._death_seq_t)
+        # The run is ending under the end banner (journal: end_banner_journal.md)
+        # rather than cut to the summary: the poof gets its time.
+        from game.states.end_banner_state import EndBannerState
+        self.assertTrue(p._ending)
+        self.assertIsInstance(g.state_machine.current, EndBannerState)
         pygame.quit()
 
     def test_enemy_poof_carries_the_enemy_radius(self):
@@ -197,9 +201,14 @@ class ProjectileTrailTests(unittest.TestCase):
         against the 4-6 the spacing predicts. `fire_level = NONE` is the
         documented way to opt a projectile out; the rule has its own coverage in
         `tests/playing/test_projectile_elevation.py`.
+
+        The obstacle block is switched off the same way (`no_block`): with
+        the buff buildings on every island the pinned world grew an obstacle
+        inside the shot's 300 px, and the count collapsed to 3. Blocking has
+        its own coverage in `tests/playing/test_buffs.py` and the bomb tests.
         """
         base = dict(pos=pygame.Vector2(p.player.pos), vel=pygame.Vector2(300, 0),
-                    damage=1, radius=4, lifetime=9.0)
+                    damage=1, radius=4, lifetime=9.0, no_block=True)
         base.update(kw)
         pr = p._spawn_projectile(**base)
         if pr is not None:

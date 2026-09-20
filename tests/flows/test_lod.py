@@ -72,13 +72,41 @@ class TickLodTests(unittest.TestCase):
         self.assertEqual(dts[id(near)], {round(1 / 60, 6)})
         self.assertEqual(dts[id(far)], {round(2 / 60, 6)})
 
-    def test_a_chasing_enemy_far_away_still_ticks_every_frame(self):
+    def test_a_chasing_enemy_off_screen_is_stepped_at_the_reduced_rate(self):
+        """Reversed on 2026-09-19, and the reversal is the point.
+
+        A chase used to be exempt wherever it happened, on the reasoning
+        that what the player is fighting must tick every frame. Once the
+        aggro ranges were raised almost every live body was pursuing, so
+        the exemption became universal and the LOD stopped firing
+        altogether -- measured at 200 live, update p50 was 6.94 ms at lod 1
+        against 6.70 at lod 4, three per cent across the whole range.
+
+        A body chasing from off screen is still chasing; the player cannot
+        see it do so, and it arrives at the same moment either way because
+        the skipped frames are paid back in the next tick's `dt`. The view
+        is what the exemption was really protecting.
+        """
         ps = _run()
         far = ps.spawn.spawn_enemy("skull", at=_far_spot(ps))
         _slot(far)["until"] = ps.stats["time"] + 1000.0        # aggro timer running
         with mock.patch.object(config, "ENEMY_LOD_SKIP", 2):
-            counts, _ = self._count(ps, 40)
-        self.assertEqual(counts[id(far)], 40)
+            counts, dts = self._count(ps, 40)
+        self.assertEqual(counts[id(far)], 20)
+        self.assertEqual(dts[id(far)], {round(2 / 60, 6)})
+
+    def test_a_chasing_enemy_on_screen_still_ticks_every_frame(self):
+        """The half of the old rule that survives, and the one that was
+        worth protecting: what the player can watch is never stepped
+        coarsely, chasing or not."""
+        ps = _run()
+        near = ps.spawn.spawn_enemy("skull",
+                                    at=ps.player.pos + pygame.Vector2(200, 0))
+        _slot(near)["until"] = ps.stats["time"] + 1000.0
+        with mock.patch.object(config, "ENEMY_LOD_SKIP", 2):
+            counts, dts = self._count(ps, 40)
+        self.assertEqual(counts[id(near)], 40)
+        self.assertEqual(dts[id(near)], {round(1 / 60, 6)})
 
     def test_lod_one_ticks_everyone_every_frame(self):
         ps = _run()
@@ -88,16 +116,20 @@ class TickLodTests(unittest.TestCase):
         self.assertEqual(counts[id(far)], 30)
         self.assertEqual(dts[id(far)], {round(1 / 60, 6)})
 
-    def test_eligibility_is_the_padded_view_and_pursuit(self):
+    def test_eligibility_is_the_padded_view_and_nothing_else(self):
+        """One question now: can the player see it? Pursuit used to be a
+        second gate and is not one any more."""
         ps = _run()
         e = ps.spawn.spawn_enemy("skull", at=_far_spot(ps))
         view = ps.camera.visible_rect().inflate(config.ENEMY_LOD_VIEW_PAD,
                                                 config.ENEMY_LOD_VIEW_PAD)
         self.assertTrue(ps.spawn.lod_eligible(e, view))
         huge = ps.camera.visible_rect().inflate(20000, 20000)
-        self.assertFalse(ps.spawn.lod_eligible(e, huge))
+        self.assertFalse(ps.spawn.lod_eligible(e, huge), "in view: never LOD")
+        # chasing makes no difference to either answer
         _slot(e)["until"] = ps.stats["time"] + 5.0
-        self.assertFalse(ps.spawn.lod_eligible(e, view))
+        self.assertTrue(ps.spawn.lod_eligible(e, view))
+        self.assertFalse(ps.spawn.lod_eligible(e, huge))
 
 
 if __name__ == "__main__":

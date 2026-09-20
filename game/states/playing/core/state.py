@@ -47,12 +47,18 @@ from world.map import GameMap
 from world.pathfinding import NavField
 from spawn.budget import SpawnDirector
 from game.states.playing.visual import rendering as _rendering
+from game.states.playing.visual import hints as hints_draw
+from game.states.playing.visual import key_marker
 from game.states.playing.visual.rendering import WorldRenderer
 from game.states.playing.core.combat import CombatResolver
 from game.states.playing.core.physics import BumpResolver
 from game.states.playing.core.chests import Chests
+from game.states.playing.core import interactions
+from game.states.playing.core.hints import RunHints
 from game.states.playing.core.locations import SpecialLocations
+from game.states.playing.core.buffs import BuffSystem
 from game.states.playing.core.npcs import Npcs
+from game.states.playing.core.fish_huts import FishHuts
 from game.states.playing.core.effects import TransientFx
 from game.states.playing.devtools.dps_meter import DpsMeter
 from game.states.playing.core.run_ledger import RunLedger
@@ -90,6 +96,9 @@ class PlayingState(State):
         self._init_scaffold()
         self._init_nav()
         self._subscribe_events()
+        # The opening Move / Attack keycap hints (journal: key_icons_journal.md):
+        # last, since they read the hero's spawn.
+        self.hints = RunHints(self)
 
     # --- enter() steps ---------------------------------------------
     def _init_run(self, seed, dev, difficulty) -> None:
@@ -122,6 +131,8 @@ class PlayingState(State):
         self.game_map = (self._prebuilt.game_map if self._prebuilt is not None
                          else GameMap(seed=self.run_seed))
         self.locations = SpecialLocations(self)
+        # The buff buildings' timed buffs (journal: buff_buildings_journal.md).
+        self.buffs = BuffSystem(self)
         self.locations.build()
         # CB-9: the treasure chests the seed seated across the islands.
         self.chest_manager = Chests(self)
@@ -129,6 +140,8 @@ class PlayingState(State):
         # The villagers (HI-3): scenery that moves, from the village records.
         self.npc_manager = Npcs(self)
         self.npc_manager.build()
+        self.fish_hut_manager = FishHuts(self)
+        self.fish_hut_manager.build()
         self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng,
                                       difficulty=self.difficulty)
         self.spawn = EnemyControl(self)
@@ -156,7 +169,10 @@ class PlayingState(State):
         # Per-hero accent colour (primitive fallback + any HUD tint); the shared
         # config default covers characters with no `color`.
         self._hero_color = tuple(cdef.get("color", config.COLOR_PLAYER))
-        self._death_seq_t: float | None = None   # window held open for the hero death poof
+        # Set the frame the outcome is decided (HP at zero, or the boss down):
+        # the run stops taking input and fighting, keeps animating its effects
+        # under the end banner, and hands off when the banner is done.
+        self._ending: bool = False
 
         # Meta-progression + equipped items applied before the run starts.
         self._apply_persistent_bonuses()
@@ -311,16 +327,15 @@ class PlayingState(State):
             self.game.state_machine.push(RunStatusState(self.game), playing=self)
         elif event.key == pygame.K_ESCAPE:
             from game.states.paused_state import PausedState
+            self.hints.dismiss()             # the pause menu lists every key
             self._suspend_mouse()
             self.game.state_machine.push(PausedState(self.game))
-        elif event.key == pygame.K_e:
-            # Special locations first -- they were here before chests, and a
-            # chest can never be seated inside a special island's clear disc,
-            # so the two prompts cannot both be live.
-            if self.locations.nearby() is not None:
-                self.locations.activate_nearby()
-            else:
-                self.chest_manager.activate_nearby()
+        elif event.key == config.KEY_INTERACT:
+            # The closest usable chest or location within reach -- the one
+            # the keycap is floating over (journal: key_icons_journal.md).
+            target = interactions.nearest(self)
+            if target is not None:
+                interactions.activate(self, target)
         elif event.key == pygame.K_BACKQUOTE and self.dev_mode:
             from game.states.dev_menu_state import DevMenuState
             self._suspend_mouse()
@@ -393,11 +408,12 @@ class PlayingState(State):
 
     # --- pipeline ---------------------------------------------
     def update(self, dt: float) -> None:
-        if self._death_seq_t is not None:
-            self._run_death_sequence(dt)
+        if self._ending:
+            self._run_ending_sequence(dt)
             return
 
         self._phase_input()
+        self.hints.update(dt)
         self._phase_update(dt)
         self._phase_combat(dt)
         self._phase_progression(dt)
@@ -408,10 +424,12 @@ class PlayingState(State):
         self.dps.update(dt)
         self._apply_dev_unlimited_hp()
         if not self.player.alive:
-            # Hold the run open for the shared death poof, then end.
+            # The shared death poof, then the end banner over the scene: the
+            # run keeps animating its effects under it and hands off to the
+            # summary when the banner has played (journal: end_banner_journal.md).
             self.fx.spawn_death_fx(self.player.pos, getattr(self.player, "_facing", 1),
                                    radius=self.player.radius)
-            self._death_seq_t = 1.05
+            self._begin_end(victory=False)
         self._report_debug()
 
     def _apply_dev_unlimited_hp(self) -> None:
@@ -435,18 +453,12 @@ class PlayingState(State):
         self.difficulty = name
         self.director.set_difficulty(name)
 
-    def _run_death_sequence(self, dt: float) -> None:
-        if self.dev_mode and self._dev_unlimited_hp:
-            # Unlimited HP switched on mid-death-animation: cancel the end.
-            self._death_seq_t = None
-            self._death_fx.clear()
-            self._trail_fx.clear()
-            self.fx.update_spawn_fx(1e9)          # let any running burst out
-            self.player.alive = True
-            self.player.hp = max(self.player.hp, self._dev_hp_floor,
-                                 self.player.max_hp * 0.5)
-            return
-        self._death_seq_t -= dt
+    def _run_ending_sequence(self, dt: float) -> None:
+        """The run under the end banner's wait phase: no input, no combat, no
+        enemy motion and no clock -- only what is already in flight plays
+        out (the hero's last animation, the death poof, the boss burst,
+        particles, damage numbers, the shake). The banner overlay stops
+        calling this once its sprite starts, and ends the run itself."""
         self._update_hero_anim(dt)
         self.fx.update_death_fx(dt)
         self.fx.update_trail_fx(dt)
@@ -455,9 +467,6 @@ class PlayingState(State):
         self.particles.update(dt)
         self.damage_numbers.update(dt)
         self.shake.update(dt)
-        if self._death_seq_t <= 0.0:
-            self._death_seq_t = None
-            self._end_run(victory=False)
 
     def _main_weapon_for(self, cdef: dict) -> str:
         """The hero's starting weapon (P5, design §20): the data's default,
@@ -564,11 +573,13 @@ class PlayingState(State):
             self.boss.update(ectx)
 
         self.bump.resolve()          # CB-3: overlapping bodies shove each other
+        self.buffs.update(dt)        # timers, Turbo's bites, Pinball's throws
 
         self.fx.update_projectiles(dt)
 
         self._update_summons(dt)
         self.npc_manager.update(dt)
+        self.fish_hut_manager.update(dt)
         self.fx.update_hazards(dt)
         self.fx.update_melee_hitboxes(dt)
         self.chest_manager.update(dt)      # CB-9: the lids that are opening
@@ -761,7 +772,8 @@ class PlayingState(State):
     def _update_summons(self, dt: float) -> None:
         sctx = SimpleNamespace(enemies=self._targetables(),
                                spawn_projectile=self._spawn_projectile,
-                               player_pos=self.player.pos)
+                               player_pos=self.player.pos,
+                               attack_speed_mult=self.buffs.attack_speed_mult())
         for s in self.summons:
             s.update(dt, sctx)
         self.summons.sweep()
@@ -808,6 +820,7 @@ class PlayingState(State):
                 gem = self.gems.acquire()
                 if gem is not None:
                     gem.reset(enemy.pos, int(amount) or 3, is_soul=True)
+                    self.buffs.on_gem(gem)
             elif effect == "heal":
                 self.player.heal(amount)
             elif effect == "fire_nova" and "burn" in enemy.status:
@@ -870,6 +883,7 @@ class PlayingState(State):
         gem = self.gems.acquire()
         if gem is not None:
             gem.reset(pos, xp)
+            self.buffs.on_gem(gem)          # Magnet pulls a fresh drop at once
 
     def _collect_potions(self, dt: float) -> None:
         """CB-8: advance the dropped potions and heal on pickup.
@@ -947,7 +961,7 @@ class PlayingState(State):
         # tells two wins apart.
         self._boss_defeated = (self.boss.boss_id, self.boss.name)
         self.boss = None
-        self._end_run(victory=True)
+        self._begin_end(victory=True)
 
     # --- gold -------------------------------------
     # The balance and the run total move together here rather than at each
@@ -974,7 +988,28 @@ class PlayingState(State):
         return True
 
     # --- run end ----------------------------------
+    # Three steps (journal: end_banner_journal.md, 2026-09-19). `_begin_end`
+    # is what the hero's death and the boss kill call: it snapshots the
+    # summary *now* -- the time and gold the screens show are the run's at
+    # the moment the outcome was decided -- and pushes the end banner over
+    # the run, which calls `_hand_off` when its sprite has played. `_end_run`
+    # is the two back to back with no banner, for callers that want the
+    # summary screen at once (tests, mostly).
+    def _begin_end(self, *, victory: bool) -> None:
+        if self._ending:
+            return
+        self._ending = True
+        summary = self._snapshot_summary(victory)
+        from game.states.end_banner_state import EndBannerState
+        self.game.state_machine.push(
+            EndBannerState(self.game), victory=victory,
+            on_done=lambda: self._hand_off(summary, victory))
+
     def _end_run(self, *, victory: bool) -> None:
+        self._ending = True
+        self._hand_off(self._snapshot_summary(victory), victory)
+
+    def _snapshot_summary(self, victory: bool) -> dict:
         summary = dict(self.stats)
         summary["weapons"] = [(w.name, w.level) for w in self.player.weapons]
         summary["seed"] = self.run_seed
@@ -1023,6 +1058,9 @@ class PlayingState(State):
         summary["equipment"] = [
             {"name": it.name, "rarity": it.rarity, "slot": it.slot, "level": it.level}
             for it in getattr(self.player, "equipment", ())]
+        return summary
+
+    def _hand_off(self, summary: dict, victory: bool) -> None:
         self.game.events.publish(Events.RUN_ENDED, stats=summary, victory=victory,
                                  dev=self.dev_mode)
         if self.dev_mode:
@@ -1098,6 +1136,8 @@ class PlayingState(State):
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
             self.renderer.aim_overlay(surface)          # dev-only, same layer
+            key_marker.draw(surface, self)              # the interact cap, over its element
+            hints_draw.draw(surface, self)              # the opening Move / Attack hints
         finally:
             self.camera.pos += offset
 
@@ -1222,6 +1262,7 @@ class PlayingState(State):
                 out.append((lvl(sm.pos.x, sm.pos.y), sm.pos.y,
                             lambda s, sm=sm: self._draw_one_summon(s, sm)))
         out.extend(self.npc_manager.actor_items(view, lvl))
+        out.extend(self.fish_hut_manager.actor_items(view, lvl))
         out.append((lvl(self.player.pos.x, self.player.pos.y),
                     self.player.pos.y, self._draw_player))
         return out

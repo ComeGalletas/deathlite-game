@@ -15,6 +15,8 @@ Extra hit filters:
                  blocked) `TransientFx.detonate` spawns a blast of
                  `blast_radius` that lasts `blast_lifetime`.
   * stun_chance > 0       -- Hammer (P1); the resolver rolls a stun on hit.
+  * bounces_left > 0      -- a pinball (buff buildings); the obstacle and
+                 terrain blocks reflect it instead of killing it.
 `weapon_id` names the weapon that fired it (synergies read it later).
 
 `fire_level` carries the terrain elevation the shot was fired from, for the
@@ -41,6 +43,7 @@ class Projectile:
         "weapon_id", "age", "stop_after", "inert", "blast_radius",
         "blast_lifetime", "detonated", "stun_chance", "stun_duration",
         "no_block", "mine", "arm_delay", "swing", "sticky", "stuck_to",
+        "bounces_left",
     )
 
     def __init__(self) -> None:
@@ -92,6 +95,10 @@ class Projectile:
         self.swing = 0               # CR2: the attack's ordinal (1 = first); picks the slash
         self.sticky = False          # Sticky Bomb: attaches to the first enemy it touches...
         self.stuck_to = None         # ...and this is the enemy it rides on
+        # Buff buildings: a pinball reflects off obstacles, cliffs and the
+        # shoreline this many more times before it is spent; 0 for every
+        # ordinary shot, which the blocks kill on contact as before.
+        self.bounces_left = 0
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
               pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
@@ -105,7 +112,8 @@ class Projectile:
               blast_radius: float = 0.0, blast_lifetime: float = 0.0,
               stun_chance: float = 0.0, stun_duration: float = 0.0,
               no_block: bool = False, mine: bool = False,
-              arm_delay: float = 0.0, swing: int = 0, sticky: bool = False) -> None:
+              arm_delay: float = 0.0, swing: int = 0, sticky: bool = False,
+              bounces: int = 0) -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
@@ -148,6 +156,7 @@ class Projectile:
         self.swing = swing
         self.sticky = sticky
         self.stuck_to = None
+        self.bounces_left = int(bounces)
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:
@@ -163,6 +172,13 @@ class Projectile:
             return  # orbiters are persistent: no lifetime countdown
 
         self.age += dt
+        if self.rehit_interval > 0.0:
+            # A travelling shot with a re-hit interval (the pinball) keeps
+            # scoring on the enemies it rolls through, the way an orbiter does.
+            self.rehit_timer -= dt
+            if self.rehit_timer <= 0.0:
+                self.rehit_timer = self.rehit_interval
+                self.hit_ids.clear()
         if self.stop_after > 0.0 and self.age >= self.stop_after:
             self.vel.update(0, 0)        # a thrown bomb has landed
         self.pos += self.vel * dt
@@ -171,7 +187,18 @@ class Projectile:
             self.active = False
 
     def on_hit(self) -> None:
+        if self.is_orbiter:
+            # Persistent by design: it scores again every `rehit_interval`
+            # rather than being spent. A base weapon's `pierce` (the Rod's 0
+            # under the Arcane Storm forge) must not turn each mote into a
+            # one-hit shot that the weapon replaces at the hero's feet every
+            # frame -- that read as 1500 dps on the training dummy.
+            return
         if self.pierce_left > 0:
             self.pierce_left -= 1
         else:
             self.active = False
+
+    @property
+    def is_orbiter(self) -> bool:
+        return self.orbit_speed != 0.0 and self.anchor is not None

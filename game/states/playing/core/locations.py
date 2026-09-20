@@ -2,7 +2,7 @@
 
 `SpecialLocations` owns the run's `Interactable` list: it builds them from the
 layout, answers "is the hero standing on a usable one?", dispatches the per-kind
-`use_*` handler on the `E` key, and drives the elite-arena state machine each
+`use_*` handler on the interact key, and drives the elite-arena state machine each
 frame.
 
 Reads from `PlayingState`: `game_map`, `player`, `stats`, `rng`, `blessing_lib`,
@@ -42,6 +42,10 @@ class SpecialLocations:
         for v in getattr(ps.game_map.layout, "villages", ()):
             ps.interactables.append(Interactable("forge", v.forge.x, v.forge.y))
             ps.interactables.append(Interactable("fountain", v.heal.x, v.heal.y))
+        # The buff buildings (journal: buff_buildings_journal.md): one
+        # interactable on each building obstacle, which carries the art.
+        for o in ps.game_map.layout.buff_buildings(ps.buffs.kinds):
+            ps.interactables.append(Interactable(o.kind, o.pos.x, o.pos.y))
 
     def nearby(self):
         ps = self.ps
@@ -50,13 +54,20 @@ class SpecialLocations:
                 return it
         return None
 
-    def activate_nearby(self) -> None:
-        it = self.nearby()
-        if it is None:
+    def use(self, it) -> None:
+        """Run `it`'s per-kind handler (the interact key, via
+        `core/interactions.py`)."""
+        if self.ps.buffs.is_buff(it.kind):
+            self.ps.buffs.activate(it)
             return
         handler = getattr(self, f"use_{it.kind}", None)
         if handler is not None:
             handler(it)
+
+    def activate_nearby(self) -> None:
+        it = self.nearby()
+        if it is not None:
+            self.use(it)
 
     def grant_random_blessing(self) -> bool:
         ps = self.ps

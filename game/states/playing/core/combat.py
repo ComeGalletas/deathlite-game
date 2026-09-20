@@ -83,6 +83,9 @@ class CombatResolver:
                     enemy.killed_by_shot = (tuple(proj.source_tags), proj.damage, proj.radius)
                 self.remember_hit(proj, enemy)           # P4: after the multiplier
                 self.flurry(proj, enemy)
+                buffs = getattr(ps, "buffs", None)       # Vampire: 1 HP per hit
+                if buffs is not None and not no_dmg:
+                    buffs.on_weapon_hit(proj, enemy)
                 proj.hit_ids.add(id(enemy))
                 ps.stats["damage_dealt"] += dealt
                 ps.damage_numbers.add(enemy.pos, dealt, proj.is_crit)

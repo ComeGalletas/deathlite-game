@@ -10,9 +10,12 @@ Layering inside the returned surface, per cell:
     ground    the biome sheet for its level, autotiled by its open sides
     cliff     the stone face, `row` down the stack, run-capped left/right
     vstair    the grass channel, plus the stone sprite on top when "rock";
-              a north flight (`dir == "n"`) is ordinary plateau ground with
-              the stone sprite, flipped to ascend toward the camera, centred
-              on the seam between it and the landing north of it
+              a north flight (`dir == "n"`) is either, when "grass", plain
+              plateau grass on its rim cell with the channel piece
+              (`slots.ramp.n`) centred on the seam between it and the
+              landing north of it, or, when "rock", plateau ground with the
+              stone sprite flipped to ascend toward the camera, centred on
+              that seam -- never both
     ewstair   the biome `slots.ramp` wedge for its descent direction
 
 A side counts as **open** (and so gets a grass fringe / shoreline edge) only
@@ -609,19 +612,35 @@ def _paint_room(store, sheets, layout, room, banded: bool):
         if spr is not None:
             target.blit(spr, (x, y))
 
-    # A north flight's stairs sit centred on the seam between the landing
-    # and the rim, half on each tile, whatever the tag. Split at the seam
-    # and each half on its own floor: the foot half over the landing's
-    # grass on the low band, where a body on the landing draws over it;
-    # the top half over the rim tile on the plateau's band, where it
-    # covers the rim's lip in that column so the stairs cut through the
-    # edge rather than vanish under it.
+    # A north flight is one thing or the other (owner, 2026-09-20,
+    # north_stairs_journal NS-7), and either way it straddles the seam
+    # between the landing and the rim, half on each tile, each half on its
+    # own floor's band -- the landing's half on the low band, where a body
+    # on the landing draws over it; the rim's half on the plateau's band,
+    # so the connection cuts through the edge rather than vanishing under
+    # it. A **grass** flight first turns its rim cell into plain plateau
+    # grass (the sheet's interior tile, no lips), then lays the grass
+    # channel piece (`ramp.n`, the south channel by default: a strip with a
+    # lip down each side and open ends) centred on the seam, so the upper
+    # floor's grass runs half a tile past the rim line onto the lower
+    # floor. A **rock** flight keeps its autotiled rim tile and carries the
+    # stone flight centred on the seam the same way. Never both.
     for c, x, y in seams:
+        low_band = band(max(0, c.level - c.drop))
+        if c.tag != "rock":
+            sheet = sheet_for(c.level, room.kind, room)
+            band(c.level).blit(cell(sheet, interior), (x, y))
+            piece = ramp_slots.get("n") or ramp_slots.get("s")
+            if piece:
+                upper, lower = sheets.channel_halves(sheet, piece[-1])
+                low_band.blit(upper, (x, y - upper.get_height()))
+                band(c.level).blit(lower, (x, y))
+            continue
         halves = sheets.vstair_seam(c.drop)
         if halves is None:
             continue
         foot, top = halves
-        band(max(0, c.level - c.drop)).blit(foot, (x, y - foot.get_height()))
+        low_band.blit(foot, (x, y - foot.get_height()))
         band(c.level).blit(top, (x, y))
 
     # Trim each band to what it actually holds. A terrace occupies a fraction

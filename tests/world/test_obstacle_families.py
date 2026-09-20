@@ -54,10 +54,14 @@ class ShrubRetiredTests(unittest.TestCase):
             seen.update(o.kind for o in W.layout(seed).obstacles)
         # ... and the village pass (HI-2) added the buildings, the forge and
         # the fence, which stand only on a village island (`test_village`).
+        # ... and the buff buildings (journal: buff_buildings_journal.md),
+        # one obstacle kind per buff, on every island but the village and
+        # the boss arena (`test_buff_buildings`).
         self.assertTrue(seen.issubset(
             {"tree", "rock", "pillar", "house", "sign", "scarecrow",
              "forge", "barracks", "tower", "archery", "monastery", "castle",
-             "fence"}), seen)
+             "fence", "magnet", "turbo", "haste", "pinball", "vampire",
+             "gnome_hut"}), seen)
 
 
 class TreeColliderTests(unittest.TestCase):

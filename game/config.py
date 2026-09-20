@@ -627,6 +627,9 @@ HUD_LEVEL_NUDGE: tuple[int, int] = (-1, 0)
 # and the primitive rectangles that stand in when the sheets are missing. Sat
 # at 14 until the same 25 px drop (owner, 2026-09-12).
 HUD_LEFT_TOP: int = 39
+# The buff marks (journal: buff_buildings_journal.md, rev. 6): one icon
+# per active buff drawn over the hero, this many design px a side.
+BUFF_MARK_PX: int = 32
 # The boss bar, bottom centre: the same hex family as the hero's bars (owner,
 # 2026-09-12), framed, with the boss name above it. Its width is a fraction of
 # the screen so it stays half the frame at any resolution, and HUD_BOSS_BOTTOM
@@ -890,6 +893,21 @@ SPRITE_ANCHOR_DROP: float = 0.83
 # 0 disables the lock.
 END_SCREEN_INPUT_LOCK: float = 1.5
 
+# The end banner (owner, 2026-09-19; `documentation/journals/end_banner_journal.md`):
+# the run is held for `END_BANNER_WAIT` seconds with the world still
+# animating (the death poof, the boss burst), then the "GAME OVER" /
+# "You Won!" sprite plays once over the frozen, dimmed scene, then the last
+# frame holds `END_BANNER_HOLD` seconds before the summary screen comes up.
+# No key or click shortens it. `END_BANNER_SCALE` is the art's integer draw
+# scale in design pixels (416 x 128 -> 832 x 256 on the 1600-wide box).
+# The wait was 3 s; the owner cut it to 1 s (2026-09-20), long enough for the
+# death poof to finish, for both outcomes.
+END_BANNER_WAIT: float = 1.0
+END_BANNER_HOLD: float = 2.0
+END_BANNER_SCALE: int = 2
+END_BANNER_DIM_ALPHA: int = 150      # the pause overlay's dim, for one family
+END_BANNER_DIM_FADE: float = 0.4     # seconds the dim takes to settle
+
 RUN_DURATION_SECONDS: float = 600.0
 BOSS_FRACTION: float = 0.95   # boss spawns at 95% of the run (~570 s)
 # Where the boss appears: this far from the hero, on a random side, clamped
@@ -1002,6 +1020,18 @@ DEBUG_OVERLAY_DEFAULT: bool = False
 # a tuple so a layout may bind more than one key to it.
 AUTO_ATTACK_DEFAULT: bool = True      # `Q` toggles it in-run; no HUD element
 KEY_TOGGLE_AUTO_ATTACK: int = 113     # K_q
+# The one key that uses whatever the hero stands on (chest, shrine, forge,
+# sanctuary...). The prompt draws its keycap from this binding
+# (`ui/keycap.py`), so the key shown and the key handled cannot disagree.
+KEY_INTERACT: int = 101               # K_e
+
+# The run's opening hints (journal: key_icons_journal.md, pass 5): Move,
+# then Attack, as keycaps over the hero. Shown every run while the Options
+# "Tutorials" row is on (`game.tutorials`); this switch is the build's.
+TUTORIAL_HINTS: bool = True
+HINT_MOVE_DISTANCE: float = 96.0      # world px from the spawn: three tiles
+HINT_ATTACK_SECONDS: float = 8.0      # the Attack hint gives up after this
+HINT_FADE: float = 0.4                # a finished hint fades out over this
 
 # Half-angle of the fire-time aim-assist cone: a manual attack targets the
 # closest enemy inside this cone (out to the weapon's reach) and fires
