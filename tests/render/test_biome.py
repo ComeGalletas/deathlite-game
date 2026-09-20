@@ -383,9 +383,18 @@ class ScatterMixTests(unittest.TestCase):
         `layout.obstacles`, and this tally counted every one of them as a
         not-tree. Restricting it to the kinds the biome table declares puts
         the pooled share at 0.731 over these twelve seeds, one of them below
-        0.7 individually. The residual gap to the 0.772 below is real but
-        small -- buildings do take slots a tree might have had -- and sits
-        inside the 0.040 standard deviation recorded there.
+        0.7 individually.
+
+        The residual gap to the 0.772 below is the sample, not the buildings.
+        Twelve seeds read about 0.024 under the thirty-seed pool (see the note
+        on `SEEDS`), which puts that 0.772 near 0.748 here against the 0.731
+        measured -- inside the 0.040 standard deviation. Displacement was
+        measured rather than assumed: raising `per_island` from 2-5 to 10-14
+        and dropping the building gaps costs 0.6 % of the world's trees
+        (2707 -> 2691), so at the shipping count it is nothing. The corollary
+        is that this tally would not see buildings crowding trees out, since
+        it counts only what the scatter draws -- and at 0.6 % there is nothing
+        there to see.
 
         This briefly had to be lowered. The uphill keep-back rejects trees far
         more often than anything else (a canopy reaches four tiles north where
