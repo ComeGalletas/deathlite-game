@@ -10,6 +10,10 @@
 
   "keycap_blue":            {"file": "ui/buttons/blue.png",              "frame": [64, 64]},
   "keycap_blue_pressed":    {"file": "ui/buttons/blue_pressed.png",      "frame": [64, 64]},
+  "keycap_grey":            {"file": "ui/buttons/grey.png",              "frame": [64, 64]},
+  "keycap_grey_wide":       {"file": "ui/buttons/grey_wide.png",         "frame": [192, 64]},
+  "keycap_blue_wide":       {"file": "ui/buttons/blue_wide.png",         "frame": [192, 64]},
+  "keycap_blue_wide_pressed": {"file": "ui/buttons/blue_wide_pressed.png", "frame": [192, 64]},
 
   "ribbon_blue":   {"file": "ui/ribbons/blue_ribbon.png",   "frame": [192, 64]},
   "ribbon_yellow": {"file": "ui/ribbons/yellow_ribbon.png", "frame": [192, 64]},

@@ -452,3 +452,88 @@ burst), `spell_heal_002` (36 fr, rising green crosses), `spell_heal_003`
   agreeing with the new strip. Contact sheets delivered: chests, forge,
   sanctuary across its loop.
 * Full suite (imp editor-source test deselected, pre-existing): **2606 passed**, 9 deselected, 638 subtests, 13:43.
+
+---
+
+## Pass 4 — the pause menu's Controls block (owner, 2026-09-19)
+
+> "confirm and propose the pause menu controls block"
+
+### Confirmed reading
+
+The first of the journal's "later passes": the pause menu shows the run's
+bindings as keycaps -- a reference listing, not a prompt -- so a player who
+forgot a key finds it without leaving the run. It follows the **chosen key
+layout** (the Key layout row on the same screen swaps WASD and the
+arrows), and it says what the run actually handles: move, aim (held),
+attack (left click), interact (`KEY_INTERACT`), auto-attack toggle
+(`KEY_TOGGLE_AUTO_ATTACK`), the build screen (TAB) and pause (ESC). Menu
+keys (ENTER, the hint line's Up / Down) are not in it -- the hint line
+already says them.
+
+Decisions taken (say if you want them changed):
+
+1. **Grey caps.** Pass 1 reserved blue for "press this now"; a listing is
+   grey. The grey sheet only exists in the down position, so both of its
+   states are one frame at the pressed face height; the block never shows
+   a press.
+2. **Words take the wide cap.** `TAB`, `ESC` and `CLICK` do not fit a
+   32 px square; the 192×64 wide sheets drawn at 96×32 (an exact ×0.5, like
+   the square) carry them. Any label longer than one character is wide.
+3. **Arrows are drawn, not typed.** `Font.metrics` answers for ↑ ← ↓ →
+   but neither bundled face has the glyphs -- they render as boxes -- so
+   `keycap.draw_arrow` paints a pixel arrow (head + shaft, 12 design px)
+   in the label ink, and the arrows layout reads as four small caps.
+4. **The mouse is a wide cap that says `CLICK`.** There is no mouse
+   glyph in the art; a labelled cap keeps the row in the same family as
+   the others until one is cut (the "mouse glyph" later pass).
+5. **Placement**: a column to the right of the buttons, left edge 340
+   design px right of centre (the buttons end at +280), top level with the
+   first button's top; heading "Controls" in the title face, rows on a
+   44 px step, labels in the body face at 20 px. On a 21:9 render the box
+   is centred and the column stays beside the buttons.
+
+### Proposal
+
+* `ui/keycap.py`: caps get a **colour** (`blue` | `grey`) and a **wide**
+  form; `KEYCAPS` maps colour → state → (square rig, wide rig, face y).
+  `cap_rect` / `label_center` / `draw_keycap` take `colour=` and `wide=`;
+  `is_wide(label)`; `label_for` maps the arrow keys to arrow glyphs.
+  `FACE_Y` stays the blue table the marker and its tests use.
+* Art: `assets/ui/buttons/grey.png`, `grey_wide.png` brought in from
+  `unused/`; rigs `keycap_grey`, `keycap_grey_wide`, and the already
+  tracked wide blue pair as `keycap_blue_wide[_pressed]`.
+* `ui/controls_block.py`: `rows(game)` from the layout and the bindings;
+  `cluster_width`; `draw(surface, assets, topleft, game, ...)` → rect.
+* `paused_state.py`: draws the block after the buttons at
+  `(cx + 340, _ROW_TOP - 32)` with its own two fonts.
+* Tests: `tests/screens/test_controls_block.py` (rows per layout, fixed
+  rows from the bindings, wide words, grey frames, every row draws grey
+  caps, the sheets load) and one pause test (the block is drawn once,
+  right of every button, inside the screen).
+
+### Todo
+
+- [x] 1. `keycap.py` colours and wide caps; grey art and rigs.
+- [x] 2. `ui/controls_block.py` and the pause hook.
+- [x] 3. Tests; suite.
+- [x] 4. Screenshots of the pause menu in both layouts; results here.
+
+### Results (2026-09-19)
+
+* Built as proposed. `ui/keycap.py` now carries `KEYCAPS` (colour → state
+  → square rig, wide rig, face y), `is_wide`, `face_y`, `draw_arrow`; the
+  marker's blue path is untouched (`FACE_Y` still the blue table).
+* The first render showed the arrows as boxes: `Font.metrics` answers for
+  the arrow code points but neither bundled face draws them. Arrows are
+  now painted glyphs (head + shaft, 12 design px, label ink).
+* `ui/controls_block.py`: seven rows; the Move / Aim clusters re-label
+  from `config.KEY_LAYOUTS[game.key_layout]`, verified in both layouts.
+* Pause menu: the block at `(cx + 340, 298)` design px, heading in the
+  title face, rows on a 44 px step. Screenshots delivered for both layouts.
+* Tests: `tests/screens/test_controls_block.py` 12 (rows per layout, fixed
+  rows from the bindings, wide words, grey frames and face height, every
+  row draws grey caps, the sheets load, an arrow is drawn not typed) and
+  `test_the_controls_block_sits_right_of_the_buttons` in `test_pause.py`.
+  Focused set (block, pause, keycap, marker): 49 + 37 passed.
+* Full suite (imp editor-source test deselected, pre-existing): **2619 passed**, 9 deselected, 638 subtests, 14:42.

@@ -17,6 +17,10 @@ sinks, and Quit to menu is red.
                      the Options screen)
   * Quit to menu  -- abandons the run
 
+To the right of the buttons, the **Controls** block (`ui/controls_block.py`,
+journal: key_icons_journal.md, pass 4): the run's bindings as grey keycaps,
+following the chosen layout.
+
 There is deliberately no single-letter quit: `Q` is the in-run auto-attack
 toggle, and a habit of tapping it must never cost the run from this screen.
 `M` is the global mute key and never reaches this state.
@@ -27,7 +31,7 @@ import pygame
 
 from game import config, fonts
 from game.state import State
-from ui import scale, widgets
+from ui import controls_block, scale, widgets
 from ui.mouse import MouseNav
 
 _ROWS = ("resume", "status", "options", "key_layout", "quit")
@@ -36,6 +40,9 @@ _ROW_TOP, _ROW_STEP, _ROW_H, _ROW_W = 330, 72, 64, 560
 _DANGER = {"quit"}
 _LABELS = {"resume": "Resume", "status": "Run status", "options": "Options",
            "key_layout": "Key layout", "quit": "Quit to menu"}
+# The Controls block: left edge this far right of the screen centre (the
+# buttons end at +280), top level with the first row's top.
+_CONTROLS_X, _CONTROLS_Y = 340, _ROW_TOP - _ROW_H // 2
 
 
 class PausedState(State):
@@ -64,6 +71,8 @@ class PausedState(State):
         self._title_font = fonts.heading(48)
         self._font = fonts.body(26)
         self._hint = fonts.body(16)
+        self._controls_font = fonts.body(20)
+        self._controls_head = fonts.heading(26)
 
     def on_display_changed(self) -> None:
         self._build_fonts()          # the sizes follow the new scale
@@ -147,6 +156,10 @@ class PausedState(State):
                     config.KEY_LAYOUT_LABELS[self.game.key_layout], True,
                     config.COLOR_ON_BUTTON_DIM)
                 surface.blit(val, val.get_rect(midright=(rect.right - scale.px(40), rect.centery + dy)))
+
+        controls_block.draw(surface, self.game.assets,
+                            (cx + scale.px(_CONTROLS_X), scale.px(_CONTROLS_Y)), self.game,
+                            font=self._controls_font, heading_font=self._controls_head)
 
         hint = self._hint.render(
             "Up / Down select    -    ENTER pick    -    ESC / P resume",
