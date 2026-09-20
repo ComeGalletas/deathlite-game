@@ -145,7 +145,7 @@ fill when a file is missing.
 | Pixel Art Potion Pack 32x32 | xnaxlzz | https://xnaxlzz.itch.io/pixel-art-potion-pack-32x32 |
 | 32x32 RPG Swords with Evolutions | maasa | https://maasa.itch.io/32x32-rpg-swords-with-evolutions |
 | Combat FX | RagnaPixel | https://ragnapixel.itch.io/combat-fx |
-| Super Pixel Effects Gigapack | Untied Games | https://untiedgames.itch.io/super-pixel-effects-gigapack |
+| Super Pixel Effects Gigapack | Untied Games | https://untiedgames.itch.io/super-pixel-effects-gigapack — used for the sanctuary heal loop (`assets/terrain/facilities/heal_effect.png`, cut from `spell_heal_002_large_green` by `tools/asset_pipeline/cut_heal_effect.py`); credit line per the pack licence: "Super Pixel Effects Gigapack - Will Tice / unTied Games" |
 | Free RPG Maker Chests | franjatesa | https://franjatesa.itch.io/free-rpgmaker-chests |
 | 750+ Effect and FX Pixel All | BDragon1727 | https://bdragon1727.itch.io/750-effect-and-fx-pixel-all |
 | Goth | ansimuz | https://ansimuz.itch.io/goth |

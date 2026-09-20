@@ -2,7 +2,7 @@
 
 `SpecialLocations` owns the run's `Interactable` list: it builds them from the
 layout, answers "is the hero standing on a usable one?", dispatches the per-kind
-`use_*` handler on the `E` key, and drives the elite-arena state machine each
+`use_*` handler on the interact key, and drives the elite-arena state machine each
 frame.
 
 Reads from `PlayingState`: `game_map`, `player`, `stats`, `rng`, `blessing_lib`,
@@ -50,13 +50,17 @@ class SpecialLocations:
                 return it
         return None
 
-    def activate_nearby(self) -> None:
-        it = self.nearby()
-        if it is None:
-            return
+    def use(self, it) -> None:
+        """Run `it`'s per-kind handler (the interact key, via
+        `core/interactions.py`)."""
         handler = getattr(self, f"use_{it.kind}", None)
         if handler is not None:
             handler(it)
+
+    def activate_nearby(self) -> None:
+        it = self.nearby()
+        if it is not None:
+            self.use(it)
 
     def grant_random_blessing(self) -> bool:
         ps = self.ps

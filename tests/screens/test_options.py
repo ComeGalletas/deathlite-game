@@ -104,11 +104,11 @@ class WindowRowTests(unittest.TestCase):
     def test_without_a_scaled_window_both_rows_are_skipped(self):
         game, opt = _options()
         self.assertFalse(game.display.available)
-        opt.sel = opt._rows.index("key_layout")
+        opt.sel = opt._rows.index("tutorials")
         _key(game, pygame.K_DOWN)
         self.assertEqual(opt._row_id(), "sanctuary")
         _key(game, pygame.K_UP)
-        self.assertEqual(opt._row_id(), "key_layout")
+        self.assertEqual(opt._row_id(), "tutorials")
         opt.draw(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))   # draws "Unavailable"
 
     def test_display_mode_row_switches_and_persists(self):
@@ -666,13 +666,14 @@ class MasterVolumeTests(unittest.TestCase):
         _key(game, pygame.K_LEFT)
         self.assertEqual(played, ["xp", "xp"])
 
-    def test_all_nine_rows_are_drawn_above_the_hint(self):
-        """Nine rows is one more than the layout was built for; the last must
-        still clear the hint line at the bottom of the box."""
+    def test_all_ten_rows_are_drawn_above_the_hint(self):
+        """Ten rows (the Tutorials row came in pass 5 of the key icons) is
+        two more than the layout was built for; the last must still clear
+        the hint line at the bottom of the box."""
         from game.states.options_state import _ROW_STEP, _ROW_TOP
         from ui import scale
         game, opt = _options()
-        self.assertEqual(len(opt._rows), 9)
+        self.assertEqual(len(opt._rows), 10)
         last = scale.px(_ROW_TOP + (len(opt._rows) - 1) * _ROW_STEP)
         hint_top = game.screen.get_height() - scale.px(40) - scale.px(_ROW_STEP) // 2
         self.assertLess(last, hint_top)

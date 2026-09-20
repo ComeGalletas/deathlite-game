@@ -117,11 +117,12 @@ class RigNumberTests(unittest.TestCase):
             with self.subTest(tier=tier):
                 self.assertEqual(self._rig(tier)["frame"], [CELL, CELL])
 
-    def test_the_drawn_size_grows_with_the_tier(self):
-        sizes = [self.assets.scale_for(chest_rules.sprite_rig(t, self.table))[0]
-                 for t in TIERS]
-        self.assertEqual(sizes, sorted(sizes))
-        self.assertEqual(len(set(sizes)), len(TIERS))
+    def test_every_tier_draws_at_one_size(self):
+        """Owner, 2026-09-19 (key_icons_journal.md, pass 3): the four
+        chests are the same dimensions; the tier is told by the skin."""
+        sizes = {self.assets.scale_for(chest_rules.sprite_rig(t, self.table))
+                 for t in TIERS}
+        self.assertEqual(sizes, {(CELL, CELL)})
 
     def test_the_anchor_is_bottom_centre_on_the_baseline(self):
         for tier in TIERS:

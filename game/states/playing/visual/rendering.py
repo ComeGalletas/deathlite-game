@@ -113,7 +113,7 @@ class WorldRenderer:
     # --- feedback / hud-adjacent overlays --------------------------
     def feedback_overlays(self, surface: pygame.Surface, box: pygame.Surface | None = None) -> None:
         """The vignette and the hit flash cover the whole render surface;
-        the banner, the notice and the prompts are interface and sit in the
+        the banner and the notice are interface and sit in the
         UI `box` (the surface itself on a 16:9 render)."""
         ps = self.ps
         w, h = surface.get_size()
@@ -144,30 +144,15 @@ class WorldRenderer:
                     f"{ps._boss_name} APPROACHES", True, (255, 90, 90))
                 surface.blit(text, text.get_rect(center=(w // 2, scale.px(120))))
 
-        # P3: a transient notice (the Forge's answer), bottom centre, one
-        # line above the interaction prompt it usually answers.
+        # P3: a transient notice (the Forge's answer, a chest's payout),
+        # bottom centre.
         if ps._notice_t > 0.0 and ps._notice_text:
             text = shadowed(ps._prompt_font, ps._notice_text, config.COLOR_ACCENT)
             surface.blit(text, text.get_rect(center=(w // 2, h - scale.px(124))))
 
-        # Interaction prompt when stood on a usable special location, or --
-        # CB-9 -- on an unopened chest. The two cannot both be live: a chest is
-        # never seated inside a special island's clear disc.
-        it = ps.locations.nearby()
-        if it is not None:
-            afford = it.kind != "merchant" or ps.stats["gold"] >= it.cost
-            col = (240, 240, 245) if afford else (200, 120, 120)
-            prompt = ps._prompt_font.render(it.prompt, True, col)
-            surface.blit(prompt, prompt.get_rect(center=(w // 2, h - scale.px(96))))
-        else:
-            chest = ps.chest_manager.nearby()
-            if chest is not None:
-                # The same white every other prompt uses: the chest's own art
-                # and the word in the prompt already say which tier it is, and
-                # a wood-brown "Common chest" was the dimmest text on screen.
-                prompt = ps._prompt_font.render(
-                    ps.chest_manager.prompt(chest), True, (240, 240, 245))
-                surface.blit(prompt, prompt.get_rect(center=(w // 2, h - scale.px(96))))
+        # There is no interaction prompt here any more: the interact keycap
+        # floats over the element itself, in the world layer
+        # (`visual/key_marker.py`, journal: key_icons_journal.md).
 
     # --- world props ----------------------------------------------
     def _off_band(self, level, pos) -> bool:
