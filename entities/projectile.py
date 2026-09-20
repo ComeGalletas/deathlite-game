@@ -40,7 +40,7 @@ class Projectile:
         "fire_level",
         "weapon_id", "age", "stop_after", "inert", "blast_radius",
         "blast_lifetime", "detonated", "stun_chance", "stun_duration",
-        "no_block", "mine", "arm_delay", "swing",
+        "no_block", "mine", "arm_delay", "swing", "sticky", "stuck_to",
     )
 
     def __init__(self) -> None:
@@ -90,6 +90,8 @@ class Projectile:
         self.mine = False            # P3 Minefield: detonates when an enemy steps on it
         self.arm_delay = 0.0         # ...once this old
         self.swing = 0               # CR2: the attack's ordinal (1 = first); picks the slash
+        self.sticky = False          # Sticky Bomb: attaches to the first enemy it touches...
+        self.stuck_to = None         # ...and this is the enemy it rides on
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
               pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
@@ -103,7 +105,7 @@ class Projectile:
               blast_radius: float = 0.0, blast_lifetime: float = 0.0,
               stun_chance: float = 0.0, stun_duration: float = 0.0,
               no_block: bool = False, mine: bool = False,
-              arm_delay: float = 0.0, swing: int = 0) -> None:
+              arm_delay: float = 0.0, swing: int = 0, sticky: bool = False) -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
@@ -144,6 +146,8 @@ class Projectile:
         self.mine = mine
         self.arm_delay = arm_delay
         self.swing = swing
+        self.sticky = sticky
+        self.stuck_to = None
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:

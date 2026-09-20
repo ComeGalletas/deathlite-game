@@ -136,6 +136,7 @@ def _isolate(ps, dummy) -> None:
 def run_one(rng, seconds: float, n_weapons: int, n_blessings: int) -> dict:
     from combat.weapons import Weapon
     from progression.blessings import apply_blessing
+    from progression.blessings.offer import blessing_offers
 
     game, ps = _start_dev_run()
     pool = [w for w, v in ps.content.weapons.items() if v.get("class") != "summon"]
@@ -145,14 +146,19 @@ def run_one(rng, seconds: float, n_weapons: int, n_blessings: int) -> dict:
         ps.player.weapons.append(Weapon(wid, ps.content.weapon(wid)))
 
     lib = ps.blessing_lib
-    owned = {w.weapon_id for w in ps.player.weapons}
-    # Only what this loadout can use. A weapon blessing for a weapon the hero
-    # lacks would have the grant path hand that weapon over too, quietly making
-    # the row a four-weapon build.
-    usable = [b for b in lib.by_id
-              if lib.by_id[b].weapon is None or lib.by_id[b].weapon in owned]
-    blessings = rng.sample(usable, n_blessings)
-    for bid in blessings:
+    # Only what the run's own offering would show this loadout (2026-09-19):
+    # a blessing for a weapon the hero lacks, a synergy missing its second
+    # weapon, or a post-Forge card on an unforged weapon would never be
+    # offered in a run and must not land in a measured build either. Drawn
+    # one at a time because taking a card changes what is valid next.
+    blessings = []
+    for _ in range(n_blessings):
+        valid = [u.id for u in blessing_offers(ps.player, ps.content)
+                 if u.id not in blessings]
+        if not valid:
+            break
+        bid = rng.choice(valid)
+        blessings.append(bid)
         apply_blessing(ps.player, lib.by_id[bid])
 
     dummy = _arm_dummy(game, ps)

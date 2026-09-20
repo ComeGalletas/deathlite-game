@@ -139,46 +139,6 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(RULES.falloff(99), RULES.level_falloff[-1])
 
 
-class BlastAmplifierTests(unittest.TestCase):
-    """2026-09-12: the Bomb's radius blessing grows the blast in 15% steps,
-    stacked on the flat "Bigger Explosion" and on the area system."""
-
-    BID = "bomb_blast_amplifier"
-
-    def test_the_card_reads_in_fifteen_point_steps(self):
-        b = CAT.get(self.BID)
-        self.assertEqual([b.describe(lv) for lv in range(1, 6)],
-                         ["The explosion is +15% bigger.",
-                          "The explosion is +30% bigger.",
-                          "The explosion is +45% bigger.",
-                          "The explosion is +60% bigger.",
-                          "The explosion is +75% bigger."])
-
-    def test_each_level_leaves_the_running_total_at_the_table_value(self):
-        p = hero("bomb")
-        w = weapon(p, "bomb")
-        for level, total in enumerate((1.15, 1.30, 1.45, 1.60, 1.75), start=1):
-            self.assertEqual(apply_blessing(p, CAT.get(self.BID)), level)
-            self.assertAlmostEqual(w.bonus["blast_radius_mult"], total)
-
-    def test_it_widens_the_blast_the_fire_path_produces(self):
-        p = hero("bomb")
-        w = weapon(p, "bomb")
-        base = w._blast_radius(1.0)
-        for _ in range(5):
-            apply_blessing(p, CAT.get(self.BID))
-        self.assertAlmostEqual(w._blast_radius(1.0), base * 1.75)
-
-    def test_it_stacks_with_the_flat_bigger_explosion(self):
-        p = hero("bomb")
-        w = weapon(p, "bomb")
-        for _ in range(5):
-            apply_blessing(p, CAT.get("bomb_bigger_explosion"))
-            apply_blessing(p, CAT.get(self.BID))
-        flat = C.weapon("bomb")["blast_radius"] + 60
-        self.assertAlmostEqual(w._blast_radius(1.0), flat * 1.75)
-
-
 class ApplyTests(unittest.TestCase):
     def test_stat_blessing_totals_follow_the_level_table(self):
         p = hero("sword")
@@ -326,7 +286,7 @@ class GatingTests(unittest.TestCase):
         self.assertEqual(u.rarity, "common")
         self.assertEqual(u.kind, "weapon")
         self.assertEqual(u.weapon, "sword")
-        self.assertIn("+6", u.description)
+        self.assertIn("+5", u.description)          # level II of the x1.15 curve
         self.assertIn("Sword", u.tags)
 
 

@@ -60,6 +60,8 @@ class CombatResolver:
             if proj.inert:
                 if proj.mine and proj.age >= proj.arm_delay:
                     self.trip_mine(proj, targets)
+                elif proj.sticky and proj.stuck_to is None:
+                    self.stick(proj)
                 continue              # a fused bomb waits for its blast (P1)
             near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
             if ps.boss is not None and ps.boss.alive:
@@ -77,7 +79,10 @@ class CombatResolver:
                 dealt = enemy.take_damage(amount, source=proj.weapon_id)
                 if not enemy.alive:
                     enemy.killed_by = proj.weapon_id     # P2: Bloodletting etc.
+                    # Powder Keg reads what the killing shot was.
+                    enemy.killed_by_shot = (tuple(proj.source_tags), proj.damage, proj.radius)
                 self.remember_hit(proj, enemy)           # P4: after the multiplier
+                self.flurry(proj, enemy)
                 proj.hit_ids.add(id(enemy))
                 ps.stats["damage_dealt"] += dealt
                 ps.damage_numbers.add(enemy.pos, dealt, proj.is_crit)
@@ -92,6 +97,7 @@ class CombatResolver:
                 self.crowd_cleaner(proj, enemy)          # P4: the Sword's pull
                 if not no_dmg:
                     self.apply_on_hit_effects(proj, enemy)
+                    self.apply_weapon_statuses(proj, enemy, amount)
                     self.apply_stun(proj, enemy)
                     self.split(proj, enemy)
                 ps.game.events.publish(Events.DAMAGE_DEALT, amount=dealt)
@@ -204,6 +210,54 @@ class CombatResolver:
                     potency * (1.0 + fx.tuned(status, "potency")),
                     bonus_max_stacks=int(fx.tuned(status, "max_stacks")),
                     source=proj.weapon_id)   # the burn's ticks belong to it
+
+    def apply_weapon_statuses(self, proj: Projectile, enemy, amount: float) -> None:
+        """Statuses a weapon's own blessings put on what it hits (Lacerate,
+        Scorch, Chilling Bolts; 2026-09-19). Effect keys, by suffix:
+        `<status>_on_hit_frac` -- a damage-over-time whose potency per tick is
+        that fraction of the hit; `<status>_on_hit_potency` -- the raw potency
+        (a slow's fraction); `<status>_on_hit_duration` -- how long it lasts.
+        The weapon is the source, so the ticks are attributed to it."""
+        fx = self._effects(proj)
+        if not fx or not hasattr(enemy, "status"):
+            return
+        for key, value in fx.items():
+            if key.endswith("_on_hit_frac"):
+                status, potency = key[:-len("_on_hit_frac")], amount * float(value)
+            elif key.endswith("_on_hit_potency"):
+                status, potency = key[:-len("_on_hit_potency")], float(value)
+            else:
+                continue
+            duration = float(fx.get(f"{status}_on_hit_duration", 0.0))
+            if potency <= 0.0 or duration <= 0.0:
+                continue
+            enemy.status.apply(status, duration, potency, source=proj.weapon_id)
+
+    def flurry(self, proj: Projectile, enemy) -> None:
+        """Flurry (Daggers): the firing weapon takes the target's streak."""
+        w = self._weapon(proj)
+        if w is not None and "flurry_per_hit" in w.effects:
+            w.note_flurry(getattr(enemy, "hit_streak", {}).get(w.weapon_id, 0),
+                          synergy.window())
+
+    def stick(self, proj: Projectile) -> None:
+        """Sticky Bomb: a bomb that overlaps an enemy attaches to it and rides
+        along until the fuse (`TransientFx.ride_stuck`); its blast is heavier
+        by `sticky_damage_mult`."""
+        ps = self.ps
+        near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
+        if ps.boss is not None and ps.boss.alive:
+            near = near + [ps.boss]
+        for enemy in near:
+            if enemy.alive and circles_overlap(proj.pos.x, proj.pos.y, proj.radius,
+                                               enemy.pos.x, enemy.pos.y, enemy.radius):
+                proj.stuck_to = enemy
+                proj.vel.update(0, 0)
+                proj.pos.update(enemy.pos)
+                w = self._weapon(proj)
+                if w is not None:
+                    proj.damage *= 1.0 + w.effect("sticky_damage_mult")
+                return
 
     def trip_mine(self, proj: Projectile, targets) -> None:
         """P3 Minefield: an armed mine goes off the moment an enemy body

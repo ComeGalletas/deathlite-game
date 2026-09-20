@@ -795,6 +795,12 @@ class PlayingState(State):
             heal = float(killer.effects.get("on_kill_heal", 0.0))
             if heal > 0.0:
                 self.player.heal(heal)
+            # Powder Keg: a kill by a blast (never by a burst) bursts again.
+            keg = killer.effect("keg_frac")
+            shot = getattr(enemy, "killed_by_shot", None)
+            if keg > 0.0 and shot is not None and "blast" in shot[0] and "keg" not in shot[0]:
+                self.fx.keg_burst(enemy.pos, shot, keg, killer.weapon_id,
+                                  float(killer.definition["blast_lifetime"]))
         for effect, chance, amount in self.player.blessing_fx.on_kill:
             if self.rng.random() >= chance:
                 continue

@@ -21,6 +21,8 @@ benefiting weapon, read here by `synergy_multiplier` and added together:
                        `hunters_mark_max` stacks
   pull_strength        Crowd Cleaner: Sword hits drag the target toward the
                        centre of the swing (`pull`), a behavioural synergy
+  pack_tactics_mult    Pack Tactics (Spirit Wolf): +frac if any *other* weapon
+                       of the hero hit the target inside the window
 
 Natural synergies (§11) need nothing here.
 """
@@ -73,6 +75,11 @@ def synergy_multiplier(player, weapon, enemy, now: float) -> float:
                 bonus += val
         elif key == "syn_vs_marked":
             if is_marked(enemy):
+                bonus += val
+        elif key == "pack_tactics_mult":
+            hits = getattr(enemy, "recent_hits", {})
+            if any(wid != weapon.weapon_id and now - t <= window()
+                   for wid, t in hits.items()):
                 bonus += val
         elif key == "hunters_mark_per_hit":
             # The streak of the *previous* arrows, and only while it is warm:
