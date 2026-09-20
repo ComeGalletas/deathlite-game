@@ -897,7 +897,9 @@ END_SCREEN_INPUT_LOCK: float = 1.5
 # frame holds `END_BANNER_HOLD` seconds before the summary screen comes up.
 # No key or click shortens it. `END_BANNER_SCALE` is the art's integer draw
 # scale in design pixels (416 x 128 -> 832 x 256 on the 1600-wide box).
-END_BANNER_WAIT: float = 3.0
+# The wait was 3 s; the owner cut it to 1 s (2026-09-20), long enough for the
+# death poof to finish, for both outcomes.
+END_BANNER_WAIT: float = 1.0
 END_BANNER_HOLD: float = 2.0
 END_BANNER_SCALE: int = 2
 END_BANNER_DIM_ALPHA: int = 150      # the pause overlay's dim, for one family
