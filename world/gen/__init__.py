@@ -37,6 +37,7 @@ from world.gen.islands import build_island, island_caps, _grid_tile_meta
 from world.gen.placement import _resize_by_topography, _offset_in_chunk
 from world.gen.biomes import assign_palettes
 from world.gen.chests import place_chests
+from world.gen.fish_huts import place_fish_huts
 from world.gen.scatter import _scatter_obstacles
 from world.gen.settings import GenSettings, settings_or_config
 from world.gen.spawnpoints import place_points
@@ -235,4 +236,8 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     # nothing above it either.
     place_chests(layout)
     yield "chests"
+    # The fish huts, moored beside the bridges once every island and bridge
+    # is final. Private RNG again; it moves nothing above it.
+    place_fish_huts(layout)
+    yield "fish huts"
     return layout

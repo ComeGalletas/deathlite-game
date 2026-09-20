@@ -57,6 +57,7 @@ from game.states.playing.core import interactions
 from game.states.playing.core.hints import RunHints
 from game.states.playing.core.locations import SpecialLocations
 from game.states.playing.core.npcs import Npcs
+from game.states.playing.core.fish_huts import FishHuts
 from game.states.playing.core.effects import TransientFx
 from game.states.playing.devtools.dps_meter import DpsMeter
 from game.states.playing.core.run_ledger import RunLedger
@@ -136,6 +137,8 @@ class PlayingState(State):
         # The villagers (HI-3): scenery that moves, from the village records.
         self.npc_manager = Npcs(self)
         self.npc_manager.build()
+        self.fish_hut_manager = FishHuts(self)
+        self.fish_hut_manager.build()
         self.director = SpawnDirector(config.RUN_DURATION_SECONDS, rng=self.rng,
                                       difficulty=self.difficulty)
         self.spawn = EnemyControl(self)
@@ -572,6 +575,7 @@ class PlayingState(State):
 
         self._update_summons(dt)
         self.npc_manager.update(dt)
+        self.fish_hut_manager.update(dt)
         self.fx.update_hazards(dt)
         self.fx.update_melee_hitboxes(dt)
         self.chest_manager.update(dt)      # CB-9: the lids that are opening
@@ -1245,6 +1249,7 @@ class PlayingState(State):
                 out.append((lvl(sm.pos.x, sm.pos.y), sm.pos.y,
                             lambda s, sm=sm: self._draw_one_summon(s, sm)))
         out.extend(self.npc_manager.actor_items(view, lvl))
+        out.extend(self.fish_hut_manager.actor_items(view, lvl))
         out.append((lvl(self.player.pos.x, self.player.pos.y),
                     self.player.pos.y, self._draw_player))
         return out
