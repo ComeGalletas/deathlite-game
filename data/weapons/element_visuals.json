@@ -16,12 +16,22 @@
     "relying on hue (design 8, colourblind proposal)."
   ],
   "aura": {
+    "_doc": [
+      "The procedural ring and marker, kept as the fallback for an element",
+      "with no rig and for the locked slot, which has no sprite at all.",
+      "",
+      "`rig_scale` is the one field the authored path uses: an aura sprite is",
+      "drawn `rig_scale` times the body's diameter, keeping the art's own",
+      "aspect rather than being squeezed into a square. Above 1 because these",
+      "effects are rings *around* a body and have to clear it."
+    ],
     "ring_pad": 3,
     "ring_width": 3,
     "alpha": 210,
     "locked_alpha": 120,
     "marker_size": 7,
-    "marker_gap": 8
+    "marker_gap": 8,
+    "rig_scale": 2.1
   },
   "budget": {
     "_doc": [
@@ -32,6 +42,66 @@
     "per_frame": 90,
     "per_element": 40
   },
+  "statuses": {
+    "_doc": [
+      "Authored art for a status, keyed by the status id the combat layer",
+      "uses -- not by element. Fire's burn and Ice's freeze are the two",
+      "that have art; `chill` has none and falls back to its procedural",
+      "chevron, which is why this is a map with gaps rather than a field",
+      "on each element.",
+      "",
+      "`burn` is shared with the weapon blessings' own burn: the elemental",
+      "one is the same status with a `bound_to_aura` flag, so it has to",
+      "look the same."
+    ],
+    "burn": "flame_loop",
+    "freeze": "element_freeze"
+  },
+  "reactions": {
+    "_doc": [
+      "One entry per reaction (combat/elements/config.py REACTION_PAIRS).",
+      "`rig` is the authored burst; where one is named the procedural",
+      "Flash does not draw at all (M10 rule 2). `seconds` is how long it",
+      "stays on screen -- these draw over every character, so the number",
+      "is deliberately small and deliberately here, where it is easy to",
+      "change, rather than buried as a constant in transient.py.",
+      "",
+      "`size` is the sprite's drawn width in world pixels at the smallest",
+      "a reaction ever is; the resolver hands the flash a radius from the",
+      "reaction's own reach, and the drawn size scales with it, so a",
+      "wide-reaching Overload looks wider than a Frostburn on one body."
+    ],
+    "frostburn": {
+      "rig": "reaction_frostburn",
+      "seconds": 0.5,
+      "size": 46
+    },
+    "overload": {
+      "rig": "reaction_overload",
+      "seconds": 0.6,
+      "size": 64
+    },
+    "superconduct": {
+      "rig": "reaction_superconduct",
+      "seconds": 0.42,
+      "size": 54
+    },
+    "firewind": {
+      "rig": "reaction_firewind",
+      "seconds": 0.67,
+      "size": 56
+    },
+    "icewind": {
+      "rig": "reaction_icewind",
+      "seconds": 0.67,
+      "size": 56
+    },
+    "thunderwind": {
+      "rig": "reaction_thunderwind",
+      "seconds": 0.67,
+      "size": 56
+    }
+  },
   "elements": {
     "fire": {
       "colour": [
@@ -40,8 +110,7 @@
         60
       ],
       "marker": "flame",
-      "aura_rig": null,
-      "status_rig": "flame_loop",
+      "aura_rig": "element_fire",
       "particles": {
         "rate": 7.0,
         "speed": 46,
@@ -56,8 +125,7 @@
         255
       ],
       "marker": "shard",
-      "aura_rig": null,
-      "status_rig": null,
+      "aura_rig": "element_ice",
       "particles": {
         "rate": 5.0,
         "speed": 26,
@@ -72,8 +140,7 @@
         90
       ],
       "marker": "bolt",
-      "aura_rig": "thunder_aura",
-      "status_rig": null,
+      "aura_rig": "element_thunder",
       "particles": {
         "rate": 6.0,
         "speed": 64,
@@ -88,8 +155,7 @@
         190
       ],
       "marker": "swirl",
-      "aura_rig": null,
-      "status_rig": null,
+      "aura_rig": "element_wind",
       "particles": {
         "rate": 6.0,
         "speed": 54,

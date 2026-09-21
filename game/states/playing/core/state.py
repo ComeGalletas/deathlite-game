@@ -569,11 +569,16 @@ class PlayingState(State):
         offset = run.shake.offset / run.camera.zoom
         run.camera.pos -= offset
         try:
+            # The elemental state of the field is painted terrace by terrace
+            # inside `_draw_world`, under the bodies it belongs to; this
+            # resets the per-frame budget and counter before those passes
+            # start (M10 rule 3).
+            element_fx.begin_frame(run)
             self._draw_world(surface)
-            element_fx.draw(surface, run)               # auras, tornadoes, jump arcs
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
             run.particles.draw(surface, run.camera)
             run.damage_numbers.draw(surface, run.camera)
+            element_fx.draw_reactions(surface, run)     # over everything, and brief
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
             self.renderer.aim_overlay(surface)          # dev-only, same layer

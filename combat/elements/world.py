@@ -78,8 +78,8 @@ class NullWorld:
     def add_arc(self, start, end, element, until: float) -> None:
         self.arcs.append((start, end, element, until))
 
-    def add_flash(self, pos, reaction, radius: float, until: float) -> None:
-        self.flashes.append((pos, reaction, radius, until))
+    def add_flash(self, pos, reaction, radius: float, started: float) -> None:
+        self.flashes.append((pos, reaction, radius, started))
 
 
 class RunWorld:
@@ -161,11 +161,19 @@ class RunWorld:
         from game.states.playing.visual.elements import Arc, transient
         transient.add(self.run, Arc(start, end, element, until))
 
-    def add_flash(self, pos, reaction, radius: float, until: float) -> None:
-        """A reaction going off, in the blend of its two elements
-        (§8.5)."""
+    def add_flash(self, pos, reaction, radius: float, started: float) -> None:
+        """A reaction going off: its authored burst, or the blend of its two
+        elements where none is wired (§8.5, M10 rule 2).
+
+        How long it lasts is looked up here rather than passed in, because
+        it is presentation tuning and lives in `element_visuals.json` with
+        the rest of it."""
         from game.states.playing.visual.elements import Flash, transient
-        transient.add(self.run, Flash(pos, reaction, radius, until))
+        visuals = getattr(self.run, "element_visuals", None)
+        burst = (visuals.profiles.reaction(getattr(reaction, "key", ""))
+                 if visuals is not None else None)
+        seconds = burst.seconds if burst is not None else transient.FLASH_SECONDS
+        transient.add(self.run, Flash(pos, reaction, radius, started, seconds))
 
 
 def direction_from(origin, target) -> pygame.Vector2:

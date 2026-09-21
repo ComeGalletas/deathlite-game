@@ -12,7 +12,6 @@ several milestones without the resolver knowing.
 from __future__ import annotations
 
 from combat.elements.ids import ReactionId
-from game.states.playing.visual.elements.transient import FLASH_SECONDS
 from combat.elements.reactions.base import Reaction, blast, status_on  # noqa: F401
 from combat.elements.reactions.firewind import FireWind
 from combat.elements.reactions.frostburn import Frostburn
@@ -35,8 +34,12 @@ def run(target, variant, config, ctx) -> bool:
     reaction.run(target, config, ctx)
     # One flash per reaction, here rather than in each of the six: they
     # all go off the same way and the blend is derived from the pair.
+    # `ctx.now`, not an expiry: how long the thing stays on screen is the
+    # renderer's business and comes from `element_visuals.json`. This used
+    # to import the duration from the visual layer, which had the combat
+    # side reaching across the seam to ask how long its own effect lasted.
     ctx.world.add_flash(target.pos, variant.reaction, _flash_radius(config),
-                        ctx.now + FLASH_SECONDS)
+                        ctx.now)
     return True
 
 

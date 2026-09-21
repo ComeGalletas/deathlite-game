@@ -622,5 +622,214 @@
         "row": 0
       }
     }
+  },
+  "element_fire": {
+    "_note": "Fire's aura: a ring that grows flame tongues outward.",
+    "frame": [
+      64,
+      64
+    ],
+    "anchor": [
+      32,
+      32
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/elements/fire.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": true
+      }
+    }
+  },
+  "element_ice": {
+    "_note": "Ice's aura: a crystal that forms, then opens into a diamond outline.",
+    "frame": [
+      58,
+      58
+    ],
+    "anchor": [
+      29,
+      29
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/elements/ice.png",
+        "frames": 13,
+        "fps": 13,
+        "loop": true
+      }
+    }
+  },
+  "element_thunder": {
+    "_note": "Thunder's aura: a radial spiked discharge. The pack has no yellow row, so this is its grey one remapped onto a yellow ramp by the cut script.",
+    "frame": [
+      62,
+      58
+    ],
+    "anchor": [
+      31,
+      30
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/elements/thunder.png",
+        "frames": 16,
+        "fps": 16,
+        "loop": true
+      }
+    }
+  },
+  "element_wind": {
+    "_note": "Wind's aura: concentric rings turning. Slower than the others on purpose -- it is the only pick that rotates, and at 14 fps the rotation reads as a flicker.",
+    "frame": [
+      56,
+      56
+    ],
+    "anchor": [
+      28,
+      28
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/elements/wind.png",
+        "frames": 14,
+        "fps": 12,
+        "loop": true
+      }
+    }
+  },
+  "element_freeze": {
+    "_note": "The freeze status: a block of ice that forms and shatters. 40 frames at 27 fps is 1.48 s, near enough the freeze's own 1.5 s that the shatter lands on the thaw. Indexed per body rather than by the shared clock, because each enemy freezes on its own schedule.",
+    "frame": [
+      87,
+      93
+    ],
+    "anchor": [
+      44,
+      48
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/elements/freeze.png",
+        "frames": 40,
+        "fps": 27,
+        "loop": false
+      }
+    }
+  },
+  "reaction_frostburn": {
+    "_note": "Frostburn: a violet sphere of motes, where fire and ice blend.",
+    "frame": [
+      48,
+      49
+    ],
+    "anchor": [
+      24,
+      25
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/reactions/frostburn.png",
+        "frames": 12,
+        "fps": 24,
+        "loop": false
+      }
+    }
+  },
+  "reaction_overload": {
+    "_note": "Overload: a hexagonal detonation, the biggest of the six.",
+    "frame": [
+      64,
+      64
+    ],
+    "anchor": [
+      32,
+      32
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/reactions/overload.png",
+        "frames": 18,
+        "fps": 30,
+        "loop": false
+      }
+    }
+  },
+  "reaction_superconduct": {
+    "_note": "Superconduct: an orbiting star coming apart.",
+    "frame": [
+      64,
+      58
+    ],
+    "anchor": [
+      32,
+      29
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/reactions/superconduct.png",
+        "frames": 10,
+        "fps": 24,
+        "loop": false
+      }
+    }
+  },
+  "reaction_firewind": {
+    "_note": "FireWind. The three wind reactions are one swirl in three colours on purpose: they are the same mechanic with different payloads.",
+    "frame": [
+      44,
+      40
+    ],
+    "anchor": [
+      22,
+      21
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/reactions/firewind.png",
+        "frames": 20,
+        "fps": 30,
+        "loop": false
+      }
+    }
+  },
+  "reaction_icewind": {
+    "_note": "IceWind: the swirl in ice's blue.",
+    "frame": [
+      44,
+      40
+    ],
+    "anchor": [
+      22,
+      21
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/reactions/icewind.png",
+        "frames": 20,
+        "fps": 30,
+        "loop": false
+      }
+    }
+  },
+  "reaction_thunderwind": {
+    "_note": "ThunderWind: the swirl in thunder's yellow, remapped from the grey row like the aura.",
+    "frame": [
+      44,
+      40
+    ],
+    "anchor": [
+      22,
+      21
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/reactions/thunderwind.png",
+        "frames": 20,
+        "fps": 30,
+        "loop": false
+      }
+    }
   }
 }

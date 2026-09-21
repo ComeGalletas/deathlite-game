@@ -21,6 +21,22 @@ import pygame
 from combat.elements import config as element_config
 from combat.elements.ids import ElementId
 
+def off_band(run, level, pos) -> bool:
+    """Is this at some other terrace than the band being painted?
+
+    `level is None` means "draw it wherever it is" -- the same convention
+    `WorldRenderer._off_band` uses, and what every caller outside the banded
+    world path passes, including the headless tests whose fake runs have no
+    map at all.
+    """
+    if level is None:
+        return False
+    game_map = getattr(run, "game_map", None)
+    if game_map is None:
+        return False
+    return game_map.renderer.level_at(pos[0], pos[1]) != level
+
+
 ARC_SECONDS = 0.18
 FLASH_SECONDS = 0.3
 # The whole transient list, arcs and flashes together.
@@ -34,6 +50,10 @@ _FLASH_RINGS = 3
 
 class Arc:
     """One Thunder jump, from where it left to where it landed."""
+
+    # A jump is a state of the field: it bands with the terrain and goes
+    # under the bodies it passes between (M10 rule 3).
+    OVER = False
     __slots__ = ("a", "b", "element", "until", "seed")
 
     def __init__(self, a, b, element, until: float) -> None:
@@ -57,20 +77,61 @@ class Arc:
 
 
 class Flash:
-    """A reaction going off: rings in the blend of the two elements that
-    made it."""
-    __slots__ = ("pos", "reaction", "radius", "until")
+    """A reaction going off.
 
-    def __init__(self, pos, reaction, radius: float, until: float) -> None:
+    Where the reaction has an authored burst it plays that and nothing
+    else (M10 rule 2). Where it does not, it falls back to rings in the
+    **blend of its two elements** -- the design's own starting point
+    (8.5), which made the six reactions distinguishable from each other
+    and from either parent without six bespoke effects, and which is still
+    what a run with an empty `assets/` gets.
+
+    `started` rather than `until`: the burst's length is presentation data
+    (`element_visuals.json`), so the visual layer decides how long the
+    thing lives. Before M10 the combat layer imported `FLASH_SECONDS` from
+    this module to work out an expiry, which had it reaching across the
+    seam to ask a renderer how long its own effect lasted.
+    """
+    # A reaction is an event, not a state: it draws over every character
+    # and is deliberately brief so that sitting on top of the scene does
+    # not disrupt play (M10 rule 3).
+    OVER = True
+    __slots__ = ("pos", "reaction", "radius", "started", "until")
+
+    def __init__(self, pos, reaction, radius: float, started: float,
+                 seconds: float = FLASH_SECONDS) -> None:
         self.pos = pygame.Vector2(pos)
         self.reaction = reaction
         self.radius = float(radius)
-        self.until = float(until)
+        self.started = float(started)
+        self.until = float(started) + max(1e-3, float(seconds))
 
     def draw(self, surface, cam, visuals, now: float) -> None:
         left = self.until - now
         if left <= 0.0:
             return
+        burst = visuals.reaction(getattr(self.reaction, "key", ""))
+        if burst is not None:
+            self._draw_burst(surface, cam, burst, now)
+        else:
+            self._draw_rings(surface, cam, visuals, left)
+
+    def _draw_burst(self, surface, cam, burst, now: float) -> None:
+        span = self.until - self.started
+        progress = (now - self.started) / span if span > 0 else 1.0
+        width = max(burst.size, self.radius) * cam.zoom
+        natural = burst.natural
+        if not natural:
+            return
+        nw, nh = natural
+        size = (max(4, int(width)), max(4, int(width * nh / nw)))
+        frame = burst.frame_at(progress, size=size)
+        if frame is None:
+            return
+        sx, sy = cam.world_to_screen(self.pos)
+        surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
+
+    def _draw_rings(self, surface, cam, visuals, left: float) -> None:
         # Clamped, not assumed: a caller is free to hand a longer lifetime
         # than the nominal one, and an alpha over 255 is a hard error in
         # pygame rather than a bright ring.
@@ -106,7 +167,7 @@ def mix(a, b, amount: float) -> tuple[int, int, int]:
     return tuple(int(round(x * keep + y * amount)) for x, y in zip(a, b))
 
 
-def draw_areas(surface, run, visuals, now: float) -> None:
+def draw_areas(surface, run, visuals, now: float, level=None) -> None:
     """The Wind tornado: a ring at its true radius, plus a second turning
     inside it so the thing reads as spinning rather than as a circle. A
     Wind *reaction*'s area is tinted toward the element it was paired with,
@@ -114,7 +175,7 @@ def draw_areas(surface, run, visuals, now: float) -> None:
     cam = run.camera
     for area in run.wind_areas:
         left = area.remaining(now)
-        if left <= 0.0:
+        if left <= 0.0 or off_band(run, level, area.pos):
             continue
         colour = _area_colour(visuals, area)
         sx, sy = cam.world_to_screen(area.pos)
@@ -155,9 +216,23 @@ def sweep(run, now: float) -> None:
         run.element_fx = [e for e in fx if e.until > now]
 
 
-def draw_transient(surface, run, visuals, now: float) -> None:
+def draw_transient(surface, run, visuals, now: float, level=None,
+                   over: bool = False) -> None:
+    """The pooled effects, one side of the split at a time.
+
+    `over=False` draws the ones that band with the terrain (the jump arcs)
+    and `over=True` the ones that ride above everything (the reaction
+    bursts). The whole list is walked either way: it is capped at
+    `MAX_EFFECTS` and keeping two lists in step through the sweep would
+    cost more than the scan.
+    """
     cam = run.camera
     for effect in run.element_fx:
+        if getattr(effect, "OVER", False) is not over:
+            continue
+        if not over and off_band(run, level, effect.a if hasattr(effect, "a")
+                                 else effect.pos):
+            continue
         effect.draw(surface, cam, visuals, now)
 
 

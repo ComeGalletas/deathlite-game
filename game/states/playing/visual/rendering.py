@@ -50,6 +50,16 @@ _HAZARD_FILL_FLOOR = 10
 _TINT_CACHE: dict[int, tuple] = {}     # id(frame) -> (frame, tinted copy)
 _TINT_CACHE_CAP = 128
 
+# The elemental aura tint (M10). `_AURA_TINT_LIFT` is how far the element's
+# colour is pulled toward white before it multiplies: a straight multiply by
+# a saturated colour crushes every channel the tint is low in, and a skeleton
+# under Ice would go from bone to navy. Lifted, it shifts hue and barely
+# darkens. `_AURA_TINT_ALPHA` is how much of that lands on the sprite.
+_AURA_TINT_LIFT = 0.45
+_AURA_TINT_ALPHA = 102                 # 40% of 255
+_AURA_TINT_CACHE: dict[tuple, tuple] = {}
+_AURA_TINT_CACHE_CAP = 256
+
 
 def hit_tinted(frame):
     """A red-tinted copy of a sprite frame -- the damage flash for rigs with no
@@ -69,6 +79,48 @@ def hit_tinted(frame):
         _TINT_CACHE.clear()
     _TINT_CACHE[id(frame)] = (frame, out)
     return out
+
+
+def aura_tinted(frame, element, colour):
+    """A copy of `frame` washed toward `colour`, or `frame` itself when the
+    wash would be invisible.
+
+    Cached by `(id(frame), element)` for the same reason `hit_tinted` is:
+    the animation frames are the asset cache's own objects, so the same one
+    comes back for every frame of an aura's several seconds, and copying it
+    each time would be a per-enemy allocation per frame. The source is kept
+    in the entry so its id cannot be recycled under the cache.
+    """
+    key = (id(frame), int(element))
+    hit = _AURA_TINT_CACHE.get(key)
+    if hit is not None and hit[0] is frame:
+        return hit[1]
+    lift = _AURA_TINT_LIFT
+    wash = tuple(int(c + (255 - c) * lift) for c in colour)
+    over = frame.copy()
+    over.fill((*wash, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    over.set_alpha(_AURA_TINT_ALPHA)
+    out = frame.copy()
+    out.blit(over, (0, 0))
+    if len(_AURA_TINT_CACHE) >= _AURA_TINT_CACHE_CAP:
+        _AURA_TINT_CACHE.clear()
+    _AURA_TINT_CACHE[key] = (frame, out)
+    return out
+
+
+def aura_colour(run, body):
+    """The colour of the aura `body` is holding, or None.
+
+    Read off the run's own visual set rather than imported, which keeps this
+    module free of the elements package and works unchanged when a run has
+    no visuals at all (the headless tests).
+    """
+    state = getattr(body, "elemental", None)
+    visuals = getattr(run, "element_visuals", None)
+    if state is None or visuals is None:
+        return None
+    element = state.element(run.stats["time"])
+    return (element, visuals.tint(element)) if element else None
 
 
 class WorldRenderer:
@@ -533,6 +585,13 @@ class WorldRenderer:
                 if sid in e.status:
                     colour = tint
                     break
+            else:
+                # No status of its own: show the aura instead, so the
+                # primitive fallback carries the same information the
+                # sprited path does.
+                primed = aura_colour(run, e)
+                if primed is not None and e.hit_flash <= 0:
+                    colour = primed[1]
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(er))
 
         # Thin state rings at the collider edge -- always for the primitive
@@ -650,6 +709,13 @@ class WorldRenderer:
             return
         if e._hurt_t > 0.0:
             frame = hit_tinted(frame)           # red flash, no pop to a circle
+        else:
+            # A primed body wears its element, lightly (M10). Not while it is
+            # flashing: a hit is the more urgent thing to see and it is over
+            # in a quarter of a second.
+            tint = aura_colour(run, e)
+            if tint is not None:
+                frame = aura_tinted(frame, *tint)
         ax, ay = self.anchor_for(rig, flip)
         self._blit_character(
             surface, frame,

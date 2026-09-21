@@ -13,6 +13,7 @@ catch it.
 """
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -91,19 +92,48 @@ class ProfileTests(unittest.TestCase):
         for element in ELEMENTS:
             self.assertIn(self.visuals[element].marker, markers.SHAPES)
 
-    def test_the_authored_rigs_load(self):
-        """Thunder's aura and Fire's flame are the two that exist; the rest
-        fall back to the ring on purpose."""
-        self.assertIsNotNone(self.visuals[ElementId.THUNDER].aura_frame())
-        self.assertIsNotNone(self.visuals[ElementId.FIRE].status_frame())
-        self.assertIsNone(self.visuals[ElementId.ICE].aura_frame())
+    def test_every_element_now_has_authored_art(self):
+        """M10: all four auras are cut art. The procedural ring stays wired
+        as the empty-`assets/` fallback and for the locked slot, but no
+        element reaches it any more."""
+        for element in ELEMENTS:
+            self.assertIsNotNone(self.visuals[element].aura_frame(),
+                                 f"{element.key} has no aura frame")
+
+    def test_status_art_is_keyed_by_status_not_by_element(self):
+        """`burn` is shared with the weapon blessings, which have no element
+        behind them; `chill` has no art and falls back to its chevron."""
+        self.assertIsNotNone(self.visuals.status_frame("burn"))
+        self.assertIsNotNone(self.visuals.status_frame("freeze"))
+        self.assertIsNone(self.visuals.status_frame("chill"))
+
+    def test_every_reaction_has_a_burst(self):
+        for reaction in REACTIONS:
+            burst = self.visuals.reaction(reaction.key)
+            self.assertIsNotNone(burst, f"{reaction.key} has no burst")
+            self.assertGreater(burst.frames, 0)
+            self.assertGreater(burst.seconds, 0.0)
+
+    def test_a_reaction_burst_is_indexed_not_clocked(self):
+        """Two Overloads half a second apart are two events: each starts at
+        its own first frame, so the burst is taken by progress rather than
+        off the shared clock an aura rides."""
+        burst = self.visuals.reaction("overload")
+        first = burst.frame_at(0.0)
+        self.assertIsNot(burst.frame_at(0.5), first)
+        self.assertIs(burst.frame_at(0.0), first, "and 0 is always frame 0")
+        # Clamped, not wrapped: overshooting holds the last frame.
+        self.assertIs(burst.frame_at(1.5), burst.frame_at(0.999))
 
     def test_one_clock_per_element_not_one_per_aura(self):
         """A hundred burning enemies must not be a hundred animators."""
         thunder = self.visuals[ElementId.THUNDER]
         first = thunder.aura_frame()
         self.assertIs(thunder.aura_frame(), first, "same frame, same clock")
-        for _ in range(30):
+        # A third of a second, not a whole one: Thunder's loop is 16 frames
+        # at 16 fps, so advancing by exactly 1 s would land back on frame 0
+        # and this would assert that a working clock is broken.
+        for _ in range(10):
             self.visuals.update(1 / 30)
         self.assertIsNot(thunder.aura_frame(), first, "and it does advance")
 
@@ -281,6 +311,130 @@ class DrawTests(unittest.TestCase):
         fx.draw(self.surface, run)
 
 
+# --- M10 rule 1 and rule 2: the sprite is the indicator -----------------------------
+
+class SpriteIsTheIndicatorTests(unittest.TestCase):
+    """Where art is wired it draws alone. The procedural ring and marker
+    stay for the cases that have none: an empty `assets/`, and the locked
+    slot, whose circle is what makes "primed" and "cannot be primed" one
+    glance apart."""
+
+    def setUp(self):
+        _init()
+        self.surface = pygame.Surface((320, 240))
+
+    def _counted(self):
+        """`fx.draw` with the procedural calls counted."""
+        calls = {"ring": 0, "marker": 0}
+        real_ring, real_marker = layers._ring, markers.draw
+
+        def ring(*a, **k):
+            calls["ring"] += 1
+            return real_ring(*a, **k)
+
+        def marker(*a, **k):
+            calls["marker"] += 1
+            return real_marker(*a, **k)
+
+        return calls, ring, marker
+
+    def test_an_element_with_a_rig_draws_no_ring_and_no_marker(self):
+        from tests.combat.fakes import FakeEnemy
+
+        body = FakeEnemy(0.0, 0.0)
+        body.elemental.set_aura(ElementId.FIRE, 0.0, 10.0)
+        run = fake_run([body])
+        calls, ring, marker = self._counted()
+        with mock.patch.object(layers, "_ring", ring), \
+                mock.patch.object(markers, "draw", marker):
+            fx.draw(self.surface, run)
+        self.assertEqual(run.element_visuals.auras_drawn, 1)
+        self.assertEqual(calls["ring"], 0, "the sprite is the whole indicator")
+        self.assertEqual(calls["marker"], 0)
+
+    def test_an_element_without_a_rig_falls_back_to_both(self):
+        """What a run with an empty `assets/` gets."""
+        from tests.combat.fakes import FakeEnemy
+
+        body = FakeEnemy(0.0, 0.0)
+        body.elemental.set_aura(ElementId.ICE, 0.0, 10.0)
+        run = fake_run([body])
+        profile = run.element_visuals.profiles[ElementId.ICE]
+        calls, ring, marker = self._counted()
+        # The profile is slotted, so its methods cannot be patched. Dropping
+        # the animator is the same thing and is exactly what an empty
+        # `assets/` produces.
+        animator, profile._aura_anim = profile._aura_anim, None
+        try:
+            with mock.patch.object(layers, "_ring", ring), \
+                    mock.patch.object(markers, "draw", marker):
+                fx.draw(self.surface, run)
+        finally:
+            profile._aura_anim = animator
+        self.assertEqual(calls["ring"], 1)
+        self.assertEqual(calls["marker"], 1)
+
+    def test_a_locked_slot_still_rings(self):
+        """Rule 1 is about elements. "Cannot be primed" has no sprite, so by
+        the same rule it keeps its circle."""
+        from tests.combat.fakes import FakeEnemy
+
+        body = FakeEnemy(0.0, 0.0)
+        body.elemental.lock(0.0, 5.0)
+        run = fake_run([body])
+        calls, ring, marker = self._counted()
+        with mock.patch.object(layers, "_ring", ring), \
+                mock.patch.object(markers, "draw", marker):
+            fx.draw(self.surface, run)
+        self.assertEqual(calls["ring"], 1)
+
+    def test_an_aura_sprite_keeps_the_art_aspect(self):
+        """These frames were trimmed to their own content and are not
+        square; squeezing one into a square box turns a ring into an
+        ellipse."""
+        profiles = get_visuals(C)
+        for element in ELEMENTS:
+            natural = profiles[element].aura_frame().get_size()
+            got = profiles[element].aura_size(80.0)
+            self.assertEqual(got[0], 80)
+            self.assertAlmostEqual(got[1] / got[0], natural[1] / natural[0],
+                                   places=1, msg=f"{element.key} is squeezed")
+
+    def test_a_reaction_with_a_burst_draws_the_sprite_not_the_rings(self):
+        run = fake_run()
+        transient.add(run, transient.Flash((0, 0), REACTIONS[0], 60.0, 0.0))
+        calls, ring, _marker = self._counted()
+        with mock.patch.object(transient, "_ring", ring):
+            fx.draw(self.surface, run)
+        self.assertEqual(calls["ring"], 0)
+
+    def test_a_reaction_without_a_burst_falls_back_to_the_blend(self):
+        run = fake_run()
+        transient.add(run, transient.Flash((0, 0), REACTIONS[0], 60.0, 0.0))
+        calls, ring, _marker = self._counted()
+        visuals = run.element_visuals.profiles
+        with mock.patch.object(visuals, "reaction", lambda key: None), \
+                mock.patch.object(transient, "_ring", ring):
+            fx.draw(self.surface, run)
+        self.assertGreater(calls["ring"], 0, "three rings in the blend")
+
+    def test_a_burst_sets_the_flash_lifetime_from_the_data(self):
+        """The combat layer hands over `now`; how long the thing stays on
+        screen is presentation tuning and belongs to the renderer."""
+        import types
+
+        from combat.elements.world import RunWorld
+
+        run = fake_run()
+        run.ledger = types.SimpleNamespace(elements=None)
+        world = RunWorld(run)
+        world.add_flash((0, 0), REACTIONS[0], 40.0, 5.0)
+        flash = run.element_fx[-1]
+        burst = run.element_visuals.profiles.reaction(REACTIONS[0].key)
+        self.assertEqual(flash.started, 5.0)
+        self.assertAlmostEqual(flash.until, 5.0 + burst.seconds)
+
+
 # --- the data ----------------------------------------------------------------------
 
 class DataTests(unittest.TestCase):
@@ -304,6 +458,60 @@ class DataTests(unittest.TestCase):
         broken["elements"]["ice"]["particles"]["rate"] = 0
         with self.assertRaises(ContentError):
             _check_element_visuals(broken)
+
+    def test_a_reaction_without_a_burst_is_refused(self):
+        """Every reaction draws over the whole scene, so every reaction
+        needs one. A missing entry would quietly fall back to the
+        procedural flash for that pair alone, which is the sort of gap
+        nobody notices until they wonder why one reaction looks
+        different."""
+        import copy
+
+        from game.content import ContentError, _check_element_visuals
+
+        for mangle in (lambda d: d["reactions"].pop("overload"),
+                       lambda d: d["reactions"]["overload"].pop("rig"),
+                       lambda d: d["reactions"]["overload"].update(seconds=0),
+                       lambda d: d["reactions"]["overload"].update(size=-1),
+                       lambda d: d.pop("reactions"),
+                       lambda d: d.pop("statuses")):
+            broken = copy.deepcopy(C.element_visuals)
+            mangle(broken)
+            with self.assertRaises(ContentError):
+                _check_element_visuals(broken)
+
+    def test_a_rig_name_that_resolves_to_nothing_is_refused(self):
+        """Checked separately from the shape, because the sprite files
+        merge *after* this one loads. It matters more since M10: with the
+        sprite as the whole indicator, a typo leaves a primed enemy with
+        nothing drawn on it rather than falling back to a ring."""
+        import copy
+
+        from game.content import ContentError, _check_element_rigs
+
+        _check_element_rigs(C.element_visuals, C.sprites)      # the real one
+
+        for where, mangle in (
+                ("an element", lambda d: d["elements"]["fire"].update(
+                    aura_rig="no_such_rig")),
+                ("a reaction", lambda d: d["reactions"]["overload"].update(
+                    rig="no_such_rig")),
+                ("a status", lambda d: d["statuses"].update(
+                    burn="no_such_rig"))):
+            broken = copy.deepcopy(C.element_visuals)
+            mangle(broken)
+            with self.assertRaises(ContentError, msg=where):
+                _check_element_rigs(broken, C.sprites)
+
+    def test_a_rig_without_a_loop_animation_is_refused(self):
+        import copy
+
+        from game.content import ContentError, _check_element_rigs
+
+        sprites = dict(C.sprites)
+        sprites["element_fire"] = {"frame": [64, 64]}          # no `anims`
+        with self.assertRaises(ContentError):
+            _check_element_rigs(copy.deepcopy(C.element_visuals), sprites)
 
 
 if __name__ == "__main__":

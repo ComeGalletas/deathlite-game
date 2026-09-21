@@ -53,18 +53,65 @@ class ElementVisuals:
         return f"{self.auras_drawn} drawn  {self.budget.report()}"
 
 
-def draw(surface, run) -> None:
-    """Every elemental visual, over the world and under the HUD."""
+def begin_frame(run) -> None:
+    """Once a frame, before the banded passes start.
+
+    The particle budget and the aura counter are per *frame*: `draw_under`
+    runs once per terrace and resetting them there would give each band the
+    whole budget and leave the counter showing only the last band's auras.
+    """
+    visuals = run.element_visuals
+    if visuals is None:
+        return
+    visuals.begin_frame()
+    visuals.auras_drawn = 0
+
+
+def draw_under(surface, run, level=None) -> None:
+    """The elemental state of the field, under the bodies it belongs to.
+
+    Auras, the Wind tornado, the status marks and Thunder's jump arcs. All
+    of them describe something that *is the case* about a body or a patch of
+    ground, so they paint with the terrace and the sprites go over them
+    (M10 rule 3). `level=None` draws the lot wherever it is, which is what
+    the headless tests and `draw` below pass.
+    """
     visuals = run.element_visuals
     if visuals is None:
         return
     now = run.stats["time"]
-    visuals.begin_frame()
-    transient.draw_areas(surface, run, visuals.profiles, now)
-    visuals.auras_drawn = layers.draw_auras(surface, run, visuals.profiles, now,
-                                            visuals.budget)
-    layers.draw_statuses(surface, run, visuals.profiles, now)
-    transient.draw_transient(surface, run, visuals.profiles, now)
+    transient.draw_areas(surface, run, visuals.profiles, now, level)
+    visuals.auras_drawn += layers.draw_auras(
+        surface, run, visuals.profiles, now, visuals.budget, level)
+    layers.draw_statuses(surface, run, visuals.profiles, now, level)
+    transient.draw_transient(surface, run, visuals.profiles, now, level,
+                             over=False)
+
+
+def draw_reactions(surface, run) -> None:
+    """The reaction bursts, over every character.
+
+    Not banded and not culled by terrace: a reaction is a moment rather
+    than a state, it is the one elemental visual the player must not miss,
+    and every one of them is gone inside 0.7 s.
+    """
+    visuals = run.element_visuals
+    if visuals is None:
+        return
+    transient.draw_transient(surface, run, visuals.profiles,
+                             run.stats["time"], None, over=True)
+
+
+def draw(surface, run) -> None:
+    """Every elemental visual in one pass, unbanded.
+
+    What the game used to do, and still the right thing for a caller with
+    no terraces to band against -- the headless render tests, and any
+    future still of a single body.
+    """
+    begin_frame(run)
+    draw_under(surface, run, None)
+    draw_reactions(surface, run)
 
 
 def sweep(run, now: float) -> None:

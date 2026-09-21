@@ -925,6 +925,16 @@ is sparse lightning -- lovely, and not a shape that says "primed". Since an
 aura is the only in-game sign of what an enemy will react to, the ring is
 now drawn for every element and the art layers on top.
 
+> **Superseded by M10, 2026-09-21.** The owner's rule is the opposite: where
+> a sprite is wired the circle does not draw at all, and the marker goes with
+> it. The reasoning above was sound about the *art* and wrong about the
+> remedy. One sparse sheet is a reason to find better art, not a reason to
+> prop it up with a procedural shape underneath -- and M10 found it, four
+> whole shapes with their own silhouettes. The ring and the marker stay in
+> the code as the fallback for an empty `assets/`, and the **locked** slot
+> keeps its circle because it has no sprite, which is also what keeps
+> "primed" and "cannot be primed" one glance apart.
+
 The first pass was also simply too faint over this game's pale stone
 terrain. Ring alpha, width and marker size all went up after looking at the
 grid, which is what the grid is for.
@@ -1105,6 +1115,439 @@ across runs needs the same.
   **hand-patched** rather than regenerated: its own drift warning says a
   rerun drops the hand-written sections, and it still would.
 
+## M10 Authored art for the elements and the reactions (CONFIRMED)
+
+Requested and confirmed 2026-09-21. The owner asked for a survey of the
+unused art for sprite effects that could carry the elements and the
+reactions, and set four rules:
+
+1. **Where an element has a sprite wired, the circle indicator does not
+   draw.** The sprite is the whole indicator. The small element marker
+   above the head goes with it -- confirmed explicitly; the four distinct
+   shapes do the job the marker was doing.
+2. **Reactions need a sprite effect too**, and it removes the circle in the
+   same way.
+3. **Element effects draw behind the enemy sprites** -- lower priority than
+   the bodies they are attached to. **Reaction effects draw on top of
+   everything else**, and stay brief so that sitting above the whole scene
+   does not disrupt play.
+4. **Each sprite is cut into its own file** rather than read out of the
+   parent multi-row sheet at run time, under `assets/effects/elements/`
+   and `assets/effects/reactions/`.
+
+### What the reserve actually holds
+
+Two packs, both already licensed, bundled and credited by this project.
+
+**`assets/unused/unordered-effects`** -- 180 sheets, 64 px frames, laid out
+as N columns by **9 rows, where the rows are nine colour variants of the
+same animation**. This is the pack the magic rod's arcane circle, thunder
+ball and thunder aura were already cut from, so `weapon_sprites.json`
+already knows the shape of the wiring (`grid: [N, 9]` plus a `row`). The
+nine rows are, in order: red/orange, violet, cyan, green, yellow/tan,
+white, grey-purple, red, indigo. Every element's colour is in there, which
+means **no recolouring script is needed** -- unlike the Grave Totem's bolt,
+which had to be recoloured because a multiply tint cannot turn orange blue.
+
+This is the pack to build on. It is deep in exactly the shapes an aura
+wants: rings, spirals, vortices, radial bursts and rosettes.
+
+**`assets/unused/Super Pixel Effects Gigapack`** -- the Fire, Lightning,
+Fantasy Spells, Explosions, Impacts and Magic Bursts categories, in two
+sizes and six to eight hues. Richer art, but almost all of it is a
+**one-shot burst**: `fire_looping_001` is the only piece in the pack that
+is authored to loop, and it is already in use as Fire's burn status. That
+makes the Gigapack a good source for *reaction* bursts and for the freeze,
+and a poor one for auras, which have to hold for three or four seconds.
+
+### The picks
+
+Shortlisted from the contact sheets, then **re-judged frame by frame**,
+which changed four of them. A single frame at an effect's peak is enough to
+shortlist and not enough to choose: an aura has to read across its whole
+loop, and two of the first picks turned out to be a squiggle for most of
+theirs.
+
+One distinct **shape** per element rather than one shape in four hues -- an
+element has to be readable without relying on colour (design 8, colourblind
+proposal), and once the ring and the marker go the sprite is the only thing
+carrying that.
+
+| Element | Source | Row | Frames | Shape |
+|---|---|---|---|---|
+| Fire | `unordered-effects` Part 12/586 | 0 coral | 14 | a ring that grows flame tongues outward |
+| Ice | Part 13/623 | 2 blue | 13 | a crystal that forms, then opens into a diamond outline |
+| Thunder | Part 14/652 | 5 grey, remapped | 16 | a radial spiked discharge |
+| Wind | Part 1/26 | 3 green | 14 | concentric rings turning -- the only pick that rotates |
+
+| Reaction | Source | Row | Frames | Shape |
+|---|---|---|---|---|
+| Frostburn | Part 4/186 | 1 magenta | 12 | a violet sphere of motes, where fire and ice blend |
+| Overload | Part 14/674 | 0 coral | 18 | a hexagonal detonation, the biggest of the six |
+| Superconduct | Part 9/446 | 2 blue | 10 | an orbiting star coming apart |
+| FireWind | Part 15/711 | 0 coral | 20 | one swirl in three colours: the three wind |
+| IceWind | Part 15/711 | 2 blue | 20 | reactions *are* the same mechanic with |
+| ThunderWind | Part 15/711 | 5 remapped | 20 | different payloads, and should read that way |
+
+Plus the Gigapack's `spell_ice_001` (large blue, 40 frames) for the
+**freeze** status: a block of ice that forms and shatters, which is what
+freeze has always wanted to look like and what no procedural bracket over
+the head was going to give it.
+
+#### Thunder had no row
+
+The pack's nine rows are coral, magenta, blue, green, brown, grey, mauve,
+crimson and purple. There is no yellow one. Row 0's *highlight* is yellow
+(`#fcf08d`) but its body is coral, and Fire wants that row -- two elements
+cannot share a palette when the sprite is the only indicator left.
+
+So Thunder takes the neutral **grey** row and is remapped. A grey ramp maps
+onto a coloured one exactly, which is the whole reason it is the row to
+take; recolouring the coral row instead would be the mistake
+`recolour_totem_fire.py` was written to avoid.
+
+Getting the ramp right took three passes, all of them visible in the
+script's comments:
+
+1. A per-channel multiply by a yellow triple. The grey row's commonest
+   pixel is `#6f6f6f`, so everything scaled into **olive**.
+2. A two-point gradient to a near-white light end with a gamma lifting the
+   midtones. This source is thin strokes and most of its pixels are already
+   light, so lifting them put everything at the light end: **cream**.
+3. A two-point gradient between *saturated* ends with the gamma near 1 --
+   `(140, 95, 10)` to `(250, 220, 40)`, gamma 0.8. Bright yellow with amber
+   shading, and unmistakably not Fire's coral.
+
+### What changes in code
+
+Small, and mostly deletion.
+
+- `visual/elements/layers.py:_aura` draws the ring, then the rig over it,
+  then the marker. Rule 1 inverts that: **rig present, nothing else**. The
+  ring and the marker stay for an element with no rig, which after this
+  milestone means none of them -- but the fallback is what keeps the game
+  playable with an empty `assets/`, so it stays wired, not deleted.
+- The **locked** ring stays exactly as it is. "Cannot be primed" has no
+  sprite, so by rule 1 it keeps its circle, which is also what makes locked
+  and primed one glance apart.
+- `visual/elements/transient.py:Flash` is the procedural reaction blast
+  today. Rule 2 gives each reaction an optional rig; where one is wired the
+  Flash does not draw at all, and the sprite plays in its place on the same
+  pooled transient list with the same cap.
+- `element_visuals.json` grows a `reactions` block beside `elements`, and
+  each element's `aura_rig` stops being null.
+- The status marks above the head (burn, chill, freeze) are a different
+  layer and are not touched, except that freeze gains its `spell_ice_001`
+  rig.
+
+### What this reverses
+
+M8 drew the ring for **every** element and layered the rig on top, on the
+grounds that Thunder's authored sheet was sparse lightning that did not
+read as "primed". That reasoning does not survive the new art: these are
+whole shapes, not accents. The M8 note stands as the record of why the
+ring was there; this supersedes it.
+
+### The layer split
+
+Today every elemental visual is one pass, `element_fx.draw`, immediately
+after `_draw_world` and therefore above every character. Rule 3 splits it
+in two by **meaning** rather than by module: a persistent state goes
+behind, a momentary event goes in front.
+
+```
+_draw_world                      banded per terrace:
+  for each level:                  ground band
+    draw_ground_band                 flat effects  <-- auras, tornadoes,
+    draw_flat_effects                                  arcs, status marks,
+    <sprites of that band>                             shed particles
+element_fx.draw_reactions        <-- reaction bursts, above everything
+_draw_hostile_projectiles
+particles / damage numbers
+dev overlays, key marker, hints
+--- HUD
+```
+
+The persistent half has to join the banded pass, which means it needs a
+level per body the way `actor_items` already computes one (`scene.band`).
+The reaction half stays a single late pass and moves *after* the
+projectiles, the particles and the damage numbers, which is what "on top of
+everything else" means in this paint order.
+
+Status marks (burn, chill, freeze) go behind with the rest, per the rule.
+They sit above the head, so a body standing behind can now occlude them; if
+that reads badly in the milestone screenshot it is worth raising then
+rather than pre-emptying the rule now.
+
+### Cost
+
+Nothing new per frame: a blit replaces a ring draw plus a marker draw, so
+the aura layer gets *cheaper*. The sheets are 64 px and one `Animator` per
+element is already shared across every aura of that element, so a hundred
+burning enemies remain a hundred blits of one frame.
+
+### Todo
+
+**A. Cut the art** -- done. `tools/asset_pipeline/cut_element_effects.py`
+
+- [x] A1. Reads the source packs and writes one single-row strip per
+      effect. No run-time read touches a parent sheet or a `row` index.
+      The reserve is a `--reserve` flag rather than a constant, because
+      `assets/unused/` is gitignored and so a git *worktree* -- which is how
+      this was built -- does not have one; the packs then live in the main
+      checkout beside it.
+- [x] A2. `assets/effects/elements/`: `fire.png`, `ice.png`, `thunder.png`,
+      `wind.png`, `freeze.png`. Named by element, not by source, so nothing
+      collides with the magic rod's own `thunder_aura.png`.
+- [x] A3. `assets/effects/reactions/`: all six.
+- [x] A4. Each strip trimmed on the **union** of its row's content, never
+      per frame -- per-frame boxes would shrink the file further and put
+      the frames out of register, which on a looping aura is a jitter no
+      anchoring fixes. The anchor is the original 64 px frame's centre
+      carried into the crop, because several of these animations are not
+      symmetrical about their own content and drift as they play.
+- [x] A5. `assets/CREDITS.md` gains usage entries for both packs. This also
+      fixes an older gap: the magic rod's `arcane_circle`, `thunder_ball`
+      and `thunder_aura` came from the same pack and had never been listed.
+
+What the cut produced, which is the input to group B:
+
+| file | frames | frame | anchor |
+|---|---|---|---|
+| `effects/elements/fire.png` | 14 | 64 x 64 | 32, 32 |
+| `effects/elements/ice.png` | 13 | 58 x 58 | 29, 29 |
+| `effects/elements/thunder.png` | 16 | 62 x 58 | 31, 30 |
+| `effects/elements/wind.png` | 14 | 56 x 56 | 28, 28 |
+| `effects/elements/freeze.png` | 40 | 87 x 93 | 44, 48 |
+| `effects/reactions/frostburn.png` | 12 | 48 x 49 | 24, 25 |
+| `effects/reactions/overload.png` | 18 | 64 x 64 | 32, 32 |
+| `effects/reactions/superconduct.png` | 10 | 64 x 58 | 32, 29 |
+| `effects/reactions/firewind.png` | 20 | 44 x 40 | 22, 21 |
+| `effects/reactions/icewind.png` | 20 | 44 x 40 | 22, 21 |
+| `effects/reactions/thunderwind.png` | 20 | 44 x 40 | 22, 21 |
+
+**B. Wire the rigs** -- done.
+
+- [x] B1. Eleven rigs in `weapon_sprites.json`. Single-row files, so no
+      `grid` and no `row`, which was the point of the cut. The anim is
+      named `loop` in all eleven because that is this project's convention
+      for a rig's only animation -- `sword_slash_down` and `hammer_impact`
+      are one-shots under the same name -- and the `loop` *flag* inside
+      says whether it repeats. fps puts each aura's cycle near a second;
+      freeze runs 40 frames at 27 fps = 1.48 s so the block shatters on the
+      thaw; every reaction is under 0.7 s, because they draw over
+      everything.
+- [x] B2. `element_visuals.json`: every `aura_rig` filled, a `reactions`
+      block, and `status_rig` replaced by a `statuses` block.
+- [x] B3. `content.py` validates the new blocks, and a new
+      `_check_element_rigs` checks that every rig a name points at is real.
+
+#### `status_rig` had to become `statuses`
+
+It was a field on an *element*, which only ever worked because Fire happened
+to own the only authored status. Ice owns both `freeze` and `chill`, so one
+field per element cannot hold them. Keying by **status id** instead matches
+how `layers._marks` already decides what to draw, and it is the truer shape:
+`burn` is shared with the weapon blessings, which have no element behind
+them at all and still have to look the same.
+
+`chill` is deliberately absent and falls back to its procedural chevron,
+which is why this is a map with gaps rather than a required field.
+
+#### A reaction burst is not an `Animator`
+
+Auras share one clock per element -- a hundred burning enemies are a hundred
+blits of one frame, which is the saving M8 was built around. A reaction
+cannot work that way: two Overloads half a second apart are two separate
+events and each has to start at its own first frame. So `ReactionBurst`
+takes the frame by **progress** off the individual flash's age, clamped
+rather than wrapped so overshooting the end holds the last frame instead of
+snapping back to the first.
+
+#### Rig validation was claimed and never done
+
+`_check_element_visuals`'s docstring said "every named rig real" and the
+code never checked it. It could not: the sprite files merge *after*
+`element_visuals.json` loads. Now `_check_element_rigs` runs once they have,
+and a name that resolves to nothing stops the boot -- which matters more
+after M10 than before, because once the sprite is the whole indicator a typo
+would leave a primed enemy with nothing drawn on it at all rather than
+falling back to a ring.
+
+#### Two M8 tests were replaced
+
+`test_the_authored_rigs_load` asserted that Ice has *no* aura rig and that
+Fire's status art hangs off Fire's profile. Both were true of M8 and neither
+is true now. They are replaced by tests for what M10 actually promises: all
+four elements have authored art, status art is keyed by status, every
+reaction has a burst, and a burst is indexed rather than clocked.
+
+`test_one_clock_per_element_not_one_per_aura` broke for a subtler reason
+worth recording: it advanced the clock by exactly one second, and Thunder's
+new rig is 16 frames at 16 fps, so it landed back on frame 0 and the test
+asserted that a working clock was broken. It now advances by a third of a
+second.
+
+**C. Rules 1 and 2: the sprite is the indicator** -- done.
+
+- [x] C1. `layers._aura` draws the rig and **nothing else** where one
+      resolves; the ring and the marker are the `else` branch.
+- [x] C2. The locked ring is untouched.
+- [x] C3. `Flash` plays the authored burst where the reaction has one, and
+      falls back to the blend of its two elements where it does not.
+- [x] C4. `markers.py` kept: it is still the fallback, and the chill
+      chevron is drawn from it.
+- [x] C5 (added). Freeze stopped being a bracket over the head and became
+      the authored block over the body.
+- [x] C6 (added, requested mid-group). A primed body is tinted toward its
+      element.
+
+#### The aura sprite needed a scale knob and an aspect
+
+The old code scaled the rig into a **square** `radius * 2.6` box. That was
+harmless when the one rig was a 64 px square sheet; the cut trimmed each
+strip to its own content, so the frames are now 56x56, 58x58, 62x58 and
+64x64, and squeezing them into a square turns a ring into an ellipse.
+`aura_size` keeps the art's aspect and `aura.rig_scale` in the data says how
+wide the sprite is against the body's diameter. There is a test for the
+aspect, because it is the kind of thing that looks almost right.
+
+#### The flash stopped being told when to expire
+
+`add_flash` took an `until`, and the combat layer worked it out by importing
+`FLASH_SECONDS` **from the renderer** -- reaching across the seam to ask a
+drawing module how long its own effect lasted. It now takes `started`, and
+the visual adapter looks the duration up in `element_visuals.json` with the
+rest of the presentation tuning. That is also what made the authored bursts
+possible at all: they run 0.42 s to 0.67 s and the old constant was 0.3 s,
+so every one of them would have been cut off mid-play.
+
+#### Freeze holds formed and shatters at the end
+
+The 40-frame block forms, holds and shatters. Playing it properly would mean
+knowing when each body froze, and nothing records that -- `StatusState` keeps
+a remaining time, not an original duration, and the freeze length is both
+tunable and modifiable. So the block holds at its formed frame for as long as
+the freeze runs and plays the shatter over the last 0.45 s, which is the part
+that has to line up. The formation frames are skipped. Giving them their
+proper run would mean putting a timestamp on the combat-side state for a
+rendering detail, and that trade did not look worth it.
+
+#### The aura tint (requested mid-group)
+
+The aura sprite says *what* an enemy is primed with. It does not say *which*
+enemies are primed, which is the question a player actually asks while
+picking a target in a crowd -- a ring around one body does not survive being
+scanned at speed. So a primed body now wears its element's colour.
+
+Slight, per the request: the sprite's own detail has to stay easily
+readable. A straight multiply by a saturated colour crushes every channel
+the tint is low in -- a bone-white skeleton under Ice would go navy -- so the
+element's colour is first lifted 45% toward white, then multiplied, then laid
+back over the original at 40%. The result shifts hue with every pixel of
+shading still there.
+
+Two things it deliberately does not do. It does not beat the **damage
+flash**: a hit is the more urgent thing to see and it is over in a quarter of
+a second, so the tint is the `else` branch. And on the primitive fallback
+(an enemy with no sprite) it does not beat a **status** colour, which is
+already carrying information there.
+
+Cached by `(id(frame), element)` the way `hit_tinted` is cached by frame
+identity: the animation frames are the asset cache's own objects, so the
+same one comes back for every frame of an aura's several seconds, and
+copying it per enemy per frame would be the expensive way to do this.
+
+`_AURA_TINT_ALPHA` (102 of 255) and `_AURA_TINT_LIFT` (0.45) are the two
+knobs. At gameplay zoom over this game's pale skeletons the effect is very
+subtle; it is clear side by side.
+
+**Settled 2026-09-21 at 102.** The strength was put to the owner with the
+same crowd rendered at 102, 150 and 190 -- at gameplay zoom, with the
+weapons removed so the hit flash could not mask it -- and they chose to
+keep 102. So "slight" in the original request meant slight: closest to the
+sprites' own palette, and you have to be looking for it to see which
+enemies are primed. Do not raise it without asking.
+
+**D. Rule 3: the layer split** -- done.
+
+- [x] D1. `elements/__init__.py` splits into `begin_frame(run)`,
+      `draw_under(surface, run, level)` and `draw_reactions(surface, run)`.
+      The old single-pass `draw` stays as the unbanded path, which is what
+      the headless tests and any still of a lone body want.
+- [x] D2. `scene.draw_flat_effects` calls `draw_under` per level, last of
+      the flat effects so an aura sits directly under the sprites standing
+      on the same band.
+- [x] D3. `PlayingState.draw` calls `draw_reactions` after the hostile
+      projectiles, the particles and the damage numbers.
+- [x] D4. `begin_frame` is called once, from `PlayingState.draw` before
+      `_draw_world`.
+
+#### The split cuts across the pooled transient list
+
+Arcs and flashes share one capped list. They do **not** share a layer:
+Thunder's jump is a state of the field and bands with the terrain, while a
+reaction's burst is an event and rides over everything. Each class carries
+an `OVER` flag and `draw_transient` takes one side at a time. The whole list
+is walked either way -- it is capped at `MAX_EFFECTS` and keeping two lists
+in step through the sweep would cost more than the scan.
+
+#### `off_band` is the rule the rest of the world already used
+
+`WorldRenderer._off_band` has always been how a flat effect decides whether
+it belongs to the band being painted, including its `level is None` escape
+meaning "draw it wherever it is". The elemental painters take the same rule
+rather than inventing one, and the same escape is what lets the headless
+tests keep drawing fake runs that have no map at all.
+
+#### D4 was the trap worth writing down
+
+`begin_frame` resets the particle budget and the aura counter, and
+`draw_under` now runs **once per terrace**. Left where it was, each band
+would have been handed the whole particle budget and the counter would have
+reported only the last band's auras. There is a test for both.
+
+#### What is still procedural, deliberately
+
+The Wind tornado's ring and the aura's shed particles. The tornado is the
+Wind *area* -- a separate object from the aura indicator the owner's rule
+is about -- and the particles belong to the run's own particle pool, which
+draws in its own layer. Both are visible in the milestone screenshot as the
+pale circles over the crowd. Worth a decision later; not what was asked
+for here.
+
+**E. Tests** -- done.
+
+- [x] E1/E2. A rig present means no ring and no marker; no rig means both;
+      locked always rings; a reaction with a burst draws the sprite and not
+      the Flash, and without one falls back to the blend. Plus a test that
+      an aura sprite keeps the art's aspect, because that is the kind of
+      thing that looks *almost* right.
+- [x] E3. `tests/render/test_element_layers.py` (new): the under-pass runs
+      before any body is painted, a reaction paints after every body, the
+      frame begins exactly once however many bands there are, and the aura
+      counter sums the bands instead of showing only the last.
+- [x] E4. Content validation refuses a missing reaction, a reaction missing
+      a field, a non-positive `seconds` or `size`, a missing block, a rig
+      name that resolves to nothing, and a rig with no `loop` animation.
+
+Both order tests originally **skipped** when the pinned seed happened to
+leave no enemy in view, which made them decorations. They now seat a body
+beside the hero through `tests.nearby.spots_near`: what the spawn master
+happened to place is not the subject.
+
+**F. Close out** -- done.
+
+- [x] F1. The M8 note that put the ring under every element now carries a
+      superseded banner saying why the reasoning does not survive the new
+      art.
+- [x] F2. Screenshot delivered: sixteen primed bodies with two reactions
+      going off over them. Zoomed, every aura is visibly *behind* the
+      skeleton wearing it -- fire's flame tongues, ice's crystals,
+      thunder's spikes and wind's rings all fan out from behind the body --
+      while the two coral FireWind bursts cover the ones they are on.
+- [x] F3. Full suite.
+
 ## Progress
 
 - 2026-09-21: discovery done, proposal written, no code changed.
@@ -1167,6 +1610,23 @@ across runs needs the same.
   tests. Full default suite: 2836 passed, 1 skipped (17 min). Nothing in the
   game reads the registry yet; M2 wires the aura state and the hit
   resolution.
+- 2026-09-21: M10 done. The elements and the reactions got authored art,
+  and the rules that came with it. Eleven single-row strips cut out of the
+  two reserve packs by `cut_element_effects.py`, with Thunder's grey row
+  remapped onto a yellow ramp because the pack has no yellow one and Fire
+  wanted the row whose highlight is. Where a sprite is wired it is now the
+  **whole** indicator: no ring, no marker, and no procedural flash -- which
+  reverses M8's reasoning, recorded there with a banner. The locked slot
+  keeps its circle, because it has no sprite. Freeze stopped being a
+  bracket over the head and became the ice block over the body. The layer
+  split landed: the elemental *state* of the field now paints terrace by
+  terrace under the bodies it belongs to, and a reaction rides over every
+  character and is gone inside 0.7 s. A primed body is also tinted lightly
+  toward its element, which answers the question the aura sprite does not
+  -- not *what* an enemy is primed with but *which* enemies are. Fifteen
+  new tests across two modules, including the order tests that pin the
+  split. Screenshot delivered.
+
 - 2026-09-21: M9 done, and with it the build. Performance: the elemental
   system costs nothing measurable at any realistic load, and about 0.66 ms
   at thirty times one -- which the two caps cut for balance then gave back.

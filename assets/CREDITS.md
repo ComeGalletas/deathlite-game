@@ -154,6 +154,26 @@ fill when a file is missing.
 
 ### Where the additional packs are used
 
+- **750+ Effect and FX Pixel All** — the elemental system's aura and reaction
+  art (`documentation/journals/elemental_system_journal.md`, M10), cut by
+  `tools/asset_pipeline/cut_element_effects.py`. The four auras in
+  `assets/effects/elements/` (`fire.png` Part 12/586 row 0, `ice.png`
+  Part 13/623 row 2, `thunder.png` Part 14/652 row 5 remapped to yellow,
+  `wind.png` Part 1/26 row 3) and the six reactions in
+  `assets/effects/reactions/` (`frostburn.png` Part 4/186 row 1,
+  `overload.png` Part 14/674 row 0, `superconduct.png` Part 9/446 row 2, and
+  `firewind.png` / `icewind.png` / `thunderwind.png` all from Part 15/711 in
+  rows 0, 2 and 5). The magic rod's own effects came from this pack earlier
+  and had not been listed here: `assets/effects/weapons/magic_rod/`
+  (`arcane_circle.png`, `thunder_ball.png`, `thunder_aura.png`). The pack is
+  kept unmodified under `assets/unused/unordered-effects/` and is not read at
+  run time.
+- **Super Pixel Effects Gigapack** — the freeze status
+  (`assets/effects/elements/freeze.png`), cut from `spell_ice_001` large blue
+  by the same script: a block of ice that forms over forty frames and
+  shatters, replacing the bracket that used to sit over a frozen enemy's
+  head.
+
 - **Super Pixel Effects Gigapack** — the buff buildings' feedback
   (`documentation/journals/buff_buildings_journal.md`): the five hero
   activation strips in `assets/effects/buffs/` (`spell_absorb_001` yellow,
