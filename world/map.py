@@ -20,7 +20,8 @@ from world.elevation import LevelIndex
 from world.rules import floor as floor_rules
 from world.rules import inset as terrain_inset
 from world.rules.steps import can_step
-from world.procedural import Room, WorldLayout, generate_world
+from world.layout import Room, WorldLayout
+from world.gen import generate_world
 from world.terrain import autotile
 from world.terrain import bake as terrain_bake
 from world.terrain.baked import BakedTerrain

@@ -61,7 +61,7 @@ class TrackDeclarationTests(unittest.TestCase):
         from game.states.meta_state import MetaState
         from game.states.options_state import OptionsState
         from game.states.paused_state import PausedState
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         from game.states.rankings_state import RankingsState
         from game.states.run_status_state import RunStatusState
         from game.states.victory_state import VictoryState
@@ -89,7 +89,7 @@ class TrackDeclarationTests(unittest.TestCase):
         from game.states.level_up_state import LevelUpState
         from game.states.loading_state import LoadingState
         from game.states.paused_state import PausedState
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         from game.states.run_status_state import RunStatusState
         self.assertEqual(PlayingState.music, "gameplay")
         # The loading screen inheriting is what carries the menu track through

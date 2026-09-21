@@ -66,121 +66,163 @@ class _Cycle:
         return self.bag.pop()
 
 
+class _Casting:
+    """One run's villager casting: the seeded draws, the colour cycle, and
+    the two lookups every placement below shares. Built once by
+    `Npcs.build` and handed to `_place_*` village by village, so the draws
+    run in one stream in placement order."""
+
+    def __init__(self, ps, rng, data, assets) -> None:
+        self.ps = ps
+        self.run = getattr(ps, "run", ps)
+        self.rng = rng
+        self.assets = assets
+        self.kinds = data["kinds"]
+        self.place = data["placement"]
+        self.px = config.TILE_PX
+        self.colours = _Cycle(rng, data["colours"])
+
+    def rig(self, kind: str) -> str:
+        return self.kinds[kind]["rigs"].format(colour=self.colours.next())
+
+    def spot_near(self, x, y, tiles, radius):
+        """A walkable point within `tiles` of `(x, y)`, or `None`."""
+        rng, px = self.rng, self.px
+        for _ in range(12):
+            ang = rng.uniform(0.0, 6.283185307)
+            d = rng.uniform(0.6, 1.0) * tiles * px
+            cand = pygame.Vector2(x, y) + pygame.Vector2(d, 0).rotate_rad(ang)
+            if self.run.game_map.is_walkable(cand, radius):
+                return cand
+        return None
+
+    def npc(self, kind: str, home, **kw) -> Npc:
+        """One villager of `kind` at `home`, its rig drawn from the cycle
+        now, its leash from the data."""
+        spec = self.kinds[kind]
+        return Npc(kind, self.rig(kind), home.x, home.y, spec, self.assets,
+                   leash_px=spec["leash"] * self.px, **kw)
+
+
+def _place_smith(cast: _Casting, v, npcs: list) -> None:
+    """The smith, at the forge's front."""
+    spec = cast.kinds["smith"]
+    home = cast.spot_near(v.forge.x, v.forge.y + 1.2 * cast.px, 0.8, spec["radius"])
+    if home is not None:
+        npcs.append(cast.npc("smith", home))
+
+
+def _place_pawns(cast: _Casting, v, npcs: list) -> None:
+    """Pawns: some at the houses, a few more about the ring."""
+    rng, place = cast.rng, cast.place
+    spec = cast.kinds["pawn"]
+    homes = [(x, y) for kind, x, y in v.buildings if kind == "house"]
+    wants = [(x, y) for x, y in homes
+             for _ in range(rng.randint(*place["pawns_per_house"]))]
+    wants += [(v.forge.x, v.forge.y)
+              for _ in range(rng.randint(*place["extra_pawns"]))]
+    for x, y in wants:
+        home = cast.spot_near(x, y, 2.5, spec["radius"])
+        if home is not None:
+            npcs.append(cast.npc("pawn", home))
+
+
+def _place_lancers(cast: _Casting, v, npcs: list) -> None:
+    """The garrison: `lancers` of them per village, dealt round the
+    guard posts in turn. Each patrols between its post's two
+    buildings (or stands by the one, if only one of the pair fit),
+    starting from a different end than the last so a shared post's
+    pair do not march in step. A village whose military row did
+    not fit at all musters its lancers round the forge instead."""
+    rng, place, px = cast.rng, cast.place, cast.px
+    spec = cast.kinds["lancer"]
+    patrols = []
+    for pair in v.posts:
+        stops = []
+        for x, y in pair:
+            s = cast.spot_near(x, y + 0.9 * px, 1.2, spec["radius"])
+            if s is not None:
+                stops.append(s)
+        if stops:
+            patrols.append(stops)
+    if not patrols:
+        patrols.append([pygame.Vector2(v.forge.x, v.forge.y + 1.8 * px)])
+    for i in range(rng.randint(*place["lancers"])):
+        stops = patrols[i % len(patrols)]
+        turn = (i // len(patrols)) % len(stops)
+        stops = stops[turn:] + stops[:turn]
+        home = cast.spot_near(stops[0].x, stops[0].y, 0.9, spec["radius"]) or stops[0]
+        npcs.append(cast.npc("lancer", home,
+                             posts=stops if len(stops) > 1 else None,
+                             aggro_px=spec["aggro"] * px,
+                             chase_px=spec["chase"] * px))
+
+
+def _place_herd(cast: _Casting, v, npcs: list) -> None:
+    """The corral: 2-4 sheep and 2-3 pigs, each on its own spot,
+    stirring within its leash of it. The sheep are dealt first and
+    exactly as they always were, so the first village's flock stands
+    where it always did; the pigs' own draws do shift everyone dealt
+    after them, which on a two-village world is the second village."""
+    if v.pen is None:
+        return
+    rng, place, px, assets = cast.rng, cast.place, cast.px, cast.assets
+    herd: list[tuple[float, float, float]] = []   # x, y, radius
+    spec = cast.kinds["sheep"]
+    pad = spec["radius"] + 4
+    if v.pen.width > 2 * pad and v.pen.height > 2 * pad:
+        for _ in range(rng.randint(*place["sheep"])):
+            x = rng.uniform(v.pen.left + pad, v.pen.right - pad)
+            y = rng.uniform(v.pen.top + pad, v.pen.bottom - pad)
+            npcs.append(SheepNpc(spec["rigs"], x, y, spec, assets, v.pen,
+                                 spec["leash"] * px))
+            herd.append((x, y, spec["radius"]))
+    # The pigs go in the same pen, but they are dealt last into a
+    # corral that already has animals in it, so each one asks for a
+    # spot off its neighbours: up to seven bodies in a band this
+    # narrow otherwise land on top of each other.
+    spec = cast.kinds["pig"]
+    pad = spec["radius"] + 4
+    if v.pen.width > 2 * pad and v.pen.height > 2 * pad:
+        for _ in range(rng.randint(*place["pigs"])):
+            x, y = pen_spot(rng, v.pen, pad, herd, spec["radius"])
+            npcs.append(SheepNpc(spec["rigs"], x, y, spec, assets, v.pen,
+                                 spec["leash"] * px, kind="pig"))
+            herd.append((x, y, spec["radius"]))
+
+
 class Npcs:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self.data = get_content().npcs
         self.rng = random.Random()
 
     # --- build ---------------------------------------------------------
     def build(self) -> None:
+        """The villagers of every village, in the order the placements run:
+        the smith, the pawns, the garrison, the corral. One `_Casting` per
+        run holds the seeded draws and the colour cycle they share."""
         ps = self.ps
-        ps.npcs = []
-        layout = ps.game_map.layout
+        run = getattr(self, "run", ps)
+        run.npcs = []
+        layout = run.game_map.layout
         if layout is None or not getattr(layout, "villages", None):
             return
-        px = config.TILE_PX
-        assets = ps.game.assets
-        kinds = self.data["kinds"]
-        place = self.data["placement"]
         # Seeded by the world, so a run's villagers are the same people each
         # time and a test can pin them.
         self.rng = random.Random(f"{layout.seed}:npcs")
-        rng = self.rng
-        colours = _Cycle(rng, self.data["colours"])
-
-        def rig(kind):
-            return kinds[kind]["rigs"].format(colour=colours.next())
-
-        def spot_near(x, y, tiles, radius):
-            """A walkable point within `tiles` of `(x, y)`, or `None`."""
-            for _ in range(12):
-                ang = rng.uniform(0.0, 6.283185307)
-                d = rng.uniform(0.6, 1.0) * tiles * px
-                cand = pygame.Vector2(x, y) + pygame.Vector2(d, 0).rotate_rad(ang)
-                if ps.game_map.is_walkable(cand, radius):
-                    return cand
-            return None
-
+        cast = _Casting(ps, self.rng, self.data, ps.game.assets)
         for v in layout.villages:
-            # The smith, at the forge's front.
-            spec = kinds["smith"]
-            home = spot_near(v.forge.x, v.forge.y + 1.2 * px, 0.8, spec["radius"])
-            if home is not None:
-                ps.npcs.append(Npc("smith", rig("smith"), home.x, home.y, spec,
-                                   assets, leash_px=spec["leash"] * px))
-            # Pawns: some at the houses, a few more about the ring.
-            spec = kinds["pawn"]
-            homes = [(x, y) for kind, x, y in v.buildings if kind == "house"]
-            wants = [(x, y) for x, y in homes
-                     for _ in range(rng.randint(*place["pawns_per_house"]))]
-            wants += [(v.forge.x, v.forge.y)
-                      for _ in range(rng.randint(*place["extra_pawns"]))]
-            for x, y in wants:
-                home = spot_near(x, y, 2.5, spec["radius"])
-                if home is not None:
-                    ps.npcs.append(Npc("pawn", rig("pawn"), home.x, home.y, spec,
-                                       assets, leash_px=spec["leash"] * px))
-            # The garrison: `lancers` of them per village, dealt round the
-            # guard posts in turn. Each patrols between its post's two
-            # buildings (or stands by the one, if only one of the pair fit),
-            # starting from a different end than the last so a shared post's
-            # pair do not march in step. A village whose military row did
-            # not fit at all musters its lancers round the forge instead.
-            spec = kinds["lancer"]
-            patrols = []
-            for pair in v.posts:
-                stops = []
-                for x, y in pair:
-                    s = spot_near(x, y + 0.9 * px, 1.2, spec["radius"])
-                    if s is not None:
-                        stops.append(s)
-                if stops:
-                    patrols.append(stops)
-            if not patrols:
-                patrols.append([pygame.Vector2(v.forge.x, v.forge.y + 1.8 * px)])
-            for i in range(rng.randint(*place["lancers"])):
-                stops = patrols[i % len(patrols)]
-                turn = (i // len(patrols)) % len(stops)
-                stops = stops[turn:] + stops[:turn]
-                home = spot_near(stops[0].x, stops[0].y, 0.9, spec["radius"]) or stops[0]
-                ps.npcs.append(Npc("lancer", rig("lancer"), home.x, home.y, spec,
-                                   assets, leash_px=spec["leash"] * px,
-                                   posts=stops if len(stops) > 1 else None,
-                                   aggro_px=spec["aggro"] * px,
-                                   chase_px=spec["chase"] * px))
-            # The corral: 2-4 sheep and 2-3 pigs, each on its own spot,
-            # stirring within its leash of it. The sheep are dealt first and
-            # exactly as they always were, so the first village's flock stands
-            # where it always did; the pigs' own draws do shift everyone dealt
-            # after them, which on a two-village world is the second village.
-            if v.pen is not None:
-                herd: list[tuple[float, float, float]] = []   # x, y, radius
-                spec = kinds["sheep"]
-                pad = spec["radius"] + 4
-                if v.pen.width > 2 * pad and v.pen.height > 2 * pad:
-                    for _ in range(rng.randint(*place["sheep"])):
-                        x = rng.uniform(v.pen.left + pad, v.pen.right - pad)
-                        y = rng.uniform(v.pen.top + pad, v.pen.bottom - pad)
-                        ps.npcs.append(SheepNpc(spec["rigs"], x, y, spec, assets, v.pen,
-                                                spec["leash"] * px))
-                        herd.append((x, y, spec["radius"]))
-                # The pigs go in the same pen, but they are dealt last into a
-                # corral that already has animals in it, so each one asks for a
-                # spot off its neighbours: up to seven bodies in a band this
-                # narrow otherwise land on top of each other.
-                spec = kinds["pig"]
-                pad = spec["radius"] + 4
-                if v.pen.width > 2 * pad and v.pen.height > 2 * pad:
-                    for _ in range(rng.randint(*place["pigs"])):
-                        x, y = pen_spot(rng, v.pen, pad, herd, spec["radius"])
-                        ps.npcs.append(SheepNpc(spec["rigs"], x, y, spec, assets, v.pen,
-                                                spec["leash"] * px, kind="pig"))
-                        herd.append((x, y, spec["radius"]))
+            _place_smith(cast, v, run.npcs)
+            _place_pawns(cast, v, run.npcs)
+            _place_lancers(cast, v, run.npcs)
+            _place_herd(cast, v, run.npcs)
 
     # --- step ----------------------------------------------------------
     def update(self, dt: float) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         npcs = getattr(ps, "npcs", None)
         if not npcs:
             return
@@ -188,8 +230,8 @@ class Npcs:
         # Only the villagers anywhere near the view move; the rest stand
         # where they are, which nobody can see.
         pad = config.RENDER_ACTOR_CULL_PAD * 3
-        view = ps.camera.visible_rect().inflate(2 * pad, 2 * pad)
-        world = ps.game_map
+        view = run.camera.visible_rect().inflate(2 * pad, 2 * pad)
+        world = run.game_map
         foes, on_hit = self._foes, self._hit
         for n in npcs:
             if view.collidepoint(n.pos.x, n.pos.y):
@@ -201,6 +243,7 @@ class Npcs:
         (last frame's cells: a frame stale, which a charge does not mind).
         The boss is not a villager's business."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         grid = getattr(ps, "grid", None)
         near = grid.query_circle(x, y, r) if grid is not None else ps.enemies
         return [e for e in near if e.alive]
@@ -210,12 +253,13 @@ class Npcs:
         provokes and hit-flashes like any hit), a damage number, a few
         sparks and a push through the same weight split as a bump."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         spec = self.data["kinds"][npc.kind]
         # `VILLAGER` so the DPS meter can drop it: a lancer that wanders over
         # and stabs the training dummy is not the hero's damage.
         dealt = foe.take_damage(npc.damage, source=VILLAGER)
-        ps.damage_numbers.add(foe.pos, dealt, False)
-        ps.particles.burst(foe.pos, (236, 226, 200), count=4, speed=90,
+        run.damage_numbers.add(foe.pos, dealt, False)
+        run.particles.burst(foe.pos, (236, 226, 200), count=4, speed=90,
                            life=0.22, radius=2)
         if spec.get("knock"):
             _, push = knock_split(float(spec["weight"]), foe.weight, float(spec["knock"]))
@@ -234,9 +278,10 @@ class Npcs:
 
     def draw_one(self, surface, n) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         r = ps.renderer
-        z = ps.camera.zoom
-        sx, sy = ps.camera.world_to_screen(n.pos)
+        z = run.camera.zoom
+        sx, sy = run.camera.world_to_screen(n.pos)
         assets = ps.game.assets
         frame = None
         if n.anim is not None:

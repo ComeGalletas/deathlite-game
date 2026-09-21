@@ -277,10 +277,6 @@ class SurvivingTests(unittest.TestCase):
         d.roster = resolve_groups(data["groups"], get_content().enemies)
         self.assertEqual({n for _t, n in _run(d, 60.0)}, {"only"})
 
-    def test_the_old_import_path_still_works(self):
-        from world.spawning import SpawnDirector as Old
-        self.assertIs(Old, SpawnDirector)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,7 +24,7 @@ import pygame
 from game import config, fonts
 from game.state import State
 from ui import scale, widgets
-from ui.mouse import MouseNav
+from ui.menu_nav import MenuNav
 
 # The option rows: 64-px `wide` buttons (the pack's native height) on a
 # 68-px step -- a 4-px gap -- inset from the layout band's edges. The top is
@@ -51,26 +51,21 @@ class MenuState(State):
             ("Exit", "exit"),
         ]
         self._index = 0
-        self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
+        self._nav = MenuNav()        # the cursor keys and the mouse (ui/menu_nav.py)
+        self._mouse = self._nav.mouse   # rows registered in draw(); see ui/mouse.py
 
     # --- input ---------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
-        act = self._mouse.event(event)
-        if act is not None:
-            kind, i = act
+        verb = self._nav.event(event, index=self._index, count=len(self._options))
+        if verb is None:
+            return
+        what, i = verb
+        if what == "move":
             self._index = i
-            if kind == "click":
-                self._activate(self._options[i][1])
-            return
-        if event.type != pygame.KEYDOWN:
-            return
-        if event.key in (pygame.K_UP, pygame.K_w):
-            self._index = (self._index - 1) % len(self._options)
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self._index = (self._index + 1) % len(self._options)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            self._activate(self._options[self._index][1])
-        elif event.key == pygame.K_ESCAPE:
+        elif what == "activate":
+            self._index = i
+            self._activate(self._options[i][1])
+        elif what == "back":
             self.game.quit()
 
     def _activate(self, action: str | None) -> None:

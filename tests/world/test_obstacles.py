@@ -16,7 +16,8 @@ from game import config
 from tests import worlds as W
 from world.gen.tuning import _GRID_CLEAR_RADIUS
 from world.map import GameMap
-from world.procedural import SPECIAL_KINDS, _corridor_doorways
+from world.gen.tuning import SPECIAL_KINDS
+from world.gen.scatter import _corridor_doorways
 
 
 class ObstacleCollisionTests(unittest.TestCase):
@@ -93,25 +94,36 @@ class ObstacleGenerationTests(unittest.TestCase):
                                 f"seed {seed}: {o.kind} at {tuple(o.pos)} is off "
                                 f"the floor")
 
-    def test_special_island_centres_keep_a_clear_disc(self):
-        """A special island (shrine, altar, ...) keeps `_GRID_CLEAR_RADIUS`
-        round its centre so the interactable there can be reached. The start
-        and boss islands have their own discs, checked in `test_repair`; a
-        combat island may fill its middle."""
+    def test_a_freed_island_may_fill_its_middle(self):
+        """Every island but the start, the boss and the villages is a plain
+        combat island now, and a combat island may fill its centre.
+
+        This replaced `test_special_island_centres_keep_a_clear_disc`, which
+        asserted that a shrine / altar island held `_GRID_CLEAR_RADIUS` open
+        for the interactable standing there. Those islands were parked on
+        2026-09-20 (`journals/special_facilities_journal.md`) and the owner
+        asked for them to become ordinary combat islands, so the disc is
+        exactly what should be gone. The start and boss discs are unaffected
+        and still checked in `test_repair`.
+
+        Stated as "somewhere across the shipping seeds an obstacle sits inside
+        the old disc": per-island it is a coin flip, and asserting it of every
+        island would only pin the scatter's luck.
+        """
+        self.assertEqual(SPECIAL_KINDS, (), "a special island would want its disc back")
+        filled = 0
         for seed in W.SEEDS:
             w = W.layout(seed)
             for room in w.rooms:
-                if (room.id in (w.start_id, w.boss_id)
-                        or room.kind not in SPECIAL_KINDS):
+                if room.id in (w.start_id, w.boss_id) or room.kind != "combat":
                     continue
                 c = room.center
-                for o in w.obstacles:
-                    if not room.rect.collidepoint(o.pos.x, o.pos.y):
-                        continue
-                    self.assertGreaterEqual(
-                        o.pos.distance_to(c), _GRID_CLEAR_RADIUS - o.radius,
-                        f"seed {seed}: {o.kind} blocks the centre of "
-                        f"{room.kind} island {room.id}")
+                if any(room.rect.collidepoint(o.pos.x, o.pos.y)
+                       and o.pos.distance_to(c) < _GRID_CLEAR_RADIUS - o.radius
+                       for o in w.obstacles):
+                    filled += 1
+        self.assertGreater(filled, 0,
+                           "no combat island used the centre the specials used to hold open")
 
     def test_nothing_stands_on_a_bridge_landing(self):
         """The two tiles at each end of every bridge -- the last plank and

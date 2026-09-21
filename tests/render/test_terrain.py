@@ -208,7 +208,8 @@ class ObstacleDecorTests(unittest.TestCase):
         return gm
 
     def test_worldlayout_has_no_standalone_decoration_field(self):
-        from world.procedural import WorldLayout, generate_world
+        from world.layout import WorldLayout
+        from world.gen import generate_world
         self.assertNotIn("decorations", WorldLayout.__dataclass_fields__)
         self.assertFalse(hasattr(W.layout(7), "decorations"))
 
@@ -530,7 +531,7 @@ class BridgeCorridorTests(unittest.TestCase):
                         "a corridor-only cell seeded shoreline foam")
 
     def test_corridor_carries_bridge_edge_properties(self):
-        from world.procedural import generate_world
+        from world.gen import generate_world
         for seed in (1, 7, 99, 1234):
             w = W.layout(seed)
             for c in w.corridors:

@@ -7,8 +7,7 @@ master S11). A generated world has its spawn points decided at generation
 (`world/gen/spawnpoints.py`).
 
 The wave/budget director that lived here moved to `spawn/budget.py` in
-spawn master S2, with its schedule in `data/enemies/spawn_tables.json`. The name is
-re-exported so `from world.spawning import SpawnDirector` keeps working.
+spawn master S2, with its schedule in `data/enemies/spawn_tables.json`.
 """
 from __future__ import annotations
 
@@ -17,9 +16,7 @@ import random
 
 import pygame
 
-from spawn.budget import SpawnDirector  # noqa: F401  -- re-export, see above
-
-__all__ = ["ring_point_around", "SpawnDirector"]
+__all__ = ["ring_point_around"]
 
 
 def ring_point_around(centre: pygame.Vector2, world_w: int, world_h: int,

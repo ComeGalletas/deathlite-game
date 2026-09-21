@@ -35,25 +35,26 @@ class NavCoordinator:
 
     def __init__(self, ps) -> None:
         self.ps = ps
-
+        self.run = getattr(ps, "run", ps)
     def update(self, dt: float) -> None:
         """Aim a new fill when one is due -- a large player jump starts every
         class at once (rare); the periodic refresh starts one class per tick,
         round-robin, at `interval / n_grids` spacing -- then advance whatever
         is filling by this frame's budget."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         nav = ps._nav
         if nav is None:
             return
         ps._nav_t -= dt
-        jumped = (nav.target_cell_drift(ps.player.pos) >= self._DRIFT_CELLS)
+        jumped = (nav.target_cell_drift(run.player.pos) >= self._DRIFT_CELLS)
         if jumped:
-            nav.begin(ps.player.pos)
+            nav.begin(run.player.pos)
             ps._nav_t = config.ENEMY_NAV_REBUILD_INTERVAL
             ps._nav_rebuilds += 1
         elif ps._nav_t <= 0.0:
             classes = nav.classes
-            nav.begin(ps.player.pos, only=classes[ps._nav_rr % len(classes)])
+            nav.begin(run.player.pos, only=classes[ps._nav_rr % len(classes)])
             ps._nav_rr += 1
             ps._nav_t = config.ENEMY_NAV_REBUILD_INTERVAL / len(classes)
             ps._nav_rebuilds += 1
@@ -71,7 +72,7 @@ class NavCoordinator:
         return self.ps._nav.direction(pos, radius)
 
     def neighbors(self, pos, radius) -> list:
-        return self.ps.grid.query_circle(pos.x, pos.y, radius)
+        return self.run.grid.query_circle(pos.x, pos.y, radius)
 
     def obstacles_near(self, pos, radius) -> list:
         if self.ps._obstacle_grid is None:

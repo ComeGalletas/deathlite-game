@@ -20,7 +20,7 @@ import pygame
 from game import config, fonts
 from game.state import State
 from ui import widgets
-from ui.mouse import MouseNav
+from ui.menu_nav import MenuNav
 from ui.run_status import BlessingsPane, BuildPane, OverviewPane
 from ui.run_status import common as c
 
@@ -50,7 +50,12 @@ class RunStatusState(State):
         self._panes = {"overview": OverviewPane(self._fonts),
                        "build": BuildPane(self._fonts),
                        "blessings": BlessingsPane(self._fonts)}
-        self._mouse = MouseNav()     # tabs and rows registered in draw()
+        # The ribbons run left to right and 1 / 2 / 3 pick one; Up / Down
+        # come back as the cross axis and move the pane's selection. TAB
+        # closes as ESC does. Tabs and rows are registered in draw().
+        self._nav = MenuNav(axis="h", numbers=True,
+                            back_keys=(pygame.K_TAB, pygame.K_ESCAPE))
+        self._mouse = self._nav.mouse
 
     @property
     def pane(self):
@@ -61,30 +66,25 @@ class RunStatusState(State):
         if event.type == pygame.MOUSEWHEEL:
             self.pane.move(-int(event.y))
             return
-        act = self._mouse.event(event)
-        if act is not None:
-            kind, key = act
-            what, i = key
-            if what == "tab":
-                self.tab = i
-            elif what == "row" and hasattr(self.pane, "select"):
-                self.pane.select(i)
+        verb = self._nav.event(event, index=self.tab, count=len(PANES))
+        if verb is None:
             return
-        if event.type != pygame.KEYDOWN:
-            return
-        k = event.key
-        if k in (pygame.K_TAB, pygame.K_ESCAPE):
+        what, v = verb
+        if what == "back":
             self._close()
-        elif k in (pygame.K_LEFT, pygame.K_a):
-            self.tab = (self.tab - 1) % len(PANES)
-        elif k in (pygame.K_RIGHT, pygame.K_d):
-            self.tab = (self.tab + 1) % len(PANES)
-        elif k in (pygame.K_1, pygame.K_2, pygame.K_3):
-            self.tab = k - pygame.K_1
-        elif k in (pygame.K_UP, pygame.K_w):
-            self.pane.move(-1)
-        elif k in (pygame.K_DOWN, pygame.K_s):
-            self.pane.move(1)
+        elif what in ("move", "activate"):
+            if isinstance(v, tuple):               # a registered target
+                kind, i = v
+                if kind == "tab":
+                    self.tab = i
+                elif kind == "row" and hasattr(self.pane, "select"):
+                    self.pane.select(i)
+            else:
+                self.tab = v
+        elif what == "number":
+            self.tab = v
+        elif what == "axis":
+            self.pane.move(v)
 
     def _close(self) -> None:
         self.game.state_machine.pop()

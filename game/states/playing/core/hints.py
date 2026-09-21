@@ -32,6 +32,7 @@ _DIRECTIONS = ("up", "left", "down", "right")
 class RunHints:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self.enabled = bool(config.TUTORIAL_HINTS) and bool(ps.game.tutorials)
         self.stage: str | None = "move" if self.enabled else None
         self.spawn = pygame.Vector2(ps.player.pos)
@@ -58,7 +59,7 @@ class RunHints:
             return
         self.t += dt
         if self.stage == "move":
-            if (self.ps.player.pos - self.spawn).length() >= config.HINT_MOVE_DISTANCE:
+            if (self.run.player.pos - self.spawn).length() >= config.HINT_MOVE_DISTANCE:
                 self._advance("attack")
         elif self.stage == "attack":
             aim = getattr(self.ps, "_aim", None)

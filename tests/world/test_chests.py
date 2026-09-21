@@ -24,7 +24,7 @@ from world.gen.chests import (island_chest_count, island_chest_rarities,
                               place_chests)
 from world.gen.tuning import (VILLAGE_KIND, _CHEST_CAPS, _CHEST_COUNT_WEIGHTS,
                               _CHEST_RARITIES)
-from world.procedural import generate_world
+from world.gen import generate_world
 
 # A wider sweep than the four pinned seeds, for the statistical claims only.
 SWEEP = tuple(range(200, 240))

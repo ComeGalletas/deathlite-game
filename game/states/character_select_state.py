@@ -24,7 +24,7 @@ from game.state import State
 from systems.animation import Animator
 from ui import widgets
 from ui import scale as ui_scale     # `scale` is a rig field here
-from ui.mouse import MouseNav
+from ui.menu_nav import MenuNav
 from ui.text import shadowed, wrap
 
 # The preview cycles these; idle / walk are held for a beat, attack plays once.
@@ -74,9 +74,12 @@ class CharacterSelectState(State):
         self._body = fonts.body(20)
         self._instr = fonts.body(17)   # ~85% of the body font
         self._hint = fonts.body(16)
-        # Mouse: card / button rects registered in draw(); `_armed_hero` is the
-        # card the last click landed on (a second click on it begins).
-        self._mouse = MouseNav()
+        # The hero cards run left to right; Up / Down come back as the cross
+        # axis and step the difficulty (ui/menu_nav.py). Card / button rects
+        # are registered in draw(); `_armed_hero` is the card the last click
+        # landed on (a second click on it begins).
+        self._nav = MenuNav(axis="h")
+        self._mouse = self._nav.mouse
         self._armed_hero: int | None = None
         # P5 (design §20): the main weapon per hero. Free once the hero has
         # cleared the boss; until then the data's starting weapon. Q / E (or
@@ -125,28 +128,27 @@ class CharacterSelectState(State):
             self._preview.play(_PREVIEW_PHASES[self._phase_i], restart=True)
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        act = self._mouse.event(event)
-        if act is not None:
-            self._mouse_action(*act)
+        verb = self._nav.event(event, index=self.index, count=len(self.ids))
+        if verb is None:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    self._step_weapon(-1)
+                elif event.key == pygame.K_e:
+                    self._step_weapon(+1)
             return
-        if event.type != pygame.KEYDOWN:
-            return
-        if event.key in (pygame.K_LEFT, pygame.K_a):
-            self._select_hero((self.index - 1) % len(self.ids))
-        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            self._select_hero((self.index + 1) % len(self.ids))
-        elif event.key in (pygame.K_UP, pygame.K_w):
-            self._step_difficulty(-1)
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self._step_difficulty(+1)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+        what, v = verb
+        if what in ("move", "activate") and not isinstance(v, int):
+            # A registered target -- a card, Begin, Back, the ribbon, the
+            # weapon arrows: the mouse rules live in `_mouse_action`.
+            self._mouse_action("hover" if what == "move" else "click", v)
+        elif what == "move":
+            self._select_hero(v)
+        elif what == "activate":
             self._begin()
-        elif event.key == pygame.K_ESCAPE:
+        elif what == "axis":
+            self._step_difficulty(v)
+        elif what == "back":
             self._back()
-        elif event.key == pygame.K_q:
-            self._step_weapon(-1)
-        elif event.key == pygame.K_e:
-            self._step_weapon(+1)
 
     def _mouse_action(self, kind: str, key) -> None:
         if isinstance(key, tuple) and key[0] == "hero":

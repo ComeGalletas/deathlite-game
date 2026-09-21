@@ -39,6 +39,81 @@ from world.elevation import NONE as _NO_LEVEL
 class TransientFx:
     def __init__(self, ps) -> None:
         self.ps = ps
+        # A bare namespace standing in for the state (the tests' fakes) is
+        # its own run: it carries the pools and services under the same names.
+        self.run = getattr(ps, "run", ps)
+
+    # --- the hero's spawns (structure review, D2) -------------------
+    # The callbacks every `FireContext` and summon carries: they used to be
+    # methods of the state, reached back through `ps`. `PlayingState` keeps
+    # `_spawn_projectile` / `_spawn_summon` / `_spawn_impact` /
+    # `_spawn_hero_hazard` as forwarders for the tests that call them.
+    def resolve_visual(self, kw: dict) -> None:
+        """Fill `color` / `style` / `fx` from `data/weapons/weapon_visuals.json` for a
+        spawn that named its `weapon_id`. An explicit value in `kw` (e.g. the
+        wolf's bite) wins; a spawn with no `weapon_id` keeps the pool default."""
+        content = self.run.content
+        wid = kw.get("weapon_id", "")
+        # P3: a forged weapon may name its Forge's look (`visual`); it falls
+        # back to the base weapon's entry when the Forge has none.
+        vid = kw.pop("visual", None)
+        if not wid and not vid:
+            return
+        if vid and vid in content.weapon_visuals:
+            vis = content.weapon_visual(vid)
+        else:
+            vis = content.weapon_visual(wid)
+        kw.setdefault("color", vis.color)
+        kw.setdefault("style", vis.style)
+        kw.setdefault("fx", vis.fx)
+
+    def spawn_projectile(self, **kw):
+        from game.states.playing.visual import slash_fx
+        proj = self.run.projectiles.acquire()
+        if proj is None:
+            return None
+        self.resolve_visual(kw)
+        proj.reset(**kw)
+        # LD-9 D10: stamp the floor it leaves from, at the muzzle. See
+        # `block_on_terrain`.
+        self.stamp_fire_level(proj)
+        slash_fx.spawn_from_cone(self.ps, proj)     # a sequence weapon's swing visual
+        self.run.game.audio.play_shoot()
+        return proj
+
+    def spawn_summon(self, **kw):
+        s = self.run.summons.acquire()
+        if s is None:
+            return None
+        self.resolve_visual(kw)
+        kw.pop("style", None)                 # summons dispatch their draw on `kind`
+        s.reset(**kw)
+        return s
+
+    def spawn_impact(self, *, pos, radius, rig, weapon_id="", anim="loop") -> None:
+        """CR1: the Hammer's impact sheet at the blow; the totem bolt's burst."""
+        from game.states.playing.visual import slam_fx
+        slam_fx.spawn_impact(self.ps, pos=pos, radius=radius, rig=rig,
+                             weapon_id=weapon_id, anim=anim)
+
+    def spawn_hero_hazard(self, *, pos, radius, dps, duration, weapon_id="",
+                          source_tags=()) -> None:
+        """P3: a hero-owned ground hazard (Meteor Hammer's crater)."""
+        self.spawn_hazard(pos, radius, dps, duration, owner="player",
+                          weapon_id=weapon_id, source_tags=source_tags)
+
+    def update_summons(self, dt: float) -> None:
+        """The summons' frame (spec 5.8): each hunts from the same view of
+        the field the hero's weapons get."""
+        from types import SimpleNamespace
+        run = self.run
+        sctx = SimpleNamespace(enemies=run.targetables(),
+                               spawn_projectile=self.ps._spawn_projectile,
+                               player_pos=run.player.pos,
+                               attack_speed_mult=self.ps.buffs.attack_speed_mult())
+        for s in run.summons:
+            s.update(dt, sctx)
+        run.summons.sweep()
 
     # --- hostile projectiles ----------------------------------
     def fire_hostile(self, *, pos, vel, damage, radius, style: str = "",
@@ -57,7 +132,7 @@ class TransientFx:
         The defaults are exactly the old behaviour, so an enemy whose JSON
         block names no shot art still fires the red arrow.
         """
-        proj = self.ps.hostiles.acquire()
+        proj = self.run.hostiles.acquire()
         if proj is None:
             return
         proj.reset(pos=pos, vel=vel, damage=damage, radius=radius,
@@ -74,7 +149,7 @@ class TransientFx:
         fast shot has already travelled several pixels by then, which at a
         terrace rim is enough to sample the tile beyond the edge and give the
         shot the wrong floor to be judged against."""
-        levels = getattr(self.ps.game_map, "_levels", None)
+        levels = getattr(self.run.game_map, "_levels", None)
         if levels is not None:
             proj.fire_level = levels.top_at_point(proj.pos.x, proj.pos.y)
 
@@ -103,21 +178,22 @@ class TransientFx:
         if (not proj.active or proj.fire_level == _NO_LEVEL or proj.orbit_speed
                 or proj.no_block):
             return
-        levels = getattr(self.ps.game_map, "_levels", None)
+        levels = getattr(self.run.game_map, "_levels", None)
         if levels is None:
             return
         here = levels.top_at_point(proj.pos.x, proj.pos.y)
         if here != _NO_LEVEL and here > proj.fire_level:
-            self.ps.particles.burst(proj.pos, proj.color, count=3, speed=70,
+            self.run.particles.burst(proj.pos, proj.color, count=3, speed=70,
                                     life=0.2, radius=2)
             proj.active = False
 
     def block_on_obstacle(self, proj) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         if not proj.active or proj.chain_left or proj.orbit_speed or proj.no_block:
             return
-        if ps.game_map.blocking_obstacle_hit(proj.pos, proj.radius) is not None:
-            ps.particles.burst(proj.pos, proj.color, count=3, speed=70,
+        if run.game_map.blocking_obstacle_hit(proj.pos, proj.radius) is not None:
+            run.particles.burst(proj.pos, proj.color, count=3, speed=70,
                                life=0.2, radius=2)
             proj.active = False
 
@@ -125,7 +201,7 @@ class TransientFx:
         """Would a bouncing shot at `pos` be stopped by the terrain: a
         terrace above the floor it was fired from (the D10 rule), or ground
         it cannot roll on at all -- a cliff face, the shoreline, the sea?"""
-        gm = self.ps.game_map
+        gm = self.run.game_map
         levels = getattr(gm, "_levels", None)
         if levels is not None and proj.fire_level != _NO_LEVEL:
             here = levels.top_at_point(pos.x, pos.y)
@@ -140,9 +216,10 @@ class TransientFx:
         at a corner). Each bounce costs one of `bounces_left`; the last one
         spends the ball."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         if not proj.active:
             return
-        hit = ps.game_map.blocking_obstacle_hit(proj.pos, proj.radius)
+        hit = run.game_map.blocking_obstacle_hit(proj.pos, proj.radius)
         if hit is not None:
             n = proj.pos - hit.pos
             if n.length_squared() < 1e-6:
@@ -165,7 +242,7 @@ class TransientFx:
         else:
             return
         proj.bounces_left -= 1
-        ps.particles.burst(proj.pos, proj.color, count=4, speed=90, life=0.25, radius=2)
+        run.particles.burst(proj.pos, proj.color, count=4, speed=90, life=0.25, radius=2)
         if proj.bounces_left <= 0:
             proj.active = False
 
@@ -174,7 +251,8 @@ class TransientFx:
         hostile shots that leave the world margin. A player projectile carrying
         a `fx.trail` spec sheds a fading dust puff every `spacing` world px."""
         ps = self.ps
-        for p in ps.projectiles:
+        run = getattr(self, "run", ps)
+        for p in run.projectiles:
             before = pygame.Vector2(p.pos)
             p.update(dt)
             self.ride_stuck(p)
@@ -186,8 +264,8 @@ class TransientFx:
             self._shed_trail(p, (p.pos - before).length())
             if p.blast_radius > 0.0 and not p.active and not p.detonated:
                 self.detonate(p)        # fuse ran out, or the bomb was blocked
-        ps.projectiles.sweep()
-        for p in ps.hostiles:
+        run.projectiles.sweep()
+        for p in run.hostiles:
             p.update(dt)
             if not ps._in_world_margin(p.pos, 60):
                 p.active = False
@@ -206,7 +284,7 @@ class TransientFx:
                 # was too much. The corpse blast on death keeps its shake.
                 self.explosion(pygame.Vector2(p.pos), p.blast_radius, p.damage,
                                shake=False)
-        ps.hostiles.sweep()
+        run.hostiles.sweep()
 
     # --- bombs (six-weapon system P1) ----------------------
     def detonate(self, bomb) -> None:
@@ -215,6 +293,7 @@ class TransientFx:
         the normal resolver (multipliers, crit, knockback, on-hit). Plus the
         ring visual, a burst and a shake. The hero is never hurt by it."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         bomb.detonated = True
         pos = pygame.Vector2(bomb.pos)
         blast = ps._spawn_projectile(
@@ -225,7 +304,7 @@ class TransientFx:
             style="blast", color=(255, 190, 110), no_block=True)
         if blast is not None:
             blast.fire_level = bomb.fire_level
-        ps._explosions.append(self.burst_visual(
+        run._explosions.append(self.burst_visual(
             pos, bomb.blast_radius, rig=self.burst_rig(bomb)))
         ps.particles.burst(pos, (255, 160, 80), count=18, speed=240, life=0.45)
         ps.shake.add(0.3)
@@ -248,6 +327,7 @@ class TransientFx:
         blast's `(tags, damage, radius)`. The burst carries the `keg` tag and
         never bursts again."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         tags, damage, radius = shot
         radius = radius * 0.6
         at = pygame.Vector2(pos)
@@ -317,7 +397,8 @@ class TransientFx:
         together, which is the same intent.
         """
         ps = self.ps
-        w = ps.player.weapon_by_id(bomb.weapon_id) if bomb.weapon_id else None
+        run = getattr(self, "run", ps)
+        w = run.player.weapon_by_id(bomb.weapon_id) if bomb.weapon_id else None
         if w is None or "cluster" in bomb.source_tags:
             return
         n = int(w.effect("cluster_count"))
@@ -328,7 +409,7 @@ class TransientFx:
         fuse = float(fx.get("cluster_fuse", 0.5))
         radius_mult = float(fx.get("cluster_radius_mult", 0.6))
         scale = self.bomblet_scale(radius_mult)
-        base = ps.rng.random() * math.tau
+        base = run.rng.random() * math.tau
         for i in range(n):
             a = base + math.tau * i / n
             ps._spawn_projectile(
@@ -346,7 +427,7 @@ class TransientFx:
     def spawn_hazard(self, pos, radius, dps, duration, tick_interval=None,
                      sprite=None, owner="enemy", weapon_id="", source_tags=()) -> None:
         colour = _HERO_HAZARD_COLOUR if owner == "player" else (200, 90, 220)
-        self.ps.hazards.append(
+        self.run.hazards.append(
             Hazard(pos.x, pos.y, radius, dps, duration, color=colour,
                    tick_interval=tick_interval, sprite=sprite, owner=owner,
                    weapon_id=weapon_id, source_tags=source_tags))
@@ -367,35 +448,37 @@ class TransientFx:
 
     def update_hazards(self, dt: float) -> None:
         ps = self.ps
-        for hz in ps.hazards:
+        run = getattr(self, "run", ps)
+        for hz in run.hazards:
             hz.update(dt)
             if hz.owner == "player":
                 if hz.alive:
                     self.hero_hazard_tick(hz, dt)
                 continue
-            if hz.alive and hz.contains(ps.player.pos, ps.player.radius):
+            if hz.alive and hz.contains(run.player.pos, run.player.radius):
                 bite = hz.due_damage(dt)       # dps * tick_interval per interval
                 if bite > 0.0:
-                    taken = ps.player.take_damage(bite)
+                    taken = run.player.take_damage(bite)
                     if taken > 0:
                         ps.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
             else:
                 hz.reset_ticks()               # partial exposure does not bank
-        ps.hazards = [h for h in ps.hazards if h.alive]
+        run.hazards = [h for h in run.hazards if h.alive]
 
     # --- melee attack hitboxes (chaser-style front-facing swing) ---
     def melee_hit(self, pos, radius, damage, duration) -> None:
-        self.ps.melee_hitboxes.append(MeleeHitbox(pos.x, pos.y, radius, damage, duration))
+        self.run.melee_hitboxes.append(MeleeHitbox(pos.x, pos.y, radius, damage, duration))
 
     def update_melee_hitboxes(self, dt: float) -> None:
         ps = self.ps
-        for hb in ps.melee_hitboxes:
+        run = getattr(self, "run", ps)
+        for hb in run.melee_hitboxes:
             hb.update(dt)
-            if hb.alive and hb.contains(ps.player.pos, ps.player.radius):
-                taken = ps.player.take_damage(hb.consume())
+            if hb.alive and hb.contains(run.player.pos, run.player.radius):
+                taken = run.player.take_damage(hb.consume())
                 if taken > 0:
                     ps.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
-        ps.melee_hitboxes = [h for h in ps.melee_hitboxes if h.alive]
+        run.melee_hitboxes = [h for h in run.melee_hitboxes if h.alive]
 
     # --- blast visuals -------------------------------------
     def explosion(self, pos: pygame.Vector2, radius: float, damage: float,
@@ -404,19 +487,20 @@ class TransientFx:
         if they stand inside `radius`. `shake` is on for the corpse blast an
         exploder leaves when it dies, and off for the Bloat's thrown bomb."""
         ps = self.ps
-        ps._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
+        run = getattr(self, "run", ps)
+        run._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
                                "t": 0.0, "dur": 0.35})
-        ps.particles.burst(pos, (255, 160, 80), count=22, speed=260, life=0.5)
+        run.particles.burst(pos, (255, 160, 80), count=22, speed=260, life=0.5)
         if shake:
-            ps.shake.add(0.4)
+            run.shake.add(0.4)
         # UNUSED, ready to implement: the thrown-bomb detonation used to shake
         # the screen too (owner removed it, 2026-09-19). To bring it back drop
         # `shake=False` from the bomb call in `update_projectiles`, or give the
         # bomb its own lighter amplitude here:
         # elif <this is a thrown bomb>:
-        #     ps.shake.add(0.2)
-        if (ps.player.pos - pos).length() <= radius + ps.player.radius:
-            taken = ps.player.take_damage(damage)
+        #     run.shake.add(0.2)
+        if (run.player.pos - pos).length() <= radius + run.player.radius:
+            taken = run.player.take_damage(damage)
             if taken > 0:
                 ps.game.events.publish(Events.PLAYER_DAMAGED, amount=taken)
 
@@ -428,7 +512,8 @@ class TransientFx:
         explosion kill credits nothing at all -- `killed_by` stays empty and
         the DPS meter files the damage under "other"."""
         ps = self.ps
-        ps._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
+        run = getattr(self, "run", ps)
+        run._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
                                "t": 0.0, "dur": 0.3})
         ps.particles.burst(pos, (255, 150, 70), count=14, speed=200, life=0.4)
         for enemy in ps.grid.query_circle(pos.x, pos.y, radius):
@@ -440,7 +525,8 @@ class TransientFx:
 
     def update_explosions(self, dt: float) -> None:
         ps = self.ps
-        for ex in ps._explosions:
+        run = getattr(self, "run", ps)
+        for ex in run._explosions:
             ex["t"] += dt
             if "anim" in ex:
                 ex["anim"].update(dt)
@@ -449,21 +535,22 @@ class TransientFx:
     # --- shared death poof --------------------------------
     def spawn_death_fx(self, pos, facing: int = 1, scale: float = 1.0,
                        radius: float = float(config.PLAYER_RADIUS)) -> None:
-        self.ps._death_fx.append(
+        self.run._death_fx.append(
             [Animator(self.ps.game.assets, "dead", start="loop"),
              pygame.Vector2(pos), 1 if facing >= 0 else -1, float(scale),
              float(radius)])
 
     def update_death_fx(self, dt: float) -> None:
         ps = self.ps
-        for fx in ps._death_fx:
+        run = getattr(self, "run", ps)
+        for fx in run._death_fx:
             fx[0].update(dt)
-        ps._death_fx = [fx for fx in ps._death_fx if not fx[0].finished]
+        run._death_fx = [fx for fx in run._death_fx if not fx[0].finished]
 
     # --- enemy spawn burst -----------------------------------
     def spawn_spawn_fx(self, body) -> None:
         """The purple burst every enemy (and the boss) appears out of --
-        `[Animator("enemy_spawn"), body]` on `ps._spawn_fx`. The entry keeps
+        `[Animator("enemy_spawn"), body]` on `run._spawn_fx`. The entry keeps
         the body rather than a copy of its position so the ring follows an
         enemy that starts walking inside the burst; a body that dies first
         leaves the ring finishing where it stood. The animator is also hung
@@ -474,10 +561,11 @@ class TransientFx:
         coming back was never a new spawn."""
         anim = Animator(self.ps.game.assets, "enemy_spawn", start="burst")
         body._spawn_fx = anim
-        self.ps._spawn_fx.append([anim, body])
+        self.run._spawn_fx.append([anim, body])
 
     def update_spawn_fx(self, dt: float) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         keep = []
         for fx in ps._spawn_fx:
             fx[0].update(dt)
@@ -486,7 +574,7 @@ class TransientFx:
                     fx[1]._spawn_fx = None
             else:
                 keep.append(fx)
-        ps._spawn_fx = keep
+        run._spawn_fx = keep
 
     # --- projectile dust trail ---------------------------------
     _TRAIL_CAP = 400
@@ -496,8 +584,9 @@ class TransientFx:
         moving projectile, one per `spacing` px. Each plays the one-shot dust
         `burst` once (bloom -> scatter -> fade) anchored where it was shed."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         tr = p.fx.get("trail") if p.fx else None
-        if not tr or not p.active or len(ps._trail_fx) >= self._TRAIL_CAP:
+        if not tr or not p.active or len(run._trail_fx) >= self._TRAIL_CAP:
             return
         p.trail_shed += moved
         spacing = max(1.0, float(tr.get("spacing", 24)))
@@ -513,6 +602,7 @@ class TransientFx:
 
     def update_trail_fx(self, dt: float) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         for tr in ps._trail_fx:
             tr[0].update(dt)
         ps._trail_fx = [tr for tr in ps._trail_fx if not tr[0].finished]

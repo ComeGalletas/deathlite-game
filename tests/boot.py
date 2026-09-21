@@ -36,7 +36,7 @@ def start_run(game, seed=None, keys=(), dev=False):
     """
     import pygame
     from game.states.loading_state import LoadingState
-    from game.states.playing_state import PlayingState
+    from game.states.playing.core.state import PlayingState
 
     def key(k):
         game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k))

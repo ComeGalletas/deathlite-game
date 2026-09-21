@@ -181,6 +181,21 @@ class NavGrid:
         with a surface) and projected onto the cells. Two nav cells inside one
         tile are always connected: a tile has a single elevation.
 
+        Three steps: `_cell_tiles` finds each walkable cell's tile and level,
+        `_tile_step_masks` decides the eight moves once per tile, and
+        `_project_masks` writes them back onto the cells."""
+        tile, live, level, flight = self._cell_tiles(walkable, corridor)
+        tmask = self._tile_step_masks(self.levels, set(tile[i] for i in live))
+        mask = self._project_masks(tile, live, tmask, self.levels.cols)
+        return level, flight, mask
+
+    def _cell_tiles(self, walkable: bytearray, corridor: bytearray):
+        """Per cell: the *linear* index of the tile it sits in (-1 where the
+        cell is not floor), the list of live cells, each cell's level, and
+        whether it stands on a flight. Linear rather than (col, row) so the
+        neighbour test in `_project_masks` is integer arithmetic instead of
+        tuple building.
+
         Flight cells are also marked `corridor`, which is what gives them the
         clearance leniency. A flight is one tile wide with stone either
         side; without it the 48 px nav class cannot thread one, exactly the
@@ -189,14 +204,9 @@ class NavGrid:
         n = self.cols * self.rows
         level = array("b", [NONE]) * n
         flight = bytearray(n)
-        mask = bytearray(n)
         ox, oy = self.origin
         half = self.cell * 0.5
         tcols = ix.cols
-
-        # Per cell: the *linear* index of the tile it sits in, -1 where the cell
-        # is not floor. Linear rather than (col, row) so the neighbour test below
-        # is integer arithmetic instead of tuple building.
         tile = array("i", [-1]) * n
         live = []
         for row in range(self.rows):
@@ -213,16 +223,20 @@ class NavGrid:
                 if ix.flight_at(tc, tr) is not None:
                     flight[i] = 1
                     corridor[i] = 1
+        return tile, live, level, flight
 
-        # Per tile, once: which of the eight moves the terrain allows.
-        #
-        # In two passes, because a diagonal is defined as its two right-angle
-        # detours and asking `can_step` for it re-derives orthogonal answers we
-        # already have. Doing the four orthogonals first and reading the
-        # diagonals off those bits cuts the rule evaluations by half and the
-        # diagonal ones to pure bit tests -- measured at a third of the build
-        # time this pass used to take.
-        seen = set(tile[i] for i in live)
+    @staticmethod
+    def _tile_step_masks(ix, seen) -> dict:
+        """Per tile, once: which of the eight moves the terrain allows, as
+        `{linear tile: bitmask over _TILE_BIT}`.
+
+        In two passes, because a diagonal is defined as its two right-angle
+        detours and asking `can_step` for it re-derives orthogonal answers we
+        already have. Doing the four orthogonals first and reading the
+        diagonals off those bits cuts the rule evaluations by half and the
+        diagonal ones to pure bit tests -- measured at a third of the build
+        time this pass used to take."""
+        tcols = ix.cols
         orth: dict = {}
         for tl in seen:
             tc, tr = tl % tcols, tl // tcols
@@ -259,10 +273,15 @@ class NavGrid:
                             and orth.get(v, 0) & (1 << _ORTH.index((dc, 0))))):
                     m |= bit
             tmask[tl] = m
+        return tmask
 
-        # Project onto cells. Two cells inside one tile are always connected --
-        # a tile has a single elevation -- so only a tile *change* consults the
-        # mask, keyed by the linear delta between the two tiles.
+    def _project_masks(self, tile, live, tmask: dict, tcols: int) -> bytearray:
+        """The per-tile masks onto the cells. Two cells inside one tile are
+        always connected -- a tile has a single elevation -- so only a tile
+        *change* consults the mask, keyed by the linear delta between the two
+        tiles."""
+        n = self.cols * self.rows
+        mask = bytearray(n)
         by_delta = {0: -1}                       # -1 marks "same tile, always ok"
         for (dc, dr), bit in _TILE_BIT.items():
             by_delta[dr * tcols + dc] = bit
@@ -288,7 +307,7 @@ class NavGrid:
                 if bit == -1 or (bit is not None and (tm & bit)):
                     m |= 1 << k
             mask[i] = m
-        return level, flight, mask
+        return mask
 
     # --- build helpers -------------------------------------------------
     def _clearance_transform(self, blocked: bytearray, obstacles) -> array:

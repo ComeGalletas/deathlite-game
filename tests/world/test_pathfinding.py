@@ -13,7 +13,9 @@ from collections import deque
 import pygame
 
 from tests import worlds as W
-from world.pathfinding import NavGrid, FlowField, _CLEARANCE_CAP, _INF
+from world.nav.field import FlowField, _INF
+from world.nav.lattice import NavGrid
+from world.nav.clearance import CLEARANCE_CAP as _CLEARANCE_CAP
 
 
 SEEDS = (1, 3, 7, 42, 99)

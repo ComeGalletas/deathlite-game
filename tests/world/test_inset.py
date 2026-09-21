@@ -526,7 +526,7 @@ class NavTests(unittest.TestCase):
     """
 
     def _nav(self, seed):
-        from world.pathfinding import NavField
+        from world.nav.field import NavField
         gm = _map(seed)
         if not hasattr(gm, "_test_nav"):
             gm._test_nav = NavField(gm.layout, gm.obstacles)
@@ -562,7 +562,7 @@ class NavTests(unittest.TestCase):
         clearance transform must come out byte for byte identical with the
         margin on and off.
         """
-        import world.pathfinding as P
+        import world.nav.field as P
         import world.nav.lattice as L          # where the grid reads the margin
         real = L.terrain_inset.body_inset
         try:

@@ -13,15 +13,15 @@ WORLD = pathlib.Path(__file__).resolve().parents[2] / "world"
 
 # module or package -> the `world.*` / `game.*` prefixes it may not import
 RULES = {
-    "rules": ("world.gen", "world.terrain", "world.map", "world.pathfinding",
+    "rules": ("world.gen", "world.terrain", "world.map", "world.nav",
               "world.elevation", "world.spawning"),
     "elevation.py": ("world.gen", "world.terrain", "world.map",
-                     "world.pathfinding", "world.spawning"),
+                     "world.nav", "world.spawning"),
     "layout.py": ("world.gen", "world.terrain", "world.map",
-                  "world.pathfinding", "world.rules", "world.elevation"),
+                  "world.nav", "world.rules", "world.elevation"),
     # The bake and the draw read the layout and the rules; a palette is data
     # decided at generation and stored on the room, never re-derived here.
-    "terrain": ("world.gen", "world.pathfinding", "world.spawning"),
+    "terrain": ("world.gen", "world.nav", "world.spawning"),
 }
 
 

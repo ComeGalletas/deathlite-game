@@ -33,7 +33,7 @@ import pygame
 
 from game import config
 from world.map import GameMap
-from world.pathfinding import NavField
+from world.nav.field import NavField
 
 # The seeds the digest pins. Modules should prefer these so the shared set
 # stays small; a statistical sweep that needs more says so with a marker.

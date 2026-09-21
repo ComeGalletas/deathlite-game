@@ -27,23 +27,24 @@ from progression.blessings import roll_offering
 class Chests:
     def __init__(self, ps) -> None:
         self.ps = ps
-
+        self.run = getattr(ps, "run", ps)
     # --- setup ---------------------------------------------------
     def build(self) -> None:
         ps = self.ps
-        ps.chests = []
-        layout = ps.game_map.layout
+        run = getattr(self, "run", ps)
+        run.chests = []
+        layout = run.game_map.layout
         if layout is None:
             return
-        radius = chest_rules.radius(ps.content.chests)
+        radius = chest_rules.radius(run.content.chests)
         for record in getattr(layout, "chests", ()):
-            ps.chests.append(Chest(record.x, record.y, record.rarity,
+            run.chests.append(Chest(record.x, record.y, record.rarity,
                                    floor=record.floor, radius=radius))
 
     # --- per frame -----------------------------------------------
     def update(self, dt: float) -> None:
-        duration = chest_rules.open_seconds(self.ps.content.chests)
-        for chest in self.ps.chests:
+        duration = chest_rules.open_seconds(self.run.content.chests)
+        for chest in self.run.chests:
             chest.update(dt, duration)
 
     def nearby(self):
@@ -51,11 +52,12 @@ class Chests:
         rather than first so two chests sharing a corner open in the order the
         player walks into them."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         best, best_d = None, 0.0
-        for chest in ps.chests:
-            if chest.opened or not chest.in_range(ps.player.pos):
+        for chest in run.chests:
+            if chest.opened or not chest.in_range(run.player.pos):
                 continue
-            d = (chest.pos - ps.player.pos).length_squared()
+            d = (chest.pos - run.player.pos).length_squared()
             if best is None or d < best_d:
                 best, best_d = chest, d
         return best
@@ -71,12 +73,13 @@ class Chests:
 
     def open(self, chest) -> None:
         ps = self.ps
-        table = ps.content.chests
+        run = getattr(self, "run", ps)
+        table = run.content.chests
         chest.opened = True
         chest.age = 0.0
-        ps.stats["chests"] = ps.stats.get("chests", 0) + 1
+        run.stats["chests"] = run.stats.get("chests", 0) + 1
 
-        gold = chest_rules.gold(chest.rarity, table, ps.rng)
+        gold = chest_rules.gold(chest.rarity, table, run.rng)
         ps.add_gold(gold)
 
         parts = [f"{gold} gold"]
@@ -87,7 +90,7 @@ class Chests:
         if blessing is not None:
             parts.append(blessing)
 
-        ps.particles.burst(chest.pos, chest_rules.colour(chest.rarity, table),
+        run.particles.burst(chest.pos, chest_rules.colour(chest.rarity, table),
                            count=26, speed=220, life=0.6)
         ps.notice(f"{chest.rarity.capitalize()} chest: {self._listed(parts)}.")
 
@@ -108,13 +111,14 @@ class Chests:
         than crashing the run.
         """
         ps = self.ps
+        run = getattr(self, "run", ps)
         from progression import potions as potion_rules
-        potion = ps.potions.acquire()
+        potion = run.potions.acquire()
         if potion is None:
             return None
         rarity = chest_rules.potion_rarity(chest.rarity, table)
         at = chest.pos - pygame.Vector2(0.0, chest_rules.potion_lift(table))
-        potion.reset(at, rarity, potion_rules.heal_amount(rarity, ps.content.potions))
+        potion.reset(at, rarity, potion_rules.heal_amount(rarity, run.content.potions))
         return rarity
 
     def _grant_blessing(self, chest, table) -> str | None:
@@ -126,14 +130,15 @@ class Chests:
         the caller treats `None` as "the chest just had gold and a potion".
         """
         ps = self.ps
-        rarity = chest_rules.blessing_rarity(chest.rarity, table, ps.rng)
+        run = getattr(self, "run", ps)
+        rarity = chest_rules.blessing_rarity(chest.rarity, table, run.rng)
         if rarity is None:
             return None
         kinds = ("stat", "weapon")
-        choices = roll_offering(ps.player, ps.content, ps.rng, 1,
+        choices = roll_offering(run.player, run.content, run.rng, 1,
                                 kinds=kinds, rarities=(rarity,))
         if not choices:
-            choices = roll_offering(ps.player, ps.content, ps.rng, 1, kinds=kinds)
+            choices = roll_offering(run.player, run.content, run.rng, 1, kinds=kinds)
         if not choices:
             return None
         upgrade = choices[0]

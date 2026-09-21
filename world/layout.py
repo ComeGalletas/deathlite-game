@@ -1,6 +1,5 @@
 """World data model -- the types `generate_world` produces and everything else
-reads. `world.procedural` re-exports every name here, so
-`from world.procedural import Room` still works.
+reads. Generation lives in `world.gen`; nothing here imports it.
 """
 from __future__ import annotations
 

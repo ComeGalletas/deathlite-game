@@ -9,7 +9,8 @@ import unittest
 from game import config
 from tests import worlds as W
 from world.gen.rooms import _four_connected
-from world.procedural import SPECIAL_KINDS
+from world.gen.tuning import VILLAGE_KIND
+from world.gen.tuning import SPECIAL_KINDS
 
 
 class StructureTests(unittest.TestCase):
@@ -31,11 +32,23 @@ class StructureTests(unittest.TestCase):
             self.assertEqual(w.room(w.start_id).kind, "start")
             self.assertEqual(w.room(w.boss_id).kind, "boss")
 
-    def test_special_rooms_present(self):
+    def test_no_special_rooms_are_placed(self):
+        """The shrine / treasure / altar / merchant islands were parked on
+        2026-09-20 (`journals/special_facilities_journal.md`): `SPECIAL_KINDS`
+        is empty, so a world is one start, one boss, one or two villages and
+        combat islands for the rest. The handlers stay -- see
+        `tests/playing/test_interactables.py`, which builds them by hand --
+        but nothing on a generated island reaches them.
+
+        Asserted on the kinds themselves, not just on the tuple, so re-filling
+        `SPECIAL_KINDS` fails here and the decision is revisited on purpose.
+        """
+        self.assertEqual(SPECIAL_KINDS, ())
+        allowed = {"start", "boss", "combat", VILLAGE_KIND}
         for seed in W.SEEDS:
             kinds = {r.kind for r in W.layout(seed).rooms}
-            self.assertTrue(set(SPECIAL_KINDS) & kinds,
-                            f"seed {seed}: no special locations placed")
+            self.assertLessEqual(kinds, allowed,
+                                 f"seed {seed}: unexpected island kinds")
 
     def test_all_geometry_within_bounds(self):
         for seed in W.SEEDS:
@@ -80,7 +93,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_a_settings_override_replaces_the_global_mutation(self):
         from world.gen.settings import GenSettings
-        from world.procedural import generate_world
+        from world.gen import generate_world
         seed = W.SEEDS[0]
         by_flag = W.layout(seed, HEIGHTMAP_UNSEAL=False)
         by_settings = generate_world(

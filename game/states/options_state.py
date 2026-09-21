@@ -55,7 +55,8 @@ import pygame
 from game import config, fonts
 from game.state import MUSIC_INHERIT, State
 from ui import scale
-from ui.mouse import BUTTON_LEFT, MouseNav
+from ui.menu_nav import MenuNav
+from ui.mouse import BUTTON_LEFT
 
 _LABELS = {"master": "Master volume", "music": "Music volume",
            "sfx": "Sound effects", "mute": "Mute", "key_layout": "Key layout",
@@ -100,7 +101,8 @@ class OptionsState(State):
             "master", "music", "sfx", "mute", "key_layout", "tutorials", "display",
             "resolution", "sanctuary", "back")
         self.sel = 0
-        self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
+        self._nav = MenuNav()        # the cursor keys and the mouse (ui/menu_nav.py)
+        self._mouse = self._nav.mouse   # rows registered in draw(); see ui/mouse.py
         self._bars: dict[str, pygame.Rect] = {}   # slider row -> its bar, from draw()
         self._drag: str | None = None             # the slider row the held button owns
         self._build_fonts()
@@ -115,27 +117,27 @@ class OptionsState(State):
 
     # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
-        if self._handle_mouse(event):
+        if self._handle_drag(event):
             return
-        if event.type != pygame.KEYDOWN:
-            return
-        k = event.key
-        if k == pygame.K_ESCAPE:
-            self._back()
-        elif k in (pygame.K_UP, pygame.K_w):
-            self._move(-1)
-        elif k in (pygame.K_DOWN, pygame.K_s):
-            self._move(+1)
-        elif k in (pygame.K_LEFT, pygame.K_a):
-            self._nudge(-1)
-        elif k in (pygame.K_RIGHT, pygame.K_d):
-            self._nudge(+1)
-        elif k in (pygame.K_RETURN, pygame.K_SPACE):
+        verb = self._nav.event(event, index=self.sel, count=len(self._rows),
+                               skip=lambda i: self._skipped(self._rows[i]))
+        if verb is None:
+            return                       # the wheel and the right button land here
+        what, v = verb
+        if what == "move":
+            self.sel = v
+        elif what == "activate":
+            self.sel = v
             self._activate()
+        elif what == "axis":
+            self._nudge(v)
+        elif what == "back":
+            self._back()
 
-    def _handle_mouse(self, event: pygame.event.Event) -> bool:
-        """True when `event` was a mouse event, handled or deliberately
-        dropped -- the wheel and the right button are dropped (owner,
+    def _handle_drag(self, event: pygame.event.Event) -> bool:
+        """True when `event` belonged to a slider drag, which the shared
+        menu rules never see. The wheel and the right button are not
+        consumed here but fall out of `MenuNav` as nothing (owner,
         2026-09-16), so nothing can resize the window by accident.
 
         A press inside a slider bar takes the drag and never reaches
@@ -159,13 +161,7 @@ class OptionsState(State):
             self._drag = None
             self.game.persist()          # once, at the end of the drag
             return True
-        act = self._mouse.event(event)
-        if act is not None:
-            kind, i = act
-            self.sel = i
-            if kind == "click":
-                self._activate()
-        return True
+        return False
 
     def _bar_at(self, pos) -> str | None:
         """The slider row whose bar covers `pos`, else None."""
@@ -222,12 +218,6 @@ class OptionsState(State):
         if rid == "resolution":
             return not self.game.display.resolution_selectable()
         return False
-
-    def _move(self, direction: int) -> None:
-        for _ in range(len(self._rows)):
-            self.sel = (self.sel + direction) % len(self._rows)
-            if not self._skipped(self._row_id()):
-                return
 
     def _toggle_display_mode(self) -> None:
         other = "borderless" if self.game.display.mode == "windowed" else "windowed"

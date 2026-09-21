@@ -27,7 +27,7 @@ from game.states.character_select_state import CharacterSelectState
 from game.states.menu_state import MenuState
 from game.states.paused_state import PausedState
 from game.states.dev_menu_state import DevMenuState, _ROOT_ROWS
-from game.states.playing_state import PlayingState
+from game.states.playing.core.state import PlayingState
 
 
 def _game():

@@ -23,7 +23,7 @@ import unittest
 from tests import worlds as W
 from world.gen import repair
 from world.map import GameMap
-from world.pathfinding import NavGrid, _point_inset_ok, _point_on_floor
+from world.nav.lattice import NavGrid, _point_inset_ok, _point_on_floor
 from world.rules import floor, inset as terrain_inset
 
 

@@ -13,10 +13,8 @@ import pygame
 from game import config
 from tests import worlds as W
 from world.gen.tuning import VILLAGE_KIND
-from world.procedural import (
-    _HOUSE_RADIUS, _VILLAGE_MIN_ROOM_CELLS, _VILLAGE_RADIUS,
-    _corridor_doorways,
-)
+from world.gen.tuning import _HOUSE_RADIUS, _VILLAGE_MIN_ROOM_CELLS, _VILLAGE_RADIUS
+from world.gen.scatter import _corridor_doorways
 
 PX = config.TILE_PX
 

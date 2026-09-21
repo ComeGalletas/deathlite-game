@@ -18,6 +18,7 @@ from ui import scale
 from progression.upgrades import apply_choice
 from ui.forge_rail import ForgeRail
 from ui.level_up import CARD_W, CARD_W_NARROW, LevelUpPanel
+from ui.menu_nav import MenuNav
 from ui.mouse import MouseNav
 
 
@@ -36,7 +37,10 @@ class LevelUpState(State):
         self.cancelable = cancelable
         self.selected = 0
         self.panel = LevelUpPanel()
-        self._mouse = MouseNav(self.panel.hits)   # the panel records the cards
+        # The cards run left to right; 1 / 2 / 3 pick directly; ESC is read
+        # below only when the screen is cancelable (ui/menu_nav.py).
+        self._nav = MenuNav(MouseNav(self.panel.hits), axis="h", numbers=True)
+        self._mouse = self._nav.mouse             # the panel records the cards
 
         # Change request 6: the Forge adds a weapon picker down the left, and
         # the cards follow whichever weapon is selected. Without these two the
@@ -89,37 +93,27 @@ class LevelUpState(State):
                 return
         if not self.choices and self.rail is None:
             return
-        act = self._mouse.event(event)
-        if act is not None:
-            kind, i = act
-            self.selected = i
-            if kind == "click":
-                self._pick(i)
+        verb = self._nav.event(event, index=self.selected, count=len(self.choices))
+        if verb is None:
             return
-        if event.type != pygame.KEYDOWN:
+        what, v = verb
+        if what == "back":
+            if self.cancelable:
+                self.game.state_machine.pop()
             return
-        key = event.key
-        if key == pygame.K_ESCAPE and self.cancelable:
-            self.game.state_machine.pop()
-            return
-        if self.rail is not None and key in (pygame.K_UP, pygame.K_w):
-            self._step_weapon(-1)
-            return
-        if self.rail is not None and key in (pygame.K_DOWN, pygame.K_s):
-            self._step_weapon(1)
+        if what == "axis":                         # Up / Down: the weapon picker
+            if self.rail is not None:
+                self._step_weapon(v)
             return
         if not self.choices:
             return
-        if key in (pygame.K_LEFT, pygame.K_a):
-            self.selected = (self.selected - 1) % len(self.choices)
-        elif key in (pygame.K_RIGHT, pygame.K_d):
-            self.selected = (self.selected + 1) % len(self.choices)
-        elif key in (pygame.K_RETURN, pygame.K_SPACE):
-            self._pick(self.selected)
-        elif key in (pygame.K_1, pygame.K_2, pygame.K_3):
-            idx = key - pygame.K_1
-            if idx < len(self.choices):
-                self._pick(idx)
+        if what == "move":
+            self.selected = v
+        elif what == "activate":
+            self.selected = v
+            self._pick(v)
+        elif what == "number":
+            self._pick(v)
 
     def _pick(self, index: int) -> None:
         upgrade = self.choices[index]

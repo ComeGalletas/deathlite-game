@@ -38,7 +38,7 @@ from game import config, fonts
 from game.content import get_content
 from game.state import State
 from ui import scale
-from ui.mouse import MouseNav
+from ui.menu_nav import MenuNav
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
@@ -123,7 +123,11 @@ class DevMenuState(State):
         self._title_font = fonts.mono(28, bold=True)
         self._row_font = fonts.mono(22)
         self._hint_font = fonts.mono(15)
-        self._mouse = MouseNav()     # visible rows registered in draw()
+        # ESC and the backtick both go back; so does the right button. The
+        # visible rows are registered in draw() (ui/menu_nav.py).
+        self._nav = MenuNav(back_keys=(pygame.K_ESCAPE, pygame.K_BACKQUOTE),
+                            right_click_back=True)
+        self._mouse = self._nav.mouse
 
     def _rows(self) -> tuple | list:
         if self.page == "weapons":
@@ -147,12 +151,6 @@ class DevMenuState(State):
         self.scroll = 0
         self._status = ""
 
-    def _move(self, delta: int) -> None:
-        n = len(self._rows())
-        if n:
-            self.sel = (self.sel + delta) % n
-        self._clamp_scroll()
-
     def _clamp_scroll(self) -> None:
         n = len(self._rows())
         window = min(MAX_VISIBLE, n)
@@ -175,27 +173,19 @@ class DevMenuState(State):
         if event.type == pygame.MOUSEWHEEL:
             self._scroll_by(-event.y)          # wheel up (y > 0) shows earlier rows
             return
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-            self._back()                       # right click: ESC's twin
+        verb = self._nav.event(event, index=self.sel, count=len(self._rows()))
+        if verb is None:
             return
-        act = self._mouse.event(event)
-        if act is not None:
-            kind, i = act
-            self.sel = i                       # a registered row is always visible
-            if kind == "click":
-                self._activate_selected()
-            return
-        if event.type != pygame.KEYDOWN:
-            return
-        k = event.key
-        if k in (pygame.K_ESCAPE, pygame.K_BACKQUOTE):
-            self._back()
-        elif k in (pygame.K_UP, pygame.K_w):
-            self._move(-1)
-        elif k in (pygame.K_DOWN, pygame.K_s):
-            self._move(1)
-        elif k in (pygame.K_RETURN, pygame.K_SPACE):
+        what, v = verb
+        if what == "move":
+            self.sel = v                       # a registered row is always visible
+            self._clamp_scroll()               # the window follows the keyboard
+        elif what == "activate":
+            self.sel = v
+            self._clamp_scroll()
             self._activate_selected()
+        elif what == "back":
+            self._back()
 
     def _back(self) -> None:
         if self.page != "root":

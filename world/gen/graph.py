@@ -127,5 +127,12 @@ def _assign_kinds(rooms, rng, start_id, boss_id, dist, settings=None) -> None:
               if r.id not in (start_id, boss_id) and r.id not in villages]
     rng.shuffle(others)
     # One of each special where room budget allows; the rest stay "combat".
+    #
+    # `SPECIAL_KINDS` is empty today (owner, 2026-09-20 --
+    # `journals/special_facilities_journal.md`), so this assigns nothing and
+    # every island here stays "combat". Kept as the working template: naming
+    # a kind in that tuple is all it takes to place one again. The shuffle
+    # runs either way so parking the specials does not move the world RNG
+    # stream for an unrelated reason.
     for kind, rid in zip(SPECIAL_KINDS, others):
         rooms[rid].kind = kind

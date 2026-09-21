@@ -70,43 +70,44 @@ def boss_spawn_point(player_pos, rng, width: float, height: float,
 class PlayingHost:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self._subs: list = []
 
     @property
     def elapsed(self) -> float:
-        return self.ps.stats["time"]
+        return self.run.stats["time"]
 
     @property
     def rng(self):
-        return self.ps.rng
+        return self.run.rng
 
     @property
     def layout(self):
-        return self.ps.game_map.layout
+        return self.run.game_map.layout
 
     @property
     def difficulty(self) -> str:
-        return self.ps.difficulty
+        return self.run.difficulty
 
     def player_pos(self) -> pygame.Vector2:
-        return self.ps.player.pos
+        return self.run.player.pos
 
     def player_heading(self) -> pygame.Vector2:
-        return pygame.Vector2(self.ps.player._move_dir)
+        return pygame.Vector2(self.run.player._move_dir)
 
     def player_floor(self):
         layout = self.layout
         if layout is None:
             return None
-        p = self.ps.player.pos
+        p = self.run.player.pos
         meta = layout.tile_at(p.x, p.y)
         return meta.floor if meta is not None else None
 
     def visible_rect(self) -> pygame.Rect:
-        return self.ps.camera.visible_rect()
+        return self.run.camera.visible_rect()
 
     def is_walkable(self, pos, radius: float, flying: bool = False) -> bool:
-        return self.ps.game_map.is_walkable(pos, radius, flying=flying)
+        return self.run.game_map.is_walkable(pos, radius, flying=flying)
 
     def floor_at(self, pos) -> int:
         layout = self.layout
@@ -116,7 +117,7 @@ class PlayingHost:
         return meta.floor if meta is not None else 0
 
     def room_at(self, pos):
-        return self.ps.game_map.room_at(pos)
+        return self.run.game_map.room_at(pos)
 
     def room(self, room_id: int):
         return self.layout.room(room_id)
@@ -133,30 +134,30 @@ class PlayingHost:
     def fallback_point(self):
         # The no-layout world (or one generated with no points): the same
         # band the placement uses, around the hero, never the camera (S11).
-        knobs = self.ps.content.spawn_tables.placement
-        return self.ps.game_map.spawn_point_near(
-            self.ps.player.pos, self.ps.rng,
+        knobs = self.run.content.spawn_tables.placement
+        return self.run.game_map.spawn_point_near(
+            self.run.player.pos, self.run.rng,
             float(knobs["far_min_distance"]), float(knobs["far_max_distance"]))
 
     def live_count(self) -> int:
-        return len(self.ps.enemies)
+        return len(self.run.enemies)
 
     def live_enemies(self) -> list:
-        return self.ps.enemies
+        return self.run.enemies
 
     def enemy_radius(self, enemy_id: str) -> float:
-        return float(self.ps.content.enemy(enemy_id)["radius"])
+        return float(self.run.content.enemy(enemy_id)["radius"])
 
     def make_enemy(self, enemy_id: str, x: float, y: float,
                    hp_mult: float, spd_mult: float, owner: str = "direct") -> Enemy:
-        enemy = Enemy(enemy_id, self.ps.content.enemy(enemy_id), x, y)
-        enemy.ledger = self.ps.ledger
+        enemy = Enemy(enemy_id, self.run.content.enemy(enemy_id), x, y)
+        enemy.ledger = self.run.ledger
         enemy.max_hp *= hp_mult
         enemy.hp = enemy.max_hp
         enemy.speed *= spd_mult
         enemy.spawn_owner = owner
         enemy.spawned_at = self.elapsed
-        self.ps.enemies.append(enemy)
+        self.run.enemies.append(enemy)
         self.ps.fx.spawn_spawn_fx(enemy)      # the burst it appears out of
         return enemy
 
@@ -172,7 +173,7 @@ class PlayingHost:
         What survives: kind, spot, HP, shield, speed, status effects,
         owner. What does not: the behaviour machine, the animator, any
         knockback in flight -- rebuilt fresh on wake."""
-        self.ps.enemies.remove(enemy)
+        self.run.enemies.remove(enemy)
         return DormantEnemy(enemy.enemy_id, enemy.pos.x, enemy.pos.y,
                             enemy.hp, enemy.max_hp, enemy.shield_hp, enemy.speed,
                             status=enemy.status, owner=self.owner_of(enemy),
@@ -180,8 +181,8 @@ class PlayingHost:
                             recycles=getattr(enemy, "recycles", 0))
 
     def wake(self, rec: DormantEnemy, x: float, y: float) -> Enemy:
-        enemy = Enemy(rec.enemy_id, self.ps.content.enemy(rec.enemy_id), x, y)
-        enemy.ledger = self.ps.ledger
+        enemy = Enemy(rec.enemy_id, self.run.content.enemy(rec.enemy_id), x, y)
+        enemy.ledger = self.run.ledger
         enemy.max_hp = rec.max_hp
         enemy.hp = rec.hp
         enemy.shield_hp = rec.shield_hp
@@ -191,7 +192,7 @@ class PlayingHost:
         enemy.spawn_owner = rec.owner
         enemy.spawned_at = rec.spawned_at
         enemy.recycles = rec.recycles
-        self.ps.enemies.append(enemy)
+        self.run.enemies.append(enemy)
         return enemy
 
     def relocate(self, enemy, x: float, y: float) -> None:
@@ -200,7 +201,7 @@ class PlayingHost:
 
     # --- the watchdog's questions (S5) ---------------------------------
     def player_radius(self) -> float:
-        return float(self.ps.player.radius)
+        return float(self.run.player.radius)
 
     def wants_to_move(self, enemy) -> bool:
         return enemy.vel.length_squared() > 1.0
@@ -212,7 +213,7 @@ class PlayingHost:
         self.ps.fx.spawn_death_fx(pos, radius=float(config.PLAYER_RADIUS))
 
     def neighbors_near(self, pos, radius: float) -> list:
-        return self.ps.grid.query_circle(pos.x, pos.y, radius)
+        return self.run.grid.query_circle(pos.x, pos.y, radius)
 
     def publish(self, event: str, **payload) -> None:
         self.ps.game.events.publish(event, **payload)
@@ -229,16 +230,17 @@ class PlayingHost:
 
     # --- the pacing's questions (S6) -----------------------------------
     def player_hp_fraction(self) -> float:
-        p = self.ps.player
+        p = self.run.player
         return (p.hp / p.max_hp) if p.max_hp > 0 else 0.0
 
     def player_max_hp(self) -> float:
-        return float(self.ps.player.max_hp)
+        return float(self.run.player.max_hp)
 
 
 class EnemyControl:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self.host = PlayingHost(ps)
         self.master = SpawnMaster(self.host, ps.director)
 
@@ -268,7 +270,8 @@ class EnemyControl:
 
     def tick_director(self, dt: float) -> None:
         ps = self.ps
-        if ps.director.should_spawn_boss(ps.stats["time"]):
+        run = getattr(self, "run", ps)
+        if ps.director.should_spawn_boss(run.stats["time"]):
             self.spawn_boss()
         self.master.update(dt)
 
@@ -281,23 +284,24 @@ class EnemyControl:
 
     def summon(self, enemy_id: str, origin: pygame.Vector2, count: int) -> None:
         for _ in range(count):
-            offset = pygame.Vector2(self.ps.rng.uniform(-40, 40),
-                                    self.ps.rng.uniform(-40, 40))
+            offset = pygame.Vector2(self.run.rng.uniform(-40, 40),
+                                    self.run.rng.uniform(-40, 40))
             self.master.spawn_at(enemy_id, origin + offset, owner="summon")
 
     def spawn_boss(self) -> None:
         ps = self.ps
-        if ps.boss is not None:
+        run = getattr(self, "run", ps)
+        if run.boss is not None:
             return
         ps.director.mark_boss_spawned()
         boss_id = self.pick_boss()
-        definition = ps.content.boss(boss_id)
+        definition = run.content.boss(boss_id)
         pos = self.boss_spawn_point(definition)
-        ps.boss = Boss(boss_id, definition, pos.x, pos.y)
-        ps.boss.ledger = ps.ledger
-        ps.fx.spawn_spawn_fx(ps.boss)          # sized to the boss's own rig
-        ps.shake.add(0.7)
-        ps.game.events.publish(Events.BOSS_SPAWNED, name=ps.boss.name)
+        run.boss = Boss(boss_id, definition, pos.x, pos.y)
+        run.boss.ledger = run.ledger
+        ps.fx.spawn_spawn_fx(run.boss)          # sized to the boss's own rig
+        run.shake.add(0.7)
+        ps.game.events.publish(Events.BOSS_SPAWNED, name=run.boss.name)
         log.info("boss spawned: %s", ps.boss.name)
 
     def pick_boss(self) -> str:
@@ -313,10 +317,11 @@ class EnemyControl:
         is the only thing that makes the choice worth reproducing. Sorted, so
         the answer does not ride on dict ordering in the JSON.
         """
-        ids = sorted(self.ps.content.bosses)
+        run = getattr(self, "run", self.ps)      # a bare namespace stands in (tests)
+        ids = sorted(run.content.bosses)
         if not ids:
             raise ValueError("data/enemies/bosses.json defines no bosses")
-        return random.Random(f"{self.ps.run_seed}:boss").choice(ids)
+        return random.Random(f"{run.run_seed}:boss").choice(ids)
 
     def boss_spawn_point(self, definition: dict | None = None) -> pygame.Vector2:
         """`boss_spawn_point()` for this run: beside the hero, not in the
@@ -326,13 +331,14 @@ class EnemyControl:
         ring search only offers it ground it can stand on. A flyer (and a caller
         that names no boss) gets the plain point -- the sea is walkable to it."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         walkable = None
         if definition is not None and "flying" not in definition.get("tags", ()):
             radius = float(definition.get("radius", 0.0))
 
             def walkable(spot) -> bool:          # noqa: F811 -- the ground case
-                return ps.game_map.is_walkable(spot, radius)
+                return run.game_map.is_walkable(spot, radius)
 
-        return boss_spawn_point(ps.player.pos, ps.rng,
+        return boss_spawn_point(run.player.pos, run.rng,
                                 ps.game_map.width, ps.game_map.height,
                                 walkable=walkable)

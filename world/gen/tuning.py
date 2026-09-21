@@ -1,14 +1,30 @@
 """Generation tuning constants -- one leaf module so every stage in
 `world.gen` can import these without an import cycle.
 """
-# Room kinds. `combat` is the filler; the rest are special locations with an
-# interactable at their centre. `elite_arena` was retired by the brief and its
-# code was removed on 2026-09-12 (`placement_review_journal.md`, C2): it had
-# been dormant but wired through the interactable kinds, a per-frame update, a
-# render branch and a spawn owner.
-# `fountain` left this tuple with HI-1: the heal is the village's sanctuary
-# prop now (`journals/human_island_journal.md`), not an island of its own.
-SPECIAL_KINDS = ("shrine", "treasure", "altar", "merchant")
+# Room kinds. `combat` is the filler; anything named here is a special
+# location with an interactable at its centre.
+#
+# **Empty on purpose** (owner, 2026-09-20 -- `journals/special_facilities_journal.md`).
+# `shrine`, `treasure`, `altar` and `merchant` used to live here, one of each
+# in every nine-island world, which left only one or two plain combat islands
+# a run. None of the four had a sprite -- they drew the placeholder ring --
+# and the merchant had already been parked in words on 2026-09-12 ("it
+# doesn't do anything, gold consumption is still work in progress"). They are
+# coming back in different forms, so **their code is parked, not deleted**:
+# `entities/interactable.py` KINDS, the `use_*` handlers in
+# `game/states/playing/core/locations.py`, the `state.py` forwarders,
+# `key_marker.KEY_LIFT` and `terrain/render.py`'s `_SPECIAL_FLOORS` all still
+# carry them. Putting a name back in this tuple is all it takes to place one
+# again. Every stage below reads this tuple rather than restating the names,
+# so an empty one means: no clear disc at an island centre, no special `keep`
+# radius for houses, no interactable built, kind stays `combat`.
+#
+# `elite_arena` was retired the other way round -- removed outright on
+# 2026-09-12 (`placement_review_journal.md`, C2) because nothing was planned
+# for it. `fountain` left this tuple with HI-1: the heal is the village's
+# sanctuary prop now (`journals/human_island_journal.md`), not an island of
+# its own.
+SPECIAL_KINDS: tuple = ()
 # HI-1: the human island. Not a special kind -- nothing sits at its centre
 # by the special-room rule, no obstacle scatters on it, no enemy spawns
 # there. `world/gen/village.py` decides what stands on it.

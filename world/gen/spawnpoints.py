@@ -60,7 +60,7 @@ from world.gen.scatter import (_blocks, _clear_radius, _corridor_doorways,
                                _doors_near, _flight_keepouts, _keep_clear_pad)
 from world.gen.settings import settings_or_config
 from world.gen.tuning import (
-    SPECIAL_KINDS, VILLAGE_KIND, _RESOURCE_KINDS, _RESOURCE_OFF_PATH_TILES,
+    VILLAGE_KIND, _RESOURCE_KINDS, _RESOURCE_OFF_PATH_TILES,
     _RESOURCE_OFF_SPAWN_TILES, _RESOURCE_POINTS_PER_ISLAND, _RESOURCE_WEIGHTS,
     _SPAWN_BRIDGE_TILES, _SPAWN_EDGE_TILES, _SPAWN_MIN_SPACING_TILES,
     _SPAWN_OBSTACLE_GAP, _SPAWN_RELAX_BELOW, _SPAWN_START_CLEAR_TILES,

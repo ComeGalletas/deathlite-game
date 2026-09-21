@@ -20,111 +20,140 @@ def walk_links(grid, pos) -> list:
     terrace on the opposite side of its foot -- the entry and exit tiles the
     journal's diagram calls for. A north flight (`dir == "n"`) is one cell on
     a plateau's back and is the mirror: the low ground lies north of it and
-    its own terrace south."""
+    its own terrace south.
+
+    One rule per cell kind, each in its own function below; this picks it."""
     cell = grid.get(pos)
     if cell is None or cell.kind not in WALKABLE_KINDS:
         return []
-    c, r = pos
+    if cell.kind == GROUND:
+        return _ground_links(grid, pos, cell)
     out = []
-
-    def ground(p, level):
-        g = grid.get(p)
-        if g is not None and g.kind == GROUND and g.level == level:
-            out.append(p)
-
-    def stair(p):
+    # inside a flight: the cell above and below in the same stack
+    c, r = pos
+    for p in ((c, r - 1), (c, r + 1)):
         g = grid.get(p)
         if g is not None and g.kind in (VSTAIR, EWSTAIR):
             out.append(p)
-
-    if cell.kind == GROUND:
-        for p in ((c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)):
-            ground(p, cell.level)
-        # ... plus any flight whose own end opens onto this cell. Asking the
-        # flight keeps the relation symmetric instead of re-deriving it here.
-        for p in ((c, r - 1), (c, r + 1), (c - 1, r), (c + 1, r)):
-            g = grid.get(p)
-            if g is not None and g.kind in (VSTAIR, EWSTAIR) \
-                    and pos in walk_links(grid, p):
-                out.append(p)
-        return out
-
-    # inside a flight: the cell above and below in the same stack
-    stair((c, r - 1))
-    stair((c, r + 1))
     if cell.kind == VSTAIR and cell.dir == "n":
-        # The rim cell of a plateau's back. Down is north, up is south; there
-        # is no stack, the one cell is both head and foot.
-        ground((c, r - 1), cell.level - cell.drop)
-        ground((c, r + 1), cell.level)
+        _north_flight_links(grid, pos, cell, out)
     elif cell.kind == VSTAIR:
-        if cell.row == 0:
-            ground((c, r - 1), cell.level)
-        if cell.row == cell.drop - 1:
-            ground((c, r + 1), cell.level - cell.drop)
+        _wall_flight_links(grid, pos, cell, out)
     elif str(cell.tag).startswith("side_"):
-        # A lateral crossing on a plateau's bare side face. Both halves of the
-        # unit behave the same: the terrace it was cut from lies behind on the
-        # entry side, the terrace it descends to in front on the exit side, and
-        # the column it sits in carries on above and below so walking the rim
-        # past a crossing still works. The two halves link to each other
-        # through the `stair` calls above.
-        dc = 1 if cell.tag.endswith("e") else -1        # the drop direction
-        low = cell.level - cell.drop
-        # Head and foot, exactly as a wall-cut flight has them -- and for the
-        # same reason. Only the head reaches the terrace above and only the
-        # foot the one below; letting the *foot* reach up would put the whole
-        # drop one step from the low ground.
-        #
-        # The head does now touch both terraces, through the low tile north of
-        # it. That was the corner-cutting hole for a while: a body could take
-        # the diagonal from the low ground to the high ground past the
-        # crossing, never standing on it, because `can_step` only asked whether
-        # one right-angle detour was open end to end. It asks something else as
-        # well now -- `steps.diagonal_blocked` refuses any diagonal between
-        # two ground tiles of different levels, which is where that move was
-        # actually wrong -- so the reach is safe and the wall it used to cost
-        # is gone.
-        #
-        # The column also carries on past both ends of the unit, and on a
-        # crossing that protrudes from the side what lies there is the *low*
-        # terrace. Those two edges are open as well -- a side face has no stone
-        # in it, so refusing them walled off open ground. Only a cliff, or
-        # nothing at all, still stops you.
-        # The head's downhill edge is open too. The ramp's top tile is a
-        # diagonal wedge with no art at all along that edge -- the low terrace
-        # shows through it -- so the only wall the unit keeps is the foot's
-        # uphill flank, which is where the drop is actually drawn.
-        # North opens onto the *low* terrace only. Ground at the head's own
-        # level above means the crossing is notched into the terrace and a
-        # backdrop cliff is painted between them, so that edge is a drawn face
-        # and stays shut; the notch is entered from its uphill flank.
-        if cell.row == 0:                              # head: the upper end
-            ground((c - dc, r), cell.level)
-            ground((c, r - 1), low)
-            ground((c + dc, r), low)
-        # ...and the foot's uphill flank, so the unit may be stepped onto
-        # sideways from either terrace at either of its cells. A ramp is a
-        # ramp; the flank is drawn, but it is not a wall.
-        if cell.row == cell.drop:                      # foot: the lower end
-            ground((c + dc, r), low)
-            ground((c, r + 1), low)
-            ground((c - dc, r), cell.level)
+        _lateral_links(grid, pos, cell, out)
     else:
-        # East/west flight. The wall jogs one row across it, so the upper
-        # terrace reaches the flight's head from the side the wall has not
-        # dropped yet, and the lower terrace meets its foot on the opposite
-        # side -- the `= > #` / `# > =` pair in the journal's diagram. The head
-        # and foot also open along the column, north onto the terrace above and
-        # south onto the one below, exactly as a straight flight does.
-        entry = 1 if cell.tag == "w" else -1     # "w" descends west, enters east
-        if cell.row == 0:
-            ground((c + entry, r), cell.level)
-            ground((c, r - 1), cell.level)
-        if cell.row == cell.drop:
-            ground((c - entry, r), cell.level - cell.drop)
-            ground((c, r + 1), cell.level - cell.drop)
+        _ewstair_links(grid, pos, cell, out)
     return out
+
+
+def _ground(grid, out, p, level) -> None:
+    """Append `p` when it is ground at `level`."""
+    g = grid.get(p)
+    if g is not None and g.kind == GROUND and g.level == level:
+        out.append(p)
+
+
+def _ground_links(grid, pos, cell) -> list:
+    """A ground cell: its four ground neighbours at the same level, plus any
+    flight whose own end opens onto this cell. Asking the flight keeps the
+    relation symmetric instead of re-deriving it here."""
+    c, r = pos
+    out: list = []
+    for p in ((c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)):
+        _ground(grid, out, p, cell.level)
+    for p in ((c, r - 1), (c, r + 1), (c - 1, r), (c + 1, r)):
+        g = grid.get(p)
+        if g is not None and g.kind in (VSTAIR, EWSTAIR) \
+                and pos in walk_links(grid, p):
+            out.append(p)
+    return out
+
+
+def _north_flight_links(grid, pos, cell, out) -> None:
+    """The rim cell of a plateau's back. Down is north, up is south; there
+    is no stack, the one cell is both head and foot."""
+    c, r = pos
+    _ground(grid, out, (c, r - 1), cell.level - cell.drop)
+    _ground(grid, out, (c, r + 1), cell.level)
+
+
+def _wall_flight_links(grid, pos, cell, out) -> None:
+    """A straight flight cut through a wall: the head reaches the terrace
+    north of it, the foot the low ground south of it."""
+    c, r = pos
+    if cell.row == 0:
+        _ground(grid, out, (c, r - 1), cell.level)
+    if cell.row == cell.drop - 1:
+        _ground(grid, out, (c, r + 1), cell.level - cell.drop)
+
+
+def _lateral_links(grid, pos, cell, out) -> None:
+    """A lateral crossing on a plateau's bare side face. Both halves of the
+    unit behave the same: the terrace it was cut from lies behind on the
+    entry side, the terrace it descends to in front on the exit side, and
+    the column it sits in carries on above and below so walking the rim
+    past a crossing still works. The two halves link to each other
+    through the stack step in `walk_links`.
+
+    Head and foot, exactly as a wall-cut flight has them -- and for the
+    same reason. Only the head reaches the terrace above and only the
+    foot the one below; letting the *foot* reach up would put the whole
+    drop one step from the low ground.
+
+    The head does now touch both terraces, through the low tile north of
+    it. That was the corner-cutting hole for a while: a body could take
+    the diagonal from the low ground to the high ground past the
+    crossing, never standing on it, because `can_step` only asked whether
+    one right-angle detour was open end to end. It asks something else as
+    well now -- `steps.diagonal_blocked` refuses any diagonal between
+    two ground tiles of different levels, which is where that move was
+    actually wrong -- so the reach is safe and the wall it used to cost
+    is gone.
+
+    The column also carries on past both ends of the unit, and on a
+    crossing that protrudes from the side what lies there is the *low*
+    terrace. Those two edges are open as well -- a side face has no stone
+    in it, so refusing them walled off open ground. Only a cliff, or
+    nothing at all, still stops you.
+    The head's downhill edge is open too. The ramp's top tile is a
+    diagonal wedge with no art at all along that edge -- the low terrace
+    shows through it -- so the only wall the unit keeps is the foot's
+    uphill flank, which is where the drop is actually drawn.
+    North opens onto the *low* terrace only. Ground at the head's own
+    level above means the crossing is notched into the terrace and a
+    backdrop cliff is painted between them, so that edge is a drawn face
+    and stays shut; the notch is entered from its uphill flank."""
+    c, r = pos
+    dc = 1 if cell.tag.endswith("e") else -1        # the drop direction
+    low = cell.level - cell.drop
+    if cell.row == 0:                              # head: the upper end
+        _ground(grid, out, (c - dc, r), cell.level)
+        _ground(grid, out, (c, r - 1), low)
+        _ground(grid, out, (c + dc, r), low)
+    # ...and the foot's uphill flank, so the unit may be stepped onto
+    # sideways from either terrace at either of its cells. A ramp is a
+    # ramp; the flank is drawn, but it is not a wall.
+    if cell.row == cell.drop:                      # foot: the lower end
+        _ground(grid, out, (c + dc, r), low)
+        _ground(grid, out, (c, r + 1), low)
+        _ground(grid, out, (c - dc, r), cell.level)
+
+
+def _ewstair_links(grid, pos, cell, out) -> None:
+    """An east/west flight. The wall jogs one row across it, so the upper
+    terrace reaches the flight's head from the side the wall has not
+    dropped yet, and the lower terrace meets its foot on the opposite
+    side -- the `= > #` / `# > =` pair in the journal's diagram. The head
+    and foot also open along the column, north onto the terrace above and
+    south onto the one below, exactly as a straight flight does."""
+    c, r = pos
+    entry = 1 if cell.tag == "w" else -1     # "w" descends west, enters east
+    if cell.row == 0:
+        _ground(grid, out, (c + entry, r), cell.level)
+        _ground(grid, out, (c, r - 1), cell.level)
+    if cell.row == cell.drop:
+        _ground(grid, out, (c - entry, r), cell.level - cell.drop)
+        _ground(grid, out, (c, r + 1), cell.level - cell.drop)
 
 
 def reachable(grid, start=None) -> set:

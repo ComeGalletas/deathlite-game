@@ -42,7 +42,8 @@ from __future__ import annotations
 from array import array
 from collections import deque
 
-from world.pathfinding import NAV_DIRS, NavGrid, _NAV_CLASSES
+from world.nav.field import _NAV_CLASSES
+from world.nav.lattice import NAV_DIRS, NavGrid
 
 
 def _widest_class():

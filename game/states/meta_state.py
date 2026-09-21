@@ -4,6 +4,10 @@ manage the item stash between runs. Every change is saved immediately.
 Two panels, switch with TAB:
   * Upgrades -- Up/Down select, ENTER buy
   * Stash    -- Up/Down select, ENTER equip into its slot, U unequip that slot
+
+The mouse drives the same cursor (structure review, B): hovering a row
+selects it -- and its panel -- and a click does what ENTER does. The rows
+are registered while drawing, keyed `(panel, row)`.
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ import pygame
 from game import config, fonts
 from game.state import State
 from ui import scale
+from ui.menu_nav import MenuNav
 from progression.items import Item
 from progression.meta import buy
 
@@ -32,35 +37,46 @@ class MetaState(State):
         self._h = fonts.heading(22)
         self._f = fonts.mono(18)
         self._small = fonts.body(15)
+        # Clamped, not wrapped: two lists, each ends where it ends.
+        self._nav = MenuNav(wrap=False)
+        self._mouse = self._nav.mouse
 
     # --- input ------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
-        if event.type != pygame.KEYDOWN:
+        verb = self._nav.event(event, index=self.sel[self.panel],
+                               count=self._count(self.panel))
+        if verb is None:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_TAB:
+                    self.panel ^= 1
+                elif event.key == pygame.K_u and self.panel == 1:
+                    self._unequip_selected()
+                self._clamp_sel()
             return
-        k = event.key
-        if k == pygame.K_ESCAPE:
+        what, v = verb
+        if what == "back":
             from game.states.menu_state import MenuState
             self.game.state_machine.change(MenuState(self.game))
-        elif k == pygame.K_TAB:
-            self.panel ^= 1
-        elif k in (pygame.K_UP, pygame.K_w):
-            self.sel[self.panel] -= 1
-        elif k in (pygame.K_DOWN, pygame.K_s):
-            self.sel[self.panel] += 1
-        elif k in (pygame.K_RETURN, pygame.K_SPACE):
-            self._activate()
-        elif k == pygame.K_u and self.panel == 1:
-            self._unequip_selected()
+            return
+        if what in ("move", "activate"):
+            if isinstance(v, tuple):           # a registered row: (panel, i)
+                self.panel, i = v
+            else:
+                i = v
+            self.sel[self.panel] = i
+            if what == "activate":
+                self._activate()
         self._clamp_sel()
 
     def _upgrade_ids(self) -> list[str]:
         return list(self.game.content.meta_upgrades.keys())
 
+    def _count(self, panel: int) -> int:
+        return len(self._upgrade_ids()) if panel == 0 else max(1, len(self.save.stash))
+
     def _clamp_sel(self) -> None:
-        n0 = len(self._upgrade_ids())
-        n1 = max(1, len(self.save.stash))
-        self.sel[0] = max(0, min(self.sel[0], n0 - 1))
-        self.sel[1] = max(0, min(self.sel[1], n1 - 1))
+        self.sel[0] = max(0, min(self.sel[0], self._count(0) - 1))
+        self.sel[1] = max(0, min(self.sel[1], self._count(1) - 1))
 
     def _activate(self) -> None:
         if self.panel == 0:
@@ -90,6 +106,7 @@ class MetaState(State):
         salvage = self._h.render(f"Salvage: {self.save.currency}", True, config.COLOR_TEXT)
         surface.blit(salvage, salvage.get_rect(midtop=(w // 2, S(78))))
 
+        self._mouse.hits.clear()             # the panels re-register their rows
         self._draw_upgrades(surface, x=S(70), active=self.panel == 0)
         self._draw_stash(surface, x=w // 2 + S(30), active=self.panel == 1)
 
@@ -118,6 +135,8 @@ class MetaState(State):
                 f"{d['name']:<14} {lvl}/{mx}   {cost:>4}", True, colour), (x, y))
             surface.blit(self._small.render(d["desc"], True, config.COLOR_TEXT_DIM),
                          (x + S(16), y + S(20)))
+            # The row and its description line, one band each, touching.
+            self._mouse.hits.add(pygame.Rect(x - S(8), y - S(4), S(440), S(46)), (0, i))
             y += S(46)
 
     def _draw_stash(self, surface, x, active) -> None:
@@ -150,4 +169,5 @@ class MetaState(State):
             colour = config.COLOR_ACCENT if (active and i == self.sel[1]) else base
             tag = " *" if equipped else ""
             surface.blit(self._f.render(f"{it.short()}{tag}", True, colour), (x, y))
+            self._mouse.hits.add(pygame.Rect(x - S(8), y, S(520), S(24)), (1, i))
             y += S(24)

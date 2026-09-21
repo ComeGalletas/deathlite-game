@@ -99,7 +99,7 @@ class HitTintTests(unittest.TestCase):
             pygame.display.set_mode((1, 1))
 
     def test_tinted_copy_is_distinct_same_size_and_redder(self):
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         src = pygame.Surface((10, 10), pygame.SRCALPHA)
         src.fill((80, 80, 80, 255))
         out = PlayingState._hit_tinted(src)
@@ -111,7 +111,7 @@ class HitTintTests(unittest.TestCase):
         self.assertEqual((g, b), (80 + 30, 80 + 30))
 
     def test_transparent_pixels_stay_transparent(self):
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         src = pygame.Surface((6, 6), pygame.SRCALPHA)   # all (0,0,0,0)
         out = PlayingState._hit_tinted(src)
         self.assertEqual(out.get_at((3, 3))[3], 0)
