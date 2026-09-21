@@ -6,8 +6,10 @@ yields `None`, logged once -- callers fall back to primitive drawing, the same
 degrade contract as `game/save.py`.
 
 Sheet metadata (frame size, frame counts, fps, loop, anchor) lives in the split
-rig files (`data/{character,enemy,weapon,prop}_sprites.json`, merged by
-`Content`); this module only slices, transforms and memoises. Every
+rig files (`data/heroes/character_sprites.json`, `data/enemies/enemy_sprites.json`,
+`data/weapons/weapon_sprites.json`, `data/loot/prop_sprites.json`, merged by
+`Content` into one namespace; `data/ui/ui_sprites.json` is its own); this
+module only slices, transforms and memoises. Every
 transform (slice, scale, flip, rotate) is cached -- nothing transforms per
 frame.
 """
