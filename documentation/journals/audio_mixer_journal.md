@@ -2,8 +2,10 @@
 
 ## Requirement (owner, 2026-09-16)
 
-"Now add a separate option for the sound effects, and naturally add the
-current synthesized sounds and the voice clips for the growls. Confirm."
+- **Objective:** Add a separate volume option for the sound effects.
+- **Details:** The new level governs both the current synthesized sounds and
+  the recorded voice clips for the growls.
+- **Constraint:** Confirm the reading before implementing.
 
 ## Confirmed reading
 

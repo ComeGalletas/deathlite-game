@@ -8,20 +8,24 @@ art whose torch swing is the summon.
 
 ## Requirement (owner, 2026-09-17)
 
-> "change the beekepper sprite to the torch_goblin in the unused folder. wire
-> the attack animation to this gnome and make a collision hitbox for the
-> attack, similar to the husk/skull change the current beekepper to a new
-> hammer_gnome enemy, wire the attack animation of swinging the torch of the
-> torch_goblin to summon the bees and increase the size of every bee by around
-> 30%. confirm"
+- **Objective:** Rebuild the Beekeeper on the `torch_goblin` sprite from the
+  unused folder, and turn the current beekeeper into a new `hammer_gnome`
+  enemy.
+- **Details:** Wire the gnome's attack animation with a collision hitbox for
+  the attack, in the manner of the husk/skull work. Wire the torch goblin's
+  torch-swing animation to summon the bees, and enlarge every bee by about
+  30 %.
+- **Constraint:** Confirm the reading before building.
 
 and, answering the three questions that reading left open:
 
-> "1. no, hammer gnome only chases the player and attacks just like the husk,
-> initally make it with 30% more hp, 35% more damage and 20% slower than the
-> husk. weight can be tuned to be above as well.
-> 2. yes the torch swing also does damage, small one on top of the summons.
-> 3. yes, add the hammer to the the id and the torch_goblin as well."
+- **Hammer Gnome behaviour:** it only chases the player and attacks just like
+  the husk — starting at 30 % more HP, 35 % more damage and 20 % less speed
+  than the husk, with its spawn weight tunable upward as well.
+- **The torch swing also deals damage** — a small amount on top of the
+  summons.
+- **Naming:** the new enemy's id carries "hammer", and the Beekeeper's entry
+  references the `torch_goblin` art.
 
 **This supersedes** the instruction earlier the same day to put the Beekeeper
 on the Blight Caller sprite. That change was never built; the torch goblin
@@ -215,14 +219,13 @@ retired `gnome` rig, and the bees' new collider and drawn size.
 
 ## The swing comes off the range gate (owner, 2026-09-17)
 
-### Requirement
+### Requirement (owner, 2026-09-17)
 
-> "modify the beekeeper behavior. make it so it swings the weapon/torch
-> animation with a fixed cooldown, this means that every time it attacks it
-> does two things. 1. spawns the melee hitbox from the torch's attacks
-> 2. summons bees from the animation. the behavior remains the same, chase the
-> player, however no longer it needs to be close to the player to attack and
-> summon"
+- **Objective:** Decouple the Beekeeper's swing from its melee range gate.
+- **Details:** The weapon/torch animation swings on a fixed cooldown, and
+  every attack does both: it spawns the melee hitbox from the torch's swing
+  and summons bees from the animation. The chase-the-player behaviour stays,
+  but proximity is no longer required to attack and summon.
 
 ### Why this was right
 

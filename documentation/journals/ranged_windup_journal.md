@@ -10,20 +10,18 @@ pass.
 
 ## Requirement (owner, 2026-09-19)
 
-> "increase all ranged enemies attack cooldown by 100%, making it a lot
-> slower to attack. while doing this make a list of the current active
-> ranged enemies and verify which ones have not an attack animation wired
-> it for the ranged attack."
+- **Objective:** Increase every ranged enemy's attack cooldown by 100 %,
+  making them much slower to attack.
+- **Details:** Alongside, list the currently active ranged enemies and verify
+  which of them have no attack animation wired for the ranged attack.
 
 and then, after the audit:
 
-> "reduce the aggro range for all enemies by 50%.
->
-> for the ranged enemies add a new metadata value separate from the aggro
-> range, that is the attack range. this is the minimal range for enemies to
-> be able to attack specifically, not just get close to the player.
->
-> make this attack range around 300px to start for all units."
+- **Objective:** Reduce the aggro range of all enemies by 50 %.
+- **Details:** Ranged enemies gain a new metadata value, separate from the
+  aggro range: the attack range — the minimum range at which an enemy is able
+  to attack specifically, not merely get close to the player. Start it at
+  around 300 px for all units.
 
 Answers to the three questions that followed: wire every enemy that can be
 wired; use a wind-up before the shot and take 20 % off the interval to pay

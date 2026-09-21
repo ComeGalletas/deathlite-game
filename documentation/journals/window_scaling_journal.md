@@ -2,13 +2,14 @@
 
 ## Requirement (owner, 2026-09-15)
 
-> Review and propose a way to implement dynamic window scaling, using
-> arbitrary screen resolutions and sizes to fit many screens, from fullscreen
-> (needs to be only borderless windowed) and windowed. Consider a min and max
-> resolution and make sure the integrity of the gameplay remains the same. Do
-> not alter the zoom. Confirm, don't touch code.
+- **Objective:** Review and propose a way to implement dynamic window
+  scaling.
+- **Details:** Arbitrary screen resolutions and sizes, to fit many screens —
+  windowed, plus fullscreen as borderless windowed only. Consider a minimum
+  and a maximum resolution, and keep the integrity of the gameplay unchanged.
+- **Constraint:** Do not alter the zoom. Confirm first; do not touch code.
 
-Status: **built** (2026-09-15, "start with the window scaling changes"):
+Status: **built** (2026-09-15, go-ahead scoped to the window scaling changes):
 the scaled window, windowed / borderless, the Resolution row, the fit rule,
 the saved settings and the cursor scale -- see "Built" at the end of the
 proposal. The ultrawide render extent (its own section below) is confirmed
@@ -62,7 +63,7 @@ pygame 2.6.1 (SDL 2.28.4) on Windows 11, the owner's 3440x1440 monitor at
 | 10 | `ctypes.CDLL("SDL2.dll")` after `pygame.init()` binds the SDL already loaded by pygame (Windows returns the loaded module by name), so it works from the PyInstaller onedir without a path. | The shims need no packaging change. |
 | 11 | The hardware cursor (`ui/mouse.install_cursor`) is in screen pixels and does not follow the scale. | Re-install it at `UI_CURSOR_SCALE * window_scale` on each size change. |
 | 12 | (found while building) On the way **out** of fullscreen pygame re-pins the window minimum to the logical size: right after the toggle a 1280x720 request came back as 1600x900 while 1920x1080 went through. | The floor is lifted again before every programmatic size (`DisplayWindow._apply_windowed_size`), not only at open. |
-| 13 | (owner's crash report, 2026-09-15: "game crashes when trying to change resolutions") An access violation in pygame's event pump one frame after a Resolution step, on a fresh save and not on a saved one -- with the cursor reinstall, the save write, the render, garbage collection and each SDL shim ruled out in turn. The trigger was every shim creating a throwaway `pygame._sdl2.video.Window.from_display_module()` wrapper: pygame stores a pointer to the wrapper in the SDL window's data and resolves window events through it, so a dropped wrapper leaves that pointer dangling and the next resize event reads freed memory; whether that faulted depended on heap layout, which is why a dict entry more or less in the save decided it. | `native._window()` makes the wrapper **once** and keeps it for the process, remaking it only if its window is gone. Pinned by `tests/display/test_native.py`. |
+| 13 | (owner's crash report, 2026-09-15: the game crashes when changing resolutions) An access violation in pygame's event pump one frame after a Resolution step, on a fresh save and not on a saved one -- with the cursor reinstall, the save write, the render, garbage collection and each SDL shim ruled out in turn. The trigger was every shim creating a throwaway `pygame._sdl2.video.Window.from_display_module()` wrapper: pygame stores a pointer to the wrapper in the SDL window's data and resolves window events through it, so a dropped wrapper leaves that pointer dangling and the next resize event reads freed memory; whether that faulted depended on heap layout, which is why a dict entry more or less in the save decided it. | `native._window()` makes the wrapper **once** and keeps it for the process, remaking it only if its window is gone. Pinned by `tests/display/test_native.py`. |
 
 ---
 
@@ -303,15 +304,15 @@ reading the desktop in Borderless, the save carrying the block).
 
 ## Ultrawide render extent (owner, 2026-09-15) — under consideration
 
-> Expand the game window display — not these resolutions, the size the game
-> is actually rendered — to allow for ultrawide screen resolutions. 21:9
-> resolutions can be selected in windowed mode too. The game should only
-> change visually: extend the game display to cover the sides for the
-> ultrawide size. The camera should naturally cover this extended space, and
-> because the spawn master can spawn enemies anywhere it should affect the
-> gameplay. HUD elements must remain static as a 16:9 resolution.
+- **Objective:** Expand the game's render extent — the size the game is
+  actually rendered at, not the selectable resolutions — to allow ultrawide
+  screens, with 21:9 selectable in windowed mode too.
+- **Details:** The change is visual only: extend the game display to cover
+  the sides on ultrawide; the camera covers the extended space naturally,
+  and since the spawn master can spawn enemies anywhere, gameplay is
+  affected. HUD elements stay static, pinned to a 16:9 layout.
 
-Status: **built** (2026-09-15, "start with the ultrawide changes"); see
+Status: **built** (2026-09-15, go-ahead scoped to the ultrawide changes); see
 "Built" at the end of this section. It relaxes the "identical gameplay at
 every size" rule above for ultrawide players. The owner's rulings on the
 open points are folded in below.

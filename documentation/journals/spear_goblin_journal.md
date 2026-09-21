@@ -7,16 +7,16 @@ melee **sweeper** and its first enemy with **two** swings.
 
 ## Requirement (owner, 2026-09-17)
 
-> "review if there are other goblin like enemies in the unused folder without
-> wiring"
+- **Objective:** Check the unused folder for other goblin-like enemies still
+  without wiring.
 
 and then
 
-> "wire the spear_goblin as a new enemy, confirm first"
+- **Objective:** Wire the spear goblin as a new enemy.
+- **Constraint:** Confirm first.
 
-with the two open questions answered:
-
-> both attacks, alternating — and the display name **Whirlspear**.
+with the two open questions answered: both attacks, used in alternation — and
+the display name **Whirlspear**.
 
 ## The review that led here
 

@@ -588,8 +588,8 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
   clumpy fringe at *both* edges and only a ~14-24 px "strands meet the drop"
   band at the bottom. Blitting the whole tile at the south-rim cell row dropped
   a differently-textured grass row with a visible seam line one tile inside the
-  plateau (user report: "the cliff tile also has the ground tile attached to
-  it").
+  plateau (owner report: the cliff tile also has the ground tile attached to
+  it).
 - [x] `_CLIFF_TOP_KEEP = 24` (world/map.py). `paint_cliff` blits **only the
       bottom `keep` px** of the `top` tile
       (`area=Rect(0, px - keep, px, keep)`), landing it at
@@ -605,10 +605,11 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
   face show at the rim -- mixes with the general ground tiles.
 
 #### E7 - Kill the frontier line + the squared stone margin -- DONE (2026-08-29)
-- User report (on the E6 result): "there's a line that clearly denotes the
-  frontier between the two tiles and makes it look jarring, and cliffs have a
-  squared margin as well. Remove the line and clean the cliff tiles so there's
-  transparency for the darker outside sections."
+- Owner report on the E6 result, and the requirement from it:
+  - **Report:** a line clearly denotes the frontier between the two tiles and
+    looks jarring, and the cliffs have a squared margin as well.
+  - **Objective:** Remove the line and clean the cliff tiles so the darker
+    outside sections carry transparency.
 - Root cause was the E2 **seam plug**: `paint_cliff` poured an opaque
   `_CLIFF_STONE` rect (`px` wide, per column, starting 8 px *above* the tile
   row) behind every cliff column. That rect had (a) a hard top edge = the
@@ -643,10 +644,11 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
   base) with the void showing past every outer edge; no teal between rows.
 
 #### E8 - Foam vs. non-foam cliff foot by what sits below -- DONE (2026-08-29)
-- User request: "switch between the foam cliff or the non foam one depending if
-  there's a tile adjacent vertically to it ... if there's a tile use the non
-  foam version, if there's empty space use the foam one and add the foam effect
-  as well."
+- Requirement (owner):
+  - **Objective:** Switch between the foam and non-foam cliff foot depending
+    on what sits below.
+  - **Details:** If a tile is vertically adjacent below, use the non-foam
+    version; over empty space, use the foam one and add the foam effect too.
 - Finding: the tileset already carries both feet -- `bottom` (50-53) is the
   stone face with a **pale scalloped shoreline** baked in; `body` (41-44) is the
   plain repeat with a flat foot. No new art.
@@ -676,9 +678,9 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
   a floor-2 rim over open water, scalloped `bottom` foot with foam lapping.
 
 #### E8a - `ground_k` must sample the column's full width -- DONE (2026-08-29)
-- User report, on the E8 result: "why there's that empty space between the left
-  most cliffs and the grass stairs" -- a strip of void hanging under a rim
-  column that should have had a stone face.
+- Owner report on the E8 result: an empty strip of void hangs between the
+  leftmost cliffs and the grass stairs, under a rim column that should have
+  had a stone face.
 - **Root cause (an E8 regression, same session).** `ground_k` probed a single
   pixel, the column's horizontal centre. Corridor and stair rects are
   tile-*sized* but **not aligned to any room's column grid** -- a room's
@@ -711,9 +713,12 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
   a different alignment.
 
 #### E9 - Cliff-grass fringe on the N/E/W rim too -- DONE (2026-08-29)
-- User request: "Remember the cliff ground tiles, the ones above the cliff that
-  have the grass strands on the south side. Also for the other directions so
-  the raised floor doesn't have the edge tiles with the foam."
+- Requirement (owner):
+  - **Objective:** Extend the cliff ground tiles' grass-strand edging to the
+    other directions.
+  - **Details:** The tiles above the cliff already carry grass strands on the
+    south side; do the same for the rest so the raised floor's edge tiles no
+    longer show foam.
 - Asset survey (tilemap_*.png, measured): the `top` tiles 32-35 carry a dark
   clumpy grass fringe on **every closed side**, not just the strand band at the
   bottom -- north ~6-8 px on all four variants, west ~13 px on `left`, east
@@ -726,9 +731,9 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
       side and blit it at the cell's edge, inner `_LIP_FEATHER` px ramped to
       alpha 0 so it melts into the interior grass (same trick as E7's strand
       band). A plateau is now bordered by cliff grass on all four sides.
-- [x] **User correction, mid-implementation:** "the top left tiles ... only
-      cover horizontal lines so if they are placed as they look the grass
-      strands in the other sides, non south, will clash with the inland tiles."
+- [x] **Owner correction, mid-implementation:** the top-left tiles only cover
+      horizontal lines, so placed as they look, the grass strands on the
+      non-south sides would clash with the inland tiles.
       Correct -- `slots.cliff` autotiles a *horizontal* run only, so
       `left`/`right` are that run's **end caps**. The first pass cut the west
       band from `left` and the east band from `right`, which stacks an end-cap
@@ -744,8 +749,8 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
       `paint_room` **clears** the band's outer `band - feather` px first and
       lets the art's own silhouette stand against the void. All clears run
       before any blit, so a corner cell's two bands don't erase each other.
-- [x] **Second user correction:** "that black shadowed line that breaks the
-      seam of the tiles, it is not needed at all." The E2/E5 overhang wash was
+- [x] **Second owner correction:** the black shadowed line that breaks the
+      seam of the tiles is not needed at all. The E2/E5 overhang wash was
       a flat `_LIP_FRAC`-deep `BLEND_RGBA_MULT` fill just inside the rim; with
       the fringe now on top of it, its hard inner edge read as exactly the
       frontier line E7 removed from the south. I first softened it to a
@@ -768,9 +773,11 @@ rim -> `cliff == "top"` with a contiguous `left..right` (or `single`) run and
   wraps as one piece).
 
 #### E10 - Use the sheet's real non-foam autotile block -- DONE (2026-08-29)
-- User request: "finally consider corner tiles, the one there is is using a mix
-  of both vertical and horizontal grass tiles, in that case the corner tile is
-  a better fit, this what the metadata is for."
+- Requirement (owner):
+  - **Objective:** Use the sheet's corner tiles for the corners.
+  - **Details:** The current corner tile mixes vertical and horizontal grass
+    tiles; the dedicated corner tile is a better fit — and is what the
+    metadata is for.
 - **The finding that reframes E6 and E9.** Labelling the whole sheet by which
   edges each tile closes shows **cols 5-8 x rows 0-3 is a complete 16-tile
   autotile block** -- the exact parallel of the foam block at cols 0-2, but
@@ -1135,9 +1142,9 @@ walls off the top of the run and is wrong.
     row, which is the room's own grass, so that row is never backed.
 - [x] **The notch above each step stays open** -- settled by the user, and for
       a reason worth recording because it is not a rendering argument at all:
-      "the notchs are necessary to allow for enough space for the characters to
-      properly use the stairs in a 2d environment without looking disjointed,
-      both at the bottom and on the upper floor." A character sprite is drawn
+      the notches leave enough room for the characters to use the stairs
+      properly in a 2D environment, at both the bottom and the upper floor,
+      without looking disjointed. A character sprite is drawn
       extending *upward* from the tile its feet occupy, so cliff face directly
       above a step would swallow anyone standing on it and make the top and
       bottom of the climb read as disjointed. I had it backwards -- I read the
@@ -1209,10 +1216,13 @@ walls off the top of the run and is wrong.
 - Suite **697 green with `RAMP_STAIRS = True`**.
 
 #### R7 - Guaranteed landings at both ends -- DONE (2026-08-29)
-- User request, with an annotated screenshot marking the two tiles with an X:
-  "there needs to be an empty tile in front of the stairs at the bottom to
-  enter the stairs with a proper level and there needs to be another empty tile
-  at the arrival floor". Confirmed as a **generation** condition, not a render
+- Requirement (owner), given with an annotated screenshot marking the two
+  tiles with an X:
+  - **Objective:** Guarantee the landings at both ends of a stair run.
+  - **Details:** An empty tile in front of the stairs at the bottom, so the
+    stairs are entered at a proper level, and another empty tile on the
+    arrival floor.
+  Confirmed as a **generation** condition, not a render
   one -- the "crevasse" (the notch through the band) already exists; what was
   missing was any guarantee about the floor at each end.
 - Measured first, and the answer was not what it looked like: across 120 seeds
@@ -1248,8 +1258,9 @@ Three fixes from one round of user feedback on a live screenshot.
 **1. The landings are now carved, not merely required.** R7 implemented the
 user's two X-marked tiles as a *precondition* -- only plan a run where they
 already exist. Measurement said they always did, so the yield was unchanged and
-**nothing appeared on screen**, which is what prompted "why are the end tiles
-not placed". That answered a different question than the one asked.
+**nothing appeared on screen**, which is what prompted the owner's question
+about the end tiles not being placed. That answered a different question than
+the one asked.
 `landings()` now returns the cells and `_plan_ramps` **adds them to the room
 masks**, so the guarantee holds by construction. It still only rejects a
 candidate when a landing would fall outside a room's rect entirely.
@@ -1257,7 +1268,8 @@ candidate when a landing would fall outside a room's rect entirely.
 **2. The notch is filled and darkened.** R4 left the band rows above a step
 open because the user said the notch is load-bearing for character sprites --
 correct, but I stopped there and never dealt with what shows *behind* it, which
-was the sea ("why is the blue empty space in the middle of the stairs"). It is
+was the sea (the owner's follow-up question about the blue empty space in the
+middle of the stairs). It is
 now filled with the ordinary cliff face and multiplied down by
 `_RAMP_NOTCH_MULT`, so it reads as the recessed far wall of the crevasse:
 present, but clearly behind whoever is on the stairs. Full brightness was
@@ -1851,8 +1863,8 @@ than reusing the grounded-foot shadow) if the stacked-plateau look needs it.
   the land wraps south past the drop-off (an L / stepped / cross edge) — was
   rendering as a `right` (or `left`) run-end: the rounded stone cap with a
   transparent outer margin and the dark curved outline, pulled back from the
-  grass it butts against. "There is land on the right side, the cliff should be
-  of type middle, not right facing."
+  grass it butts against — where there is land on the right side, the cliff
+  should be of type middle, not right facing.
 - **Root cause.** `_cliff_variant` decided `left` / `mid` / `right` / `single`
   purely from whether the same-row horizontal neighbour was *itself a south-rim
   cell* (`_is_south_rim`). A neighbour that is floor but has floor below it
@@ -2836,8 +2848,8 @@ Suite **730** green.
 
 ### C18 -- a land-facing fringe needs the floor below behind it
 
-Reported as "cliff tiles appearing with a blueish square outline as if they
-didn't have transparency" on an upper terrace. The transparency is real and
+Reported on an upper terrace: cliff tiles appear with a blueish square
+outline, as if they had no transparency. The transparency is real and
 intended, and that is the whole problem.
 
 Every fringe tile is authored with a ragged, part-transparent outer margin --

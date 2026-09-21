@@ -7,16 +7,13 @@ few seahorse boats drifting round it. Nothing here fights, blocks or drops.
 
 ## Requirement (owner, 2026-09-20)
 
-> "review the asset folder unused\enemies\extra. theres a fish hut folder and
-> sprite sheet for a decoration on water, and the folder seahorse_boat for
-> npcs.
->
-> add the functionality to draw these fish huts and seahorse boat sprites and
-> non combat npcs, similar to the human npcs, they only move around slightly
-> but dont interact with combat, and these npcs are drawn close to the fish
-> hut, between 2 and 4.
->
-> confirm your understanding first"
+- **Objective:** Draw the fish-hut and seahorse-boat sprites from
+  `unused\enemies\extra` as water decoration and non-combat NPCs.
+- **Details:** The folder holds a fish-hut sheet (a decoration on water) and
+  the `seahorse_boat` folder (NPCs). Like the human NPCs, the boats only move
+  around slightly and never interact with combat; draw them close to the fish
+  hut, two to four of them.
+- **Constraint:** Confirm the understanding before building.
 
 ## What the review found
 
@@ -76,9 +73,9 @@ Decisions the request left open, taken as follows unless overruled:
 
 ## Correction (owner, 2026-09-20)
 
-> "the fish huts must be placed nearby bridges, can be perpendicular to the
-> bridges or just close to the intersection to the islands, can be between 1
-> and 3 huts per island assignment."
+- **Objective:** Place the fish huts near bridges.
+- **Details:** A hut may sit perpendicular to its bridge or simply close to
+  where the bridge meets the island; one to three huts per island assignment.
 
 So the huts belong to the bridges, not to the open coast:
 
@@ -227,7 +224,7 @@ huts are wanted, `_FH_CLEAR` or the candidate count per bridge is the knob.
 
 ## Follow-up: a bigger hut (owner, 2026-09-20)
 
-> "Increase the size of the fishhut sprite by 30%"
+- **Objective:** Enlarge the fish-hut sprite by 30 %.
 
 `npc_fish_hut`'s `scale` goes from 80x87 (0.54 of the sheet) to 104x113
 (0.70), the anchor moved with it to stay on the waterline. Placement,

@@ -7,14 +7,16 @@ work to bring the **ranged** ones into the game with their own projectiles.
 
 ## Requirement (owner, 2026-09-17)
 
-> "review the unused enemy sprites in the unused asset folder. make a summary
-> for each one, what do they look like and how they could attack. confirm"
+- **Objective:** Survey the unused enemy sprites in the unused asset folder.
+- **Details:** A summary for each one — what it looks like and how it could
+  attack.
+- **Constraint:** Confirm the survey before acting on it.
 
-and then
+and then:
 
-> "yes, create the journal with this survey and propose a todo list to
-> implement the ranged enemies with their respective projectiles. confirm
-> first"
+- **Objective:** Record the survey in this journal and propose a todo list
+  for implementing the ranged enemies with their respective projectiles.
+- **Constraint:** Confirm the proposal before building anything.
 
 Status: **survey done, proposal written, nothing built.** The owner asked to
 confirm the reading before the work starts, so this entry stops at the todo.
@@ -484,10 +486,12 @@ works.
 
 ## The `unused` category — benching the Stoutpaw (owner, 2026-09-17)
 
-### Requirement
+### Requirement (owner, 2026-09-17)
 
-> "now, make an unused category for currently unused enemies. move the current
-> panda enemy there. dont delete the references in the code, just 'disable' it."
+- **Objective:** Add an "unused" category for currently unused enemies and
+  move the current panda enemy into it.
+- **Constraint:** Do not delete its code references — the enemy is only
+  disabled.
 
 ### Confirmed reading
 

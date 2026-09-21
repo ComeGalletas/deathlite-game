@@ -10,14 +10,13 @@ meet.
 
 ## Requirement (owner, 2026-09-18)
 
-> "Review how is the current spawn master despawning enemies.
->
-> The requirement is that the master removes enemies off screen that are far
-> away from the player, to save processing power and to lower the current
-> amount of enemies to allow for more to be spawned near the player.
->
-> The player must be constantly dealing with enemies besides the human
-> village."
+- **Objective:** Have the spawn master remove off-screen enemies that are far
+  from the player.
+- **Details:** Review how the master despawns enemies today. The goals are to
+  save processing power and to lower the live count, so that more enemies can
+  be spawned near the player.
+- **Constraint:** The player must be constantly dealing with enemies, the
+  human village aside.
 
 ---
 
@@ -238,13 +237,13 @@ for revisiting `seeded`.
 
 ## Answered (owner, 2026-09-18)
 
-> 1. Increase the radius to 1700
-> 2. Hibernate but also remove them from the current max limit so that more
->    enemies can spawn in other islands
-> 3. We don't need the camera with the spawn ring
-> 4. All enemies should be accounted for.
-> 5. Every island should be constantly filled with enemies. The player should
->    be constantly dealing with enemies.
+1. Increase the radius to 1700.
+2. Hibernate, but also remove them from the current max limit, so more
+   enemies can spawn in other islands.
+3. The camera is not needed with the spawn ring.
+4. All enemies should be accounted for.
+5. Every island should be constantly filled with enemies; the player should
+   be constantly dealing with enemies.
 
 ### 1. The ring is 1,700 px
 
@@ -534,9 +533,9 @@ ring ships**, since that is where the remaining risk sits.
 
 ### The overflow rule: already the behaviour, no code needed
 
-> "The live cap might overflow if the enemies woken up exceed the current cap,
-> in this case the spawning gets paused given the current rules and everything
-> keeps working as usual"
+The owner's ruling: the live cap may overflow when the enemies woken up exceed
+the current cap; in that case spawning pauses under the current rules and
+everything keeps working as usual.
 
 Confirmed against the code, and it is already exactly this:
 
@@ -689,8 +688,9 @@ had just seated.
 
 ### The fix (owner, 2026-09-19)
 
-> "increase the aggro range substantially so that far enemies are aggroed
-> closer, however also consider spawning enemies even closer to the player"
+- **Objective:** Increase the aggro range substantially, so far enemies are
+  aggroed from closer.
+- **Details:** Also consider spawning enemies even closer to the player.
 
 Both levers, set against each other so that two invariants hold at once:
 

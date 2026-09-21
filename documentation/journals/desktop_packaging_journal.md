@@ -328,7 +328,7 @@ None — all four originally raised here are closed.
   surface.
 
   Verified: a source run still resolves to the repo-root `save.json`; the frozen
-  branch resolves to `C:\Users\juanp\AppData\Local\DeathliteGame\save.json`; the
+  branch resolves to `%LOCALAPPDATA%\DeathliteGame\save.json`; the
   fallback ladder produces `%APPDATA%` then `~/.local/share` when those
   variables are stripped; and a write into a not-yet-existing directory creates
   it and round-trips (`currency = 1234` read back intact). 28 tests pass across
@@ -381,7 +381,7 @@ None — all four originally raised here are closed.
   **The save was proven in both directions in the real frozen runtime**, not
   inferred. A console build (below) printed at startup:
 
-      INFO game.save: no save at C:\Users\juanp\AppData\Local\DeathliteGame\save.json -- starting fresh
+      INFO game.save: no save at %LOCALAPPDATA%\DeathliteGame\save.json -- starting fresh
       INFO game.content: content loaded: 9 weapons, 14 enemies, 1 bosses, 3 characters, ...
 
   and pressing the mute key wrote that same file back with `settings.muted:

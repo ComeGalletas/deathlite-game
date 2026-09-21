@@ -452,8 +452,8 @@ on both flanks, every pen and hall in place.
 
 ## HI-4 — a quarter less island (2026-09-12, owner's request)
 
-**The request.** "Only the size of it, reduce it by 25%, keep every other
-functionality the same." Confirmed as a quarter less *walkable ground*, the
+**The request.** Reduce the island's size by 25 %, keeping every other
+functionality the same. Confirmed as a quarter less *walkable ground*, the
 reading the two earlier cuts used, not a quarter off the `size` number:
 `size` scales the rect on both axes and the coast erosion costs a fixed
 ring, so the literal 0.42 would have taken 56% of the ground and left a
@@ -522,8 +522,8 @@ the same island) and `village_after_seed2.png` (scratch, sent to the owner).
 
 ## A row of three to five houses (2026-09-12, owner's request)
 
-"Try placing 3-5 houses this time, it's fine if they get close together as
-long as they don't disrupt the main heal area, forge and monastery." So the
+**The request.** Place 3-5 houses this time; they may stand close together as
+long as they do not disrupt the main heal area, forge and monastery. So the
 row grew and the spacing between *houses only* went:
 
 - `_V_HOUSES` 3-4 → **3-5**.
@@ -562,9 +562,9 @@ a single house.
 
 ## A second decoration sweep, to fill out the island (2026-09-12, owner's request)
 
-"After the buildings and facilities are placed do another decoration and
-tree placement sweep to fill out the remaining empty spaces, not too much
-but enough to fill out the outsides of the island."
+**The request.** After the buildings and facilities are placed, run another
+decoration and tree placement sweep to fill the remaining empty spaces — not
+too much, but enough to fill out the outsides of the island.
 
 `_fill_scatter` (`world/gen/village.py`), run straight after the first
 scatter and before the tidy pass, so anything it puts too near the square
@@ -614,9 +614,9 @@ owner).
 
 ## Four more trees a village (2026-09-12, owner's request)
 
-"Increase the amount of trees by an average of 4 more." Trees a village
-**10.1 → 13.9** over 35 seeds / 52 villages (total 523 → 724), from two
-changes that both keep the grove a grove:
+**The request.** Increase the amount of trees by an average of four more.
+Trees a village **10.1 → 13.9** over 35 seeds / 52 villages (total 523 →
+724), from two changes that both keep the grove a grove:
 
 - **`_V_TREE_GAP` (40 px):** trees, and only trees, have their own spacing
   now -- 15 px trunk + 15 px trunk + 40 = 70 px between centres, the figure
@@ -637,8 +637,8 @@ Props a village 12.4 → 16.1, island cells with nothing within a tile 78% →
 74%.
 
 Note for later: a tree may still stand with its canopy over a house, which
-is the rule the village has had since HI-2 ("a prop may stand before or
-behind a house -- that is a tree by a house") and is not new here; with
+is the rule the village has had since HI-2 (a prop may stand before or
+behind a house, so a tree by a house is legal) and is not new here; with
 more trees it simply happens more often. If it should stop, the change is
 to make `art_ok` treat a building's painted box as blocking for trees, or
 to give trees a wider gap from buildings than from each other.
@@ -650,8 +650,8 @@ Screenshots: `village_trees_seed2.png`, `village_trees_seed42.png`
 
 ## Denser clutter on the village island (2026-09-12, owner's request)
 
-"Increase the density of the decorations as well, keep the center (heal
-area) clean but fill out the edges around 35% more."
+**The request.** Increase the density of the decorations as well: keep the
+centre (the heal area) clean, but fill out the edges by around 35 % more.
 
 The decorations are the bake's own non-colliding clutter -- the pebbles,
 bushes, mushrooms and pumpkins of `data/terrain.json` `decorations` -- not

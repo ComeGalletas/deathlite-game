@@ -635,8 +635,8 @@ rather than bridging over foam.
 **What (first cut):** a separate `WorldLayout.decorations` list — bushes / rocks
 scattered on room floors and water-rocks / a duck in the void, drawn as pure
 scenery.
-**What (after the user's follow-up "change the circular obstacles as decoration
-… don't place decorations without an obstacle attached"):** `decorations` and
+**What (after the owner's follow-up ruling that decorations must come
+attached to the circular obstacles):** `decorations` and
 `_scatter_decorations` deleted. `Obstacle` gained a cosmetic `variant` (1–4 from
 the run seed). `data/terrain.json::obstacle_decor` maps each obstacle kind to a
 list of interchangeable rigs (`tree`/`shrub` → `deco_bush_*`, `rock`/`pillar` →

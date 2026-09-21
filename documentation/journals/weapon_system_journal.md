@@ -483,7 +483,7 @@ instant it fires:
   keeping the crop's aspect; the frame is blitted centred, so the splash
   centres on the blow. Two tests pin the crop against the sheet and the
   drawn size.
-- **Lift (owner, same day): "raise the sprite some 5 pixels."** The rig's
+- **Lift (owner, same day): raise the sprite by about 5 px.** The rig's
   anchor moved 4 crop px below the crop's centre (`[37, 37]`) and
   `slam_fx.impact_topleft` now honours the anchor the way the character
   rigs do (scaled with the frame), so the splash draws about 5.5 screen px
@@ -491,11 +491,11 @@ instant it fires:
 - The owner tuned the blow's radius from the agreed 52 to **42** in
   `data/weapons.json` (confirmed intended); the tests read the radius from
   the data.
-- **Size (owner, same day): "increase the sprite by about 25 %."** The rig's
+- **Size (owner, same day): increase the sprite by about 25 %.** The rig's
   `over_circle: 1.25` makes the frame a quarter wider than the blow's
   diameter (`slam_fx.impact_size`); the lift scales with it (about 5.6 px at
   radius 42, zoom 1).
-- **Lift again (owner): "5 px more."** Anchor `[37, 41]` -- 8 crop px below
+- **Lift again (owner): 5 px more.** Anchor `[37, 41]` -- 8 crop px below
   the centre, about 11 screen px above the blow at radius 42, zoom 1.
 
 ---

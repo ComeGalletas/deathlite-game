@@ -8,11 +8,12 @@ and `documentation/journals/weapon_system_journal.md` (the weapon system).
 
 ## Requirement (owner, 2026-09-19)
 
-> Review the current `weapon_blessing_forge_tables.md` for the state of the
-> weapon system. Propose a way for all weapons to have 6 blessings, that should
-> cover damage, area, speed/frequency, and special effects to each one. Make it
-> so that the increases are at around 10-20 % more damage for each level.
-> Confirm.
+- **Objective:** Give every weapon six blessings.
+- **Details:** They should cover damage, area, speed/frequency and special
+  effects for each weapon, with each level worth around 10-20 % more damage.
+  Start by reviewing `weapon_blessing_forge_tables.md` for the state of the
+  weapon system.
+- **Constraint:** Confirm the proposal first.
 
 ## Review of the tables (state on 2026-09-19)
 
@@ -400,9 +401,10 @@ worktree does not carry).
 
 ## Follow-up (owner, 2026-09-19): the Forge cards, the post-Forge gate, the weapon weight
 
-> Fix the forge card defect and make sure the forge blessings aren't being
-> offered as normal blessings, and the weapon weight should rise, but first
-> propose how much.
+- **Objective:** Fix the Forge card defect, and keep Forge blessings from
+  being offered as normal blessings.
+- **Details:** The weapon weight should rise too — but propose by how much
+  first.
 
 **Forge cards fixed.** The three overrides are re-based on the current
 weapons so the cards tell the truth: Meteor Hammer 27 → **23** (0.85 of the
@@ -465,8 +467,9 @@ dominate until the slots fill, by design.
 
 ## Owner's ruling and the merge (2026-09-20)
 
-> use the weights as 10, merge the six-blessings worktree into main but first
-> confirm that it wont break anything currently.
+- **Ruling:** the weapon weight is 10.
+- **Objective:** Merge the six-blessings worktree into main.
+- **Constraint:** Confirm first that the merge breaks nothing currently.
 
 **Weapon weight: 10.** Set in `data/weapons/offering.json`, parity with the
 `stat` and `grant` kinds, as recommended above.

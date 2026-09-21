@@ -8,19 +8,21 @@ every other place the game will need to show a key.
 
 ## Requirement (owner, 2026-09-19)
 
-> "review the assets folder and unused asset folder for sprite resources
-> that we can use to show keyboard keys ingame with pixel art."
+- **Objective:** Find sprite resources for showing keyboard keys in-game with
+  pixel art.
+- **Details:** Survey both the assets folder and the unused asset folder.
 
 then, after the survey and mockup:
 
-> "the key label needs to move when the keyicon is not selected."
+- **Correction:** the key label must move when the key icon is not selected.
 
 and
 
-> "fix the mockup with the per-state offsets. prepare a todo list to add
-> these key icons to the ingame and first as the interaction key for the
-> game elements, opening a box, using the forge and sanctuary heal areas
-> and any possible future interactions."
+- **Objective:** Fix the mockup with the per-state offsets, then prepare a
+  todo list for adding the key icons in-game.
+- **Details:** The first use is the interaction key for the game elements —
+  opening a box, using the forge and the sanctuary heal areas — and any
+  possible future interactions.
 
 ## The survey
 
@@ -247,15 +249,15 @@ Later passes (not started; listed so the module is shaped for them):
 
 ## Pass 2 — the cap floats over the element (owner, 2026-09-19)
 
-> "move the keycap to interact, in this case 'E' on top of the element to
-> interact with when getting close to it. this means that only one key
-> should be available at a time and only for the closer element to the
-> player. the comment at the bottom goes away"
+- **Objective:** Move the interact keycap ('E') onto the element to interact
+  with, shown when the player gets close to it.
+- **Details:** Only one key is shown at a time, and only for the element
+  closer to the player; the comment line at the bottom goes away.
 
 Decisions, answered the same day:
 
-1. The prompt words are gone with the bar: no merchant price ("there is no
-   proper merchant functionality yet, for now thats irrelevant") and no
+1. The prompt words are gone with the bar: no merchant price (there is no
+   proper merchant functionality yet, so it is irrelevant for now) and no
    chest rarity in the prompt. **The notice after opening a chest stays** —
    that is `ps.notice("Rare chest: 40 gold, ...")` at `h - 124`, which was
    never part of the prompt and is untouched.
@@ -355,11 +357,13 @@ Decisions, answered the same day:
 
 ## Pass 3 — anchoring to the art (owner, 2026-09-19)
 
-> "1. blue chest has the keycap slightly to the left of its top center.
-> review the size and rendering of all chests to make it as similar as
-> possible dimensions wise. 2. review the current forge center as well.
-> 3. the sanctuary is fine, however try searching in the unused assets if
-> theres a better effect to change"
+- **Details:**
+  1. The keycap sits slightly left of the blue chest's top centre — review
+     the size and rendering of every chest so they match as closely as
+     possible, dimensions-wise.
+  2. Review the forge's centre as well.
+  3. The sanctuary is fine, but search the unused assets for a better effect
+     to swap in.
 
 ### What the measurements say
 
@@ -457,7 +461,8 @@ burst), `spell_heal_002` (36 fr, rising green crosses), `spell_heal_003`
 
 ## Pass 4 — the pause menu's Controls block (owner, 2026-09-19)
 
-> "confirm and propose the pause menu controls block"
+- **Objective:** Add a controls block to the pause menu.
+- **Constraint:** Confirm the proposal before building.
 
 ### Confirmed reading
 
@@ -542,8 +547,8 @@ Decisions taken (say if you want them changed):
 
 ## Pass 5 — first-run movement hints, and the mouse glyph (owner, 2026-09-19)
 
-> "prepare the first run movement hints and what glyph for the mouse
-> would you use?"
+- **Objective:** Prepare the first-run movement hints.
+- **Open question:** which glyph should stand for the mouse?
 
 ### The mouse glyph
 
@@ -621,9 +626,9 @@ HUD. It fades over its last 0.4 s rather than vanishing.
 
 ### Change of rule (owner, 2026-09-19)
 
-> "change the hints behavior to show for every run, however add an option
-> to the options menu to turn off tutorials and control this visibility
-> there"
+- **Objective:** Show the hints on every run.
+- **Details:** Add an option to the options menu that turns tutorials off and
+  controls this visibility.
 
 So: no `hints_done` flag, no first-run gating, no dev-menu replay row.
 **Every run opens with the hints**; the player switches them off with a

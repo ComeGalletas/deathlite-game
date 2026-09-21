@@ -8,14 +8,11 @@ way when the run ended.
 
 ## Requirement (owner, 2026-09-16)
 
-> "add a keyboard input lock after the player has died or won the game when
-> the corresponding screen appears.
->
-> this basically means, when the game over or victory screens appear, lock the
-> controls so that the player doesnt accidentaly clicks or presses a key that
-> closes this screen and doesnt give time the player to react to it.
->
-> confirm."
+- **Objective:** Add an input lock that engages when the game-over or victory
+  screen appears, after the player has died or won.
+- **Details:** Lock the controls so that a click or a keypress already on its
+  way cannot close the screen before the player has had time to react to it.
+- **Constraint:** Confirm the reading before implementing.
 
 ## Confirmed reading
 

@@ -877,12 +877,12 @@ budget. `ENEMY_COUNT_HARD_CAP` (600, live + dormant) is untouched.
 
 ## S10 — camping starved the placement filter (owner, 2026-09-12)
 
-### Requirement
+### Requirement (owner, 2026-09-12)
 
-> "check the spawn master behaviour and confirm if the camera of the player
-> doesn't move too much, or the player stays too much on a single island,
-> the density of spawns gets greatly reduced, in this case the spawns should
-> continue even if the camera is showing"
+- **Objective:** Check whether spawn density drops greatly when the player's
+  camera barely moves, or when the player stays on a single island.
+- **Details:** If it does, spawns should continue even while the camera would
+  be showing them.
 
 ### Confirmed, and the cause was not the obvious one
 
@@ -989,18 +989,19 @@ rather than in `spawn_tables.json`.
 
 ## S11 — placement by distance from the player, regardless of the camera (owner, 2026-09-15)
 
-### Requirement
+### Requirement (owner, 2026-09-15)
 
-> Change the way the spawn master spawns enemies to do it on a range outside
-> of the player so it doesn't spawn on top of them, but regardless of the
-> camera. Confirm.
+- **Objective:** Spawn enemies in a range outside the player, so nothing
+  spawns on top of them, regardless of where the camera points.
+- **Constraint:** Confirm the reading first.
 
 Raised while considering the ultrawide render extent
 (`window_scaling_journal.md`): a wider view would have pushed every spawn
 further out horizontally, because the ladder's first two rungs are walls
 built from the camera's visible rect.
 
-Status: **built** the same day (owner: "start only with the spawn master changes").
+Status: **built** the same day (scoped by the owner to the spawn-master
+changes only).
 
 ### Confirmed reading
 
@@ -1117,15 +1118,16 @@ tests deselected (11m44s).
 
 ## S12 — a 45 s ramp, a 250 crowd, elites from the first minute (owner, 2026-09-16)
 
-### Requirement
+### Requirement (owner, 2026-09-16)
 
 Raised after a review of the spawn rate over a 10 minute run
 (the curve of scheduled demand against the live cap, per difficulty):
 
-> "increase the pacing. lower the 300s requirement to ramp up to 45 seconds
-> base for normal. increase the enemy live cap to 250. increase the elite
-> chance by a base of 15%, all around, so it starts from 25%. keep everything
-> else. confirm"
+- **Objective:** Increase the run's pacing.
+- **Details:** Lower the 300 s ramp-up requirement to a 45 s base on Normal;
+  raise the enemy live cap to 250; raise the elite chance by a flat 15 %
+  across the board, so it starts at 25 %.
+- **Constraint:** Keep everything else; confirm before building.
 
 ### What the review found first, because it frames all four items
 
@@ -1153,14 +1155,14 @@ the ones this entry moves.
 Three of the four items were unambiguous; two were put to the owner and
 answered:
 
-- **"increase the pacing"** — the headline for the ramp change below, *not*
+- **The pacing increase** — the headline for the ramp change below, *not*
   a change to `pacing.base`. Confirmed: `pacing.base` stays 15. Raising it
   would not show on the field while placement is the ceiling.
-- **"lower the 300s requirement to ramp up to 45 seconds"** — the **phase
+- **The 300 s ramp-up requirement lowered to 45 s** — the **phase
   schedule** is what ramps in 45 s (chosen over the cap ramp and the stat
   ramp). There is no 300 s constant in the code; the 300 s is the review's
   observation that the heavy phase lands at 270 s on normal.
-- **"45 seconds base for normal"** — 45 s is the Normal figure, divided by
+- **45 s as the Normal base** — 45 s is the Normal figure, divided by
   `timeline_pace` like `run_duration` is, so fast ramps in 36 s and super
   fast in 30 s.
 - **The boss does not move.** The phase schedule is keyed to `run_duration`
@@ -1169,7 +1171,7 @@ answered:
   plainly not the ask. The two clocks are therefore **decoupled**: a new
   `ramp_seconds` drives the phase schedule and the interval lerp;
   `run_duration` keeps the boss at 570 / 456 / 380 s.
-- **elite "+15%, so it starts from 25%"** — did not resolve as stated
+- **The elite chance: +15 %, starting from 25 %** — did not resolve as stated
   (+15 points on the opening 0% is 15%, not 25%). Owner chose: **floor the
   opening at 25% and add 15 points to the rest**, giving
   0 / 2 / 5 / 10 / 14 -> **25 / 25 / 25 / 25 / 29**.

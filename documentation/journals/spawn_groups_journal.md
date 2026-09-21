@@ -11,39 +11,25 @@ only if that group has any.
 
 ## Requirement (owner, 2026-09-17)
 
-> "now we need to create two types of categories, you can consider them levels.
->
-> first is category by sprite grouping, you could call it by the relative
-> social group. second will be simply by common and elite enemy.
->
-> 1. Dark group: Husk, Blink, Imp
-> 2. Goblin group: bonepicker, hexcaller, beekeeper, grudge.
-> 3. Marine group: bloat, gaffjaw
-> 4. Gnomes: hammer gnome, slinger
-> 5. wild beasts: gorehorn, stoutpaw, turtle, bear.
-> 6. swarm: skitter and stinger
->
-> elite enemies will be: hexcaller, grudge, bear, gorehorn turtle.
-> the rest will be considered common enemies.
->
-> groups will be used to spawn enemies, this means that the spawn master will
-> decide first which group to spawn, this will mean around 15 - 25 common
-> enemies and if the group has elite enemies on it, the chance of spawing some
-> of those enemies as elites.
->
-> if the group doesnt have elites the elite check doesnt go off. each group
-> should also have a variable that shows whats the minimum and maximum amount
-> of enemies per group spawn. this means for example that the swarm group that
-> is made of small enemies, needs a minimum of 20 enemies per spawn, while a
-> big group like the wild beasts can settle for a minimum of 5 up to 20.
->
-> this will also mean that some groups are more fitted for the start of the
-> game and others for the end.
->
-> the expectation is that dark, swarm, marine and gnomes are common groups that
-> will be spawning throught the entire run, while the others that have elite
-> enemies will be secondary up to a certain time thresholds that will be
-> increasing as the run goes on."
+- **Objective:** Create two category levels over the roster.
+- **Details:**
+  - The first category groups enemies by sprite family — the relative social
+    group; the second is simply common versus elite.
+  - The groups: 1. Dark — Husk, Blink, Imp. 2. Goblin — bonepicker,
+    hexcaller, beekeeper, grudge. 3. Marine — bloat, gaffjaw. 4. Gnomes —
+    hammer gnome, slinger. 5. Wild beasts — gorehorn, stoutpaw, turtle, bear.
+    6. Swarm — skitter and stinger.
+  - Elites: hexcaller, grudge, bear, gorehorn, turtle; the rest are common.
+  - The spawn master picks a group first; a spawn is around 15-25 common
+    enemies, plus a chance of elites only if the group has any — for a group
+    without elites the elite check never fires.
+  - Each group carries a minimum and maximum company size: a small-bodied
+    group like the swarm needs a minimum of 20, while a big-bodied one like
+    the wild beasts can settle for 5-20.
+  - Some groups fit the start of the run and others the end: dark, swarm,
+    marine and gnomes are common groups expected to spawn throughout the
+    entire run, while the elite-bearing groups stay secondary up to time
+    thresholds that rise as the run goes on.
 
 ## Confirmed reading
 
@@ -899,10 +885,10 @@ Two caveats worth carrying forward:
 
 ### A bigger ring, filled randomly (owner, 2026-09-17)
 
-> "the placement ring can be bigger but enemies about to spawn can be placed
-> randomly at different intervals inside this ring, this can allow for enemies
-> to avoid spawning on top of each other at the exact time and allow room for
-> different topographies"
+- **Proposal from the owner:** the placement ring may be bigger, with the
+  enemies about to spawn placed randomly at different intervals inside it.
+- **Rationale:** that would keep enemies from spawning on top of each other
+  at the exact same time and would leave room for different topographies.
 
 Measured against the concentric packer on the same 16 real anchors. **Pure
 random scatter fills worse**, and the gap is widest on exactly the awkward
@@ -1005,8 +991,8 @@ fits any slot that is free.
 
 **The jitter.** Each body is nudged a random direction and up to
 `pack_jitter` of a cell, retried `pack_tries` times, with the exact slot as
-the fallback. This is what the owner asked for - "placed randomly at
-different intervals inside this ring" - and the measurement said it is free.
+the fallback. This is the randomised placement the owner asked for, and the
+measurement said it is free.
 
 **The two checks.** A candidate is taken only if it is clear of every body
 already seated, *the leader included*, and walkable for its own radius. The
@@ -1234,8 +1220,8 @@ should be decided with the companies actually running.
 that an enemy is rare-band exactly when it is `is_elite`, which held while
 "elite" meant the two toughest bodies on the roster. Hexcaller (64) and
 Gorehorn (55) are now elites in the *uncommon* band, so the rule is not
-true any more. The owner settled the replacement in advance - "potions can
-keep the same check by hp" - so there is no coupling left to pin and the
+true any more. The owner settled the replacement in advance -- potions keep
+the same check by HP -- so there is no coupling left to pin and the
 test is gone rather than re-pinned, with a comment in its place saying why.
 
 **Rewritten: `test_uncommon_enemies_can_drop_all_three`.** It named
@@ -1396,10 +1382,12 @@ Suite green: 187 in `tests/spawn`.
 
 ## G2a: the group check fails soft (owner, 2026-09-17)
 
-> "do a simple check before the spawn decides. simple function to read the
-> list of enemies in a certain group. if one of them contains elite metadata
-> then check a flag instead of requiring at load ... in case the data is
-> corrupted or simply inadequate skip whichever enemy or group contains it"
+- **Objective:** Replace the load-time group validation with a simple check
+  made before the spawn decides.
+- **Details:** A simple function reads the enemy list of the group in
+  question; if a member carries elite metadata, a flag is consulted instead
+  of requiring validity at load. If the data is corrupted or simply
+  inadequate, skip whichever enemy or group contains it.
 
 G2 shipped a load-time check that refused to boot when a group's declared
 rank contradicted `enemies.json`. The owner reversed the failure mode: a
@@ -1429,8 +1417,8 @@ accessor on the table could not know that.
 ### Nothing spawnable is thrown away
 
 This is the rule that is easy to get backwards, and the owner's follow-up
-settled it: "if the available data is enough to spawn it as a common enemy
-do it, this obviously requires to scan the required elite metadata". So the
+settled it: if the available data is enough to spawn an enemy as a common, do
+so -- which requires scanning the required elite metadata first. So the
 two rank mismatches resolve **differently**:
 
 | filed as | actually | outcome |
@@ -1688,9 +1676,9 @@ benching.
 
 ## G7: the base company cooldown back to 5 s (owner, 2026-09-20)
 
-> "review the base cooldown for companies/groups by the spawn master and
-> confirm a way to increase the base cooldown for the spawning of companies"
-> ... "try with base 5 seconds"
+- **Objective:** Review the spawn master's base cooldown for
+  companies/groups and confirm a way to increase it.
+- **Details:** Try a 5-second base.
 
 ### Reviewed
 
@@ -1745,12 +1733,13 @@ run waiting on the cap a little less because it reaches it later.
 
 ## G8: a cap on commons per company that climbs through the run (owner, 2026-09-20)
 
-> "similar to how the max amount of elites are being controlled, now we need
-> to limit the max amount of common enemies given the different bands of
-> progression through the run. review how is the min and max amount of common
-> enemies calculated and placed, and propose a way to limit the max amount by
-> the settings to make common enemies start at a max of 5 enemies per group at
-> the start of the gameplay run."
+- **Objective:** Limit the maximum number of common enemies per company
+  across the run's progression bands, similar to how the elite maximum is
+  already controlled.
+- **Details:** Review how the minimum and maximum common counts are
+  calculated and placed, and propose a settings-driven way to limit the
+  maximum, so common enemies start at a max of 5 per group at the start of
+  the run.
 
 ### Reviewed
 
@@ -1763,7 +1752,7 @@ step (`ResolvedGroup.elite_count`), deterministic and capped. Commons had no
 such ladder. Every entry point composes the same way -- the director's paced
 companies, an island's resident company, the dev spawn.
 
-### Confirmed reading and proposal ("journal it and go with your values")
+### Confirmed reading and proposal (numbers delegated by the owner)
 
 A `common_cap` block in `data/enemies/spawn_tables.json` -- `start` 5,
 `step` 5, `ceiling` 30 -- on the director's `step_seconds` clock: the cap is

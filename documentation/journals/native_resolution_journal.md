@@ -4,10 +4,10 @@ Branch: `native-resolution` (off `main` at `cf50aba`, 2026-09-16).
 
 ## Requirement (owner, 2026-09-16)
 
-> Is there a way to scale the rendering resolution to keep the same
-> sharpness as if the game was rendered at 1600x900, almost as if making it
-> pixel perfect? Make a new branch for this, journal it in a new file,
-> prepare a todo list for option 2.
+- **Objective:** Find a way to scale the rendering resolution while keeping
+  the same sharpness as a native 1600x900 render — near pixel-perfect.
+- **Details:** Work on a new branch, journal it in a new file, and prepare
+  the todo list for option 2.
 
 Status: **all stages built** (2026-09-16): the world renders at the
 window's native size at the effective zoom, the interface draws at the

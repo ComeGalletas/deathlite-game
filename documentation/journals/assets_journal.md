@@ -503,8 +503,8 @@ edge tiles are Phase T3.
 
 *First cut (superseded): `WorldLayout.decorations` — free-standing bushes / rocks
 scattered on floors, water-rocks / a duck in the void, drawn as pure scenery.
-The user then asked: "change the circular obstacles as decoration … don't place
-decorations without an obstacle attached." Reworked as below.*
+The owner then ruled that decorations come as the circular obstacles' skins --
+none placed without an obstacle attached. Reworked as below.*
 
 - [x] `entities/obstacle.py`: `Obstacle` gains a cosmetic `variant` (1–4).
 - [x] `world/procedural.py`: `_scatter_decorations` and `WorldLayout.decorations`
@@ -1834,9 +1834,12 @@ rule — only a flush cliff is capped.
 **Goal.** Give the Thunder Orb projectile a real look: two stacked, looping
 animations centred on the orb -- an amber energy **aura** ring behind and a grey
 **lightning ball** in front -- over (not replacing) the existing orb disc.
-User request: "for the first sheet [`thunder_ball`] use row 5 (0-indexed), for
-the aura sheet [`thunder_aura`] use row 4; align both on top of the orb entity
-for now."
+
+Requirement (owner, 2026-08-30):
+
+- **Objective:** Layer the two sheets' animations on top of the orb entity.
+- **Details:** Use row 5 (0-indexed) of the `thunder_ball` sheet and row 4 of
+  the `thunder_aura` sheet, both aligned on the orb's centre.
 
 ### The sheets (measured)
 

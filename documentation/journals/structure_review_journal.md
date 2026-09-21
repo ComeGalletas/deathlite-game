@@ -10,22 +10,19 @@ each roll their own cursor, and a handful of functions run past 180 lines.
 
 ## Requirement (owner, 2026-09-20)
 
-> list the current fixable tasks, including the documentation, however
-> create another "FUNCTIONAL_README.md" and place all relevant sections
-> that are related to the functionality of the game including testing
-> documentation, information that is not relevant for a common player, and
-> instead leave the current README as basic as possible for most people to
-> understand the concepts of the game, the tools and asset references and
-> the current features and options of the game.
->
-> review the menu screens to implement a general cursor movement and hover
-> hit testing to modularize it.
->
-> and the outsized files and functions that could split up, including
-> obviously that one god-object that is getting big.
->
-> the worktrees have been deleted. the unused asset folder untrack is
-> intentional so dont touch it.
+- **Objective:** List the current fixable tasks, documentation included.
+- **Details:**
+  1. Create a second file, `FUNCTIONAL_README.md`, and move the sections
+     related to the game's functionality there — testing documentation and
+     everything else not relevant to a common player — leaving the current
+     README as basic as possible: the game's concepts, the tools and asset
+     references, and the current features and options.
+  2. Review the menu screens toward a general cursor-movement and hover
+     hit-testing implementation, to modularize them.
+  3. Identify the outsized files and functions that could be split up, the
+     growing god-object included.
+- **Constraints:** The worktrees have already been deleted, and the unused
+  asset folder's untracked state is intentional — do not touch it.
 
 ## Confirmed reading
 

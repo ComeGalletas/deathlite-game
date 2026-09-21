@@ -2,11 +2,12 @@
 
 ## The request
 
-> "review the current special areas/facilities/merchants that are placed
-> usually in the center of some islands. most of these functionalities are
-> incomplete or simply dont do anything like the merchant, dont have any
-> sprite wired in. check which of them are to remove them from the world
-> generation, but keep the code template in case"
+- **Objective:** Review the special areas / facilities / merchants usually
+  placed at the centre of some islands.
+- **Details:** Most of these functionalities are incomplete or do nothing at
+  all — the merchant among them — and have no sprite wired in. Identify which
+  of them are to be removed from world generation.
+- **Constraint:** Keep the code templates in place, in case they are needed.
 
 ## What was there
 
@@ -31,23 +32,25 @@ sanctuary heal (`heal_effect.png`), the five buff buildings (~60 an island
 world, data-driven from `data/world/buildings.json`), the CB-9 chests and the
 fish huts.
 
-The merchant had already been parked once in words: *"keep the merchant as is
-for now, for now it doesn't do anything, gold consumption is still work in
-progress"* (owner, 2026-09-12, `combat_balance_journal.md`). Nothing has
-changed since — there is still no gold sink.
+The merchant had already been parked once by the owner (2026-09-12,
+`combat_balance_journal.md`): left as it is, doing nothing yet, with gold
+consumption still work in progress. Nothing has changed since — there is
+still no gold sink.
 
 ## The decision (owner, 2026-09-20)
 
 Remove **all four** from world generation.
 
-> "remove the merchant, treasure and altar, but dont generate more islands,
-> just remove those interactions and remove the tags that identify those
-> islands. the only islands left should be combat islands, which are the most
-> of them, and the human island that is treated separately. these special
-> facilities are going to be implemented later in different ways so dont
-> remove the referenced code for them."
+- **Objective:** Remove the merchant, treasure and altar from world
+  generation.
+- **Details:** Do not generate more islands to replace them — only remove
+  those interactions and the tags that identify those islands. The islands
+  left are the combat islands, the most of them, and the human island, which
+  is treated separately.
+- **Constraint:** These special facilities will be implemented later in
+  different ways, so the referenced code is not to be removed.
 
-Asked whether the shrine — the fourth special, which the sentence above
+Asked whether the shrine — the fourth special, which the decision above
 implies but does not name — went with them: **yes**.
 
 Three things follow, and they are the whole brief:
@@ -60,7 +63,7 @@ Three things follow, and they are the whole brief:
    particular they stop reserving the `_GRID_CLEAR_RADIUS` disc at their
    centre — there is nothing left there to reach.
 3. **The code is parked, not deleted.** These facilities are coming back
-   "in different ways", so every handler, kind entry, colour and marker
+   in different ways, so every handler, kind entry, colour and marker
    height stays exactly where it is. Only the generator's ability to emit
    the four tags goes away.
 

@@ -1,11 +1,13 @@
 # Sound effects journal — the recorded cues
 
-## Requirement (2026-09-16)
+## Requirement (owner, 2026-09-16)
 
-"Wire up the sound effects too, but first check their sounds, one file the
-biggest one only has the audio at the start of the track so it needs to be cut
-and rename the files for proper management. Credit those two using the names.
-Sound effects comes from freesound.org."
+- **Objective:** Wire up the recorded sound effects.
+- **Details:** Check the sounds first — the biggest file only carries its
+  audio at the start of the track and needs cutting — and rename the files
+  for proper management.
+- **Constraint:** Credit the two sources by name; the effects come from
+  freesound.org.
 
 Delivered into `assets/sound_effects/`. Companion to
 `music_journal.md` — that entry covers the two streamed Pixabay tracks; this

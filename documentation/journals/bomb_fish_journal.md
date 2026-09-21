@@ -7,8 +7,10 @@ always drawn holding — and enemy shots learn how to explode.
 
 ## Requirement (owner, 2026-09-17)
 
-> "check the current bombfish enemy. wire the bomb attack for it and color the
-> bomb red similar to the previous enemy arrow. confirm"
+- **Objective:** Wire the bomb fish's bomb attack.
+- **Details:** Colour the bomb red, similar to the previous enemy arrow.
+  Review the current bombfish enemy first.
+- **Constraint:** Confirm the plan before building.
 
 ## What the check found
 
@@ -130,9 +132,10 @@ for.
 
 ## Follow-up: the thrown bomb stops shaking the screen (owner, 2026-09-19)
 
-> "review the bombfish enemy. remove the screenshake from the attack of bomb
-> but dont delete the functionality, comment it as unusued but ready to
-> implement. confirm first"
+- **Objective:** Remove the screen shake from the bomb fish's thrown-bomb
+  attack.
+- **Constraint:** Do not delete the functionality — comment it out as unused
+  but ready to implement. Review the enemy first; confirm before changing.
 
 Confirmed before the change, with one question answered: the corpse blast on
 death **keeps** its shake; only the thrown bomb goes quiet.

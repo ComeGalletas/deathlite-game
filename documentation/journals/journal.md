@@ -933,14 +933,14 @@ cosmetic layer with the flat renderer kept as the fallback.
 | T1 | `data/terrain.json` (tile vocabulary: `tile_px`, `slots` = which sheet index is interior/edge/corner, `room_palettes`, 13 decoration rigs + `terrain_foam`). `game/content.py` loads it. `game/assets.py`: rig namespace = `{**sprites, **terrain.rigs}`, new `tile(sheet, index)` and `terrain` accessor. |
 | T2 | `world/map.py`: `_build_tiles()` (lazy, first draw) pre-renders each room/corridor to one grass-tiled `Surface`; `Water_Background` tiled into a `SCREEN + 1 tile` scroll buffer. `_draw_tiled` replaces the flat rects; `_draw_flat_layout` stays as the `else`. |
 | T3 | Autotile edges — `_slot_for(row,col,rows,cols)` picks the edge/corner tile by grid position, baked into the room surfaces. **Animated shoreline foam** — `Water_Foam` (16×192px) blitted per in-view perimeter tile (`self._shore`, ~492), *after* rooms / *before* corridors so doorways stay clear. Grey wall border dropped in the tiled path. |
-| T4 | Decoration sprites (bush / rock rigs) become the **skin of the circular obstacles** — one per obstacle, scaled to the collider, `get_ticks`-clocked. See the revision note below: the first T4 cut scattered free-standing scenery; the user asked for "no decoration without an obstacle attached". |
+| T4 | Decoration sprites (bush / rock rigs) become the **skin of the circular obstacles** — one per obstacle, scaled to the collider, `get_ticks`-clocked. See the revision note below: the first T4 cut scattered free-standing scenery; the owner ruled that no decoration ships without an obstacle attached. |
 | T5 | This log; README "Assets" + layout + counts; `assets/CREDITS.md` "Pack 2"; `transcript.md` entry. |
 
 ### Revision — obstacles *are* the decorations (2026-08-27)
 The first T4 pass added `WorldLayout.decorations`, a separate list of
 seed-scattered bushes / rocks on floors and water-rocks / a duck in the void,
-drawn purely as scenery. The user then asked to **"change the circular obstacles
-as decoration … don't place decorations without an obstacle attached"**, so:
+drawn purely as scenery. The owner then ruled that the circular obstacles
+themselves carry the decoration -- none placed without an obstacle attached -- so:
 - `WorldLayout.decorations` and `_scatter_decorations` were **removed**.
 - `Obstacle` gained a cosmetic `variant` (1–4, from the run seed).
 - `data/terrain.json` → `obstacle_decor`: obstacle kind → list of interchangeable
@@ -3993,17 +3993,18 @@ never wrong.
 
 ## Body text white (2026-09-10)
 
-Owner: "change the color of the normal text, not titles, to a white
-color." `config.COLOR_TEXT_DIM` (the body text on dark grounds: hints,
+Owner: change the color of the normal text — not the titles — to white.
+`config.COLOR_TEXT_DIM` (the body text on dark grounds: hints,
 instructions, HUD labels, list rows) went from grey (150, 150, 165) to white
 (235, 235, 240). Titles keep `COLOR_ACCENT` gold; text on the light button
 art keeps the black / dark-grey rule (`COLOR_ON_BUTTON*`).
-Same day, "the card descriptions too": `COLOR_ON_BUTTON_DIM` (descriptions,
+Same day, the card descriptions too: `COLOR_ON_BUTTON_DIM` (descriptions,
 tag lines and badges on the light card / button art) went from dark grey
 (80, 80, 70) to white (240, 240, 245); card names and titles keep
 `COLOR_ON_BUTTON`.
-Then, "too clear": card titles (hero names, trait lines, level-up card
-names) became the heading gold `COLOR_ACCENT` and the descriptions went to
+Then, a legibility follow-up: card titles (hero names, trait lines, level-up
+card names) became the heading gold `COLOR_ACCENT` and the descriptions went
+to
 the near-black (28, 28, 34); button labels unchanged.
 Same day: the level-up card's number badge moved 25 px in from the corner
 (`x + 39`), and card titles (hero names, trait lines, level-up card names)

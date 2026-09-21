@@ -1,12 +1,13 @@
 # Cluster Bomb bomblet FX — journal
 
-## 1. The requirement (2026-09-12, as stated)
+## 1. The requirement (owner, 2026-09-12)
 
-> review the current assets folder for explosion effects different from the
-> current explosion sprite for the bomb, to use for the bomblets. confirm and
-> propose which ones could be used and how.
->
-> consider the unused folder and the mega pack on the root. dont code
+- **Objective:** Find explosion effects for the bomblets, different from the
+  bomb's current explosion sprite.
+- **Details:** Survey the assets folder — the unused folder and the mega pack
+  on the root included — then confirm and propose which ones could be used
+  and how.
+- **Constraint:** Survey and proposal only; no code this pass.
 
 A survey and a proposal. No code this pass.
 

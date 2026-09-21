@@ -1,8 +1,9 @@
 # Music journal — generating a complex track for the game
 
-## Requirement (2026-09-15)
+## Requirement (owner, 2026-09-15)
 
-"Review a way to generate a complex music track for the game, don't code."
+- **Objective:** Review a way to generate a complex music track for the game.
+- **Constraint:** Review only — do not code.
 
 This entry is the review only. Nothing was built.
 
@@ -193,18 +194,17 @@ generator for free as a fallback.
 
 # Music journal — shipping the two delivered tracks
 
-## Requirement (2026-09-16)
+## Requirement (owner, 2026-09-16)
 
-"I have added two music tracks to the folder assets\music with appropriate
-names. Review them and propose a way to add them to the main menu and the
-gameplay stage."
+- **Objective:** Review the two music tracks delivered into `assets\music`
+  and propose a way to add them to the main menu and the gameplay stage.
 
 This entry is the review and the proposal. Nothing has been built yet; the
 plan below is waiting on the confirmations at the end.
 
 Note on this file: a `music_journal.md` already existed (the 2026-09-15 review
 above, which recommended an offline procedural composer, option C). The owner
-asked for "a new music_journal.md"; rather than overwrite that review it is
+asked for a new music journal; rather than overwrite that review it is
 kept as the entry above, because it is the direct context for this one. This
 request is effectively **option A** of that review — author once, stream a
 file — now that real tracks exist. Option C is not cancelled by this; it can

@@ -1,12 +1,13 @@
 # Test seed stability journal
 
-## Requirement (2026-09-17)
+## Requirement (owner, 2026-09-17)
 
-> "review the tests that depend on world generation and consider adding a
-> fixed seed to make sure its stable. confirm."
+- **Objective:** Review the tests that depend on world generation and
+  consider pinning them to a fixed seed so they are stable.
+- **Constraint:** Confirm the approach first.
 
 Preceded, the same day, by two narrower requests: fix a ghost-render test that
-passed roughly one run in five, and "pin those four helpers to a seed".
+passed roughly one run in five, and pin those four helpers to a seed.
 
 ## Confirmed reading
 
@@ -108,9 +109,10 @@ of its own assertions because the dice went against it.
 
 ## Seed range (2026-09-17, second pass)
 
-> "apply the seed range, 3 could be a good start if you can test them
-> properly. the other assumptions are fine, if the tests themselves depend on
-> random seeds dont touch them."
+- **Objective:** Apply the seed range — three seeds as a good start, provided
+  they can be tested properly.
+- **Constraint:** The other assumptions stand; any tests that themselves
+  depend on random seeds stay untouched.
 
 One world shaping every assertion was its own hazard -- a quirk of that world
 would be invisible, because nothing would disagree with it. `W.pinned(index)`

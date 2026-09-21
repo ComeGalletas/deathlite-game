@@ -125,13 +125,13 @@ swing off its own hitbox.
 
 ## Follow-up: the lance spawned in the sea (owner, 2026-09-12)
 
-### Requirement
+### Requirement (owner, 2026-09-12)
 
-> "the pig rider spawns on water/void similar to the giant bat, but because it
-> doesn't have the flying tag it essentially gets stuck on the water and can't
-> move. change the way the spawn works to make it spawn on ground, however
-> increase the movement speed 3x in case its far away from the character so it
-> can reach the character faster"
+- **Objective:** Change the pig rider's spawn so it spawns on ground.
+- **Details:** It currently spawns on water/void much like the giant bat, but
+  without the flying tag it gets stuck on the water, unable to move. In
+  compensation, triple its movement speed when it is far from the character,
+  so it can reach the character faster.
 
 ### The bug
 

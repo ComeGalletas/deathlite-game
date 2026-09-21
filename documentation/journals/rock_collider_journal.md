@@ -1,10 +1,10 @@
 # Rock collider journal
 
-## Requirement (2026-09-16)
+## Requirement (owner, 2026-09-16)
 
-"Review the current obstacle placements for rocks. Reduce the size of the
-hitbox/collision ring by 35% or so while keeping the size of the sprite the
-same."
+- **Objective:** Reduce the rock obstacles' hitbox/collision ring by about
+  35 %, after reviewing the current obstacle placements.
+- **Constraint:** The sprite's size stays the same.
 
 ## Review: where a rock's numbers live today
 

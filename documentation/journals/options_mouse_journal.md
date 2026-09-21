@@ -2,7 +2,8 @@
 
 ## Requirement (owner, 2026-09-16)
 
-"Enable mouse control for the options menu. Review and confirm, don't code."
+- **Objective:** Enable mouse control for the options menu.
+- **Constraint:** Review and confirm only — no code yet.
 
 ## Confirmed reading
 

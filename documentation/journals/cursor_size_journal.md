@@ -1,9 +1,10 @@
 # Cursor size — matching the in-game arrow to the desktop cursor
 
-**Owner request, 2026-09-16:** "review the current cursor rendering. currently
-the cursor is rendering at around 20-40% bigger than the system cursor. change
-it so the size of the windows cursor corresponds to the size of the ingame
-cursor."
+**Requirement (owner, 2026-09-16):**
+
+- **Objective:** Make the in-game cursor match the Windows system cursor in
+  size — it currently renders around 20-40 % bigger.
+- **Details:** Review the current cursor rendering first.
 
 Confirmed with the owner before any change: **match Windows exactly**, by
 measuring the system cursor at run time rather than tuning a constant.

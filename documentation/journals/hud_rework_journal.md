@@ -198,9 +198,10 @@ The boss bar in `ui/hud.py` is still a primitive rectangle.
 
 ## The pieces were cut out of the pack sheets (owner, 2026-09-12)
 
-> "review the ui elements that have sprites associated with them and cut them
-> from the sprite sheet to create specific sprite sheets for the ui elements
-> [...] and then move the big sprite sheets in a different 'base' folder"
+- **Objective:** Cut the UI elements that have sprites out of the shared
+  sprite sheets into per-element sheets.
+- **Details:** Review which elements have sprites first; once cut, move the
+  big pack sheets into a separate "base" folder.
 
 Ten rigs were reaching into `assets/ui/04.png` and `01.png` with offsets — the
 only assets in the whole of `assets/ui/` doing so, since the buttons, ribbons

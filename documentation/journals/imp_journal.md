@@ -8,9 +8,9 @@ pool on the ground.
 
 ## Requirement (owner, 2026-09-17)
 
-> "I have added a new enemy, imp, in the enemies folder.
->
-> confirm and wire it"
+- **Objective:** Wire the newly delivered `imp` enemy from the enemies
+  folder.
+- **Constraint:** Confirm the wiring plan first.
 
 ## What was delivered, and what it turned out to be
 
@@ -103,7 +103,7 @@ ahead and stays inside the fire the player can see. Recorded in a
 
 ### Then 35 % smaller (owner, 2026-09-17)
 
-> "reduce the area of the ember circle attack by 35%~"
+- **Objective:** Reduce the area of the ember-circle attack by about 35 %.
 
 **Area**, not radius — and a percentage on a size means area in this project
 by standing convention, not the linear knob. So the radius scales by

@@ -1,10 +1,11 @@
 # Bomb blast radius — journal
 
-## 1. The requirement (2026-09-12, as stated)
+## 1. The requirement (owner, 2026-09-12)
 
-> bind the bomb weapon area to its actual ingame radius size for the
-> explosion. currently the explosion is independent and doesnt modify. also
-> add blessings that increase the size of the radius by steps of 15%
+- **Objective:** Bind the Bomb weapon's blast area to its actual in-game
+  radius for the explosion — today the explosion is independent and does not
+  scale with anything.
+- **Details:** Also add blessings that grow the radius in 15 % steps.
 
 Two items:
 

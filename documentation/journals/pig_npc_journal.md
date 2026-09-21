@@ -1,11 +1,12 @@
 # Pig NPC (village corral)
 
-## Requirement (user, 2026-09-17)
+## Requirement (owner, 2026-09-17)
 
-> I have added a folder with pig sprites inside the `assets/terrain/npcs` folder.
-> Add the pig npc just the same as the sheep for the village, same corral as the
-> sheep just make pigs be between 2 and 3. dont modify the sheep behavior if
-> necessary. confirm first.
+- **Objective:** Add a pig NPC to the village, from the pig sprite folder
+  delivered under `assets/terrain/npcs`.
+- **Details:** Build it just the same as the sheep, sharing the sheep's
+  corral; two to three pigs per village.
+- **Constraint:** Do not modify the sheep's behaviour; confirm first.
 
 So: a second pen animal, built the same way the sheep is (HI-3, see
 `human_island_journal.md`), sharing the one corral each village already has,

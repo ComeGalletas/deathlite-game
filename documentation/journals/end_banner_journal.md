@@ -200,8 +200,10 @@ untracked file under `assets/unused/`, which this worktree does not carry).
 
 ## Follow-up: a shorter wait (owner, 2026-09-20)
 
-> "review the current wait time for the game over screen. reduce the wait
-> time for the game over sprite animation to 1 second. confirm"
+- **Objective:** Cut the wait before the game-over sprite animation to
+  1 second.
+- **Details:** Review the current wait time first; confirm the reading before
+  changing it.
 
 Reviewed: wait 3.0 s, banner 2.93 s (loss) / 2.80 s (win), hold 2.0 s, then
 the summary with its own 1.5 s input lock -- about 7.9 s from the last hit to

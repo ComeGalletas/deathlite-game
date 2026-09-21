@@ -1,9 +1,9 @@
 # Chaser collider journal
 
-## Requirement (2026-09-14)
+## Requirement (owner, 2026-09-14)
 
-"Reduce the size of the collision ring for the chaser enemy without altering
-the size of the sprite."
+- **Objective:** Shrink the chaser enemy's collision ring.
+- **Constraint:** The sprite's drawn size stays exactly as it is.
 
 ## Confirmed reading
 

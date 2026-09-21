@@ -72,9 +72,10 @@ Every open question answered. Nothing below is coded yet.
 
 ## Gold is reported gross (owner, 2026-09-12)
 
-> "for currency only keep a total amount of accumulated gold, not salvages, so
-> if the player gets a total of 200 gold, and spends 50 during the run, the 200
-> is the value to show."
+- **Objective:** Keep only a total of accumulated gold as the reported
+  currency, not salvages.
+- **Details:** The figure is gross — a run that earns 200 gold and spends 50
+  during the run still reports 200.
 
 Two changes, and the second cancels the bug reported earlier rather than fixing
 it in place.

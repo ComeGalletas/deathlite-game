@@ -921,7 +921,7 @@ Click and aim key at the same time: click wins.
   takes the key tuple set instead of hard-coding it.
 - The pause menu's **`Q` = quit to menu** clashes in spirit with `Q` = toggle
   auto attack (a run-long habit followed by ESC → Q loses the run). The plan
-  first said "move it to `M`", but `M` is the global mute key, consumed in
+  first moved the quit to `M`, but `M` is the global mute key, consumed in
   `Game._process_input` before any state sees it. So the pause screen became
   a **cursor menu** (Resume / Key layout / Quit to menu; ENTER picks) with no
   single-letter quit at all; `Q` does nothing there.
@@ -1109,11 +1109,12 @@ Click and aim key at the same time: click wins.
 **Status:** **DONE** 2026-09-12. Data-only. Verification at the end of this
 entry.
 
-### Requirement (user, 2026-09-12)
+### Requirement (owner, 2026-09-12)
 
-> "check the data folder for the data values for the different elements in the
-> game. increase the health/hp values of all enemies by 50% to 70% depending on
-> their current health. if they have low hp, 70%, if they have more up to 50%"
+- **Objective:** Raise every enemy's HP from the data files.
+- **Details:** Review the data folder for the game elements' values, then
+  increase all enemies' health by 50-70 % depending on current health —
+  low-HP enemies get the 70 % end, higher-HP enemies down to 50 %.
 
 ### Confirmed reading
 
@@ -1214,36 +1215,28 @@ time-to-kill pass and not a threat or economy pass.
 the two open balance questions (below). Built, tested and screenshotted;
 verification at the end of this entry.
 
-### Requirement (user, 2026-09-12)
+### Requirement (owner, 2026-09-12)
 
-> "add randomly spawned chests in the world after the generation completed.
->
-> chests should come in 3 rarities, common, uncommon, rare and epic.
->
-> each rarity includes:
-> * health potions of the respective rarity, epic chests always drop rare
->   potions.
-> * gold: amount starts from 10-25 base and increases per rarity. random amount
->   in a specific range
->
-> common: only includes these items.
-> uncommon: might include a common blessing
-> rare: includes a blessing, common or uncommon blessing, with higher chance for
-> common blessings.
-> epic: includes a blessing, uncommon or rare, with higher chance for uncommon.
->
-> there can only be a max of 5 chests per island, with an average of 2-3.
->
-> rare chests should be a max of 1 if there are.
->
-> `assets\items\chests` contains a sprite sheet of many colored chests, choose
-> the ones that fit the color scheme the best and make specific .pngs for each
-> one instead of using the big one."
+- **Objective:** Add randomly spawned chests to the world, placed after
+  generation completes.
+- **Details:**
+  - Chests come in rarities — common, uncommon, rare and epic.
+  - Each rarity holds health potions of its respective rarity (epic chests
+    always drop rare potions) and gold: a 10-25 base that increases per
+    rarity, rolled as a random amount in a specific range.
+  - Common chests hold only those. Uncommon might add a common blessing.
+    Rare includes a blessing — common or uncommon, weighted toward common.
+    Epic includes a blessing — uncommon or rare, weighted toward uncommon.
+  - At most 5 chests per island, 2-3 on average; at most 1 rare chest.
+  - `assets\items\chests` holds a sheet of many coloured chests — pick the
+    ones that fit the colour scheme best and cut a specific .png per rarity
+    instead of using the big sheet.
 
 ### Confirmed reading
 
-- **Four tiers, not three.** The line says "3 rarities" and then names four.
-  Read as **four** -- `common`, `uncommon`, `rare`, `epic` -- because the rest
+- **Four tiers, not three.** The brief says three rarities and then names
+  four. Read as **four** -- `common`, `uncommon`, `rare`, `epic` -- because
+  the rest
   of the brief gives each of the four its own contents rule, and `epic` is
   already a rarity the codebase knows (`progression/items.py RARITIES`,
   `meta_state._RARITY_COLOR`). Three would leave `epic` with nowhere to go.
@@ -1251,12 +1244,13 @@ verification at the end of this entry.
   "respective rarity" mapping is common -> common, uncommon -> uncommon,
   rare -> rare, and **epic -> rare** exactly as the brief spells out; there is
   no epic potion to author.
-- **One potion per chest, always** (owner, 2026-09-12): *"keep only ONE potion
-  per chest, what increases is the rarity of it."* A richer chest is a better
+- **One potion per chest, always** (owner, 2026-09-12): a chest holds one
+  potion; what increases is the rarity of it. A richer chest is a better
   potion, never more of them, so an epic and a rare chest hand out the same
   single rare potion and the epic's edge is its gold and its blessing tier.
-- **"after the generation completed" is literal.** The chests are a **stage of
-  world generation**, not a run-time spawner: the seed decides where every
+- **Placement after generation completes is literal.** The chests are a
+  **stage of world generation**, not a run-time spawner: the seed decides
+  where every
   chest is and what tier it is, the same way islands, obstacles and spawn
   points are decided. The same seed gives the same chests every run.
 - **Counts are per island.** Max 5, average 2-3, and at most 1 `rare` chest on
@@ -1506,10 +1500,9 @@ Three things fall out of that table, and the first is a problem:
 
 ### Open questions -- resolved 2026-09-12
 
-1. **The gold sink.** *Answered:* the Merchant stays exactly as it is. The
-   owner: "keep the merchant as is for now, for now it doesn't do anything,
-   gold consumption is still work in progress." Chest gold ships at the
-   brief's numbers.
+1. **The gold sink.** *Answered:* the Merchant stays exactly as it is — the
+   owner parked it: it does nothing yet, and gold consumption is still work
+   in progress. Chest gold ships at the brief's numbers.
 2. **Potions per chest.** *Answered:* one, always; the rarity is what climbs.
 3. **The treasure island's existing chest.** Not raised again, so it is left
    alone: `Interactable("treasure")` stays an item chest, distinct from CB-9
@@ -1688,10 +1681,11 @@ current data.
 
 **Status:** **DONE** 2026-09-16. Not committed.
 
-### Requirement (as asked)
+### Requirement (owner, 2026-09-16)
 
-> "review the current exp requirements to level up per each level increase, and
-> reduce the amount of exp required by a flat 25% all around."
+- **Objective:** Cut the experience required per level by a flat 25 % across
+  the board.
+- **Details:** Review the current per-level XP requirements first.
 
 Confirmed before implementing: *flat* means the same 25 % at every level, not a
 steeper cut early or late — the curve's shape is deliberately left alone and
