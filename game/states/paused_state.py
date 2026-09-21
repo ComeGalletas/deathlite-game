@@ -32,7 +32,7 @@ import pygame
 from game import config, fonts
 from game.state import State
 from ui import controls_block, scale, widgets
-from ui.mouse import MouseNav
+from ui.menu_nav import MenuNav
 
 _ROWS = ("resume", "status", "options", "key_layout", "quit")
 # 64-px `wide` buttons on a 72-px step; the Quit row on the red sheet.
@@ -54,7 +54,10 @@ class PausedState(State):
     def enter(self, **kwargs) -> None:
         self.sel = 0
         self._build_fonts()
-        self._mouse = MouseNav()     # rows registered in draw(); see ui/mouse.py
+        # ESC and P both resume; the cursor keys and the mouse are the shared
+        # menu rules (ui/menu_nav.py), rows registered in draw().
+        self._nav = MenuNav(back_keys=(pygame.K_ESCAPE, pygame.K_p))
+        self._mouse = self._nav.mouse
         self._duck(True)
 
     def exit(self) -> None:
@@ -79,27 +82,20 @@ class PausedState(State):
 
     # --- input -------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> None:
-        act = self._mouse.event(event)
-        if act is not None:
-            kind, i = act
-            self.sel = i
-            if kind == "click":
-                self._activate()
+        verb = self._nav.event(event, index=self.sel, count=len(_ROWS))
+        if verb is None:
             return
-        if event.type != pygame.KEYDOWN:
-            return
-        k = event.key
-        if k in (pygame.K_ESCAPE, pygame.K_p):
-            self._resume()
-        elif k in (pygame.K_UP, pygame.K_w):
-            self.sel = (self.sel - 1) % len(_ROWS)
-        elif k in (pygame.K_DOWN, pygame.K_s):
-            self.sel = (self.sel + 1) % len(_ROWS)
-        elif k in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_d):
-            if _ROWS[self.sel] == "key_layout":
-                self.game.cycle_key_layout()
-        elif k in (pygame.K_RETURN, pygame.K_SPACE):
+        what, v = verb
+        if what == "move":
+            self.sel = v
+        elif what == "activate":
+            self.sel = v
             self._activate()
+        elif what == "axis":
+            if _ROWS[self.sel] == "key_layout":      # Left / Right cycle it too
+                self.game.cycle_key_layout()
+        elif what == "back":
+            self._resume()
 
     def _activate(self) -> None:
         rid = _ROWS[self.sel]

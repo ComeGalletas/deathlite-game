@@ -73,6 +73,7 @@ INTEGRATION = (
     "tests/screens/test_options.py",
     "tests/screens/test_pause.py",
     "tests/screens/test_rankings.py",
+    "tests/screens/test_sanctuary_mouse.py",
     "tests/render/test_render_cull.py",
 )
 

@@ -32,7 +32,7 @@ import pygame
 from game import config, fonts
 from ui import widgets
 from ui import scale
-from ui.mouse import MouseNav
+from ui.menu_nav import MenuNav
 from ui.run_summary import COLUMNS, RunSummaryPanel
 
 # 64-px `wide` buttons in a row above the hint line, and the band the summary
@@ -92,7 +92,11 @@ class EndScreen:
         # is how the frame's own tests ask for an unlocked screen.
         self.lock_remaining = float(
             config.END_SCREEN_INPUT_LOCK if lock is None else lock)
-        self.mouse = MouseNav()      # button rects registered in draw()
+        # The buttons run left to right; a button's own key (below) and the
+        # confirm keys are read here, the cursor keys and the mouse by the
+        # shared menu rules (ui/menu_nav.py). No back key: ESC is a button.
+        self.nav = MenuNav(axis="h", back_keys=())
+        self.mouse = self.nav.mouse  # button rects registered in draw()
         self._panel = RunSummaryPanel(stats)
         self._title_font = fonts.heading(title_px)
         self._sub_font = fonts.body(22)
@@ -119,27 +123,25 @@ class EndScreen:
             # it can only move the hover highlight, and letting it through
             # keeps the screen from looking frozen while the lock runs.
             return None
-        act = self.mouse.event(event)
-        if act is not None:
-            kind, i = act
-            self.sel = i                       # hovering selects, as in the menus
-            return self.buttons[i].bid if kind == "click" else None
         # Only KEYDOWN leaves: the *release* of the key that ended the run must
-        # not skip the summary before it was read.
-        if event.type != pygame.KEYDOWN:
+        # not skip the summary before it was read. Direct keys before the
+        # cursor keys, so a button bound to one of the cursor letters would
+        # still fire rather than move the selection.
+        if event.type == pygame.KEYDOWN:
+            if event.key in self.nav.confirm_keys:
+                return self.buttons[self.sel].bid
+            for b in self.buttons:
+                if b.key is not None and event.key == b.key:
+                    return b.bid
+        verb = self.nav.event(event, index=self.sel, count=len(self.buttons))
+        if verb is None:
             return None
-        k = event.key
-        if k in (pygame.K_RETURN, pygame.K_SPACE):
-            return self.buttons[self.sel].bid
-        # Direct keys before the cursor keys, so a button bound to one of the
-        # cursor letters would still fire rather than move the selection.
-        for b in self.buttons:
-            if b.key is not None and k == b.key:
-                return b.bid
-        if k in (pygame.K_LEFT, pygame.K_a):
-            self.sel = (self.sel - 1) % len(self.buttons)
-        elif k in (pygame.K_RIGHT, pygame.K_d):
-            self.sel = (self.sel + 1) % len(self.buttons)
+        what, i = verb
+        if what == "move":
+            self.sel = i                       # hovering selects, as in the menus
+        elif what == "activate":
+            self.sel = i
+            return self.buttons[i].bid
         return None
 
     # --- render ------------------------------------------------------

@@ -3,8 +3,9 @@
 Reached from the menu's "Rankings" entry. One column per difficulty
 (Normal / Fast / Super Fast), each showing that bucket's own best time survived,
 level, kills and damage dealt. Records are never compared across buckets -- a
-Fast run's time only ranks against other Fast runs. ESC (or the "Back" row)
-returns to the menu.
+Fast run's time only ranks against other Fast runs. ESC, ENTER, SPACE or
+BACKSPACE returns to the menu, as does a click on the hint line at the foot
+(the one mouse target here; `ui.menu_nav`).
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ import pygame
 from game import config, fonts
 from game.state import State
 from ui import scale
+from ui.menu_nav import MenuNav
 
 # (stat key in save.records, row label, formatter)
 _ROWS = (
@@ -31,12 +33,14 @@ class RankingsState(State):
         self._head = fonts.heading(24)
         self._row = fonts.body(20)
         self._hint = fonts.body(16)
+        # One "row": the hint line, registered in draw(); activating it or
+        # any back key leaves.
+        self._nav = MenuNav(back_keys=(pygame.K_ESCAPE, pygame.K_BACKSPACE))
+        self._mouse = self._nav.mouse
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        if event.type != pygame.KEYDOWN:
-            return
-        if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE,
-                         pygame.K_BACKSPACE):
+        verb = self._nav.event(event, index=0, count=1)
+        if verb is not None and verb[0] in ("activate", "back"):
             from game.states.menu_state import MenuState
             self.game.state_machine.change(MenuState(self.game))
 
@@ -79,6 +83,11 @@ class RankingsState(State):
                 val = self._row.render(val_s, True, config.COLOR_TEXT)
                 surface.blit(val, val.get_rect(midleft=(colx + S(12), y)))
 
+        hits = self._mouse.hits
+        hits.clear()
+        lit = self._mouse.hover == 0
         hint = self._hint.render("ENTER / ESC  -  back to menu", True,
-                                 config.COLOR_TEXT_DIM)
-        surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - S(40))))
+                                 config.COLOR_TEXT if lit else config.COLOR_TEXT_DIM)
+        rect = hint.get_rect(center=(cx, surface.get_height() - S(40)))
+        surface.blit(hint, rect)
+        hits.add(rect.inflate(S(24), S(16)), 0)      # the hint is the Back target
