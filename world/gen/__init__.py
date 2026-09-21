@@ -65,7 +65,12 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     expensive ones) and *returns* the `WorldLayout` when it is exhausted.
     The loading screen drives it one step per frame so the hero keeps
     animating; `generate_world` drives it to the end. Both consume the RNG
-    in exactly the same order, which the pinned digests check."""
+    in exactly the same order, which the pinned digests check.
+
+    The stages are the functions below, called in the order the world
+    stream is consumed: `_grow_tree`, `_seat_rooms`, `_lay_bridges`, the
+    roles and shapes, the height maps, `_shift_to_origin`, then the passes
+    that place things on the finished islands."""
     settings = settings_or_config(settings)
     rng = random.Random(seed)
     px = config.TILE_PX
@@ -74,78 +79,10 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     chunk = (settings.chunk_cols * px, settings.chunk_rows * px)
     room_count = room_count or settings.room_count
 
-    # --- grow a tree of occupied cells ---------------------------
-    start_cell = (0, 0)
-    occupied: dict[tuple[int, int], int] = {start_cell: 0}
-    order = [start_cell]
-    edges: list[tuple[int, int]] = []
-
-    while len(occupied) < room_count:
-        # frontier: free cells orthogonally adjacent to an occupied cell
-        frontier = []
-        for cell in order:
-            for dx, dy in _DIRS:
-                nb = (cell[0] + dx, cell[1] + dy)
-                if nb not in occupied:
-                    frontier.append((nb, cell))
-        if not frontier:
-            break
-        new_cell, parent = rng.choice(frontier)
-        new_id = len(occupied)
-        occupied[new_cell] = new_id
-        order.append(new_cell)
-        edges.append((occupied[parent], new_id))
+    occupied, order, edges = _grow_tree(rng, room_count)
     yield "lattice"
-
-    # --- one island rect per cell --------------------------------
-    # Tile-sized, and snapped to the *world* tile lattice, not merely centred
-    # in the chunk: centring a room of odd tile-width leaves it half a tile
-    # off the grid, and then no two rooms share one. A bridge between them
-    # could never sit squarely on a tile at both ends -- its end caps landed
-    # mid-tile and the planks read crooked.
-    rooms: list[Room] = []
-    for cell in order:
-        rid = occupied[cell]
-        full = _cell_rect(cell, chunk)
-        w = rng.randint(*settings.room_cols) * px
-        h = rng.randint(*settings.room_rows) * px
-        rect = pygame.Rect(0, 0, w, h)
-        rect.center = full.center
-        rect.x = round(rect.x / px) * px
-        rect.y = round(rect.y / px) * px
-        rooms.append(Room(rid, cell, rect, "combat"))
-
-    for a, b in edges:
-        rooms[a].neighbors.append(b)
-        rooms[b].neighbors.append(a)
-
-    # --- one bridge per tree edge --------------------------------
-    # One tile wide, rendered as a plank bridge over the water. Each records
-    # which edge is which (west/east or north/south) so the renderer draws
-    # the matching end-cap tile at each mouth. One per link *here*, always:
-    # how many a link actually carries is a property of the two islands, and
-    # neither their topography nor their shape exists yet. `_seat_corridors`
-    # clones them once both are known and it can see where the beaches are.
-    corridors: list[Corridor] = []
-    width = px
-    for a, b in edges:
-        ra, rb = rooms[a].rect, rooms[b].rect
-        if rooms[a].cell[0] == rooms[b].cell[0]:           # vertical neighbour
-            (lo, lo_r), (hi, hi_r) = sorted(
-                ((a, ra), (b, rb)), key=lambda t: t[1].centery)
-            axis, e_lo, e_hi = "v", "north", "south"
-            lane = _connection_lane(seed, a, b, axis, lo_r, hi_r, px)
-            rect = pygame.Rect(lane - width // 2, lo_r.centery,
-                               width, hi_r.centery - lo_r.centery)
-        else:                                              # horizontal neighbour
-            (lo, lo_r), (hi, hi_r) = sorted(
-                ((a, ra), (b, rb)), key=lambda t: t[1].centerx)
-            axis, e_lo, e_hi = "h", "west", "east"
-            lane = _connection_lane(seed, a, b, axis, lo_r, hi_r, px)
-            rect = pygame.Rect(lo_r.centerx, lane - width // 2,
-                               hi_r.centerx - lo_r.centerx, width)
-        corridors.append(Corridor(a, b, rect.copy(), axis,
-                                  e_lo, e_hi, lo, hi, lane))
+    rooms = _seat_rooms(order, occupied, edges, rng, chunk, settings)
+    corridors = _lay_bridges(rooms, edges, seed)
 
     # --- roles, then shape ---------------------------------------
     # Kind says what happens on an island; topography says what shape it is.
@@ -182,23 +119,7 @@ def generate_world_steps(seed: int, room_count: int | None = None,
         room.inset = build_inset(room, px)
         yield f"terraces {room.id + 1} of {len(rooms)}"
 
-    # --- bounds (union of everything + margin) ---------------
-    union = rooms[0].rect.copy()
-    for r in rooms:
-        union.union_ip(r.rect)
-    for c in corridors:
-        union.union_ip(c.rect)
-    cw, ch = chunk
-    union.inflate_ip(cw, ch)
-
-    # Shift the whole world so bounds start at (0, 0) -- keeps camera clamp simple.
-    shift = pygame.Vector2(-union.x, -union.y)
-    for r in rooms:
-        r.rect.move_ip(shift)
-    for c in corridors:
-        c.rect.move_ip(shift)
-        c.lane += shift.y if c.axis == "h" else shift.x
-    union.move_ip(shift)
+    union = _shift_to_origin(rooms, corridors, chunk)
 
     # Scatter obstacles last, in the final (0,0)-based coordinate space, so the
     # bridge-mouth keep-clear rects match the world the game sees.
@@ -241,3 +162,116 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     place_fish_huts(layout)
     yield "fish huts"
     return layout
+
+
+# --- the stages -----------------------------------------------------------
+
+def _grow_tree(rng, room_count: int):
+    """Grow a tree of occupied lattice cells from the start cell: each new
+    cell is a random free cell orthogonally adjacent to an occupied one, and
+    records a tree edge to its parent, so every island is reachable by
+    construction. Returns `(occupied, order, edges)` -- cell -> room id, the
+    cells in the order they were taken, and the `(parent id, child id)`
+    edges."""
+    start_cell = (0, 0)
+    occupied: dict[tuple[int, int], int] = {start_cell: 0}
+    order = [start_cell]
+    edges: list[tuple[int, int]] = []
+
+    while len(occupied) < room_count:
+        # frontier: free cells orthogonally adjacent to an occupied cell
+        frontier = []
+        for cell in order:
+            for dx, dy in _DIRS:
+                nb = (cell[0] + dx, cell[1] + dy)
+                if nb not in occupied:
+                    frontier.append((nb, cell))
+        if not frontier:
+            break
+        new_cell, parent = rng.choice(frontier)
+        new_id = len(occupied)
+        occupied[new_cell] = new_id
+        order.append(new_cell)
+        edges.append((occupied[parent], new_id))
+    return occupied, order, edges
+
+
+def _seat_rooms(order, occupied, edges, rng, chunk, settings) -> list:
+    """One island rect per cell, and the tree edges as `Room.neighbors`.
+
+    Tile-sized, and snapped to the *world* tile lattice, not merely centred
+    in the chunk: centring a room of odd tile-width leaves it half a tile
+    off the grid, and then no two rooms share one. A bridge between them
+    could never sit squarely on a tile at both ends -- its end caps landed
+    mid-tile and the planks read crooked."""
+    px = config.TILE_PX
+    rooms: list[Room] = []
+    for cell in order:
+        rid = occupied[cell]
+        full = _cell_rect(cell, chunk)
+        w = rng.randint(*settings.room_cols) * px
+        h = rng.randint(*settings.room_rows) * px
+        rect = pygame.Rect(0, 0, w, h)
+        rect.center = full.center
+        rect.x = round(rect.x / px) * px
+        rect.y = round(rect.y / px) * px
+        rooms.append(Room(rid, cell, rect, "combat"))
+
+    for a, b in edges:
+        rooms[a].neighbors.append(b)
+        rooms[b].neighbors.append(a)
+    return rooms
+
+
+def _lay_bridges(rooms, edges, seed: int) -> list:
+    """One bridge per tree edge, one tile wide, rendered as a plank bridge
+    over the water. Each records which edge is which (west/east or
+    north/south) so the renderer draws the matching end-cap tile at each
+    mouth. One per link *here*, always: how many a link actually carries is
+    a property of the two islands, and neither their topography nor their
+    shape exists yet. `_seat_corridors` clones them once both are known and
+    it can see where the beaches are."""
+    px = config.TILE_PX
+    corridors: list[Corridor] = []
+    width = px
+    for a, b in edges:
+        ra, rb = rooms[a].rect, rooms[b].rect
+        if rooms[a].cell[0] == rooms[b].cell[0]:           # vertical neighbour
+            (lo, lo_r), (hi, hi_r) = sorted(
+                ((a, ra), (b, rb)), key=lambda t: t[1].centery)
+            axis, e_lo, e_hi = "v", "north", "south"
+            lane = _connection_lane(seed, a, b, axis, lo_r, hi_r, px)
+            rect = pygame.Rect(lane - width // 2, lo_r.centery,
+                               width, hi_r.centery - lo_r.centery)
+        else:                                              # horizontal neighbour
+            (lo, lo_r), (hi, hi_r) = sorted(
+                ((a, ra), (b, rb)), key=lambda t: t[1].centerx)
+            axis, e_lo, e_hi = "h", "west", "east"
+            lane = _connection_lane(seed, a, b, axis, lo_r, hi_r, px)
+            rect = pygame.Rect(lo_r.centerx, lane - width // 2,
+                               hi_r.centerx - lo_r.centerx, width)
+        corridors.append(Corridor(a, b, rect.copy(), axis,
+                                  e_lo, e_hi, lo, hi, lane))
+    return corridors
+
+
+def _shift_to_origin(rooms, corridors, chunk) -> pygame.Rect:
+    """The world's bounds -- the union of everything plus a chunk of margin
+    -- and the whole world shifted so they start at `(0, 0)`, which keeps
+    the camera clamp simple. Returns the shifted bounds."""
+    union = rooms[0].rect.copy()
+    for r in rooms:
+        union.union_ip(r.rect)
+    for c in corridors:
+        union.union_ip(c.rect)
+    cw, ch = chunk
+    union.inflate_ip(cw, ch)
+
+    shift = pygame.Vector2(-union.x, -union.y)
+    for r in rooms:
+        r.rect.move_ip(shift)
+    for c in corridors:
+        c.rect.move_ip(shift)
+        c.lane += shift.y if c.axis == "h" else shift.x
+    union.move_ip(shift)
+    return union

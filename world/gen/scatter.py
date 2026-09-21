@@ -211,6 +211,11 @@ def _clear_radius(room, start_id, boss_id) -> float:
     # the room's own size, which on a height-map island works out at ~460 px --
     # it blanks the entire upper plateau, since that is what sits in the middle
     # of a concentric island. A fixed few tiles is all the altar / shrine needs.
+    #
+    # `SPECIAL_KINDS` is empty today, so `special` is never true and every
+    # island but the start and the boss may fill its middle -- which is what
+    # parking the facilities asked for: the freed islands are plain combat
+    # islands (`journals/special_facilities_journal.md`).
     return _GRID_CLEAR_RADIUS if special else 0.0
 
 
@@ -220,10 +225,12 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
     of every corridor doorway (so movement is never blocked). Count scales with
     a room's cell area. **Special** rooms also keep a clear central disc for
     their interaction / fight space; plain `combat` rooms fill freely.
+
+    Houses and buff buildings first, then `_scatter_room` per island, then
+    the global tree top-up.
     """
     doorways = _corridor_doorways(rooms, corridors)
     all_doors = [d for slabs in doorways.values() for d in slabs]
-    px = config.TILE_PX
     # Imported here rather than at module scope for the reason `KINDS` is: this
     # module stays importable without the asset layer.
     from game.assets import get_assets
@@ -250,72 +257,90 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
     for room in rooms:
         if room.kind == VILLAGE_KIND:
             continue        # HI-1: the village pass owns everything on it
-        # The start and boss islands scatter like any other. Skipping them
-        # outright -- a safe spawn, a clear arena -- left two of nine islands
-        # as bare slabs, a fifth of all the land. Each keeps a clear disc
-        # instead (`_clear_radius`). Attempts scale with floor area, per
-        # terrace, mixed for the terrace's biome.
-        tries = _GRID_PLACE_TRIES
-        batches = _biome_batches(room)
-        r = room.rect
-        doors = _doors_near(all_doors, r, pad)
-        # Keep the interaction / fight space clear around *both* the shaped-room
-        # centroid and the bounding-box centre -- for an L / T room the two can
-        # sit a cell or two apart, and a shot-blocker near either reads as
-        # "middle of the room".
-        centres = ((room.center.x, room.center.y), (r.centerx, r.centery))
-        clear = _clear_radius(room, start_id, boss_id)
-        # The kind is drawn once per slot rather than again on every retry. A
-        # biome's weights are a statement about the *mix*, and re-drawing
-        # quietly re-weights it toward whatever is easiest to place: a slot
-        # that opens as a tree and fails becomes a boulder, so the terrace
-        # ends up with more boulders than the table asks for. The uphill
-        # keep-back made that visible rather than causing it -- a canopy
-        # reaches four tiles north where a boulder reaches half of one, so
-        # trees are rejected far more often. A slot that cannot seat its kind
-        # simply goes unfilled, which costs density and keeps the mix honest.
-        for fam, floor, kinds, weights, density in batches:
-            for _ in range(density):
-                # Kind is drawn before the position either way, so the
-                # placement gap can depend on it: `_PAIR_GAPS` holds the
-                # pairings that differ (tree next to tree, for groves) and
-                # every other pairing keeps the full `_OBSTACLE_GAP`.
-                kind = rng.choices(kinds, weights=weights, k=1)[0]
-                for _try in range(tries):
-                    if floor:
-                        col, row = rng.choice(floor)
-                        x = r.left + col * px + rng.uniform(px * 0.28, px * 0.72)
-                        y = r.top + row * px + rng.uniform(px * 0.28, px * 0.72)
-                    else:
-                        x = rng.uniform(r.left + 40, r.right - 40)
-                        y = rng.uniform(r.top + 40, r.bottom - 40)
-                    if clear and any((x - mx) ** 2 + (y - my) ** 2 < clear ** 2
-                                     for mx, my in centres):
-                        continue
-                    if _blocks(doors, x, y, _radius(kind)):
-                        continue
-                    # O(1), so it goes ahead of the O(n) spacing sweep below.
-                    if not _uphill_ok(room, x, y, kind, reach, px):
-                        continue
-                    if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
-                           < (o.radius
-                              + _PAIR_GAPS.get((kind, o.kind), _OBSTACLE_GAP)) ** 2
-                           for o in out):
-                        continue
-                    # Cosmetic decoration variant (see world/map.py), drawn
-                    # here rather than in a pass of its own: that pass existed
-                    # only to keep the draw order byte-identical to before the
-                    # variants were added, and `_topup_trees` had to run after
-                    # it for the same reason. Houses carry a colour/type
-                    # `variant` from `_scatter_houses` instead.
-                    ob = Obstacle(kind, x, y, rng.randint(1, 4))
-                    ob.biome = fam
-                    out.append(ob)
-                    break
+        _scatter_room(room, all_doors, rng, start_id, boss_id, out, reach, pad)
 
     # Global +25% tree top-up, clumped into the existing groves.
     _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach)
     return out
+
+
+def _scatter_room(room, all_doors, rng, start_id, boss_id, out, reach, pad) -> None:
+    """One island's scatter, appended to `out`.
+
+    The start and boss islands scatter like any other. Skipping them
+    outright -- a safe spawn, a clear arena -- left two of nine islands
+    as bare slabs, a fifth of all the land. Each keeps a clear disc
+    instead (`_clear_radius`). Attempts scale with floor area, per
+    terrace, mixed for the terrace's biome.
+
+    The kind is drawn once per slot rather than again on every retry. A
+    biome's weights are a statement about the *mix*, and re-drawing
+    quietly re-weights it toward whatever is easiest to place: a slot
+    that opens as a tree and fails becomes a boulder, so the terrace
+    ends up with more boulders than the table asks for. The uphill
+    keep-back made that visible rather than causing it -- a canopy
+    reaches four tiles north where a boulder reaches half of one, so
+    trees are rejected far more often. A slot that cannot seat its kind
+    simply goes unfilled, which costs density and keeps the mix honest."""
+    px = config.TILE_PX
+    tries = _GRID_PLACE_TRIES
+    batches = _biome_batches(room)
+    r = room.rect
+    doors = _doors_near(all_doors, r, pad)
+    # Keep the interaction / fight space clear around *both* the shaped-room
+    # centroid and the bounding-box centre -- for an L / T room the two can
+    # sit a cell or two apart, and a shot-blocker near either reads as
+    # "middle of the room".
+    centres = ((room.center.x, room.center.y), (r.centerx, r.centery))
+    clear = _clear_radius(room, start_id, boss_id)
+    for fam, floor, kinds, weights, density in batches:
+        for _ in range(density):
+            # Kind is drawn before the position either way, so the
+            # placement gap can depend on it: `_PAIR_GAPS` holds the
+            # pairings that differ (tree next to tree, for groves) and
+            # every other pairing keeps the full `_OBSTACLE_GAP`.
+            kind = rng.choices(kinds, weights=weights, k=1)[0]
+            for _try in range(tries):
+                if floor:
+                    col, row = rng.choice(floor)
+                    x = r.left + col * px + rng.uniform(px * 0.28, px * 0.72)
+                    y = r.top + row * px + rng.uniform(px * 0.28, px * 0.72)
+                else:
+                    x = rng.uniform(r.left + 40, r.right - 40)
+                    y = rng.uniform(r.top + 40, r.bottom - 40)
+                if not _spot_ok(room, kind, x, y, centres, clear, doors, out,
+                                reach, px):
+                    continue
+                # Cosmetic decoration variant (see world/map.py), drawn
+                # here rather than in a pass of its own: that pass existed
+                # only to keep the draw order byte-identical to before the
+                # variants were added, and `_topup_trees` had to run after
+                # it for the same reason. Houses carry a colour/type
+                # `variant` from `_scatter_houses` instead.
+                ob = Obstacle(kind, x, y, rng.randint(1, 4))
+                ob.biome = fam
+                out.append(ob)
+                break
+
+
+def _spot_ok(room, kind, x, y, centres, clear, doors, out, reach, px) -> bool:
+    """May an obstacle of `kind` stand at `(x, y)`: off the clear disc(s),
+    off every bridge mouth, not reaching uphill over a terrace edge, and
+    spaced off everything placed so far. Cheapest tests first; the O(n)
+    spacing sweep last."""
+    if clear and any((x - mx) ** 2 + (y - my) ** 2 < clear ** 2
+                     for mx, my in centres):
+        return False
+    if _blocks(doors, x, y, _radius(kind)):
+        return False
+    # O(1), so it goes ahead of the O(n) spacing sweep below.
+    if not _uphill_ok(room, x, y, kind, reach, px):
+        return False
+    if any((x - o.pos.x) ** 2 + (y - o.pos.y) ** 2
+           < (o.radius + _PAIR_GAPS.get((kind, o.kind), _OBSTACLE_GAP)) ** 2
+           for o in out):
+        return False
+    return True
 
 
 def _topup_trees(rooms, all_doors, rng, start_id, boss_id, out, reach) -> None:

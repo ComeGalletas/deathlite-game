@@ -48,165 +48,178 @@ def _seat_corridors(rooms, corridors, seed: int = 0, settings=None) -> list:
     Returns the corridors that found a home. A link's *first* bridge always
     survives, falling back to the shortest crossing if the random pass finds
     nothing, since dropping it would disconnect the world; the extras are
-    optional and are discarded when there is no room for them."""
+    optional and are discarded when there is no room for them.
+
+    One link at a time (`_seat_link`), over the lanes `_lane_options` finds
+    and `_apply_lane` seats; `_reach` is the beach test under both."""
     s = settings_or_config(settings)
-    px = config.TILE_PX
-
-    def reach(room, axis, fixed, along, step, limit, strict=True):
-        """The cell a bridge may land on along one line, scanning in from the
-        rect edge, as `(index, cell)` -- or `(None, None)`.
-
-        A bridge belongs on the beach. Taking the *first* land the scan reaches
-        keeps it on the outer shore rather than striking inland, and it must be
-        plain ground so it never meets the middle of a flight. `strict` also
-        demands sea level, so the planks do not run up onto a terrace or stop
-        on a cliff top; the caller drops that only when no lane at all offers a
-        beach on both sides, since a bridge onto raised ground still beats one
-        left hanging over the water."""
-        for i in range(limit):
-            idx = along + step * i
-            # Grid keys are `(col, row)`. A horizontal bridge holds the row and
-            # scans columns, a vertical one the reverse -- get this the wrong
-            # way round and the scan silently reads a transposed cell, which is
-            # how horizontal bridges ended up starting in open water.
-            pos = (idx, fixed) if axis == "h" else (fixed, idx)
-            cell = room.grid.get(pos)
-            if cell is None:
-                continue
-            if cell.kind != GROUND:
-                return None, None       # first land is a flight or a wall
-            if strict and cell.level != 0:
-                return None, None       # ... or a terrace: no beach on this line
-            return idx, cell
-        return None, None
-
-    def options(c):
-        """Every lane where both islands offer a beach, as
-        `(lane, span, i0, i1)`. Computed once per link and shared by all the
-        bridges on it."""
-        a, b = rooms[c.a], rooms[c.b]
-        out = []
-        if c.axis == "h":
-            west, east = (a, b) if a.rect.centerx < b.rect.centerx else (b, a)
-            wcols, _ = west.tile_dims
-            ecols, _ = east.tile_dims
-            # Any lane where both islands offer a beach will do -- scan the
-            # whole span either room reaches, not just where the two rects
-            # happen to overlap.
-            lo = min(west.rect.top, east.rect.top) + px // 2
-            hi = max(west.rect.bottom, east.rect.bottom) - px // 2
-            for y in range(lo, hi + 1, px):
-                wi, wc = reach(west, "h", (y - west.rect.top) // px,
-                               wcols - 1, -1, wcols, True)
-                ei, ec = reach(east, "h", (y - east.rect.top) // px, 0, 1,
-                               ecols, True)
-                if wc is None or ec is None:
-                    continue
-                span = (east.rect.x + ei * px) - (west.rect.x + wi * px)
-                out.append((y, span, wi, ei))
-        else:
-            north, south = (a, b) if a.rect.centery < b.rect.centery else (b, a)
-            _, nrows = north.tile_dims
-            _, srows = south.tile_dims
-            lo = min(north.rect.left, south.rect.left) + px // 2
-            hi = max(north.rect.right, south.rect.right) - px // 2
-            for x in range(lo, hi + 1, px):
-                ni, nc = reach(north, "v", (x - north.rect.left) // px,
-                               nrows - 1, -1, nrows, True)
-                si, sc = reach(south, "v", (x - south.rect.left) // px, 0, 1,
-                               srows, True)
-                if nc is None or sc is None:
-                    continue
-                span = (south.rect.y + si * px) - (north.rect.y + ni * px)
-                out.append((x, span, ni, si))
-        return out
-
-    def apply(c, opt):
-        a, b = rooms[c.a], rooms[c.b]
-        lane, _span, i0, i1 = opt
-        c.lane = lane
-        if c.axis == "h":
-            west, east = (a, b) if a.rect.centerx < b.rect.centerx else (b, a)
-            # The end caps sit *on* the ground tile they meet, so the planks
-            # land square on it rather than stopping beside it.
-            x0 = west.rect.x + i0 * px
-            x1 = east.rect.x + (i1 + 1) * px
-            c.rect = pygame.Rect(x0, lane - px // 2, x1 - x0, px)
-        else:
-            north, south = (a, b) if a.rect.centery < b.rect.centery else (b, a)
-            y0 = north.rect.y + i0 * px
-            y1 = south.rect.y + (i1 + 1) * px
-            c.rect = pygame.Rect(lane - px // 2, y0, px, y1 - y0)
-
-    def side_of(room, other, axis):
-        """Which edge of `room` a link to `other` leaves from."""
-        if axis == "h":
-            return "e" if other.rect.centerx > room.rect.centerx else "w"
-        return "s" if other.rect.centery > room.rect.centery else "n"
-
-    def allowance(c, used):
-        """How many bridges this link may carry, given what its two islands
-        have already spent on the sides it uses."""
-        a, b = rooms[c.a], rooms[c.b]
-        want = min(topography_of(a, s).get("bridges", 1),
-                   topography_of(b, s).get("bridges", 1))
-        for room, other in ((a, b), (b, a)):
-            cap = topography_of(room, s).get("bridges", 1)
-            spent = used.get((room.id, side_of(room, other, c.axis)), 0)
-            want = min(want, cap - spent)
-        return max(1, want)          # a link always keeps one: dropping it
-                                     # would disconnect the world
-
     links: dict = {}
     for c in corridors:
         links.setdefault((min(c.a, c.b), max(c.a, c.b), c.axis), []).append(c)
 
-    kept = []
+    kept: list = []
     used: dict = {}
+    for (a_id, b_id, _axis), group in sorted(links.items()):
+        _seat_link(rooms, group, a_id, b_id, seed, s, kept, used)
+    _add_shortcuts(rooms, kept, used, seed, s)
+    return kept
+
+
+def _seat_link(rooms, group, a_id, b_id, seed, s, kept, used) -> None:
+    """Seat every bridge one link carries. `group` arrives with exactly one
+    corridor; it is cloned up to the link's allowance before seating, so
+    every copy is seated as a peer. Appends what found a home to `kept`
+    and charges the two islands' sides in `used`."""
+    px = config.TILE_PX
     gap = max(1, s.bridge_min_gap) * px
     cap = s.bridge_max * px
-    for (a_id, b_id, _axis), group in sorted(links.items()):
-        # The group arrives with exactly one corridor. Clone it up to the
-        # allowance before seating, so every copy is seated as a peer.
-        want = allowance(group[0], used)
-        base = group[0]
-        while len(group) < want:
-            group.append(Corridor(base.a, base.b, base.rect.copy(), base.axis,
-                                  base.end_low, base.end_high, base.room_low,
-                                  base.room_high, base.lane))
-        opts = options(group[0])
-        if not opts:
-            kept.append(group[0])            # nothing worked; leave it as laid
-            for room, other in ((rooms[a_id], rooms[b_id]),
-                                (rooms[b_id], rooms[a_id])):
-                key = (room.id, side_of(room, other, group[0].axis))
-                used[key] = used.get(key, 0) + 1
+    want = _allowance(rooms, group[0], used, s)
+    base = group[0]
+    while len(group) < want:
+        group.append(Corridor(base.a, base.b, base.rect.copy(), base.axis,
+                              base.end_low, base.end_high, base.room_low,
+                              base.room_high, base.lane))
+    opts = _lane_options(rooms, group[0])
+    if not opts:
+        kept.append(group[0])            # nothing worked; leave it as laid
+        _charge(rooms, a_id, b_id, group[0].axis, used, 1)
+        return
+    pick = random.Random(f"{seed}:bridges:{a_id}:{b_id}")
+    # A crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a
+    # causeway rather than a bridge. Lanes inside the cap are the pool; if
+    # a link has none, its *first* bridge still has to exist, so it falls
+    # back to the shortest lane there is -- refusing it would cut the world
+    # in two -- and its extras are simply not built.
+    short = [o for o in opts if o[1] <= cap]
+    order = list(short)
+    pick.shuffle(order)
+    chosen: list = []
+    for o in order:
+        if all(abs(o[0] - taken[0]) >= gap for taken in chosen):
+            chosen.append(o)
+            if len(chosen) == len(group):
+                break
+    if not chosen:                        # gap too wide, or nothing short
+        chosen = [min(opts, key=lambda o: o[1])]
+    for c, o in zip(group, chosen):
+        _apply_lane(rooms, c, o)
+        kept.append(c)
+    _charge(rooms, a_id, b_id, group[0].axis, used, min(len(group), len(chosen)))
+
+
+def _charge(rooms, a_id, b_id, axis, used, n: int) -> None:
+    """Spend `n` of the bridge allowance on the side each of the two islands
+    uses for this link."""
+    for room, other in ((rooms[a_id], rooms[b_id]), (rooms[b_id], rooms[a_id])):
+        key = (room.id, _side_of(room, other, axis))
+        used[key] = used.get(key, 0) + n
+
+
+def _reach(room, axis, fixed, along, step, limit, strict=True):
+    """The cell a bridge may land on along one line, scanning in from the
+    rect edge, as `(index, cell)` -- or `(None, None)`.
+
+    A bridge belongs on the beach. Taking the *first* land the scan reaches
+    keeps it on the outer shore rather than striking inland, and it must be
+    plain ground so it never meets the middle of a flight. `strict` also
+    demands sea level, so the planks do not run up onto a terrace or stop
+    on a cliff top; the caller drops that only when no lane at all offers a
+    beach on both sides, since a bridge onto raised ground still beats one
+    left hanging over the water."""
+    for i in range(limit):
+        idx = along + step * i
+        # Grid keys are `(col, row)`. A horizontal bridge holds the row and
+        # scans columns, a vertical one the reverse -- get this the wrong
+        # way round and the scan silently reads a transposed cell, which is
+        # how horizontal bridges ended up starting in open water.
+        pos = (idx, fixed) if axis == "h" else (fixed, idx)
+        cell = room.grid.get(pos)
+        if cell is None:
             continue
-        pick = random.Random(f"{seed}:bridges:{a_id}:{b_id}")
-        # A crossing longer than `HEIGHTMAP_BRIDGE_MAX` reads as a
-        # causeway rather than a bridge. Lanes inside the cap are the pool; if
-        # a link has none, its *first* bridge still has to exist, so it falls
-        # back to the shortest lane there is -- refusing it would cut the world
-        # in two -- and its extras are simply not built.
-        short = [o for o in opts if o[1] <= cap]
-        order = list(short)
-        pick.shuffle(order)
-        chosen: list = []
-        for o in order:
-            if all(abs(o[0] - taken[0]) >= gap for taken in chosen):
-                chosen.append(o)
-                if len(chosen) == len(group):
-                    break
-        if not chosen:                        # gap too wide, or nothing short
-            chosen = [min(opts, key=lambda o: o[1])]
-        for c, o in zip(group, chosen):
-            apply(c, o)
-            kept.append(c)
-        for room, other in ((rooms[a_id], rooms[b_id]), (rooms[b_id], rooms[a_id])):
-            key = (room.id, side_of(room, other, group[0].axis))
-            used[key] = used.get(key, 0) + min(len(group), len(chosen))
-    _add_shortcuts(rooms, kept, used, options, apply, seed, s)
-    return kept
+        if cell.kind != GROUND:
+            return None, None       # first land is a flight or a wall
+        if strict and cell.level != 0:
+            return None, None       # ... or a terrace: no beach on this line
+        return idx, cell
+    return None, None
+
+
+def _lane_options(rooms, c) -> list:
+    """Every lane where both islands offer a beach, as
+    `(lane, span, i0, i1)`. Computed once per link and shared by all the
+    bridges on it."""
+    px = config.TILE_PX
+    a, b = rooms[c.a], rooms[c.b]
+    out = []
+    if c.axis == "h":
+        west, east = (a, b) if a.rect.centerx < b.rect.centerx else (b, a)
+        wcols, _ = west.tile_dims
+        ecols, _ = east.tile_dims
+        # Any lane where both islands offer a beach will do -- scan the
+        # whole span either room reaches, not just where the two rects
+        # happen to overlap.
+        lo = min(west.rect.top, east.rect.top) + px // 2
+        hi = max(west.rect.bottom, east.rect.bottom) - px // 2
+        for y in range(lo, hi + 1, px):
+            wi, wc = _reach(west, "h", (y - west.rect.top) // px,
+                            wcols - 1, -1, wcols, True)
+            ei, ec = _reach(east, "h", (y - east.rect.top) // px, 0, 1,
+                            ecols, True)
+            if wc is None or ec is None:
+                continue
+            span = (east.rect.x + ei * px) - (west.rect.x + wi * px)
+            out.append((y, span, wi, ei))
+    else:
+        north, south = (a, b) if a.rect.centery < b.rect.centery else (b, a)
+        _, nrows = north.tile_dims
+        _, srows = south.tile_dims
+        lo = min(north.rect.left, south.rect.left) + px // 2
+        hi = max(north.rect.right, south.rect.right) - px // 2
+        for x in range(lo, hi + 1, px):
+            ni, nc = _reach(north, "v", (x - north.rect.left) // px,
+                            nrows - 1, -1, nrows, True)
+            si, sc = _reach(south, "v", (x - south.rect.left) // px, 0, 1,
+                            srows, True)
+            if nc is None or sc is None:
+                continue
+            span = (south.rect.y + si * px) - (north.rect.y + ni * px)
+            out.append((x, span, ni, si))
+    return out
+
+
+def _apply_lane(rooms, c, opt) -> None:
+    """Seat `c` on one of `_lane_options`' lanes: the lane, and a rect
+    stretched coast to coast."""
+    px = config.TILE_PX
+    a, b = rooms[c.a], rooms[c.b]
+    lane, _span, i0, i1 = opt
+    c.lane = lane
+    if c.axis == "h":
+        west, east = (a, b) if a.rect.centerx < b.rect.centerx else (b, a)
+        # The end caps sit *on* the ground tile they meet, so the planks
+        # land square on it rather than stopping beside it.
+        x0 = west.rect.x + i0 * px
+        x1 = east.rect.x + (i1 + 1) * px
+        c.rect = pygame.Rect(x0, lane - px // 2, x1 - x0, px)
+    else:
+        north, south = (a, b) if a.rect.centery < b.rect.centery else (b, a)
+        y0 = north.rect.y + i0 * px
+        y1 = south.rect.y + (i1 + 1) * px
+        c.rect = pygame.Rect(lane - px // 2, y0, px, y1 - y0)
+
+
+def _allowance(rooms, c, used, s) -> int:
+    """How many bridges this link may carry, given what its two islands
+    have already spent on the sides it uses."""
+    a, b = rooms[c.a], rooms[c.b]
+    want = min(topography_of(a, s).get("bridges", 1),
+               topography_of(b, s).get("bridges", 1))
+    for room, other in ((a, b), (b, a)):
+        cap = topography_of(room, s).get("bridges", 1)
+        spent = used.get((room.id, _side_of(room, other, c.axis)), 0)
+        want = min(want, cap - spent)
+    return max(1, want)          # a link always keeps one: dropping it
+                                 # would disconnect the world
 
 
 def _side_of(room, other, axis):
@@ -236,7 +249,7 @@ def _shortcut_axis(a, b):
     return None
 
 
-def _add_shortcuts(rooms, kept, used, options, apply, seed, settings=None) -> list:
+def _add_shortcuts(rooms, kept, used, seed, settings=None) -> list:
     """Join islands that ended up close together but were never linked.
 
     The lattice grows a **tree**, so every route between two islands is unique
@@ -255,8 +268,8 @@ def _add_shortcuts(rooms, kept, used, options, apply, seed, settings=None) -> li
 
     The yield is modest and that is the honest number: measured before building
     it, 44 candidates over twelve worlds and **16 that actually seat**, because
-    `options` wants a *beach* on the same lane on both sides and ragged coasts
-    rarely line up. About one extra crossing a world.
+    `_lane_options` wants a *beach* on the same lane on both sides and ragged
+    coasts rarely line up. About one extra crossing a world.
     """
     s = settings_or_config(settings)
     if not s.shortcuts:
@@ -299,11 +312,11 @@ def _add_shortcuts(rooms, kept, used, options, apply, seed, settings=None) -> li
                      "west" if axis == "h" else "north",
                      "east" if axis == "h" else "south",
                      room_low, room_high, 0)
-        opts = [o for o in options(c)
+        opts = [o for o in _lane_options(rooms, c)
                 if o[1] <= s.bridge_max * px]
         if not opts:
             continue        # no lane with a beach on both sides, or all too long
-        apply(c, min(opts, key=lambda o: o[1]))
+        _apply_lane(rooms, c, min(opts, key=lambda o: o[1]))
         kept.append(c)
         # Keep the layout graph and the corridor list agreeing -- several
         # callers read `Room.neighbors` rather than the corridors.
@@ -311,7 +324,5 @@ def _add_shortcuts(rooms, kept, used, options, apply, seed, settings=None) -> li
             a.neighbors.append(b_id)
         if a_id not in b.neighbors:
             b.neighbors.append(a_id)
-        for room, other in ((a, b), (b, a)):
-            key = (room.id, _side_of(room, other, axis))
-            used[key] = used.get(key, 0) + 1
+        _charge(rooms, a_id, b_id, axis, used, 1)
     return kept

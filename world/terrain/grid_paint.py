@@ -388,63 +388,75 @@ def paint_room_levels(store, sheets, layout, room):
     already down when their band is painted, and the higher ground is not.
 
     Composited in level order this is pixel-identical to `paint_room_grid`,
-    which is the property that makes the split safe; `tests/render/
-    test_level_bands.py` asserts it.
+    which is the property that makes the split safe: both run the same
+    `_RoomPaint` passes, and the pinned frame digest
+    (`tests/world/test_digest.py`) is what would move if they drifted.
     """
     return _paint_room(store, sheets, layout, room, banded=True)
 
 
-def _paint_room(store, sheets, layout, room, banded: bool):
-    """The one painter behind both entry points above.
+class _RoomPaint:
+    """One island's painting, pass by pass: the state `_paint_room` shares
+    between its passes, and one method per pass.
 
     `banded` only decides *which surface* each blit lands on -- never what is
     blitted, or in what order. One implementation rather than two is what keeps
-    the banded and unbanded pictures from drifting apart.
+    the banded and unbanded pictures from drifting apart. The passes run in
+    the order `_paint_room` calls them -- `sort_cells`, `paint_floors`,
+    `paint_stone`, `paint_tall`, `paint_seams`, `trim` -- and that order is
+    the picture: each pass's comment says what it relies on the one before
+    having done.
     """
-    grid = room.grid
-    if not grid:
-        return []
-    px = sheets.px
-    cell = sheets.cell
-    interior = sheets.interior
-    sheet_for = sheets.sheet_for
-    cliff_idx = sheets.cliff_idx
-    ramp_slots = sheets.ramp_slots
-    slots = sheets.slots
 
-    cols = [p[0] for p in grid]
-    rows = [p[1] for p in grid]
-    c0, r0 = min(cols), min(rows)
-    w = (max(cols) - c0 + 1) * px
-    h = (max(rows) - r0 + 1) * px
+    def __init__(self, sheets, room, banded: bool) -> None:
+        self.sheets = sheets
+        self.room = room
+        self.banded = banded
+        self.grid = room.grid
+        self.px = sheets.px
+        self.cell = sheets.cell
+        self.interior = sheets.interior
+        self.sheet_for = sheets.sheet_for
+        self.cliff_idx = sheets.cliff_idx
+        self.ramp_slots = sheets.ramp_slots
+        self.slots = sheets.slots
+        self.walls: list = []            # (col, row, cell, x, y) -- stone to come
+        self.seams: list = []            # (cell, x, y) -- north flights, `paint_seams`
+        self.floors: dict = {}           # level -> the ground tiles painted at it
+        self.shadows: dict = {}          # level -> the casters standing at it
+        self.tall: list = []             # (x, y, sprite, surface) -- taller than a cell
+        if not self.grid:
+            return
+        px = self.px
+        cols = [p[0] for p in self.grid]
+        rows = [p[1] for p in self.grid]
+        self.c0, self.r0 = min(cols), min(rows)
+        self.w = (max(cols) - self.c0 + 1) * px
+        self.h = (max(rows) - self.r0 + 1) * px
 
-    levels = sorted({c.level for c in grid.values()})
-    if banded:
-        bands = {lvl: pygame.Surface((w, h), pygame.SRCALPHA) for lvl in levels}
-    else:
-        one = pygame.Surface((w, h), pygame.SRCALPHA)
-        bands = {lvl: one for lvl in levels}
+        self.levels = sorted({c.level for c in self.grid.values()})
+        if banded:
+            self.bands = {lvl: pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+                          for lvl in self.levels}
+        else:
+            one = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+            self.bands = {lvl: one for lvl in self.levels}
 
-    def band(level):
+    def band(self, level):
         """The surface a blit at this terrace lands on. Clamped, because a wall
         can drop below the lowest level any *cell* stands at."""
-        if level in bands:
-            return bands[level]
-        near = min(levels, key=lambda l: abs(l - level))
-        return bands[near]
+        if level in self.bands:
+            return self.bands[level]
+        near = min(self.levels, key=lambda l: abs(l - level))
+        return self.bands[near]
 
-    order = sorted(grid.items(), key=lambda kv: kv[0][1])
-    walls = []                       # (col, row, cell, x, y) -- stone to come
-    seams = []                       # (cell, x, y) -- north flights, pass 4
-    floors: dict = {}                # level -> the ground tiles painted at it
-    shadows: dict = {}               # level -> the casters standing at it
-
-    def ground(col, row, level, x, y, under=False, on=None):
+    def ground(self, col, row, level, x, y, under=False, on=None):
         """Paint ground of `level` at this cell -- `under` for the floor that
         runs on beneath a wall."""
-        surf = on if on is not None else band(level)
-        face = sheet_for(level, room.kind, room)
-        idx, wet = _ground_tile(grid, sheets, slots, col, row, level, under,
+        room, sheets = self.room, self.sheets
+        surf = on if on is not None else self.band(level)
+        face = self.sheet_for(level, room.kind, room)
+        idx, wet = _ground_tile(self.grid, sheets, self.slots, col, row, level, under,
                                 beachless=not sheets.has_shoreline(face))
         if not wet:
             # This tile's fringe faces land, and the fringe art is ragged and
@@ -454,49 +466,52 @@ def _paint_room(store, sheets, layout, room, banded: bool):
             # upper terrace, where every cell of a rim had one. Lay the floor
             # below behind it: it is what genuinely runs on under the fringe,
             # so the strands sit against grass, not sea.
-            surf.blit(cell(sheet_for(max(0, level - 1), room.kind, room),
-                           interior),
+            surf.blit(self.cell(self.sheet_for(max(0, level - 1), room.kind, room),
+                                self.interior),
                       (x, y))
-        surf.blit(cell(face, idx), (x, y))
+        surf.blit(self.cell(face, idx), (x, y))
 
     # --- pass 1: sort every cell into the floor it paints on ---------------
-    for (col, row), c in order:
-        x, y = (col - c0) * px, (row - r0) * px
-        if c.kind == LAKE:
-            continue                       # the water buffer shows through
+    def sort_cells(self) -> None:
+        grid, px = self.grid, self.px
+        order = sorted(grid.items(), key=lambda kv: kv[0][1])
+        for (col, row), c in order:
+            x, y = (col - self.c0) * px, (row - self.r0) * px
+            if c.kind == LAKE:
+                continue                       # the water buffer shows through
 
-        shadows.setdefault(c.level, []).extend(
-            _shadow_casts(grid, col, row, c, x, y, px))
+            self.shadows.setdefault(c.level, []).extend(
+                _shadow_casts(grid, col, row, c, x, y, px))
 
-        if c.kind == GROUND:
-            floors.setdefault(c.level, []).append((col, row, c.level, x, y,
-                                                   False))
-            continue
-        if c.kind == VSTAIR and c.dir == "n":
-            # The rim cell of a plateau's back is painted as the plateau
-            # ground it is -- autotiled, lip and all -- and the stairs go
-            # on afterwards, centred on the seam; see pass 4.
-            floors.setdefault(c.level, []).append((col, row, c.level, x, y,
-                                                   False))
-            seams.append((c, x, y))
-            continue
+            if c.kind == GROUND:
+                self.floors.setdefault(c.level, []).append((col, row, c.level, x, y,
+                                                            False))
+                continue
+            if c.kind == VSTAIR and c.dir == "n":
+                # The rim cell of a plateau's back is painted as the plateau
+                # ground it is -- autotiled, lip and all -- and the stairs go
+                # on afterwards, centred on the seam; see `paint_seams`.
+                self.floors.setdefault(c.level, []).append((col, row, c.level, x, y,
+                                                            False))
+                self.seams.append((c, x, y))
+                continue
 
-        walls.append((col, row, c, x, y))
-        if c.kind == VSTAIR:
-            continue                       # a channel you walk down, not stone
-        if (c.kind == CLIFF and c.row == c.drop - 1
-                and grid.get((col, row + 1)) is None):
-            continue                       # hanging over open water, no floor
-        # The run-end face variants keep their outer edge transparent, which is
-        # the point -- but with nothing behind them that edge would show the sea
-        # straight through a wall standing on land. Lay the terrace the wall
-        # drops onto underneath it first -- autotiled, not a plain tile: the
-        # floor genuinely runs on under the stone, and where it runs out at the
-        # water's edge the exposed sliver has to be a shore tile or it reads as
-        # grass floating on the sea. Inland it comes out plain anyway, since a
-        # floor running under a wall has nothing to fringe against.
-        low = max(0, c.level - c.drop)
-        floors.setdefault(low, []).append((col, row, low, x, y, True))
+            self.walls.append((col, row, c, x, y))
+            if c.kind == VSTAIR:
+                continue                       # a channel you walk down, not stone
+            if (c.kind == CLIFF and c.row == c.drop - 1
+                    and grid.get((col, row + 1)) is None):
+                continue                       # hanging over open water, no floor
+            # The run-end face variants keep their outer edge transparent, which is
+            # the point -- but with nothing behind them that edge would show the sea
+            # straight through a wall standing on land. Lay the terrace the wall
+            # drops onto underneath it first -- autotiled, not a plain tile: the
+            # floor genuinely runs on under the stone, and where it runs out at the
+            # water's edge the exposed sliver has to be a shore tile or it reads as
+            # grass floating on the sea. Inland it comes out plain anyway, since a
+            # floor running under a wall has nothing to fringe against.
+            low = max(0, c.level - c.drop)
+            self.floors.setdefault(low, []).append((col, row, low, x, y, True))
 
     # --- pass 2: floor by floor, each level's shadows under its own tiles ---
     # The order is the whole trick. A shadow square sits at its caster's own
@@ -505,112 +520,116 @@ def _paint_room(store, sheets, layout, room, banded: bool):
     # only what falls on the floor beneath is left. Painting all the ground
     # first and all the shadows afterwards cannot do this -- there is nothing
     # left to cover the parts that should not show.
-    for lvl in sorted(set(floors) | set(shadows)):
-        # A shadow belongs to the terrace it *falls on*, one below its caster,
-        # and has to be laid straight onto that floor. Put it on its caster's
-        # own band instead and it blends against transparency, so the composite
-        # comes out darker than the single-surface picture -- which is exactly
-        # what the first banded build did. `band` clamps, so level 0's shade
-        # still lands on level 0, ahead of its own tiles, as it always did.
-        # Onto the *highest* terrace any of this level's blobs reach. Bands
-        # composite in order, so a blob meant for a deeper floor still shows
-        # over it from here, while one meant for this terrace would be buried
-        # if it were laid any lower. Splitting the group per destination is not
-        # an option: `_shade` merges a run with BLEND_RGBA_MAX, and separating
-        # it would let two groups alpha-stack into the lumpy over-darkening
-        # that trick exists to prevent.
-        casts = shadows.get(lvl, ())
-        _shade(band(max((c[3] for c in casts), default=lvl - 1)),
-               sheets, casts, px)
-        target = band(lvl)
-        for col, row, level, x, y, under in floors.get(lvl, ()):
-            ground(col, row, level, x, y, under, on=target)
+    def paint_floors(self) -> None:
+        for lvl in sorted(set(self.floors) | set(self.shadows)):
+            # A shadow belongs to the terrace it *falls on*, one below its caster,
+            # and has to be laid straight onto that floor. Put it on its caster's
+            # own band instead and it blends against transparency, so the composite
+            # comes out darker than the single-surface picture -- which is exactly
+            # what the first banded build did. `band` clamps, so level 0's shade
+            # still lands on level 0, ahead of its own tiles, as it always did.
+            # Onto the *highest* terrace any of this level's blobs reach. Bands
+            # composite in order, so a blob meant for a deeper floor still shows
+            # over it from here, while one meant for this terrace would be buried
+            # if it were laid any lower. Splitting the group per destination is not
+            # an option: `_shade` merges a run with BLEND_RGBA_MAX, and separating
+            # it would let two groups alpha-stack into the lumpy over-darkening
+            # that trick exists to prevent.
+            casts = self.shadows.get(lvl, ())
+            _shade(self.band(max((c[3] for c in casts), default=lvl - 1)),
+                   self.sheets, casts, self.px)
+            target = self.band(lvl)
+            for col, row, level, x, y, under in self.floors.get(lvl, ()):
+                self.ground(col, row, level, x, y, under, on=target)
 
     # --- pass 3: the stone itself -----------------------------------------
-    tall = []
-    for col, row, c, x, y in walls:
-        sheet = sheet_for(c.level, room.kind, room)
-        low = sheet_for(max(0, c.level - c.drop), room.kind, room)
-        # The terrace this stone *stands on*, not the one it holds up. A wall
-        # painted with the level above it would cover anything standing at its
-        # foot -- which is the one place a character is guaranteed to be.
-        surf = band(max(0, c.level - c.drop))
+    def paint_stone(self) -> None:
+        grid, room, sheets = self.grid, self.room, self.sheets
+        cell, cliff_idx, ramp_slots = self.cell, self.cliff_idx, self.ramp_slots
+        for col, row, c, x, y in self.walls:
+            sheet = self.sheet_for(c.level, room.kind, room)
+            low = self.sheet_for(max(0, c.level - c.drop), room.kind, room)
+            # The terrace this stone *stands on*, not the one it holds up. A wall
+            # painted with the level above it would cover anything standing at its
+            # foot -- which is the one place a character is guaranteed to be.
+            surf = self.band(max(0, c.level - c.drop))
 
-        if c.kind == CLIFF:
-            var = _run_var(grid, col, row)
-            foot = c.row == c.drop - 1 and grid.get((col, row + 1)) is None
-            surf.blit(cell(sheet, cliff_idx("bottom" if foot else "body", var)),
-                      (x, y))
-        elif c.kind == VSTAIR:
-            # The wall-cut straight flight: the grass channel, and the stone
-            # flight over it when "rock". Its own branch -- when the north
-            # branch above was first added it took this line's place, and
-            # every south flight fell through to the east/west branch below
-            # and came out as a bare cliff face.
-            piece = ramp_slots.get("s", (interior, interior))
-            idx = piece[0] if (c.row == 0 and c.drop > 1) else piece[-1]
-            surf.blit(cell(sheet if c.row == 0 else low, idx), (x, y))
-            if c.tag == "rock" and c.row == 0:
-                tall.append((x, y, sheets.vstair_sprite(c.drop), surf))
-        elif str(c.tag).startswith("side_"):
-            # A lateral crossing: the two-tile ramp unit laid straight onto a
-            # plateau's bare side face. Top wedge on row 0, the piece carrying
-            # the rocky step on row 1 -- the same pair a wall-cut flight uses,
-            # and drawn in this terrace's own material.
-            #
-            # A lateral crossing casts a drop shadow like any other structure
-            # standing on a terrace -- `_shadow_casts` gives it the same
-            # unclipped blob at its own cell that a `CLIFF` gets, laid in pass
-            # 2 and so under the ramp painted here in pass 3. It was excluded
-            # at first, on the reasoning that a side face carries no stone; but
-            # the crossing itself stands proud of the floor below it whichever
-            # alignment it takes, and without the shade it reads as painted
-            # flat onto that floor.
-            #
-            # The backdrop, and only on the head. A crossing notched *into*
-            # the terrace leaves a terrace tile standing directly above it, and
-            # that tile drops into the notch -- without its wall drawn the
-            # crossing reads as a hole rather than a way down. A crossing that
-            # protrudes from the terrace side has nothing above it and takes
-            # none. The drop is one level, so one tile of face is the whole
-            # wall, which is why the foot never carries it.
-            if c.row == 0:
-                over = grid.get((col, row - 1))
-                if (over is not None and over.kind == GROUND
-                        and over.level == c.level):
-                    surf.blit(cell(sheet, cliff_idx("body", "single")), (x, y))
-            #
-            # The side is taken straight from the tag: a crossing that drops
-            # east draws `ramp.e`. I had this mirrored at first, reasoning from
-            # a one-tile prototype about which way the riser should face; in
-            # the finished two-tile unit that puts the ramps facing the wrong
-            # way round, which is plain enough on screen.
-            piece = ramp_slots.get(c.tag[-1])
-            if piece:
-                surf.blit(cell(sheet, piece[0] if c.row == 0 else piece[-1]),
+            if c.kind == CLIFF:
+                var = _run_var(grid, col, row)
+                foot = c.row == c.drop - 1 and grid.get((col, row + 1)) is None
+                surf.blit(cell(sheet, cliff_idx("bottom" if foot else "body", var)),
                           (x, y))
-        else:                                       # EWSTAIR
-            # An east/west flight is a notch cut into the wall, not a hole
-            # through it, so the **wall stands behind it** -- and that stone is
-            # an ordinary cliff face: it takes its left / mid / right / single
-            # variant from its neighbours exactly as any other does, so the rim
-            # reads as one continuous run straight past the flight. The wedge's
-            # own corners are transparent, which is how the stone shows.
-            surf.blit(cell(sheet, cliff_idx("body", _run_var(grid, col, row,
-                                                             c.level, c.drop))),
-                      (x, y))
-            piece = ramp_slots.get(c.tag)
-            if piece:
-                surf.blit(cell(sheet, piece[0] if c.row == 0 else piece[-1]),
+            elif c.kind == VSTAIR:
+                # The wall-cut straight flight: the grass channel, and the stone
+                # flight over it when "rock". Its own branch -- when the north
+                # branch in `sort_cells` was first added it took this line's
+                # place, and every south flight fell through to the east/west
+                # branch below and came out as a bare cliff face.
+                piece = ramp_slots.get("s", (self.interior, self.interior))
+                idx = piece[0] if (c.row == 0 and c.drop > 1) else piece[-1]
+                surf.blit(cell(sheet if c.row == 0 else low, idx), (x, y))
+                if c.tag == "rock" and c.row == 0:
+                    self.tall.append((x, y, sheets.vstair_sprite(c.drop), surf))
+            elif str(c.tag).startswith("side_"):
+                # A lateral crossing: the two-tile ramp unit laid straight onto a
+                # plateau's bare side face. Top wedge on row 0, the piece carrying
+                # the rocky step on row 1 -- the same pair a wall-cut flight uses,
+                # and drawn in this terrace's own material.
+                #
+                # A lateral crossing casts a drop shadow like any other structure
+                # standing on a terrace -- `_shadow_casts` gives it the same
+                # unclipped blob at its own cell that a `CLIFF` gets, laid in
+                # `paint_floors` and so under the ramp painted here. It was
+                # excluded at first, on the reasoning that a side face carries no
+                # stone; but the crossing itself stands proud of the floor below it
+                # whichever alignment it takes, and without the shade it reads as
+                # painted flat onto that floor.
+                #
+                # The backdrop, and only on the head. A crossing notched *into*
+                # the terrace leaves a terrace tile standing directly above it, and
+                # that tile drops into the notch -- without its wall drawn the
+                # crossing reads as a hole rather than a way down. A crossing that
+                # protrudes from the terrace side has nothing above it and takes
+                # none. The drop is one level, so one tile of face is the whole
+                # wall, which is why the foot never carries it.
+                if c.row == 0:
+                    over = grid.get((col, row - 1))
+                    if (over is not None and over.kind == GROUND
+                            and over.level == c.level):
+                        surf.blit(cell(sheet, cliff_idx("body", "single")), (x, y))
+                #
+                # The side is taken straight from the tag: a crossing that drops
+                # east draws `ramp.e`. I had this mirrored at first, reasoning from
+                # a one-tile prototype about which way the riser should face; in
+                # the finished two-tile unit that puts the ramps facing the wrong
+                # way round, which is plain enough on screen.
+                piece = ramp_slots.get(c.tag[-1])
+                if piece:
+                    surf.blit(cell(sheet, piece[0] if c.row == 0 else piece[-1]),
+                              (x, y))
+            else:                                       # EWSTAIR
+                # An east/west flight is a notch cut into the wall, not a hole
+                # through it, so the **wall stands behind it** -- and that stone is
+                # an ordinary cliff face: it takes its left / mid / right / single
+                # variant from its neighbours exactly as any other does, so the rim
+                # reads as one continuous run straight past the flight. The wedge's
+                # own corners are transparent, which is how the stone shows.
+                surf.blit(cell(sheet, cliff_idx("body", _run_var(grid, col, row,
+                                                                 c.level, c.drop))),
                           (x, y))
+                piece = ramp_slots.get(c.tag)
+                if piece:
+                    surf.blit(cell(sheet, piece[0] if c.row == 0 else piece[-1]),
+                              (x, y))
 
     # --- pass 4: sprites taller than their cell ---------------------------
     # A drop-2 stone flight is 64x128 and hangs into the row below it, so it has
     # to go on after every one-cell blit -- otherwise the grass of the cell it
     # hangs into paints over its bottom half.
-    for x, y, spr, target in tall:
-        if spr is not None:
-            target.blit(spr, (x, y))
+    def paint_tall(self) -> None:
+        for x, y, spr, target in self.tall:
+            if spr is not None:
+                target.blit(spr, (x, y))
 
     # A north flight is one thing or the other (owner, 2026-09-20,
     # north_stairs_journal NS-7), and either way it straddles the seam
@@ -625,42 +644,62 @@ def _paint_room(store, sheets, layout, room, banded: bool):
     # floor's grass runs half a tile past the rim line onto the lower
     # floor. A **rock** flight keeps its autotiled rim tile and carries the
     # stone flight centred on the seam the same way. Never both.
-    for c, x, y in seams:
-        low_band = band(max(0, c.level - c.drop))
-        if c.tag != "rock":
-            sheet = sheet_for(c.level, room.kind, room)
-            band(c.level).blit(cell(sheet, interior), (x, y))
-            piece = ramp_slots.get("n") or ramp_slots.get("s")
-            if piece:
-                upper, lower = sheets.channel_halves(sheet, piece[-1])
-                low_band.blit(upper, (x, y - upper.get_height()))
-                band(c.level).blit(lower, (x, y))
-            continue
-        halves = sheets.vstair_seam(c.drop)
-        if halves is None:
-            continue
-        foot, top = halves
-        low_band.blit(foot, (x, y - foot.get_height()))
-        band(c.level).blit(top, (x, y))
+    def paint_seams(self) -> None:
+        room, sheets, cell = self.room, self.sheets, self.cell
+        for c, x, y in self.seams:
+            low_band = self.band(max(0, c.level - c.drop))
+            if c.tag != "rock":
+                sheet = self.sheet_for(c.level, room.kind, room)
+                self.band(c.level).blit(cell(sheet, self.interior), (x, y))
+                piece = self.ramp_slots.get("n") or self.ramp_slots.get("s")
+                if piece:
+                    upper, lower = sheets.channel_halves(sheet, piece[-1])
+                    low_band.blit(upper, (x, y - upper.get_height()))
+                    self.band(c.level).blit(lower, (x, y))
+                continue
+            halves = sheets.vstair_seam(c.drop)
+            if halves is None:
+                continue
+            foot, top = halves
+            low_band.blit(foot, (x, y - foot.get_height()))
+            self.band(c.level).blit(top, (x, y))
 
     # Trim each band to what it actually holds. A terrace occupies a fraction
     # of the island's bounding box, and an untrimmed band would cost the whole
     # of it -- the split is only affordable because most of each band is empty.
-    out = []
-    for lvl in levels:
-        surface = bands[lvl]
-        if not banded:
-            out.append((pygame.Rect(room.rect.x + c0 * px,
-                                    room.rect.y + r0 * px, w, h), surface, lvl))
-            break
-        clip = surface.get_bounding_rect()
-        if clip.width <= 0 or clip.height <= 0:
-            continue
-        out.append((pygame.Rect(room.rect.x + (c0 * px) + clip.x,
-                                room.rect.y + (r0 * px) + clip.y,
-                                clip.width, clip.height),
-                    surface.subsurface(clip).copy(), lvl))
-    return out
+    def trim(self) -> list:
+        room, px, c0, r0 = self.room, self.px, self.c0, self.r0
+        out = []
+        for lvl in self.levels:
+            surface = self.bands[lvl]
+            if not self.banded:
+                out.append((pygame.Rect(room.rect.x + c0 * px,
+                                        room.rect.y + r0 * px, self.w, self.h),
+                            surface, lvl))
+                break
+            clip = surface.get_bounding_rect()
+            if clip.width <= 0 or clip.height <= 0:
+                continue
+            out.append((pygame.Rect(room.rect.x + (c0 * px) + clip.x,
+                                    room.rect.y + (r0 * px) + clip.y,
+                                    clip.width, clip.height),
+                        surface.subsurface(clip).copy(), lvl))
+        return out
+
+
+def _paint_room(store, sheets, layout, room, banded: bool):
+    """The one painter behind both entry points above: a `_RoomPaint` job
+    run pass by pass. `store` and `layout` are the painters' common
+    signature; this one reads only the sheets and the room."""
+    job = _RoomPaint(sheets, room, banded)
+    if not job.grid:
+        return []
+    job.sort_cells()
+    job.paint_floors()
+    job.paint_stone()
+    job.paint_tall()
+    job.paint_seams()
+    return job.trim()
 
 
 def paint_bridge(sheets, corridor):
