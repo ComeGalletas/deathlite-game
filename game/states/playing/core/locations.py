@@ -27,10 +27,12 @@ ALTAR_HP_COST_FRACTION = 0.25
 class SpecialLocations:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
     def build(self) -> None:
         ps = self.ps
-        ps.interactables = []
-        if ps.game_map.layout is None:
+        run = getattr(self, "run", ps)
+        run.interactables = []
+        if run.game_map.layout is None:
             return
         # Parked since 2026-09-20: `SPECIAL_KINDS` is empty, so no shrine,
         # treasure, altar or merchant is ever built here -- the generator no
@@ -38,24 +40,25 @@ class SpecialLocations:
         # handlers below are kept as the template for when those facilities
         # come back in another form
         # (`journals/special_facilities_journal.md`).
-        for room in ps.game_map.layout.rooms:
+        for room in run.game_map.layout.rooms:
             if room.kind in SPECIAL_KINDS:
-                ps.interactables.append(Interactable(
+                run.interactables.append(Interactable(
                     room.kind, room.center.x, room.center.y, cost=MERCHANT_COST))
         # HI-2: every village carries the forge and the sanctuary heal, where
         # the village pass put them.
-        for v in getattr(ps.game_map.layout, "villages", ()):
-            ps.interactables.append(Interactable("forge", v.forge.x, v.forge.y))
-            ps.interactables.append(Interactable("fountain", v.heal.x, v.heal.y))
+        for v in getattr(run.game_map.layout, "villages", ()):
+            run.interactables.append(Interactable("forge", v.forge.x, v.forge.y))
+            run.interactables.append(Interactable("fountain", v.heal.x, v.heal.y))
         # The buff buildings (journal: buff_buildings_journal.md): one
         # interactable on each building obstacle, which carries the art.
-        for o in ps.game_map.layout.buff_buildings(ps.buffs.kinds):
-            ps.interactables.append(Interactable(o.kind, o.pos.x, o.pos.y))
+        for o in run.game_map.layout.buff_buildings(ps.buffs.kinds):
+            run.interactables.append(Interactable(o.kind, o.pos.x, o.pos.y))
 
     def nearby(self):
         ps = self.ps
-        for it in ps.interactables:
-            if not it.used and it.in_range(ps.player.pos):
+        run = getattr(self, "run", ps)
+        for it in run.interactables:
+            if not it.used and it.in_range(run.player.pos):
                 return it
         return None
 
@@ -76,14 +79,15 @@ class SpecialLocations:
 
     def grant_random_blessing(self) -> bool:
         ps = self.ps
+        run = getattr(self, "run", ps)
         # P2: one blessing, never a weapon grant (a shrine does not hand out
         # weapons; the level-up does).
-        choices = roll_offering(ps.player, ps.content, ps.rng, 1,
+        choices = roll_offering(run.player, run.content, run.rng, 1,
                                 kinds=("stat", "weapon"))
         if not choices:
             return False
-        choices[0].apply(ps.player)
-        ps.particles.burst(ps.player.pos, (150, 190, 255), count=20,
+        choices[0].apply(run.player)
+        run.particles.burst(run.player.pos, (150, 190, 255), count=20,
                            speed=180, life=0.6)
         return True
 
@@ -91,29 +95,32 @@ class SpecialLocations:
     def use_shrine(self, it: Interactable) -> None:
         it.used = True
         if not self.grant_random_blessing():
-            self.ps.player.heal(30)
+            self.run.player.heal(30)
 
     def use_treasure(self, it: Interactable) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         it.used = True
-        ps._drop_item(max(2, int(1 + ps.stats["time"] // 80)))
-        ps.particles.burst(it.pos, it.colour, count=24, speed=220, life=0.6)
+        ps._drop_item(max(2, int(1 + run.stats["time"] // 80)))
+        run.particles.burst(it.pos, it.colour, count=24, speed=220, life=0.6)
 
     def use_fountain(self, it: Interactable) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         it.used = True
-        ps.player.heal(ps.player.max_hp)
-        ps.particles.burst(ps.player.pos, it.colour, count=18, speed=140, life=0.6)
+        run.player.heal(run.player.max_hp)
+        run.particles.burst(run.player.pos, it.colour, count=18, speed=140, life=0.6)
 
     def use_altar(self, it: Interactable) -> None:
         ps = self.ps
-        cost = ps.player.max_hp * ALTAR_HP_COST_FRACTION
-        if ps.player.hp <= cost + 1:
+        run = getattr(self, "run", ps)
+        cost = run.player.max_hp * ALTAR_HP_COST_FRACTION
+        if run.player.hp <= cost + 1:
             return  # too risky -- refuse rather than kill the player
-        ps.player.hp -= cost
+        run.player.hp -= cost
         it.used = True
         if not self.grant_random_blessing():
-            ps.player.heal(cost)  # refund if nothing to grant
+            run.player.heal(cost)  # refund if nothing to grant
 
     def use_forge(self, it: Interactable) -> None:
         """P3 (design §7), change request 6: offer the Forgings of *a chosen*
@@ -126,22 +133,23 @@ class SpecialLocations:
         the player picks.
         """
         ps = self.ps
+        run = getattr(self, "run", ps)
         from combat.weapons.forge import blessing_levels, forge_eligible
         from progression.blessings import get_rules
         from progression.blessings.offer import forge_offers_for
         from ui.forge_rail import rows_for
-        need = get_rules(ps.content).forge_requires_levels
-        ps.particles.burst(it.pos, it.colour, count=16, speed=160, life=0.5)
-        if not any(forge_eligible(w, need) for w in ps.player.weapons):
+        need = get_rules(run.content).forge_requires_levels
+        run.particles.burst(it.pos, it.colour, count=16, speed=160, life=0.5)
+        if not any(forge_eligible(w, need) for w in run.player.weapons):
             ps.notice(self.forge_requirements(need))
             return
-        rows = rows_for(ps.player.weapons, need, blessing_levels,
+        rows = rows_for(run.player.weapons, need, blessing_levels,
                         forged_name=lambda w: w.name)
-        offers = lambda w: forge_offers_for(ps.player, ps.content, w)
+        offers = lambda w: forge_offers_for(run.player, run.content, w)
         ps._suspend_mouse()
         from game.states.level_up_state import LevelUpState
         ps.game.state_machine.push(
-            LevelUpState(ps.game), player=ps.player,
+            LevelUpState(ps.game), player=run.player,
             weapon_rows=rows, offers_for=offers,
             # Names both halves, as it did before the picker: which weapon was
             # reforged is no longer obvious now that the player chose it from a
@@ -154,7 +162,8 @@ class SpecialLocations:
         """The message for a Forge with nothing to work on."""
         from combat.weapons.forge import blessing_levels
         ps = self.ps
-        unforged = [w for w in ps.player.weapons if w.forge is None and not w.is_summon]
+        run = getattr(self, "run", ps)
+        unforged = [w for w in run.player.weapons if w.forge is None and not w.is_summon]
         if not unforged:
             return "Every weapon is already forged."
         w = min(unforged, key=lambda w: need - blessing_levels(w))
@@ -164,6 +173,7 @@ class SpecialLocations:
 
     def use_merchant(self, it: Interactable) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         if not ps.spend_gold(it.cost):
             return
         it.used = True

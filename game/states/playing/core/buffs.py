@@ -37,6 +37,7 @@ def _source(kind: str) -> str:
 class BuffSystem:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         data = ps.content.buildings
         self.defs: dict[str, dict] = data.get("buffs", {})
         self.feedback: dict = data.get("feedback", {})
@@ -90,7 +91,8 @@ class BuffSystem:
         self.start(it.kind)
         self._mark_used(it)
         ps = self.ps
-        ps.particles.burst(ps.player.pos, self.palette(it.kind)[0], count=22,
+        run = getattr(self, "run", ps)
+        run.particles.burst(run.player.pos, self.palette(it.kind)[0], count=22,
                            speed=170, life=0.6)
 
     def start(self, kind: str) -> None:
@@ -108,7 +110,8 @@ class BuffSystem:
 
     def _apply(self, kind: str, spec: dict) -> None:
         ps = self.ps
-        player = ps.player
+        run = getattr(self, "run", ps)
+        player = run.player
         src = _source(kind)
         mods = []
         if "speed_add" in spec:
@@ -128,14 +131,14 @@ class BuffSystem:
             player.weight = math.inf
             self._contact_cd.clear()
         elif kind == "magnet":
-            for gem in ps.gems:
+            for gem in run.gems:
                 if gem.active:
                     gem.homing = True
         elif kind == "pinball":
             self._pinball_t = 0.0          # the first ball flies with the next attack
 
     def _expire(self, kind: str) -> None:
-        player = self.ps.player
+        player = self.run.player
         player.remove_modifier_source(_source(kind))
         if kind == "turbo":
             player.weight = float(config.PLAYER_WEIGHT)
@@ -147,7 +150,7 @@ class BuffSystem:
         rig = self.defs[it.kind].get("used_rig")
         if not rig:
             return
-        gm = self.ps.game_map
+        gm = self.run.game_map
         for i, o in enumerate(getattr(gm, "obstacles", ())):
             if o.kind == it.kind and (o.pos - it.pos).length_squared() <= 1.0:
                 from world.terrain.decor.obstacle_skins import reskin_obstacle
@@ -186,14 +189,15 @@ class BuffSystem:
         shots excluded."""
         if "vampire" not in self.active:
             return
-        w = self.ps.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
+        w = self.run.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
         if w is not None and w.is_summon:
             return
-        self.ps.player.heal(float(self.defs["vampire"].get("heal_per_hit", 1.0)))
+        self.run.player.heal(float(self.defs["vampire"].get("heal_per_hit", 1.0)))
 
     # --- Turbo: contact bites -----------------------------------
     def _turbo_contact(self, dt: float) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         spec = self.defs["turbo"]
         tick = max(0.05, float(spec.get("contact_tick", 0.5)))
         amount = float(spec.get("contact_dps", 5.0)) * tick
@@ -201,11 +205,11 @@ class BuffSystem:
             self._contact_cd[key] -= dt
             if self._contact_cd[key] <= 0.0:
                 del self._contact_cd[key]
-        p = ps.player
+        p = run.player
         if not p.alive:
             return
-        no_dmg = ps.dev_mode and getattr(ps, "_dev_no_damage", False)
-        for e in ps.grid.query_circle(p.pos.x, p.pos.y, p.radius + 48):
+        no_dmg = run.dev_mode and getattr(ps, "_dev_no_damage", False)
+        for e in run.grid.query_circle(p.pos.x, p.pos.y, p.radius + 48):
             if not e.alive or id(e) in self._contact_cd:
                 continue
             if not circles_overlap(p.pos.x, p.pos.y, p.radius, e.pos.x, e.pos.y, e.radius):
@@ -216,24 +220,25 @@ class BuffSystem:
             dealt = e.take_damage(amount, source="turbo")
             if not e.alive:
                 e.killed_by = "turbo"
-            ps.stats["damage_dealt"] += dealt
+            run.stats["damage_dealt"] += dealt
             ps.damage_numbers.add(e.pos, dealt)
             ps.game.events.publish(Events.DAMAGE_DEALT, amount=dealt)
 
     # --- Pinball: the throws ------------------------------------
     def _pinball(self, dt: float) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         spec = self.defs["pinball"].get("pinball", {})
         self._pinball_t -= dt
         if self._pinball_t > 0.0:
             return
-        if ps.player._attack_t <= 0.0:
+        if run.player._attack_t <= 0.0:
             return                          # "when attacking": no swing, no ball
         direction = self._aim_dir()
         speed = float(spec.get("speed", 260.0))
-        dmg = float(spec.get("damage", 40.0)) * float(ps.player.stats["damage_multiplier"])
+        dmg = float(spec.get("damage", 40.0)) * float(run.player.stats["damage_multiplier"])
         ps._spawn_projectile(
-            pos=pygame.Vector2(ps.player.pos), vel=direction * speed, damage=dmg,
+            pos=pygame.Vector2(run.player.pos), vel=direction * speed, damage=dmg,
             radius=float(spec.get("radius", 10.0)), lifetime=float(spec.get("lifetime", 10.0)),
             pierce=999, src_weight=float(spec.get("weight", 400.0)),
             color=self.palette("pinball")[0], style="pinball", weapon_id="pinball",
@@ -243,6 +248,7 @@ class BuffSystem:
 
     def _aim_dir(self) -> pygame.Vector2:
         ps = self.ps
+        run = getattr(self, "run", ps)
         aim = getattr(ps, "_aim", None)
         if aim is not None and getattr(aim, "active", False):
             d = pygame.Vector2(aim.direction)
@@ -252,7 +258,7 @@ class BuffSystem:
         for e in ps._targetables():
             if not e.alive:
                 continue
-            d = (e.pos - ps.player.pos).length_squared()
+            d = (e.pos - run.player.pos).length_squared()
             if best is None or d < best_d:
                 best, best_d = e, d
         if best is not None and best_d > 1e-6:

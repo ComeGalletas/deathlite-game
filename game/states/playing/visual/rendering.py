@@ -16,9 +16,10 @@ import math
 
 import pygame
 
-from game import config, fonts
+from game import config
 from ui import scale
 from entities.pickup import XP_TIER_COLORS
+from game.states.playing.devtools import overlays
 from game.states.playing.visual.drawctx import DrawCtx
 from game.states.playing.visual.glow import GlowCache
 from game.states.playing.visual.projectiles import draw_projectile
@@ -28,8 +29,6 @@ from progression import potions as _potions
 from ui import buff_marks
 from ui.text import shadowed
 
-# CB-5 dev aim line: length for a main weapon with no finite reach.
-_AIM_LINE_PX = 160.0
 # Re-exported so `PlayingState._draw_cone` (a `test_depth_sort` entry point) and
 # `_rendering.draw_cone` keep resolving after the move to the projectiles pkg.
 from game.states.playing.visual.projectiles.cone import draw_cone  # noqa: F401
@@ -41,8 +40,6 @@ _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
                 "shock": (255, 230, 120), "stun": (240, 240, 255),
                 "mark": (210, 170, 255)}
 _HIT_TINT = (150, 30, 30)
-_KNOCK_VEC_SCALE = 0.15     # dev overlay: `_knock` px/s -> screen px line length
-_SPAWN_MARK_PX = 6          # dev overlay: half-size of a spawn-point mark, world px
 # Hazard fill: alpha at spawn is FLOOR + ALPHA, fading to FLOOR as the pool
 # expires. Halved from 70/20 when the pools gained art -- the disc still has
 # to state the area, but it no longer has to carry the whole effect.
@@ -77,13 +74,14 @@ def hit_tinted(frame):
 class WorldRenderer:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self._glow = GlowCache()      # XP orb glow discs, pre-rendered per size / alpha
 
     # --- geometry helper --------------------------------------------
     def sprite_drop(self, radius: float) -> float:
         """Downward render offset (screen px) that seats a rig's feet-anchor
         below the collider centre -- see config.SPRITE_ANCHOR_DROP. Render-only."""
-        return config.SPRITE_ANCHOR_DROP * radius * self.ps.camera.zoom
+        return config.SPRITE_ANCHOR_DROP * radius * self.run.camera.zoom
 
     def anchor_for(self, rig: str, flip: bool) -> tuple[int, int]:
         """A rig's feet anchor in its (unscaled) frame, mirrored when the
@@ -99,8 +97,8 @@ class WorldRenderer:
         return ax, ay
 
     def _blit_character(self, surface, frame, dest, character_y: float) -> None:
-        r = self.ps.game_map.renderer
-        drawn = r.shade_character_frame(frame, dest, self.ps.camera, character_y)
+        r = self.run.game_map.renderer
+        drawn = r.shade_character_frame(frame, dest, self.run.camera, character_y)
         surface.blit(drawn, dest)
         # For the ghost pass. A shaded result lives in a scratch surface the
         # next character of the same size overwrites, so it is copied here;
@@ -117,19 +115,20 @@ class WorldRenderer:
         the banner and the notice are interface and sit in the
         UI `box` (the surface itself on a 16:9 render)."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         w, h = surface.get_size()
 
         # Low-HP vignette (spec 3.6 player damage feedback) -- pulsing red frame.
-        frac = ps.player.hp / ps.player.max_hp if ps.player.max_hp else 1.0
+        frac = run.player.hp / run.player.max_hp if run.player.max_hp else 1.0
         if frac < 0.3:
-            pulse = 60 + int(40 * math.sin(ps.stats["time"] * 8))
+            pulse = 60 + int(40 * math.sin(run.stats["time"] * 8))
             vig = pygame.Surface((w, h), pygame.SRCALPHA)
             pygame.draw.rect(vig, (180, 20, 20, max(0, pulse)), (0, 0, w, h), 24)
             surface.blit(vig, (0, 0))
 
         # Brief full-screen red flash on taking a hit.
-        if ps._hurt_flash_t > 0.0:
-            a = int(120 * min(1.0, ps._hurt_flash_t / 0.35))
+        if run._hurt_flash_t > 0.0:
+            a = int(120 * min(1.0, run._hurt_flash_t / 0.35))
             flash = pygame.Surface((w, h), pygame.SRCALPHA)
             flash.fill((200, 30, 30, a))
             surface.blit(flash, (0, 0))
@@ -139,7 +138,7 @@ class WorldRenderer:
         self.buff_tint(surface)
         # ... the timers over the hero (rev. 6: here, not on the HUD), and
         # the buff's flying name above them, all following the hero.
-        hero = ps.camera.world_to_screen(ps.player.pos)
+        hero = run.camera.world_to_screen(run.player.pos)
         buff_marks.draw(surface, ps.game.assets, hero, ps.buffs.rows())
         ps.buffs.banners.draw(surface, hero)
 
@@ -147,17 +146,17 @@ class WorldRenderer:
         w, h = surface.get_size()
 
         # Boss-incoming warning banner (spec 3.6 "Boss warning").
-        if ps._boss_warning_t > 0.0:
-            blink = (ps._boss_warning_t * 4) % 1.0 < 0.6
+        if run._boss_warning_t > 0.0:
+            blink = (run._boss_warning_t * 4) % 1.0 < 0.6
             if blink:
                 text = ps._banner_font.render(
-                    f"{ps._boss_name} APPROACHES", True, (255, 90, 90))
+                    f"{run._boss_name} APPROACHES", True, (255, 90, 90))
                 surface.blit(text, text.get_rect(center=(w // 2, scale.px(120))))
 
         # P3: a transient notice (the Forge's answer, a chest's payout),
         # bottom centre.
-        if ps._notice_t > 0.0 and ps._notice_text:
-            text = shadowed(ps._prompt_font, ps._notice_text, config.COLOR_ACCENT)
+        if run._notice_t > 0.0 and run._notice_text:
+            text = shadowed(ps._prompt_font, run._notice_text, config.COLOR_ACCENT)
             surface.blit(text, text.get_rect(center=(w // 2, h - scale.px(124))))
 
         # There is no interaction prompt here any more: the interact keycap
@@ -200,12 +199,13 @@ class WorldRenderer:
         buff_buildings_journal.md): each strip plays once, feet-anchored,
         at its own frame rate, drawn right after the hero's sprite."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         fx_list = ps.buffs.hero_fx
         if not fx_list:
             return
         a = ps.game.assets
-        z = ps.camera.zoom
-        drop = self.sprite_drop(ps.player.radius)
+        z = run.camera.zoom
+        drop = self.sprite_drop(run.player.radius)
         for rig, age, scale in fx_list:
             meta = a.rig(rig)
             if not meta:
@@ -228,7 +228,7 @@ class WorldRenderer:
         every caller outside the banded world path passes."""
         if level is None:
             return False
-        return self.ps.game_map.renderer.level_at(pos[0], pos[1]) != level
+        return self.run.game_map.renderer.level_at(pos[0], pos[1]) != level
 
     def _heal_frames(self, z: float):
         """The sanctuary's looping heal effect at this zoom, or `None`
@@ -248,8 +248,9 @@ class WorldRenderer:
 
     def interactables(self, surface, level=None) -> None:
         ps = self.ps
-        z = ps.camera.zoom
-        for it in ps.interactables:
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
+        for it in run.interactables:
             if self._off_band(level, it.pos):
                 continue
             if it.kind == "forge" and self._forge_skinned():
@@ -262,11 +263,11 @@ class WorldRenderer:
                     if it.used:
                         continue        # healed once: the prop is gone
                     frs, fps, ax, ay = heal
-                    sx, sy = ps.camera.world_to_screen(it.pos)
-                    idx = int(ps.stats["time"] * fps) % len(frs)
+                    sx, sy = run.camera.world_to_screen(it.pos)
+                    idx = int(run.stats["time"] * fps) % len(frs)
                     surface.blit(frs[idx], (round(sx - ax), round(sy - ay)))
                     continue
-            sx, sy = ps.camera.world_to_screen(it.pos)
+            sx, sy = run.camera.world_to_screen(it.pos)
             done = it.used
             col = (90, 90, 100) if done else it.colour
             pygame.draw.circle(surface, col, (int(sx), int(sy)),
@@ -277,7 +278,7 @@ class WorldRenderer:
         """Did the bake skin a forge obstacle? Then the interactable draws
         nothing of its own; without the art the ring is the placeholder."""
         cached = getattr(self, "_forge_skin_cache", None)
-        gm = self.ps.game_map
+        gm = self.run.game_map
         key = id(getattr(gm, "_decos", None))
         if cached is None or cached[0] != key:
             decos = getattr(gm, "_decos", {}) or {}
@@ -288,11 +289,12 @@ class WorldRenderer:
 
     def hazards(self, surface, level=None) -> None:
         ps = self.ps
-        z = ps.camera.zoom
-        for hz in ps.hazards:
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
+        for hz in run.hazards:
             if self._off_band(level, hz.pos):
                 continue
-            sx, sy = ps.camera.world_to_screen(hz.pos)
+            sx, sy = run.camera.world_to_screen(hz.pos)
             frac = max(0.0, hz.life / hz.max_life)
             rr = max(1, round(hz.radius * z))
             # The disc states the area; the ring states its exact edge. Both
@@ -332,7 +334,7 @@ class WorldRenderer:
         surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
 
     def one_summon(self, surface, s) -> None:
-        sx, sy = self.ps.camera.world_to_screen(s.pos)
+        sx, sy = self.run.camera.world_to_screen(s.pos)
         draw_summon(surface, sx, sy, s, self._draw_ctx(), default="disc")
 
     def gems(self, surface, level=None) -> None:
@@ -342,17 +344,18 @@ class WorldRenderer:
         orbs shimmers out of phase and freezes with the run. Cached discs --
         one lookup and one blit per orb. Off-screen gems draw nothing."""
         ps = self.ps
-        z = ps.camera.zoom
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
         assets = ps.game.assets
-        view = ps.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+        view = run.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
         glow = self._glow
 
-        for gem in ps.gems:
+        for gem in run.gems:
             if self._off_band(level, gem.pos):
                 continue
             if not view.collidepoint(gem.pos.x, gem.pos.y):
                 continue
-            sx, sy = ps.camera.world_to_screen(gem.pos)
+            sx, sy = run.camera.world_to_screen(gem.pos)
             rig = _ORB_RIGS.get(gem.tier, "xp_orb_small")
             base_size = assets.scale_for(rig) or (8, 8)
             size = (
@@ -389,18 +392,19 @@ class WorldRenderer:
         art falls back to a disc in the rarity's colour, like the orbs.
         """
         ps = self.ps
-        z = ps.camera.zoom
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
         assets = ps.game.assets
-        table = ps.content.chests
+        table = run.content.chests
         duration = _chests.open_seconds(table)
-        view = ps.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+        view = run.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
 
-        for chest in ps.chests:
+        for chest in run.chests:
             if self._off_band(level, chest.pos):
                 continue
             if not view.collidepoint(chest.pos.x, chest.pos.y):
                 continue
-            sx, sy = ps.camera.world_to_screen(chest.pos)
+            sx, sy = run.camera.world_to_screen(chest.pos)
             rig = _chests.sprite_rig(chest.rarity, table)
             base_size = assets.scale_for(rig) or (30, 30)
             size = (max(1, round(base_size[0] * z)), max(1, round(base_size[1] * z)))
@@ -424,17 +428,18 @@ class WorldRenderer:
         rare potion is legible across the screen. Off-screen potions draw
         nothing; missing art falls back to a disc like the orbs do."""
         ps = self.ps
-        z = ps.camera.zoom
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
         assets = ps.game.assets
-        table = ps.content.potions
-        view = ps.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
+        table = run.content.potions
+        view = run.camera.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
 
-        for potion in ps.potions:
+        for potion in run.potions:
             if self._off_band(level, potion.pos):
                 continue
             if not view.collidepoint(potion.pos.x, potion.pos.y):
                 continue
-            sx, sy = ps.camera.world_to_screen(potion.pos)
+            sx, sy = run.camera.world_to_screen(potion.pos)
             rig = _potions.sprite_rig(potion.rarity, table)
             base_size = assets.scale_for(rig) or (16, 16)
             size = (max(1, round(base_size[0] * z)), max(1, round(base_size[1] * z)))
@@ -458,8 +463,9 @@ class WorldRenderer:
         spans the blast diameter, centred on the blast; the rest, and any
         burst whose sheet is missing, draw the expanding ring."""
         ps = self.ps
-        z = ps.camera.zoom
-        for ex in ps._explosions:
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
+        for ex in run._explosions:
             if self._off_band(level, ex["pos"]):
                 continue
             sx, sy = ps.camera.world_to_screen(ex["pos"])
@@ -490,9 +496,10 @@ class WorldRenderer:
         entry blits the current burst frame (tinted), optionally alpha-ramped
         over its life. Anchored in world space; the bolt draws over it."""
         ps = self.ps
-        z = ps.camera.zoom
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
         a = ps.game.assets
-        for anim, pos, (w, h), tint, fade in ps._trail_fx:
+        for anim, pos, (w, h), tint, fade in run._trail_fx:
             if self._off_band(level, pos):
                 continue
             size = (max(1, round(w * z)), max(1, round(h * z)))
@@ -504,16 +511,17 @@ class WorldRenderer:
                 total = max(1, a.frame_count(anim.rig, anim.anim)) / fps
                 fr = fr.copy()                       # don't touch the shared cache
                 fr.set_alpha(max(0, int(255 * (1.0 - anim.t / total))))
-            sx, sy = ps.camera.world_to_screen(pos)
+            sx, sy = run.camera.world_to_screen(pos)
             surface.blit(fr, fr.get_rect(center=(int(sx), int(sy))))
 
     # --- characters (depth layer) --------------------------------
     def one_enemy(self, surface, e) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         if self.spawn_veiled(e):
             return                              # still inside its spawn burst
-        z = ps.camera.zoom
-        sx, sy = ps.camera.world_to_screen(e.pos)
+        z = run.camera.zoom
+        sx, sy = run.camera.world_to_screen(e.pos)
         er = e.radius * z
 
         sprited = e.anim is not None
@@ -550,8 +558,9 @@ class WorldRenderer:
 
     def death_fx(self, surface, fx) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         anim, pos, facing, scale, radius = fx
-        z = ps.camera.zoom
+        z = run.camera.zoom
         scale *= z
         assets = ps.game.assets
         bw, bh = assets.scale_for("dead")
@@ -589,9 +598,10 @@ class WorldRenderer:
         A rig-less body gets the collider: its centre, and `over_sprite` x
         its diameter."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         assets = ps.game.assets
-        z = ps.camera.zoom
-        sx, sy = ps.camera.world_to_screen(body.pos)
+        z = run.camera.zoom
+        sx, sy = run.camera.world_to_screen(body.pos)
         over = float((assets.rig(self._SPAWN_RIG) or {}).get("over_sprite", 1.0))
         anim = getattr(body, "anim", None)
         scale = assets.scale_for(anim.rig) if anim is not None else None
@@ -625,14 +635,15 @@ class WorldRenderer:
 
     def enemy_sprite(self, surface, e) -> None:
         ps = self.ps
-        z = ps.camera.zoom
+        run = getattr(self, "run", ps)
+        z = run.camera.zoom
         assets = ps.game.assets
         rig = e.anim.rig
         flip = e._facing < 0 and assets.face(rig) == "right"
         bw, bh = assets.scale_for(rig)
         frame = e.anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))),
                              flip=flip)
-        sx, sy = ps.camera.world_to_screen(e.pos)
+        sx, sy = run.camera.world_to_screen(e.pos)
         if frame is None:                        # sprite file missing -> primitive
             pygame.draw.circle(surface, e.color, (int(sx), int(sy)),
                                round(e.radius * z))
@@ -646,11 +657,12 @@ class WorldRenderer:
 
     def boss(self, surface) -> None:
         ps = self.ps
-        b = ps.boss
+        run = getattr(self, "run", ps)
+        b = run.boss
         if b is None or not b.alive or self.spawn_veiled(b):
             return
-        z = ps.camera.zoom
-        sx, sy = ps.camera.world_to_screen(b.pos)
+        z = run.camera.zoom
+        sx, sy = run.camera.world_to_screen(b.pos)
         br = b.radius * z
         assets = ps.game.assets
         frame = None
@@ -679,10 +691,10 @@ class WorldRenderer:
                 pygame.draw.circle(surface, (255, 140, 140), (int(sx), int(sy)),
                                    round((40 + 220 * frac) * z), 2)
             elif pid == "charge":
-                d = ps.player.pos - b.pos
+                d = run.player.pos - b.pos
                 if d.length_squared() > 1:
                     d = d.normalize() * 900
-                    ex, ey = ps.camera.world_to_screen(b.pos + d)
+                    ex, ey = run.camera.world_to_screen(b.pos + d)
                     pygame.draw.line(surface, (255, 120, 120), (sx, sy), (ex, ey), 3)
             elif pid == "summon_brood":
                 pygame.draw.circle(surface, (150, 220, 160), (int(sx), int(sy)),
@@ -690,11 +702,12 @@ class WorldRenderer:
 
     def player(self, surface) -> None:
         ps = self.ps
-        if not ps.player.alive:
+        run = getattr(self, "run", ps)
+        if not run.player.alive:
             return                              # the death poof (_death_fx) stands in
-        z = ps.camera.zoom
-        sx, sy = ps.camera.world_to_screen(ps.player.pos)
-        pr = ps.player.radius * z
+        z = run.camera.zoom
+        sx, sy = run.camera.world_to_screen(run.player.pos)
+        pr = run.player.radius * z
 
         frame = self.hero_sprite_frame()
         if frame is not None:
@@ -702,7 +715,7 @@ class WorldRenderer:
             # position (bottom-centre-ish -- the art is bottom-heavy); the drop
             # then seats it below the collider centre (config.SPRITE_ANCHOR_DROP).
             ax, ay = self.anchor_for(ps._hero_anim.rig, self._hero_flip())
-            if ps.player._hurt_t > 0.0:
+            if run.player._hurt_t > 0.0:
                 frame = hit_tinted(frame)
             self._blit_character(
                 surface, frame,
@@ -720,14 +733,16 @@ class WorldRenderer:
 
     def _hero_flip(self) -> bool:
         ps = self.ps
-        return ps.player._facing < 0 and ps.game.assets.face(ps._hero_anim.rig) == "right"
+        run = getattr(self, "run", ps)
+        return run.player._facing < 0 and ps.game.assets.face(ps._hero_anim.rig) == "right"
 
     def hero_sprite_frame(self):
         ps = self.ps
+        run = getattr(self, "run", ps)
         if ps._hero_anim is None:
             return None
         rig = ps._hero_anim.rig
-        z = ps.camera.zoom
+        z = run.camera.zoom
         bw, bh = ps.game.assets.scale_for(rig)
         return ps._hero_anim.frame(
             size=(max(1, round(bw * z)), max(1, round(bh * z))),
@@ -736,11 +751,12 @@ class WorldRenderer:
     # --- projectiles / summons (per-family draw in the sub-packages) ---
     def _draw_ctx(self) -> DrawCtx:
         ps = self.ps
-        return DrawCtx(ps.game.assets, ps.stats["time"], ps.camera.zoom)
+        run = getattr(self, "run", ps)
+        return DrawCtx(ps.game.assets, run.stats["time"], run.camera.zoom)
 
     def player_projectiles(self, surface, level=None) -> None:
-        cam, ctx = self.ps.camera, self._draw_ctx()
-        for p in self.ps.projectiles:
+        cam, ctx = self.run.camera, self._draw_ctx()
+        for p in self.run.projectiles:
             if self._off_band(level, p.pos):
                 continue
             sx, sy = cam.world_to_screen(p.pos)
@@ -751,13 +767,13 @@ class WorldRenderer:
         "Breathing glow under the XP orbs", group D): the same cached disc
         as the orbs at one constant alpha, sized from the shot's collider,
         blitted before the arrow. Off-screen shots draw nothing."""
-        cam, ctx = self.ps.camera, self._draw_ctx()
+        cam, ctx = self.run.camera, self._draw_ctx()
         z = cam.zoom
         view = cam.visible_rect().inflate(_GEM_CULL_PAD, _GEM_CULL_PAD)
         cfg = config.HOSTILE_GLOW
         scale, alpha, colour = float(cfg["scale"]), int(cfg["alpha"]), cfg["colour"]
         glow = self._glow
-        for p in self.ps.hostiles:
+        for p in self.run.hostiles:
             if not view.collidepoint(p.pos.x, p.pos.y):
                 continue
             sx, sy = cam.world_to_screen(p.pos)
@@ -768,168 +784,12 @@ class WorldRenderer:
                     surface.blit(halo, halo.get_rect(center=(int(sx), int(sy))))
             draw_projectile(surface, sx, sy, p, ctx, default="arrow")
 
-    # --- dev overlay -------------------------------------------
+    # --- dev overlays -- see devtools/overlays.py --------------
     def spawn_point_overlay(self, surface) -> None:
-        """Dev-mode: every spawn point and resource anchor the generator
-        decided, read straight off the layout. Enemy points are diamonds
-        (bright for the large class, dim for small-only), resource anchors
-        squares, each with its floor number. Toggle with F8 or the dev
-        menu's 'Spawn points' row. Same shape as `collider_overlay`."""
-        ps = self.ps
-        if not (ps.dev_mode and ps._dev_show_spawn_points):
-            return
-        layout = ps.game_map.layout
-        if layout is None:
-            return
-        cam = ps.camera
-        z = cam.zoom
-        view = cam.visible_rect().inflate(200, 200)
-        font = fonts.mono(10)
-        half = max(3, round(_SPAWN_MARK_PX * z))
-
-        def label(sx, sy, text, col):
-            surface.blit(font.render(text, True, col), (sx + half + 2, sy - 6))
-
-        placement = ps.spawn.master.placement
-        now = ps.stats["time"]
-        for p in layout.spawn_points:
-            if not view.collidepoint(p.x, p.y):
-                continue
-            sx, sy = cam.world_to_screen(p.pos)
-            sx, sy = int(sx), int(sy)
-            col = (config.COLOR_DEBUG_SPAWN if p.clearance == "large"
-                   else config.COLOR_DEBUG_SPAWN_SMALL)
-            if placement.on_cooldown(p, now):        # just used: dimmed
-                col = tuple(c // 3 for c in col)
-            pygame.draw.polygon(surface, col, ((sx, sy - half), (sx + half, sy),
-                                               (sx, sy + half), (sx - half, sy)), 2)
-            label(sx, sy, str(p.floor), col)
-        for p in layout.resource_points:
-            if not view.collidepoint(p.x, p.y):
-                continue
-            sx, sy = cam.world_to_screen(p.pos)
-            sx, sy = int(sx), int(sy)
-            col = config.COLOR_DEBUG_RESOURCE
-            pygame.draw.rect(surface, col,
-                             pygame.Rect(sx - half, sy - half, 2 * half, 2 * half), 2)
-            label(sx, sy, f"{p.floor} {p.kind[0]}", col)
+        overlays.spawn_point_overlay(surface, self.ps)
 
     def aim_overlay(self, surface) -> None:
-        """Dev-mode (CB-5): the manual aim, drawn only while one is active --
-        a line from the hero along the aim out to the main weapon's reach,
-        plus the edges of the cone that decides the fire-time target pick
-        (the assist cone for a shot; the swing cone itself for melee, which
-        takes no assist). Mouse and key sources are tinted apart so the
-        priority ladder is visible. Toggle with the dev menu's 'Aim line'
-        row; no F-key. Same shape as `collider_overlay`."""
-        ps = self.ps
-        if not (ps.dev_mode and ps._dev_show_aim):
-            return
-        aim = ps._aim
-        if not aim.active:
-            return
-        cam = ps.camera
-        origin = ps.player.pos
-        main = ps.player.weapons[0] if ps.player.weapons else None
-        reach = _AIM_LINE_PX
-        half = math.radians(config.MANUAL_AIM_ASSIST_DEG)
-        if main is not None:
-            r = main._reach(ps.player.stats.get("area_multiplier", 1.0))
-            if math.isfinite(r):
-                reach = r
-            if main.special == "cone":
-                half = math.radians(float(main.definition["cone_half_angle"]))
-            else:
-                half = main._assist_half_angle()
-        col = (config.COLOR_DEBUG_AIM_MOUSE if aim.source == "mouse"
-               else config.COLOR_DEBUG_AIM_KEYS)
-        edge = tuple(c // 2 for c in col)
-
-        def seg(direction, colour, width):
-            pygame.draw.line(surface, colour, cam.world_to_screen(origin),
-                             cam.world_to_screen(origin + direction * reach), width)
-
-        seg(aim.direction, col, 2)
-        for sign in (1, -1):
-            seg(aim.direction.rotate(math.degrees(half) * sign), edge, 1)
+        overlays.aim_overlay(surface, self.ps)
 
     def collider_overlay(self, surface) -> None:
-        """Dev-mode: every true circular collider / hitbox in one pass, read
-        straight off the fields the physics uses. Toggle with F7 or the dev
-        menu's 'Collision shapes' row."""
-        ps = self.ps
-        if not (ps.dev_mode and ps._dev_show_colliders):
-            return
-        cam = ps.camera
-        z = cam.zoom
-        view = cam.visible_rect().inflate(200, 200)
-
-        def ring(pos, r, col, w=2):
-            sx, sy = cam.world_to_screen(pos)
-            pygame.draw.circle(surface, col, (int(sx), int(sy)),
-                               max(1, round(r * z)), w)
-
-        ring(ps.player.pos, ps.player.radius, config.COLOR_DEBUG)
-        ring(ps.player.pos, ps.player.pickup_radius, config.COLOR_DEBUG_SOFT, 1)
-        for e in ps.enemies:
-            if view.collidepoint(e.pos.x, e.pos.y):
-                ring(e.pos, e.radius, config.COLOR_DEBUG)
-        if ps.boss is not None and ps.boss.alive:
-            ring(ps.boss.pos, ps.boss.radius, config.COLOR_DEBUG)
-        for o in ps.game_map.obstacles:
-            if view.collidepoint(o.pos.x, o.pos.y):
-                ring(o.pos, o.radius, config.COLOR_DEBUG)
-        for p in ps.projectiles:
-            ring(p.pos, p.radius, config.COLOR_DEBUG_HIT, 1)
-        for p in ps.hostiles:
-            ring(p.pos, p.radius, config.COLOR_DEBUG_HIT, 1)
-        # Melee swing rings -- one-shot contact volumes, same style as the
-        # projectile hitboxes above (they used to draw unconditionally).
-        for hb in ps.melee_hitboxes:
-            if view.collidepoint(hb.pos.x, hb.pos.y):
-                ring(hb.pos, hb.radius, config.COLOR_DEBUG_HIT, 1)
-
-        # CB-2 reach rings: the gate that decides fire-vs-idle. One ring per
-        # equipped weapon at the hero (summon weapons have no ring -- `_reach`
-        # is `inf` -- so they are skipped); one leash ring per live summon,
-        # hero-centred for the wolf and planted-spot-centred for the totem,
-        # matching `Summon._acquire_target`.
-        area_mult = ps.player.stats.get("area_multiplier", 1.0)
-        for w in ps.player.weapons:
-            r = w._reach(area_mult)
-            if math.isfinite(r):
-                ring(ps.player.pos, r, config.COLOR_DEBUG_REACH, 1)
-        for s in ps.summons:
-            if not getattr(s, "active", False) or not math.isfinite(s.reach):
-                continue
-            center = ps.player.pos if s.kind == "wolf" else s.pos
-            ring(center, s.reach, config.COLOR_DEBUG_REACH, 1)
-
-        # CB-3 physics: a `weight` tag by every mobile body, and its live
-        # `_knock` (bump + hit impulse) drawn as a short blue line while it is
-        # being shoved -- so `BUMP_GAIN` / `HIT_KNOCK_GAIN` can be tuned by eye.
-        wf = fonts.mono(10)
-
-        def wtag(pos, weight, rad):
-            sx, sy = cam.world_to_screen(pos)
-            txt = "wINF" if math.isinf(weight) else f"w{weight:g}"
-            surface.blit(wf.render(txt, True, config.COLOR_DEBUG_REACH),
-                         (int(sx + rad * z) + 2, int(sy) - 6))
-
-        def knock_vec(pos, kn):
-            if kn.length_squared() <= 1.0:
-                return
-            sx, sy = cam.world_to_screen(pos)
-            pygame.draw.line(
-                surface, config.COLOR_DEBUG_KNOCK, (int(sx), int(sy)),
-                (int(sx + kn.x * _KNOCK_VEC_SCALE * z),
-                 int(sy + kn.y * _KNOCK_VEC_SCALE * z)), 2)
-
-        wtag(ps.player.pos, ps.player.weight, ps.player.radius)
-        knock_vec(ps.player.pos, ps.player._knock)
-        for e in ps.enemies:
-            if view.collidepoint(e.pos.x, e.pos.y):
-                wtag(e.pos, e.weight, e.radius)
-                knock_vec(e.pos, e._knock)
-        if ps.boss is not None and ps.boss.alive:
-            wtag(ps.boss.pos, ps.boss.weight, ps.boss.radius)
+        overlays.collider_overlay(surface, self.ps)

@@ -39,7 +39,7 @@ _SPLIT_LIFE = 0.6                   # ...and how long a child flies
 class CombatResolver:
     def __init__(self, ps) -> None:
         self.ps = ps
-
+        self.run = getattr(ps, "run", ps)
     def resolve(self) -> None:
         self.projectile_hits()
         self.hostile_hits()
@@ -49,12 +49,13 @@ class CombatResolver:
     # --- player projectiles -> enemies / boss --------------------
     def projectile_hits(self) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         # Dev toggle: weapons keep firing (animation, projectiles, knockback all
         # play) but a hit deals no HP damage and applies no on-hit status, so
         # enemies never die from the hero.
-        no_dmg = ps.dev_mode and ps._dev_no_damage
+        no_dmg = run.dev_mode and ps._dev_no_damage
         targets = ps._targetables()
-        for proj in ps.projectiles:
+        for proj in run.projectiles:
             if not proj.active:
                 continue
             if proj.inert:
@@ -63,9 +64,9 @@ class CombatResolver:
                 elif proj.sticky and proj.stuck_to is None:
                     self.stick(proj)
                 continue              # a fused bomb waits for its blast (P1)
-            near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
-            if ps.boss is not None and ps.boss.alive:
-                near = near + [ps.boss]
+            near = run.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
+            if run.boss is not None and run.boss.alive:
+                near = near + [run.boss]
             for enemy in near:
                 if not enemy.alive or id(enemy) in proj.hit_ids:
                     continue
@@ -87,9 +88,9 @@ class CombatResolver:
                 if buffs is not None and not no_dmg:
                     buffs.on_weapon_hit(proj, enemy)
                 proj.hit_ids.add(id(enemy))
-                ps.stats["damage_dealt"] += dealt
-                ps.damage_numbers.add(enemy.pos, dealt, proj.is_crit)
-                ps.particles.burst(proj.pos, proj.color, count=4, speed=90,
+                run.stats["damage_dealt"] += dealt
+                run.damage_numbers.add(enemy.pos, dealt, proj.is_crit)
+                run.particles.burst(proj.pos, proj.color, count=4, speed=90,
                                    life=0.22, radius=2)
                 if proj.src_weight:
                     # CB-3: same weight-split as a bump, base scaled by the
@@ -115,20 +116,20 @@ class CombatResolver:
         """Item tag bonuses + Shock + status-vulnerability synergy, times the
         firing weapon's conditional blessings (P2) and its weapon synergies
         (P4)."""
-        fx = self.ps.player.blessing_fx
+        fx = self.run.player.blessing_fx
         mult = 1.0 + fx.tag_bonus(proj.source_tags, getattr(enemy, "is_elite", False))
         mult *= enemy.status.damage_taken_multiplier()
         mult += fx.vuln_bonus(proj.source_tags, enemy.status)
         mult *= self.weapon_effect_multiplier(proj, enemy)
         mult *= synergy.synergy_multiplier(
-            self.ps.player, self._weapon(proj), enemy, self.now())
+            self.run.player, self._weapon(proj), enemy, self.now())
         return mult
 
     def now(self) -> float:
-        return float(self.ps.stats.get("time", 0.0))
+        return float(self.run.stats.get("time", 0.0))
 
     def _weapon(self, proj: Projectile):
-        return self.ps.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
+        return self.run.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
 
     def remember_hit(self, proj: Projectile, enemy) -> None:
         """P4: the enemy remembers who hit it and when; a marking weapon (the
@@ -149,7 +150,7 @@ class CombatResolver:
     def _effects(self, proj: Projectile) -> dict:
         """The firing weapon's `effects` (P2), or `{}` for a shot that no owned
         weapon fired (a summon's bolt, a stray)."""
-        w = self.ps.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
+        w = self.run.player.weapon_by_id(proj.weapon_id) if proj.weapon_id else None
         return w.effects if w is not None else {}
 
     def weapon_effect_multiplier(self, proj: Projectile, enemy) -> float:
@@ -182,6 +183,7 @@ class CombatResolver:
         if n <= 0 or "split" in proj.source_tags or proj.vel.length_squared() < 1.0:
             return
         ps = self.ps
+        run = getattr(self, "run", ps)
         mult = float(fx.get("split_damage_mult", 0.5))
         speed = proj.vel.length()
         heading = math.atan2(proj.vel.y, proj.vel.x)
@@ -202,11 +204,12 @@ class CombatResolver:
 
     def apply_on_hit_effects(self, proj: Projectile, enemy) -> None:
         ps = self.ps
-        fx = ps.player.blessing_fx
+        run = getattr(self, "run", ps)
+        fx = run.player.blessing_fx
         for status, tag, chance, dur, potency in fx.on_hit:
             if tag is not None and tag not in proj.source_tags:
                 continue
-            if ps.rng.random() < chance:
+            if run.rng.random() < chance:
                 enemy.status.apply(
                     status,
                     dur * (1.0 + fx.tuned(status, "duration")),
@@ -248,9 +251,10 @@ class CombatResolver:
         along until the fuse (`TransientFx.ride_stuck`); its blast is heavier
         by `sticky_damage_mult`."""
         ps = self.ps
-        near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
-        if ps.boss is not None and ps.boss.alive:
-            near = near + [ps.boss]
+        run = getattr(self, "run", ps)
+        near = run.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
+        if run.boss is not None and run.boss.alive:
+            near = near + [run.boss]
         for enemy in near:
             if enemy.alive and circles_overlap(proj.pos.x, proj.pos.y, proj.radius,
                                                enemy.pos.x, enemy.pos.y, enemy.radius):
@@ -266,9 +270,10 @@ class CombatResolver:
         """P3 Minefield: an armed mine goes off the moment an enemy body
         overlaps it."""
         ps = self.ps
-        near = ps.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
-        if ps.boss is not None and ps.boss.alive:
-            near = near + [ps.boss]
+        run = getattr(self, "run", ps)
+        near = run.grid.query_circle(proj.pos.x, proj.pos.y, proj.radius + 40)
+        if run.boss is not None and run.boss.alive:
+            near = near + [run.boss]
         for enemy in near:
             if enemy.alive and circles_overlap(proj.pos.x, proj.pos.y, proj.radius,
                                                enemy.pos.x, enemy.pos.y, enemy.radius):
@@ -280,7 +285,7 @@ class CombatResolver:
         """P1: the Hammer's `stun_chance` roll. Bosses are immune."""
         if proj.stun_chance <= 0.0 or getattr(enemy, "stun_immune", False):
             return
-        if self.ps.rng.random() < proj.stun_chance:
+        if self.run.rng.random() < proj.stun_chance:
             enemy.status.apply("stun", proj.stun_duration, 1.0)
 
     @staticmethod
@@ -310,12 +315,13 @@ class CombatResolver:
     # --- hostile projectiles -> player -------------------------
     def hostile_hits(self) -> None:
         ps = self.ps
-        pr = ps.player.radius
-        for proj in ps.hostiles:
+        run = getattr(self, "run", ps)
+        pr = run.player.radius
+        for proj in run.hostiles:
             if not proj.active:
                 continue
             if circles_overlap(proj.pos.x, proj.pos.y, proj.radius,
-                               ps.player.pos.x, ps.player.pos.y, pr):
+                               run.player.pos.x, run.player.pos.y, pr):
                 taken = ps.player.take_damage(proj.damage)
                 proj.active = False
                 if taken > 0:
@@ -327,16 +333,17 @@ class CombatResolver:
         before armor) once per its `contact_interval`; `contact_cd` -- ticked
         down in Enemy/Boss.update -- paces it."""
         ps = self.ps
-        pr = ps.player.radius
-        contacts = list(ps.grid.query_circle(ps.player.pos.x, ps.player.pos.y, pr + 48))
-        if ps.boss is not None and ps.boss.alive:
-            contacts.append(ps.boss)
+        run = getattr(self, "run", ps)
+        pr = run.player.radius
+        contacts = list(run.grid.query_circle(run.player.pos.x, run.player.pos.y, pr + 48))
+        if run.boss is not None and run.boss.alive:
+            contacts.append(run.boss)
         for enemy in contacts:
             if not enemy.alive or enemy.contact_cd > 0.0:
                 continue
             if not getattr(enemy, "contact_damage_enabled", True):
                 continue
-            if circles_overlap(ps.player.pos.x, ps.player.pos.y, pr,
+            if circles_overlap(run.player.pos.x, run.player.pos.y, pr,
                                enemy.pos.x, enemy.pos.y, enemy.radius):
                 enemy.contact_cd = enemy.contact_interval
                 taken = ps.player.take_damage(
@@ -359,19 +366,20 @@ class CombatResolver:
     # --- reap the dead ----------------------------------------
     def cull_dead_enemies(self) -> None:
         ps = self.ps
-        if ps.boss is not None and not ps.boss.alive:
+        run = getattr(self, "run", ps)
+        if run.boss is not None and not run.boss.alive:
             ps._on_boss_killed()
 
-        if not ps.enemies:
+        if not run.enemies:
             return
         survivors = []
-        for e in ps.enemies:
+        for e in run.enemies:
             if e.alive:
                 survivors.append(e)
                 continue
             # Death effects fire NOW, at the instant of death.
-            ps.stats["kills"] += 1
-            ps.ledger.kill(e)
+            run.stats["kills"] += 1
+            run.ledger.kill(e)
             if e.explode_radius > 0.0:
                 ps.fx.explosion(e.pos, e.explode_radius, e.explode_damage)
             ps._apply_on_kill_effects(e)

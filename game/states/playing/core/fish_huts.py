@@ -50,15 +50,17 @@ class FishHutProp:
 class FishHuts:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self.data = get_content().npcs
         self.rng = random.Random()
 
     # --- build ---------------------------------------------------------
     def build(self) -> None:
         ps = self.ps
-        ps.fish_huts = []
-        ps.boats = []
-        layout = ps.game_map.layout
+        run = getattr(self, "run", ps)
+        run.fish_huts = []
+        run.boats = []
+        layout = run.game_map.layout
         records = getattr(layout, "fish_huts", None) if layout is not None else None
         if not records:
             return
@@ -74,29 +76,30 @@ class FishHuts:
         self.rng = random.Random(f"{layout.seed}:fish_huts")
         rng = self.rng
         for rec in records:
-            ps.fish_huts.append(FishHutProp(f"npc_{HUT}", rec.x, rec.y, assets))
+            run.fish_huts.append(FishHutProp(f"npc_{HUT}", rec.x, rec.y, assets))
             for _ in range(rng.randint(lo, hi)):
                 rig = rng.choice(rigs)
                 for _ in range(_HOME_TRIES):
                     ang = rng.uniform(0.0, 6.283185307)
                     d = rng.uniform(*ring) * px
                     home = pygame.Vector2(rec.x, rec.y) + pygame.Vector2(d, 0).rotate_rad(ang)
-                    if ps.game_map.is_open_water(home.x, home.y):
-                        ps.boats.append(WaterNpc(BOAT, rig, home.x, home.y, spec,
+                    if run.game_map.is_open_water(home.x, home.y):
+                        run.boats.append(WaterNpc(BOAT, rig, home.x, home.y, spec,
                                                  assets, leash_px=spec["leash"] * px))
                         break
 
     # --- step ----------------------------------------------------------
     def update(self, dt: float) -> None:
         ps = self.ps
+        run = getattr(self, "run", ps)
         huts = getattr(ps, "fish_huts", None)
         boats = getattr(ps, "boats", None)
         if not huts and not boats:
             return
         idle = self.data["kinds"][BOAT]["idle"]
         pad = config.RENDER_ACTOR_CULL_PAD * 3
-        view = ps.camera.visible_rect().inflate(2 * pad, 2 * pad)
-        world = ps.game_map
+        view = run.camera.visible_rect().inflate(2 * pad, 2 * pad)
+        world = run.game_map
         for h in huts or ():
             if h.anim is not None and view.collidepoint(h.pos.x, h.pos.y):
                 h.anim.update(dt)
@@ -108,6 +111,7 @@ class FishHuts:
     def actor_items(self, view, lvl) -> list:
         """`(level, depth_y, draw_fn)` for the visible huts and boats."""
         ps = self.ps
+        run = getattr(self, "run", ps)
         draw = ps.npc_manager.draw_one
         out = []
         for n in list(getattr(ps, "fish_huts", ())) + list(getattr(ps, "boats", ())):

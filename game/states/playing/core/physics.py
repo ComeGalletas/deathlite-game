@@ -37,12 +37,14 @@ _PEN_CAP_FRAC = 0.6
 class BumpResolver:
     def __init__(self, ps) -> None:
         self.ps = ps
+        self.run = getattr(ps, "run", ps)
         self._grid = SpatialGrid()
 
     def resolve(self) -> None:
         ps = self.ps
-        enemies = ps.enemies
-        boss = ps.boss if (ps.boss is not None and ps.boss.alive) else None
+        run = getattr(self, "run", ps)
+        enemies = run.enemies
+        boss = run.boss if (run.boss is not None and run.boss.alive) else None
 
         population = enemies + [boss] if boss is not None else enemies
         if not population:
@@ -65,7 +67,7 @@ class BumpResolver:
                 self._bump(a, b)
 
         # hero <-> enemy / boss
-        p = ps.player
+        p = run.player
         if p.alive:
             for e in self._grid.query_circle(p.pos.x, p.pos.y,
                                              p.radius + _QUERY_PAD):
