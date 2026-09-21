@@ -12,7 +12,7 @@ import pygame
 
 from game.game import Game
 from game.states.menu_state import MenuState
-from game.states.playing_state import PlayingState
+from game.states.playing.core.state import PlayingState
 from tests import worlds as W
 from world.map import GameMap
 
@@ -186,7 +186,7 @@ class ConeWeaponVisualTests(unittest.TestCase):
 
     def _proj(self, cx, cy, r=60, half_deg=55, dir=(1, 0)):
         import math
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
 
         class P:
             radius = r

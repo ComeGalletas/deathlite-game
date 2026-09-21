@@ -28,7 +28,7 @@ from world.gen.height.flights import (_nstair_site, _cut, _cut_flights,
                                       _cut_north_flights)
 from world.gen.height.graph import walk_links, check_grid, to_ascii
 from world.layout import Cell, GROUND, CLIFF, VSTAIR, EWSTAIR
-from world.pathfinding import NavField, _INF
+from world.nav.field import NavField, _INF
 from world.rules.steps import can_cross
 
 SEEDS = (35, 7)

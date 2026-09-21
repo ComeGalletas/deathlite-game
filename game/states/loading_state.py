@@ -29,7 +29,7 @@ from ui import scale
 from systems.animation import Animator
 from world.gen import generate_world_steps
 from world.map import GameMap
-from world.pathfinding import NavField
+from world.nav.field import NavField
 from world.terrain.bake import bake_steps
 
 PrebuiltWorld = namedtuple("PrebuiltWorld", "game_map nav")
@@ -150,7 +150,7 @@ class LoadingState(State):
                 return
 
     def _start_run(self) -> None:
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         self.game.state_machine.change(PlayingState(self.game),
                                        prebuilt=self._prebuilt, **self._run_kwargs)
 

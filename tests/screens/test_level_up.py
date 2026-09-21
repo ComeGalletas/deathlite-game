@@ -16,7 +16,7 @@ import pygame
 from game.game import Game
 from game.states.level_up_state import LevelUpState
 from game.states.menu_state import MenuState
-from game.states.playing_state import PlayingState
+from game.states.playing.core.state import PlayingState
 from tests import worlds as W
 
 SEED = W.pinned(1)

@@ -11,7 +11,7 @@ import pygame
 
 from game.game import Game
 from game.states.loading_state import LoadingState
-from game.states.playing_state import PlayingState
+from game.states.playing.core.state import PlayingState
 from tests import worlds as W
 from tools.verification import world_digest as digest
 

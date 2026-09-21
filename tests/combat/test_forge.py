@@ -504,7 +504,7 @@ class ForgeWeaponPickerTests(unittest.TestCase):
         self.assertEqual(st.weapon_rows[st.weapon_sel][0].weapon_id, "sword")
 
     def test_nothing_eligible_still_just_says_what_is_missing(self):
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         game, ps = self._run_with(("sword", "bow"), ("sword_bloodletting",))
         self._open_forge(ps)
         self.assertIsInstance(game.state_machine.current, PlayingState)

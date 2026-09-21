@@ -31,7 +31,7 @@ from world.gen.height.coast import _walk
 from world.gen.height.graph import check_grid
 from world.gen.height.water import _trim_lake_stubs
 from world.layout import Corridor, GROUND, LAKE
-from world.pathfinding import NavGrid
+from world.nav.lattice import NavGrid
 
 _SEEDS = range(1, 9)
 _NB = ((1, 0), (-1, 0), (0, 1), (0, -1))

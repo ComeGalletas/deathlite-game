@@ -294,7 +294,7 @@ class PowderKegTests(unittest.TestCase):
     BLAST = ("ranged", "area", "explosive", "blast")
 
     def _kill(self, ps, enemy, shot):
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         enemy.alive = False
         enemy.killed_by = "bomb"
         enemy.killed_by_shot = shot

@@ -28,7 +28,7 @@ from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.playing.core.locations import MERCHANT_COST
 from tests import worlds as W
-from world.procedural import SPECIAL_KINDS
+from world.gen.tuning import SPECIAL_KINDS
 
 
 SEED = W.pinned(0)

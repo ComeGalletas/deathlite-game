@@ -104,7 +104,7 @@ def _start_dev_run(hero: str = HERO):
     """
     from game.game import Game
     from game.states.loading_state import PrebuiltWorld
-    from game.states.playing_state import PlayingState
+    from game.states.playing.core.state import PlayingState
     from world.map import GameMap
 
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))

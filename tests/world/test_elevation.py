@@ -25,7 +25,8 @@ from world.gen.height.graph import reachable, walk_links
 from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
 from tests import worlds
-from world.pathfinding import NavField, NavGrid, FlowField, NAV_DIRS, _INF
+from world.nav.field import NavField, FlowField, _INF
+from world.nav.lattice import NavGrid, NAV_DIRS
 
 # Two seeds, not forty. Every case here is structural -- it holds for a
 # neighbourhood, not for a lucky layout -- and each seed costs a world plus a

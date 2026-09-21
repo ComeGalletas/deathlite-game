@@ -16,7 +16,8 @@ from game import config
 from tests import worlds as W
 from world.gen.tuning import _GRID_CLEAR_RADIUS
 from world.map import GameMap
-from world.procedural import SPECIAL_KINDS, _corridor_doorways
+from world.gen.tuning import SPECIAL_KINDS
+from world.gen.scatter import _corridor_doorways
 
 
 class ObstacleCollisionTests(unittest.TestCase):

@@ -12,8 +12,8 @@ import pygame
 
 from game import config
 from game.game import Game
-from game.states.playing_state import PlayingState
-from world.pathfinding import NavField, _INF
+from game.states.playing.core.state import PlayingState
+from world.nav.field import NavField, _INF
 from tests import worlds as W
 
 
@@ -288,7 +288,7 @@ class NavRebuildStaggerTests(unittest.TestCase):
         # class radius) next to a reached one -> `direction` now steers toward the
         # field instead of handing back zero (which forced a blind straight line).
         _g, p = _playing(1234, True)
-        from world.pathfinding import _INF
+        from world.nav.field import _INF
         ng = p._nav.grids["small"]
         ff = p._nav.fields["small"]
         cols = ng.cols

@@ -10,7 +10,7 @@ from game import config
 from tests import worlds as W
 from world.gen.rooms import _four_connected
 from world.gen.tuning import VILLAGE_KIND
-from world.procedural import SPECIAL_KINDS
+from world.gen.tuning import SPECIAL_KINDS
 
 
 class StructureTests(unittest.TestCase):

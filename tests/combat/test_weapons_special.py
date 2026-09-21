@@ -176,7 +176,7 @@ class MainWeaponAttackAnimTests(unittest.TestCase):
     def _playing(self):
         from game.game import Game
         from game.states.menu_state import MenuState
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "s.json"))
         g.state_machine.change(MenuState(g))
         from tests.boot import start_run

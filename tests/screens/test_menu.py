@@ -515,7 +515,7 @@ class CharacterSelectDifficultyTests(unittest.TestCase):
         self.assertEqual(cs.difficulty, before)
 
     def test_choice_reaches_the_playing_state(self):
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         game, cs = self._select()
         _key(game, pygame.K_DOWN)                   # -> fast
         _key(game, pygame.K_RETURN)                 # begin -> loading -> run
@@ -583,7 +583,7 @@ class CharacterSelectMouseTests(unittest.TestCase):
 
     def test_begin_button_starts_with_the_selected_hero_and_difficulty(self):
         from tests.boot import settle
-        from game.states.playing_state import PlayingState
+        from game.states.playing.core.state import PlayingState
         game, cs = self._cs()
         _key(game, pygame.K_RIGHT)                                    # hero 1
         _key(game, pygame.K_DOWN)                                     # next difficulty

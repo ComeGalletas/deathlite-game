@@ -14,7 +14,7 @@ from game import save as save_mod
 from game.game import Game
 from game.states.character_select_state import CharacterSelectState
 from game.states.menu_state import MenuState
-from game.states.playing_state import PlayingState
+from game.states.playing.core.state import PlayingState
 from tests.boot import settle
 
 
