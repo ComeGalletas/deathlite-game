@@ -18,7 +18,7 @@ import pygame
 
 from entities.interactable import Interactable
 from progression.blessings import roll_offering
-from world.procedural import SPECIAL_KINDS
+from world.gen.tuning import SPECIAL_KINDS
 
 MERCHANT_COST = 30            # in-run gold
 ALTAR_HP_COST_FRACTION = 0.25
@@ -27,12 +27,17 @@ ALTAR_HP_COST_FRACTION = 0.25
 class SpecialLocations:
     def __init__(self, ps) -> None:
         self.ps = ps
-
     def build(self) -> None:
         ps = self.ps
         ps.interactables = []
         if ps.game_map.layout is None:
             return
+        # Parked since 2026-09-20: `SPECIAL_KINDS` is empty, so no shrine,
+        # treasure, altar or merchant is ever built here -- the generator no
+        # longer labels an island with one. The loop and the four `use_*`
+        # handlers below are kept as the template for when those facilities
+        # come back in another form
+        # (`journals/special_facilities_journal.md`).
         for room in ps.game_map.layout.rooms:
             if room.kind in SPECIAL_KINDS:
                 ps.interactables.append(Interactable(

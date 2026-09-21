@@ -1,7 +1,19 @@
 """Milestone 10: special-location interactables (spec 5.5).
 
 Driven through a real headless PlayingState so the effects hit the same code the
-game runs (drops, heals, blessing grants, elite arena)."""
+game runs (drops, heals, blessing grants).
+
+**Four of these are parked code** (owner, 2026-09-20 --
+`journals/special_facilities_journal.md`): the shrine, treasure, altar and
+merchant islands are no longer generated, so `SPECIAL_KINDS` is empty and no
+world builds one of those interactables. Their handlers are kept for the
+re-implementation, so the tests below *hand-build* the interactable instead of
+hunting a layout for one -- `_parked` says so at each call. The alternative
+was four `skipTest`s, which would look like coverage and be none.
+
+What a real world still places -- the village forge and sanctuary heal, and
+the buff buildings -- is still found through the layout.
+"""
 import os
 import tempfile
 import unittest
@@ -11,8 +23,10 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from entities.interactable import Interactable
 from game.game import Game
 from game.states.menu_state import MenuState
+from game.states.playing.core.locations import MERCHANT_COST
 from tests import worlds as W
 from world.procedural import SPECIAL_KINDS
 
@@ -21,31 +35,42 @@ SEED = W.pinned(0)
 
 
 def fresh_playing(seed=SEED):
-    """A booted run on the pinned world. Pinned because which special rooms
-    a layout has decides which of these tests run at all: on a random world
-    each one skipped itself whenever its shrine, fountain, treasure, altar or
-    merchant was not generated."""
+    """A booted run on the pinned world. Pinned because how many villages and
+    buff buildings a layout has decides what `PlacementTests` counts, and
+    because the forge tests need the village that carries the forge."""
     from tests.boot import start_run
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(MenuState(game))
     return game, start_run(game, seed)
 
 
+def _parked(p, kind, cost=0):
+    """One of the four parked facilities, built by hand at the hero's feet.
+
+    Generation never produces these any more; the handler under test does not
+    care where the interactable came from.
+    """
+    return Interactable(kind, p.player.pos.x, p.player.pos.y, cost=cost)
+
+
 class PlacementTests(unittest.TestCase):
-    def test_one_interactable_per_special_room_at_its_centre(self):
+    def test_a_world_builds_only_village_and_buff_interactables(self):
+        """HI-2: a forge and a sanctuary heal per village, and one per buff
+        building (journal: buff_buildings_journal.md) -- and nothing else.
+
+        The `specials` term used to be the point of this test. It is now
+        asserted to be empty: the four special islands were parked on
+        2026-09-20 (`journals/special_facilities_journal.md`), and this is
+        where "the generator really stopped building them" is pinned on the
+        run side.
+        """
         _, p = fresh_playing()
         lay = p.game_map.layout
-        specials = [r for r in lay.rooms if r.kind in SPECIAL_KINDS]
-        # HI-2: plus a forge and a sanctuary heal per village, and one per
-        # buff building (journal: buff_buildings_journal.md).
+        self.assertEqual(SPECIAL_KINDS, ())
+        self.assertEqual([r.kind for r in lay.rooms if r.kind in SPECIAL_KINDS], [])
         buildings = lay.buff_buildings(p.buffs.kinds)
         self.assertEqual(len(p.interactables),
-                         len(specials) + 2 * len(lay.villages) + len(buildings))
-        by_kind = {it.kind: it for it in p.interactables}
-        for room in specials:
-            it = by_kind[room.kind]
-            self.assertAlmostEqual(it.pos.x, room.center.x)
-            self.assertAlmostEqual(it.pos.y, room.center.y)
+                         2 * len(lay.villages) + len(buildings))
         forges = {(it.pos.x, it.pos.y) for it in p.interactables if it.kind == "forge"}
         heals = {(it.pos.x, it.pos.y) for it in p.interactables if it.kind == "fountain"}
         self.assertEqual(forges, {(v.forge.x, v.forge.y) for v in lay.villages})
@@ -58,10 +83,9 @@ class EffectTests(unittest.TestCase):
         return next((it for it in p.interactables if it.kind == kind), None)
 
     def test_shrine_grants_a_blessing_and_is_consumed(self):
+        """Parked handler, hand-built interactable -- see the module docstring."""
         _, p = fresh_playing()
-        it = self._get(p, "shrine")
-        if it is None:
-            self.skipTest("no shrine in this layout")
+        it = _parked(p, "shrine")
         before = sum(p.player.blessings.values())
         p._use_shrine(it)
         self.assertTrue(it.used)
@@ -116,20 +140,18 @@ class EffectTests(unittest.TestCase):
         pygame.quit()
 
     def test_treasure_adds_an_item_to_the_run_drops(self):
+        """Parked handler, hand-built interactable -- see the module docstring."""
         _, p = fresh_playing()
-        it = self._get(p, "treasure")
-        if it is None:
-            self.skipTest("no treasure in this layout")
+        it = _parked(p, "treasure")
         n = len(p.stats["dropped_items"])
         p._use_treasure(it)
         self.assertEqual(len(p.stats["dropped_items"]), n + 1)
         pygame.quit()
 
     def test_altar_costs_hp_and_refuses_when_too_low(self):
+        """Parked handler, hand-built interactable -- see the module docstring."""
         _, p = fresh_playing()
-        it = self._get(p, "altar")
-        if it is None:
-            self.skipTest("no altar in this layout")
+        it = _parked(p, "altar")
         p.player.hp = p.player.max_hp
         p._use_altar(it)
         self.assertTrue(it.used)
@@ -142,10 +164,13 @@ class EffectTests(unittest.TestCase):
         pygame.quit()
 
     def test_merchant_requires_gold(self):
+        """Parked handler, hand-built interactable -- see the module docstring.
+
+        `MERCHANT_COST` is passed explicitly because `locations.build()` used
+        to supply it and no longer builds one of these at all.
+        """
         _, p = fresh_playing()
-        it = self._get(p, "merchant")
-        if it is None:
-            self.skipTest("no merchant in this layout")
+        it = _parked(p, "merchant", cost=MERCHANT_COST)
         p.stats["gold"] = 0
         p._use_merchant(it)
         self.assertFalse(it.used)

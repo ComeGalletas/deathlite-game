@@ -12,6 +12,13 @@ import pygame
 # kind -> (radius, colour). Nothing here is text: the interact keycap that
 # floats over the element is drawn by `visual/key_marker.py` from
 # `config.KEY_INTERACT` (journal: key_icons_journal.md).
+#
+# `shrine`, `treasure`, `altar` and `merchant` are **parked** (owner,
+# 2026-09-20): `world/gen/tuning.py`'s `SPECIAL_KINDS` is empty, so no
+# generated world labels an island with one and none of the four is ever
+# built at run time. They are kept here, with their handlers in
+# `core/locations.py`, because the facilities are coming back in another
+# form (`journals/special_facilities_journal.md`).
 KINDS = {
     "shrine":      (26, (120, 160, 240)),
     "treasure":    (24, (230, 200, 90)),

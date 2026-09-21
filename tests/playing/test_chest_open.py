@@ -264,12 +264,19 @@ class KeyTests(unittest.TestCase):
 
     def test_a_special_location_wins_a_tie(self):
         """The key goes to the closest element; at an equal distance the
-        location wins, as it always did. A chest can never be seated inside
-        a special island's clear disc, so this only pins the tie rule."""
+        location wins, as it always did.
+
+        The shrine is hand-seated rather than found in the layout: the four
+        special islands were parked on 2026-09-20
+        (`journals/special_facilities_journal.md`), so no world generates one.
+        That does not retire the rule -- a village forge or a buff building
+        can tie with a chest the same way -- and a hand-built interactable is
+        the smallest thing that exercises `interactions.nearest`."""
+        from entities.interactable import Interactable
         _g, p = _run()
         p.chests = []
-        it = next((i for i in p.interactables if i.kind == "shrine"), None)
-        self.assertIsNotNone(it, "seed 1234 has no shrine")
+        it = Interactable("shrine", p.player.pos.x, p.player.pos.y)
+        p.interactables.append(it)
         p.player.pos.update(it.pos)
         chest = _put(p, "epic", it.pos)
         p.handle_event(pygame.event.Event(pygame.KEYDOWN, key=config.KEY_INTERACT))
