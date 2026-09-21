@@ -65,6 +65,12 @@ class RunEnd:
         summary["character"] = content.character(run.character_id)["name"]
         summary["character_id"] = run.character_id
         summary["blessings"] = dict(player.blessings)
+        # The elements this run obtained (design §7.3): a set, so it can
+        # never hold duplicates and never outgrow the element count.
+        # Sorted for the screen; nothing reads it for gameplay.
+        summary["unlocked_elements"] = sorted(
+            e.key for e in run.unlocked_elements)
+        summary["elements"] = run.ledger.elements.snapshot()
         # The game-over readout (`ui/run_summary.py`): the per-weapon damage
         # split with DPS over the held span, the proc rows, kills per type,
         # blessings by name. Nothing above is renamed -- the save, the

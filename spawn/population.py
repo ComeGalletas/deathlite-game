@@ -75,18 +75,21 @@ class DormantEnemy:
     is under 100 KB of these."""
 
     __slots__ = ("enemy_id", "room_id", "floor", "x", "y", "hp", "max_hp",
-                 "shield_hp", "speed", "status", "owner", "spawned_at", "slept_at",
-                 "recycles")
+                 "shield_hp", "speed", "status", "elemental", "owner",
+                 "spawned_at", "slept_at", "recycles")
 
     def __init__(self, enemy_id: str, x: float, y: float, hp: float, max_hp: float,
                  shield_hp: float, speed: float, status=None, owner: str = "direct",
                  spawned_at: float = 0.0, room_id: int = -1, floor: int = 0,
-                 slept_at: float = 0.0, recycles: int = 0) -> None:
+                 slept_at: float = 0.0, recycles: int = 0, elemental=None) -> None:
         self.enemy_id = enemy_id
         self.x, self.y = float(x), float(y)
         self.hp, self.max_hp = float(hp), float(max_hp)
         self.shield_hp, self.speed = float(shield_hp), float(speed)
         self.status = status
+        # The aura and its lock survive a nap, as the statuses do: an enemy
+        # that hibernates mid-burn wakes still burning.
+        self.elemental = elemental
         self.owner = owner
         self.spawned_at = float(spawned_at)
         self.room_id, self.floor = int(room_id), int(floor)

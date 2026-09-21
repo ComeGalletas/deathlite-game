@@ -853,11 +853,30 @@ class DevMenuScrollTests(unittest.TestCase):
         self.assertEqual(menu.scroll, n - MAX_VISIBLE)
 
     def test_short_pages_never_scroll(self):
+        """A page with fewer rows than the window shows all of them and
+        never moves. The root page outgrew the window as the menu filled
+        up, so this uses one that is genuinely short."""
+        from game.states.dev_menu_state import MAX_VISIBLE
+
         game = _game()
-        _, menu = _open_dev_menu(game)         # root: 8 rows < MAX_VISIBLE
+        _, menu = _open_dev_menu(game)
+        menu._activate("force_aura")           # the four elements
+        self.assertLess(len(menu._rows()), MAX_VISIBLE)
         for _ in range(20):
             _key(game, pygame.K_DOWN)
         self.assertEqual(menu.scroll, 0)
+
+    def test_the_root_page_scrolls_now_that_it_outgrew_the_window(self):
+        from game.states.dev_menu_state import MAX_VISIBLE
+
+        game = _game()
+        _, menu = _open_dev_menu(game)
+        n = len(menu._rows())
+        self.assertGreater(n, MAX_VISIBLE, "the root page is a long page now")
+        for _ in range(n + 5):                 # sweep it, wrapping
+            _key(game, pygame.K_DOWN)
+            self.assertTrue(menu.scroll <= menu.sel < menu.scroll + MAX_VISIBLE)
+            self.assertLessEqual(menu.scroll, n - MAX_VISIBLE)
 
     def test_draw_headless_across_scroll_positions(self):
         game, playing, menu = self._long_page()
@@ -1061,3 +1080,166 @@ class DevTrainingDummyTests(unittest.TestCase):
         menu._activate("dummy")
         playing.update(1 / 60)
         self.assertGreater(playing.dps.elapsed, 0.0)
+
+
+class DevAuraMenuTests(unittest.TestCase):
+    """The "Aura inspector" toggle and the "Force aura..." page (elemental
+    system M2).
+
+    Until weapons carry elements (M6) this page is the only way to drive the
+    elemental system in a running game, and it goes through the run's real
+    resolver -- so this also checks that a booted run *has* one, with its
+    enemy profiles resolved.
+    """
+
+    def _menu(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        return game, playing, menu
+
+    def _an_enemy(self, playing, menu):
+        """One living enemy beside the hero, spawned the way the dev menu
+        spawns them."""
+        menu._spawn("skull")
+        return playing.enemies[-1]
+
+    def test_a_booted_run_has_a_resolver_with_every_type_profiled(self):
+        _game_, playing, _menu = self._menu()
+        resolver = playing.run.elements
+        self.assertIsNotNone(resolver)
+        self.assertIn("skull", resolver.profiles)
+        self.assertIn("the_first_hunger", resolver.profiles)
+        self.assertTrue(resolver.profile_for(self._an_enemy(playing, _menu)).aura_enabled)
+
+    def test_the_inspector_row_toggles_its_flag(self):
+        _game_, playing, menu = self._menu()
+        self.assertFalse(playing._dev_show_auras)
+        menu._activate("auras")
+        self.assertTrue(playing._dev_show_auras)
+        self.assertIn("ON", menu._row_label("auras"))
+        menu._activate("auras")
+        self.assertFalse(playing._dev_show_auras)
+
+    def test_the_force_aura_row_opens_a_page_of_the_four_elements(self):
+        _game_, _playing, menu = self._menu()
+        menu._activate("force_aura")
+        self.assertEqual(menu.page, "elements")
+        self.assertEqual([e.key for e in menu._rows()],
+                         ["fire", "ice", "thunder", "wind"])
+
+    def test_applying_one_puts_a_live_aura_on_the_nearest_enemy(self):
+        from combat.elements.ids import ElementId
+
+        _game_, playing, menu = self._menu()
+        enemy = self._an_enemy(playing, menu)
+        menu._force_aura(ElementId.FIRE)
+        nearest = menu._nearest_enemy()
+        self.assertTrue(nearest.elemental.has_aura(playing.stats["time"]))
+        self.assertEqual(nearest.elemental.element(playing.stats["time"]),
+                         ElementId.FIRE)
+        self.assertEqual(nearest.elemental.source_weapon, "dev")
+        self.assertIn("fire", menu._status.lower())
+        self.assertIsNotNone(enemy)
+
+    def test_a_second_element_reacts_and_locks_the_slot(self):
+        from combat.elements.ids import ElementId
+
+        _game_, playing, menu = self._menu()
+        self._an_enemy(playing, menu)
+        menu._force_aura(ElementId.FIRE)
+        target = menu._nearest_enemy()
+        menu._force_aura(ElementId.THUNDER)
+        now = playing.stats["time"]
+        self.assertFalse(target.elemental.has_aura(now), "the aura was consumed")
+        self.assertTrue(target.elemental.is_locked(now))
+        self.assertEqual(playing.ledger.elements.reactions[("dev", "overload")], 1)
+
+    def test_with_nothing_alive_it_says_so_instead_of_failing(self):
+        _game_, playing, menu = self._menu()
+        from combat.elements.ids import ElementId
+        for e in playing.enemies:
+            e.alive = False
+        if playing.boss is not None:
+            playing.boss.alive = False
+        menu._force_aura(ElementId.ICE)
+        self.assertIn("no enemy", menu._status.lower())
+
+    def test_the_inspector_draws_without_a_surface_error(self):
+        from combat.elements.ids import ElementId
+
+        _game_, playing, menu = self._menu()
+        self._an_enemy(playing, menu)
+        menu._force_aura(ElementId.ICE)
+        playing._dev_show_auras = True
+        surface = pygame.Surface((320, 240))
+        playing.renderer.aura_overlay(surface)
+
+
+class DevInfuseMenuTests(unittest.TestCase):
+    """The "Infuse weapons..." page (elemental system M6).
+
+    One row per held weapon, summons included, and ENTER cycles the element
+    rather than opening a second page -- the point is to try pairs quickly.
+    """
+
+    def _menu(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        return game, playing, menu
+
+    def test_the_page_lists_every_held_weapon(self):
+        _game_, playing, menu = self._menu()
+        menu._activate("infuse")
+        self.assertEqual(menu.page, "infuse")
+        self.assertEqual(len(menu._rows()), len(playing.player.weapons))
+
+    def test_enter_cycles_the_element_and_comes_back_to_none(self):
+        from combat.elements.ids import ELEMENTS, ElementId
+
+        _game_, playing, menu = self._menu()
+        menu._activate("infuse")
+        weapon = playing.player.weapons[0]
+        self.assertEqual(weapon.element, ElementId.NONE)
+        seen = []
+        for _ in range(len(ELEMENTS) + 1):
+            menu._activate_selected()
+            seen.append(weapon.element)
+        self.assertEqual(seen, [*ELEMENTS, ElementId.NONE])
+
+    def test_infusing_records_the_element_as_unlocked_this_run(self):
+        from combat.elements.ids import ElementId
+
+        _game_, playing, menu = self._menu()
+        menu._activate("infuse")
+        menu._activate_selected()
+        self.assertIn(ElementId.FIRE, playing.run.unlocked_elements)
+
+    def test_the_row_names_the_element_and_how_often_it_lands(self):
+        _game_, playing, menu = self._menu()
+        menu._activate("infuse")
+        row = menu._rows()[0]
+        self.assertIn("none", menu._infusion_label(row))
+        menu._activate_selected()
+        label = menu._infusion_label(row)
+        self.assertIn("fire", label)
+        self.assertTrue("attack" in label or "every" in label, label)
+
+    def test_an_infused_weapon_actually_applies_its_element_in_the_run(self):
+        """End to end: infuse through the menu, then let the run tick until
+        something on the field is carrying an aura."""
+        _game_, playing, menu = self._menu()
+        menu._activate("infuse")
+        menu._activate_selected()               # the first weapon takes Fire
+        for spot in spots_near(playing, 3, radius=14.0, apart=40.0):
+            enemy = playing.spawn.master.spawn_at("skull", spot, owner="dev")
+            if enemy is not None:
+                enemy.max_hp = enemy.hp = 5000.0
+
+        game = playing.game
+        game.state_machine.pop()                # close the menu, unfreeze
+        for _ in range(240):
+            game.state_machine.update(1 / 60)
+            if playing.ledger.elements.applications:
+                break
+        self.assertTrue(playing.ledger.elements.applications,
+                        "an infused weapon applied its element unaided")

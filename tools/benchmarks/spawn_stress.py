@@ -90,8 +90,87 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
     return game, ps
 
 
+def infuse(ps, seed: int) -> None:
+    """The elemental system at its worst plausible load (design §9,
+    §11 stress test): three infused weapons firing into the crowd, and
+    every enemy already primed so that *every* hit lands on an aura and
+    sets off a reaction.
+
+    Priming is the pessimistic part. In play an aura has to be applied
+    before it can be consumed, and the global cooldown spaces the
+    reactions out; here the crowd starts saturated, which is the shape
+    of a late-run fight rather than an average one.
+    """
+    import random
+
+    from combat.elements.ids import ELEMENTS, ElementId
+    from combat.weapons import Weapon
+
+    # Thunder into Fire auras is the expensive pair: a chain that sets
+    # off an Overload at every node it reaches.
+    loadout = (("magic_rod", ElementId.THUNDER), ("bow", ElementId.WIND),
+               ("sword", ElementId.FIRE))
+    ps.player.weapons.clear()
+    for wid, element in loadout:
+        weapon = Weapon(wid, ps.content.weapon(wid))
+        weapon.element = element
+        ps.player.weapons.append(weapon)
+        ps.run.unlocked_elements.add(element)
+    ps._dev_no_attack = False                    # the weapons must fire
+    ps.player.invulnerable = True
+    now = ps.stats["time"]
+    rng = random.Random(seed)
+    for enemy in ps.enemies:
+        enemy.elemental.set_aura(rng.choice(ELEMENTS), now, 600.0)
+        enemy.max_hp = enemy.hp = 1e9            # nothing dies, nothing respawns
+
+
+def element_report(ps) -> str:
+    run = ps.run
+    el = run.elements
+    vis = run.element_visuals
+    now = run.stats["time"]
+    budget = vis.budget.report() if vis else "n/a"
+    return (f"  elements  auras {el.active_auras(run.enemies, now)}  "
+            f"reactions {el.stats.reactions_total} "
+            f"({el.stats.deferred_total} deferred, {el.pending} held)  "
+            f"areas {len(run.wind_areas)}  fx {len(run.element_fx)}\n"
+            f"            particles {len(run.particles)}  budget {budget}")
+
+
+def element_pump(ps, per_frame: int, seed: int = 3):
+    """A callable that resolves `per_frame` element-carrying hits a
+    frame, straight through the resolver.
+
+    The weapons' own cadence is nowhere near the load the design asks
+    this test for -- three infused weapons on their cooldowns land
+    under two hits a second between them. This drives the elemental
+    system at a rate no build could reach, which is the point: it
+    measures the system rather than the weapons in front of it.
+    """
+    import random
+
+    from combat.elements.ids import ELEMENTS
+
+    rng = random.Random(seed)
+    weapons = ("magic_rod", "bow", "sword")
+
+    def pump() -> None:
+        bodies = ps.enemies
+        if not bodies:
+            return
+        now = ps.stats["time"]
+        for _ in range(per_frame):
+            target = bodies[rng.randrange(len(bodies))]
+            ps.run.elements.apply(
+                target, rng.choice(ELEMENTS),
+                weapon_id=rng.choice(weapons), hit_damage=40.0, now=now)
+
+    return pump
+
+
 def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
-        render: bool = False) -> tuple:
+        render: bool = False, pump=None) -> tuple:
     """Frame times in milliseconds for `frames` updates with the hero
     jittering by up to `jitter` px each frame.
 
@@ -114,6 +193,8 @@ def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
                              home.y + rng.uniform(-jitter, jitter))
         t0 = time.perf_counter()
         ps.update(dt)
+        if pump is not None:
+            pump()
         times.append((time.perf_counter() - t0) * 1000.0)
         if render:
             view = ps.camera.visible_rect()
@@ -146,24 +227,43 @@ def main(argv=None) -> int:
     ap.add_argument("--render", action="store_true",
                     help="time ps.draw as well, and report update + draw "
                          "together against the 16.7 ms frame budget")
+    ap.add_argument("--elements", action="store_true",
+                    help="infuse three weapons and prime every enemy, so the "
+                         "elemental system runs at its worst plausible load")
+    ap.add_argument("--element-rate", type=int, default=0,
+                    help="element-carrying hits resolved per frame, over "
+                         "and above what the weapons land (implies "
+                         "--elements)")
     ap.add_argument("--profile", action="store_true")
     args = ap.parse_args(argv)
     from game import config
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod)
-    run(ps, 60, render=args.render)                  # warm the caches
+    elements = args.elements or args.element_rate > 0
+    pump = None
+    if elements:
+        infuse(ps, args.seed)
+        if args.element_rate > 0:
+            pump = element_pump(ps, args.element_rate, args.seed)
+    run(ps, 60, render=args.render, pump=pump)       # warm the caches
     if args.profile:
         import cProfile
         import pstats
         prof = cProfile.Profile()
         prof.enable()
-        times, draws, in_view = run(ps, args.frames, render=args.render)
+        times, draws, in_view = run(ps, args.frames, render=args.render,
+                                    pump=pump)
         prof.disable()
         print(report(times, ps))
+        if elements:
+            print(element_report(ps))
         pstats.Stats(prof).sort_stats("cumulative").print_stats(28)
     else:
-        times, draws, in_view = run(ps, args.frames, render=args.render)
+        times, draws, in_view = run(ps, args.frames, render=args.render,
+                                    pump=pump)
         print(f"seed {args.seed} lod {lod}  " + report(times, ps))
+        if elements:
+            print(element_report(ps))
         if args.render:
             d, v = sorted(draws), sorted(in_view)
             print(f"  draw   p50 {_percentile(d, 0.5):.2f}  "

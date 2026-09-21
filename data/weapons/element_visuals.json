@@ -1,0 +1,101 @@
+{
+  "_doc": [
+    "How the four elements look (design 8; elemental_system_journal.md M8).",
+    "Presentation only. The elements themselves are code and their gameplay",
+    "numbers live in elements.json -- this file is the other half of the same",
+    "split weapons.json and weapon_visuals.json already use, so nothing here",
+    "is ever read by the resolver.",
+    "",
+    "Each element names a colour, a marker shape, an optional authored rig",
+    "for its aura and its status, and a particle preset. A rig is optional on",
+    "purpose: only Thunder has an authored aura today and only Fire an",
+    "authored status flame, so everything else falls back to the procedural",
+    "ring, which is the design's own baseline (8, considerations).",
+    "",
+    "`marker` is a shape, not a colour: an element has to be readable without",
+    "relying on hue (design 8, colourblind proposal)."
+  ],
+  "aura": {
+    "ring_pad": 3,
+    "ring_width": 3,
+    "alpha": 210,
+    "locked_alpha": 120,
+    "marker_size": 7,
+    "marker_gap": 8
+  },
+  "budget": {
+    "_doc": [
+      "Elemental particles are capped per frame, separately from the pool's",
+      "own MAX_PARTICLES, so a hundred auras can never starve the hit",
+      "bursts and the death poofs of theirs (design 9, particle budget)."
+    ],
+    "per_frame": 90,
+    "per_element": 40
+  },
+  "elements": {
+    "fire": {
+      "colour": [
+        255,
+        130,
+        60
+      ],
+      "marker": "flame",
+      "aura_rig": null,
+      "status_rig": "flame_loop",
+      "particles": {
+        "rate": 7.0,
+        "speed": 46,
+        "life": 0.42,
+        "radius": 2.5
+      }
+    },
+    "ice": {
+      "colour": [
+        120,
+        200,
+        255
+      ],
+      "marker": "shard",
+      "aura_rig": null,
+      "status_rig": null,
+      "particles": {
+        "rate": 5.0,
+        "speed": 26,
+        "life": 0.55,
+        "radius": 2.0
+      }
+    },
+    "thunder": {
+      "colour": [
+        245,
+        225,
+        90
+      ],
+      "marker": "bolt",
+      "aura_rig": "thunder_aura",
+      "status_rig": null,
+      "particles": {
+        "rate": 6.0,
+        "speed": 64,
+        "life": 0.28,
+        "radius": 2.0
+      }
+    },
+    "wind": {
+      "colour": [
+        170,
+        255,
+        190
+      ],
+      "marker": "swirl",
+      "aura_rig": null,
+      "status_rig": null,
+      "particles": {
+        "rate": 6.0,
+        "speed": 54,
+        "life": 0.36,
+        "radius": 2.0
+      }
+    }
+  }
+}

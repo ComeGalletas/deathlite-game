@@ -11,6 +11,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from combat.elements import config as element_schema
+from combat.elements.ids import ELEMENTS as ELEMENT_IDS
+from combat.elements.schema import ElementDataError
 from progression.blessings.catalog import RARITIES as BLESSING_RARITIES
 from spawn.tables import SpawnTables, TableError
 
@@ -203,6 +206,88 @@ def _check_buildings(data: dict[str, Any]) -> dict[str, Any]:
         for rig in (*skins[kind], spec["fx_rig"], spec["icon_rig"], *spec.get("dressing", ())):
             if rig not in rigs and rig not in images and not rig.startswith("deco_"):
                 raise ContentError(f"buildings.json: buff {kind!r} names unknown rig {rig!r}")
+    _check_building_elements(data)
+    return data
+
+
+def _check_building_elements(data: dict[str, Any]) -> None:
+    """The optional `elements` block (M7): how often a buff building
+    also hands out an element, and which. Absent means none ever do."""
+    block = data.get("elements")
+    if block is None:
+        return
+    if not isinstance(block, dict):
+        raise ContentError("buildings.json: `elements` must be an object")
+    chance = float(block.get("chance", 0.0))
+    if not 0.0 <= chance <= 1.0:
+        raise ContentError(f"buildings.json: elements.chance {chance} is not 0..1")
+    weights = block.get("weights", {})
+    if not isinstance(weights, dict):
+        raise ContentError("buildings.json: elements.weights must be an object")
+    known = {e.key for e in ELEMENT_IDS}
+    unknown = {k for k in weights if not k.startswith("_")} - known
+    if unknown:
+        raise ContentError(
+            f"buildings.json: elements.weights names {sorted(unknown)}, "
+            f"which are not elements")
+    if chance > 0.0 and sum(
+            float(w) for k, w in weights.items() if not k.startswith("_")) <= 0.0:
+        raise ContentError("buildings.json: elements.weights sum to zero")
+
+
+def _check_elements(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `elements.json` against `combat.elements.config`."""
+    try:
+        return element_schema.check_elements(data)
+    except ElementDataError as exc:
+        raise ContentError(str(exc)) from exc
+
+
+def _check_reactions(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `reactions.json` against `combat.elements.config`."""
+    try:
+        return element_schema.check_reactions(data)
+    except ElementDataError as exc:
+        raise ContentError(str(exc)) from exc
+
+
+def _check_element_visuals(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `element_visuals.json`: every element styled, every
+    marker a shape the renderer knows, every named rig real."""
+    from game.states.playing.visual.elements.markers import SHAPES
+
+    elements = data.get("elements")
+    if not isinstance(elements, dict):
+        raise ContentError("element_visuals.json: `elements` must be an object")
+    got = {k for k in elements if not k.startswith("_")}
+    want = {e.key for e in ELEMENT_IDS}
+    if got != want:
+        raise ContentError(
+            f"element_visuals.json: covers {sorted(got)}, expected {sorted(want)}")
+    for key in sorted(want):
+        spec = elements[key]
+        for field in ("colour", "marker", "particles"):
+            if field not in spec:
+                raise ContentError(
+                    f"element_visuals.json: {key} has no {field!r}")
+        if len(spec["colour"]) != 3:
+            raise ContentError(f"element_visuals.json: {key} colour is not RGB")
+        if spec["marker"] not in SHAPES:
+            raise ContentError(
+                f"element_visuals.json: {key} marker {spec['marker']!r} is not a known shape")
+        for field in ("rate", "speed", "life", "radius"):
+            if float(spec["particles"][field]) <= 0.0:
+                raise ContentError(
+                    f"element_visuals.json: {key} particles.{field} must be > 0")
+    for block, fields in (("aura", ("ring_pad", "ring_width", "alpha",
+                                    "locked_alpha", "marker_size", "marker_gap")),
+                          ("budget", ("per_frame", "per_element"))):
+        if not isinstance(data.get(block), dict):
+            raise ContentError(f"element_visuals.json: `{block}` must be an object")
+        for field in fields:
+            if field not in data[block]:
+                raise ContentError(
+                    f"element_visuals.json: {block} has no {field!r}")
     return data
 
 
@@ -244,6 +329,15 @@ class Content:
         self.offering: dict = _load("weapons/offering.json")        # P2 weights
         self.forges: dict[str, dict] = _load("weapons/forges.json")   # P3 Forgings
         self.items: dict = _load("weapons/items.json")
+        # Elemental infusions (journal: elemental_system_journal.md). The
+        # schema lives in `combat.elements.config`; both files are content,
+        # so a missing, unknown or out-of-range value stops the boot.
+        self.elements: dict = _check_elements(_load("weapons/elements.json"))
+        self.reactions: dict = _check_reactions(_load("weapons/reactions.json"))
+        # Presentation only, split from the tuning the way
+        # `weapon_visuals.json` is split from `weapons.json`.
+        self.element_visuals: dict = _check_element_visuals(
+            _load("weapons/element_visuals.json"))
         self.meta_upgrades: dict[str, dict] = _load("heroes/meta_upgrades.json")
         # CB-8: health potion drops. Validated here so a table that does not
         # cover every rarity fails at boot, not on the first kill.

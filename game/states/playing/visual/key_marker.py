@@ -40,6 +40,7 @@ KEY_LIFT = {
     "shrine": 26, "altar": 26, "merchant": 26, "treasure": 24,
     "fountain": 40,
     "forge": 56,
+    "monastery": 58,
     # The buff buildings, when their skin is missing and the ring stands in.
     "magnet": 40, "turbo": 40, "haste": 40, "pinball": 40, "vampire": 40,
 }

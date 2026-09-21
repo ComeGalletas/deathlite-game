@@ -595,5 +595,32 @@
         "loop": true
       }
     }
+  },
+  "flame_loop": {
+    "frame": [
+      47,
+      75
+    ],
+    "scale": [
+      22,
+      35
+    ],
+    "anchor": [
+      23,
+      70
+    ],
+    "grid": [
+      16,
+      1
+    ],
+    "anims": {
+      "loop": {
+        "file": "effects/flame_loop/spritesheet.png",
+        "frames": 16,
+        "fps": 14,
+        "loop": true,
+        "row": 0
+      }
+    }
   }
 }

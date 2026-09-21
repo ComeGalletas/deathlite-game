@@ -28,6 +28,9 @@ from ui.mouse import HitMap
 ROW_H = 62
 ROW_GAP = 8
 WIDTH = 250
+# The Forge's own heading. The Monastery reuses the rail for elements
+# and passes its own (M7).
+DEFAULT_HEADING = "REFORGE WHICH WEAPON"
 _PAD_X = 14
 
 # The lit row reads as a card does: the pack's gold panel for the selected
@@ -38,7 +41,10 @@ _SUB_DY = 32
 
 
 class ForgeRail:
-    """Rows of `(weapon, eligible, note)`; records its own click targets."""
+    """Rows of `(item, eligible, note)`; records its own click targets.
+
+    The rows are weapons for the Forge and elements for the Monastery;
+    all the rail asks of a row is a `.name`."""
 
     def __init__(self) -> None:
         self._name = fonts.heading(20)
@@ -50,7 +56,8 @@ class ForgeRail:
         return len(rows) * scale.px(ROW_H) + max(0, len(rows) - 1) * scale.px(ROW_GAP)
 
     def draw(self, surface: pygame.Surface, rows, selected: int, *,
-             assets=None, right: int, top: int) -> None:
+             assets=None, right: int, top: int,
+             heading: str = DEFAULT_HEADING) -> None:
         """`right` is the rail's right edge -- the caller puts it just left of
         the cards, so the two read as one screen on any resolution rather than
         the rail drifting into the corner on a wide one."""
@@ -59,10 +66,10 @@ class ForgeRail:
         self.hits.clear()
         width, row_h, row_gap = scale.px(WIDTH), scale.px(ROW_H), scale.px(ROW_GAP)
         left = right - width
-        head = self._head.render("REFORGE WHICH WEAPON", True, config.COLOR_TEXT_DIM)
+        head = self._head.render(heading, True, config.COLOR_TEXT_DIM)
         surface.blit(head, head.get_rect(midbottom=(left + width // 2, top - scale.px(10))))
 
-        for i, (weapon, eligible, note) in enumerate(rows):
+        for i, (item, eligible, note) in enumerate(rows):
             y = top + i * (row_h + row_gap)
             rect = pygame.Rect(left, y, width, row_h)
             if eligible:
@@ -84,7 +91,7 @@ class ForgeRail:
                 name_col = config.COLOR_TEXT_DIM
                 note_col = config.COLOR_TEXT_DIM
 
-            name = self._name.render(weapon.name, True, name_col)
+            name = self._name.render(item.name, True, name_col)
             surface.blit(name, (left + scale.px(_PAD_X), y + scale.px(_TITLE_DY)))
             sub = self._note.render(note, True, note_col)
             surface.blit(sub, (left + scale.px(_PAD_X), y + scale.px(_SUB_DY)))

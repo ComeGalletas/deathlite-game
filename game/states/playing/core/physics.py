@@ -17,6 +17,7 @@ Read-only w.r.t. `PlayingState` apart from the `_knock` it induces:
 """
 from __future__ import annotations
 
+from combat.elements import ice as ice_rules
 from combat.knockback import knock_split
 from game import config
 from systems.collision import SpatialGrid
@@ -64,7 +65,7 @@ class BumpResolver:
                 if key in seen:
                     continue
                 seen.add(key)
-                self._bump(a, b)
+                self._bump(a, b, contact=True)
 
         # hero <-> enemy / boss
         p = run.player
@@ -74,7 +75,7 @@ class BumpResolver:
                 if getattr(e, "alive", True):
                     self._bump(p, e)
 
-    def _bump(self, a, b) -> None:
+    def _bump(self, a, b, contact: bool = False) -> None:
         delta = a.pos - b.pos
         d2 = delta.length_squared()
         rr = a.radius + b.radius
@@ -84,3 +85,19 @@ class BumpResolver:
         push_a, push_b = knock_split(a.weight, b.weight, config.BUMP_GAIN * pen)
         a.apply_knockback(delta, push_a)             # a shoved away from b
         b.apply_knockback(-delta, push_b)            # b shoved away from a
+        if contact:
+            # Only ever between two bodies: a sliding frozen enemy hurts
+            # other enemies, never the hero (whose damage path is its
+            # own, with evasion, block and armor).
+            self._frozen_contact(a, b)
+
+    def _frozen_contact(self, a, b) -> None:
+        """A frozen body being shoved damages what it clips (elemental
+        system M3). The bump pass is the one place two bodies are known
+        to overlap, so the rule lives off this seam; the rule itself is
+        the element's, in `combat/elements/ice.py`."""
+        run = self.run
+        resolver = getattr(run, "elements", None)
+        if resolver is None:
+            return
+        ice_rules.exchange_contact(resolver, a, b, run.stats["time"])

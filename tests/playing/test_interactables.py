@@ -55,8 +55,9 @@ def _parked(p, kind, cost=0):
 
 class PlacementTests(unittest.TestCase):
     def test_a_world_builds_only_village_and_buff_interactables(self):
-        """HI-2: a forge and a sanctuary heal per village, and one per buff
-        building (journal: buff_buildings_journal.md) -- and nothing else.
+        """HI-2: a forge, a sanctuary heal and a Monastery per village,
+        and one per buff building (journal: buff_buildings_journal.md)
+        -- and nothing else.
 
         The `specials` term used to be the point of this test. It is now
         asserted to be empty: the four special islands were parked on
@@ -69,12 +70,20 @@ class PlacementTests(unittest.TestCase):
         self.assertEqual(SPECIAL_KINDS, ())
         self.assertEqual([r.kind for r in lay.rooms if r.kind in SPECIAL_KINDS], [])
         buildings = lay.buff_buildings(p.buffs.kinds)
+        # Three per village since M7: the forge, the sanctuary heal and
+        # the Monastery, which stands on the town hall the village pass
+        # has always placed (`elemental_system_journal.md`).
         self.assertEqual(len(p.interactables),
-                         2 * len(lay.villages) + len(buildings))
+                         3 * len(lay.villages) + len(buildings))
         forges = {(it.pos.x, it.pos.y) for it in p.interactables if it.kind == "forge"}
         heals = {(it.pos.x, it.pos.y) for it in p.interactables if it.kind == "fountain"}
+        halls = {(it.pos.x, it.pos.y) for it in p.interactables
+                 if it.kind == "monastery"}
         self.assertEqual(forges, {(v.forge.x, v.forge.y) for v in lay.villages})
         self.assertEqual(heals, {(v.heal.x, v.heal.y) for v in lay.villages})
+        self.assertEqual(halls, {(x, y) for v in lay.villages
+                                 for kind, x, y in v.buildings
+                                 if kind == "monastery"})
         pygame.quit()
 
 

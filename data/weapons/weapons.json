@@ -15,7 +15,14 @@
     "special_effect": "cone",
     "cone_half_angle": 60,
     "category": "melee",
-    "tags": ["melee", "area"]
+    "tags": [
+      "melee",
+      "area"
+    ],
+    "element_application": {
+      "mode": "attack",
+      "interval": 0
+    }
   },
   "hammer": {
     "name": "Hammer",
@@ -37,7 +44,14 @@
     "stun_chance": 0.35,
     "stun_duration": 0.8,
     "category": "melee",
-    "tags": ["melee", "area"]
+    "tags": [
+      "melee",
+      "area"
+    ],
+    "element_application": {
+      "mode": "attack",
+      "interval": 0
+    }
   },
   "daggers": {
     "name": "Daggers",
@@ -55,7 +69,13 @@
     "special_effect": "cone",
     "cone_half_angle": 17,
     "category": "melee",
-    "tags": ["melee"]
+    "tags": [
+      "melee"
+    ],
+    "element_application": {
+      "mode": "attack",
+      "interval": 2
+    }
   },
   "bow": {
     "name": "Bow",
@@ -74,7 +94,14 @@
     "special_effect": null,
     "category": "projectile",
     "reach": 460,
-    "tags": ["ranged", "projectile"]
+    "tags": [
+      "ranged",
+      "projectile"
+    ],
+    "element_application": {
+      "mode": "attack",
+      "interval": 0
+    }
   },
   "magic_rod": {
     "name": "Magic Rod",
@@ -94,8 +121,16 @@
     "category": "projectile",
     "reach": 400,
     "aim_assist_deg": 45,
-    "tags": ["ranged", "projectile", "arcane"],
-    "mark_on_hit": true
+    "tags": [
+      "ranged",
+      "projectile",
+      "arcane"
+    ],
+    "mark_on_hit": true,
+    "element_application": {
+      "mode": "attack",
+      "interval": 0
+    }
   },
   "bomb": {
     "name": "Bomb",
@@ -118,7 +153,15 @@
     "special_effect": "bomb",
     "category": "projectile",
     "reach": 100,
-    "tags": ["ranged", "area", "explosive"]
+    "tags": [
+      "ranged",
+      "area",
+      "explosive"
+    ],
+    "element_application": {
+      "mode": "attack",
+      "interval": 0
+    }
   },
   "ember_ring": {
     "name": "Ember Ring",
@@ -139,7 +182,14 @@
     "rehit_interval": 0.4,
     "category": "orbit",
     "reach": 140,
-    "tags": ["area", "orbit"]
+    "tags": [
+      "area",
+      "orbit"
+    ],
+    "element_application": {
+      "mode": "time",
+      "window": 1.0
+    }
   },
   "grave_totem": {
     "name": "Grave Totem",
@@ -163,7 +213,14 @@
     "summon_attack_range": 360,
     "summon_reach": 360,
     "category": "summon",
-    "tags": ["summon", "projectile"]
+    "tags": [
+      "summon",
+      "projectile"
+    ],
+    "element_application": {
+      "mode": "time",
+      "window": 1.5
+    }
   },
   "spirit_wolf": {
     "name": "Spirit Wolf",
@@ -187,6 +244,13 @@
     "summon_attack_range": 70,
     "summon_reach": 180,
     "category": "summon",
-    "tags": ["summon", "melee"]
+    "tags": [
+      "summon",
+      "melee"
+    ],
+    "element_application": {
+      "mode": "time",
+      "window": 1.5
+    }
   }
 }

@@ -25,6 +25,7 @@ import pygame
 import math
 
 from entities.hazard import Hazard
+from game.states.playing.visual import elements as element_fx
 from entities.melee_hitbox import MeleeHitbox
 from game.events import Events
 from game.assets import get_assets
@@ -66,6 +67,12 @@ class TransientFx:
         kw.setdefault("color", vis.color)
         kw.setdefault("style", vis.style)
         kw.setdefault("fx", vis.fx)
+        # M6: an element-carrying shot is tinted toward its element, so
+        # a player can see which attacks are the infused ones. The M8
+        # visual system replaces this with the shared profiles.
+        element = kw.get("element")
+        if element:
+            kw["color"] = element_fx.blend(kw["color"], element_fx.tint(element))
 
     def spawn_projectile(self, **kw):
         from game.states.playing.visual import slash_fx
@@ -304,6 +311,9 @@ class TransientFx:
             style="blast", color=(255, 190, 110), no_block=True)
         if blast is not None:
             blast.fire_level = bomb.fire_level
+            # The blast *is* the bomb's hit, so it carries the attack's
+            # element (§6.3: every hit an attack produces shares it).
+            blast.element = bomb.element
         run._explosions.append(self.burst_visual(
             pos, bomb.blast_radius, rig=self.burst_rig(bomb)))
         ps.particles.burst(pos, (255, 160, 80), count=18, speed=240, life=0.45)
@@ -421,6 +431,7 @@ class TransientFx:
                 is_crit=bomb.is_crit, inert=True, stop_after=fuse * 0.5,
                 blast_radius=bomb.blast_radius * radius_mult,
                 blast_lifetime=bomb.blast_lifetime,
+                element=bomb.element,
                 fx={"scale": scale} if scale else {})
 
     # --- ground hazards (spec 5.6) --------------------------

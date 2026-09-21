@@ -1,0 +1,83 @@
+{
+  "_doc": [
+    "Reaction tuning (documentation/journals/elemental_system_journal.md).",
+    "Which pair produces which reaction is code (combat/elements/config.py",
+    "REACTION_PAIRS); this file only tunes each one. A reaction may carry a",
+    "\"triggered_by\" block with partial overrides per incoming element, e.g.",
+    "\"triggered_by\": {\"fire\": {\"damage\": {\"frac\": 0.9}}} -- only the",
+    "pair's own elements and only keys the reaction already has. With no",
+    "overrides both directions are identical. Every reaction locks the aura",
+    "slot for the global cooldown; lock_aura_slot / lock_duration extend it.",
+    "Starting values are placeholders until the M9 balance pass."
+  ],
+  "reactions": {
+    "frostburn": {
+      "tick": {"frac": 0.20},
+      "tick_interval": 0.5,
+      "duration": 4.0,
+      "slow_percent": 0.35,
+      "lock_aura_slot": true,
+      "lock_duration": 4.0
+    },
+    "overload": {
+      "damage": {"frac": 0.30},
+      "shockwave_damage": {"frac": 0.10},
+      "shockwave_radius": 96,
+      "knockback": 350,
+      "max_knockback_speed": 600,
+      "max_range": 96,
+      "max_targets": 6,
+      "lock_aura_slot": false,
+      "lock_duration": 0.0
+    },
+    "superconduct": {
+      "damage": {"frac": 0.50},
+      "bonus_jumps": 1,
+      "targets_per_jump": 3,
+      "slow_percent": 0.30,
+      "slow_duration": 2.0,
+      "max_range": 180,
+      "max_targets": 12,
+      "lock_aura_slot": false,
+      "lock_duration": 0.0
+    },
+    "firewind": {
+      "duration": 1.0,
+      "radius": 90,
+      "damage": {"frac": 0.12},
+      "knockback": 220,
+      "max_range": 130,
+      "max_targets": 10,
+      "burn_tick": {"frac": 0.07},
+      "burn_tick_interval": 1.0,
+      "burn_duration": 3.0,
+      "lock_aura_slot": false,
+      "lock_duration": 0.0
+    },
+    "icewind": {
+      "duration": 1.0,
+      "radius": 90,
+      "damage": {"frac": 0.15},
+      "knockback": 220,
+      "max_range": 130,
+      "max_targets": 10,
+      "stacks_per_contact": 2,
+      "slow_duration": 3.0,
+      "lock_aura_slot": false,
+      "lock_duration": 0.0
+    },
+    "thunderwind": {
+      "duration": 1.0,
+      "radius": 90,
+      "damage": {"frac": 0.10},
+      "knockback": 220,
+      "max_range": 130,
+      "max_targets": 10,
+      "strike_targets": 4,
+      "strike_damage": {"frac": 0.06},
+      "strike_range": 220,
+      "lock_aura_slot": false,
+      "lock_duration": 0.0
+    }
+  }
+}

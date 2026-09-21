@@ -16,6 +16,7 @@ import math
 import pygame
 
 from combat.damage import apply_armor
+from combat.elements.aura import ElementalState
 from combat.status import StatusState
 from game import config
 from game.assets import get_assets
@@ -77,6 +78,7 @@ class Boss:
         self.alive = True
         self.hit_flash = 0.0
         self.status = StatusState()
+        self.elemental = ElementalState()
         self.recent_hits: dict[str, float] = {}   # P4 synergies
         self.hit_streak: dict[str, int] = {}
         # Duck-typed to satisfy the shared combat loop / draw code.
@@ -101,26 +103,28 @@ class Boss:
         self._facing = -1
 
     # --- combat --------------------------------------------------
-    def _absorb(self, dealt: float, source) -> float:
+    def _absorb(self, dealt: float, source,
+                effect: str | None = None) -> float:
         """The one place damage lands on the boss (as `Enemy._absorb`): the
         run ledger hears it here, whichever path delivered it. The boss is
         never the metered target, so there is no `damage_sink`."""
         if self.ledger is not None:
-            self.ledger.record(dealt, source)
+            self.ledger.record(dealt, source, effect)
         self.hp -= dealt
         if self.hp <= 0:
             self.hp = 0.0
             self.alive = False
         return dealt
 
-    def take_damage(self, amount: float, armor: float = 0.0, source=None) -> float:
+    def take_damage(self, amount: float, armor: float = 0.0, source=None,
+                    effect: str | None = None) -> float:
         dealt = apply_armor(amount, armor)
         self.hit_flash = 0.06
         if self.anim is not None:
             self._hurt_t = 0.22
             if self._has_hurt:
                 self.anim.play("hurt", restart=True)
-        return self._absorb(dealt, source)
+        return self._absorb(dealt, source, effect)
 
     def apply_knockback(self, *_args) -> None:
         pass  # immovable
@@ -174,7 +178,8 @@ class Boss:
                 self._facing = -1
             self.anim.play(self._anim_name())
             self.anim.update(dt)
-        self.status.update(dt, lambda amt, src: self._status_damage(amt, ctx, src))
+        self.status.update(
+            dt, lambda amt, src, eff=None: self._status_damage(amt, ctx, src, eff))
         self.contact_damage = self._base_contact
         chill = self.status.speed_multiplier()
 
@@ -209,11 +214,12 @@ class Boss:
         return ctx.resolve_movement(self.pos, self.pos + step, self.radius,
                                     flying=self.flying)
 
-    def _status_damage(self, amount: float, ctx, source=None) -> None:
+    def _status_damage(self, amount: float, ctx, source=None,
+                       effect: str | None = None) -> None:
         # A damage-over-time tick; `source` is the weapon keeping it alive.
         if not self.alive:
             return
-        self._absorb(amount, source)
+        self._absorb(amount, source, effect)
         ctx.report_damage(amount)
 
     def _seek(self, ctx) -> pygame.Vector2:

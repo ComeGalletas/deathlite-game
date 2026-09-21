@@ -159,7 +159,29 @@ def weapon_summary(wid: str) -> str:
             parts.append(f"{k.replace('_', ' ')} {w[k]}")
     if w.get("special_effect"):
         parts.append(f"special {w['special_effect']}")
+    parts.append(element_cadence(w))
     return ", ".join(parts)
+
+
+def element_cadence(w: dict) -> str:
+    """How often this weapon inflicts the element infused into it.
+
+    Every weapon carries `element_application` (the owner's rule: summons
+    are infusable too, so every one of them needs the metadata), in one of
+    two modes -- an attack counter, or a time window. Without this column
+    the reference tables describe the weapons as if infusion did not exist,
+    and the cadence is the whole reason one weapon is a better home for an
+    element than another.
+    """
+    spec = w["element_application"]
+    if spec["mode"] == "time":
+        return f"element every {spec['window']}s"
+    skipped = int(spec["interval"])
+    if skipped == 0:
+        return "element every attack"
+    nth = skipped + 1
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(nth if nth < 20 else nth % 10, "th")
+    return f"element every {nth}{suffix} attack"
 
 
 # --------------------------------------------------------------------------

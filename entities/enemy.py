@@ -10,6 +10,7 @@ from __future__ import annotations
 import pygame
 
 from combat.damage import apply_armor
+from combat.elements.aura import ElementalState
 from combat.status import StatusState
 from entities.ai import Blackboard, build_behavior
 from entities.ai.components.aggro import provoke
@@ -83,6 +84,9 @@ class Enemy:
         self.bb = Blackboard()
         self._behavior = build_behavior(self.behavior, self.cfg)
         self.status = StatusState()
+        # Elemental system: the aura slot, its lock and Ice's stacks. Its
+        # timestamps are run-clock, so nothing here is ticked per frame.
+        self.elemental = ElementalState()
 
         # Sprite animation (only for variants that declare a rig; the rest draw
         # a primitive). `_hurt_t` drives the flinch anim; `_facing` is +1/-1.
@@ -112,7 +116,8 @@ class Enemy:
         if direction.length_squared() > 1e-6:
             self._knock += direction.normalize() * strength
 
-    def _absorb(self, dealt: float, source) -> float:
+    def _absorb(self, dealt: float, source,
+                effect: str | None = None) -> float:
         """The one place damage lands on an enemy.
 
         Every path -- a projectile hit, an explosion, a damage-over-time tick,
@@ -124,7 +129,7 @@ class Enemy:
         if self.damage_sink is not None:
             self.damage_sink(dealt, source)
         if self.ledger is not None:
-            self.ledger.record(dealt, source)
+            self.ledger.record(dealt, source, effect)
         if self.invulnerable:
             return dealt
         self.hp -= dealt
@@ -133,10 +138,13 @@ class Enemy:
             self.alive = False
         return dealt
 
-    def take_damage(self, amount: float, armor: float = 0.0, source=None) -> float:
+    def take_damage(self, amount: float, armor: float = 0.0, source=None,
+                    effect: str | None = None) -> float:
         """`source` names what dealt it -- a weapon id, a blessing id, or
         `"villager"`. The DPS meter reads it to break a build down by weapon;
-        nothing else does, so it stays optional."""
+        nothing else does, so it stays optional. `effect` names the
+        elemental effect behind it ("overload", "burn"), which the ledger
+        files the same damage under as a second dimension."""
         dealt = apply_armor(amount, armor)
         # LD-9 D7: a hit provokes, whatever the range. Recorded as a flag rather
         # than a timestamp because nothing here has the clock; `AggroSense`
@@ -151,7 +159,7 @@ class Enemy:
             absorbed = min(self.shield_hp, dealt)
             self.shield_hp -= absorbed
             dealt -= absorbed
-        return self._absorb(dealt, source)
+        return self._absorb(dealt, source, effect)
 
     # --- per-frame ------------------------------------------------
     def update(self, ctx) -> None:
@@ -169,7 +177,8 @@ class Enemy:
 
         dt = ctx.dt
         # Status DoT (burn) is dealt straight to HP and reported for stats.
-        self.status.update(dt, lambda amt, src: self._status_damage(amt, ctx, src))
+        self.status.update(
+            dt, lambda amt, src, eff=None: self._status_damage(amt, ctx, src, eff))
         # Chill scales movement; knockback is unaffected.
         step = (self.vel * self.status.speed_multiplier() + self._knock) * dt
         self.pos = ctx.resolve_movement(self.pos, self.pos + step, self.radius,
@@ -177,6 +186,9 @@ class Enemy:
         self._knock *= pow(config.BUMP_DECAY, dt)
         if self._knock.length_squared() < 1.0:
             self._knock.update(0, 0)
+            # Came to rest: a frozen body's next slide starts with a
+            # clean sheet of who it has already clipped.
+            self.elemental.end_slide()
         if self.hit_flash > 0.0:
             self.hit_flash = max(0.0, self.hit_flash - dt)
 
@@ -211,14 +223,15 @@ class Enemy:
     def _attacking(self) -> bool:
         return self.bb.slot(_MACHINE).get("state") in ("telegraph", "attack")
 
-    def _status_damage(self, amount: float, ctx, source=None) -> None:
+    def _status_damage(self, amount: float, ctx, source=None,
+                       effect: str | None = None) -> None:
         """A damage-over-time tick. Goes through `_absorb` like every other
         path -- it used to subtract HP itself, which would have burned the
         dummy down through its invulnerability and hidden the tick from the
         meter."""
         if not self.alive:
             return
-        self._absorb(amount, source)
+        self._absorb(amount, source, effect)
         ctx.report_damage(amount)
 
     @property

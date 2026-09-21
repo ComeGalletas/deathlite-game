@@ -183,3 +183,76 @@ def collider_overlay(surface, ps) -> None:
             knock_vec(e.pos, e._knock)
     if ps.boss is not None and ps.boss.alive:
         wtag(ps.boss.pos, ps.boss.weight, ps.boss.radius)
+
+
+# Elemental system (M2): one colour per element for the aura inspector. Kept
+# here rather than in the visual profiles of §8 -- these are debug markers,
+# not the game's look, and they must stay readable over any terrain.
+_AURA_COLOURS = {
+    "fire": (255, 130, 60),
+    "ice": (120, 200, 255),
+    "thunder": (245, 225, 90),
+    "wind": (170, 255, 190),
+}
+_AURA_RING_PAD = 4          # px outside the body
+_LOCK_COLOUR = (190, 190, 200)
+_LABEL_SHADOW = (20, 20, 28)
+
+
+def aura_overlay(surface, ps) -> None:
+    """The elemental inspector (design §10.1): over every enemy, the aura it
+    holds with the seconds left, whether its slot is locked, and the active
+    statuses with their stacks. Toggle with the dev menu's 'Aura inspector'
+    row; no F-key.
+
+    Until the weapons carry elements (M6) the way to put something on screen
+    is the dev menu's 'Force aura' row, which applies one to the nearest
+    enemy through the real resolver -- so what this draws is the live state,
+    never a mock-up.
+    """
+    if not (ps.dev_mode and ps._dev_show_auras):
+        return
+    run = ps.run
+    cam = run.camera
+    now = run.stats["time"]
+    font = fonts.mono(10)
+    bodies = list(run.enemies)
+    if run.boss is not None and run.boss.alive:
+        bodies.append(run.boss)
+
+    for body in bodies:
+        state = getattr(body, "elemental", None)
+        status = getattr(body, "status", None)
+        if state is None:
+            continue
+        lines = []
+        element = state.element(now)
+        if element:
+            colour = _AURA_COLOURS.get(element.key, (255, 255, 255))
+            sx, sy = cam.world_to_screen(body.pos)
+            radius = int((body.radius + _AURA_RING_PAD) * cam.zoom)
+            pygame.draw.circle(surface, colour, (int(sx), int(sy)), radius, 2)
+            lines.append((f"{element.key} {state.remaining(now):.1f}s", colour))
+        if state.is_locked(now):
+            lines.append((f"lock {state.lock_remaining(now):.1f}s", _LOCK_COLOUR))
+        if state.ice_stacks:
+            lines.append((f"ice x{state.ice_stacks}", _AURA_COLOURS["ice"]))
+        if status is not None:
+            for sid in status.active_ids():
+                stacks = status.stacks(sid)
+                text = f"{sid}{'' if stacks <= 1 else f' x{stacks}'}"
+                text += "*" if status.is_bound(sid) else ""
+                lines.append((f"{text} {status.remaining(sid):.1f}s", (225, 225, 235)))
+        if not lines:
+            continue
+        sx, sy = cam.world_to_screen(body.pos)
+        top = int(sy) - int((body.radius + 10) * cam.zoom) - 12 * len(lines)
+        for i, (text, colour) in enumerate(lines):
+            img = font.render(text, True, colour)
+            # A one-pixel drop shadow: these labels sit over whatever terrain
+            # the enemy is standing on, and the pale stone the hero starts on
+            # washed the tinted text out completely.
+            shadow = font.render(text, True, _LABEL_SHADOW)
+            x = int(sx) - img.get_width() // 2
+            surface.blit(shadow, (x + 1, top + i * 12 + 1))
+            surface.blit(img, (x, top + i * 12))

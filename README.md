@@ -136,6 +136,9 @@ each difficulty; they are never compared across difficulties.
   warlock) + **1 boss** with 3 telegraphed attack patterns and a health bar
 - **5 status effects** (burn / poison / bleed / chill / shock) on a generic
   data-driven framework
+- **4 elemental infusions** (fire / ice / thunder / wind) attached to a
+  weapon for the run, leaving an aura on what they hit, with **6 reactions**
+  when one element lands on another's aura
 - **17 item affixes**, 5 rarities, seeded deterministic item generation
 - **6 meta-progression upgrades**, corruption-tolerant JSON save/load
 - Seeded **procedural world** of islands and bridges: terraces, cliffs and

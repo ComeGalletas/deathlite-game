@@ -8,6 +8,7 @@ incremental structure is ever needed.
 """
 from __future__ import annotations
 
+import heapq
 import math
 from typing import Iterable, TypeVar
 
@@ -44,6 +45,37 @@ class SpatialGrid:
                 if bucket:
                     out.extend(bucket)
         return out
+
+    def nearest(self, x: float, y: float, count: int, radius: float,
+                exclude=(), alive_only: bool = True) -> list:
+        """The `count` inserted entities closest to (x, y) inside
+        `radius`, nearest first.
+
+        The elemental system asks this a lot -- every Thunder jump
+        level, every Superconduct spread, every ThunderWind strike --
+        and the answer has to be bounded work, so it is a grid query
+        followed by a partial sort rather than a scan of the field.
+        `exclude` is a container of `id()`s already taken by this
+        chain, which is how "never hit twice" is enforced.
+        """
+        if count <= 0 or radius <= 0.0:
+            return []
+        r2 = radius * radius
+        scored = []
+        for e in self.query_circle(x, y, radius):
+            if id(e) in exclude:
+                continue
+            if alive_only and not getattr(e, 'alive', True):
+                continue
+            dx, dy = e.pos.x - x, e.pos.y - y
+            d2 = dx * dx + dy * dy
+            if d2 <= r2:
+                scored.append((d2, id(e), e))
+        if len(scored) <= count:
+            scored.sort(key=lambda s: s[0])
+            return [e for _d, _i, e in scored]
+        return [e for _d, _i, e in heapq.nsmallest(count, scored,
+                                                   key=lambda s: s[0])]
 
 
 def circles_overlap(ax: float, ay: float, ar: float,

@@ -207,5 +207,11 @@ because it is presentation, not because it depends on P4.
 
 ## 4. Out of scope
 
-Elements and infusions (§16), elemental blessings, more than six weapons or
-twelve Forgings, per-pair mechanics beyond the six synergies, homing.
+Elemental blessings, more than six weapons or twelve Forgings, per-pair
+mechanics beyond the six synergies, homing.
+
+> **Changed 2026-09-21.** Elements and infusions (§16) were out of scope for
+> *this* plan and were built afterwards, on top of the weapons it shipped.
+> Nothing in this plan was reopened to do it: the one weapon-side addition
+> is the required `element_application` block in `data/weapons/weapons.json`.
+> See `documentation/journals/elemental_system_journal.md`.

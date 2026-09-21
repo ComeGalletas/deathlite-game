@@ -170,15 +170,17 @@ class PlayingHost:
 
     def sleep(self, enemy) -> DormantEnemy:
         """Strip a live enemy to its record and take it out of the run.
-        What survives: kind, spot, HP, shield, speed, status effects,
-        owner. What does not: the behaviour machine, the animator, any
-        knockback in flight -- rebuilt fresh on wake."""
+        What survives: kind, spot, HP, shield, speed, status effects, the
+        elemental aura and its lock, owner. What does not: the behaviour
+        machine, the animator, any knockback in flight -- rebuilt fresh on
+        wake."""
         self.run.enemies.remove(enemy)
         return DormantEnemy(enemy.enemy_id, enemy.pos.x, enemy.pos.y,
                             enemy.hp, enemy.max_hp, enemy.shield_hp, enemy.speed,
                             status=enemy.status, owner=self.owner_of(enemy),
                             spawned_at=getattr(enemy, "spawned_at", 0.0),
-                            recycles=getattr(enemy, "recycles", 0))
+                            recycles=getattr(enemy, "recycles", 0),
+                            elemental=getattr(enemy, "elemental", None))
 
     def wake(self, rec: DormantEnemy, x: float, y: float) -> Enemy:
         enemy = Enemy(rec.enemy_id, self.run.content.enemy(rec.enemy_id), x, y)
@@ -189,6 +191,8 @@ class PlayingHost:
         enemy.speed = rec.speed
         if rec.status is not None:
             enemy.status = rec.status
+        if rec.elemental is not None:
+            enemy.elemental = rec.elemental
         enemy.spawn_owner = rec.owner
         enemy.spawned_at = rec.spawned_at
         enemy.recycles = rec.recycles

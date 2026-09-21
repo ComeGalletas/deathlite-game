@@ -43,6 +43,7 @@ import pygame
 
 from combat import targeting
 from combat.damage import outgoing_damage
+from combat.elements.ids import ElementId
 from game import config
 
 # --- weapon taxonomy (the only fixed weapon data that stays in code) ---------
@@ -55,6 +56,14 @@ SPECIAL_EFFECTS = (None, "chain", "cone", "orbit", "summon", "bomb", "slam")
 # The slot a weapon occupies: melee / ranged share the run's three weapon
 # slots (design §20); a summon has its own single slot (§3.7).
 CLASSES = ("melee", "ranged", "summon")
+# How a weapon decides which of its hits carry its element (owner's
+# decision, 2026-09-21). `attack` counts attacks and stamps the whole
+# attack; `time` grants one application per window, decided at hit time.
+# Two modes are needed because "one firing = one attack" is false here:
+# the Ember Ring's orbiters and the summons re-hit on their own timers
+# and never fire an attack at all.
+ATTACK_MODE, TIME_MODE = "attack", "time"
+ELEMENT_MODES = (ATTACK_MODE, TIME_MODE)
 
 
 @dataclass(frozen=True)
@@ -141,12 +150,22 @@ class Weapon:
         "crit_damage": 0.0, "reach": 0.0, "orbit_radius": 0.0, "rehit_mult": 1.0,
         "orbit_speed_mult": 1.0,
         "attack_interval_mult": 1.0, "summon_speed": 0.0, "summon_reach": 0.0,
+        # How often the weapon's element lands: fewer skipped attacks,
+        # or a shorter window.
+        "element_interval": 0.0, "element_window_mult": 1.0,
     })
     # Behaviour hooks the hit resolver / fire path read by key (P2): totals
     # set by `weapon_effect` blessings -- executioner_mult, split_count, ...
     effects: dict = field(default_factory=dict)
     # P3: the Forging this weapon took (`data/weapons/forges.json` id), or None.
     forge: str | None = None
+    # The element infused into this weapon, or NONE. Run-scoped: a new
+    # `Weapon` is built per run, so nothing has to clear it.
+    element: ElementId = ElementId.NONE
+    # Attack mode: does the attack now being fired carry the element?
+    _element_this_attack: bool = field(default=False, init=False)
+    # Time mode: the run-clock instant the next application is due.
+    _next_element_at: float = field(default=0.0, init=False)
     _shots: int = field(default=0, init=False)          # attacks fired (Overcharge)
     _volley_mult: float = field(default=1.0, init=False)
     # CR1 slam: the pending swing -- seconds left, its full length, and the
@@ -178,6 +197,28 @@ class Weapon:
             raise ValueError(
                 f"{self.weapon_id}: special_effect "
                 f"{self.definition.get('special_effect')!r} not in {SPECIAL_EFFECTS}")
+        self._check_element_application()
+
+    def _check_element_application(self) -> None:
+        """`element_application` is required on every weapon and names one
+        of two modes with the number that mode needs. Validated here like
+        the rest of the taxonomy, so bad data fails at load rather than on
+        the first infusion."""
+        spec = self.definition.get("element_application")
+        if not isinstance(spec, dict):
+            raise ValueError(
+                f"{self.weapon_id}: element_application must be an object")
+        mode = spec.get("mode")
+        if mode not in ELEMENT_MODES:
+            raise ValueError(
+                f"{self.weapon_id}: element_application mode {mode!r} not in {ELEMENT_MODES}")
+        if mode == ATTACK_MODE:
+            if int(spec["interval"]) < 0:
+                raise ValueError(
+                    f"{self.weapon_id}: element interval must be >= 0")
+        elif float(spec["window"]) <= 0.0:
+            raise ValueError(
+                f"{self.weapon_id}: element window must be > 0")
 
     # --- derived stats -------------------------------------------
     @property
@@ -263,10 +304,62 @@ class Weapon:
     def _weight(self) -> float:
         return float(self.definition["weight"]) + self.bonus["weight"]
 
+    # --- elemental infusion ---------------------------------------
+    @property
+    def element_mode(self) -> str:
+        """`attack` or `time` -- how this weapon paces its element."""
+        return self.definition["element_application"]["mode"]
+
+    @property
+    def element_interval(self) -> int:
+        """Attack mode: attacks skipped between element-carrying ones.
+        0 means every attack."""
+        base = int(self.definition["element_application"]["interval"])
+        return max(0, base + int(self.bonus["element_interval"]))
+
+    @property
+    def element_window(self) -> float:
+        """Time mode: seconds between applications."""
+        base = float(self.definition["element_application"]["window"])
+        return max(0.01, base * self.bonus["element_window_mult"])
+
+    @property
+    def infused(self) -> bool:
+        return self.element != ElementId.NONE
+
+    @property
+    def attack_element(self) -> ElementId:
+        """The element to stamp on the projectiles of the attack being
+        fired. `NONE` for a plain attack, and always `NONE` for a
+        time-mode weapon, whose hits are gated at the hit site instead.
+        """
+        return self.element if self._element_this_attack else ElementId.NONE
+
+    def take_element_window(self, now: float) -> bool:
+        """Time mode: claim this window's one application, if it is due.
+
+        Called once per hit by the hit resolver, so the first hit a
+        time-mode weapon lands after the window elapses carries the
+        element and the rest are plain -- which is what makes the
+        re-hitting weapons (orbiters, summons) sane.
+        """
+        if not self.infused or self.element_mode != TIME_MODE:
+            return False
+        if now < self._next_element_at:
+            return False
+        self._next_element_at = now + self.element_window
+        return True
+
     def _begin_attack(self) -> None:
-        """Count the attack and set the volley multiplier (Overcharge: every
-        `overcharge_every`-th attack is an overcharged one)."""
+        """Count the attack, set the volley multiplier (Overcharge: every
+        `overcharge_every`-th attack is an overcharged one), and decide
+        whether this attack carries the weapon's element."""
         self._shots += 1
+        # One decision per attack, shared by every projectile it spawns
+        # and every pierce they score -- never a per-hit check.
+        self._element_this_attack = (
+            self.infused and self.element_mode == ATTACK_MODE
+            and (self._shots - 1) % (self.element_interval + 1) == 0)
         every = int(self.effects.get("overcharge_every", 0))
         if every > 0 and self._shots % every == 0:
             self._volley_mult = float(self.effects.get("overcharge_mult", 1.0))
@@ -577,7 +670,8 @@ class Weapon:
                 src_weight=src_weight, weapon_id=self.weapon_id,
                 visual=self.visual_id,
                 source_tags=self.tags, is_crit=dmg.is_crit,
-                chain_left=chain_left, chain_range=chain_range)
+                chain_left=chain_left, chain_range=chain_range,
+                element=self.attack_element)
         return True
 
     def _cone_directions(self, cone_dir: pygame.Vector2) -> list:
@@ -608,7 +702,8 @@ class Weapon:
                 source_tags=self.tags, is_crit=dmg.is_crit, cone_dir=direction,
                 cone_half_angle=math.radians(half),
                 stun_chance=stun_chance, stun_duration=stun_duration,
-                swing=self._shots)                      # CR2: picks the slash
+                swing=self._shots,                      # CR2: picks the slash
+                element=self.attack_element)
         fx = self.effects
         impact = ctx.origin + cone_dir * (area * 0.55)
         if self.effect("shockwave_radius") > 0.0:
@@ -620,7 +715,8 @@ class Weapon:
                 radius=self.effect("shockwave_radius"), lifetime=0.15, pierce=999,
                 src_weight=src_weight * 0.5, weapon_id=self.weapon_id,
                 visual=self.visual_id, source_tags=self.tags + ("shockwave",),
-                is_crit=dmg.is_crit, style="blast", no_block=True)
+                is_crit=dmg.is_crit, style="blast", no_block=True,
+                element=self.attack_element)
         if self.effect("hazard_radius") > 0.0 and ctx.spawn_hazard is not None:
             ctx.spawn_hazard(
                 pos=impact, radius=self.effect("hazard_radius"),
@@ -664,7 +760,10 @@ class Weapon:
                 weapon_id=self.weapon_id, visual=self.visual_id,
                 source_tags=self.tags, anchor=ctx.anchor,
                 orbit_angle=0.0, orbit_radius=radius, orbit_speed=orbit_speed,
-                rehit_interval=rehit)
+                rehit_interval=rehit,
+                # Orbiters never fire an attack, so they are time mode and
+                # carry nothing: the hit site asks the weapon instead.
+                element=self.attack_element)
             if o is None:
                 break
             self._orbiters.append(o)
