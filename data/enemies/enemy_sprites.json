@@ -143,7 +143,7 @@
     }
   },
   "minotaur": {
-    "frame": [320, 320], "content": [52, 57, 245, 199], "scale": [68, 56], "anchor": [22, 44], "face": "right",
+    "frame": [320, 320], "content": [52, 57, 245, 199], "scale": [88, 76], "anchor": [22, 44], "face": "right",
     "anims": {
       "idle":   {"file": "enemies/minotaur/idle.png", "frames": 16, "fps": 7, "loop": true},
       "walk":   {"file": "enemies/minotaur/walk.png", "frames": 8, "fps": 10, "loop": true},
