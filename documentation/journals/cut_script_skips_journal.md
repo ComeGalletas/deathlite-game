@@ -1,7 +1,7 @@
 # Cut-script test skips — journal
 
 **ID:** TST-002 · **System:** tests (+ RND) · **Type:** bug ·
-**Status:** in progress · **Branch:** claude/optimistic-poincare-e34af9
+**Status:** done · **Branch:** claude/optimistic-poincare-e34af9
 (existing worktree, rebased onto `claude/reaction-damage-rework` so the
 DOC-001 index and `CLAUDE.md` §1 are present — owner's choice, 2026-09-22)
 
@@ -64,8 +64,8 @@ now holds everywhere. One task per test module, then the results.
 - [x] TST-002.3 — `test_totem_bolt.py`: assert `cut_totem_bolt_sheets` and
   `recolour_totem_fire --check` exit 0 → `5dbfff0`
 - [x] TST-002.4 — `test_totem_sprite.py`: assert `cut_totem_sheets --check`
-  exits 0
-- [ ] TST-002.5 — Run the affected tests, record results, mark the index row done
+  exits 0 → `29508e9`
+- [x] TST-002.5 — Run the affected tests, record results, mark the index row done
 
 ## TST-002 — Follow-up candidates (not in scope)
 
@@ -90,4 +90,11 @@ the owner named come first; the rest turned up in the same sweep.
 
 ## TST-002 — Results
 
-(pending)
+- `tests/render/test_spawn_fx.py`, `test_totem_bolt.py`, `test_totem_sprite.py`
+  together: **42 passed, 46 subtests passed, 0 skipped** (was: the three
+  cut-check tests skip in any checkout missing a source). Each module was also
+  run on its own before its commit: 13, 16 (+2 subtests), 13 (+44 subtests).
+- No `.gitignore` or asset change was needed (TST-002.D1): all four sources
+  were already tracked, and every `--check` exits 0 in this worktree.
+- Deferred: the conditional skips listed under *Follow-up candidates*, per the
+  requirement's scope.
