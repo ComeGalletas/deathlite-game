@@ -103,6 +103,7 @@ class CombatResolver:
                     self.apply_on_hit_effects(proj, enemy)
                     self.apply_weapon_statuses(proj, enemy, amount)
                     self.apply_stun(proj, enemy)
+                    self.apply_element(proj, enemy, amount)
                     self.split(proj, enemy)
                 ps.game.events.publish(Events.DAMAGE_DEALT, amount=dealt)
                 if proj.chain_left > 0 and self.chain_to_next(proj, targets):
@@ -201,6 +202,7 @@ class CombatResolver:
             if child is not None:
                 child.hit_ids.add(id(enemy))
                 child.fire_level = proj.fire_level
+                child.element = proj.element      # same attack, same flag
 
     def apply_on_hit_effects(self, proj: Projectile, enemy) -> None:
         ps = self.ps
@@ -280,6 +282,47 @@ class CombatResolver:
                 proj.active = False
                 ps.fx.detonate(proj)
                 return
+
+    def apply_element(self, proj: Projectile, enemy, amount: float) -> None:
+        """The elemental system's one entry point (design §6.2).
+
+        Every hero damage path in this game ends in `projectile_hits` -- a
+        shot, a melee cone, a chain, an orbiter, the Bomb's blast, the
+        Hammer's slam, a summon's bite, a crater tick -- so stamping the
+        element on the projectile and resolving it here reaches all of them
+        with no per-weapon wiring.
+
+        `amount` is the weapon damage this hit dealt, which is what the
+        element's own values are a fraction of. It runs inside the
+        `no_dmg` guard above, so the dev "attacks deal 0 damage" toggle
+        silences elements exactly as it silences on-hit statuses.
+
+        Which hits carry an element is the weapon's own business, in one of
+        two ways (owner's decision, 2026-09-21):
+
+        * **attack mode** stamped it on the projectile when the attack was
+          fired, so every projectile of that attack and every pierce they
+          score share one decision and nothing is checked here;
+        * **time mode** grants one application per window, claimed by the
+          first hit that asks. This is what makes the re-hitting weapons
+          sane -- the Ember Ring's orbiters and the summons never fire an
+          "attack" at all, so they have no counter to key off.
+        """
+        element = self.element_for(proj)
+        if not element:
+            return
+        self.run.elements.apply(enemy, element, weapon_id=proj.weapon_id,
+                                hit_damage=amount, now=self.now())
+
+    def element_for(self, proj: Projectile):
+        """The element this particular hit carries, or a falsy `NONE`."""
+        stamped = getattr(proj, "element", None)
+        if stamped:
+            return stamped
+        weapon = self._weapon(proj)
+        if weapon is None or not weapon.take_element_window(self.now()):
+            return None
+        return weapon.element
 
     def apply_stun(self, proj: Projectile, enemy) -> None:
         """P1: the Hammer's `stun_chance` roll. Bosses are immune."""

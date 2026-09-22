@@ -27,6 +27,8 @@ Three things it keeps, and why:
 """
 from __future__ import annotations
 
+from combat.elements.tracking import ElementTracking
+
 # The two damage-source labels the ledger and the training dummy's meter
 # share. They live here, on the core side, so the ledger and the NPCs never
 # import from `devtools/`: the meter is the optional consumer, the ledger
@@ -49,10 +51,20 @@ class RunLedger:
         self.held_since: dict[str, float] = {}
         self.kills: dict[str, int] = {}
         self.kill_names: dict[str, str] = {}
+        # The elemental books (`combat.elements.tracking`): the same damage
+        # again, split by the *effect* that dealt it as well as the weapon it
+        # belongs to. Kept here rather than beside the ledger so both come off
+        # the one `_absorb` hook and can never disagree about a total.
+        self.elements = ElementTracking()
 
     # --- recording ------------------------------------------------
-    def record(self, amount: float, source=None) -> None:
-        """One hit. Called through `Enemy._absorb` / `Boss._absorb`."""
+    def record(self, amount: float, source=None, effect: str | None = None) -> None:
+        """One hit. Called through `Enemy._absorb` / `Boss._absorb`.
+
+        `effect` names the elemental effect behind the damage ("overload",
+        "burn"). It is a *second* filing, never a replacement: the weapon
+        row is unchanged, so `total` still equals `stats["damage_dealt"]`.
+        """
         if amount <= 0.0:
             return
         # An empty string is as unnamed as None: a projectile whose
@@ -62,6 +74,8 @@ class RunLedger:
             return
         self.damage[key] = self.damage.get(key, 0.0) + amount
         self.first_hit.setdefault(key, self.now)
+        if effect:
+            self.elements.record_damage(amount, key, effect)
 
     def track_held(self, weapon_ids) -> None:
         """Note the clock for any weapon id seen for the first time."""

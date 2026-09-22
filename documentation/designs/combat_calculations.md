@@ -430,6 +430,12 @@ def _status_damage(self, amount: float, ctx) -> None:
 
 Tick intervals: `burn` 0.5 s, `poison` 0.75 s, `bleed` 0.4 s (`combat/status.py`).
 
+The elemental system reuses two of these rather than adding its own: Fire's
+burn is `burn` and Ice's slow is `chill`, both applied with their own tick
+and duration from `data/weapons/elements.json`. They carry a `bound_to_aura`
+flag so an elemental burn ends when its aura does while a weapon-blessing
+burn on the same body runs its own course.
+
 ### 1h · On-kill procs
 
 At the instant `alive` flips false — `game/states/playing_state.py —
@@ -688,8 +694,15 @@ def take_damage(self, amount: float, armor: float = 0.0) -> float:
   `damage`/`radius` live but never crit).
 - **`damage_multiplier` from `player.stats` is the only global outgoing
   scalar**; per-weapon trait modifiers come in through `weapon_mods`. There
-  is no elemental-resistance layer; the melee / ranged stat blessings land in
-  P2 of `plans/weapon_system_plan.md`.
+  is still no elemental *resistance* layer -- an element's damage is a
+  fraction of the hit that carried it and lands unscaled by the target's
+  type. The melee / ranged stat blessings land in P2 of
+  `plans/weapon_system_plan.md`.
+- **Elemental damage is a second source, not a multiplier.** An infused
+  weapon's hit resolves normally and then `apply_element` fires
+  (`core/combat.py`); anything the element deals is its own `report_damage`
+  under its own effect id, so the run ledger separates "the Sword" from
+  "the Sword's fire". See `journals/elemental_system_journal.md`.
 - **Incoming (P1):** `Player.take_damage` rolls `evasion_chance` (hit
   negated), then `block_chance` (hit × `1 − block_strength`), then the trait
   multiplier, then flat armour.

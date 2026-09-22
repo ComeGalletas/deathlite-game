@@ -144,7 +144,13 @@ def generate_world_steps(seed: int, room_count: int | None = None,
     # terrain allows -- and takes back the few obstacles that say no. See
     # `world/gen/repair.py`.
     if settings.unseal:
-        unseal(layout)
+        # The buff buildings are promised two to five an island, so the
+        # repair prices them above scenery and opens a sealed region past a
+        # tree where it can. Imported here rather than at module scope, the
+        # way the scatter reaches the same data.
+        from game.content import get_content
+        from world.gen.buildings import buff_kinds
+        unseal(layout, precious=buff_kinds(get_content().buildings))
         yield "repair"
     # Spawn points and resource anchors, last of all: they are tested against
     # the obstacles as the repair left them and the lattice the game steers

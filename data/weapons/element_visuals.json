@@ -1,0 +1,202 @@
+{
+  "_doc": [
+    "How the four elements look (design 8; elemental_system_journal.md M8).",
+    "Presentation only. The elements themselves are code and their gameplay",
+    "numbers live in elements.json -- this file is the other half of the same",
+    "split weapons.json and weapon_visuals.json already use, so nothing here",
+    "is ever read by the resolver.",
+    "",
+    "Each element names a colour, a marker shape, an optional authored rig",
+    "for its aura and its status, and a particle preset. A rig is optional on",
+    "purpose: only Thunder has an authored aura today and only Fire an",
+    "authored status flame, so everything else falls back to the procedural",
+    "ring, which is the design's own baseline (8, considerations).",
+    "",
+    "`marker` is a shape, not a colour: an element has to be readable without",
+    "relying on hue (design 8, colourblind proposal)."
+  ],
+  "aura": {
+    "_doc": [
+      "The procedural ring and marker, kept as the fallback for an element",
+      "with no rig and for the locked slot, which has no sprite at all.",
+      "",
+      "`rig_scale` is the one field the authored path uses: an aura sprite is",
+      "drawn `rig_scale` times the body's diameter, keeping the art's own",
+      "aspect rather than being squeezed into a square. Above 1 because these",
+      "effects are rings *around* a body and have to clear it."
+    ],
+    "ring_pad": 3,
+    "ring_width": 3,
+    "alpha": 210,
+    "locked_alpha": 120,
+    "marker_size": 7,
+    "marker_gap": 8,
+    "rig_scale": 2.1
+  },
+  "wash": {
+    "_doc": [
+      "How strongly an element colours a **primed enemy's** sprite (M10).",
+      "",
+      "Two numbers, and both are needed. `lift` pulls the element's colour",
+      "toward white *before* it multiplies: a straight multiply by a",
+      "saturated colour crushes every channel the tint is low in, and a",
+      "bone-white skeleton under Ice would go navy. `alpha` is how much of",
+      "that lands on the sprite.",
+      "",
+      "Settled at 102 of 255 by the owner, who was shown the same crowd at",
+      "102, 150 and 190 and kept the slightest (M11).",
+      "",
+      "It is not how an attack wears its element. M13 tried that and",
+      "measured it out: a multiply can only darken toward the overlap of two",
+      "hues, so on saturated art it never reaches the element's colour at any",
+      "strength -- stronger only means muddier. Attacks are recoloured",
+      "offline instead, by tools/asset_pipeline/recolour_element_variants.py",
+      "for the effects that keep their own art and by cut_element_effects.py",
+      "for the melee swings, which are replaced outright."
+    ],
+    "lift": 0.45,
+    "alpha": 102
+  },
+  "budget": {
+    "_doc": [
+      "Elemental particles are capped per frame, separately from the pool's",
+      "own MAX_PARTICLES, so a hundred auras can never starve the hit",
+      "bursts and the death poofs of theirs (design 9, particle budget)."
+    ],
+    "per_frame": 90,
+    "per_element": 40
+  },
+  "statuses": {
+    "_doc": [
+      "Authored art for a status, keyed by the status id the combat layer",
+      "uses -- not by element. Fire's burn and Ice's freeze are the two",
+      "that have art; `chill` has none and falls back to its procedural",
+      "chevron, which is why this is a map with gaps rather than a field",
+      "on each element.",
+      "",
+      "`burn` is shared with the weapon blessings' own burn: the elemental",
+      "one is the same status with a `bound_to_aura` flag, so it has to",
+      "look the same."
+    ],
+    "burn": "flame_loop",
+    "freeze": "element_freeze"
+  },
+  "reactions": {
+    "_doc": [
+      "One entry per reaction (combat/elements/config.py REACTION_PAIRS).",
+      "`rig` is the authored burst; where one is named the procedural",
+      "Flash does not draw at all (M10 rule 2). `seconds` is how long it",
+      "stays on screen -- these draw over every character, so the number",
+      "is deliberately small and deliberately here, where it is easy to",
+      "change, rather than buried as a constant in transient.py.",
+      "",
+      "`size` is the sprite's drawn width in world pixels at the smallest",
+      "a reaction ever is; the resolver hands the flash a radius from the",
+      "reaction's own reach, and the drawn size scales with it, so a",
+      "wide-reaching Overload looks wider than a Frostburn on one body.",
+      "",
+      "`label` is optional and names which of the two elements is the",
+      "*fill* of the popped reaction name and which is the *ring* round it",
+      "(M11 C). Left out, they follow REACTION_PAIRS order. It exists",
+      "because that order is taxonomy -- it also decides the blend and the",
+      "art -- and which colour reads better on the inside of a word is a",
+      "separate question with a separate answer."
+    ],
+    "frostburn": {
+      "rig": "reaction_frostburn",
+      "seconds": 0.5,
+      "size": 46,
+      "label": {
+        "fill": "ice",
+        "ring": "fire"
+      }
+    },
+    "overload": {
+      "rig": "reaction_overload",
+      "seconds": 0.6,
+      "size": 64
+    },
+    "superconduct": {
+      "rig": "reaction_superconduct",
+      "seconds": 0.42,
+      "size": 54
+    },
+    "firewind": {
+      "rig": "reaction_firewind",
+      "seconds": 0.67,
+      "size": 56
+    },
+    "icewind": {
+      "rig": "reaction_icewind",
+      "seconds": 0.67,
+      "size": 56
+    },
+    "thunderwind": {
+      "rig": "reaction_thunderwind",
+      "seconds": 0.67,
+      "size": 56
+    }
+  },
+  "elements": {
+    "fire": {
+      "colour": [
+        255,
+        130,
+        60
+      ],
+      "marker": "flame",
+      "aura_rig": "element_fire",
+      "particles": {
+        "rate": 7.0,
+        "speed": 46,
+        "life": 0.42,
+        "radius": 2.5
+      }
+    },
+    "ice": {
+      "colour": [
+        120,
+        200,
+        255
+      ],
+      "marker": "shard",
+      "aura_rig": "element_ice",
+      "particles": {
+        "rate": 5.0,
+        "speed": 26,
+        "life": 0.55,
+        "radius": 2.0
+      }
+    },
+    "thunder": {
+      "colour": [
+        108,
+        74,
+        163
+      ],
+      "marker": "bolt",
+      "aura_rig": "element_thunder",
+      "particles": {
+        "rate": 6.0,
+        "speed": 64,
+        "life": 0.28,
+        "radius": 2.0
+      }
+    },
+    "wind": {
+      "colour": [
+        170,
+        255,
+        190
+      ],
+      "marker": "swirl",
+      "aura_rig": "element_wind",
+      "particles": {
+        "rate": 6.0,
+        "speed": 54,
+        "life": 0.36,
+        "radius": 2.0
+      }
+    }
+  }
+}

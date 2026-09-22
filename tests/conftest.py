@@ -30,6 +30,7 @@ WORLD = (
     # folder reorganisation and keep their tier.
     "tests/entities/test_npcs.py",
     "tests/playing/test_interactables.py",
+    "tests/playing/test_infusion_sources.py",
     "tests/entities/ai/test_boss_pig_rider.py",
     "tests/world/test_pathfinding.py",
     "tests/playing/test_enemy_nav.py",

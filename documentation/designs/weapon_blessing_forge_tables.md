@@ -59,7 +59,7 @@ Gates that hold on every path: a post-Forge card (`requires.forge`) needs one of
 
 *A wide sweeping arc. Reliable when enemies close in.*  
 
-Base: class melee, category melee, damage 15, cooldown 1.2s, area 40, cone ±60°, weight 26, special cone
+Base: class melee, category melee, damage 15, cooldown 1.2s, area 40, cone ±60°, weight 26, special cone, element every attack
 
 #### Blessings
 
@@ -96,7 +96,7 @@ Base: class melee, category melee, damage 15, cooldown 1.2s, area 40, cone ±60�
 
 *A slow, crushing blow: it winds up, then lands ahead of you. Strong knockback, may stun.*  
 
-Base: class melee, category melee, damage 27, cooldown 1.5s, area 35, weight 75, stun chance 0.35, stun duration 0.8, special slam
+Base: class melee, category melee, damage 27, cooldown 1.5s, area 35, weight 75, stun chance 0.35, stun duration 0.8, special slam, element every attack
 
 #### Blessings
 
@@ -130,7 +130,7 @@ Base: class melee, category melee, damage 27, cooldown 1.5s, area 35, weight 75,
 
 *Quick, precise stabs. Melts a single target.*  
 
-Base: class melee, category melee, damage 9, cooldown 0.4s, area 42, cone ±17°, pierce 1, weight 6, special cone
+Base: class melee, category melee, damage 9, cooldown 0.4s, area 42, cone ±17°, pierce 1, weight 6, special cone, element every 3rd attack
 
 #### Blessings
 
@@ -166,7 +166,7 @@ Base: class melee, category melee, damage 9, cooldown 0.4s, area 42, cone ±17°
 
 *A long, piercing arrow. Punishes enemies in a line.*  
 
-Base: class ranged, category projectile, damage 10, cooldown 1.2s, area 5, reach 460, pierce 2, weight 20
+Base: class ranged, category projectile, damage 10, cooldown 1.2s, area 5, reach 460, pierce 2, weight 20, element every attack
 
 #### Blessings
 
@@ -204,7 +204,7 @@ Base: class ranged, category projectile, damage 10, cooldown 1.2s, area 5, reach
 
 *A bolt that seeks the nearest foe. Steady pressure, no aiming needed.*  
 
-Base: class ranged, category projectile, damage 10, cooldown 1.0s, area 6, reach 400, pierce 0, weight 5, aim assist deg 45
+Base: class ranged, category projectile, damage 10, cooldown 1.0s, area 6, reach 400, pierce 0, weight 5, aim assist deg 45, element every attack
 
 #### Blessings
 
@@ -238,7 +238,7 @@ Base: class ranged, category projectile, damage 10, cooldown 1.0s, area 6, reach
 
 *A thrown explosive. Lands, sits, then erases a cluster.*  
 
-Base: class ranged, category projectile, damage 23, cooldown 2.2s, area 8, reach 100, pierce 0, weight 22, blast radius 42, fuse 1.1, special bomb
+Base: class ranged, category projectile, damage 23, cooldown 2.2s, area 8, reach 100, pierce 0, weight 22, blast radius 42, fuse 1.1, special bomb, element every attack
 
 #### Blessings
 
@@ -271,7 +271,7 @@ Base: class ranged, category projectile, damage 23, cooldown 2.2s, area 8, reach
 
 *Embers orbit you, scorching anything they touch.*  
 
-Base: class summon, category orbit, damage 6, cooldown 0.45s, count 3, area 8, reach 140, weight 8, orbit radius 96, orbit speed 3.2, rehit interval 0.4, special orbit
+Base: class summon, category orbit, damage 6, cooldown 0.45s, count 3, area 8, reach 140, weight 8, orbit radius 96, orbit speed 3.2, rehit interval 0.4, special orbit, element every 1.0s
 
 #### Blessings
 
@@ -293,7 +293,7 @@ No Forgings: summons cannot be forged.
 
 *Plants a totem that fires spectral bolts at nearby foes.*  
 
-Base: class summon, category summon, damage 7, cooldown 6.0s, area 5, pierce 0, weight 1, summon lifetime 8.0, summon replant delay 5.0, summon attack interval 0.7, summon attack range 360, special summon
+Base: class summon, category summon, damage 7, cooldown 6.0s, area 5, pierce 0, weight 1, summon lifetime 8.0, summon replant delay 5.0, summon attack interval 0.7, summon attack range 360, special summon, element every 1.5s
 
 #### Blessings
 
@@ -313,7 +313,7 @@ No Forgings: summons cannot be forged.
 
 *Looses a spirit wolf that hunts and mauls the nearest foe.*  
 
-Base: class summon, category summon, damage 12, cooldown 7.0s, area 5, pierce 0, weight 0, summon lifetime 0, summon replant delay 0.0, summon attack interval 0.6, summon attack range 70, special summon
+Base: class summon, category summon, damage 12, cooldown 7.0s, area 5, pierce 0, weight 0, summon lifetime 0, summon replant delay 0.0, summon attack interval 0.6, summon attack range 70, special summon, element every 1.5s
 
 #### Blessings
 

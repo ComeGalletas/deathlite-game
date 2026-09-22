@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from game.states.playing.visual.projectiles import style
 from game.states.playing.visual.projectiles.simple import bolt
+from game.states.playing.visual import elements as element_fx
 
 ANIM = "spin"
 
@@ -38,6 +39,10 @@ def spin(surface, sx, sy, p, ctx) -> None:
     if not rig:
         bolt(surface, sx, sy, p, ctx)
         return
+    # An infused shot wears its element (M13): the Bomb turns over in the
+    # element's colour. A rig with no infused variants -- an enemy's thrown
+    # bone, an acorn -- resolves back to itself.
+    rig = element_fx.variant_rig(ctx.assets, rig, getattr(p, "infusion", None))
     i = frame_index(ctx.assets, rig, getattr(p, "age", 0.0),
                     p.fx.get("fps") if p.fx else None)
     if i is None:

@@ -36,6 +36,8 @@ BOLT = {
     "area": 5, "weight": 0, "targeting_mode": "nearest", "pierce": 0,
     "special_effect": None, "category": "projectile", "class": "ranged",
     "tags": ["projectile"],
+    # Required taxonomy since M6: how the weapon paces its element.
+    "element_application": {"mode": "attack", "interval": 0},
 }
 
 

@@ -205,7 +205,11 @@ deathlite-game/
 │                       shake, audio (+ mixer backend), music, animation,
 │                       debug overlay
 ├── combat/             weapons/ (core, bomb, slam, forge), damage,
-│                       targeting, status, knockback, synergy, weapon visuals
+│   │                   targeting, status, knockback, synergy, weapon visuals
+│   └── elements/    the four elements and their six reactions: ids,
+│                       schema/config (the JSON tuning), registry,
+│                       modifiers, aura state, the resolver, fire / ice /
+│                       thunder / wind, reactions/, spread, tracking
 ├── progression/        experience, stats, upgrades, blessings/ (catalog,
 │                       offer, apply, effects), items, potions, chests, meta
 ├── world/              layout (the WorldLayout data model); gen/ (seeded
@@ -244,7 +248,8 @@ deathlite-game/
 │                       plans/ (what is to be done), journals/ (what was done),
 │                       dps_calcs/
 └── tests/              1,650 tests: pure logic + headless integration
-    ├── combat/         weapons, damage, status, forges, synergies, summons
+    ├── combat/         weapons, damage, status, forges, synergies, summons,
+    │                   elements (config, auras, hits, the six reactions)
     ├── entities/       ai/ (behaviours, FSM enemies, boss), characters,
     │                   movement, hero animation, npcs, fish huts, pickups
     ├── playing/        the run's sub-systems: buffs, bump, chests, gold,
@@ -346,6 +351,32 @@ selected weapon's Forging with every number it changed, the synergies) and
 Blessings (the owned blessings and the selected one's card text at its
 current level). Also reachable from the pause menu's "Run status" row. See
 `documentation/journals/run_status_journal.md`.
+
+**Elemental infusions.** Four elements — Fire, Ice, Thunder, Wind — can be
+attached to a weapon slot for the run, from the village Monastery or a buff
+building. An infused weapon's hits land normally and then apply their element
+(`core/combat.py:apply_element`, the system's one entry point, which every
+hero damage path already funnels through: shots, melee cones, chains,
+orbiters, blasts, summon bites, crater ticks). Each element does something of
+its own — Fire burns, Ice stacks toward a freeze, Thunder chains to
+neighbours, Wind knocks back and leaves a tornado — and each one leaves an
+**aura** on what it hit.
+
+An aura is what makes the system more than four damage types: land a
+*different* element on a body that already carries one and the pair produces
+a **reaction** — Frostburn, Overload, Superconduct, FireWind, IceWind,
+ThunderWind — which consumes the aura and locks the slot briefly. A weapon
+inflicts its element on a cadence of its own (`element_application` in
+`data/weapons/weapons.json`): every Nth attack, or once per time window for
+the summons and the orbiters, which never fire an "attack" to count.
+
+Elements are code and JSON only tunes them: the behaviours are
+`combat/elements/`, the numbers are `data/weapons/elements.json` and
+`reactions.json`, and how they look is `element_visuals.json`, split off the
+same way `weapons.json` and `weapon_visuals.json` already are. A killing blow
+still fires the element's *outward* effects — the chain, the tornado, the
+reaction — but writes nothing to the body it killed. See
+`documentation/journals/elemental_system_journal.md`.
 
 Not done: balance is a first tuning pass (needs human playtesting); one boss
 (the spec's Phase-1 floor); a few polish items listed in `documentation/journals/journal.md`.

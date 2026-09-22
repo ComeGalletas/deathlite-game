@@ -247,6 +247,13 @@ class RunSummaryPanel:
         # CB-8: potions picked up, with the HP they actually restored.
         y = self._kv(surface, area, y, "Potions",
                      f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
+        # The elements this run obtained (design §7.3). Tracked for the
+        # summary only -- no gameplay system reads the set. A run with
+        # no infusion says so rather than showing a blank.
+        elements = list(s.get("unlocked_elements", ()))
+        y = self._kv(surface, area, y, "Elements",
+                     ", ".join(elements) if elements else "none",
+                     colour=config.COLOR_ACCENT if elements else None)
         items = list(s.get("dropped_items", ()))
         y = self._subheader(surface, area, y, f"Items acquired  ({len(items)})")
         if not items:

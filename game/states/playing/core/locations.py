@@ -17,6 +17,7 @@ from __future__ import annotations
 import pygame
 
 from entities.interactable import Interactable
+from game.states.playing.core import elemental, infusion
 from progression.blessings import roll_offering
 from world.gen.tuning import SPECIAL_KINDS
 
@@ -49,10 +50,19 @@ class SpecialLocations:
         for v in getattr(run.game_map.layout, "villages", ()):
             run.interactables.append(Interactable("forge", v.forge.x, v.forge.y))
             run.interactables.append(Interactable("fountain", v.heal.x, v.heal.y))
+            # M7: the Monastery is the village town hall, which the
+            # village pass has always placed and nothing has ever used.
+            # No new building, no change to generation.
+            for kind, x, y in v.buildings:
+                if kind == "monastery":
+                    run.interactables.append(Interactable("monastery", x, y))
+                    break
         # The buff buildings (journal: buff_buildings_journal.md): one
         # interactable on each building obstacle, which carries the art.
         for o in run.game_map.layout.buff_buildings(ps.buffs.kinds):
-            run.interactables.append(Interactable(o.kind, o.pos.x, o.pos.y))
+            run.interactables.append(Interactable(
+                o.kind, o.pos.x, o.pos.y,
+                element=elemental.roll(run, o)))
 
     def nearby(self):
         ps = self.ps
@@ -122,6 +132,24 @@ class SpecialLocations:
         if not self.grant_random_blessing():
             run.player.heal(cost)  # refund if nothing to grant
 
+    def use_monastery(self, it: Interactable) -> None:
+        """The Monastery (design §7.2, confirmed 2026-09-21): the player
+        picks any of the four elements and one weapon to carry it. It
+        rolls nothing, offers every element whatever the run has
+        unlocked, and is spent after a single use."""
+        ps = self.ps
+        run = getattr(self, "run", ps)
+        run.particles.burst(it.pos, it.colour, count=18, speed=150, life=0.5)
+        infusion.offer(
+            ps, title="The Monastery  -  choose an element, then a weapon",
+            on_done=lambda u: self._infused(it, u))
+
+    def _infused(self, it: Interactable, upgrade) -> None:
+        """Spend the source and say what happened. Only a completed pick
+        spends it -- walking away with ESC leaves it standing."""
+        it.used = True
+        infusion._noticed(self.ps, upgrade)
+
     def use_forge(self, it: Interactable) -> None:
         """P3 (design §7), change request 6: offer the Forgings of *a chosen*
         weapon. The Forge is never consumed, and with nothing eligible it says
@@ -156,7 +184,9 @@ class SpecialLocations:
             # list of several.
             on_done=lambda u: ps.notice(
                 f"The {str(u.weapon).replace('_', ' ')} is reforged: {u.title}."),
-            title="The Forge  -  choose a weapon to reforge", cancelable=True)
+            title="The Forge  -  choose a weapon to reforge", cancelable=True,
+            hint=("Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter "
+                  "to forge    -    ESC to leave"))
 
     def forge_requirements(self, need: int) -> str:
         """The message for a Forge with nothing to work on."""

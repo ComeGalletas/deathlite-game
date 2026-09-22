@@ -78,4 +78,10 @@ def throw_bombs(weapon, ctx, aim: pygame.Vector2, candidates, area: float,
             blast_lifetime=float(d["blast_lifetime"]),
             mine=mine, arm_delay=float(weapon.effects.get("mine_arm_delay", 0.0)),
             # Sticky Bomb: the resolver attaches it to the first enemy it touches.
-            sticky=bool(weapon.effects.get("sticky", 0)))
+            sticky=bool(weapon.effects.get("sticky", 0)),
+            # The ball never hits anything itself; its blast inherits this.
+            element=weapon.attack_element,
+            # ...and the look, which is the weapon's infusion rather than
+            # this attack's element, so every throw of an infused Bomb is
+            # its colour (M13).
+            infusion=weapon.element)

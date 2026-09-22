@@ -49,6 +49,9 @@ class Run:
     potions: object = None            # Pool[HealthPotion]
     summons: object = None            # Pool[Summon]
     hazards: list = field(default_factory=list)
+    wind_areas: list = field(default_factory=list)   # elemental tornadoes
+    element_fx: list = field(default_factory=list)   # jump arcs and flashes
+    element_visuals: object = None    # ElementVisuals (profiles + budget)
     melee_hitboxes: list = field(default_factory=list)
     interactables: list = field(default_factory=list)
     chests: list = field(default_factory=list)
@@ -62,6 +65,7 @@ class Run:
     shake: object = None
     levels: object = None             # LevelTracker
     ledger: object = None             # RunLedger
+    elements: object = None           # ElementalResolver
     stats: dict = field(default_factory=dict)
     # --- transient effects ----------------------------------------------
     explosions: list = field(default_factory=list)   # blast visuals
@@ -76,6 +80,10 @@ class Run:
     boss_name: str = ""
     notice_t: float = 0.0
     notice_text: str = ""
+    # --- elemental system -------------------------------------------------
+    # Elements obtained this run (`ElementId`s). Run-scoped by living
+    # here: a new `Run` is built per run, so nothing has to clear it.
+    unlocked_elements: set = field(default_factory=set)
     # --- input --------------------------------------------------------------
     auto_attack: bool = True
     aim: object = None                # this frame's `AimInput`

@@ -12,6 +12,7 @@ the tests that call them.
 from __future__ import annotations
 
 from game import config
+from game.states.playing.visual import elements as element_fx
 from game.states.playing.visual import slam_fx, slash_fx
 
 
@@ -92,6 +93,9 @@ def draw_flat_effects(ps, surface, level: int) -> None:
     slash_fx.draw(surface, ps, level)             # the Sword's swing sequence
     ren.trail_fx(surface, level)
     ps._draw_player_projectiles(surface, level)   # patchable: the order test hooks it
+    # The elemental state of this terrace, last of the flat effects so it
+    # sits directly under the sprites standing on the same band (M10 rule 3).
+    element_fx.draw_under(surface, ps.run, level)
 
 
 def actor_items(ps) -> list:

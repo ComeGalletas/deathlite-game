@@ -11,6 +11,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from combat.elements import config as element_schema
+from combat.elements.ids import ELEMENTS as ELEMENT_IDS
+from combat.elements.ids import REACTIONS as REACTION_IDS
+from combat.elements.schema import ElementDataError
 from progression.blessings.catalog import RARITIES as BLESSING_RARITIES
 from spawn.tables import SpawnTables, TableError
 
@@ -40,10 +44,17 @@ def _load(name: str) -> dict[str, Any]:
 def _merge_sprites(*names: str) -> dict[str, Any]:
     """Load several sprite-rig files into one flat namespace. A rig may appear
     in more than one file (a shared rig, copied on purpose) as long as the
-    copies are identical."""
+    copies are identical.
+
+    A top-level `_`-prefixed key is documentation, not a rig -- the same
+    convention the tuning blocks use. `infused_sprites.json` is generated
+    and leads with a `_doc` saying so, and everything that walks this
+    namespace would otherwise have to know that."""
     merged: dict[str, Any] = {}
     for name in names:
         for rig, spec in _load(name).items():
+            if rig.startswith("_"):
+                continue
             if rig in merged and merged[rig] != spec:
                 raise ContentError(
                     f"sprite rig {rig!r} differs between files (last: {name})")
@@ -203,7 +214,195 @@ def _check_buildings(data: dict[str, Any]) -> dict[str, Any]:
         for rig in (*skins[kind], spec["fx_rig"], spec["icon_rig"], *spec.get("dressing", ())):
             if rig not in rigs and rig not in images and not rig.startswith("deco_"):
                 raise ContentError(f"buildings.json: buff {kind!r} names unknown rig {rig!r}")
+    _check_building_elements(data)
     return data
+
+
+def _check_building_elements(data: dict[str, Any]) -> None:
+    """The optional `elements` block (M7): how often a buff building
+    also hands out an element, and which. Absent means none ever do."""
+    block = data.get("elements")
+    if block is None:
+        return
+    if not isinstance(block, dict):
+        raise ContentError("buildings.json: `elements` must be an object")
+    chance = float(block.get("chance", 0.0))
+    if not 0.0 <= chance <= 1.0:
+        raise ContentError(f"buildings.json: elements.chance {chance} is not 0..1")
+    weights = block.get("weights", {})
+    if not isinstance(weights, dict):
+        raise ContentError("buildings.json: elements.weights must be an object")
+    known = {e.key for e in ELEMENT_IDS}
+    unknown = {k for k in weights if not k.startswith("_")} - known
+    if unknown:
+        raise ContentError(
+            f"buildings.json: elements.weights names {sorted(unknown)}, "
+            f"which are not elements")
+    if chance > 0.0 and sum(
+            float(w) for k, w in weights.items() if not k.startswith("_")) <= 0.0:
+        raise ContentError("buildings.json: elements.weights sum to zero")
+
+
+def _check_elements(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `elements.json` against `combat.elements.config`."""
+    try:
+        return element_schema.check_elements(data)
+    except ElementDataError as exc:
+        raise ContentError(str(exc)) from exc
+
+
+def _check_reactions(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `reactions.json` against `combat.elements.config`."""
+    try:
+        return element_schema.check_reactions(data)
+    except ElementDataError as exc:
+        raise ContentError(str(exc)) from exc
+
+
+def _check_element_visuals(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate `element_visuals.json`: every element styled, every marker a
+    shape the renderer knows, every reaction given a burst.
+
+    That the named *rigs* exist is checked separately, by
+    `_check_element_rigs` once the sprite files have merged -- they load
+    after this one, and a rig name that resolves to nothing is exactly the
+    kind of thing that should stop the boot rather than show up as an
+    invisible aura."""
+    from game.states.playing.visual.elements.markers import SHAPES
+
+    elements = data.get("elements")
+    if not isinstance(elements, dict):
+        raise ContentError("element_visuals.json: `elements` must be an object")
+    got = {k for k in elements if not k.startswith("_")}
+    want = {e.key for e in ELEMENT_IDS}
+    if got != want:
+        raise ContentError(
+            f"element_visuals.json: covers {sorted(got)}, expected {sorted(want)}")
+    for key in sorted(want):
+        spec = elements[key]
+        for field in ("colour", "marker", "particles"):
+            if field not in spec:
+                raise ContentError(
+                    f"element_visuals.json: {key} has no {field!r}")
+        if len(spec["colour"]) != 3:
+            raise ContentError(f"element_visuals.json: {key} colour is not RGB")
+        if spec["marker"] not in SHAPES:
+            raise ContentError(
+                f"element_visuals.json: {key} marker {spec['marker']!r} is not a known shape")
+        for field in ("rate", "speed", "life", "radius"):
+            if float(spec["particles"][field]) <= 0.0:
+                raise ContentError(
+                    f"element_visuals.json: {key} particles.{field} must be > 0")
+    for block, fields in (("aura", ("ring_pad", "ring_width", "alpha",
+                                    "locked_alpha", "marker_size",
+                                    "marker_gap", "rig_scale")),
+                          ("wash", ("lift", "alpha")),
+                          ("budget", ("per_frame", "per_element"))):
+        if not isinstance(data.get(block), dict):
+            raise ContentError(f"element_visuals.json: `{block}` must be an object")
+        for field in fields:
+            if field not in data[block]:
+                raise ContentError(
+                    f"element_visuals.json: {block} has no {field!r}")
+
+    # M10: every reaction draws a burst over the whole scene, so every
+    # reaction needs one. A missing entry would silently fall back to the
+    # procedural flash for that pair alone, which is the sort of gap nobody
+    # notices until they wonder why one reaction looks different.
+    reactions = data.get("reactions")
+    if not isinstance(reactions, dict):
+        raise ContentError("element_visuals.json: `reactions` must be an object")
+    got = {k for k in reactions if not k.startswith("_")}
+    want = {r.key for r in REACTION_IDS}
+    if got != want:
+        raise ContentError(
+            f"element_visuals.json: reactions covers {sorted(got)}, "
+            f"expected {sorted(want)}")
+    for key in sorted(want):
+        spec = reactions[key]
+        for field in ("rig", "seconds", "size"):
+            if field not in spec:
+                raise ContentError(
+                    f"element_visuals.json: reaction {key} has no {field!r}")
+        for field in ("seconds", "size"):
+            if float(spec[field]) <= 0.0:
+                raise ContentError(
+                    f"element_visuals.json: reaction {key}.{field} must be > 0")
+        _check_reaction_label(key, spec.get("label"))
+
+    statuses = data.get("statuses")
+    if not isinstance(statuses, dict):
+        raise ContentError("element_visuals.json: `statuses` must be an object")
+    return data
+
+
+def _check_reaction_label(key: str, label: Any) -> None:
+    """A reaction's optional label order names two *different* elements of
+    that reaction's own pair.
+
+    Checked rather than trusted: naming the wrong element would silently
+    colour a word in a hue that has nothing to do with the reaction, and
+    naming the same one twice would draw a ring the same colour as its
+    fill, which reads as no ring at all."""
+    if label is None:
+        return
+    from combat.elements.config import REACTION_PAIRS
+    from combat.elements.ids import reaction_from_key
+
+    if not isinstance(label, dict):
+        raise ContentError(
+            f"element_visuals.json: reaction {key}.label must be an object")
+    missing = {"fill", "ring"} - set(label)
+    if missing:
+        raise ContentError(
+            f"element_visuals.json: reaction {key}.label has no "
+            f"{sorted(missing)} -- name both or neither")
+    allowed = {e.key for e in REACTION_PAIRS[reaction_from_key(key)]}
+    for field in ("fill", "ring"):
+        if label[field] not in allowed:
+            raise ContentError(
+                f"element_visuals.json: reaction {key}.label.{field} is "
+                f"{label[field]!r}, which is not one of {sorted(allowed)}")
+    if label["fill"] == label["ring"]:
+        raise ContentError(
+            f"element_visuals.json: reaction {key}.label names "
+            f"{label['fill']!r} twice -- the ring would vanish")
+
+
+def _check_element_rigs(visuals: dict[str, Any], sprites: dict[str, dict]) -> None:
+    """Every rig `element_visuals.json` names is a real one.
+
+    Run after the sprite files merge, because that is when the rigs exist.
+    An unresolvable name is a boot failure and not a warning: an aura is
+    the only in-game sign of what an enemy will react to, and once the
+    sprite is the whole indicator (M10 rule 1) a typo here would leave a
+    primed enemy with nothing drawn on it at all."""
+    named: list[tuple[str, str]] = []
+    for key, spec in visuals["elements"].items():
+        if key.startswith("_"):
+            continue
+        if spec.get("aura_rig"):
+            named.append((f"{key}.aura_rig", spec["aura_rig"]))
+    for status, rig in visuals["statuses"].items():
+        if not status.startswith("_"):
+            named.append((f"statuses.{status}", rig))
+    for key, spec in visuals["reactions"].items():
+        if not key.startswith("_"):
+            named.append((f"reactions.{key}.rig", spec["rig"]))
+
+    for where, rig in named:
+        if not isinstance(rig, str):
+            raise ContentError(
+                f"element_visuals.json: {where} is not a rig name")
+        if rig not in sprites:
+            raise ContentError(
+                f"element_visuals.json: {where} names rig {rig!r}, "
+                "which no sprite file declares")
+        if "loop" not in sprites[rig].get("anims", {}):
+            raise ContentError(
+                f"element_visuals.json: {where} rig {rig!r} has no `loop` "
+                "animation (this project's name for a rig's only anim, "
+                "whether or not it repeats)")
 
 
 def _merge_buildings(terrain: dict[str, Any], ui_sprites: dict[str, Any],
@@ -244,6 +443,15 @@ class Content:
         self.offering: dict = _load("weapons/offering.json")        # P2 weights
         self.forges: dict[str, dict] = _load("weapons/forges.json")   # P3 Forgings
         self.items: dict = _load("weapons/items.json")
+        # Elemental infusions (journal: elemental_system_journal.md). The
+        # schema lives in `combat.elements.config`; both files are content,
+        # so a missing, unknown or out-of-range value stops the boot.
+        self.elements: dict = _check_elements(_load("weapons/elements.json"))
+        self.reactions: dict = _check_reactions(_load("weapons/reactions.json"))
+        # Presentation only, split from the tuning the way
+        # `weapon_visuals.json` is split from `weapons.json`.
+        self.element_visuals: dict = _check_element_visuals(
+            _load("weapons/element_visuals.json"))
         self.meta_upgrades: dict[str, dict] = _load("heroes/meta_upgrades.json")
         # CB-8: health potion drops. Validated here so a table that does not
         # cover every rarity fails at boot, not on the first kill.
@@ -257,7 +465,9 @@ class Content:
         # merge back into one flat `sprites` namespace here.
         self.sprites: dict[str, dict] = _merge_sprites(
             "heroes/character_sprites.json", "enemies/enemy_sprites.json",
-            "weapons/weapon_sprites.json", "loot/prop_sprites.json")
+            "weapons/weapon_sprites.json", "weapons/infused_sprites.json",
+            "loot/prop_sprites.json")
+        _check_element_rigs(self.element_visuals, self.sprites)
         self.terrain: dict = _load("world/terrain.json")
         # Buff buildings (journal: buff_buildings_journal.md): the five
         # interactive buildings and their timed buffs. Their obstacle kinds,

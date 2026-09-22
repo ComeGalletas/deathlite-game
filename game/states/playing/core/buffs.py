@@ -86,7 +86,12 @@ class BuffSystem:
 
     # --- activation ---------------------------------------------
     def activate(self, it) -> None:
-        """The interact key on a building: one use, then the buff."""
+        """The interact key on a building: one use, then the buff.
+
+        A building that rolled elemental (M7) gives **both**: its buff
+        as always, and then the weapon picker for the element it
+        offers (owner's decision, 2026-09-21).
+        """
         it.used = True
         self.start(it.kind)
         self._mark_used(it)
@@ -94,6 +99,12 @@ class BuffSystem:
         run = getattr(self, "run", ps)
         run.particles.burst(run.player.pos, self.palette(it.kind)[0], count=22,
                            speed=170, life=0.6)
+        element = getattr(it, "element", None)
+        if element:
+            from game.states.playing.core import infusion
+            infusion.offer(
+                ps, element=element,
+                title=f"{element.key.title()} - choose a weapon to infuse")
 
     def start(self, kind: str) -> None:
         """Grant `kind` for its full duration. A buff already running is

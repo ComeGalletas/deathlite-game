@@ -28,7 +28,10 @@ import math
 
 import pygame
 
+from combat.elements.ids import ElementId as _ElementId
 from world.elevation import NONE as _NO_LEVEL
+
+_NO_ELEMENT = _ElementId.NONE
 
 
 class Projectile:
@@ -43,7 +46,7 @@ class Projectile:
         "weapon_id", "age", "stop_after", "inert", "blast_radius",
         "blast_lifetime", "detonated", "stun_chance", "stun_duration",
         "no_block", "mine", "arm_delay", "swing", "sticky", "stuck_to",
-        "bounces_left",
+        "bounces_left", "element", "infusion",
     )
 
     def __init__(self) -> None:
@@ -99,6 +102,17 @@ class Projectile:
         # shoreline this many more times before it is spent; 0 for every
         # ordinary shot, which the blocks kill on contact as before.
         self.bounces_left = 0
+        # Elemental system: the element this attack carries, stamped by
+        # the spawner (M6). `NONE` for a plain attack, which is every
+        # attack until a weapon is infused.
+        self.element = _NO_ELEMENT
+        # What the weapon it came from is *infused* with, for the look
+        # alone (M13). Not the same thing: a time-mode weapon stamps no
+        # element on its spawns at all -- the hit site claims one per
+        # window -- and an attack-mode weapon with an interval stamps it
+        # on one attack in three. An infused weapon still looks infused
+        # every time it swings.
+        self.infusion = _NO_ELEMENT
 
     def reset(self, *, pos, vel, damage: float, radius: float, lifetime: float,
               pierce: int = 0, src_weight: float = 0.0, color=(255, 255, 255),
@@ -113,7 +127,8 @@ class Projectile:
               stun_chance: float = 0.0, stun_duration: float = 0.0,
               no_block: bool = False, mine: bool = False,
               arm_delay: float = 0.0, swing: int = 0, sticky: bool = False,
-              bounces: int = 0) -> None:
+              bounces: int = 0, element=_NO_ELEMENT,
+              infusion=_NO_ELEMENT) -> None:
         self.pos.update(pos)
         self.vel.update(vel)
         self.damage = damage
@@ -157,6 +172,8 @@ class Projectile:
         self.sticky = sticky
         self.stuck_to = None
         self.bounces_left = int(bounces)
+        self.element = element
+        self.infusion = infusion
 
     def update(self, dt: float) -> None:
         if self.orbit_speed != 0.0 and self.anchor is not None:

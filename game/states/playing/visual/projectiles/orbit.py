@@ -15,6 +15,7 @@ import math
 import pygame
 
 from game.states.playing.visual.projectiles import style
+from game.states.playing.visual import elements as element_fx
 
 _RIG, _ANIM = "ember", "loop"
 
@@ -23,14 +24,17 @@ _RIG, _ANIM = "ember", "loop"
 def orbit(surface, sx, sy, p, ctx) -> None:
     z = ctx.zoom
     assets = ctx.assets
-    scale = assets.scale_for(_RIG) or (16, 34)
+    # An infused ring burns in its element's colour (M13). The flame is
+    # recoloured offline, four sheets per rig, so this is an ordinary blit.
+    rig = element_fx.variant_rig(assets, _RIG, getattr(p, "infusion", None))
+    scale = assets.scale_for(rig) or (16, 34)
     size = (max(1, round(scale[0] * z)), max(1, round(scale[1] * z)))
 
-    n = max(1, assets.frame_count(_RIG, _ANIM))
-    idx = int(ctx.now * assets.fps(_RIG, _ANIM)) % n
+    n = max(1, assets.frame_count(rig, _ANIM))
+    idx = int(ctx.now * assets.fps(rig, _ANIM)) % n
     heading = math.degrees(p.orbit_angle) + (0.0 if p.orbit_speed > 0 else 180.0)
 
-    spr = assets.frame_rotated(_RIG, _ANIM, idx, heading, size=size)
+    spr = assets.frame_rotated(rig, _ANIM, idx, heading, size=size)
     if spr is not None:
         surface.blit(spr, spr.get_rect(center=(int(sx), int(sy))))
     else:  # rig / sheet missing -> the plain disc it replaces

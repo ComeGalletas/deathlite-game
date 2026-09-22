@@ -8,11 +8,11 @@
     "style": "cone",
     "fx": {
       "slash": [
-        "sword_slash_down",
-        "sword_slash_up"
+        "sword_slash"
       ],
       "slash_mode": "sequence",
-      "slash_size": 1.5
+      "slash_size": 1.5,
+      "_note_slash": "One rig, not two. The old pair played a downward strip then an upward one; the replacement is a single fanned arc, and the name here is a *base* -- the element picks sword_slash_plain, _fire and so on (M13)."
     }
   },
   "hammer": {
@@ -36,7 +36,8 @@
       "slash_size": 0.8,
       "_slash_disabled": [
         "daggers_slash"
-      ]
+      ],
+      "_note_slash": "A base name, like the Sword's. `_slash_disabled` keeps the sweep out of play exactly as it was before the art changed."
     }
   },
   "bow": {

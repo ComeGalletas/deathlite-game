@@ -16,6 +16,7 @@ import pygame
 from game.state import State
 from ui import scale
 from progression.upgrades import apply_choice
+from ui import forge_rail
 from ui.forge_rail import ForgeRail
 from ui.level_up import CARD_W, CARD_W_NARROW, LevelUpPanel
 from ui.menu_nav import MenuNav
@@ -28,7 +29,7 @@ class LevelUpState(State):
 
     def enter(self, *, player, choices=(), on_done=None, title=None,
               cancelable=False, weapon_rows=None, offers_for=None,
-              **kwargs) -> None:
+              rail_heading=None, hint=None, **kwargs) -> None:
         self.player = player
         self.on_done = on_done
         # P3: the Forge reuses this overlay with its own title, and lets the
@@ -48,10 +49,25 @@ class LevelUpState(State):
         # card width, no rail, no extra keys.
         self.weapon_rows = list(weapon_rows or ())
         self.offers_for = offers_for
+        # M7: the Monastery reuses the rail for elements, so the heading
+        # is the caller's; left out it is the Forge's own.
+        self.rail_heading = rail_heading or forge_rail.DEFAULT_HEADING
+        # The keys line under the cards. It names what the screen
+        # actually does, so a caller that is not the Forge (the
+        # Monastery, M7) says so rather than offering to forge.
+        self.hint = hint or self._default_hint()
         self.rail = ForgeRail() if self.weapon_rows else None
         self._rail_mouse = MouseNav(self.rail.hits) if self.rail else None
         self.weapon_sel = next((i for i, r in enumerate(self.weapon_rows) if r[1]), 0)
         self.choices = list(choices) if choices else self._offers()
+
+    def _default_hint(self) -> str | None:
+        if self.weapon_rows:
+            return ("Up/Down pick the row    -    1/2/3 or Left/Right + Enter "
+                    "to choose    -    ESC to leave")
+        if self.cancelable:
+            return "1/2/3 or Left/Right + Enter to pick    -    ESC to leave"
+        return None
 
     @property
     def card_width(self) -> int:
@@ -126,13 +142,7 @@ class LevelUpState(State):
         self.panel.draw_dim(surface)         # the whole surface, margins included
 
     def draw(self, surface: pygame.Surface) -> None:
-        if self.rail is not None:
-            hint = ("Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter "
-                    "to forge    -    ESC to leave")
-        elif self.cancelable:
-            hint = "1/2/3 or Left/Right + Enter to pick    -    ESC to leave the Forge"
-        else:
-            hint = None
+        hint = self.hint
         self.panel.draw(surface, self.choices, self.selected,
                         assets=self.game.assets, pressed=self._mouse.pressed_on,
                         title=self.title, hint=hint, card_w=self.card_width,
@@ -146,4 +156,5 @@ class LevelUpState(State):
         right = (first.left - scale.px(30)) if first is not None else surface.get_width() // 4
         top = first.top if first is not None else scale.px(300)
         self.rail.draw(surface, self.weapon_rows, self.weapon_sel,
-                       assets=self.game.assets, right=right, top=top)
+                       assets=self.game.assets, right=right, top=top,
+                       heading=self.rail_heading)

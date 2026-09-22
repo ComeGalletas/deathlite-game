@@ -34,6 +34,7 @@ import random
 
 import pygame
 
+from combat.elements.ids import ELEMENTS, ElementId
 from game import config, fonts
 from game.content import get_content
 from game.state import State
@@ -43,9 +44,9 @@ from ui.menu_nav import MenuNav
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
-              "aim_line", "all_rooms", "freeze", "difficulty",
+              "aim_line", "auras", "all_rooms", "freeze", "difficulty",
               "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
-              "reset", "exit", "close")
+              "force_aura", "infuse", "reset", "exit", "close")
 
 _LABELS = {
     "unlimited_hp": "Unlimited HP",
@@ -54,6 +55,7 @@ _LABELS = {
     "colliders":    "Collision shapes",
     "spawn_points": "Spawn points",
     "aim_line":     "Aim line",
+    "auras":        "Aura inspector",
     "all_rooms":    "Activate all rooms",
     "freeze":       "Freeze spawns",
     "difficulty":   "Difficulty",
@@ -63,19 +65,27 @@ _LABELS = {
     "items":        "Items...",
     "forges":       "Forges...",
     "remove_weapon": "Remove weapon...",
+    "force_aura":   "Force aura...",
+    "infuse":       "Infuse weapons...",
     "reset":        "Reset run",
     "exit":         "Exit to main menu",
     "close":        "Close",
 }
 _HEADINGS = {"root": "DEV MENU", "enemies": "SPAWN ENEMY",
              "blessings": "GRANT BLESSING", "items": "GRANT ITEM",
-             "forges": "FORGE WEAPON", "weapons": "REMOVE WEAPON"}
+             "forges": "FORGE WEAPON", "weapons": "REMOVE WEAPON",
+             "elements": "FORCE AURA", "infuse": "INFUSE WEAPON"}
 _NAV = {"root": "Up/Down move   ENTER select   ESC / ` close",
         "enemies": "Up/Down   ENTER spawn   ESC back",
         "blessings": "Up/Down   ENTER grant   ESC back",
         "items": "Up/Down   ENTER grant   ESC back",
         "forges": "Up/Down   ENTER forge   ESC back",
-        "weapons": "Up/Down   ENTER remove   ESC back"}
+        "weapons": "Up/Down   ENTER remove   ESC back",
+        "elements": "Up/Down   ENTER apply to the nearest enemy   ESC back",
+        "infuse": "Up/Down   ENTER cycle the element   ESC back"}
+# The four elements, for the "Force aura" page: applying one drives the
+# real resolver, so what the inspector then shows is live state.
+_ELEMENT_ROWS = tuple(ELEMENTS)
 # The weapons page's rows: the "remove everything" row, one per owned
 # weapon instance (its index in `player.weapons`), or the empty marker.
 _ROW_ALL = ("all",)
@@ -134,7 +144,9 @@ class DevMenuState(State):
             return self._weapon_rows()
         return {"root": _ROOT_ROWS, "enemies": self._enemy_ids,
                 "blessings": self._blessing_ids, "items": self._item_rows,
-                "forges": self._forge_ids}[self.page]
+                "forges": self._forge_ids,
+                "elements": _ELEMENT_ROWS,
+                "infuse": self._infuse_rows()}[self.page]
 
     def _weapon_rows(self) -> list[tuple]:
         """Rebuilt on every read so the page tracks what the Items / Forges
@@ -207,6 +219,10 @@ class DevMenuState(State):
             self._forge(self._forge_ids[self.sel])
         elif self.page == "weapons":
             self._remove_weapon(self._weapon_rows()[self.sel])
+        elif self.page == "elements":
+            self._force_aura(_ELEMENT_ROWS[self.sel])
+        elif self.page == "infuse":
+            self._cycle_infusion(self._infuse_rows()[self.sel])
 
     def _activate(self, rid: str) -> None:
         p = self._playing
@@ -235,6 +251,9 @@ class DevMenuState(State):
         elif rid == "aim_line":
             p._dev_show_aim = not p._dev_show_aim
             self._status = f"Aim line {'ON' if p._dev_show_aim else 'off'}"
+        elif rid == "auras":
+            p._dev_show_auras = not p._dev_show_auras
+            self._status = f"Aura inspector {'ON' if p._dev_show_auras else 'off'}"
         elif rid == "all_rooms":
             m = p.spawn.master
             m.all_active = not m.all_active
@@ -260,6 +279,10 @@ class DevMenuState(State):
             self._goto("forges")
         elif rid == "remove_weapon":
             self._goto("weapons")
+        elif rid == "force_aura":
+            self._goto("elements")
+        elif rid == "infuse":
+            self._goto("infuse")
         elif rid == "reset":
             p._restart_dev_run()               # replaces the whole stack
         elif rid == "exit":
@@ -267,6 +290,90 @@ class DevMenuState(State):
             self.game.state_machine.change(MenuState(self.game))
         elif rid == "close":
             self.game.state_machine.pop()
+
+    # --- elemental (M2) -------------------------------------------
+    def _nearest_enemy(self):
+        """The living enemy closest to the hero, or the boss if it is the
+        only thing up. What the Force aura page acts on."""
+        p = self._playing
+        bodies = [e for e in p.enemies if e.alive]
+        if p.boss is not None and p.boss.alive:
+            bodies.append(p.boss)
+        if not bodies:
+            return None
+        return min(bodies, key=lambda e: (e.pos - p.player.pos).length_squared())
+
+    def _element_label(self, element) -> str:
+        """The row, with what the nearest enemy currently holds, so the page
+        doubles as a readout while the inspector is off."""
+        p = self._playing
+        label = element.key.title()
+        target = self._nearest_enemy() if p is not None else None
+        if target is None:
+            return label
+        state = getattr(target, "elemental", None)
+        if state is None:
+            return label
+        now = p.stats["time"]
+        if state.element(now) == element:
+            label += f"   [held {state.remaining(now):.1f}s]"
+        elif state.is_locked(now):
+            label += f"   (locked {state.lock_remaining(now):.1f}s)"
+        return label
+
+    def _infuse_rows(self) -> list:
+        """One row per weapon the hero holds, summons included -- every
+        weapon can take an element (owner's decision, 2026-09-21)."""
+        p = self._playing
+        n = len(p.player.weapons) if p is not None else 0
+        return [("weapon", i) for i in range(n)] or [_ROW_NONE]
+
+    def _infusion_label(self, row) -> str:
+        if row == _ROW_NONE:
+            return "(no weapons)"
+        w = self._playing.player.weapons[row[1]]
+        held = w.element.key if w.infused else "none"
+        if w.element_mode == "time":
+            pace = f"every {w.element_window:.2g}s"
+        elif w.element_interval:
+            pace = f"1 attack in {w.element_interval + 1}"
+        else:
+            pace = "every attack"
+        return f"{w.name.ljust(14)} {held.ljust(8)} ({pace})"
+
+    def _cycle_infusion(self, row) -> None:
+        """Step a weapon through none -> fire -> ice -> thunder -> wind ->
+        none. One row and one key, rather than a second page: the whole
+        point is to try pairs quickly."""
+        if row == _ROW_NONE:
+            self._status = "No weapons to infuse"
+            return
+        p = self._playing
+        w = p.player.weapons[row[1]]
+        order = (ElementId.NONE, *ELEMENTS)
+        w.element = order[(order.index(w.element) + 1) % len(order)]
+        if w.infused:
+            p.run.unlocked_elements.add(w.element)
+        held = w.element.key if w.infused else "nothing"
+        self._status = f"{w.name} carries {held}"
+
+    def _force_aura(self, element) -> None:
+        """Apply one element to the nearest enemy through the real resolver,
+        so the aura, the lock and any reaction behave exactly as a weapon's
+        hit would. Until weapons carry elements (M6) this is the only way to
+        drive the system in a running game."""
+        p = self._playing
+        if p is None:
+            return
+        target = self._nearest_enemy()
+        if target is None:
+            self._status = "No enemy to apply it to"
+            return
+        outcome = p.run.elements.apply(
+            target, element, weapon_id="dev", hit_damage=10.0,
+            now=p.stats["time"])
+        name = getattr(target, "name", element.key)
+        self._status = f"{element.key.title()} on {name}: {outcome.name.lower()}"
 
     def _toggle_dummy(self) -> None:
         """Spawn one training dummy and meter it, or clear both.
@@ -509,6 +616,10 @@ class DevMenuState(State):
             head = p.content.weapon(f["weapon"]).get("name", f["weapon"])
             carried = any(w.forge == rid for w in p.player.weapons)
             return f"{head}: {f['name']}" + ("   (forged)" if carried else "")
+        if self.page == "elements":
+            return self._element_label(rid)
+        if self.page == "infuse":
+            return self._infusion_label(rid)
         if self.page == "weapons":
             if rid == _ROW_NONE:
                 return "(no weapons)"
@@ -531,6 +642,8 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_show_spawn_points else "   [  ]"
         elif rid == "aim_line" and p is not None:
             label += "   [ON]" if p._dev_show_aim else "   [  ]"
+        elif rid == "auras" and p is not None:
+            label += "   [ON]" if p._dev_show_auras else "   [  ]"
         elif rid == "all_rooms" and p is not None:
             label += "   [ON]" if p.spawn.master.all_active else "   [  ]"
         elif rid == "freeze" and p is not None:

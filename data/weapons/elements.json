@@ -1,0 +1,56 @@
+{
+  "_doc": [
+    "Elemental infusion tuning (documentation/journals/elemental_system_journal.md).",
+    "The schema is combat/elements/config.py: every key below is required, no",
+    "other key is allowed, and a value outside its range stops the boot.",
+    "A damage value is {\"frac\": x} (that fraction of the hit that carried the",
+    "element) or {\"flat\": y}. Durations and intervals are seconds, distances",
+    "are world pixels, percents are 0..1. Starting values are placeholders",
+    "until the M9 balance pass."
+  ],
+  "global": {
+    "reaction_aura_cooldown": 1.0,
+    "max_reactions_per_frame": 8,
+    "max_active_wind_areas": 6
+  },
+  "elements": {
+    "fire": {
+      "aura": {"duration": 4.0},
+      "hit": {"damage": {"frac": 0.12}},
+      "burn": {"tick": {"frac": 0.05}, "tick_interval": 1.0}
+    },
+    "ice": {
+      "aura": {"duration": 4.0},
+      "slow": {"percent_per_stack": 0.10, "max_percent": 0.50},
+      "freeze": {
+        "stacks_required": 5,
+        "duration": 1.5,
+        "immunity_duration": 2.0,
+        "contact": {"enabled": true, "damage": {"frac": 0.5}}
+      }
+    },
+    "thunder": {
+      "aura": {"duration": 3.0},
+      "chain": {
+        "damage": {"frac": 0.07},
+        "targets_per_jump": 2,
+        "jumps": 1,
+        "max_range": 160,
+        "max_targets": 8,
+        "falloff": 0.8
+      }
+    },
+    "wind": {
+      "aura": {"duration": 3.0},
+      "hit": {"damage": {"frac": 0.10}},
+      "area": {
+        "duration": 1.0,
+        "radius": 80,
+        "damage": {"frac": 0.07},
+        "knockback": 220,
+        "max_range": 120,
+        "max_targets": 10
+      }
+    }
+  }
+}

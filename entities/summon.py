@@ -12,6 +12,10 @@ import pygame
 from game.assets import get_assets
 from systems.animation import Animator
 
+from combat.elements.ids import ElementId as _ElementId
+
+_NO_ELEMENT = _ElementId.NONE
+
 # The wolf's `bite_*` strip is 5 frames at 16 fps; hold the bite anim this long
 # after a bite before falling back to `run_*` (< `attack_interval` so there is a
 # run gap between snaps).
@@ -33,11 +37,19 @@ class Summon:
     __slots__ = ("active", "kind", "pos", "vel", "life", "attack_cd", "radius",
                  "color", "damage", "speed", "attack_range", "attack_interval",
                  "tags", "_t", "anim", "_bite_t", "_side", "reach", "fx",
-                 "weapon_id", "_phase")
+                 "weapon_id", "_phase", "infusion")
 
     def __init__(self) -> None:
         self.active = False
         self.weapon_id = ""
+        # What its summoning weapon is infused with, or NONE. Summons are
+        # infusable (owner, 2026-09-21), so the creature wears it the way
+        # an infused shot does. This is the *infusion*, not the element a
+        # given bite applies: both summon weapons are time-mode, so they
+        # stamp no element on anything and the pillar would never have
+        # changed colour. Reset on every acquire, because a pooled object
+        # outlives its last use.
+        self.infusion = _NO_ELEMENT
         self.kind = "totem"
         self.pos = pygame.Vector2()
         self.vel = pygame.Vector2()
@@ -61,9 +73,13 @@ class Summon:
     def reset(self, *, kind, pos, damage, lifetime, color, tags,
               speed=0.0, attack_range=320.0, attack_interval=0.7,
               radius=12.0, reach=float("inf"), fx: dict | None = None,
-              weapon_id: str = "") -> None:
+              weapon_id: str = "", infusion=_NO_ELEMENT) -> None:
         self.kind = kind
         self.weapon_id = weapon_id
+        # Set on every reset, not only when passed: a pooled summon
+        # outlives its last use and a stale infusion would leave an
+        # uninfused totem wearing the last one's colour.
+        self.infusion = infusion
         self.pos.update(pos)
         self.vel.update(0, 0)
         self.damage = damage

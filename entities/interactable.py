@@ -27,6 +27,10 @@ KINDS = {
     # HI-2: the forge stands on the village island; the handler is a stub
     # until weapon forging (six_weapon_system_design.md 7) lands.
     "forge":       (44, (230, 150, 80)),
+    # The village town hall -- the pack calls the art a monastery, and
+    # so does the elemental system that now stands on it (M7). One per
+    # village, spent after a single infusion.
+    "monastery":   (46, (170, 140, 255)),
     "altar":       (26, (210, 110, 210)),
     "merchant":    (26, (220, 190, 120)),
     # Buff buildings (journal: buff_buildings_journal.md): the interactable
@@ -41,15 +45,20 @@ KINDS = {
 
 
 class Interactable:
-    __slots__ = ("kind", "pos", "radius", "colour", "used", "cost")
+    __slots__ = ("kind", "pos", "radius", "colour", "used", "cost", "element")
 
-    def __init__(self, kind: str, x: float, y: float, cost: int = 0) -> None:
+    def __init__(self, kind: str, x: float, y: float, cost: int = 0,
+                 element=None) -> None:
         radius, colour = KINDS.get(kind, KINDS["shrine"])
         self.kind = kind
         self.pos = pygame.Vector2(x, y)
         self.radius = radius
         self.colour = colour
         self.cost = cost
+        # M7: a buff building that rolled elemental carries the element
+        # it offers. `None` on everything else, including the Monastery,
+        # where the player picks the element instead.
+        self.element = element
         self.used = False
 
     def in_range(self, point: pygame.Vector2, pad: float = 40.0) -> bool:

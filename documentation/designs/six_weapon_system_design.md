@@ -1137,6 +1137,14 @@ A new upgrade should ideally introduce a decision, not simply make an old decisi
 
 # 16. Future Elemental Expansion
 
+> **Superseded 2026-09-21.** The elemental system was built: four
+> elements infused into weapons, six reactions between them. The
+> design is `ELEMENTAL_SYSTEM_DESIGN.md` and the build is recorded
+> in `documentation/journals/elemental_system_journal.md`. What
+> this section asked for held: infusions layer on top of the six
+> weapons, every weapon can take one, and the weapons are still
+> whole without them.
+
 The elemental system is intentionally OUTSIDE the current scope.
 
 Future design should allow:
@@ -1417,6 +1425,15 @@ elements of the removed weapons: tag damage, on-hit statuses (Burn, Chill,
 Shock, ...) and status vulnerabilities. They are **deleted until the elemental
 system is implemented** (§16). They are not redesigned now; when elements
 return, they return as infusions layered on the six weapons.
+
+> **Settled 2026-09-21.** Elements returned, and they returned exactly
+> that way: as **infusions**, not as blessings. Ember, Tide, Storm and
+> Grave stay deleted -- nothing brought them back. An element is attached
+> to a weapon slot for the run (from the village Monastery or a buff
+> building), and the six blessings a weapon owns are unchanged. The one
+> seam between the two systems is `element_interval` /
+> `element_window_mult` in `Weapon.bonus`, which lets a future blessing
+> pace an infusion without becoming an elemental blessing itself.
 
 ## One offering, three kinds of blessing
 

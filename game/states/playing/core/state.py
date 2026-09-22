@@ -38,6 +38,10 @@ from entities.pickup import XPGem
 from entities.potion import HealthPotion
 from entities.summon import Summon
 from combat.weapons import Weapon, FireContext
+from combat.elements import area as wind_area
+from game.states.playing.visual import elements as element_fx
+from game.states.playing.visual.elements import ElementVisuals
+from combat.elements.runtime import build_resolver
 from progression.experience import LevelTracker
 from game.states.playing.core.aim import AimInput, read_aim
 from progression.blessings import get_catalog, rebuild as rebuild_blessings
@@ -213,6 +217,11 @@ class PlayingState(State):
         # through every enemy's `ledger` attribute (`core/run_ledger.py`). Built
         # before anything can spawn: the spawner hands it to each enemy.
         run.ledger = RunLedger()
+        # The elemental resolver: the aura rules, the reaction budget and
+        # the per-enemy-type profiles, resolved once here because the data
+        # does not change mid-run.
+        run.elements = build_resolver(run)
+        run.element_visuals = ElementVisuals(run.content)
 
         self.hud = HUD()
         self._banner_font = fonts.heading(40)
@@ -450,6 +459,13 @@ class PlayingState(State):
         self.npc_manager.update(dt)
         self.fish_hut_manager.update(dt)
         self.fx.update_hazards(dt)
+        # Elemental Wind areas: they follow the enemy they formed on and
+        # check contact at their own low rate, so this is a short list
+        # walk (design 9.7).
+        run.wind_areas = wind_area.update_all(
+            run.wind_areas, run.stats["time"], run.elements.world)
+        element_fx.sweep(run, run.stats["time"])
+        run.element_visuals.update(dt)
         self.fx.update_melee_hitboxes(dt)
         self.chest_manager.update(dt)      # CB-9: the lids that are opening
         self.fx.update_death_fx(dt)
@@ -468,6 +484,9 @@ class PlayingState(State):
     def _phase_combat(self, dt: float) -> None:
         run = self.run
         run.grid.rebuild(run.enemies)
+        # Elemental system: reset this frame's reaction budget and run
+        # whatever the last frame's budget held over (design 9.3).
+        run.elements.begin_frame(run.stats["time"])
 
         s = run.player.stats
         ctx = FireContext(
@@ -550,13 +569,22 @@ class PlayingState(State):
         offset = run.shake.offset / run.camera.zoom
         run.camera.pos -= offset
         try:
+            # The elemental state of the field is painted terrace by terrace
+            # inside `_draw_world`, under the bodies it belongs to; this
+            # resets the per-frame budget and counter before those passes
+            # start (M10 rule 3).
+            element_fx.begin_frame(run)
             self._draw_world(surface)
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
-            run.particles.draw(surface, run.camera)
+            # Only the event particles: the aura's shed is `under` and was
+            # already painted with its own terrace inside `_draw_world`.
+            run.particles.draw(surface, run.camera, under=False)
             run.damage_numbers.draw(surface, run.camera)
+            element_fx.draw_reactions(surface, run)     # over everything, and brief
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
             self.renderer.aim_overlay(surface)          # dev-only, same layer
+            self.renderer.aura_overlay(surface)         # dev-only, same layer
             key_marker.draw(surface, self)              # the interact cap, over its element
             hints_draw.draw(surface, self)              # the opening Move / Attack hints
         finally:
@@ -623,6 +651,7 @@ class PlayingState(State):
     _dev_show_colliders = _forward("dev", "show_colliders")
     _dev_show_spawn_points = _forward("dev", "show_spawn_points")
     _dev_show_aim = _forward("dev", "show_aim")
+    _dev_show_auras = _forward("dev", "show_auras")
 
     def _apply_dev_unlimited_hp(self) -> None:
         self.dev.apply_unlimited_hp(self.run)

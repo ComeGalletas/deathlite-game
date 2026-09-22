@@ -19,6 +19,7 @@ import math
 
 import pygame
 
+from game.states.playing.visual import elements as element_fx
 from game.states.playing.visual.projectiles.cone import _SLASH_ANIM, _SLASH_FWD, slash_size
 
 SEQUENCE = "sequence"
@@ -44,8 +45,14 @@ def spawn_from_cone(ps, proj) -> None:
     fx = getattr(proj, "fx", None)
     if proj.cone_half_angle <= 0.0 or not is_sequence(fx):
         return
-    rigs = [str(r) for r in fx["slash"]]
-    durs = rig_durations(ps.game.assets, rigs)
+    # The rigs the visual names are *bases*; the weapon's infusion picks
+    # which colour of each is drawn (M13). The infusion and not the
+    # attack's element: the Daggers apply theirs on one swing in three,
+    # and all three should still look infused.
+    assets = ps.game.assets
+    rigs = [element_fx.variant_rig(assets, str(r), getattr(proj, "infusion", None))
+            for r in fx["slash"]]
+    durs = rig_durations(assets, rigs)
     if sum(durs) <= 0.0:
         return
     ps._slashes.append({

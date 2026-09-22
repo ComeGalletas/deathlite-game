@@ -29,6 +29,7 @@ class DevFlags:
         self.show_colliders = False     # F7 / dev menu: true collider overlay
         self.show_spawn_points = False  # F8 / dev menu: generated spawn points
         self.show_aim = False           # dev menu: CB-5 manual-aim line
+        self.show_auras = False         # dev menu: elemental aura inspector
 
     def apply_unlimited_hp(self, run) -> None:
         """Dev toggle: HP never ends a frame lower than it started (it may still
@@ -102,6 +103,17 @@ class DevFlags:
         d.set_metric("melee hitboxes", len(run.melee_hitboxes))
         d.set_metric("gems", len(run.gems))
         d.set_metric("particles", len(run.particles))
+        el = run.elements
+        d.set_metric("auras", f"{el.active_auras(run.enemies, run.stats['time'])} live "
+                              f"{el.stats.applications} applied "
+                              f"{el.stats.corpse_hits} on corpses")
+        d.set_metric("reactions", f"{el.stats.reactions_this_frame}/frame "
+                                  f"{el.stats.reactions_total} total "
+                                  f"{el.pending} held")
+        vis = run.element_visuals
+        if vis is not None:
+            d.set_metric("element fx", f"{vis.report()}  "
+                                       f"{len(run.element_fx)} transient")
         d.set_metric("level", run.levels.level)
         d.set_metric("kills", run.stats["kills"])
         m = ps.spawn.master

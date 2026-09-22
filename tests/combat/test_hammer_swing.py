@@ -64,7 +64,8 @@ class DataTests(unittest.TestCase):
         self.assertEqual(H["impact_offset"], 40)
         self.assertGreater(H["area"], 0)            # 52 agreed; the owner tunes it in play
         self.assertNotIn("cone_half_angle", H)
-        self.assertEqual(H["impact_rig"], "hammer_impact")
+        self.assertEqual(H["impact_rig"], "hammer_impact",
+                         "a base name -- the element picks the variant")
 
     def test_the_impact_rig_matches_the_sheet(self):
         """The rig's frame count is the strip's, and the cells are square.
@@ -73,53 +74,73 @@ class DataTests(unittest.TestCase):
         `size == (400, 80)`: re-cutting the sheet is an art change, and the
         claim worth keeping is that the data still agrees with the file.
         """
-        rig = C.sprites["hammer_impact"]
+        rig = C.sprites["hammer_impact_plain"]
         self.assertFalse(rig["anims"]["loop"]["loop"])
         path = os.path.join(os.path.dirname(__file__), "..", "..", "assets",
                             rig["anims"]["loop"]["file"])
         w, h = pygame.image.load(path).get_size()
-        self.assertEqual(list(rig["frame"]), [h, h], "the cells are not square")
-        self.assertEqual(rig["anims"]["loop"]["frames"], w // h,
-                         "the rig's frame count is not the strip's")
+        fw, fh = rig["frame"]
+        # The cells used to be square, because the sheet was cut on a square
+        # grid. M13's strips are trimmed to the union of the art's own
+        # frames, so a cell is as wide and as tall as the art -- which makes
+        # this a stronger claim than squareness ever was: the data has to
+        # account for the file exactly, in both directions.
+        self.assertEqual(fh, h, "the frame height is not the strip's")
+        self.assertEqual(rig["anims"]["loop"]["frames"] * fw, w,
+                         "the frames do not tile the strip's width")
 
     def test_the_impact_crop_is_the_splashs_bounding_box(self):
         """The rig's `content` crops the 80 x 80 cell to the art over all
         five frames, so centring the frame centres the splash on the blow."""
-        rig = C.sprites["hammer_impact"]
+        rig = C.sprites["hammer_impact_plain"]
         path = os.path.join(os.path.dirname(__file__), "..", "..", "assets",
                             rig["anims"]["loop"]["file"])
         pygame.display.init()
         if pygame.display.get_surface() is None:
             pygame.display.set_mode((1, 1))
         sheet = pygame.image.load(path).convert_alpha()
-        cell = rig["frame"][0]
+        fw, fh = rig["frame"]
         union = None
         for i in range(rig["anims"]["loop"]["frames"]):
             r = sheet.subsurface(
-                pygame.Rect(i * cell, 0, cell, cell)).get_bounding_rect(min_alpha=16)
+                pygame.Rect(i * fw, 0, fw, fh)).get_bounding_rect(min_alpha=16)
             union = r if union is None else union.union(r)
         self.assertEqual(list(rig["content"]), list(union))
-        # The anchor sits 8 crop px below the centre: the splash is drawn
-        # above the blow (owner: "some 5 pixels", then "5 px more").
-        self.assertEqual(list(rig["anchor"]), [union.width // 2, union.height // 2 + 8])
+        # Centred, where the old splash sat 8 crop px low. That lift was
+        # for art whose mass hung below its own box; M13's impact is a
+        # radial star and its centre is the blow (within a pixel of the
+        # crop's, since the cut trims to the union of all frames).
+        self.assertAlmostEqual(rig["anchor"][0], union.width // 2, delta=1)
+        self.assertAlmostEqual(rig["anchor"][1], union.height // 2, delta=1)
 
-    def test_the_splash_is_drawn_about_five_pixels_above_the_blow(self):
+    def test_the_splash_is_centred_on_the_blow(self):
+        """It used to be lifted about five screen pixels, because the old
+        splash's mass hung below its own crop and the anchor was set eight
+        crop px low to compensate. M13's impact is a radial star centred on
+        its own box, so the lift is gone and the claim is the simpler one:
+        the effect lands *on* the blow. The scaling rule -- the anchor
+        follows the frame -- is still what is being exercised."""
         from game.assets import get_assets
         assets = get_assets()
-        size = slam_fx.impact_size(assets, "hammer_impact", 42, 1.0)     # the data's radius
-        x, y = slam_fx.impact_topleft(assets, "hammer_impact", size, 500, 300)
-        cx, cy = x + size[0] / 2, y + size[1] / 2
-        lift = 8 * size[0] / 75                                          # 8 crop px, scaled
-        self.assertAlmostEqual(cx, 500, delta=1)
-        self.assertAlmostEqual(300 - cy, lift, delta=1)
-        self.assertGreater(lift, 10)                                      # 5 px, then 5 more
-        size2 = slam_fx.impact_size(assets, "hammer_impact", 42, 2.0)   # zoom scales it
-        x2, y2 = slam_fx.impact_topleft(assets, "hammer_impact", size2, 500, 300)
-        self.assertAlmostEqual(300 - (y2 + size2[1] / 2), 2 * lift, delta=1.5)
+        rig = "hammer_impact_plain"
+        frame_w, frame_h = C.sprites[rig]["frame"]
+        for radius, zoom in ((42, 1.0), (52, 1.0), (42, 2.0)):
+            with self.subTest(radius=radius, zoom=zoom):
+                size = slam_fx.impact_size(assets, rig, radius, zoom)
+                x, y = slam_fx.impact_topleft(assets, rig, size, 500, 300)
+                cx, cy = x + size[0] / 2, y + size[1] / 2
+                # Within one *source* pixel, which is more than one screen
+                # pixel once the frame is scaled up. The anchor is the
+                # original 64 px cell's centre carried into the trimmed
+                # crop, so on an odd-sized frame it sits half a pixel off
+                # the crop's own centre -- and that half pixel grows with
+                # the draw.
+                self.assertAlmostEqual(cx, 500, delta=1 + size[0] / frame_w)
+                self.assertAlmostEqual(cy, 300, delta=1 + size[1] / frame_h)
 
     def test_the_impact_is_drawn_a_quarter_wider_than_the_circle_with_the_crops_aspect(self):
         from game.assets import get_assets
-        rig = C.sprites["hammer_impact"]
+        rig = C.sprites["hammer_impact_plain"]
         # This one stays a literal: it is the owner's decision, not tuning
         # that drifts ("about 25 % bigger").
         self.assertAlmostEqual(rig["over_circle"], 1.25)
@@ -127,11 +148,14 @@ class DataTests(unittest.TestCase):
         # retuning the overhang does not fail a test about the *rule*.
         radius = 52
         _cx, _cy, crop_w, crop_h = rig["content"]
-        w, h = slam_fx.impact_size(get_assets(), "hammer_impact", radius, 1.0)
+        w, h = slam_fx.impact_size(get_assets(), "hammer_impact_plain", radius, 1.0)
         self.assertEqual(w, round(radius * 2 * rig["over_circle"]))
         self.assertEqual(h, round(w * crop_h / crop_w))
-        w2, h2 = slam_fx.impact_size(get_assets(), "hammer_impact", 52, 0.5)
-        self.assertEqual((w2, h2), (65, round(65 * 66 / 75)))
+        # Halve the zoom, halve the drawn size -- derived from the rig, so
+        # re-cutting the art does not fail a test about the *rule*.
+        w2, h2 = slam_fx.impact_size(get_assets(), "hammer_impact_plain", 52, 0.5)
+        self.assertEqual(w2, round(radius * 2 * 0.5 * rig["over_circle"]))
+        self.assertEqual(h2, round(w2 * crop_h / crop_w))
 
     def test_reach_is_offset_plus_radius(self):
         w = hammer()
@@ -298,13 +322,19 @@ class VisualTests(unittest.TestCase):
         self.assertAlmostEqual(radius, H["area"])
         self.assertAlmostEqual(progress, 0.5, delta=0.03)
 
-    def test_the_impact_visual_plays_the_five_frames_then_goes(self):
+    def test_the_impact_visual_plays_through_then_goes(self):
         from types import SimpleNamespace
         from game.assets import get_assets
         ps = SimpleNamespace(_impacts=[], game=SimpleNamespace(assets=get_assets()))
+        assets = get_assets()
         slam_fx.spawn_impact(ps, pos=(0, 0), radius=52, rig="hammer_impact")
-        self.assertEqual(len(ps._impacts), 1)
-        slam_fx.update_impacts(ps, 5 / 15 - 0.02)
+        self.assertEqual(len(ps._impacts), 1, "the base name resolves to a variant")
+        # Read the length off the rig rather than writing it down: M13
+        # replaced the five-frame splash with a fourteen-frame one and a
+        # literal here would have to change again next time.
+        rig = "hammer_impact_plain"
+        span = assets.frame_count(rig, "loop") / assets.fps(rig, "loop")
+        slam_fx.update_impacts(ps, span - 0.02)
         self.assertEqual(len(ps._impacts), 1)
         slam_fx.update_impacts(ps, 0.05)
         self.assertEqual(ps._impacts, [])

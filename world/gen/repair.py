@@ -52,6 +52,14 @@ def _widest_class():
     return int(cell), float(clearance)
 
 
+# What a precious obstacle costs the repair's Dijkstra against an ordinary
+# one. Six rather than a huge number on purpose: the queue is a bucket
+# queue over small integers, and "worth about half a dozen trees" is the
+# honest weighting -- a building should lose to a short detour past
+# scenery and still go when it is the only thing sealing the ground.
+_PRECIOUS_COST = 6
+
+
 def _killers(grid, obstacles, radius):
     """For each cell, the indices of the obstacles that make it impassable.
 
@@ -133,14 +141,20 @@ def _regions(grid, dead):
     return label, rid
 
 
-def _seals(grid, open_, killers, start, dead):
-    """Dijkstra from `start` over geometry-passable cells, paying one unit per
+def _seals(grid, open_, killers, start, dead, cost=None):
+    """Dijkstra from `start` over geometry-passable cells, paying for each
     obstacle that would have to be removed to enter a cell.
 
     Returns the obstacles on the cheapest route into **each** sealed region --
     Dijkstra pops in cost order, so the first cell of a region to come off the
     queue is that region's cheapest entry, and one sweep settles them all.
     Weights are small integers, so this is a bucket queue rather than a heap.
+
+    `cost` prices obstacles individually. It used to be one unit each, which
+    made a choke held by a tree and a choke held by a buff building look
+    identical and let the pass take back whichever it met first -- 8.5 % of
+    every building placed. A building is worth several trees, so the route
+    in should go past the trees.
     """
     label, count = _regions(grid, dead)
     if not count:
@@ -187,7 +201,8 @@ def _seals(grid, open_, killers, start, dead):
                 # by paying for the cell at its end.
                 if _corner_clips(open_, killers, cols, col, row, dc, dr):
                     continue
-                nd = d + len(killers[j])
+                nd = d + (len(killers[j]) if cost is None
+                          else sum(cost[k] for k in killers[j]))
                 if nd < dist[j]:
                     dist[j] = nd
                     prev[j] = i
@@ -342,11 +357,29 @@ def _compound_groups(obstacles) -> dict:
     return groups
 
 
-def unseal(layout, rounds: int = 40):
+def _costs(obstacles, precious) -> list:
+    """What removing each obstacle is worth avoiding.
+
+    Only two prices, because only one distinction matters: a thing the
+    generator promised a fixed number of per island, and everything else.
+    An island is meant to carry two to five buff buildings and scenery is
+    scenery.
+    """
+    if not precious:
+        return [1] * len(obstacles)
+    return [_PRECIOUS_COST if o.kind in precious else 1 for o in obstacles]
+
+
+def unseal(layout, rounds: int = 40, precious=()):
     """Drop the obstacles that cut part of `layout` off, in place.
 
     Returns the obstacles removed. Deterministic -- no RNG, and the obstacle
     list is walked in order -- so a seed still produces the same world.
+
+    `precious` names kinds the pass should take back only as a last resort:
+    the buff buildings, which are promised two to five an island and were
+    losing 8.5 % of themselves to chokes a neighbouring tree would have
+    opened just as well.
 
     `rounds` is a **safety valve, not a budget**: the loop already stops the
     moment nothing is sealed, and each round is one Dijkstra over a lattice the
@@ -359,6 +392,7 @@ def unseal(layout, rounds: int = 40):
     obstacles = layout.obstacles
     if not obstacles or not layout.rooms:
         return []
+    cost = _costs(obstacles, frozenset(precious))
     cell, radius = _widest_class()
     # Geometry only. Neither the chamfer nor the step mask depends on obstacles,
     # so this is built once and reused as they are taken away.
@@ -377,6 +411,7 @@ def unseal(layout, rounds: int = 40):
     removed = []
     for _ in range(rounds):
         killers = _killers(grid, obstacles, radius)
+        cost = _costs(obstacles, frozenset(precious))
         _open_villages(grid, layout, killers)
         if killers[start]:
             # An obstacle landed on the only cell we can flood from; it has to
@@ -388,7 +423,7 @@ def unseal(layout, rounds: int = 40):
                              else 0 for i in range(n))
             if not any(dead):
                 break
-            hit = _seals(grid, open_, killers, start, dead)
+            hit = _seals(grid, open_, killers, start, dead, cost)
             if not hit:
                 break                 # sealed by terrain, not by obstacles
             drop = set(hit)

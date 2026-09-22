@@ -25,6 +25,7 @@ import pygame
 import math
 
 from entities.hazard import Hazard
+from game.states.playing.visual import elements as element_fx
 from entities.melee_hitbox import MeleeHitbox
 from game.events import Events
 from game.assets import get_assets
@@ -66,6 +67,12 @@ class TransientFx:
         kw.setdefault("color", vis.color)
         kw.setdefault("style", vis.style)
         kw.setdefault("fx", vis.fx)
+        # M6: an element-carrying shot is tinted toward its element, so
+        # a player can see which attacks are the infused ones. The M8
+        # visual system replaces this with the shared profiles.
+        element = kw.get("element")
+        if element:
+            kw["color"] = element_fx.blend(kw["color"], element_fx.tint(element))
 
     def spawn_projectile(self, **kw):
         from game.states.playing.visual import slash_fx
@@ -90,10 +97,12 @@ class TransientFx:
         s.reset(**kw)
         return s
 
-    def spawn_impact(self, *, pos, radius, rig, weapon_id="", anim="loop") -> None:
+    def spawn_impact(self, *, pos, radius, rig, weapon_id="", anim="loop",
+                     infusion=None) -> None:
         """CR1: the Hammer's impact sheet at the blow; the totem bolt's burst."""
         from game.states.playing.visual import slam_fx
         slam_fx.spawn_impact(self.ps, pos=pos, radius=radius, rig=rig,
+                             infusion=infusion,
                              weapon_id=weapon_id, anim=anim)
 
     def spawn_hero_hazard(self, *, pos, radius, dps, duration, weapon_id="",
@@ -304,8 +313,13 @@ class TransientFx:
             style="blast", color=(255, 190, 110), no_block=True)
         if blast is not None:
             blast.fire_level = bomb.fire_level
+            # The blast *is* the bomb's hit, so it carries the attack's
+            # element (§6.3: every hit an attack produces shares it).
+            blast.element = bomb.element
+            blast.infusion = bomb.infusion
         run._explosions.append(self.burst_visual(
-            pos, bomb.blast_radius, rig=self.burst_rig(bomb)))
+            pos, bomb.blast_radius, rig=self.burst_rig(bomb),
+            infusion=bomb.infusion))
         ps.particles.burst(pos, (255, 160, 80), count=18, speed=240, life=0.45)
         ps.shake.add(0.3)
         self.scatter_bomblets(bomb, pos)
@@ -353,18 +367,26 @@ class TransientFx:
         return (self._BOMBLET_BURST_RIG if "cluster" in bomb.source_tags
                 else self._BURST_RIG)
 
-    def burst_visual(self, pos, radius: float, rig: str | None = None) -> dict:
+    def burst_visual(self, pos, radius: float, rig: str | None = None,
+                     infusion=None) -> dict:
         """An `_explosions` entry that plays `rig`'s one-shot `burst` scaled
         to the blast diameter, and lives exactly as long as the strip.
         Without the rig it is the plain expanding ring the other explosions
-        use. `rig` defaults to the Bomb's own `explosion`."""
+        use. `rig` defaults to the Bomb's own `explosion`.
+
+        `infusion` colours the burst where the Bomb was infused (M13):
+        the explosion keeps its own art -- it is the Bomb's, not the
+        element's -- and is recoloured for the element rather than
+        replaced."""
         rig = rig or self._BURST_RIG
         assets = get_assets()
         n = assets.frame_count(rig, "burst")
         if n <= 0:
-            return {"pos": pos, "radius": radius, "t": 0.0, "dur": 0.35}
+            return {"pos": pos, "radius": radius, "t": 0.0, "dur": 0.35,
+                    "infusion": infusion}
         return {"pos": pos, "radius": radius, "t": 0.0,
                 "dur": n / assets.fps(rig, "burst"),
+                "infusion": infusion,
                 "anim": Animator(assets, rig, start="burst")}
 
     _BOMB_RIG = "bomb"
@@ -421,6 +443,7 @@ class TransientFx:
                 is_crit=bomb.is_crit, inert=True, stop_after=fuse * 0.5,
                 blast_radius=bomb.blast_radius * radius_mult,
                 blast_lifetime=bomb.blast_lifetime,
+                element=bomb.element, infusion=bomb.infusion,
                 fx={"scale": scale} if scale else {})
 
     # --- ground hazards (spec 5.6) --------------------------

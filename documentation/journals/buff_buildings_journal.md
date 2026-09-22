@@ -774,3 +774,52 @@ buff buildings on every island, that world now has an obstacle inside the
 shot's path, so the shot died at three puffs. The test measures shedding,
 not blocking, so its shot now opts out of the obstacle block (`no_block`)
 the way it already opts out of the elevation rule.
+
+### Rev. 7: the repair was eating the buildings (2026-09-21)
+
+Found while checking a different question -- whether every island offers
+the player an element, which since M7 of the elemental system means a
+Monastery or a buff building that rolled elemental. The survey turned up
+islands with **no buff building at all**, which `placement.per_island`
+(`[2, 5]`) says cannot happen.
+
+The scatter was not at fault. Instrumented over twelve worlds it seated
+between two and five on every island it attempted and came up short of its
+own `want` four times in seventy-nine. What was happening is downstream:
+
+    buff buildings seated by the generator : 670
+    still present in the finished layout   : 613
+    taken back afterwards                  :  57  (8.5%)
+
+The **repair pass** was taking them. It is right to take *something* -- a
+building that seals a road has to go, and `WorldLayout.buff_buildings` has
+always said so in its docstring -- but not necessarily right to take that
+one. `repair._seals` runs a Dijkstra that pays **one unit per obstacle**
+blocking a cell, so a choke held by a tree and a choke held by a building
+cost the same and it opened whichever route it met first.
+
+So obstacles are now priced. `unseal(layout, precious=...)` takes the kinds
+that should go last, the generator passes it the buff kinds, and a precious
+obstacle costs `_PRECIOUS_COST` (6) against scenery's 1. A building now
+loses to a short detour past a tree and still goes when it is genuinely the
+only thing sealing the ground behind it.
+
+| over 60 seeds, eligible islands only | before | after |
+|---|---|---|
+| buildings taken back by the repair | 8.5 % | **4.3 %** |
+| islands under the minimum of two | 18 of 390 (4.6 %) | **8 (2.1 %)** |
+| islands with none at all | 1 | **0** |
+| islands offering an element | 80.5 % | 82.1 % |
+
+Eligible means not a village -- the village pass owns its island -- and not
+the boss arena, whose clear disc is the fight. **That exclusion is worth
+writing down, because getting it wrong is what made the problem look four
+times bigger than it was.** The first survey counted the boss arena as an
+ordinary island, saw 41 with no buildings, and reported 18 % of islands
+short; 40 of those 41 were boss arenas behaving exactly as designed.
+
+The eight islands still at one are the case where the building really is
+the only seal. The repair is correct to take it and the ground wins, so
+`tests/world/test_repair.py` asserts a **rate** there (no worse than 4 %)
+and keeps the hard guarantee for the floor that matters: no island is left
+with none. Digests re-pinned.

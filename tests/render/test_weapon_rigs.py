@@ -45,10 +45,22 @@ class RigFilesTests(unittest.TestCase):
         self.assertTrue(s["thunder_ball"]["anims"]["loop"]["file"].startswith("effects/weapons/magic_rod/"))
         self.assertTrue(s["thunder_aura"]["anims"]["loop"]["file"].startswith("effects/weapons/magic_rod/"))
         self.assertTrue(s["soul_slash"]["anims"]["loop"]["file"].startswith("effects/weapons/sword/"))
-        self.assertTrue(s["hammer_impact"]["anims"]["loop"]["file"].startswith("effects/weapons/hammer/"))
+        self.assertTrue(s["hammer_impact_plain"]["anims"]["loop"]["file"].startswith("effects/weapons/hammer/"))
 
 
-class SwordSlashRigTests(unittest.TestCase):
+class SheetLoaderTests(unittest.TestCase):
+    """What `SwordSlashRigTests` used to cover.
+
+    Most of it described the two strips cut from `Combat-Sheet.png` -- their
+    frame counts, that `slash_down` was strip 2 flipped, that both play
+    once. M13 replaced both with one fanned arc from the effects pack, so
+    that art is gone and so are the tests that measured it.
+
+    The loader behaviour is not about that art and stays: a sheet authored
+    the other way up can still ask for a vertical flip, which is the escape
+    hatch the Sword's old down-strip once needed.
+    """
+
     @classmethod
     def setUpClass(cls):
         _display()
@@ -56,60 +68,31 @@ class SwordSlashRigTests(unittest.TestCase):
         cls.a = Assets()
         cls.s = get_content().sprites
 
-    def test_the_two_sheets_cut_from_the_combat_sheet(self):
-        down, up = self.s["sword_slash_down"], self.s["sword_slash_up"]
-        for rig in (down, up):
-            self.assertEqual(rig["frame"], [64, 64])
-            self.assertFalse(rig["anims"]["loop"]["loop"], "a swing plays once")
-            self.assertNotIn("flip_v", rig["anims"]["loop"], "the flip is baked into the sheet")
-        self.assertEqual(down["anims"]["loop"]["file"], "effects/weapons/sword/slash_down.png")
-        self.assertEqual(down["anims"]["loop"]["frames"], 4)
-        self.assertEqual(up["anims"]["loop"]["file"], "effects/weapons/sword/slash_up.png")
-        self.assertEqual(up["anims"]["loop"]["frames"], 6)
-
-    def test_the_down_sheet_is_strip_2_flipped_vertically(self):
-        """`slash_down.png` was cut from Combat-Sheet strip 2 (row index 1)
-        with the vertical flip baked in; the rig loads it as is."""
-        frames = self.a.frames("sword_slash_down", "loop")
-        self.assertEqual(len(frames), 4)
-        combat = pygame.image.load(os.path.join(ASSETS, "effects/weapons/sword/Combat-Sheet.png")).convert_alpha()
-        raw = combat.subsurface(pygame.Rect(64, 64, 64, 64)).copy()      # strip 2, frame 2
-        flipped = pygame.transform.flip(raw, False, True)
-        got = frames[1]
-        self.assertEqual(got.get_size(), (64, 64))
-        self.assertEqual(pygame.image.tobytes(got, "RGBA"), pygame.image.tobytes(flipped, "RGBA"))
-        self.assertNotEqual(pygame.image.tobytes(got, "RGBA"), pygame.image.tobytes(raw, "RGBA"),
-                            "the strip is asymmetric top to bottom, so a flip shows")
-
-    def test_the_up_sheet_is_row_27_as_authored(self):
-        """The slash-up moved (owner, 2026-09-10) to the third row from the
-        bottom of the combat sheet: the tan crescent, row 27, 6 frames."""
-        frames = self.a.frames("sword_slash_up", "loop")
-        self.assertEqual(len(frames), 6)
-        combat = pygame.image.load(os.path.join(ASSETS, "effects/weapons/sword/Combat-Sheet.png")).convert_alpha()
-        for i in (0, 2, 5):
-            raw = combat.subsurface(pygame.Rect(i * 64, 26 * 64, 64, 64)).copy()
-            self.assertEqual(pygame.image.tobytes(frames[i], "RGBA"), pygame.image.tobytes(raw, "RGBA"))
-
     def test_the_loader_can_still_flip_vertically_on_request(self):
-        """`flip_v` stays available for a sheet authored the other way up."""
         import copy
-        meta = copy.deepcopy(self.s["sword_slash_up"])
+        meta = copy.deepcopy(self.s["sword_slash_plain"])
         meta["anims"]["loop"]["flip_v"] = True
         self.a.meta["_flip_probe"] = meta
         try:
-            plain = self.a.frames("sword_slash_up", "loop")[2]
+            plain = self.a.frames("sword_slash_plain", "loop")[2]
             flipped = self.a.frames("_flip_probe", "loop")[2]
             self.assertEqual(pygame.image.tobytes(flipped, "RGBA"),
-                             pygame.image.tobytes(pygame.transform.flip(plain, False, True), "RGBA"))
+                             pygame.image.tobytes(
+                                 pygame.transform.flip(plain, False, True), "RGBA"))
         finally:
             self.a.meta.pop("_flip_probe", None)
 
-    def test_the_swings_play_out_within_the_swords_hit(self):
+    def test_a_swing_plays_once_and_covers_the_hit(self):
         life = get_content().weapon("sword")["projectile_lifetime"]
-        for rig in ("sword_slash_down", "sword_slash_up"):
-            n, fps = self.a.frame_count(rig, "loop"), self.a.fps(rig, "loop")
-            self.assertGreaterEqual(n / fps, life * 0.9, rig)   # the whole strip is seen
+        for variant in ("plain", "fire", "ice", "thunder", "wind"):
+            rig = f"sword_slash_{variant}"
+            with self.subTest(rig=rig):
+                self.assertFalse(self.s[rig]["anims"]["loop"]["loop"],
+                                 "a swing plays once")
+                n = self.a.frame_count(rig, "loop")
+                fps = self.a.fps(rig, "loop")
+                self.assertGreaterEqual(n / fps, life * 0.9,
+                                        "the whole strip is seen")
 
 
 class SlashChoiceTests(unittest.TestCase):
@@ -118,9 +101,11 @@ class SlashChoiceTests(unittest.TestCase):
                                cone_dir=pygame.Vector2(1, 0), radius=74, age=0.0)
 
     def test_the_sword_is_a_sequence_so_the_cone_draws_no_slash_itself(self):
+        """M13 replaced the down-then-up pair with one fanned arc, and the
+        name in the data is now a *base* the element picks a colour of."""
         fx = get_content().weapon_visual("sword").fx
         self.assertEqual(fx["slash_mode"], "sequence")
-        self.assertEqual(fx["slash"], ["sword_slash_down", "sword_slash_up"])
+        self.assertEqual(fx["slash"], ["sword_slash"])
         self.assertIsNone(cone_mod.slash_rig(self._p(fx, 1)))
 
     def test_a_list_without_sequence_mode_alternates_by_the_swing_ordinal(self):
@@ -160,8 +145,14 @@ class SwingOrdinalTests(unittest.TestCase):
 
 
 class SwingSequenceTests(unittest.TestCase):
-    """One Sword attack plays the down strip, then the up strip, as a timed
-    visual that outlives the 0.14 s hit (`slash_fx`)."""
+    """A Sword attack is a timed visual that outlives its own 0.14 s hit
+    (`slash_fx`).
+
+    It used to be two strips back to back, a downward slash then an upward
+    one. M13 replaced both with a single fanned arc, so the sequence is one
+    entry long -- the machinery is unchanged and still has to hold, because
+    a sequence weapon's cone draws no slash of its own and would show
+    nothing if this broke."""
 
     @classmethod
     def setUpClass(cls):
@@ -183,8 +174,9 @@ class SwingSequenceTests(unittest.TestCase):
         slash_fx.spawn_from_cone(ps, self._cone(fx))
         self.assertEqual(len(ps._slashes), 1)
         e = ps._slashes[0]
-        self.assertEqual(e["rigs"], ["sword_slash_down", "sword_slash_up"])
-        self.assertEqual(len(e["durs"]), 2)
+        self.assertEqual(e["rigs"], ["sword_slash_plain"],
+                         "an uninfused Sword draws the plain variant")
+        self.assertEqual(len(e["durs"]), 1)
         self.assertGreater(sum(e["durs"]), get_content().weapon("sword")["projectile_lifetime"],
                            "the sequence outlives the hit, which is why it is its own visual")
         self.assertEqual(e["pos"], pygame.Vector2(100, 50))
@@ -198,20 +190,47 @@ class SwingSequenceTests(unittest.TestCase):
         slash_fx.spawn_from_cone(ps, shot)
         self.assertEqual(ps._slashes, [])
 
-    def test_down_plays_first_then_up_then_the_entry_goes(self):
+    def test_the_strip_plays_through_and_then_the_entry_goes(self):
         ps, slash_fx = self._ps()
         slash_fx.spawn_from_cone(ps, self._cone(get_content().weapon_visual("sword").fx))
         e = ps._slashes[0]
-        d_down, d_up = e["durs"]
-        self.assertEqual(slash_fx.current(e)[0], "sword_slash_down")
+        d_down = e["durs"][0]
+        self.assertEqual(slash_fx.current(e)[0], "sword_slash_plain")
         slash_fx.update(ps, d_down - 0.01)
-        self.assertEqual(slash_fx.current(e)[0], "sword_slash_down")
-        slash_fx.update(ps, 0.02)
         rig, t = slash_fx.current(e)
-        self.assertEqual(rig, "sword_slash_up")
-        self.assertAlmostEqual(t, 0.01, places=5)
-        slash_fx.update(ps, d_up)
-        self.assertEqual(ps._slashes, [])
+        self.assertEqual(rig, "sword_slash_plain", "still on its one strip")
+        self.assertAlmostEqual(t, d_down - 0.01, places=5)
+        slash_fx.update(ps, 0.02)
+        self.assertEqual(ps._slashes, [], "past the last frame, the entry goes")
+
+    def test_an_infused_sword_draws_its_element(self):
+        """The whole point of M13: the rig in the data is a base and the
+        weapon's infusion picks which colour of it is drawn."""
+        from combat.elements.ids import ELEMENTS
+
+        fx = get_content().weapon_visual("sword").fx
+        for element in ELEMENTS:
+            with self.subTest(element=element.key):
+                ps, slash_fx = self._ps()
+                cone = self._cone(fx)
+                cone.infusion = element
+                slash_fx.spawn_from_cone(ps, cone)
+                self.assertEqual(ps._slashes[0]["rigs"],
+                                 [f"sword_slash_{element.key}"])
+
+    def test_it_is_the_infusion_that_picks_the_colour_not_the_hit(self):
+        """`element` is what this hit *applies* and is not the same thing.
+        Painting from it left the three time-mode weapons plain at every
+        element and drew the Daggers plain on two swings in three, because
+        both stamp `NONE` on the attacks that do not apply (M13 C)."""
+        from combat.elements.ids import ElementId
+
+        ps, slash_fx = self._ps()
+        cone = self._cone(get_content().weapon_visual("sword").fx)
+        cone.element = ElementId.NONE
+        cone.infusion = ElementId.FIRE
+        slash_fx.spawn_from_cone(ps, cone)
+        self.assertEqual(ps._slashes[0]["rigs"], ["sword_slash_fire"])
 
     def test_the_draw_asks_each_rig_for_its_frame_in_turn(self):
         ps, slash_fx = self._ps()
@@ -224,25 +243,42 @@ class SwingSequenceTests(unittest.TestCase):
             slash_fx.spawn_from_cone(ps, self._cone(get_content().weapon_visual("sword").fx))
             surf = pygame.Surface((300, 300), pygame.SRCALPHA)
             slash_fx.draw(surf, ps)
-            self.assertEqual(calls[-1][0], "sword_slash_down")
-            self.assertEqual(calls[-1][2], 0)
-            slash_fx.update(ps, ps._slashes[0]["durs"][0] + 0.03)
+            self.assertEqual(calls[-1][0], "sword_slash_plain")
+            self.assertEqual(calls[-1][2], 0, "the first frame first")
+            # Part way in, the same rig at a later index. This used to step
+            # from the down strip to the up one; M13 made the swing one
+            # strip, so what it checks now is that the index advances with
+            # the clock rather than that the rig changes.
+            fps = self.a.fps("sword_slash_plain", "loop")
+            slash_fx.update(ps, 3.5 / fps)
             slash_fx.draw(surf, ps)
-            self.assertEqual(calls[-1][0], "sword_slash_up")
-            self.assertEqual(calls[-1][2], int(0.03 * self.a.fps("sword_slash_up", "loop")))
+            self.assertEqual(calls[-1][0], "sword_slash_plain")
+            self.assertEqual(calls[-1][2], 3)
         finally:
             self.a.frame_rotated = real
 
-    def test_both_sword_strips_are_half_again_as_big(self):
+    def test_every_sword_variant_shares_one_geometry(self):
+        """Five colours of one animation: they must agree on frame and
+        anchor or the swing would jump when a weapon is infused."""
         s = get_content().sprites
-        for rig in ("sword_slash_down", "sword_slash_up"):
-            self.assertEqual(s[rig]["scale"], [97, 97])              # 72 -> 108 -> -10 %
-            self.assertEqual(s[rig]["anchor"], [48, 48])
+        base = None
+        for variant in ("plain", "fire", "ice", "thunder", "wind"):
+            rig = s[f"sword_slash_{variant}"]
+            got = (tuple(rig["frame"]), tuple(rig["anchor"]))
+            base = base or got
+            self.assertEqual(got, base, f"{variant} does not match plain")
 
 
 class DaggersSlashTests(unittest.TestCase):
-    """The Daggers' slash: row 18 of the combat sheet cut into its own
-    sheet, drawn 10 % bigger than the cone (assets journal, 2026-09-10)."""
+    """The Daggers' effects.
+
+    They used to be cut from `Combat-Sheet.png` -- the crescent from row 18,
+    the stab from row 13 -- and the tests pinned that provenance. M13
+    replaced both with art from the effects pack, five colour variants
+    each, so the provenance claims are gone and what stays is the
+    behaviour: which rig is swung, that the crescent is still parked, and
+    that a strip covers its own hit.
+    """
 
     @classmethod
     def setUpClass(cls):
@@ -250,22 +286,11 @@ class DaggersSlashTests(unittest.TestCase):
         reset_assets()
         cls.a = Assets()
 
-    def test_the_sheet_is_row_18_of_the_combat_sheet(self):
-        rig = get_content().sprites["daggers_slash"]
-        self.assertEqual(rig["anims"]["loop"]["file"], "effects/weapons/daggers/slash.png")
-        self.assertEqual(rig["anims"]["loop"]["frames"], 6)
-        self.assertFalse(rig["anims"]["loop"]["loop"])
-        frames = self.a.frames("daggers_slash", "loop")
-        self.assertEqual(len(frames), 6)
-        combat = pygame.image.load(os.path.join(ASSETS, "effects/weapons/sword/Combat-Sheet.png")).convert_alpha()
-        for i in (1, 3):
-            raw = combat.subsurface(pygame.Rect(i * 64, 17 * 64, 64, 64)).copy()   # row 18
-            self.assertEqual(pygame.image.tobytes(frames[i], "RGBA"), pygame.image.tobytes(raw, "RGBA"))
-
     def test_the_daggers_swing_only_the_stab_with_the_crescent_parked(self):
         # Owner (2026-09-10): the crescent is "commented out" -- kept in the
         # data under `_slash_disabled`, a key the game never reads -- so the
         # stab is the only Daggers animation. Move it back to re-enable.
+        # M13 changed the art behind both names, not this arrangement.
         fx = get_content().weapon_visual("daggers").fx
         self.assertEqual(fx["slash"], ["daggers_stab"])
         self.assertEqual(fx["_slash_disabled"], ["daggers_slash"])
@@ -275,21 +300,27 @@ class DaggersSlashTests(unittest.TestCase):
         for swing in (1, 2, 3):
             p.swing = swing
             self.assertEqual(cone_mod.slash_rig(p), "daggers_stab")
-        self.assertIn("daggers_slash", get_content().sprites, "the rig itself stays")
 
-    def test_the_stab_sheet_is_row_13_of_the_combat_sheet(self):
-        rig = get_content().sprites["daggers_stab"]
-        self.assertEqual(rig["anims"]["loop"]["file"], "effects/weapons/daggers/stab.png")
-        self.assertEqual(rig["anims"]["loop"]["frames"], 5)
-        self.assertFalse(rig["anims"]["loop"]["loop"])
-        frames = self.a.frames("daggers_stab", "loop")
-        self.assertEqual(len(frames), 5)
-        combat = pygame.image.load(os.path.join(ASSETS, "effects/weapons/sword/Combat-Sheet.png")).convert_alpha()
-        for i in (1, 2, 4):
-            raw = combat.subsurface(pygame.Rect(i * 64, 12 * 64, 64, 64)).copy()   # row 13
-            self.assertEqual(pygame.image.tobytes(frames[i], "RGBA"), pygame.image.tobytes(raw, "RGBA"))
+    def test_both_daggers_effects_have_all_five_variants(self):
+        s = get_content().sprites
+        for base in ("daggers_stab", "daggers_slash"):
+            geometry = None
+            for variant in ("plain", "fire", "ice", "thunder", "wind"):
+                rig = s.get(f"{base}_{variant}")
+                with self.subTest(rig=f"{base}_{variant}"):
+                    self.assertIsNotNone(rig)
+                    self.assertFalse(rig["anims"]["loop"]["loop"],
+                                     "a swing plays once")
+                    got = (tuple(rig["frame"]), tuple(rig["anchor"]))
+                    geometry = geometry or got
+                    self.assertEqual(got, geometry,
+                                     "the variants must share a geometry or "
+                                     "the swing would jump when infused")
+
+    def test_the_stab_covers_the_daggers_hit(self):
         life = get_content().weapon("daggers")["projectile_lifetime"]
-        n, fps = self.a.frame_count("daggers_stab", "loop"), self.a.fps("daggers_stab", "loop")
+        n = self.a.frame_count("daggers_stab_plain", "loop")
+        fps = self.a.fps("daggers_stab_plain", "loop")
         self.assertGreaterEqual(n / fps, life * 0.9)
 
     def test_the_sprite_follows_the_cone_at_the_datas_factor(self):
@@ -297,9 +328,9 @@ class DaggersSlashTests(unittest.TestCase):
         fx = get_content().weapon_visual("daggers").fx
         self.assertAlmostEqual(fx["slash_size"], 0.8)
         p = SimpleNamespace(fx=fx, radius=46)
-        self.assertEqual(cone_mod.slash_size(p, self.a, "daggers_slash"), (74, 74))
+        self.assertEqual(cone_mod.slash_size(p, self.a, "daggers_slash_plain"), (74, 74))
         p.radius = 60                                                 # follows the reach
-        self.assertEqual(cone_mod.slash_size(p, self.a, "daggers_slash"), (96, 96))
+        self.assertEqual(cone_mod.slash_size(p, self.a, "daggers_slash_plain"), (96, 96))
 
     def test_the_sword_follows_the_area_too(self):
         # Owner (2026-09-10): like the Daggers -- 1.5 x the cone's diameter,
@@ -307,20 +338,36 @@ class DaggersSlashTests(unittest.TestCase):
         fx = get_content().weapon_visual("sword").fx
         self.assertAlmostEqual(fx["slash_size"], 1.5)
         p = SimpleNamespace(fx=fx, radius=32)
-        self.assertEqual(cone_mod.slash_size(p, self.a, "sword_slash_down"), (96, 96))
+        self.assertEqual(cone_mod.slash_size(p, self.a, "sword_slash_plain"), (96, 96))
         p.radius = 48
-        self.assertEqual(cone_mod.slash_size(p, self.a, "sword_slash_down"), (144, 144))
+        self.assertEqual(cone_mod.slash_size(p, self.a, "sword_slash_plain"), (144, 144))
 
     def test_a_visual_without_the_factor_uses_the_rigs_fixed_scale(self):
-        p = SimpleNamespace(fx={"slash": ["sword_slash_down"]}, radius=32)
-        self.assertEqual(cone_mod.slash_size(p, self.a, "sword_slash_down"),
-                         tuple(get_content().sprites["sword_slash_down"]["scale"]))
+        """The fallback, on a rig that still carries a `scale`.
 
-    def test_the_strip_fits_the_daggers_hit(self):
+        It used to be checked on the Sword's slash. M13's melee rigs have
+        no `scale` of their own -- both weapons that use them set
+        `slash_size`, so the reach decides -- and a rig with neither
+        reports `(0, 0)`, which means absent. Both halves are worth
+        holding."""
+        p = SimpleNamespace(fx={"slash": ["soul_slash"]}, radius=32)
+        self.assertEqual(cone_mod.slash_size(p, self.a, "soul_slash"),
+                         tuple(get_content().sprites["soul_slash"]["scale"]))
+        self.assertEqual(cone_mod.slash_size(p, self.a, "sword_slash_plain"), (0, 0))
+
+    def test_the_parked_crescent_would_also_fit_the_hit(self):
+        """It is disabled, not broken: if the owner moves it back out of
+        `_slash_disabled` it should still play inside the swing."""
         life = get_content().weapon("daggers")["projectile_lifetime"]
-        n, fps = self.a.frame_count("daggers_slash", "loop"), self.a.fps("daggers_slash", "loop")
+        n = self.a.frame_count("daggers_slash_plain", "loop")
+        fps = self.a.fps("daggers_slash_plain", "loop")
         self.assertGreaterEqual(n / fps, life * 0.9)
-        self.assertLessEqual(n / fps, life * 1.5)
+        # Against the *cooldown*, not the hit. The old upper bound was 1.5x
+        # the 0.1 s hit, which was really a statement about a five-frame
+        # strip; what has to be true is that a swing's visual is finished
+        # before the next swing starts, or the Daggers would stack slashes
+        # at 0.4 s a swing.
+        self.assertLess(n / fps, get_content().weapon("daggers")["cooldown"])
 
 
 class ThrownDaggerTests(unittest.TestCase):

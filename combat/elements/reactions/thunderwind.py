@@ -1,0 +1,54 @@
+"""ThunderWind: Thunder + Wind (design §5.1, §5.5).
+
+The Wind area, plus a Thunder strike delivered **through the reacting
+enemy** to the N closest enemies around it.
+
+The strike is a single nearest-N query, not a jump tree -- that is what
+distinguishes it from base Thunder and from Superconduct, and it is why N is
+meant to be high: this is a wide, flat burst rather than an arc that walks
+from body to body.
+
+N is floored at what a base Thunder spread would have reached
+(`targets_per_jump x (jumps + 1)`), read off Thunder's live config, so
+ThunderWind can never be the weaker of the two and a buff to Thunder's reach
+widens this as well.
+
+Like every reaction's secondary hit, the strike leaves no aura.
+"""
+from __future__ import annotations
+
+from combat.elements import tracking
+from combat.elements.ids import ElementId, ReactionId
+from combat.elements.reactions.base import Reaction
+from combat.elements.thunder import ARC_SECONDS
+from combat.elements.wind import Wind
+
+
+class ThunderWind(Reaction):
+    ID = ReactionId.THUNDERWIND
+
+    def run(self, target, config, ctx) -> None:
+        Wind.spawn_area(target, ctx, config=config, effect=tracking.THUNDERWIND)
+        self.strike(target, config, ctx)
+
+    @staticmethod
+    def targets(config, ctx) -> int:
+        """N: the data's own figure, or what base Thunder would have
+        reached, whichever is larger."""
+        chain = ctx.registry.config(ElementId.THUNDER, ctx.profile).chain
+        reach = chain.targets_per_jump * (chain.jumps + 1)
+        return max(config.strike_targets, reach)
+
+    @staticmethod
+    def strike(target, config, ctx) -> int:
+        """One flat burst on the closest bodies. Returns how many it hit."""
+        world = ctx.world
+        damage = config.strike_damage.resolve(ctx.hit_damage)
+        hit = 0
+        for other in world.nearest(target.pos, ThunderWind.targets(config, ctx),
+                                   config.strike_range, exclude={id(target)}):
+            hit += 1
+            ctx.deal(other, damage, tracking.THUNDER_STRIKE)
+            world.add_arc(target.pos, other.pos, ElementId.THUNDER,
+                          ctx.now + ARC_SECONDS)
+        return hit

@@ -14,6 +14,7 @@ from __future__ import annotations
 import pygame
 
 from game.states.playing.visual.summons import summon_style
+from game.states.playing.visual import elements as element_fx
 
 
 @summon_style("totem")
@@ -22,9 +23,14 @@ def totem(surface, sx, sy, s, ctx) -> None:
     anim = getattr(s, "anim", None)
     if anim is not None:
         assets = ctx.assets
-        rig = anim.rig
+        # A summon wears its summoning weapon's element (M13): summons are
+        # infusable, and the pillar is recoloured offline, one sheet per
+        # action per element. The Animator still times the strip.
+        rig = element_fx.variant_rig(assets, anim.rig,
+                                     getattr(s, "infusion", None))
         bw, bh = assets.scale_for(rig) or (32, 48)
-        frame = anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))))
+        frame = assets.frame(rig, anim.anim, anim.index,
+                             size=(max(1, round(bw * z)), max(1, round(bh * z))))
         if frame is not None:
             ax, ay = assets.anchor(rig)
             surface.blit(frame, (int(sx - ax * z), int(sy - ay * z)))

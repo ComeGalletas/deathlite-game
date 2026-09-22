@@ -71,6 +71,21 @@ def hit_tinted(frame):
     return out
 
 
+def aura_colour(run, body):
+    """The colour of the aura `body` is holding, or None.
+
+    Read off the run's own visual set rather than imported, which keeps this
+    module free of the elements package and works unchanged when a run has
+    no visuals at all (the headless tests).
+    """
+    state = getattr(body, "elemental", None)
+    visuals = getattr(run, "element_visuals", None)
+    if state is None or visuals is None:
+        return None
+    element = state.element(run.stats["time"])
+    return (element, visuals.tint(element)) if element else None
+
+
 class WorldRenderer:
     def __init__(self, ps) -> None:
         self.ps = ps
@@ -470,24 +485,34 @@ class WorldRenderer:
                 continue
             sx, sy = ps.camera.world_to_screen(ex["pos"])
             anim = ex.get("anim")
-            if anim is not None and self._blit_burst(surface, anim, sx, sy, ex["radius"] * z):
+            if anim is not None and self._blit_burst(surface, anim, sx, sy,
+                                                     ex["radius"] * z,
+                                                     ex.get("infusion")):
                 continue
             frac = ex["t"] / ex["dur"]
             pygame.draw.circle(surface, (255, 180, 90),
                                (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
 
-    def _blit_burst(self, surface, anim, sx, sy, radius_px: float) -> bool:
+    def _blit_burst(self, surface, anim, sx, sy, radius_px: float,
+                    infusion=None) -> bool:
         assets = self.ps.game.assets
-        rig = assets.rig(anim.rig) or {}
-        bw, bh = assets.scale_for(anim.rig) or (0, 0)
+        from game.states.playing.visual import elements as element_fx
+        # An infused blast detonates in its element's colour (M13). The
+        # Animator holds the plain rig and keeps timing the strip; only the
+        # sheet the frame is taken from changes, and the variants are
+        # frame-for-frame copies of it.
+        name = element_fx.variant_rig(assets, anim.rig, infusion)
+        rig = assets.rig(name) or {}
+        bw, bh = assets.scale_for(name) or (0, 0)
         fireball = float(rig.get("fireball") or bw)
         if not bw or not fireball:
             return False
         k = 2.0 * radius_px / fireball          # rig px -> screen px
-        frame = anim.frame(size=(max(1, round(bw * k)), max(1, round(bh * k))))
+        frame = assets.frame(name, anim.anim, anim.index,
+                             size=(max(1, round(bw * k)), max(1, round(bh * k))))
         if frame is None:
             return False
-        ax, ay = assets.anchor(anim.rig)
+        ax, ay = assets.anchor(name)
         surface.blit(frame, (sx - ax * k, sy - ay * k))
         return True
 
@@ -533,6 +558,13 @@ class WorldRenderer:
                 if sid in e.status:
                     colour = tint
                     break
+            else:
+                # No status of its own: show the aura instead, so the
+                # primitive fallback carries the same information the
+                # sprited path does.
+                primed = aura_colour(run, e)
+                if primed is not None and e.hit_flash <= 0:
+                    colour = primed[1]
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(er))
 
         # Thin state rings at the collider edge -- always for the primitive
@@ -650,6 +682,14 @@ class WorldRenderer:
             return
         if e._hurt_t > 0.0:
             frame = hit_tinted(frame)           # red flash, no pop to a circle
+        else:
+            # A primed body wears its element, lightly (M10). Not while it is
+            # flashing: a hit is the more urgent thing to see and it is over
+            # in a quarter of a second.
+            primed = aura_colour(run, e)
+            if primed is not None:
+                from game.states.playing.visual import elements as element_fx
+                frame = element_fx.washed(frame, primed[0])
         ax, ay = self.anchor_for(rig, flip)
         self._blit_character(
             surface, frame,
@@ -790,6 +830,9 @@ class WorldRenderer:
 
     def aim_overlay(self, surface) -> None:
         overlays.aim_overlay(surface, self.ps)
+
+    def aura_overlay(self, surface) -> None:
+        overlays.aura_overlay(surface, self.ps)
 
     def collider_overlay(self, surface) -> None:
         overlays.collider_overlay(surface, self.ps)

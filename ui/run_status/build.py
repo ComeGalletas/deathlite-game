@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import pygame
 
+from combat.weapons.core import TIME_MODE
 from combat.weapons.forge import blessing_levels, forge_changes, get_forges
+from game.states.playing.visual import elements as element_fx
 from game import config
 from progression.blessings.catalog import roman
 from progression.blessings.offer import get_rules
@@ -93,6 +95,18 @@ def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
     if crit > 0.0:
         out.append(("Crit chance", f"+{crit * 100:.0f}%", None))
     return out
+
+
+def infusion_text(weapon) -> str:
+    """`fire  ·  every attack` -- the element and the cadence it lands
+    at, which is the half of an infusion the numbers do not show."""
+    if weapon.element_mode == TIME_MODE:
+        pace = f"every {weapon.element_window:.2g}s"
+    elif weapon.element_interval:
+        pace = f"1 attack in {weapon.element_interval + 1}"
+    else:
+        pace = "every attack"
+    return f"{weapon.element.key}  ·  {pace}"
 
 
 def gate_text(weapon, need: int, forges) -> str:
@@ -184,6 +198,12 @@ class BuildPane:
         if w.special and w.special != w.weapon_class:
             parts.append(str(w.special).replace("_", " "))
         y = c.line(surface, f.small, area, y, "  ·  ".join(parts), colour=config.COLOR_TEXT_DIM, step=24)
+        # The infusion, in the weapon's own element colour, with how
+        # often it actually lands -- which is the part a player cannot
+        # work out from the card.
+        if w.infused:
+            y = c.line(surface, f.small, area, y, infusion_text(w),
+                       colour=element_fx.tint(w.element), step=24)
 
         # The gate block is anchored at the bottom; the numbers fill down to it.
         gate_top = area.bottom - c.S(GATE_H)
