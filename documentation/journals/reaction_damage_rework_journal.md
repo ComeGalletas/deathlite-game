@@ -361,6 +361,8 @@ are `interval: 0`, every attack. That does not change the answer, but the
 Ember Ring being rate-limited matters: it is a re-hitting orbiter, which is
 exactly the case the cadence exists for.
 
+*(DOC-003: #12 is tracked as **CMB-008**, proposed.)*
+
 #12 is worth keeping open for a reason the original audit could not have had:
 `MAX_PARTICLES` is 1200 and `MAX_DAMAGE_NUMBERS` 200, and the M9 pass measured
 the system at roughly thirty times a real build's load — but that was before

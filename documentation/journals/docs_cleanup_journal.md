@@ -54,7 +54,7 @@ by path.
 - [x] DOC-003.4 — World, spawn and tests: `worldgen_modularity_todo.md`, `journal.md` flow field, `spawn_master_todo.md` S8, `spawn_master_journal.md`, `spawn_groups_journal.md`, `test_suite_review.md`
 - [x] DOC-003.5 — Entities and UI: bomb fish, roster expansion, gnome split, imp, spear goblin, key icons, buff buildings, assets WA5
 - [x] DOC-003.6 — Stale text: `FUNCTIONAL_README.md` `MENU_SCRIM`, `spawn_tables.json` `_unused_comment`, `pending_plans.md` status
-- [ ] DOC-003.7 — Cross-references: ENT-012.D2 → WLD-011, WLD-011 → WLD-012, SYS-007 *Open* → SYS-008 and `state.py` size, CMB-007 → CMB-008
+- [x] DOC-003.7 — Cross-references: ENT-012.D2 → WLD-011, WLD-011 → WLD-012, SYS-007 *Open* → SYS-008 and `state.py` size, CMB-007 → CMB-008
 - [ ] DOC-003.8 — Index: assign the unassigned plans, note CMB-006's legacy stamp, results, close
 
 ## DOC-003 — Results

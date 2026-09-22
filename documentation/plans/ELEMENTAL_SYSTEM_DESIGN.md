@@ -613,6 +613,6 @@ a cascade decay in value.
 
 | # | Question | Proposal |
 |---|---|---|
-| 12 | Existing particle system limits | **Open, to measure and test** (owner, 2026-09-22). `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200 in `game/config.py`. The M9 pass measured the element system at ~30x a real build's load without trouble, but that was before the R38 cascade, which is load the original audit never saw: more reactions per frame, each with its own flash, label and stream of numbers. Measure a dense cascade before closing this. |
+| 12 | Existing particle system limits | **Open, to measure and test** (owner, 2026-09-22). `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200 in `game/config.py`. The M9 pass measured the element system at ~30x a real build's load without trouble, but that was before the R38 cascade, which is load the original audit never saw: more reactions per frame, each with its own flash, label and stream of numbers. Measure a dense cascade before closing this. Tracked as **CMB-008** (proposed). |
 
 
