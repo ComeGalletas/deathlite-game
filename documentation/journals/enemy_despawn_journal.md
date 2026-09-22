@@ -1,5 +1,7 @@
 # Enemy despawn by distance — the master lets go of what the player has left behind
 
+**Legacy ID:** SPN-003 · **Systems:** SPN · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The spawn master removes live bodies that are far from the player, so the
 frame is cheaper and the live cap is spent on enemies the player can actually
 meet.

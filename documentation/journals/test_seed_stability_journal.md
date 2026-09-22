@@ -1,5 +1,7 @@
 # Test seed stability journal
 
+**Legacy ID:** TST-001 · **Systems:** TST · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-17)
 
 - **Objective:** Review the tests that depend on world generation and

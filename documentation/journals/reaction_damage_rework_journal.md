@@ -1,5 +1,7 @@
 # Reaction damage rework — execution journal
 
+**Legacy ID:** CMB-006 · **Systems:** CMB · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-22)
 
 - **Objective:** Rework how elemental reactions deal damage, so a reaction is

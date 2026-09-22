@@ -1,5 +1,7 @@
 # Fish huts and seahorse boats (water NPCs)
 
+**Legacy ID:** ENT-011 · **Systems:** ENT, WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Scenery on the sea that moves: a fish hut moored off an island's coast, and a
 few seahorse boats drifting round it. Nothing here fights, blocks or drops.
 

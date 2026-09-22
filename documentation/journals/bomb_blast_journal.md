@@ -1,5 +1,7 @@
 # Bomb blast radius — journal
 
+**Legacy ID:** CMB-004 · **Systems:** CMB · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## 1. The requirement (owner, 2026-09-12)
 
 - **Objective:** Bind the Bomb weapon's blast area to its actual in-game

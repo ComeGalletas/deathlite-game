@@ -1,5 +1,7 @@
 # Audio mixer journal — a sound-effects level of its own
 
+**Legacy ID:** AUD-002 · **Systems:** AUD, UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-16)
 
 - **Objective:** Add a separate volume option for the sound effects.

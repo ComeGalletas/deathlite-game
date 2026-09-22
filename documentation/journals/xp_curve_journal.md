@@ -1,5 +1,7 @@
 # XP curve journal
 
+**Legacy ID:** PRG-002 · **Systems:** PRG · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The hero's level curve lives in `progression/experience.py`. Everything that
 grants or displays XP (`LevelTracker`, the HUD bar, the dev "fill the bar" key,
 the level-up screen) reads `xp_for_level(level)`, so the curve is changed in one

@@ -1,5 +1,7 @@
 # PlayingState refactor — dev log
 
+**Legacy ID:** SYS-005 · **Systems:** SYS · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Splitting `game/states/playing_state.py` (1404 lines, one class, ~88 methods)
 into a `game/states/playing/` package so each concern is a small, separately
 maintainable unit. Same as `enemy_ai.md` tracks the AI split and

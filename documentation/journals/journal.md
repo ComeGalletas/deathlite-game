@@ -1,5 +1,7 @@
 # Development Journal — Death Lite Die
 
+**Legacy ID:** SYS-003 · **Systems:** all · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A running log of what was built each milestone, the decisions behind it, how it
 was verified, and known risks. Companion file `transcript.md` holds a curated
 transcript of the most important steps with the reasoning for each.

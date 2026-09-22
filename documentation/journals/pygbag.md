@@ -1,5 +1,7 @@
 # Web build (pygbag) — dev log
 
+**Legacy ID:** BLD-001 · **Systems:** BLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Tracks getting **Death Lite Die** running in the browser via
 [pygbag](https://pygame-web.github.io/) and deployed from GitHub, the same way
 `assets_journal.md` tracks the art passes and `enemy_ai.md` tracks the AI

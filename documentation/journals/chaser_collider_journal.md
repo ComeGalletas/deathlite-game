@@ -1,5 +1,7 @@
 # Chaser collider journal
 
+**Legacy ID:** ENT-003 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-14)
 
 - **Objective:** Shrink the chaser enemy's collision ring.

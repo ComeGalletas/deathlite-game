@@ -1,5 +1,7 @@
 # Training dummy and DPS meter — execution journal
 
+**Legacy ID:** CMB-003 · **Systems:** CMB, UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Named `training_dummy_journal.md` to match the other journals in this folder
 (`weapon_system_journal.md`, `spawn_master_journal.md`, ...) rather than the
 `training_dummy.journal` spelling in the request.

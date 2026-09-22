@@ -1,5 +1,7 @@
 # Buff buildings — execution journal
 
+**Legacy ID:** WLD-009 · **Systems:** WLD, PRG · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Interactive buildings scattered over the islands that hand the hero a short
 timed advantage. Named `buff_buildings_journal.md` to match the other
 journals in this folder.

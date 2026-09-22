@@ -1,5 +1,7 @@
 # North stairs — dev log
 
+**Legacy ID:** WLD-007 · **Systems:** WLD, RND · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A straight flight on the **north** rim of a plateau, so an island can be
 climbed from its back and not only from its south wall and its two flanks.
 Milestones are prefixed **NS**. Same rules as the other logs: full suite

@@ -1,5 +1,7 @@
 # Combat balance journal
 
+**Legacy ID:** CMB-001 · **Systems:** CMB · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Design + checklist log for combat‑model and tuning changes. Same role for
 combat that `assets_journal.md` plays for art. Newest work first.
 

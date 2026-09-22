@@ -1,5 +1,7 @@
 # Elemental system journal
 
+**Legacy ID:** CMB-005 · **Systems:** CMB, RND · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (2026-09-21)
 
 The owner delivered `ELEMENTAL_SYSTEM_DESIGN.md` (revision 8, kept outside the

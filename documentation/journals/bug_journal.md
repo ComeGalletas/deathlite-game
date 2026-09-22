@@ -1,5 +1,7 @@
 # Bug journal
 
+**Legacy ID:** SYS-001 · **Systems:** all · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Running log of confirmed bugs: symptom, root cause, evidence, and the proposed
 fix. Entries stay until the fix lands, then get a **Resolved** stamp with the
 commit / milestone. Newest first.

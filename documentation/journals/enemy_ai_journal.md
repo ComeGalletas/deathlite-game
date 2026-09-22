@@ -1,5 +1,7 @@
 # Enemy AI — architecture & refactor journal
 
+**Legacy ID:** ENT-001 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Scope: `entities/enemy_ai.py`, `entities/enemy.py`, `entities/boss.py`, and the
 enemy-facing seam in `game/states/playing_state.py`. **Out of scope:**
 `world/pathfinding.py` (`NavGrid` / `FlowField` / `NavField`) — already isolated,

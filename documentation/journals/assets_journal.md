@@ -1,5 +1,7 @@
 # Asset Integration Journal — Death Lite Die
 
+**Legacy ID:** RND-001 · **Systems:** RND · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A focused checklist + phase log for wiring real sprites into the game, kept
 separate from the main `journal.md`. Same format: **Goal → What changes → How
 it's verified → Decisions → Risks**, with a tick-box workflow.

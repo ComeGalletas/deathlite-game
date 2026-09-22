@@ -1,5 +1,7 @@
 # Enemy health bar — execution journal
 
+**Legacy ID:** UI-011 · **Systems:** UI, ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-22)
 
 - **Objective:** Draw a health bar above every enemy that is below full HP.

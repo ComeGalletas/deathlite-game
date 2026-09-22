@@ -1,5 +1,7 @@
 # Desktop packaging (.exe) — execution journal
 
+**Legacy ID:** BLD-002 · **Systems:** BLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-12)
 
 Package the game **as it stands** so it runs on another Windows PC as a `.exe`,

@@ -1,5 +1,7 @@
 # Six blessings per weapon
 
+**Legacy ID:** PRG-001 · **Systems:** PRG, CMB · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Journal for the request that every weapon carries six blessings of its own,
 covering damage, area, speed / frequency and special effects, with each level
 worth about 10-20 % more damage. Companion to

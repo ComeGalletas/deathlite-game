@@ -1,5 +1,7 @@
 # World refactor — dev log
 
+**Legacy ID:** WLD-002 · **Systems:** WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Splitting the two 1.4k-line world files —
 [`world/map.py`](../world/map.py) (1414 lines, one `GameMap` class doing four
 unrelated jobs) and [`world/procedural.py`](../world/procedural.py) (1360 lines,

@@ -1,5 +1,7 @@
 # Pig NPC (village corral)
 
+**Legacy ID:** ENT-008 · **Systems:** ENT, WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-17)
 
 - **Objective:** Add a pig NPC to the village, from the pig sprite folder

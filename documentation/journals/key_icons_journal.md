@@ -1,5 +1,7 @@
 # Key icons — drawing keyboard keys as pixel-art keycaps
 
+**Legacy ID:** UI-010 · **Systems:** UI, RND · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The interaction prompt says `E  Shrine - gain a blessing` in plain text. This
 journal turns that leading `E` into a drawn keycap, and lays the ground for
 every other place the game will need to show a key.

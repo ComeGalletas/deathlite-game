@@ -1,5 +1,7 @@
 # End-screen input lock — journal
 
+**Legacy ID:** UI-007 · **Systems:** UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 An input lock on the two run-end screens (GAME OVER and VICTORY), so the
 summary cannot be dismissed by the keypress or click that was already on its
 way when the run ended.

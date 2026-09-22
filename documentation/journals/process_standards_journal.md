@@ -43,8 +43,8 @@ Decisions the request left open:
   same journal; the journal's ID is its first requirement's.
 - **DOC-001.D3 — Legacy journals.** The 60 existing journals got
   retroactive IDs in creation order within their system, listed in the
-  index with status `legacy`. Their files are not edited yet (one has
-  uncommitted owner changes); stamping the header is DOC-001.3.
+  index with status `legacy`. Each file carries a `**Legacy ID:**` line under
+  its title (DOC-001.3); their sections are not rewritten to the standard.
 - **DOC-001.D4 — Memory conflict found.** The spent-source-sheet rule has
   the cut's pinning test skip when the source is gone; the later rule says
   a test never skips to green. Flagged in `CLAUDE.md` §3 for the owner.
@@ -74,7 +74,7 @@ Decisions the request left open:
 ## DOC-001 — Tasks
 
 - [x] DOC-001.1 — Write `CLAUDE.md` (process standard + condensed standing rules) → `1e1225e`
-- [x] DOC-001.2 — Create `INDEX.md` with retroactive IDs for existing journals
-- [ ] DOC-001.3 — Stamp the ID header onto each legacy journal (awaiting owner)
+- [x] DOC-001.2 — Create `INDEX.md` with retroactive IDs for existing journals → `712775d`
+- [x] DOC-001.3 — Stamp a `**Legacy ID:**` line under each legacy journal's title (owner approved; tagged as legacy so they grep apart)
 - [ ] DOC-001.4 — Resolve DOC-001.D4 with the owner and update memory + `CLAUDE.md`
 - [ ] DOC-001.5 — Commit on the branch the owner chooses
