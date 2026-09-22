@@ -53,15 +53,13 @@ class SheetTests(unittest.TestCase):
 
     def test_the_strips_are_what_the_cutting_script_produces(self):
         """`tools/asset_pipeline/cut_totem_sheets.py --check` compares every committed
-        strip with a fresh cut of the blue sheet. The script looks for the
-        sheet in the folder and in `unused/`, where spent sources are
-        archived; exit 2 means it is gone from both and there is nothing to
-        compare against -- the strips themselves are still pinned above."""
+        strip with a fresh cut of the blue sheet. The sheet is tracked at
+        `grave_totem/unused/Fire_Totem_blue-Sheet.png`, where spent sources
+        are archived, so it is present in every clone and worktree: exit 2
+        (sheet missing) is a failure, not a reason to skip (TST-002)."""
         from tools.asset_pipeline import cut_totem_sheets
-        code = cut_totem_sheets.main(["--check"])
-        if code == 2:
-            self.skipTest("the source sheet has been archived away entirely")
-        self.assertEqual(code, 0)
+        self.assertEqual(cut_totem_sheets.main(["--check"]), 0,
+                         "cut_totem_sheets --check failed (2 = source sheet missing)")
 
     def test_every_frame_of_every_strip_loads(self):
         for anim, frames in STRIPS.items():
