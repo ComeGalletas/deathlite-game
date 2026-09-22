@@ -1,7 +1,7 @@
 # Process standards — journal
 
-**ID:** DOC-001 · **System:** process · **Type:** process ·
-**Status:** done · **Branch:** main
+**ID:** DOC-001 (+ DOC-002) · **System:** process · **Type:** process ·
+**Status:** done · **Branch:** claude/reaction-damage-rework (reaches `main` by PR)
 
 ---
 
@@ -53,7 +53,10 @@ Decisions the request left open:
   cut-script tests still skipping on exit 2 (`tests/render/test_spawn_fx.py`,
   `test_totem_bolt.py`, `test_totem_sprite.py`), logged as TST-002 (proposed).
 - **DOC-001.D5 — This request's own branch.** Owner chose `main`, with no
-  test run since no code is touched; still one commit per task.
+  test run since no code is touched; still one commit per task. The commits
+  were made in the main checkout, which was later moved to
+  `claude/reaction-damage-rework`; local and remote `main` stayed at
+  `c63b126`, so DOC-001 reaches `main` through that branch's PR.
 
 ## DOC-001 — Proposed additions (included in `CLAUDE.md`)
 
@@ -84,8 +87,35 @@ Decisions the request left open:
 
 ## DOC-001 — Results
 
-Four commits on `main` (`1e1225e`, `712775d`, `a4bd438`, and the DOC-001.4
-commit). No tests run: documentation only, as the owner directed. Memory
+Four commits (`1e1225e`, `712775d`, `a4bd438`, `1bb3c0a`), now on
+`claude/reaction-damage-rework`. No tests run: documentation only, as the owner directed. Memory
 updated in step: a pinned `requirement-ids-journals-commits` entry, a pointer
 from the journal-per-request entry, and the spent-source-sheet entry no
 longer prescribes a skip.
+
+---
+
+## DOC-002 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Add a rule for owner balance tweaks found in the `data/`
+  JSON while other work is in progress.
+- **Details:** When such a change is seen, point it out and ask whether to
+  ignore it for the current work or commit it in a separate commit that
+  names the balance change.
+- **Constraint:** Hold commits until the owner confirms the other agents
+  have finished and settles which branch is `main`.
+
+## DOC-002 — Confirmed reading
+
+- **DOC-002.D1 — What counts.** Any `data/` value change the current task
+  did not make. It is reported as file, actor, old → new.
+- **DOC-002.D2 — The separate commit.** It carries a `balance`-type
+  requirement ID in the actor's system, matching what the ENT-012 session
+  already did (`ENT-012.1: Drop Stoutpaw's shield from 41 to 7`).
+- **DOC-002.D3 — Before the answer.** No folding into a task commit, no
+  revert, and no code or test changed to agree with the tweak.
+
+## DOC-002 — Tasks
+
+- [x] DOC-002.1 — Add `CLAUDE.md` §1.7 and the index row; save the rule to memory
+- [x] DOC-002.2 — Commit once the other agents finished, on `claude/reaction-damage-rework`

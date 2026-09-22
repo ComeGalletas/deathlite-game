@@ -134,6 +134,24 @@ requirement do not need the question again.
 - End every commit message with the attribution trailer the harness
   supplies.
 
+### 1.7 Balance tweaks in `data/` — flag and ask (DOC-002)
+
+The owner tunes actors by hand in the `data/` JSON (enemies, bosses,
+weapons, elements, reactions, heroes, …), often while other work is in
+flight. When the working tree or a diff shows a change to a `data/` value
+that the current task did not make:
+
+- **Say so** — name the file, the actor and the old → new value.
+- **Ask how to handle it**, with two options:
+  1. **Leave it out** of the current work: not staged, not committed, not
+     reverted.
+  2. **Commit it separately**, in its own commit that is only the balance
+     change. It gets a requirement ID of type `balance` in the actor's
+     system (e.g. `ENT-012.1: Drop Stoutpaw's shield from 41 to 7`) and a
+     row in the index.
+- Until the owner answers, never fold such a change into a task commit,
+  never revert it, and never "fix" code or tests to agree with it.
+
 ---
 
 ## 2. Standing rules (condensed from memory)
