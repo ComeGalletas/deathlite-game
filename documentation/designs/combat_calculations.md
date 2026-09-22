@@ -792,23 +792,42 @@ def take_damage(self, amount: float, armor: float = 0.0) -> float:
 - Pre-CB-1 this was `max(0, (21/120)·0.7 − 4)` = **0** every frame — immune.
   Fixed; see `../journals/BUG_JOURNAL.md` entry #1.
 
-### 5c · Hex shaman hazard on Kestrel (armor 0)
+### 5c · Hex shaman hazard against hero armor
 
-Retuned 2026-09-21 — the data key is `hex_shaman` (`warlock` in the older
-sections above), and the pool went `hazard_dps` 23 → **3**, `hazard_radius`
-92 → **20**, `hazard_duration` 1.8 → **0.9**.
+The data key is `hex_shaman` (`warlock` in the older sections above). This
+pool is tuned against the heroes' armor rather than in isolation, so the two
+move together and the number to reason about is the gap between them.
 
-- `hazard_dps` = 3, `tick_interval` = 0.5 → bite = `3 · 0.5` = **1.5**, once
-  per 0.5 s; Windborne, no incoming multiplier.
-- `dealt = max(0, 1.5 − 0)` = **1.5** per bite → **3 HP/s**. The pool lives
-  0.9 s, and `Hazard.due_damage` pays only *whole* intervals, so standing in
-  one from the moment it lands is **1 bite ≈ 1.5 HP** — the trailing 0.4 s
-  never completes a second interval.
-- The same pool on Aegis (armor 4): `max(0, 1.5 − 4)` = **0** per bite —
-  **immune**, before Bulwark is even considered. Armor is subtracted per bite
-  (`entities/player.py`), so any hero with armor ≥ 1.5 takes nothing from this
-  pool at all. Worth knowing rather than discovering: this is the same shape as
-  the pre-CB-1 bug in 5b, except here it falls out of the tuning rather than
-  from a per-frame divisor. If the pool is meant to threaten an armoured hero,
-  the dps has to clear their armor across a 0.5 s bite (armor 4 needs
-  `hazard_dps` > 8).
+**The rule.** A pool deals `hazard_dps · tick_interval` per bite and armor is
+subtracted from each bite whole (`entities/player.py`), so a pool touches a
+hero only when
+
+    hazard_dps · tick_interval  >  armor
+
+With `tick_interval` at `INCOMING_TICK_INTERVAL` = 0.5 that is simply
+**`hazard_dps > 2 · armor`**. Armor does not scale the bite, it cancels it, so
+the pool goes from full damage to nothing over a range of one or two dps —
+this is a cliff, not a slope, and it is the knob to turn.
+
+**Where the current values sit** (2026-09-22: `hazard_dps` 6,
+`hazard_radius` 20, `hazard_duration` 0.9):
+
+| hero | armor | bite `6 · 0.5` | dealt | needs |
+|---|---|---|---|---|
+| Aegis | 4 | 3.0 | `max(0, 3.0 − 4)` = **0** | `hazard_dps` > 8 |
+| Kestrel | 3 | 3.0 | `max(0, 3.0 − 3)` = **0** | `hazard_dps` > 6 |
+| Nihil | 3 | 3.0 | `max(0, 3.0 − 3)` = **0** | `hazard_dps` > 6 |
+
+So the pool currently lands nothing on anyone, and at 6 it sits exactly on the
+armor-3 boundary — 7 would put 0.5 per bite through to Kestrel and Nihil, 9
+would reach Aegis. Bulwark never enters it: the multiplier applies before
+armor, and zero survives either order.
+
+**How much a full pool is worth**, once the dps does clear the armor:
+`Hazard.due_damage` pays only *whole* intervals, and the pool lives 0.9 s, so
+standing in one from the moment it lands is **a single bite** — the trailing
+0.4 s never completes a second. At `hazard_dps` 9 against Aegis that is
+`max(0, 4.5 − 4)` = 0.5 HP for the whole pool. Reaching a meaningful chunk
+means raising the dps well past the threshold, widening `hazard_duration` so a
+second bite lands, or shortening `tick_interval` on this hazard — the third
+also lowers the threshold, since a smaller interval means a smaller bite.
