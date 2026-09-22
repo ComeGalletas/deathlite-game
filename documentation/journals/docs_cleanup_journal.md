@@ -20,8 +20,8 @@
 ## DOC-003 — Confirmed reading
 
 A review on 2026-09-22 read every unticked box in `documentation/` and
-checked each against the code, `data/`, `tests/` and `git log`. About 90
-boxes describe work that shipped; most sit in plans that a later "built"
+checked each against the code, `data/`, `tests/` and `git log`. About 150
+of the 184 describe work that shipped or was superseded; most sit in plans that a later "built"
 section replaced. The genuinely open work is listed under *Results*.
 
 - **DOC-003.D1 — Box states.** `- [x]` done; `- [-]` superseded or obsolete,
@@ -62,7 +62,7 @@ by path.
 No tests run: documentation only. The one `data/` edit is a comment string
 (DOC-003.D3), re-parsed as JSON before it was written.
 
-**Unticked boxes:** about 180 before, **33 after**. The count was taken with
+**Unticked boxes:** 184 before, **33 after**. The count was taken with
 `grep -rn -- "- \[ \]" documentation`, leaving out this journal. Every box
 that remains is real open work:
 
