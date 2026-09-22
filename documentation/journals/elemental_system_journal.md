@@ -1744,6 +1744,48 @@ wrong as soon as a blessing widens it. If it ever wants art, the shape
 that works is a hybrid -- an authored core at 1x inside the procedural
 ring.
 
+## Does every island offer an element? (surveyed 2026-09-21)
+
+Asked by the owner. There are two doors into the elemental system: the
+village Monastery, and a buff building that rolled elemental at
+`elements.chance`. Measured over 60 seeds, excluding villages (whose pass
+owns their island) and the boss arena (whose clear disc is the fight):
+
+| | |
+|---|---|
+| eligible islands | 390 |
+| offering an element | 320 (82.1 %) |
+| offering none | 70 (17.9 %) |
+| villages missing a Monastery | 0 of 60 |
+
+**No, and it cannot hold by construction.** `elements.chance` is 0.4 rolled
+independently per building, so an island with two buff buildings has a 36 %
+chance of neither rolling elemental and one with three has 21.6 %. What
+*does* hold is that every **run** has a door: both villages always carry a
+Monastery, so the system is never unreachable. It is per-island coverage
+that fails.
+
+The owner's call was to **fix the placement side only** and leave the
+chance alone, which is recorded in `buff_buildings_journal.md` rev. 7: the
+repair pass was taking back 8.5 % of every buff building placed, because
+its Dijkstra priced a building the same as a tree. Pricing them apart took
+islands under the minimum from 18 to 8 and islands with none from 1 to 0,
+and moved element coverage from 80.5 % to 82.1 %.
+
+The remaining 17.9 % is the 0.4 chance, untouched by request. If it is ever
+worth closing, the cheapest lever is to guarantee the *first* buff building
+on an island rolls elemental and leave 0.4 for the rest.
+
+#### A measurement error worth remembering
+
+The first survey reported 24.4 % of islands with no element and 18 % below
+the buff-building minimum. Both were too high: it counted the boss arena as
+an ordinary island. The arena is excluded from the buff scatter by design,
+so 40 of the 41 "islands with no buff building" were arenas behaving
+correctly, and the real figure was 1. The layout has no `boss_room_id`
+attribute -- the check silently read `None` and never excluded anything --
+and `room.kind == "boss"` is the test that works.
+
 ## Progress
 
 - 2026-09-21: discovery done, proposal written, no code changed.

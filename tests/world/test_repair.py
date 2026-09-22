@@ -832,3 +832,91 @@ class EveryIslandIsScatteredTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuffBuildingCountTests(unittest.TestCase):
+    """An island carries the two to five buff buildings it is promised.
+
+    `placement.per_island` is `[2, 5]` and the scatter honours it, but the
+    repair pass then took some of them back: its Dijkstra paid one unit per
+    obstacle blocking a cell, so a choke held by a tree and a choke held by
+    a building cost the same and it removed whichever it met first.
+    Measured before the weighting: 8.5 % of every building placed was taken
+    back, and 18 of 390 eligible islands over sixty seeds finished under
+    the minimum, one of them with nothing at all.
+
+    A building is now worth several trees to the pass, so a sealed region
+    is opened past the scenery where there is scenery to open it past. What
+    is left -- a handful of islands at one -- is the case where the
+    building genuinely is the only thing between the player and the ground
+    behind it, and there the ground wins. That is the pass doing its job,
+    so this asserts a rate rather than a guarantee.
+
+    Villages are excluded because the village pass owns their island, and
+    the boss arena because its clear disc is the fight.
+    """
+
+    SEEDS = tuple(range(1, 41))
+
+    def _islands(self):
+        """`(buff building count)` per eligible island, over the seeds."""
+        from game.content import get_content
+        from world.gen.buildings import buff_kinds
+
+        kinds = set(buff_kinds(get_content().buildings))
+        out = []
+        for seed in self.SEEDS:
+            layout = W.layout(seed)
+            villages = {v.room_id for v in layout.villages}
+            rooms = {r.id: r for r in layout.rooms}
+            counts = {rid: 0 for rid in rooms}
+            for o in layout.buff_buildings(kinds):
+                for rid, room in rooms.items():
+                    if room.rect.collidepoint(o.pos.x, o.pos.y):
+                        counts[rid] += 1
+                        break
+            for rid, n in counts.items():
+                if rid in villages or rooms[rid].kind == "boss":
+                    continue
+                out.append((seed, rid, n))
+        return out
+
+    def test_no_island_is_left_without_one(self):
+        """The floor that is a guarantee. An island with no buff building
+        has no buff and, since M7, no way into the elemental system either
+        unless it happens to be a village."""
+        bare = [(s, r) for s, r, n in self._islands() if n == 0]
+        self.assertEqual(bare, [], f"islands with no buff building: {bare}")
+
+    def test_almost_every_island_reaches_the_minimum(self):
+        """The rate that is not. Some islands really are sealed by their
+        own building, and the repair is right to take it."""
+        islands = self._islands()
+        short = [(s, r, n) for s, r, n in islands if n < 2]
+        self.assertLessEqual(
+            len(short) / len(islands), 0.04,
+            f"{len(short)} of {len(islands)} islands under two buff "
+            f"buildings, which is worse than the 2 % the repair weighting "
+            f"leaves: {short[:10]}")
+
+    def test_none_exceeds_the_ceiling(self):
+        over = [(s, r, n) for s, r, n in self._islands() if n > 5]
+        self.assertEqual(over, [])
+
+
+class RepairPricesBuildingsAboveSceneryTests(unittest.TestCase):
+    """The weighting itself, away from a generated world."""
+
+    def test_a_precious_kind_costs_more_than_scenery(self):
+        from world.gen.repair import _PRECIOUS_COST, _costs
+
+        class _O:
+            def __init__(self, kind):
+                self.kind = kind
+
+        obstacles = [_O("tree"), _O("turbo"), _O("rock")]
+        self.assertEqual(_costs(obstacles, frozenset()), [1, 1, 1],
+                         "with nothing precious it is one unit each, as before")
+        self.assertEqual(_costs(obstacles, frozenset({"turbo"})),
+                         [1, _PRECIOUS_COST, 1])
+        self.assertGreater(_PRECIOUS_COST, 1)
