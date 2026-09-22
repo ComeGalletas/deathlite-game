@@ -263,3 +263,64 @@ behind `spread_aura`.
   cascade seam and all six reactions reworked; `FUNCTIONAL_README.md` updated.
   Balance consequences measured and reported above, left untuned pending the
   owner's call.
+* 2026-09-22 — Committed as `8792594` (unprefixed: the DOC-001 ID standard
+  landed on this branch after it). The two enemy tuning tweaks that were in
+  the tree alongside it went out separately as ENT-012.
+
+---
+
+## CMB-007 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Update `documentation/plans/ELEMENTAL_SYSTEM_DESIGN.md` so it
+  describes the behaviour CMB-006 shipped.
+- **Details:** The document is the live reference for this system (INDEX maps
+  it to CMB-005 and CMB-006), and its §5.3 and §5.4 still asserted the two
+  rules the rework retired.
+- **Constraint:** None given.
+
+## CMB-007 — Confirmed reading
+
+The document was written as a *plan*, in revisions v2–v8, each recorded as a
+"vN changes" line and a decisions log in §13. Six places contradicted the
+shipped code:
+
+| where | claimed | now |
+|---|---|---|
+| §5.1 | Superconduct's spread applies "Slow only (no damage, no aura)" | damage, Ice stacks and the Ice aura |
+| §5.3 | secondary hits "never" apply auras | the Wind three and Superconduct prime what they reach |
+| §5.4 | "reaction depth is therefore always 1" | uncapped, with three named brakes |
+| §5.5 | `shockwaveDamage`, Superconduct `slowPercent`, `tickDamage` | one pair figure, `iceStacks`, `tick` + `ticks` |
+| §5.6 | **[OPEN]** flat or weapon-scaled damage | resolved: two sources, `high × max + low × min` |
+| §11 | acceptance: "secondary hits never apply auras; depth never exceeds 1" | the spread and cascade checks the suite actually makes |
+
+**CMB-007.D1 — supersede in place, do not delete.** §5.3 and §5.4 keep the
+old rule as a marked quotation above the new text. The document's own history
+is load-bearing: §13's R2, §11's acceptance list and four "vN changes" lines
+were all written against those sentences, and a reader arriving at R2 needs to
+find the rule it refers to rather than a gap. The same reasoning kept the v4
+history line intact even though it describes superseded behaviour.
+
+**CMB-007.D2 — renumber nothing in §13.** Open questions 1, 2, 3, 7 and 11
+are settled and were removed from "Still open", but the rest keep their
+numbers and a note says which went and why. Renumbering would break every
+existing reference to "open item 7", including ones in `combat/elements/`
+docstrings.
+
+## CMB-007 — Plan
+
+Edit in place, no code. Add a v9 line to the header, rewrite §5.1's table,
+§5.3, §5.4, §5.5 and §5.6, correct §11's acceptance sentence, mark R2/R18/R19/
+R20 in §13 and add R38–R42 plus one new open question for the balance.
+
+## CMB-007 — Tasks
+
+- [x] CMB-007.1 — Rewrite the design document to the shipped behaviour
+
+## CMB-007 — Results
+
+One new open question recorded as §13 item 14: whether the uncapped cascade is
+too strong in play, with the bench figures and the intended lever (a depth cap
+behind the spread seam, not a coefficient change). The owner is testing the
+damage values as shipped.
+
+The document was untracked until this commit, so it enters history at v9.
