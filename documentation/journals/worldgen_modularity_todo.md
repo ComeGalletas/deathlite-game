@@ -1,5 +1,7 @@
 # World generation — modularity & test rework TODO
 
+**Legacy ID:** WLD-004 · **Systems:** WLD, TST · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Working list for the structural review of the generation pipeline. The full
 reasoning, measurements and dependency diagram live in the review page; this
 file is only the order of work and what each step is for.

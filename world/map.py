@@ -169,6 +169,16 @@ class GameMap:
         through the same one body of it."""
         return not self._point_ok(x, y)
 
+    def on_bridge(self, x: float, y: float) -> bool:
+        """Is the point on a plank bridge rather than on an island?
+
+        Only ever asked on the radius probe's failure path (`is_walkable`),
+        so the linear scan over corridors stays off the hot route: ordinary
+        movement on open ground never reaches it."""
+        if self.layout is None:
+            return False
+        return floor_rules.in_corridor(self.layout, x, y)
+
     def _room_of(self, x: float, y: float):
         """The island whose floor the point actually stands on, or `None`."""
         if self.layout is None:
@@ -269,7 +279,30 @@ class GameMap:
                 and self._point_ok(pos.x - radius, pos.y)
                 and self._point_ok(pos.x, pos.y + radius)
                 and self._point_ok(pos.x, pos.y - radius)):
-            return False
+            # ...unless it is on a bridge, or stepping between one and the
+            # shore. A deck is **one tile** wide, so `y +/- radius` leaves it
+            # for any body past radius 31 and the probe refuses every crossing
+            # to anything larger -- while the navigation field hands corridor
+            # cells out regardless of clearance (`world/nav/field.py`,
+            # `corridor_lenient`, on by default and documented as being there
+            # "so the big rare enemies can still thread it"). The two rules
+            # disagreed, and a body routed onto a deck it could not stand on
+            # stalled at the mouth: the pig-rider boss could never leave the
+            # island it spawned on (ENT-012.D3).
+            #
+            # The centre still has to be on floor, and obstacles below are
+            # still checked, so this only lets a wide body overhang the
+            # planks -- which is what a bridge that narrow has always asked of
+            # anything bigger than a gnoll.
+            #
+            # `frm` is consulted as well as `pos` because the mouths are the
+            # hard part: stepping off the deck puts the centre on a coast
+            # whose floor is irregular, and demanding a full radius of it the
+            # moment the body leaves the planks would stand it up on the deck
+            # and refuse to let it ashore.
+            if not (self.on_bridge(pos.x, pos.y)
+                    or (frm is not None and self.on_bridge(frm.x, frm.y))):
+                return False
         for o in self._obstacle_index.near(pos.x, pos.y, radius):
             rr = o.radius + radius
             if (pos.x - o.pos.x) ** 2 + (pos.y - o.pos.y) ** 2 < rr * rr:

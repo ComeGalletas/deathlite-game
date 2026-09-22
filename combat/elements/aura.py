@@ -26,8 +26,8 @@ from combat.elements.ids import ElementId
 
 class ElementalState:
     __slots__ = ("aura", "aura_expires_at", "locked_until", "source_weapon",
-                 "ice_stacks", "freeze_immune_until", "knock_source",
-                 "contact_hits")
+                 "source_damage", "ice_stacks", "freeze_immune_until",
+                 "knock_source", "contact_hits")
 
     def __init__(self) -> None:
         self.aura: ElementId = ElementId.NONE
@@ -37,6 +37,11 @@ class ElementalState:
         self.locked_until: float = 0.0
         # Which weapon applied the live aura -- tracking only (§3.6).
         self.source_weapon: str = ""
+        # **How big the hit was** that applied it. Not tracking: this is one
+        # of the two numbers a reaction is paid from (owner's rework,
+        # 2026-09-22), so an aura that forgot it would leave the reaction
+        # reading a single hit again, which is what the rework replaced.
+        self.source_damage: float = 0.0
         # Ice applications since the last freeze; `freeze.stacks_required`
         # of them freeze the enemy and reset this to zero.
         self.ice_stacks: int = 0
@@ -75,22 +80,32 @@ class ElementalState:
 
     # --- mutation --------------------------------------------------------
     def set_aura(self, element: ElementId, now: float, duration: float,
-                 weapon_id: str = "") -> None:
+                 weapon_id: str = "", damage: float = 0.0) -> None:
         self.aura = element
         self.aura_expires_at = now + duration
         self.source_weapon = weapon_id
+        self.source_damage = max(0.0, float(damage))
 
-    def refresh_aura(self, now: float, duration: float, weapon_id: str = "") -> None:
-        """Same element again: push the expiry out and re-attribute."""
+    def refresh_aura(self, now: float, duration: float, weapon_id: str = "",
+                     damage: float = 0.0) -> None:
+        """Same element again: push the expiry out and re-attribute.
+
+        The damage takes the **larger** of the two rather than the latest.
+        A refresh is the same aura being kept alive, and letting a weak
+        re-application overwrite a heavy one would mean a fast cheap weapon
+        could quietly defuse a reaction the player had set up with a slow
+        expensive one -- which is the failure the rework was for."""
         self.aura_expires_at = max(self.aura_expires_at, now + duration)
         if weapon_id:
             self.source_weapon = weapon_id
+        self.source_damage = max(self.source_damage, float(damage))
 
     def consume_aura(self) -> ElementId:
         """Take the aura off the slot (a reaction). Returns what it was."""
         was, self.aura = self.aura, ElementId.NONE
         self.aura_expires_at = 0.0
         self.source_weapon = ""
+        self.source_damage = 0.0
         return was
 
     def lock(self, now: float, seconds: float) -> None:

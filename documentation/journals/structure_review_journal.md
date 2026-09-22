@@ -1,5 +1,7 @@
 # Structure review — dev log
 
+**Legacy ID:** SYS-007 · **Systems:** SYS · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Follow-up to the 2026-09-20 read-through of the tree (package docstrings,
 cross-package imports, the two big subsystems, the documentation set; no
 tests run). The review found the architecture sound — layered `world/`, a

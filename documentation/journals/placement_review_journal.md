@@ -1,5 +1,7 @@
 # Placement review — obstacles, decorations, and the order they run in
 
+**Legacy ID:** WLD-006 · **Systems:** WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A read-only review asked for on 2026-09-12, after the human island shrank a
 quarter and gained a house row, a fill sweep and denser clutter (HI-4,
 `human_island_journal.md`). Scope: how the world places obstacles and

@@ -1,5 +1,7 @@
 # Splitting the gnome: Hammer Gnome and the torch-swinging Beekeeper
 
+**Legacy ID:** ENT-006 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The one gnome-sprited enemy becomes two: a plain melee chaser that finally uses
 the gnome's unused hammer swing, and a Beekeeper rebuilt on the torch goblin
 art whose torch swing is the summon.

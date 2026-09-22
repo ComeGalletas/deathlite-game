@@ -1,5 +1,7 @@
 # Rock collider journal
 
+**Legacy ID:** WLD-008 · **Systems:** WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-16)
 
 - **Objective:** Reduce the rock obstacles' hitbox/collision ring by about

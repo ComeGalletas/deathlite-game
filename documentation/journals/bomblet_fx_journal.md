@@ -1,5 +1,7 @@
 # Cluster Bomb bomblet FX — journal
 
+**Legacy ID:** RND-002 · **Systems:** RND, CMB · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## 1. The requirement (owner, 2026-09-12)
 
 - **Objective:** Find explosion effects for the bomblets, different from the

@@ -1,5 +1,7 @@
 # Music journal — generating a complex track for the game
 
+**Legacy ID:** AUD-001 · **Systems:** AUD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-15)
 
 - **Objective:** Review a way to generate a complex music track for the game.

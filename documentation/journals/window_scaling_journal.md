@@ -1,5 +1,7 @@
 # Dynamic window scaling — execution journal
 
+**Legacy ID:** RND-003 · **Systems:** RND, UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-15)
 
 - **Objective:** Review and propose a way to implement dynamic window

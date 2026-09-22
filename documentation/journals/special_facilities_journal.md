@@ -1,5 +1,7 @@
 # Special island facilities — parked (2026-09-20)
 
+**Legacy ID:** WLD-010 · **Systems:** WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## The request
 
 - **Objective:** Review the special areas / facilities / merchants usually

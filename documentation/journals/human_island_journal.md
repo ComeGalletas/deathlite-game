@@ -1,5 +1,7 @@
 # Human island — dev log
 
+**Legacy ID:** WLD-005 · **Systems:** WLD, ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The village island: a small, flat island with no enemy spawns that hosts
 NPCs, buildings and facilities. First facility is the Forge the six-weapon
 update needs (`six_weapon_system_design.md` §7). Milestones are prefixed

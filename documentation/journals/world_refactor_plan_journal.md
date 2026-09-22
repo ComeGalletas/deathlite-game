@@ -1,5 +1,7 @@
 # World generation refactor — execution journal
 
+**Legacy ID:** WLD-003 · **Systems:** WLD, TST · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Progress log for `documentation/plans/worldgen_refactor_plan.md`. One section per
 phase: what was done, what was verified, what was deferred, the next item.
 The plan document is the *what*; this is the *when* and the *evidence*.

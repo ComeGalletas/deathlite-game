@@ -1,5 +1,7 @@
 # Cursor size — matching the in-game arrow to the desktop cursor
 
+**Legacy ID:** UI-006 · **Systems:** UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 **Requirement (owner, 2026-09-16):**
 
 - **Objective:** Make the in-game cursor match the Windows system cursor in

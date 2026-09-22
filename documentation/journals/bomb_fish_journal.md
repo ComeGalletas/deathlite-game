@@ -1,5 +1,7 @@
 # The Bloat throws its bomb
 
+**Legacy ID:** ENT-004 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The bomb fish stops being a suicide rusher and starts lobbing the bomb it was
 always drawn holding — and enemy shots learn how to explode.
 

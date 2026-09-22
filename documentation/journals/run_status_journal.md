@@ -1,5 +1,7 @@
 # Run status screen — execution journal
 
+**Legacy ID:** UI-004 · **Systems:** UI, PRG · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-12)
 
 A screen that lets the player see, during a run:

@@ -1,5 +1,7 @@
 # Developer mode — dev log
 
+**Legacy ID:** SYS-002 · **Systems:** SYS · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A separate log for the **developer mode** feature, the same way `assets_journal.md`
 tracks the art passes. The general `journal.md` gets a one-paragraph pointer here.
 

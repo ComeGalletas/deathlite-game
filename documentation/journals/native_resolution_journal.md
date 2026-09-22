@@ -1,5 +1,7 @@
 # Native-resolution rendering — execution journal
 
+**Legacy ID:** RND-004 · **Systems:** RND · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Branch: `native-resolution` (off `main` at `cf50aba`, 2026-09-16).
 
 ## Requirement (owner, 2026-09-16)

@@ -1,5 +1,7 @@
 # End banners (GAME OVER / VICTORY intermission) — execution journal
 
+**Legacy ID:** UI-009 · **Systems:** UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-19)
 
 Find art for the game-over and victory screens in the asset reserve, and add

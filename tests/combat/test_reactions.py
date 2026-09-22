@@ -5,9 +5,13 @@ Unit tier. Every reaction is reached the way the game reaches one -- prime
 an enemy with one element, hit it with another through the real resolver --
 so what is pinned is the behaviour a pair of infused weapons would produce.
 
-The two rules that hold for every reaction, present and future, are checked
-first: a secondary hit never leaves an aura, so reaction depth can never
-exceed 1.
+The rules that hold for every reaction are checked first. Since the owner's
+rework (2026-09-22) "a secondary hit never leaves an aura" is **not** one of
+them: the Wind three and Superconduct prime what they reach, and a spread
+aura meeting a different one starts another reaction on purpose. What is
+pinned instead is that Overload and Frostburn stay terminal, that a reaction
+is paid from **both** interacting hits, and that its damage on its own
+carrier never falls below the global floor.
 """
 import unittest
 
@@ -38,12 +42,34 @@ def build(enemies=(), **kw):
 
 
 def react(resolver, target, first, second, *, damage=100.0, now=0.0,
-          first_weapon="sword", second_weapon="rod"):
-    """Prime `target` with `first`, then trigger with `second`."""
+          first_weapon="sword", second_weapon="rod", second_damage=None):
+    """Prime `target` with `first`, then trigger with `second`.
+
+    `second_damage` gives the triggering hit a size of its own, which is how
+    a test tells the two source values apart: since the rework a reaction is
+    paid `high x max + low x min` of the pair, and two equal hits cannot show
+    which coefficient went where."""
     resolver.apply(target, first, weapon_id=first_weapon, hit_damage=damage,
                    now=now)
     return resolver.apply(target, second, weapon_id=second_weapon,
-                          hit_damage=damage, now=now)
+                          hit_damage=damage if second_damage is None
+                          else second_damage, now=now)
+
+
+def pair_damage(cfg_damage, first: float, second: float) -> float:
+    """What the data says a reaction pays for two hits of these sizes."""
+    return (cfg_damage["high"] * max(first, second)
+            + cfg_damage["low"] * min(first, second))
+
+
+def reaction_damage(world) -> float:
+    """Everything a world recorded that a **reaction** dealt, leaving out
+    the priming element's own hit -- which differs between two runs that
+    swap the sizes of the pair, and would otherwise drown the figure under
+    test."""
+    from combat.elements.ids import ReactionId
+    return sum(d[1] for d in world.dealt
+               if isinstance(tracking.source_of(d[3]), ReactionId))
 
 
 def tough(x=0.0, y=0.0, hp=100000.0):
@@ -68,9 +94,9 @@ class UniversalRuleTests(unittest.TestCase):
                 self.assertTrue(any(d[3] == tracking.OVERLOAD_WAVE
                                     for d in world.dealt))
 
-    def test_a_secondary_hit_never_leaves_an_aura(self):
-        """Which is what makes reaction depth exactly 1: nothing a reaction
-        touches can hold an aura, so nothing it touches can react."""
+    def test_overload_leaves_no_aura_on_what_it_reaches(self):
+        """Overload and Frostburn spread nothing, so they stay terminal --
+        the cascade the rework opened is the Wind three and Superconduct."""
         crowd = [tough(), tough(30.0, 0.0), tough(60.0, 0.0)]
         r, _w, _t = build(crowd)
         react(r, crowd[0], FIRE, THUNDER)
@@ -78,6 +104,8 @@ class UniversalRuleTests(unittest.TestCase):
             self.assertFalse(bystander.elemental.has_aura(0.0))
 
     def test_a_blast_cannot_set_off_a_second_reaction(self):
+        """Still true of Overload: its shockwave damages and shoves, and
+        leaves nothing behind that another hit could react with."""
         crowd = [tough(), tough(30.0, 0.0)]
         r, _w, _t = build(crowd)
         # The bystander is primed and would react to anything elemental.
@@ -88,6 +116,43 @@ class UniversalRuleTests(unittest.TestCase):
                          "only the triggering pair reacted")
         self.assertEqual(crowd[1].elemental.element(0.0), FIRE,
                          "the bystander keeps the aura it had")
+
+    def test_every_reaction_reads_both_hits_that_met_on_the_body(self):
+        """The heart of the rework: the aura's own hit is one of the two
+        numbers, so a heavy primer pays even when a feeble hit triggers."""
+        for first, second in ((FIRE, THUNDER), (ICE, THUNDER)):
+            with self.subTest(pair=f"{first.key}+{second.key}"):
+                heavy, feeble = [tough(), tough()], [tough(), tough()]
+                r1, w1, _t = build([heavy[0]])
+                react(r1, heavy[0], first, second, damage=100.0,
+                      second_damage=5.0)
+                r2, w2, _t = build([feeble[0]])
+                react(r2, feeble[0], first, second, damage=5.0,
+                      second_damage=5.0)
+                self.assertGreater(reaction_damage(w1), reaction_damage(w2))
+
+    def test_the_order_of_the_two_hits_does_not_change_the_figure(self):
+        """`high x max + low x min` is symmetric, so which weapon happened to
+        fire second cannot change what the reaction is worth."""
+        a, b = tough(), tough()
+        r1, w1, _t = build([a])
+        react(r1, a, FIRE, THUNDER, damage=80.0, second_damage=20.0)
+        r2, w2, _t = build([b])
+        react(r2, b, FIRE, THUNDER, damage=20.0, second_damage=80.0)
+        self.assertAlmostEqual(reaction_damage(w1), reaction_damage(w2))
+
+    def test_a_reaction_never_pays_its_carrier_less_than_the_floor(self):
+        floor = C.elements["global"]["reaction_min_damage"]
+        for first, second in ((FIRE, ICE), (FIRE, THUNDER), (ICE, THUNDER),
+                              (FIRE, WIND), (ICE, WIND), (THUNDER, WIND)):
+            with self.subTest(pair=f"{first.key}+{second.key}"):
+                e = tough()
+                r, world, _t = build([e])
+                react(r, e, first, second, damage=0.5, second_damage=0.5)
+                own = [d[1] for d in world.dealt if d[0] is e
+                       and isinstance(tracking.source_of(d[3]), ReactionId)]
+                self.assertTrue(own, f"{first.key}+{second.key} paid nothing")
+                self.assertAlmostEqual(max(own), floor)
 
     def test_every_reaction_locks_the_slot_it_consumed(self):
         cooldown = C.elements["global"]["reaction_aura_cooldown"]
@@ -143,11 +208,37 @@ class FrostburnTests(unittest.TestCase):
             lambda amount, source, effect=None: ticks.append(effect))
         self.assertEqual(ticks, [tracking.FROSTBURN])
 
-    def test_both_statuses_last_the_reactions_own_duration(self):
+    def test_the_slow_lasts_the_reactions_own_duration(self):
         self.fire_then_ice()
-        for sid in ("burn", "chill"):
-            self.assertAlmostEqual(self.enemy.status.remaining(sid),
-                                   FROSTBURN_CFG["duration"])
+        self.assertAlmostEqual(self.enemy.status.remaining("chill"),
+                               FROSTBURN_CFG["duration"])
+
+    def test_the_burn_lasts_exactly_long_enough_to_pay_out_its_ticks(self):
+        """Derived from `ticks x tick_interval` rather than carrying a
+        duration of its own, so the two can never drift apart."""
+        self.fire_then_ice()
+        self.assertAlmostEqual(
+            self.enemy.status.remaining("burn"),
+            FROSTBURN_CFG["ticks"] * FROSTBURN_CFG["tick_interval"])
+
+    def test_it_lands_an_immediate_hit_as_well_as_the_burn(self):
+        """The half the rework added: 70 % of the smaller source hit and
+        20 % of the larger, paid at once."""
+        self.r, self.world, _t = build([self.enemy])
+        self.fire_then_ice(damage=100.0)
+        direct = [d for d in self.world.dealt if d[3] == tracking.FROSTBURN]
+        self.assertEqual(len(direct), 1)
+        self.assertAlmostEqual(
+            direct[0][1], pair_damage(FROSTBURN_CFG["damage"], 100.0, 100.0))
+
+    def test_the_burn_pays_out_the_figure_the_data_names(self):
+        """`tick` is what the whole burn is worth, so raising `ticks`
+        redistributes it instead of multiplying it."""
+        self.fire_then_ice(damage=100.0)
+        per_tick = self.enemy.status.potency("burn")
+        self.assertAlmostEqual(
+            per_tick * FROSTBURN_CFG["ticks"],
+            pair_damage(FROSTBURN_CFG["tick"], 100.0, 100.0))
 
     def test_neither_status_is_bound_to_an_aura(self):
         """The aura that earned them has just been consumed, so they are
@@ -207,7 +298,18 @@ class OverloadTests(unittest.TestCase):
         self.assertEqual(len(direct), 1)
         self.assertIs(direct[0][0], self.centre)
         self.assertAlmostEqual(direct[0][1],
-                               100.0 * OVERLOAD_CFG["damage"]["frac"])
+                               pair_damage(OVERLOAD_CFG["damage"], 100.0, 100.0))
+
+    def test_the_shockwave_pays_what_the_carrier_paid(self):
+        """Since the rework there is one figure, not a carrier value and a
+        weaker wave value (owner, 2026-09-22)."""
+        self.go(damage=100.0)
+        wave = [d[1] for d in self.world.dealt
+                if d[3] == tracking.OVERLOAD_WAVE]
+        self.assertTrue(wave)
+        for amount in wave:
+            self.assertAlmostEqual(
+                amount, pair_damage(OVERLOAD_CFG["damage"], 100.0, 100.0))
 
     def test_the_shockwave_reaches_the_neighbours_but_not_the_target(self):
         self.go()
@@ -276,30 +378,41 @@ class SuperconductTests(unittest.TestCase):
 
     def test_the_target_takes_the_direct_damage(self):
         self.go(damage=100.0)
-        direct = [d for d in self.world.dealt if d[3] == tracking.SUPERCONDUCT]
+        direct = [d for d in self.world.dealt
+                  if d[3] == tracking.SUPERCONDUCT and d[0] is self.line[0]]
         self.assertEqual(len(direct), 1)
-        self.assertAlmostEqual(direct[0][1],
-                               100.0 * SUPERCONDUCT_CFG["damage"]["frac"])
+        self.assertAlmostEqual(
+            direct[0][1], pair_damage(SUPERCONDUCT_CFG["damage"], 100.0, 100.0))
 
-    def test_the_spread_slows_without_damaging(self):
-        self.go()
-        spread = [e for e in self.line[1:] if "chill" in e.status]
-        self.assertTrue(spread)
-        for e in spread:
-            self.assertEqual(e.damage_effects, [], "slow only, no damage")
-            self.assertAlmostEqual(e.status.potency("chill"),
-                                   SUPERCONDUCT_CFG["slow_percent"])
+    def test_the_spread_damages_everything_it_reaches(self):
+        """It used to carry a slow and nothing else, so its arcs flew out to
+        bodies that took nothing (owner's rework, 2026-09-22)."""
+        self.go(damage=100.0)
+        want = pair_damage(SUPERCONDUCT_CFG["damage"], 100.0, 100.0)
+        reached = [e for e in self.line[1:] if "chill" in e.status]
+        self.assertTrue(reached)
+        for e in reached:
+            paid = [d[1] for d in self.world.dealt
+                    if d[0] is e and d[3] == tracking.SUPERCONDUCT]
+            self.assertEqual(len(paid), 1)
+            self.assertAlmostEqual(paid[0], want)
 
-    def test_the_spread_leaves_no_aura(self):
+    def test_the_spread_primes_what_it_reaches_with_ice(self):
         self.go()
-        for e in self.line[1:]:
-            self.assertFalse(e.elemental.has_aura(0.0))
+        reached = [e for e in self.line[1:] if "chill" in e.status]
+        self.assertTrue(reached)
+        for e in reached:
+            self.assertEqual(e.elemental.element(0.0), ICE)
 
-    def test_the_spread_adds_no_freeze_stacks(self):
+    def test_the_spread_pours_in_the_stacks_the_data_names(self):
+        """Counted, not added blind: laying the aura runs Ice's own
+        `on_applied`, which is worth a stack by itself."""
         self.go()
-        for e in self.line[1:]:
-            self.assertEqual(e.elemental.ice_stacks, 0)
-            self.assertNotIn("freeze", e.status)
+        reached = [e for e in self.line[1:] if "chill" in e.status]
+        self.assertTrue(reached)
+        for e in reached:
+            self.assertEqual(e.elemental.ice_stacks,
+                             SUPERCONDUCT_CFG["ice_stacks"])
 
     def test_it_always_reaches_further_than_base_thunder(self):
         """Defined against Thunder's live config, so no edit to the data can

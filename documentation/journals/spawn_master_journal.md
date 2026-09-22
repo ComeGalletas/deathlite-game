@@ -1,5 +1,7 @@
 # Spawn master — journal
 
+**Legacy ID:** SPN-001 · **Systems:** SPN · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Evidence for the phases of `documentation/plans/spawn_master_todo.md`, against the
 design in `documentation/spawn_master_design.md`. One entry per phase:
 what landed, what was measured, what was decided on the way, what was left.

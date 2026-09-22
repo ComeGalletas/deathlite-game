@@ -1,5 +1,7 @@
 # Sound effects journal — the recorded cues
 
+**Legacy ID:** AUD-003 · **Systems:** AUD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-16)
 
 - **Objective:** Wire up the recorded sound effects.

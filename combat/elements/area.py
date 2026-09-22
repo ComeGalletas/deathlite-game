@@ -48,7 +48,12 @@ class WindArea:
         self.taken = 0
         # The enemy it formed on never contacts its own area.
         self.hit_ids: set[int] = {id(anchor)} if anchor is not None else set()
-        # `payload(target, area, world)` -- what a Wind *reaction* adds.
+        # `payload(target, area, world, now, damage)` -- what a Wind
+        # *reaction* adds. `now` is the live clock; `damage` is this
+        # area's own figure, which is the value a spread aura carries
+        # forward (owner, 2026-09-22). The figure rather than what the
+        # body actually lost, so a shield soaking the hit does not also
+        # strip the aura it leaves behind.
         self.payload = payload
         self.max_speed = float(max_speed)
         # `allows(target, effect)` -- the contacted body's own profile,
@@ -71,12 +76,19 @@ class WindArea:
         if now < self.next_check_at:
             return True
         self.next_check_at = now + _CHECK_INTERVAL
-        self.contact(world)
+        self.contact(world, now)
         return True
 
-    def contact(self, world) -> int:
+    def contact(self, world, now: float = 0.0) -> int:
         """One sweep: damage, knock back and pay the payload on every body
-        inside that this area has not already taken."""
+        inside that this area has not already taken.
+
+        `now` is the **live** clock, not the reaction's. A payload that
+        spreads an aura (the owner's 2026-09-22 rework) resolves it through
+        the resolver, which times auras and locks against the run clock, and
+        an area outlives the context it was built from by up to its whole
+        duration -- so passing the stale time would set auras that expired
+        before they were written."""
         room = self.max_targets - self.taken
         if room <= 0:
             return 0
@@ -95,7 +107,7 @@ class WindArea:
                             self.knockback, weapon_id=self.weapon_id,
                             max_speed=self.max_speed)
             if self.payload is not None:
-                self.payload(target, self, world)
+                self.payload(target, self, world, now, self.damage)
         return hit
 
 

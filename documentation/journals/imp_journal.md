@@ -1,5 +1,7 @@
 # The Imp ("Cinder") — wiring a delivered enemy
 
+**Legacy ID:** ENT-007 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 An enemy the owner dropped into `assets/enemies/imp/` on 2026-09-17, wired as
 the roster's first fire-breather: a three-part attack that leaves a burning
 pool on the ground.

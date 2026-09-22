@@ -59,7 +59,12 @@ class IndexTests(unittest.TestCase):
                 not (gm._body_inset > 0.0 and not gm.inset_ok(pos.x, pos.y)))
             if radius > 0 and not (gm._point_ok(pos.x + radius, pos.y) and gm._point_ok(pos.x - radius, pos.y)
                                    and gm._point_ok(pos.x, pos.y + radius) and gm._point_ok(pos.x, pos.y - radius)):
-                expect = False
+                # ...unless the body is on a bridge (WLD-011): a deck is one
+                # tile wide, so the probe refuses every crossing to anything
+                # past radius 31 while the navigation field hands corridor
+                # cells out regardless. The centre still has to be on floor.
+                if not gm.on_bridge(pos.x, pos.y):
+                    expect = False
             self.assertEqual(gm.is_walkable(pos, radius), expect)
             hit = gm.blocking_obstacle_hit(pos, radius)
             linear = next((o for o in gm.obstacles if o.blocks_projectiles

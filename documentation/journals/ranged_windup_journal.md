@@ -1,5 +1,7 @@
 # Ranged attacks get a range, a wind-up, and their animation back
 
+**Legacy ID:** ENT-010 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The four kiting enemies stop firing on an invisible timer from an
 undeclared distance. Aggro comes down across the whole roster in the same
 pass.

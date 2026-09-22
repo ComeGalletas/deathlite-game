@@ -14,7 +14,8 @@ from combat.elements.base import AuraEnd, Element
 from combat.elements.ids import (
     ELEMENTS, REACTIONS, ElementId, ReactionId, element_from_key, reaction_from_key)
 from combat.elements.registry import ElementRegistry, get_registry
-from combat.elements.schema import DamageSpec, ElementDataError, Section, deep_merge, dmg, f, i
+from combat.elements.schema import (
+    DamageSpec, ElementDataError, PairSpec, Section, deep_merge, dmg, f, i, pair)
 from game.content import ContentError, get_content
 
 C = get_content()
@@ -62,16 +63,18 @@ class SchemaTests(unittest.TestCase):
     def setUp(self):
         self.s = Section("Demo", {
             "count": i(1), "rate": f(0.0, 1.0), "life": f(0.0, lo_open=True),
-            "dmg": dmg(), "inner": Section("Inner", {"on": f(0.0)}),
+            "dmg": dmg(), "duo": pair(),
+            "inner": Section("Inner", {"on": f(0.0)}),
         })
         self.ok = {"count": 2, "rate": 0.5, "life": 1.0, "dmg": {"frac": 0.3},
-                   "inner": {"on": 1.0}}
+                   "duo": {"high": 0.5, "low": 0.2}, "inner": {"on": 1.0}}
 
     def test_a_valid_block_bakes_to_an_immutable_record(self):
         rec = self.s.bake(self.s.validate("demo", self.ok))
         self.assertEqual(rec.count, 2)
         self.assertEqual(rec.inner.on, 1.0)
         self.assertEqual(rec.dmg, DamageSpec(frac=0.3, flat=None))
+        self.assertEqual(rec.duo, PairSpec(high=0.5, low=0.2))
         with self.assertRaises(AttributeError):
             rec.count = 5
 
@@ -113,9 +116,10 @@ class SchemaTests(unittest.TestCase):
         rec = self.s.bake(self.s.validate("demo", self.ok))
         self.assertAlmostEqual(rec.dmg.resolve(100.0), 30.0)
 
-    def test_leaf_paths_are_dotted_and_damage_contributes_both(self):
+    def test_leaf_paths_are_dotted_and_damage_and_pair_contribute_both(self):
         self.assertEqual(self.s.paths(), (
-            "count", "rate", "life", "dmg.frac", "dmg.flat", "inner.on"))
+            "count", "rate", "life", "dmg.frac", "dmg.flat",
+            "duo.high", "duo.low", "inner.on"))
 
     def test_deep_merge_replaces_a_damage_dict_whole(self):
         merged = deep_merge({"dmg": {"frac": 0.3}, "inner": {"on": 1.0, "x": 2}},
@@ -234,10 +238,58 @@ class ReactionValidationTests(unittest.TestCase):
     def test_a_valid_override_is_kept_and_a_comment_trigger_is_ignored(self):
         r = reactions_data()
         r["reactions"]["overload"]["triggered_by"] = {
-            "fire": {"damage": {"frac": 0.9}}, "_why": "fire hits harder"}
+            "fire": {"damage": {"high": 0.9, "low": 0.2}},
+            "_why": "fire hits harder"}
         out = schema.check_reactions(r)
         self.assertEqual(out["reactions"]["overload"]["triggered_by"],
-                         {"fire": {"damage": {"frac": 0.9}}})
+                         {"fire": {"damage": {"high": 0.9, "low": 0.2}}})
+
+
+class PairFieldTests(unittest.TestCase):
+    """The two-source damage value the owner's 2026-09-22 rework introduced."""
+
+    def setUp(self):
+        self.s = Section("Demo", {"duo": pair()})
+
+    def bake(self, high, low):
+        return self.s.bake(self.s.validate(
+            "demo", {"duo": {"high": high, "low": low}})).duo
+
+    def test_it_pays_high_of_the_larger_and_low_of_the_smaller(self):
+        spec = self.bake(0.5, 0.3)
+        self.assertAlmostEqual(spec.resolve(100.0, 20.0), 0.5 * 100 + 0.3 * 20)
+
+    def test_it_is_symmetric_in_its_two_arguments(self):
+        """Which hit placed the aura and which triggered the reaction is
+        bookkeeping; it must not change the figure."""
+        spec = self.bake(0.5, 0.3)
+        self.assertAlmostEqual(spec.resolve(100.0, 20.0),
+                               spec.resolve(20.0, 100.0))
+
+    def test_equal_coefficients_pay_the_same_share_of_both(self):
+        """Which is how the Wind three are expressed: 30 % of each."""
+        spec = self.bake(0.3, 0.3)
+        self.assertAlmostEqual(spec.resolve(27.0, 6.0), 0.3 * (27.0 + 6.0))
+
+    def test_both_halves_are_required_and_must_be_numbers_at_or_above_zero(self):
+        for bad in ({"high": 0.5}, {"low": 0.5}, {}, {"high": 0.5, "low": -1},
+                    {"high": 0.5, "low": True}, {"high": 0.5, "low": 0.2, "mid": 1}):
+            with self.subTest(block=bad):
+                with self.assertRaises(ElementDataError):
+                    self.s.validate("demo", {"duo": bad})
+
+    def test_a_modifier_can_address_either_coefficient(self):
+        self.assertEqual(self.s.paths(), ("duo.high", "duo.low"))
+        baked = self.s.bake(self.s.validate("demo", {"duo": {"high": 0.5, "low": 0.3}}),
+                            lambda path, v: v * 2 if path == "duo.high" else v)
+        self.assertEqual(baked.duo, PairSpec(1.0, 0.3))
+
+    def test_every_shipped_reaction_declares_its_damage_as_a_pair(self):
+        for rid in schema.REACTIONS:
+            with self.subTest(reaction=rid.key):
+                cfg = registry().reaction_config(
+                    rid, schema.REACTION_PAIRS[rid][1])
+                self.assertIsInstance(cfg.damage, PairSpec)
 
 
 # --- directional variants ------------------------------------------------------------------
@@ -246,22 +298,34 @@ class VariantTests(unittest.TestCase):
     def test_an_override_applies_only_in_its_direction(self):
         r = reactions_data()
         r["reactions"]["overload"]["triggered_by"] = {
-            "fire": {"damage": {"frac": 0.9}}, "thunder": {"shockwave_radius": 150}}
+            "fire": {"damage": {"high": 0.9, "low": 0.2}},
+            "thunder": {"shockwave_radius": 150}}
         reg = registry(reactions=schema.check_reactions(r))
         by_fire = reg.reaction_config(ReactionId.OVERLOAD, ElementId.FIRE)
         by_thunder = reg.reaction_config(ReactionId.OVERLOAD, ElementId.THUNDER)
         base = C.reactions["reactions"]["overload"]
-        self.assertEqual(by_fire.damage, DamageSpec(0.9, None))
-        self.assertEqual(by_thunder.damage, DamageSpec(base["damage"]["frac"], None))
+        self.assertEqual(by_fire.damage, PairSpec(0.9, 0.2))
+        self.assertEqual(by_thunder.damage,
+                         PairSpec(base["damage"]["high"], base["damage"]["low"]))
         self.assertEqual(by_thunder.shockwave_radius, 150.0)
         self.assertEqual(by_fire.shockwave_radius, base["shockwave_radius"])
 
-    def test_an_override_can_switch_a_damage_value_to_flat(self):
+    def test_a_pair_override_replaces_both_halves_rather_than_blending(self):
+        """`deep_merge` recurses into sub-objects, which would otherwise
+        leave an override that named one coefficient carrying the base's
+        other one -- a half-applied tuning value."""
         r = reactions_data()
-        r["reactions"]["overload"]["triggered_by"] = {"fire": {"damage": {"flat": 40}}}
+        r["reactions"]["overload"]["triggered_by"] = {
+            "fire": {"damage": {"high": 0.9, "low": 0.0}}}
         reg = registry(reactions=schema.check_reactions(r))
         self.assertEqual(reg.reaction_config(ReactionId.OVERLOAD, ElementId.FIRE).damage,
-                         DamageSpec(None, 40.0))
+                         PairSpec(0.9, 0.0))
+
+    def test_a_pair_override_must_name_both_coefficients(self):
+        r = reactions_data()
+        r["reactions"]["overload"]["triggered_by"] = {"fire": {"damage": {"high": 0.9}}}
+        with self.assertRaises(ElementDataError):
+            schema.check_reactions(r)
 
     def test_the_table_is_symmetric_in_type_and_empty_on_the_diagonal(self):
         reg = registry()

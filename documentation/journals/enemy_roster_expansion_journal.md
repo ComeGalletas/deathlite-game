@@ -1,5 +1,7 @@
 # Enemy roster expansion — journal
 
+**Legacy ID:** ENT-005 · **Systems:** ENT, SPN · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The unused enemy art in `assets/unused/enemies/`, what each piece is, and the
 work to bring the **ranged** ones into the game with their own projectiles.
 

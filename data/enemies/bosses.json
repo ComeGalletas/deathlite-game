@@ -44,7 +44,7 @@
     "hp": 9990,
     "speed": 92,
     "contact_damage": 28,
-    "radius": 44,
+    "radius": 40,
     "vision_range": 720,
     "experience_reward": 400,
     "reward_currency": 60,

@@ -1,5 +1,7 @@
 # Data layout journal
 
+**Legacy ID:** SYS-006 · **Systems:** SYS · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## 2026-09-12 -- `data/` regrouped by actor
 
 **Request.** Review the JSON files that build the game's elements and group

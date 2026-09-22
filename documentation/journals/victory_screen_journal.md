@@ -1,5 +1,7 @@
 # Victory screen — execution journal
 
+**Legacy ID:** UI-005 · **Systems:** UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-12)
 
 Review the victory screen as it stands and rework it to show more information,

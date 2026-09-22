@@ -1,5 +1,7 @@
 # Spawn groups and ranks — the spawn master picks a *company*, not a pack
 
+**Legacy ID:** SPN-002 · **Systems:** SPN · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Two levels of category over the roster — a **group** by social / sprite family,
 and a **rank** of common or elite — and a spawn model built on them: the master
 chooses a group, seats fifteen to twenty-five of it at once, and rolls elites

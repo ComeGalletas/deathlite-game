@@ -11,7 +11,8 @@
   "global": {
     "reaction_aura_cooldown": 1.0,
     "max_reactions_per_frame": 8,
-    "max_active_wind_areas": 6
+    "max_active_wind_areas": 6,
+    "reaction_min_damage": 3.0
   },
   "elements": {
     "fire": {

@@ -1,5 +1,7 @@
 # Build Transcript — Death Lite Die
 
+**Legacy ID:** SYS-004 · **Systems:** all · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A curated transcript of the most important steps of each milestone, with the
 reason behind each one. This is not a full command log — it captures the
 decisions and turning points that shaped the code. The full milestone log lives

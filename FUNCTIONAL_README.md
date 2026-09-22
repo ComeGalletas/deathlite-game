@@ -370,6 +370,18 @@ inflicts its element on a cadence of its own (`element_application` in
 `data/weapons/weapons.json`): every Nth attack, or once per time window for
 the summons and the orbiters, which never fire an "attack" to count.
 
+A reaction is paid from **both** hits that met on that body — the one that
+placed the aura and the one that triggered it — as `high × the larger +
+low × the smaller`, so a heavy primer still pays when a feeble hit sets it
+off. The same figure lands on the enemy it fired on and on everything it
+reaches, raised to a floor (`reaction_min_damage`) on the carrier alone. The
+three Wind reactions and Superconduct also **prime what they reach with
+their own element**, so a reaction can set off another one; the brakes on
+that cascade are the per-enemy aura lock and the per-frame reaction budget,
+and it is documented at `ElementalResolver.spread_aura`. Overload and
+Frostburn spread nothing and stay terminal. See
+`documentation/journals/reaction_damage_rework_journal.md`.
+
 Elements are code and JSON only tunes them: the behaviours are
 `combat/elements/`, the numbers are `data/weapons/elements.json` and
 `reactions.json`, and how they look is `element_visuals.json`, split off the

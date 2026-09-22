@@ -1,5 +1,7 @@
 # The Whirlspear — wiring the spear goblin
 
+**Legacy ID:** ENT-009 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 The last unwired goblin in the reserve art, brought in as the roster's first
 melee **sweeper** and its first enemy with **two** swings.
 

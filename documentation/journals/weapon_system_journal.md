@@ -1,5 +1,7 @@
 # Six-weapon system — execution journal
 
+**Legacy ID:** CMB-002 · **Systems:** CMB, PRG · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 Progress log for `documentation/plans/weapon_system_plan.md`. One section per
 phase: what was done, what was verified, what was deferred, the next item.
 The design is `six_weapon_system_design.md`; the plan is the *what*; this is

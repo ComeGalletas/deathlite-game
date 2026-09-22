@@ -1,5 +1,7 @@
 # Level design — dev log
 
+**Legacy ID:** WLD-001 · **Systems:** WLD · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 A separate log for **world / level generation** work, the same way
 `enemy_ai_journal.md` tracks the AI split and `assets_journal.md` the art
 passes. The general `journal.md` gets a one-paragraph pointer here once the

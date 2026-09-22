@@ -1,5 +1,7 @@
 # Pig rider boss — execution journal
 
+**Legacy ID:** ENT-002 · **Systems:** ENT · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-12)
 
 Implement the pig rider from `assets/unused/` as a second boss. It gets a

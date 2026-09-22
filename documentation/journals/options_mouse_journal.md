@@ -1,5 +1,7 @@
 # Options mouse journal — the last keyboard-only menu
 
+**Legacy ID:** UI-008 · **Systems:** UI · tagged retroactively on 2026-09-22 (DOC-001.3); predates the ID standard, so its sections do not follow it.
+
 ## Requirement (owner, 2026-09-16)
 
 - **Objective:** Enable mouse control for the options menu.
