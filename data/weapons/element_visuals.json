@@ -135,9 +135,9 @@
     },
     "thunder": {
       "colour": [
-        245,
-        225,
-        90
+        108,
+        74,
+        163
       ],
       "marker": "bolt",
       "aura_rig": "element_thunder",

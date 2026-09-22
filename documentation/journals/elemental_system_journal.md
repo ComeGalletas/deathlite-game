@@ -1548,6 +1548,294 @@ happened to place is not the subject.
       while the two coral FireWind bursts cover the ones they are on.
 - [x] F3. Full suite.
 
+## M11 Elemental feedback (PROPOSED)
+
+Requested 2026-09-21, **not yet confirmed**. Three things, all about the
+player being able to read what the elemental system is doing to a crowd.
+
+1. The aura's shed particles draw **behind** the bodies, like everything
+   else the elements put on a body.
+2. Damage numbers last a bit longer and take the colour of the element that
+   dealt them. **Only the element's own damage is coloured** -- the
+   weapon's own number stays as it is (owner's call, asked and answered).
+3. A reaction pops its **name** out of the enemy it fired on -- "Overload",
+   "Frostburn" -- drawn like a damage number, in the two colours of the
+   pair that made it, on every enemy a reaction triggers on.
+
+### A. The particles go under
+
+`layers._shed` calls `run.particles.burst`, and `run.particles.draw` runs
+in `PlayingState.draw` *after* `_draw_world`, so the shed sits over every
+body. It is the one piece of M10's rule 3 that did not land, because the
+particles are not drawn by the elements package at all.
+
+- [ ] A1. `Particle` gains an `under` flag; `ParticleSystem.burst` gains
+      the keyword, defaulting to today's behaviour so all 23 existing call
+      sites are untouched.
+- [ ] A2. `ParticleSystem.draw(surface, camera, under=None)` filters on it.
+      `None` means "both", which is what a caller with no bands passes.
+- [ ] A3. `elements.draw_under` draws the `under=True` half, banded;
+      `PlayingState.draw` keeps drawing the rest where it does now.
+- [ ] A4. `layers._shed` passes `under=True`.
+
+Not a second pool. A separate pool costs another sweep and splits
+`MAX_PARTICLES`, which defeats the point of one shared cap -- and the
+elemental shed is already capped separately by `ParticleBudget`. Walking a
+1200-slot, mostly empty pool twice a frame is cheaper than maintaining two.
+
+### B. Damage numbers: longer, and the element's colour
+
+- [ ] B1. `DamageNumbers.add` gains `colour=None` and `life=None`. Both
+      generic: `ui/damage_numbers.py` must not learn what an element is,
+      the same way it does not know what a weapon is.
+- [ ] B2. An effect -> colour table in `combat/elements/tracking.py`, beside
+      the `_LABELS` table that is already keyed the same way. Four of the
+      fourteen effect ids belong to an element; the other ten belong to a
+      reaction and take the mix of its pair, which `transient.blend_colours`
+      already computes.
+- [ ] B3. `RunWorld.deal` passes the colour and the longer life. It is the
+      right seam: it is already the adapter that reaches into the visual
+      package for `add_flash`.
+- [ ] B4. Legibility, which is the real work here, not the plumbing.
+      **Re-checked against M12's colours**, which changed the problem
+      rather than removing it:
+      - Thunder *was* `(245, 225, 90)` against a `COLOR_ACCENT` crit of
+        `(255, 205, 90)` -- indistinguishable. M12 made it `(108, 74, 163)`
+        and that clash is gone.
+      - But purple is a **dark** hue, and these numbers are 16pt text over
+        grass, stone and shadow. Thunder has gone from "too close to the
+        crit colour" to "too dark to read", which needs the same fix from
+        the other direction.
+      - Wind `(170, 255, 190)` over a green meadow is unchanged and still
+        the pale-on-pale version of the same thing.
+      - So all of them get the treatment the aura tint got: the colour
+        lifted toward white, over a near-black outline, so hue carries
+        *meaning* and the outline carries *contrast*. With purple in the
+        set the outline stops being optional for one colour and becomes
+        the thing that makes the scheme work at all.
+- [ ] B5. Only elemental damage is coloured and lengthened. The weapon's
+      own number keeps its colour and its 0.6 s.
+
+**The flooding risk, which decides how long "a bit longer" can be.**
+`MAX_DAMAGE_NUMBERS` is 200, and Fire's burn ticks once a second on every
+burning body. Going 0.6 s to 1.0 s puts about 1.7x as many on screen at
+once, and a saturated pool drops whatever asks next -- which could be the
+*weapon's* number, the one that matters more. Two mitigations, both in:
+lengthen only the elemental numbers, and measure the pool's high-water mark
+in the stress harness before settling the number. Start at 0.9 s.
+
+### C. The reaction label
+
+- [ ] C1. `DamageNumber` carries `outline` and a size, and `DamageNumbers`
+      grows `add_label(pos, text, colour, outline, life)`. Same pool, same
+      cap, same rise-and-fade: a label *is* a floating number whose text is
+      a word, and the class already stores `text` as a string.
+- [ ] C2. `world.add_label(pos, reaction)` beside `add_flash`, and the
+      matching recorder on `NullWorld`.
+- [ ] C3. One call in `reactions.run`, next to the flash, for the same
+      reason the flash is there: all six go off the same way, so it is one
+      line in the dispatcher rather than six in the reactions.
+- [ ] C4. The text is `tracking.label(reaction.key)` -- "Overload",
+      "Frostburn", "FireWind" -- which already exists and is already the
+      wording the run summary uses, so the two never disagree.
+- [ ] C5. The two colours come from `REACTION_PAIRS`, in its order, so
+      Overload always reads fire-on-thunder and never the reverse.
+
+**How two colours on one word.** The proposal is **fill in the first
+element's colour, outline in the second**, over a near-black shadow. A
+pixel font at 16pt is eight or nine characters wide; splitting the word in
+half and colouring each half is mush at that size, and alternating letters
+is worse. An outline keeps the word one readable shape and still states the
+pair at a glance.
+
+**Re-checked against M12's colours.** The awkward pair used to be
+Overload, fire orange on thunder yellow -- two warm colours. Purple fixed
+that one and created another: **Superconduct** is now ice blue on thunder
+purple, two adjacent hues that are both mid-dark, which is the weakest
+fill-and-outline pair in the set. Frostburn (orange on blue) and Overload
+(orange on violet) are the strong ones.
+
+So the near-black shadow under every label is not a garnish for Wind, it is
+what makes Superconduct legible at all, and it goes in from the start. If
+Superconduct still reads as one muddy colour, the fallback is to lighten
+the fill rather than to change the pair -- the pair is the information.
+
+- [ ] C6. The label sits above the damage numbers so the two do not
+      overlap on a body taking a reaction's damage in the same frame.
+- [ ] C7. Lifetime longer than a number -- around 0.9 s -- because it is a
+      word and has to be read, not glanced at.
+
+**One per reaction, which is one per enemy that reacted.** A reaction fires
+on the body whose aura was consumed; Superconduct's jumps and Overload's
+shockwave touch other bodies but do not *react* on them. So a label per
+reaction already means a label on every enemy a reaction triggers on, which
+is what was asked. Worth saying out loud because "every enemy that gets a
+reaction triggered" could also be read as every enemy a reaction *touches*,
+and that would be a different feature.
+
+### D. Tests
+
+- [ ] D1. A particle burst with `under=True` draws in the banded pass and
+      not in the late one, and the default still draws late.
+- [ ] D2. An elemental damage number carries its element's colour and the
+      longer life; a weapon's does not.
+- [ ] D3. Every one of the six reactions produces exactly one label, with
+      the right text and both of its pair's colours.
+- [ ] D4. The label pool is the damage-number pool: a run at the cap drops
+      labels rather than growing.
+
+### E. Close out
+
+- [ ] E1. Measure the damage-number high-water mark in `spawn_stress` and
+      settle the lifetime against it.
+- [ ] E2. Screenshot: a crowd mid-reaction with the labels up.
+- [ ] E3. Full suite.
+
+## M12 Colours in the data, and Thunder goes purple (CONFIRMED)
+
+Requested and confirmed 2026-09-21.
+
+1. **Thunder is purple, `#6C4AA3`.** No more yellow.
+2. **A reaction's colour is simply the combination of its two elements**
+   (owner, asked and answered), so it stays derived from the pair rather
+   than becoming an override -- the pair's element colours are already in
+   the JSON, so the combination already is data. What needed re-deciding
+   was **Overload's art**, whose pair stopped being two warm colours.
+3. The two look-alikes -- the `shock` status tint and the magic rod's own
+   `thunder_*` art -- are left alone, confirmed.
+
+And the rule that came with it, which is wider than this milestone: **it is
+not acceptable to have discontinued references or appearances.** A
+deliberate, commented duplicate of a value is still a duplicate; prose that
+states the old value is still wrong; a cut asset with the old value baked
+in still has to be recut. The survey below is part of the change, not
+follow-up work.
+
+### A. Reaction colours become data -- **dropped, answered instead**
+
+The proposal was an optional `colours` override per reaction in
+`element_visuals.json`. The owner's answer made it unnecessary: **a
+reaction's colour is simply the combination of its two elements**. The
+pair is taxonomy (`REACTION_PAIRS`) and the element colours are already
+data, so the combination already *is* data and an override entry would
+have been a second way to say the same thing -- exactly the sort of
+duplicate this milestone is otherwise removing.
+
+`transient.blend_colours` is unchanged and remains the one place a
+reaction palette is built.
+
+What the question actually surfaced was the **art**: Overload and
+Superconduct were each a single authored row picked when one of their two
+elements was yellow, and neither states its pair any more. See C3 and C4.
+
+### B. Thunder goes purple -- done
+
+- [x] B1. `elements.thunder.colour` is `[108, 74, 163]`.
+- [x] B2/C1. `overlays.py` no longer keeps its own copy. It calls
+      `aura_colour(key)`, which reads the game's data, with an empty
+      `_READABLE` map for the day something genuinely needs a contrast
+      nudge -- so a divergence would have to be written down rather than
+      drifting. Verified returning `(108, 74, 163)`.
+- [x] B3/C2. `thunder.png` and `thunderwind.png` re-cut on a purple ramp,
+      `(58, 36, 92)` to `(168, 132, 226)` at gamma 0.8, chosen by eye
+      against the two authored alternatives (see below).
+- [x] B4. Every remaining statement that Thunder is yellow: the rig
+      `_note`s, the CREDITS usage entry, the cut script's docstring, and
+      its ramp comment -- rewritten hue-neutral, because the lesson it
+      records (why a per-channel multiply fails on the grey row) is true
+      of any colour and should outlive this one.
+
+**Why not an authored purple row.** Rows 8 and 1 were rendered beside the
+remap. Row 8 is a near-black indigo that disappears against grass; row 1 is
+a saturated magenta that would fight Frostburn, which already owns it. The
+grey row remaps onto any ramp exactly, which is why it was the row to take
+in the first place, so it hits `#6C4AA3` on the nose.
+
+### C. The two reactions whose pair changed -- done
+
+- [x] C3. **Overload** was coral, picked when its pair was fire orange and
+      thunder yellow. It is now the grey row remapped **across its own
+      pair**: purple in the shadows, a hot orange core. One authored row is
+      one colour and a reaction has two elements.
+- [x] C4. **Superconduct** got the same treatment on the owner's word --
+      purple shadows to an icy highlight. It had been cyan, which read as
+      ice alone.
+- [x] C5/C6. The `shock` status tint and the magic rod's own `thunder_*`
+      art are **left alone**, confirmed. The first is a weapon-blessing
+      status that happened to share a hue with the old Thunder and no
+      longer does; the second is the rod's own projectile and cast art,
+      which an *uninfused* rod still fires. Written down here so neither is
+      "fixed" later on the strength of its name.
+
+**The three Wind reactions are deliberately not pair-ramped.** FireWind,
+IceWind and ThunderWind are one swirl in three colours because they are the
+same mechanic with different payloads, and reading as a family is worth
+more there than naming the pair. ThunderWind did change -- from the old
+yellow to the new purple -- because that is its payload's colour, not
+because it became a pair ramp.
+
+### D. Tests and close out -- done
+
+`tests/render/test_element_colours.py`, 7 tests and 17 subtests.
+
+- [x] D1. The dev inspector's colours match the data, for all four
+      elements. Two tests beside it: that `_AURA_COLOURS` has not come
+      back at all -- the *shape* the defect took, which a future edit could
+      reintroduce while keeping both tables in step today and leaving the
+      first test passing -- and that `_READABLE` is still empty, so any
+      contrast override has to be written down rather than forked.
+- [x] D2. Superseded by dropping A: there is no override to test.
+- [x] D3. Screenshots delivered.
+- [x] D4. Full suite: 3131 passed, 1 skipped, before the Overload fix
+      below; re-run after it.
+
+**The art has to be tested against the data, and nothing was doing it.**
+The aura and reaction strips are *cut* assets with a colour baked in.
+Changing a number in `element_visuals.json` cannot reach them -- only
+re-running the cut script can -- and no other test in the suite looks at a
+pixel. So a colour change that forgot the art would have shown up only when
+somebody eventually noticed. The new tests compare the strips' **hue** to
+the declared colour: hue rather than RGB distance, because the claim being
+made is "still the same colour family" and the art is a whole ramp against
+one declared point. Measured deltas are 0 to 11 degrees against a 45 degree
+threshold, so a retune has four times the headroom and a 150-degree mistake
+like yellow-for-purple still cannot pass.
+
+#### It immediately caught a real one
+
+Overload's pair ramp -- authored as "thunder's purple in the shadows,
+fire's orange in the core", approved from a screenshot, and shipped --
+contained **no purple at all**. Fire sits at 22 degrees and Thunder at 263,
+nearly opposite on the wheel, so interpolating between them in RGB runs
+through muddy red rather than through either end; and the source row's
+darkest pixels only reach about a fifth of the way along the ramp, so the
+purple end was never sampled. Measured on the old strip: 0 % of its
+coloured pixels anywhere near thunder's hue, against the test's 5 % floor.
+
+The fix is a deeper, more saturated dark end and a gamma above 1 so values
+stay low for longer: `(68, 24, 185)` to `(255, 168, 64)` at gamma 1.5. The
+strip is now 72 % thunder and 20 % fire -- a violet body with a hot orange
+core, which is what was wanted.
+
+Superconduct needed none of this and is 100 % ice / 72 % thunder on the
+first try, because ice and thunder are *adjacent* hues: anything between
+them is already both. That contrast is the whole lesson. **A pair ramp
+works when the pair is adjacent on the colour wheel and has to be forced
+when it is not**, and the only way to know which happened is to count.
+
+It is worth saying plainly that the picture looked fine. Two screenshots
+were taken of that strip, one of them a deliberate candidate comparison,
+and neither showed the problem -- a warm purple-grey reads as "purple
+enough" beside an orange core. The measurement disagreed and the
+measurement was right.
+
+### Ordering
+
+M12 before M11's part B. M11 planned an outline-and-lift treatment partly
+to separate Thunder from the crit gold; purple separates itself, so doing
+the colour first means that work is sized against the colours that ship
+rather than against one that is about to change.
+
 ## Progress
 
 - 2026-09-21: discovery done, proposal written, no code changed.

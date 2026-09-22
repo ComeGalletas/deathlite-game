@@ -185,15 +185,28 @@ def collider_overlay(surface, ps) -> None:
         wtag(ps.boss.pos, ps.boss.weight, ps.boss.radius)
 
 
-# Elemental system (M2): one colour per element for the aura inspector. Kept
-# here rather than in the visual profiles of §8 -- these are debug markers,
-# not the game's look, and they must stay readable over any terrain.
-_AURA_COLOURS = {
-    "fire": (255, 130, 60),
-    "ice": (120, 200, 255),
-    "thunder": (245, 225, 90),
-    "wind": (170, 255, 190),
-}
+# Elemental system: the aura inspector's colour per element, read from the
+# same data the game draws with (`element_visuals.json`).
+#
+# This was a hand-kept copy of all four, on the grounds that a debug marker
+# is not the game's look and has to stay readable over any terrain. Thunder
+# going from yellow to purple is what showed the cost: the inspector would
+# have gone on labelling a purple aura in yellow, and a dev tool that
+# disagrees with the game is worse than one that is a shade harder to read.
+# There is a test that these match.
+_READABLE = {}          # element key -> an explicit override, if one is ever
+                        # needed for contrast. Empty: nothing needs one today.
+
+
+def aura_colour(element_key: str):
+    """The inspector's colour for an element: the game's, unless something
+    has been given an explicit override above."""
+    from combat.elements.ids import element_from_key
+    from game.states.playing.visual.elements import tint
+
+    if element_key in _READABLE:
+        return _READABLE[element_key]
+    return tint(element_from_key(element_key))
 _AURA_RING_PAD = 4          # px outside the body
 _LOCK_COLOUR = (190, 190, 200)
 _LABEL_SHADOW = (20, 20, 28)
@@ -228,7 +241,7 @@ def aura_overlay(surface, ps) -> None:
         lines = []
         element = state.element(now)
         if element:
-            colour = _AURA_COLOURS.get(element.key, (255, 255, 255))
+            colour = aura_colour(element.key)
             sx, sy = cam.world_to_screen(body.pos)
             radius = int((body.radius + _AURA_RING_PAD) * cam.zoom)
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), radius, 2)
@@ -236,7 +249,7 @@ def aura_overlay(surface, ps) -> None:
         if state.is_locked(now):
             lines.append((f"lock {state.lock_remaining(now):.1f}s", _LOCK_COLOUR))
         if state.ice_stacks:
-            lines.append((f"ice x{state.ice_stacks}", _AURA_COLOURS["ice"]))
+            lines.append((f"ice x{state.ice_stacks}", aura_colour("ice")))
         if status is not None:
             for sid in status.active_ids():
                 stacks = status.stacks(sid)

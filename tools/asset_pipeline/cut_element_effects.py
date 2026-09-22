@@ -21,13 +21,21 @@ Sources, both under the gitignored `assets/unused/`:
 
 Two things this script has to do beyond copying pixels.
 
-**Recolour, for Thunder.** There is no yellow row. Row 0's *highlight* is
-yellow (`#fcf08d`) but its body is coral, and Fire wants that row -- two
-elements cannot share a palette when the sprite is the only indicator
-left. So Thunder takes the neutral grey row and is remapped onto a yellow
-ramp. A grey ramp maps onto a coloured one exactly, which is the whole
-reason this is the row to take; recolouring the coral row instead would be
-the mistake `recolour_totem_fire.py` was written to avoid.
+**Recolour**, for three of the eleven. Thunder is `#6C4AA3` and the pack's
+purple rows are a dark indigo, a mauve and a saturated magenta -- none of
+them that, and the magenta is Frostburn's. Overload and Superconduct want
+to state *both* of their elements, and one authored row is one colour. All
+three therefore take the neutral grey row and are remapped: a grey ramp
+maps onto any coloured one exactly, which is the whole reason it is the row
+to take, and recolouring a coloured row instead would be the mistake
+`recolour_totem_fire.py` was written to avoid.
+
+The two reaction ramps run between their *pair's* colours -- purple shadow
+to a hot orange core for Overload, purple shadow to an icy highlight for
+Superconduct -- so each burst names both of its elements in one shape. The
+three Wind reactions stay one authored row each on purpose: they are the
+same mechanic with different payloads and the family reading is worth more
+there than naming the pair.
 
 **Trim, on one common box.** Every frame of a strip is cropped to the
 *union* of the row's content, never to its own, so the frames stay in
@@ -72,22 +80,51 @@ SIDE = 64
 ALPHA_FLOOR = 24          # below this a pixel is pack noise, not content
 
 # Thunder's ramp: a two-point gradient, dark end to light end, with a gamma
-# that lifts the midtones.
+# that lifts the midtones. Centred on the element's own `#6C4AA3`.
 #
-# A plain per-channel multiply was the first attempt and it came out olive.
-# The grey row's values sit in the middle -- its commonest pixel is #6f6f6f
-# -- so scaling it by a yellow triple lands everything in brown. The pack's
-# own coral row is not built that way either: it runs a pale yellow
-# highlight down to a red shadow. So this interpolates between two authored
-# ends the same way, which is what makes the result read as the same pack.
+# Two lessons from getting this wrong, both of which apply to whatever
+# colour is asked for next; they were learned on a yellow Thunder, before
+# the owner changed the element to purple, and neither depends on the hue.
 #
-# The ends are saturated rather than pale on purpose too. A first pass ran
-# a light end near white with a gamma that lifted the midtones, and the
-# result washed to cream: this source is thin strokes and most of its
-# pixels are already light, so lifting them puts everything at the light
-# end. Keeping the light end at a real yellow and the gamma near 1 is what
-# makes it read as electric instead of sandy.
-YELLOW = ((140, 95, 10), (250, 220, 40), 0.8)
+# A plain per-channel multiply was the first attempt. The grey row's values
+# sit in the middle -- its commonest pixel is #6f6f6f -- so scaling it by a
+# colour triple darkens everything into mud. The pack's own coloured rows
+# are not built that way either: each runs a pale highlight down to a
+# saturated shadow. Interpolating between two ends the same way is what
+# makes the result read as the same pack.
+#
+# The ends want to be saturated rather than pale. A pass with a light end
+# near white and a gamma that lifted the midtones washed out entirely: this
+# source is thin strokes and most of its pixels are already light, so
+# lifting them puts the whole thing at the light end. A real colour at the
+# light end and a gamma near 1 is what keeps it a colour.
+PURPLE = ((58, 36, 92), (168, 132, 226), 0.8)
+
+# The two reactions whose pair is *Thunder plus something*, each remapped
+# across its own pair, dark end to light end. One authored row is one
+# colour and a reaction has two elements; where the pair used to be two
+# warm colours (Overload) or one of them was yellow (Superconduct), a
+# single row could pass for the whole reaction. Purple ended that, and
+# stating both is better anyway.
+#
+# The three Wind reactions are deliberately *not* done this way. They are
+# one swirl in three colours because they are the same mechanic with
+# different payloads, and that family reading is worth more there than
+# naming the pair.
+# Overload's ends are pushed further apart and its gamma above 1 on
+# purpose. Fire and Thunder sit nearly opposite on the colour wheel, so a
+# straight RGB interpolation between them runs through mud rather than
+# through either of them, and the source's darkest pixels only reach about
+# a fifth of the way along the ramp. A first attempt at `(92, 56, 140)` and
+# gamma 0.9 therefore produced a strip with **no purple in it at all** --
+# it looked plausible and `test_element_colours` counted the pixels and
+# said otherwise. A deeper, more saturated dark end and a gamma that keeps
+# values low for longer is what puts thunder back in it.
+#
+# Superconduct needs none of that: ice and thunder are adjacent hues, so
+# anything between them is already both.
+OVERLOAD_PAIR = ((68, 24, 185), (255, 168, 64), 1.5)       # purple -> fire orange
+SUPERCONDUCT_PAIR = ((92, 56, 140), (150, 214, 255), 0.9)  # purple -> ice blue
 
 
 class Cut:
@@ -121,18 +158,21 @@ CUTS = [
         note="a ring that grows flame tongues outward"),
     Cut("ice", OUT_ELEMENTS, 13, "623", 2,
         note="a crystal that forms, then opens into a diamond outline"),
-    Cut("thunder", OUT_ELEMENTS, 14, "652", 5, recolour=YELLOW,
-        note="a radial spiked discharge; grey row remapped to yellow"),
+    Cut("thunder", OUT_ELEMENTS, 14, "652", 5, recolour=PURPLE,
+        note="a radial spiked discharge; grey row remapped to purple"),
     Cut("wind", OUT_ELEMENTS, 1, "26", 3,
         note="concentric rings turning -- the only pick that rotates"),
 
     # The six reactions, one-shot at the body that reacted.
     Cut("frostburn", OUT_REACTIONS, 4, "186", 1,
         note="a violet sphere of motes -- where fire and ice blend"),
-    Cut("overload", OUT_REACTIONS, 14, "674", 0,
-        note="a hexagonal detonation, the biggest of the six"),
-    Cut("superconduct", OUT_REACTIONS, 9, "446", 2,
-        note="an orbiting star coming apart -- what a chain reads as"),
+    Cut("overload", OUT_REACTIONS, 14, "674", 5, recolour=OVERLOAD_PAIR,
+        note="a hexagonal detonation, the biggest of the six; the grey row "
+             "remapped across its own pair, purple shadow to orange core"),
+    Cut("superconduct", OUT_REACTIONS, 9, "446", 5, recolour=SUPERCONDUCT_PAIR,
+        note="an orbiting star coming apart -- what a chain reads as; the "
+             "grey row remapped across its own pair, thunder's purple in "
+             "the shadows to ice's blue in the highlights"),
     # The three wind reactions are one swirl in three colours on purpose:
     # they are the same mechanic (a tornado with a payload) and should read
     # as siblings rather than as three unrelated effects.
@@ -140,8 +180,8 @@ CUTS = [
         note="the swirl, fire's coral"),
     Cut("icewind", OUT_REACTIONS, 15, "711", 2,
         note="the swirl, ice's blue"),
-    Cut("thunderwind", OUT_REACTIONS, 15, "711", 5, recolour=YELLOW,
-        note="the swirl, thunder's yellow; grey row remapped"),
+    Cut("thunderwind", OUT_REACTIONS, 15, "711", 5, recolour=PURPLE,
+        note="the swirl, thunder's purple; grey row remapped"),
 ]
 
 

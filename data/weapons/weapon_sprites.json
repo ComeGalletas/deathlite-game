@@ -662,7 +662,7 @@
     }
   },
   "element_thunder": {
-    "_note": "Thunder's aura: a radial spiked discharge. The pack has no yellow row, so this is its grey one remapped onto a yellow ramp by the cut script.",
+    "_note": "Thunder's aura: a radial spiked discharge. The pack's purple rows are a dark indigo, a mauve and a magenta that Frostburn already owns, so this is its neutral grey row remapped onto a ramp centred on the element's own #6C4AA3 by the cut script.",
     "frame": [
       62,
       58
@@ -738,7 +738,7 @@
     }
   },
   "reaction_overload": {
-    "_note": "Overload: a hexagonal detonation, the biggest of the six.",
+    "_note": "Overload: a hexagonal detonation, the biggest of the six. Remapped across its own pair -- thunder's purple in the shadows, fire's orange in the core -- because one authored row is one colour and this reaction has to state both of its elements. Fire and thunder are nearly opposite hues, so the ramp's ends are pushed apart and its gamma is above 1; a gentler one produced no purple at all.",
     "frame": [
       64,
       64
@@ -757,7 +757,7 @@
     }
   },
   "reaction_superconduct": {
-    "_note": "Superconduct: an orbiting star coming apart.",
+    "_note": "Superconduct: an orbiting star coming apart, which is what a chain reads as. Remapped across its own pair -- thunder's purple in the shadows, ice's blue in the highlights -- for the same reason Overload is: one authored row is one colour and this reaction has two elements.",
     "frame": [
       64,
       58
@@ -814,7 +814,7 @@
     }
   },
   "reaction_thunderwind": {
-    "_note": "ThunderWind: the swirl in thunder's yellow, remapped from the grey row like the aura.",
+    "_note": "ThunderWind: the swirl in thunder's purple, remapped from the grey row like the aura.",
     "frame": [
       44,
       40

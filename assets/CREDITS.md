@@ -158,10 +158,11 @@ fill when a file is missing.
   art (`documentation/journals/elemental_system_journal.md`, M10), cut by
   `tools/asset_pipeline/cut_element_effects.py`. The four auras in
   `assets/effects/elements/` (`fire.png` Part 12/586 row 0, `ice.png`
-  Part 13/623 row 2, `thunder.png` Part 14/652 row 5 remapped to yellow,
+  Part 13/623 row 2, `thunder.png` Part 14/652 row 5 remapped to purple,
   `wind.png` Part 1/26 row 3) and the six reactions in
   `assets/effects/reactions/` (`frostburn.png` Part 4/186 row 1,
-  `overload.png` Part 14/674 row 0, `superconduct.png` Part 9/446 row 2, and
+  `overload.png` Part 14/674 row 5 remapped across its own pair,
+  `superconduct.png` Part 9/446 row 5 remapped across its own pair, and
   `firewind.png` / `icewind.png` / `thunderwind.png` all from Part 15/711 in
   rows 0, 2 and 5). The magic rod's own effects came from this pack earlier
   and had not been listed here: `assets/effects/weapons/magic_rod/`
