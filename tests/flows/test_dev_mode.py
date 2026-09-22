@@ -21,6 +21,7 @@ from tests import worlds as W
 
 SEED = W.pinned(2)
 
+from game import config
 from game import save as save_mod
 from game.game import Game
 from game.states.character_select_state import CharacterSelectState
@@ -1243,3 +1244,107 @@ class DevInfuseMenuTests(unittest.TestCase):
                 break
         self.assertTrue(playing.ledger.elements.applications,
                         "an infused weapon applied its element unaided")
+
+
+class DevEndScreenPreviewTests(unittest.TestCase):
+    """The "Game over screen" / "Victory screen" rows (journal:
+    dev_mode_journal.md, 2026-09-21). A dev run can never reach these screens
+    on its own -- `run_end.hand_off` diverts it to `restart_dev_run()` -- so
+    the rows push the real screen over the frozen run as a preview: the run's
+    own snapshot, nothing banked, and ESC comes back."""
+
+    def _preview(self, row):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate(row)
+        screen = game.state_machine.current
+        # Past the shared input lock, so ESC / a click is answered.
+        screen.update(config.END_SCREEN_INPUT_LOCK)
+        return game, playing, menu, screen
+
+    def test_both_rows_are_on_the_root_page(self):
+        self.assertIn("game_over", _ROOT_ROWS)
+        self.assertIn("victory", _ROOT_ROWS)
+        # With the other navigating rows, before the run-level actions.
+        self.assertLess(_ROOT_ROWS.index("remove_weapon"), _ROOT_ROWS.index("game_over"))
+        self.assertLess(_ROOT_ROWS.index("victory"), _ROOT_ROWS.index("reset"))
+
+    def test_the_rows_push_the_real_screens_over_the_frozen_run(self):
+        from game.states.game_over_state import GameOverState
+        from game.states.victory_state import VictoryState
+        for row, cls, won in (("game_over", GameOverState, False),
+                              ("victory", VictoryState, True)):
+            game, playing, menu, screen = self._preview(row)
+            self.assertIsInstance(screen, cls)
+            self.assertTrue(screen.preview)
+            self.assertTrue(screen.stats["victory"] is won)
+            # Pushed, not changed: the dev menu and the run are still under it.
+            self.assertIs(game.state_machine._stack[-2], menu)
+            self.assertIs(game.state_machine._stack[-3], playing)
+            self.assertFalse(playing._ending)       # the run is frozen, not over
+
+    def test_the_screen_shows_this_run_s_real_numbers(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate("blessings")
+        bid = menu._blessing_ids[0]
+        _key(game, pygame.K_RETURN)                 # grant it, so a column fills
+        _key(game, pygame.K_ESCAPE)                 # back to root
+        playing.run.stats["kills"] = 17
+        playing.run.stats["time"] = 42.0
+        menu._activate("victory")
+        stats = game.state_machine.current.stats
+        self.assertEqual(stats["kills"], 17)
+        self.assertEqual(stats["time"], 42.0)
+        self.assertEqual(stats["seed"], playing.run_seed)
+        self.assertIn(bid, stats["blessings"])
+        self.assertEqual(stats["character_id"], playing.character_id)
+
+    def test_the_preview_banks_nothing(self):
+        game = _game()
+        persisted = []
+        ended = []
+        game.persist = lambda: persisted.append(1)
+        from game.events import Events
+        game.events.subscribe(Events.RUN_ENDED, lambda **kw: ended.append(kw))
+        before = copy.deepcopy(game.save)
+        playing, menu = _open_dev_menu(game)
+        for row in ("game_over", "victory"):
+            menu._activate(row)
+            game.state_machine.pop()                # back to the dev menu
+        self.assertEqual(ended, [])                 # never published
+        self.assertEqual(persisted, [])
+        self.assertEqual(game.save.currency, before.currency)
+        self.assertEqual(game.save.best, before.best)
+        self.assertEqual(game.save.heroes, before.heroes)
+        self.assertFalse(os.path.exists(game.save_path))
+
+    def test_escape_comes_back_to_the_dev_menu(self):
+        for row in ("game_over", "victory"):
+            game, playing, menu, screen = self._preview(row)
+            _key(game, pygame.K_ESCAPE)
+            self.assertIs(game.state_machine.current, menu)
+            self.assertIs(game.state_machine._stack[-2], playing)
+            # And the run picks up where it froze.
+            menu._activate("close")
+            self.assertIs(game.state_machine.current, playing)
+            playing.update(1 / 60)
+
+    def test_a_real_run_s_screens_still_leave_on_escape(self):
+        """The preview guard must not change the shipped path: without
+        `preview`, ESC is still the Main menu button."""
+        from game.states.game_over_state import GameOverState
+        from game.states.victory_state import VictoryState
+        for cls in (GameOverState, VictoryState):
+            game = _game()
+            game.state_machine.change(cls(game), stats={"time": 1.0})
+            screen = game.state_machine.current
+            self.assertFalse(screen.preview)
+            screen.update(config.END_SCREEN_INPUT_LOCK)
+            _key(game, pygame.K_ESCAPE)
+            self.assertIsInstance(game.state_machine.current, MenuState)
+
+    def test_the_previews_draw_headless(self):
+        for row in ("game_over", "victory"):
+            game, playing, menu, screen = self._preview(row)
+            game._render()

@@ -40,10 +40,15 @@ BUTTONS = (
 
 
 class VictoryState(State):
+    preview = False         # set by `enter`; True only for the dev preview
     music = None        # fades out, like GAME OVER (owner, 2026-09-16)
     backdrop = BACKDROP     # the whole surface; the panel goes on the box
-    def enter(self, *, stats: dict | None = None, **kwargs) -> None:
+    def enter(self, *, stats: dict | None = None, preview: bool = False,
+              **kwargs) -> None:
         self.stats = stats or {}
+        # The dev menu's preview over a frozen dev run; see the game-over
+        # screen and `dev_mode_journal.md` (assumption P).
+        self.preview = bool(preview)
         self._screen = end_screen.EndScreen(
             self.stats, title="Victory", title_colour=TITLE_COLOUR,
             backdrop=BACKDROP, buttons=BUTTONS,
@@ -70,6 +75,13 @@ class VictoryState(State):
             self._activate(bid)
 
     def _activate(self, bid: str) -> None:
+        if self.preview and bid == "menu":
+            # The dev-menu preview (journal: dev_mode_journal.md): ESC and the
+            # Main menu button are the way back to the dev run underneath
+            # rather than out to the menu. New run and Sanctuary are left
+            # alone -- they leave, exactly as they do after a real run.
+            self.game.state_machine.pop()
+            return
         if bid == "new_run":
             from game.states.character_select_state import CharacterSelectState
             self.game.state_machine.change(CharacterSelectState(self.game))

@@ -18,6 +18,11 @@ Pages:
                 removes one, unwinding its orbiters, summons and the
                 weapon-blessing stacks taken on that weapon id
 
+Two root rows are not pages but previews: **Game over screen** and **Victory
+screen** push the real results screen over the frozen run with this run's own
+snapshot, and ESC there comes back here. Nothing is banked -- see
+`_show_end_screen`.
+
 Any page longer than `MAX_VISIBLE` scrolls: the visible window follows the
 selection and "N more" markers show what's clipped, so the panel never outgrows
 the screen no matter how much content is added -- every list is built from the
@@ -46,7 +51,8 @@ MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
               "aim_line", "auras", "all_rooms", "freeze", "difficulty",
               "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
-              "force_aura", "infuse", "reset", "exit", "close")
+              "force_aura", "infuse", "game_over", "victory",
+              "reset", "exit", "close")
 
 _LABELS = {
     "unlimited_hp": "Unlimited HP",
@@ -67,6 +73,8 @@ _LABELS = {
     "remove_weapon": "Remove weapon...",
     "force_aura":   "Force aura...",
     "infuse":       "Infuse weapons...",
+    "game_over":    "Game over screen",
+    "victory":      "Victory screen",
     "reset":        "Reset run",
     "exit":         "Exit to main menu",
     "close":        "Close",
@@ -283,6 +291,8 @@ class DevMenuState(State):
             self._goto("elements")
         elif rid == "infuse":
             self._goto("infuse")
+        elif rid in ("game_over", "victory"):
+            self._show_end_screen(rid == "victory")
         elif rid == "reset":
             p._restart_dev_run()               # replaces the whole stack
         elif rid == "exit":
@@ -374,6 +384,37 @@ class DevMenuState(State):
             now=p.stats["time"])
         name = getattr(target, "name", element.key)
         self._status = f"{element.key.title()} on {name}: {outcome.name.lower()}"
+
+    def _show_end_screen(self, victory: bool) -> None:
+        """Open the real results screen over the frozen dev run, as a preview.
+
+        A dev run can never reach these screens on its own -- `run_end.hand_off`
+        diverts it to `restart_dev_run()` before the Victory / GameOver branch --
+        so this is the only way to read a résumé without playing a real run out
+        to its end. The dict is built by the *same* `_snapshot_summary` a real
+        ending uses, off this run's live numbers, so the columns show whatever
+        the other pages have granted.
+
+        `hand_off` is deliberately not used: it publishes `RUN_ENDED`, and that
+        is what drives `Game._on_run_ended` (salvage bank, best run, item stash,
+        `save.mark_cleared`, `persist`). Skipping the publish keeps the preview
+        out of the save entirely, and leaves the run's `_ending` flag clear --
+        the run is frozen under the screen, not over. `preview=True` is what
+        makes the screen's ESC and Main menu button come back here rather than
+        change to the main menu; its other two buttons leave as shipped.
+        """
+        p = self._playing
+        if p is None:
+            return
+        summary = p._snapshot_summary(victory)
+        if victory:
+            from game.states.victory_state import VictoryState
+            state = VictoryState(self.game)
+        else:
+            from game.states.game_over_state import GameOverState
+            state = GameOverState(self.game)
+        self._status = ("Victory" if victory else "Game over") + " screen (preview)"
+        self.game.state_machine.push(state, stats=summary, preview=True)
 
     def _toggle_dummy(self) -> None:
         """Spawn one training dummy and meter it, or clear both.

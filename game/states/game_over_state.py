@@ -31,12 +31,18 @@ BUTTONS = (
 
 
 class GameOverState(State):
+    preview = False         # set by `enter`; True only for the dev preview
     # The music stopping is itself the signal that the run is over, and
     # it leaves the boss-death cue room (owner, 2026-09-16).
     music = None
     backdrop = BACKDROP     # the whole surface; the panel goes on the box
-    def enter(self, *, stats: dict | None = None, **kwargs) -> None:
+    def enter(self, *, stats: dict | None = None, preview: bool = False,
+              **kwargs) -> None:
         self.stats = stats or {}
+        # Pushed over a frozen dev run by the dev menu rather than reached by
+        # ending one (assumption P, dev_mode_journal.md): the run is still on
+        # the stack below, so the way out of the screen is back into it.
+        self.preview = bool(preview)
         self._screen = end_screen.EndScreen(
             self.stats, title="Game Over", title_colour=TITLE_COLOUR,
             backdrop=BACKDROP, buttons=BUTTONS,
@@ -63,6 +69,13 @@ class GameOverState(State):
             self._activate(bid)
 
     def _activate(self, bid: str) -> None:
+        if self.preview and bid == "menu":
+            # The dev-menu preview (journal: dev_mode_journal.md): ESC and the
+            # Main menu button are the way back to the dev run underneath
+            # rather than out to the menu. New run and Sanctuary are left
+            # alone -- they leave, exactly as they do after a real run.
+            self.game.state_machine.pop()
+            return
         if bid == "new_run":
             from game.states.character_select_state import CharacterSelectState
             self.game.state_machine.change(CharacterSelectState(self.game))

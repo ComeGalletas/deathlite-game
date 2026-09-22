@@ -9,7 +9,7 @@ plus a windowed / headless-screenshot check — before the next.
 
 **Status:** D1–D5 done (D5 2026-08-28). D6 (docs) pending. All assumptions
 confirmed. Post-plan toggles collected under **Later additions** below (latest:
-the "Forges..." and "Remove weapon..." pages, 2026-09-10).
+the "Game over screen" / "Victory screen" preview rows, 2026-09-21).
 
 ---
 
@@ -247,3 +247,80 @@ with an enemy inside its reach or the mouse held.
 Screenshots captured headless (Forges page with two `(forged)` rows and
 the status line; Remove weapon page with three instances, two of them
 showing their Forge name) and sent.
+
+### "Game over screen" + "Victory screen" rows — done 2026-09-21
+
+Requested as a small addition: reach the two run-results screens from the dev
+menu. Today a dev run can never show them — `run_end.hand_off` diverts a dev
+run to `restart_dev_run()` before the Victory / GameOver branch — so the only
+way to look at a results screen is to play a real run to its end, which makes
+the résumé (weapon damage split, kills per type, blessings, equipment) slow and
+awkward to populate for a layout or wording check.
+
+#### Interpretations (confirmed by the user 2026-09-21, built as written)
+
+| # | Assumption |
+|---|-----------|
+| **P** | **Two root rows, "Game over screen" and "Victory screen"**, sitting after **Remove weapon...** and before **Reset run** — with the sub-page links rather than the run-level actions, since they navigate rather than toggle. They are not "..." pages: each opens the real screen, not a dev list. |
+| **Q** | **The screen is the real one with the real run's numbers.** The row calls `PlayingState._snapshot_summary(victory)` — the same builder a real run's end uses — and hands the dict to the real `GameOverState` / `VictoryState`. Whatever the dev run has accumulated (time, gold, kills, weapon rows, blessings, equipment, trait, hero stats) is what the screen shows, so grant items and blessings from the other pages first to fill the columns. |
+| **R** | **Nothing is banked and nothing ends.** The row does *not* go through `hand_off`, so `RUN_ENDED` is never published — which is what keeps `Game._on_run_ended` (salvage bank, best run, item stash, `save.mark_cleared`, `persist`) out of it entirely. `_snapshot_summary` itself only reads the save. The run's `_ending` flag is untouched: the dev run is not over, it is frozen under the screen. |
+| **S** | **The screens carry their own `music = None`**, so previewing one fades the run's track out; popping back restores `"gameplay"` on its own, because `StateMachine._apply_music` walks down to the `PlayingState` underneath. No new music wiring. |
+| **T** | **`boss` is left honest.** The victory subtitle leads with the boss that fell, read from `rewards.boss_defeated`; a dev run that has not killed one simply has no lead (`run_subtitle` drops empty parts), so the subtitle reads hero / difficulty / seed. To see the boss line, spawn the boss from the enemies page and kill it first. Nothing is fabricated. |
+| **U** | **`END_SCREEN_INPUT_LOCK` (1.5 s) applies as shipped.** The preview ignores input for the first moment exactly like the real screen, so the lock is part of what gets looked at rather than something the dev path skips. |
+
+Two alternatives were offered and declined, so they are on the record: a real
+hand-off (`change`, all three buttons as shipped, the dev run gone) rather than
+a preview, and forcing `first_clear` / `new_records` on so the victory screen's
+unlock line and record ribbons show without the save being in the right state.
+The end banner (`EndBannerState`) is likewise skipped — the rows open the
+results screen directly. It could get a row of its own later.
+
+#### Done — what was built
+
+`game/states/dev_menu_state.py`: `_ROOT_ROWS` gains `"game_over"` and
+`"victory"` after `"remove_weapon"`; `_LABELS` gives them **"Game over
+screen"** / **"Victory screen"**. They are the only root rows that are neither
+a toggle nor a page, so `_activate` routes both to one helper,
+`_show_end_screen(victory)`: it calls `p._snapshot_summary(victory)` and
+`push`es the real `GameOverState` / `VictoryState` with `stats=summary,
+preview=True`, leaving `(status) <name> screen (preview)` on the status line.
+`_row_label` needs no case — neither row carries state.
+
+`game/states/game_over_state.py` and `victory_state.py`: `enter` gains
+`preview: bool = False` → `self.preview` (with a `preview = False` class
+default, so a directly constructed screen is never one), and `_activate` opens
+with a guard — `if self.preview and bid == "menu": pop(); return`. That is the
+whole change to the screens: **ESC and the Main menu button** come back to the
+dev menu, while **New run** and **Sanctuary** still `change` away exactly as
+they do after a real run. The consequence to know: in a preview, ESC is the way
+back, so the real ESC → main-menu path is the one thing the preview cannot
+exercise. `END_SCREEN_INPUT_LOCK` still applies, so the first 1.5 s of the
+preview refuses input like the real screen.
+
+Nothing else moved — `run_end.py`, `PlayingState`, `ui/end_screen.py` and the
+data are untouched.
+
+**Tests** (`tests/flows/test_dev_mode.py::DevEndScreenPreviewTests`, +7): both
+rows are on the root page in the right order; each row pushes the real class
+with `preview` set, `stats["victory"]` right, the dev menu and the run still
+under it on the stack and `_ending` still clear; the résumé carries this run's
+real numbers (a granted blessing, edited `kills` / `time`, the run seed and
+character id); the preview banks nothing (`RUN_ENDED` never published, `persist`
+never called, `save.currency` / `best` / `heroes` untouched, `save.json` never
+created); ESC returns to the dev menu and Close then resumes the same
+`PlayingState`, which keeps ticking; a *non*-preview screen still leaves for
+`MenuState` on ESC, so the shipped path is unchanged; both previews draw
+headless through `game._render()`.
+
+One cosmetic mismatch left alone deliberately: the screen's hint line is
+composed from the buttons, so in a preview it still reads `ESC main menu`
+while ESC actually returns to the dev menu. Rewording it means teaching
+`ui/end_screen.py` about the preview, which would spread the flag past the two
+states for a dev-only label. Left as-is.
+
+Screenshots captured headless: the root page with **Game over screen**
+selected under the sub-page links, and both previews over a dev run carrying
+four blessings, one equipped item and an edited clock / kill count (the
+victory screen showing the Hero column, the first-clear "Main weapon
+unlocked" line and the gold title; "nothing slain" because the kill *rows*
+come from the ledger, not the `kills` counter the script poked).
