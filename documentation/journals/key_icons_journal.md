@@ -667,7 +667,7 @@ arrow on a square cap), no objection raised.
   `set_alpha`, the next stage waits for it. Drawn right after the key
   marker.
 * Config: `TUTORIAL_HINTS`, `HINT_MOVE_DISTANCE = 96`,
-  `HINT_ATTACK_SECONDS = 8`, `HINT_FADE = 0.4`. Save: `settings["tutorials"]`
+  `HINT_ATTACK_SECONDS = 5`, `HINT_FADE = 0.4`. Save: `settings["tutorials"]`
   defaults True. Options: row "Tutorials" after Key layout, ENTER / Left /
   Right / click toggle it; ten rows now, so `_ROW_TOP, _ROW_STEP` went from
   200 / 74 to 180 / 68 to keep the last row clear of the hint line.
@@ -721,3 +721,10 @@ body's top row and the cap centred on the pipe's span. `BODY_FRACTION` is
 0.3 (the forge's chimney, over a third wide, still counts) and the peak is
 the middle of the top row's *longest* opaque run, so a pipe beside the
 roof no longer pulls the cap. Test added.
+
+**Addendum (2026-09-21): the Attack hint gives up sooner.** Owner: the
+opening instructions should fade after 5 seconds, not 8, so
+`config.HINT_ATTACK_SECONDS` is 5.0. The Move stage is unchanged (it is
+distance-driven) and the Attack stage still ends early on the first aimed
+attack; only the give-up timeout moved. The hint tests read the constant
+rather than a literal, so they follow it.

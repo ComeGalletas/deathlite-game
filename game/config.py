@@ -1030,7 +1030,7 @@ KEY_INTERACT: int = 101               # K_e
 # "Tutorials" row is on (`game.tutorials`); this switch is the build's.
 TUTORIAL_HINTS: bool = True
 HINT_MOVE_DISTANCE: float = 96.0      # world px from the spawn: three tiles
-HINT_ATTACK_SECONDS: float = 8.0      # the Attack hint gives up after this
+HINT_ATTACK_SECONDS: float = 5.0      # the Attack hint gives up after this
 HINT_FADE: float = 0.4                # a finished hint fades out over this
 
 # Half-angle of the fire-time aim-assist cone: a manual attack targets the
