@@ -15,7 +15,7 @@ from typing import Any
 
 from combat.elements.ids import ELEMENTS, REACTIONS, ElementId, ReactionId
 from combat.elements.schema import (
-    ElementDataError, Section, b, deep_merge, dmg, f, i)
+    ElementDataError, Section, b, deep_merge, dmg, f, i, pair)
 
 # --- the global block (design §3, §9) ------------------------------------------
 
@@ -26,6 +26,11 @@ GLOBAL = Section("GlobalConfig", {
     "max_reactions_per_frame": i(1),
     # Simultaneous Wind areas (base Wind and the Wind reactions together).
     "max_active_wind_areas": i(1),
+    # The floor every reaction's damage on its own carrier is raised to
+    # (owner, 2026-09-22). One number for all six rather than six copies:
+    # it is a single rule about reactions, and a per-reaction copy would be
+    # one more place for it to go stale.
+    "reaction_min_damage": f(0.0),
 })
 
 # --- per-element schemas (design §4) ----------------------------------------------
@@ -93,20 +98,36 @@ _LOCK = {"lock_aura_slot": b(), "lock_duration": f(0.0)}
 # Every effect that reaches other enemies carries its own caps.
 _AREA_CAPS = {"max_range": f(0.0, lo_open=True), "max_targets": i(1)}
 # The Wind-area payload the three Wind reactions share (§4.4, §5.5).
+#
+# `damage` is the reaction's own two-source figure and is dealt to the
+# enemy the reaction fired on *and* to everything the tornado touches
+# (owner, 2026-09-22), so there is one number here rather than a separate
+# carrier value and area value.
 _WIND_AREA = {"duration": f(0.0, lo_open=True), "radius": f(0.0, lo_open=True),
-              "damage": dmg(), "knockback": f(0.0), **_AREA_CAPS}
+              "damage": pair(), "knockback": f(0.0), **_AREA_CAPS}
 
 REACTION_SCHEMAS: dict[ReactionId, Section] = {
     ReactionId.FROSTBURN: Section("FrostburnConfig", {
-        "tick": dmg(), "tick_interval": f(0.0, lo_open=True),
+        # Immediate, then `tick` split across `ticks` ticks (owner,
+        # 2026-09-22): "50 % of the highest, split into 3, one a second".
+        "damage": pair(), "tick": pair(), "ticks": i(1),
+        "tick_interval": f(0.0, lo_open=True),
         "duration": f(0.0, lo_open=True), "slow_percent": f(0.0, 1.0), **_LOCK}),
     ReactionId.OVERLOAD: Section("OverloadConfig", {
-        "damage": dmg(), "shockwave_damage": dmg(),
+        # The shockwave deals the same figure as the carrier takes, so the
+        # separate `shockwave_damage` is gone.
+        "damage": pair(),
         "shockwave_radius": f(0.0, lo_open=True), "knockback": f(0.0),
         "max_knockback_speed": f(0.0, lo_open=True), **_AREA_CAPS, **_LOCK}),
     ReactionId.SUPERCONDUCT: Section("SuperconductConfig", {
-        "damage": dmg(), "bonus_jumps": i(1), "targets_per_jump": i(1),
-        "slow_percent": f(0.0, 1.0), "slow_duration": f(0.0, lo_open=True),
+        "damage": pair(), "bonus_jumps": i(1), "targets_per_jump": i(1),
+        # Ice stacks poured into every enemy the tree reaches, alongside the
+        # Ice aura it spreads there.
+        "ice_stacks": i(1),
+        # No `slow_percent`: the spread pours Ice stacks in, and Ice
+        # sizes the slow from the stack count. A second figure here
+        # would be one nothing reads.
+        "slow_duration": f(0.0, lo_open=True),
         **_AREA_CAPS, **_LOCK}),
     ReactionId.FIREWIND: Section("FireWindConfig", {
         **_WIND_AREA, "burn_tick": dmg(), "burn_tick_interval": f(0.0, lo_open=True),

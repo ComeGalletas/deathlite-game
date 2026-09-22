@@ -569,13 +569,20 @@ class WindTests(unittest.TestCase):
                         "the hit and its aura still happened")
 
     def test_a_payload_runs_on_every_contact(self):
+        """A payload is handed the live clock and the area's own figure as
+        well as the body: since the rework a Wind reaction's payload spreads
+        an aura, which has to be timed against the run clock rather than
+        against the reaction that seated the area."""
         paid = []
         area = WindArea(pos=pygame.Vector2(0, 0), radius=200.0, expires_at=10.0,
                         damage=1.0, knockback=0.0, weapon_id="bow",
                         effect=tracking.WIND_AREA, max_targets=9,
-                        payload=lambda t, a, w: paid.append(t))
-        area.update(0.0, self.world)
+                        payload=lambda t, a, w, now, dmg: paid.append((t, now, dmg)))
+        area.update(2.5, self.world)
         self.assertEqual(len(paid), len(self.enemies))
+        for _body, now, dmg in paid:
+            self.assertEqual(now, 2.5, "the live clock, not the reaction's")
+            self.assertEqual(dmg, 1.0)
 
 
 # --- the spatial query --------------------------------------------------------------

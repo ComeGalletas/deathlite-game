@@ -6,6 +6,11 @@ pinned here is mostly the payload -- the area's own rules (follows its
 enemy, sweeps at a low rate, one contact per body, bounded by
 `max_targets`) are covered in `test_elements_base.py` and not repeated.
 
+Since the owner's rework (2026-09-22) all three also pay their two-source
+figure to the enemy they fired on -- which used to be excluded from its own
+tornado and so took nothing at all -- and prime everything the tornado
+touches with their own element, which can set off a further reaction.
+
 The area outlives the hit that made it, so these tests advance it by hand
 the way the run's update pass does.
 """
@@ -19,7 +24,7 @@ from game.content import get_content
 from tests.combat.fakes import FakeEnemy
 from tests.combat.test_elements_base import build as build_bare
 from tests.combat.test_elements_base import tweak
-from tests.combat.test_reactions import react, tough
+from tests.combat.test_reactions import pair_damage, react, tough
 
 C = get_content()
 FIRE, ICE, THUNDER, WIND = (ElementId.FIRE, ElementId.ICE,
@@ -86,29 +91,48 @@ class WindReactionShapeTests(unittest.TestCase):
                 crowd = huddle()
                 r, world, _t = build(crowd)
                 react(r, crowd[0], prime, trigger)
+                area_before = len(world.dealt)
                 sweep(world)
-                touched = [d[0] for d in world.dealt if d[3] == effect]
+                touched = [d[0] for d in world.dealt[area_before:]
+                           if d[3] == effect]
                 self.assertTrue(touched)
-                self.assertNotIn(crowd[0], touched, "never its own anchor")
+                self.assertNotIn(crowd[0], touched,
+                                 "the anchor is paid directly, not by its own area")
                 self.assertTrue(any(e._knock.length_squared() > 0.0
                                     for e in crowd[1:]))
 
-    def test_no_secondary_contact_leaves_an_aura(self):
-        """Priming with Thunder spreads auras through its own chain, which
-        is the element doing its job -- so this measures what the *reaction*
-        adds on top, which must be nothing."""
-        for prime, trigger, rid, _effect in self.PAIRS:
+    def test_the_enemy_it_fired_on_is_paid_too(self):
+        """The rework's headline fix: before it, a Wind reaction's carrier
+        took literally nothing, and with the incoming Wind hit suppressed
+        triggering one on a lone enemy was a net loss."""
+        for prime, trigger, rid, effect in self.PAIRS:
             with self.subTest(reaction=rid.key):
                 crowd = huddle()
                 r, world, _t = build(crowd)
-                r.apply(crowd[0], prime, weapon_id="sword", hit_damage=100.0,
-                        now=0.0)
-                before = {id(e) for e in crowd[1:] if e.elemental.has_aura(0.0)}
-                r.apply(crowd[0], trigger, weapon_id="rod", hit_damage=100.0,
-                        now=0.0)
+                cfg = C.reactions["reactions"][rid.key]
+                react(r, crowd[0], prime, trigger, damage=100.0)
+                own = [d[1] for d in world.dealt
+                       if d[0] is crowd[0] and d[3] == effect]
+                self.assertEqual(len(own), 1)
+                self.assertAlmostEqual(
+                    own[0], pair_damage(cfg["damage"], 100.0, 100.0))
+
+    def test_the_tornado_primes_everything_it_touches(self):
+        """The aura spread the owner asked for: the tornado's own element,
+        laid on each body it contacts."""
+        want = {ReactionId.FIREWIND: FIRE, ReactionId.ICEWIND: ICE,
+                ReactionId.THUNDERWIND: THUNDER}
+        for prime, trigger, rid, effect in self.PAIRS:
+            with self.subTest(reaction=rid.key):
+                crowd = huddle()
+                r, world, _t = build(crowd)
+                react(r, crowd[0], prime, trigger)
                 sweep(world)
-                after = {id(e) for e in crowd[1:] if e.elemental.has_aura(0.0)}
-                self.assertEqual(after, before)
+                touched = [d[0] for d in world.dealt if d[3] == effect
+                           and d[0] is not crowd[0]]
+                self.assertTrue(touched)
+                for e in touched:
+                    self.assertEqual(e.elemental.element(0.0), want[rid])
 
     def test_a_bystanders_own_profile_decides_what_may_be_done_to_it(self):
         """Not the profile of whoever set the tornado off."""
@@ -136,23 +160,36 @@ class FireWindTests(unittest.TestCase):
         sweep(self.world)
 
     def test_it_leaves_everything_it_touches_burning(self):
+        """The burn outlives `burn_duration` because the tornado also primes
+        each body with Fire, and a Fire aura carries a burn of its own for
+        the aura's life -- `StatusState.apply` keeps the longer of the two."""
         self.go()
         burning = [e for e in self.crowd[1:] if "burn" in e.status]
         self.assertTrue(burning)
         for e in burning:
-            self.assertAlmostEqual(e.status.remaining("burn"),
-                                   FIREWIND_CFG["burn_duration"])
+            self.assertGreaterEqual(e.status.remaining("burn"),
+                                    FIREWIND_CFG["burn_duration"])
 
-    def test_the_burn_is_standalone_so_a_bystanders_own_aura_is_safe(self):
+    def test_the_burn_is_standalone_so_it_survives_the_aura_it_rode_in_with(self):
+        """It is applied over the spread aura rather than under it, so the
+        row belongs to FireWind: consuming that aura cannot end the burn."""
         keeper = self.crowd[1]
-        self.r.apply(keeper, ICE, weapon_id="rod", hit_damage=50.0, now=0.0)
         self.go()
         self.assertIn("burn", keeper.status)
         self.assertFalse(keeper.status.is_bound("burn"))
-        self.assertEqual(keeper.elemental.element(0.0), ICE,
-                         "the tornado did not disturb the aura it was holding")
 
-    def test_its_ticks_are_credited_to_firewind(self):
+    def test_it_reacts_with_an_aura_a_bystander_was_already_holding(self):
+        """The cascade the owner chose (2026-09-22): the tornado's Fire
+        meeting a bystander's Ice is a Frostburn on that bystander."""
+        keeper = self.crowd[1]
+        self.r.apply(keeper, ICE, weapon_id="rod", hit_damage=50.0, now=0.0)
+        before = self.r.stats.reactions_total
+        self.go()
+        self.assertGreater(self.r.stats.reactions_total, before + 1,
+                           "the tornado set off a second reaction")
+        self.assertIn(tracking.FROSTBURN, keeper.damage_effects)
+
+    def test_its_ticks_are_credited_to_firewind_not_to_the_spread_auras_burn(self):
         self.go()
         burning = next(e for e in self.crowd[1:] if "burn" in e.status)
         ticks = []
@@ -184,26 +221,31 @@ class IceWindTests(unittest.TestCase):
         sweep(self.world, now)
 
     def test_it_pours_its_stacks_into_what_it_touches(self):
+        """`stacks_per_contact` from the payload plus one from the Ice aura
+        the tornado now spreads, whose own application is a stack."""
         self.go()
+        want = self.per_contact + 1
         touched = [e for e in self.crowd[1:] if e.elemental.ice_stacks]
         self.assertTrue(touched)
         for e in touched:
-            self.assertEqual(e.elemental.ice_stacks, self.per_contact)
+            self.assertEqual(e.elemental.ice_stacks, want)
             self.assertAlmostEqual(
                 e.status.potency("chill"),
-                ICE_CFG["slow"]["percent_per_stack"] * self.per_contact)
+                ICE_CFG["slow"]["percent_per_stack"] * want)
 
-    def test_the_slow_lasts_the_reactions_own_duration(self):
+    def test_the_slow_is_standalone_and_rides_the_aura_it_came_with(self):
+        """Applied over the spread aura, so the row is IceWind's: it is not
+        bound, and it lasts at least the reaction's own `slow_duration`."""
         self.go()
         chilled = next(e for e in self.crowd[1:] if "chill" in e.status)
-        self.assertAlmostEqual(chilled.status.remaining("chill"),
-                               ICEWIND_CFG["slow_duration"])
+        self.assertGreaterEqual(chilled.status.remaining("chill"),
+                                ICEWIND_CFG["slow_duration"])
         self.assertFalse(chilled.status.is_bound("chill"))
 
     def test_its_stacks_can_freeze(self):
         """Design open item 7: the stacks go through Ice's own model, so
         enough of them freeze exactly as Ice's do."""
-        data = tweak(**{"ice.freeze.stacks_required": self.per_contact})
+        data = tweak(**{"ice.freeze.stacks_required": self.per_contact + 1})
         self.crowd = huddle()
         self.r, self.world, _t = build(self.crowd, elements=data)
         self.go()
@@ -212,7 +254,7 @@ class IceWindTests(unittest.TestCase):
         self.assertTrue(frozen[0].status.is_stunned())
 
     def test_it_stops_short_of_freezing_when_the_threshold_is_higher(self):
-        data = tweak(**{"ice.freeze.stacks_required": self.per_contact + 3})
+        data = tweak(**{"ice.freeze.stacks_required": self.per_contact + 4})
         self.crowd = huddle()
         self.r, self.world, _t = build(self.crowd, elements=data)
         self.go()
@@ -224,7 +266,7 @@ class IceWindTests(unittest.TestCase):
         has to be read per body rather than off whoever reacted."""
         profiles, _ = prof.resolve(
             {"tank": {"elementProfile": {"ice": {"freeze.stacks_required": 99}}}})
-        data = tweak(**{"ice.freeze.stacks_required": self.per_contact})
+        data = tweak(**{"ice.freeze.stacks_required": self.per_contact + 1})
         self.crowd = huddle()
         self.crowd[1].enemy_id = "tank"
         self.r, self.world, _t = build(self.crowd, elements=data)

@@ -138,6 +138,70 @@ def dmg() -> DamageField:
     return DamageField()
 
 
+# --- the two-source pair (owner's rework, 2026-09-22) ------------------------
+
+PairSpec = namedtuple("PairSpec", "high low")
+PairSpec.__doc__ = """A reaction's damage, read from **both** hits that met on
+the enemy: `high` of the larger and `low` of the smaller."""
+
+
+def _pair_resolve(self: PairSpec, first: float, second: float) -> float:
+    """`high x max + low x min` for the two hits that produced the reaction.
+
+    Symmetric in its arguments on purpose: which of the two placed the aura
+    and which triggered it is bookkeeping, and a reaction that read them in
+    a fixed order would pay differently depending on which weapon happened
+    to fire second."""
+    a, b = float(first), float(second)
+    if a < b:
+        a, b = b, a
+    return float(self.high) * a + float(self.low) * b
+
+
+PairSpec.resolve = _pair_resolve
+
+_PAIR_KEYS = ("high", "low")
+
+
+class PairField(Field):
+    """`{"high": x, "low": y}`, both required and both >= 0. Its leaf paths
+    are `<path>.high` and `<path>.low`, so a modifier or an enemy profile can
+    address either coefficient on its own.
+
+    A reaction that pays the same for both hits -- the Wind three, which are
+    30 % of each -- simply sets the two equal, so `high x max + low x min`
+    collapses to `0.30 x (A + B)` with no second shape to maintain.
+    """
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("pair", 0.0, None, False)
+
+    def check(self, path: str, value: Any):
+        if not isinstance(value, dict):
+            raise ElementDataError(
+                f"{path}: expected {{\"high\": x, \"low\": y}}, got {value!r}")
+        keys = [k for k in value if not k.startswith("_")]
+        if sorted(keys) != sorted(_PAIR_KEYS):
+            raise ElementDataError(
+                f"{path}: needs exactly {list(_PAIR_KEYS)}, got {sorted(keys)}")
+        out = {}
+        for key in _PAIR_KEYS:
+            num = value[key]
+            if isinstance(num, bool) or not isinstance(num, (int, float)) or num < 0.0:
+                raise ElementDataError(
+                    f"{path}.{key}: expected a number >= 0, got {num!r}")
+            out[key] = float(num)
+        return out
+
+    def clamp(self, value):
+        return max(0.0, float(value))
+
+
+def pair() -> PairField:
+    return PairField()
+
+
 # --- sections ----------------------------------------------------------------
 
 Adjust = Callable[[str, Any], Any]      # (leaf path, base value) -> value
@@ -192,6 +256,10 @@ class Section:
                 for k, v in value.items():
                     spec[k] = node.clamp(adjust(f"{sub}.{k}", v)) if adjust else v
                 values.append(DamageSpec(**spec))
+            elif isinstance(node, PairField):
+                values.append(PairSpec(**{
+                    k: node.clamp(adjust(f"{sub}.{k}", v)) if adjust else v
+                    for k, v in value.items()}))
             elif adjust is not None and node.kind != "bool":
                 values.append(node.clamp(adjust(sub, value)))
             else:
@@ -201,7 +269,7 @@ class Section:
     # -- introspection --
     def paths(self, prefix: str = "") -> tuple[str, ...]:
         """Every leaf path, dotted. A damage leaf contributes both
-        `.frac` and `.flat`."""
+        `.frac` and `.flat`; a pair leaf both `.high` and `.low`."""
         out: list[str] = []
         for key, node in self.fields.items():
             sub = f"{prefix}.{key}" if prefix else key
@@ -209,6 +277,8 @@ class Section:
                 out.extend(node.paths(sub))
             elif isinstance(node, DamageField):
                 out.extend(f"{sub}.{k}" for k in _DAMAGE_KEYS)
+            elif isinstance(node, PairField):
+                out.extend(f"{sub}.{k}" for k in _PAIR_KEYS)
             else:
                 out.append(sub)
         return tuple(out)
@@ -220,12 +290,17 @@ def deep_merge(base: dict, override: dict) -> dict:
     out = dict(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(out.get(key), dict) \
-                and not _is_damage(value):
+                and not _is_leaf_spec(value):
             out[key] = deep_merge(out[key], value)
         else:
             out[key] = value
     return out
 
 
-def _is_damage(value: dict) -> bool:
-    return len(value) == 1 and next(iter(value)) in _DAMAGE_KEYS
+def _is_leaf_spec(value: dict) -> bool:
+    """A damage or pair value, which replaces wholesale rather than merging:
+    laying `{"high": 0.9, "low": 0.1}` over `{"high": 0.5, "low": 0.3}` must
+    give the override, not a blend of the two."""
+    keys = set(value)
+    return (len(value) == 1 and next(iter(value)) in _DAMAGE_KEYS) \
+        or keys == set(_PAIR_KEYS)

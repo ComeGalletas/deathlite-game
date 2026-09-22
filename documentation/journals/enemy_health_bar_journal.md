@@ -2,21 +2,12 @@
 
 ## Requirement (owner, 2026-09-22)
 
-> Add a health bar / HP bar on top of enemies that have less than 100 % of their
-> HP. This bar has a fixed height that increases its length depending on the
-> maximum amount of health points the enemy has. This excludes boss enemies as
-> they have their own HP bar.
-
-Three rules, restated as acceptance criteria:
-
-1. **Visibility.** An enemy at full HP shows nothing. The bar appears the moment
-   `hp < max_hp` and stays for the rest of that body's life.
-2. **Fixed height, variable length.** Every enemy bar is the same number of
-   pixels tall. Its *length* is a function of `max_hp` — a tanky enemy carries a
-   visibly longer bar than a mook, and the fill inside it reads as the fraction
-   left.
-3. **Not the boss.** `entities/boss.py` already has the bottom-centre HUD bar
-   (`ui/hud.py::_draw_boss`); it must not gain a second one over its head.
+- **Objective:** Draw a health bar above every enemy that is below full HP.
+- **Details:** Fixed height on every bar, with its length scaled by the enemy's
+  maximum HP so a tanky enemy carries a visibly longer one than a mook, and the
+  fill inside reading as the fraction left. The bar appears the moment
+  `hp < max_hp` and stays for the rest of that body's life.
+- **Constraint:** Bosses are excluded — they already have their own HP bar.
 
 ---
 
@@ -25,7 +16,9 @@ Three rules, restated as acceptance criteria:
 * `run.boss` is a **separate** `Boss` object, not a member of `run.enemies`
   (`game/states/playing/visual/scene.py::actor_items` appends it on its own
   line). Drawing the new bar from the enemy path therefore excludes the boss
-  structurally — no tag check, no `isinstance`.
+  structurally — no tag check, no `isinstance`. The bottom-centre HUD bar it
+  already has is `ui/hud.py::_draw_boss`, and it must not gain a second one
+  over its head.
 * `ui/bars/meters.py::bar(...)` already builds a finished bar Surface from the
   `assets/ui/04.png` hex family at any length and any fraction, cut from
   authored art rather than drawn as rectangles, and returns `None` when the art

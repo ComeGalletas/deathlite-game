@@ -56,6 +56,12 @@ class HitContext:
     profile: object
     registry: object
     resolver: "ElementalResolver"
+    # The hit that placed the aura this one is meeting, taken off the slot
+    # before it is consumed. Zero on a hit that starts no reaction, and on
+    # a reaction whose aura was laid by a path that carried no damage. A
+    # reaction reads the two together through `sources` (owner's rework,
+    # 2026-09-22).
+    aura_damage: float = 0.0
     tracking: object = None
     # May a status applied now share the aura's lifetime? False on a locked
     # slot, where Fire's burn and Ice's chill are applied standalone (§3.2).
@@ -96,7 +102,45 @@ class HitContext:
         """The same, for a `DamageSpec` resolved against the hit that carried
         the element (the owner's rule: element damage is a fraction of the
         hit unless the value is flat)."""
-        return self.deal(target, spec.resolve(self.hit_damage), effect)
+        return self.deal(target, spec.resolve(self.reference), effect)
+
+    # --- the two damage sources a reaction is paid from ---------------------
+    @property
+    def sources(self) -> tuple[float, float]:
+        """The two hits that met on this body: the one that placed the aura
+        and the one that triggered the reaction.
+
+        An aura that carries no damage of its own falls back to the
+        triggering hit, so a reaction is never paid as if one of its two
+        halves were free. That covers a slot filled by something with no
+        weapon damage behind it as well as the first reaction after a save
+        is loaded."""
+        placed = self.aura_damage if self.aura_damage > 0.0 else self.hit_damage
+        return (placed, self.hit_damage)
+
+    @property
+    def reference(self) -> float:
+        """The single number the *non-pair* values of a reaction resolve
+        against -- FireWind's burn, ThunderWind's strike -- and the damage
+        an ordinary element hit uses.
+
+        For an element hit that is simply the hit itself. For a reaction it
+        is the larger of the two sources, so the payloads the owner kept
+        (2026-09-22) benefit from the rework's central point without their
+        tuning numbers being restated."""
+        return max(self.sources)
+
+    def pair_damage(self, spec) -> float:
+        """A `PairSpec` resolved against both sources: `high x max + low x min`."""
+        first, second = self.sources
+        return spec.resolve(first, second)
+
+    def floored(self, amount: float) -> float:
+        """`amount` raised to the global floor -- the owner's rule that a
+        reaction never lands for less than a few points on the enemy it
+        fired on (2026-09-22). Applied to the carrier only; the bodies a
+        reaction spreads to take the raw figure."""
+        return max(float(amount), self.registry.global_cfg.reaction_min_damage)
 
     def knock(self, target, direction, strength: float, max_speed: float = 0.0) -> None:
         self.resolver.world.knock(target, direction, strength,
@@ -234,6 +278,9 @@ class ElementalResolver:
 
         state = state_of(target)
         profile = self.profile_for(target)
+        # Read before anything can consume the slot: this is the reaction's
+        # first damage source (owner's rework, 2026-09-22).
+        aura_damage = state.source_damage if state.has_aura(now) else 0.0
         # A carrier the hit has already killed still resolves, but only for
         # what reaches *other* enemies (the owner's rule, 2026-09-21). See
         # `HitContext.carrier_dead`.
@@ -242,7 +289,8 @@ class ElementalResolver:
             target=target, element=element, now=now, weapon_id=weapon_id,
             hit_damage=hit_damage, config=self.registry.config(element, profile),
             profile=profile, registry=self.registry, resolver=self,
-            tracking=self.tracking, chain=chain, carrier_dead=dead)
+            aura_damage=aura_damage, tracking=self.tracking, chain=chain,
+            carrier_dead=dead)
 
         if self.tracking is not None:
             self.tracking.record_application(weapon_id, element)
@@ -267,7 +315,8 @@ class ElementalResolver:
             self._land(target, element, ctx)
             if not alive(target):
                 return self._done(Outcome.OUTWARD)
-            state.set_aura(element, now, ctx.config.aura.duration, weapon_id)
+            state.set_aura(element, now, ctx.config.aura.duration, weapon_id,
+                           damage=hit_damage)
             self.registry.element(element).on_applied(target, ctx)
             return self._done(Outcome.APPLIED)
 
@@ -277,7 +326,8 @@ class ElementalResolver:
             self._land(target, element, ctx)
             if not alive(target):
                 return self._done(Outcome.OUTWARD)
-            state.refresh_aura(now, ctx.config.aura.duration, weapon_id)
+            state.refresh_aura(now, ctx.config.aura.duration, weapon_id,
+                               damage=hit_damage)
             self.registry.element(element).on_applied(target, ctx)
             return self._done(Outcome.REFRESHED)
 
@@ -286,6 +336,32 @@ class ElementalResolver:
         # the aura it was holding is what earned the reaction, and the blast
         # is owed to the enemies around it, not to the body.
         return self._done(self._react(target, state, held, element, ctx))
+
+    def spread_aura(self, target, element: ElementId, *, weapon_id: str = "",
+                    hit_damage: float = 0.0, now: float = 0.0) -> Outcome:
+        """An aura laid on a **bystander** by a reaction (owner's decision,
+        2026-09-22): a tornado's contacts and Superconduct's jump tree.
+
+        This is deliberately the ordinary `apply`, which means a spread aura
+        landing on an enemy already holding a different one **triggers
+        another reaction**. The design's old rule -- secondary hits never
+        apply auras, so reaction depth is exactly 1 (§5.3, §5.4) -- is
+        retired by that decision; the owner chose the cascade with the
+        blow-up risk stated, and chose not to cap its depth.
+
+        What bounds it is what already existed: the per-enemy aura lock, so
+        a body that has just reacted takes no new aura for
+        `reaction_aura_cooldown`; and `max_reactions_per_frame`, which caps
+        the recursion depth of a cascade at the frame's remaining budget and
+        defers the rest rather than dropping it. The value carried also
+        decays -- a spread aura is worth the damage that enemy just took --
+        so successive generations are paid less.
+
+        A method of its own rather than a bare `apply` call because it is
+        the one seam a depth cap would go behind if play asks for one.
+        """
+        return self.apply(target, element, weapon_id=weapon_id,
+                          hit_damage=hit_damage, now=now)
 
     def _land(self, target, element: ElementId, ctx: HitContext) -> None:
         """The element's own effect, then its statuses. On a locked slot
@@ -309,7 +385,8 @@ class ElementalResolver:
             # treated as a plain application so a future fifth element
             # without a full row of reactions degrades instead of crashing.
             self._land(target, incoming, ctx)
-            state.set_aura(incoming, ctx.now, ctx.config.aura.duration, ctx.weapon_id)
+            state.set_aura(incoming, ctx.now, ctx.config.aura.duration,
+                           ctx.weapon_id, damage=ctx.hit_damage)
             self.registry.element(incoming).on_applied(target, ctx)
             return Outcome.APPLIED
 

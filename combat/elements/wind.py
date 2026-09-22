@@ -29,15 +29,18 @@ class Wind(Element):
 
     @staticmethod
     def spawn_area(target, ctx, *, config=None, effect=tracking.WIND_AREA,
-                   payload=None) -> WindArea | None:
+                   payload=None, damage=None) -> WindArea | None:
         """Seat a Wind area on `target`. The Wind reactions call this with
-        their own `config` block and a payload; it returns the area, or None
+        their own `config` block, a payload and their own `damage` -- the
+        two-source figure, which they have already paid to the carrier, so
+        it is passed in rather than resolved here. Returns the area, or None
         when the run is at its cap."""
         cfg = config if config is not None else ctx.config.area
         area = WindArea(
             pos=target.pos, radius=cfg.radius,
             expires_at=ctx.now + cfg.duration,
-            damage=cfg.damage.resolve(ctx.hit_damage),
+            damage=(cfg.damage.resolve(ctx.reference) if damage is None
+                    else float(damage)),
             knockback=cfg.knockback, weapon_id=ctx.weapon_id, effect=effect,
             max_targets=cfg.max_targets, anchor=target, payload=payload,
             # Whether a body may be shoved is its own profile's call,
