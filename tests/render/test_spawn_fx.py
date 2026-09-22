@@ -58,13 +58,13 @@ class SheetTests(unittest.TestCase):
         self.assertNotIn("row", spec)
 
     def test_the_strip_matches_the_script(self):
-        """Exit 2 means the source has been archived away from the folder
-        and `unused/` both; the strip itself is still pinned above."""
+        """`--check` recuts the strip from `77.png` and compares. The source
+        is tracked at `assets/effects/spawn/unused/77.png`, so it is present
+        in every clone and worktree: exit 2 (source missing) is a failure,
+        not a reason to skip (TST-002)."""
         from tools.asset_pipeline import cut_spawn_sheet
-        code = cut_spawn_sheet.main(["--check"])
-        if code == 2:
-            self.skipTest("the source has been archived away entirely")
-        self.assertEqual(code, 0)
+        self.assertEqual(cut_spawn_sheet.main(["--check"]), 0,
+                         "cut_spawn_sheet --check failed (2 = 77.png missing)")
 
     def test_the_strip_is_the_dark_purple_row(self):
         """Bluer than red, redder than green, and near the measured mean --
