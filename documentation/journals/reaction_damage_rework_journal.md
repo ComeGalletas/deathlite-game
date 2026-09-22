@@ -341,3 +341,30 @@ did not. They are now R43–R46. The §13 numbering is still untouched.
 
 - [x] CMB-007.2 — Reconcile §13 against the shipped code and record the
   cascade verdict
+
+## CMB-007.3 — The owner's answers to the remaining questions (2026-09-22)
+
+Four of the five outstanding §13 items are now closed, leaving one.
+
+| # | answer | recorded as |
+|---|---|---|
+| 5 | Infusion survives upgrades by construction. Level-ups changing the application cadence is possible, unused and not required — kept as a future data option. | R48 |
+| 6 | No reaction differs by trigger and none needs to; the `triggered_by` machinery stays so order *could* matter later as a data edit with no code change. | R49 |
+| 13 | `reaction_aura_cooldown` stays at **1.0 s**, edited at `data/weapons/elements.json` → `global.reaction_aura_cooldown`. | R50 |
+| 12 | **Stays open**, to measure and test. | — |
+
+One correction to the reading behind #5: it is not only the summons that are
+rate-limited. Three weapons use a time window — the Grave Totem and Spirit
+Wolf at 1.5 s and the **Ember Ring at 1.0 s** — and the Daggers use attack
+mode with `interval: 2`, so they apply on every third swing. The other five
+are `interval: 0`, every attack. That does not change the answer, but the
+Ember Ring being rate-limited matters: it is a re-hitting orbiter, which is
+exactly the case the cadence exists for.
+
+#12 is worth keeping open for a reason the original audit could not have had:
+`MAX_PARTICLES` is 1200 and `MAX_DAMAGE_NUMBERS` 200, and the M9 pass measured
+the system at roughly thirty times a real build's load — but that was before
+the R38 cascade. A cascade puts more reactions in a frame than M9 ever saw,
+each with its own flash, label and stream of numbers.
+
+- [x] CMB-007.3 — Record the owner's answers; one question left

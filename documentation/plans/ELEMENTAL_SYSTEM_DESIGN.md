@@ -289,7 +289,8 @@ A reaction's behavior is the same regardless of order, but its **values** can di
 - At load, bake **two configs per reaction** (one per trigger direction) by merging overrides onto the base. No merging at runtime.
 - An override may only touch keys that exist in the reaction's base schema (validated).
 - Default with no overrides: both directions are identical.
-- **[OPEN]** Which reactions should actually differ by trigger, and in which values? This is a balance/design task. The code supports it for all six from day one.
+- **Parked** *(owner, 2026-09-22; open question 6)*: **no reaction differs by trigger today, and none needs to.** All six pay the same figure whichever element arrives second, which is also what §5.6's symmetry guarantees.
+  - The machinery stays because it costs nothing idle: `triggered_by` is validated, baked per direction and covered by tests, so making order matter later is a **data edit and no code**. A future pass might use it to give a pair a different character depending on which element closed it — a Fire-triggered Overload hitting harder than a Thunder-triggered one, say — without touching `combat/elements/`.
 
 ### 5.3 Secondary-hit rule *(rewritten in v9 — CMB-006)*
 
@@ -421,7 +422,7 @@ a cascade decay in value.
   - All weapons are cooldown-based: a weapon fires when its internal cooldown finishes, and **one firing = one attack** *(confirmed)*. There are no continuous/ticking weapons.
   - One counter per weapon, advanced once per attack. Every hit produced by that attack (all projectiles, pierces) shares the attack's element flag, stamped on the projectile/hitbox at spawn. No per-hit checks.
   - Plain attacks deal weapon damage only: no initial effect, no aura, no reaction.
-  - **[PROPOSAL]** Weapon level-ups can change `elementInterval` like any other weapon stat.
+  - **Possible, unused** *(owner, 2026-09-22; open question 5)*: a weapon keeps its infusion across upgrades by construction — the element lives on the weapon object and weapons are upgraded, never replaced (R16) — and nothing in `blessings.json` touches the application cadence. Level-ups changing it is supported in principle and **not required**; it is recorded here as something the data could express later rather than as a gap.
 - [ ] **6.4 Visuals:** the weapon shows its infusion using the shared visual profile (§8). Element-carrying projectiles should look different from plain ones.
 
 ---
@@ -599,16 +600,17 @@ a cascade decay in value.
 | R45 | Wind area late entrants *(closes open 10)* | Hit, via the 10 Hz re-query; the area follows its anchor and contacts each body once per instance. |
 | R46 | Collision damage between non-frozen bodies *(closes open 4)* | None. Only frozen contact damage exists (R25), with the knockback speed clamp. |
 | R47 | Cascade strength in play *(v9, closes open 14)* | The owner played the uncapped cascade on 2026-09-22 and found it good. No depth cap, no coefficient change. The damage values ship as built. |
+| R48 | Infusion across weapon upgrades *(closes open 5)* | Kept, by construction: the element lives on the weapon and weapons are upgraded, never replaced (R16). Level-ups changing the application cadence is **possible but unused and not required**; kept as a future data option. |
+| R49 | Directional variants in practice *(closes open 6)* | **None today, and none needed.** The `triggered_by` machinery stays available — making order matter later is a data edit with no code change. |
+| R50 | `globalReactionAuraCooldown` value *(closes open 13)* | **1.0 s**, as shipped. Edit it at `data/weapons/elements.json` → `global.reaction_aura_cooldown`; it is one of the two brakes on the R38 cascade. |
 | R42 | Spread ordering *(v9, CMB-006)* | Inside one contact the aura is spread before the reaction's own payload, so the payload owns its status row's credit and binding rather than the spread element's `onApplied`. |
 
 ### Still open
 
-*Settled since v8: 1 (locked node keeps spreading, §4.3), 2 and 3 (Superconduct and ThunderWind reach, §5.5), 7 (IceWind stacks freeze, §5.5), 11 (damage formula, R39), and — reconciled against the shipped code on 2026-09-22 — 4, 8, 9 and 10, which the implementation had answered without the answer ever being written down. 14 was closed by the owner in play. The numbering of the rest is unchanged so older references still resolve.*
+*Settled since v8: 1 (locked node keeps spreading, §4.3), 2 and 3 (Superconduct and ThunderWind reach, §5.5), 7 (IceWind stacks freeze, §5.5), 11 (damage formula, R39), and — reconciled against the shipped code on 2026-09-22 — 4, 8, 9 and 10, which the implementation had answered without the answer ever being written down. 5, 6, 13 and 14 were closed by the owner on 2026-09-22. The numbering of the rest is unchanged so older references still resolve.*
 
 | # | Question | Proposal |
 |---|---|---|
-| 5 | Do weapon upgrades keep the infusion, and can they change `elementInterval`? | Yes to both |
-| 6 | Which reactions differ by trigger, and in which values? | Balance task; identical by default |
-| 12 | Existing particle system limits | Audit in Milestone 0 |
-| 13 | Starting value for `globalReactionAuraCooldown` | Balance task |
+| 12 | Existing particle system limits | **Open, to measure and test** (owner, 2026-09-22). `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200 in `game/config.py`. The M9 pass measured the element system at ~30x a real build's load without trouble, but that was before the R38 cascade, which is load the original audit never saw: more reactions per frame, each with its own flash, label and stream of numbers. Measure a dense cascade before closing this. |
+
 
