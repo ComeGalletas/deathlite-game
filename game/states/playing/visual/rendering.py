@@ -22,6 +22,7 @@ from entities.pickup import XP_TIER_COLORS
 from game.states.playing.devtools import overlays
 from game.states.playing.visual.drawctx import DrawCtx
 from game.states.playing.visual.glow import GlowCache
+from game.states.playing.visual import health_bars
 from game.states.playing.visual.projectiles import draw_projectile
 from game.states.playing.visual.summons import draw_summon
 from progression import chests as _chests
@@ -587,6 +588,12 @@ class WorldRenderer:
             r = e.cfg["slam_radius"]
             pygame.draw.circle(surface, (255, 90, 90), (int(sx), int(sy)),
                                round(r * z), 2)
+
+        # Over the head, and only once the enemy has been hurt: its length
+        # states the enemy's maximum HP, its fill what is left of it. The boss
+        # never reaches here -- it is not one of `run.enemies` -- so it keeps
+        # the HUD's own bar and gains no second one.
+        health_bars.draw(surface, self, e)
 
     def death_fx(self, surface, fx) -> None:
         ps = self.ps
