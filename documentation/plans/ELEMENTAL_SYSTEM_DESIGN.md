@@ -166,7 +166,7 @@
 
 ### Considerations
 - Thunder and Wind auras have no bound status. They are pure reactable markers with their own configurable duration.
-- **[OPEN]** If a reaction consumes an Ice aura while the enemy is **frozen**, does the Freeze end with it? **[PROPOSAL]** Freeze keeps its own duration (it is its own status, not bound), and only Slow ends.
+- **Settled in code** *(open question 8)*: a reaction consuming an Ice aura while the enemy is **frozen** does not end the Freeze. `freeze` is its own status and is never bound to the aura, so the resolver's `end_bound()` leaves it; only the `chill` goes. `combat/elements/ice.py` cites the question by number.
 
 ---
 
@@ -203,7 +203,7 @@ Each source carries `maxRange` (max distance to reach a target) and `maxTargets`
 | Aura / slow duration | `aura.duration` |
 
 - [ ] On reaching X stacks: apply Freeze for Y s and reset Slow stacks to 0.
-- **[OPEN]** Does the Ice aura remain after a freeze triggers (with 0 stacks)? **[PROPOSAL]** Yes, it stays until it expires or reacts.
+- **Settled in code** *(open question 9)*: the Ice aura remains after a freeze triggers. Freezing touches the stack counter and the statuses, never the aura slot, so it falls out of the implementation rather than needing a branch.
 - **Frozen enemies are not immune to knockback** *(confirmed)*. Wind areas and Overload shockwaves push them away like any other enemy. The freeze stops the enemy's own movement, not external knockback. **[PROPOSAL]** Being knocked back does not end the freeze.
 - **Addendum: frozen contact damage** *(confirmed, optional)*. A frozen enemy that is knocked back by another source can deal contact damage to enemies it collides with while sliding.
   - Toggle: `freeze.knockbackContactDamage.enabled` (JSON, bool).
@@ -248,7 +248,7 @@ Each source carries `maxRange` (max distance to reach a target) and `maxTargets`
 
 - [ ] **Wind area is a reusable component** (`WindAreaEffect`) with a swappable **payload**: damage, knockback, and an optional extra effect. The Wind reactions (§5) reuse it with different payloads.
 - **[PROPOSAL]** The area follows the inflicted enemy. Each enemy is hit at most once per area instance. The inflicted enemy itself is not knocked back. Contact checks run on spawn and then at a low fixed rate (e.g., 10 Hz) for its lifetime.
-- **[OPEN]** Should enemies entering the area after spawn be hit too (the proposal says yes, via the low-rate check), or only enemies inside at spawn (cheaper, one query)?
+- **Settled in code** *(open question 10)*: late entrants **are** hit. `WindArea` follows its anchor and re-queries at `CHECK_HZ` (10 Hz) for its whole life, contacting each body at most once per area instance.
 
 ---
 
@@ -594,20 +594,21 @@ a cascade decay in value.
 | R39 | Reaction damage sources *(v9, CMB-006)* | `high × max(A, B) + low × min(A, B)`, where A placed the aura and B triggered the reaction. Symmetric. The aura remembers its hit; a refresh keeps the larger. Closes open question 11. |
 | R40 | Who a reaction pays *(v9, CMB-006)* | The same figure reaches the enemy it fired on and every enemy it reaches. The Wind three used to pay their carrier nothing at all. |
 | R41 | Reaction damage floor *(v9, CMB-006)* | Raised to `globalReactionMinDamage` on the carrier only; spread targets take the raw figure. |
+| R43 | Freeze vs a consumed Ice aura *(closes open 8)* | Freeze keeps its own duration. It is its own status and is never bound to the aura, so only the Slow ends with it. |
+| R44 | Ice aura after a freeze *(closes open 9)* | It stays until it expires or reacts. Freezing touches the stacks and the statuses, never the slot. |
+| R45 | Wind area late entrants *(closes open 10)* | Hit, via the 10 Hz re-query; the area follows its anchor and contacts each body once per instance. |
+| R46 | Collision damage between non-frozen bodies *(closes open 4)* | None. Only frozen contact damage exists (R25), with the knockback speed clamp. |
+| R47 | Cascade strength in play *(v9, closes open 14)* | The owner played the uncapped cascade on 2026-09-22 and found it good. No depth cap, no coefficient change. The damage values ship as built. |
 | R42 | Spread ordering *(v9, CMB-006)* | Inside one contact the aura is spread before the reaction's own payload, so the payload owns its status row's credit and binding rather than the spread element's `onApplied`. |
 
 ### Still open
 
-*Settled since v8 and moved into Resolved: 1 (locked node keeps spreading, §4.3), 2 and 3 (Superconduct and ThunderWind reach, §5.5), 7 (IceWind stacks freeze, §5.5), 11 (damage formula, R39). The numbering of the rest is unchanged so older references still resolve.*
+*Settled since v8: 1 (locked node keeps spreading, §4.3), 2 and 3 (Superconduct and ThunderWind reach, §5.5), 7 (IceWind stacks freeze, §5.5), 11 (damage formula, R39), and — reconciled against the shipped code on 2026-09-22 — 4, 8, 9 and 10, which the implementation had answered without the answer ever being written down. 14 was closed by the owner in play. The numbering of the rest is unchanged so older references still resolve.*
 
 | # | Question | Proposal |
 |---|---|---|
-| 4 | Collision damage between knocked-back enemies that are *not* frozen? | No, only frozen enemies (R25). Speed clamp on knockback |
 | 5 | Do weapon upgrades keep the infusion, and can they change `elementInterval`? | Yes to both |
 | 6 | Which reactions differ by trigger, and in which values? | Balance task; identical by default |
-| 8 | Consuming the Ice aura during Freeze: does Freeze end? | No, only Slow ends |
-| 9 | Ice aura after a freeze triggers | Stays until it expires or reacts |
-| 10 | Wind area: hit late entrants? Does it follow the enemy? | Late entrants via 10 Hz check; follows |
 | 12 | Existing particle system limits | Audit in Milestone 0 |
 | 13 | Starting value for `globalReactionAuraCooldown` | Balance task |
-| 14 | Is the uncapped cascade (R38) too strong in play? | Owner is testing it. The bench measured large jumps after v9 — Ice+Thunder 3.5 → 74.1 element dps, Fire+Wind 10.1 → 48.9. If it needs reining in, a depth cap behind the spread seam is the intended lever, not a coefficient change. |
+

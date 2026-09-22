@@ -22,7 +22,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | CMB-003 | Training dummy and DPS meter | CMB, UI | feature | legacy | [training_dummy_journal.md](training_dummy_journal.md) | — | 2026-09-11 |
 | CMB-004 | Bomb blast radius | CMB | balance | legacy | [bomb_blast_journal.md](bomb_blast_journal.md) | — | 2026-09-12 |
 | CMB-005 | Elemental system | CMB, RND | feature | legacy | [elemental_system_journal.md](elemental_system_journal.md) | — | 2026-09-21 |
-| CMB-006 | Reaction damage rework | CMB | feature | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| CMB-006 | Reaction damage rework | CMB | feature | done (balance confirmed in play) | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-007 | Elemental design doc brought to the shipped behaviour | CMB, DOC | process | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |

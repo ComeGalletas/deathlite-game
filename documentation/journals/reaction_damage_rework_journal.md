@@ -324,3 +324,20 @@ behind the spread seam, not a coefficient change). The owner is testing the
 damage values as shipped.
 
 The document was untracked until this commit, so it enters history at v9.
+
+## CMB-007.2 — The owner's verdict on the cascade (2026-09-22)
+
+The owner played the uncapped cascade and found it good; the damage values
+ship as built. §13's item 14 is closed as **R47** and no depth cap is added.
+This settles the one balance consequence CMB-006 left open, so the bench
+figures in "Measured after the change" are the intended numbers rather than a
+deviation to watch.
+
+Asked in the same breath what was still unanswered, which turned up four
+questions the **implementation had already answered without anyone recording
+it** — open 4, 8, 9 and 10. Two of them (8 and 9) are even cited by number in
+`combat/elements/ice.py`'s docstring, so the code knew and the design document
+did not. They are now R43–R46. The §13 numbering is still untouched.
+
+- [x] CMB-007.2 — Reconcile §13 against the shipped code and record the
+  cascade verdict
