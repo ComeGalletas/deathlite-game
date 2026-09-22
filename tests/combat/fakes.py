@@ -107,11 +107,23 @@ class _Fx:
 
 
 class _Numbers:
+    """The floating-number pool, recording instead of drawing.
+
+    `colour` and `life` are kept rather than swallowed: since M11 the
+    elemental damage path passes both, and a test that wants to check an
+    element's damage is written in its own colour needs to see them.
+    """
+
     def __init__(self):
         self.shown = []
+        self.rows = []
 
-    def add(self, pos, amount, crit):
+    def add(self, pos, amount, crit=False, incoming=False, healing=False,
+            colour=None, life=None, low_priority=False):
         self.shown.append((amount, crit))
+        self.rows.append({"pos": pos, "amount": amount, "crit": crit,
+                          "colour": colour, "life": life,
+                          "low_priority": low_priority})
 
 
 class _Particles:

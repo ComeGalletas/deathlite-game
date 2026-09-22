@@ -23,7 +23,8 @@ frozen enemy.
 """
 from __future__ import annotations
 
-from combat.elements.ids import ELEMENTS, REACTIONS
+from combat.elements.ids import (ELEMENTS, REACTIONS, ElementId,
+                                 ReactionId)
 
 # --- effect ids -------------------------------------------------------------------
 # What dealt a piece of elemental damage. Strings, like every other damage
@@ -60,9 +61,34 @@ _LABELS = {
 
 UNATTRIBUTED = "other"      # matches `RunLedger.UNATTRIBUTED`
 
+# Which element or reaction a piece of damage came from (M11). Keyed the
+# same way `_LABELS` is, and living beside it for the same reason: the
+# effect id is the one name every part of the system already agrees on.
+#
+# Deliberately *not* a colour. This module is combat-side and has no
+# business knowing what an element looks like; it answers "whose damage
+# was this" and the visual layer turns that into a colour.
+_SOURCE: dict[str, object] = {
+    FIRE_HIT: ElementId.FIRE, BURN: ElementId.FIRE,
+    WIND_HIT: ElementId.WIND, WIND_AREA: ElementId.WIND,
+    THUNDER_CHAIN: ElementId.THUNDER, THUNDER_STRIKE: ElementId.THUNDER,
+    FROZEN_CONTACT: ElementId.ICE,
+    FROSTBURN: ReactionId.FROSTBURN,
+    OVERLOAD: ReactionId.OVERLOAD, OVERLOAD_WAVE: ReactionId.OVERLOAD,
+    SUPERCONDUCT: ReactionId.SUPERCONDUCT,
+    FIREWIND: ReactionId.FIREWIND, ICEWIND: ReactionId.ICEWIND,
+    THUNDERWIND: ReactionId.THUNDERWIND,
+}
+
 
 def label(effect: str) -> str:
     return _LABELS.get(effect, effect.replace("_", " ").title())
+
+
+def source_of(effect: str):
+    """The `ElementId` or `ReactionId` behind an effect id, or None for a
+    weapon's own damage."""
+    return _SOURCE.get(effect)
 
 
 class ElementTracking:

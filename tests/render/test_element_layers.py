@@ -30,9 +30,13 @@ from combat.elements.ids import ELEMENTS, REACTIONS
 from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.playing.visual import elements as element_fx
+from game.states.playing.visual import elements as fx
 from game.states.playing.visual import scene
 from game.states.playing.visual.elements import transient
 from tests import worlds as W
+# The headless fake run and its stub camera, shared with the sibling
+# module rather than written twice.
+from tests.render.test_element_visuals import _Camera, _init, fake_run
 
 SEED = W.pinned(0)
 
@@ -177,6 +181,84 @@ class TransientSplitTests(unittest.TestCase):
     def test_an_arc_bands_and_a_flash_does_not(self):
         self.assertFalse(transient.Arc.OVER)
         self.assertTrue(transient.Flash.OVER)
+
+
+class ShedParticleLayerTests(unittest.TestCase):
+    """The aura's shed goes under the bodies too (M11 A).
+
+    It was the one piece of rule 3 that did not land in M10, and it did not
+    land because the particles are not drawn by the elements package at
+    all -- the pool is painted from `PlayingState.draw`, after the whole
+    world. One flag on the particle splits it without a second pool.
+    """
+
+    def setUp(self):
+        from systems.particles import ParticleSystem
+        _init()
+        self.surface = pygame.Surface((320, 240))
+        self.particles = ParticleSystem(max_particles=64)
+
+    def _drawn(self, **kwargs):
+        """How many particles a `draw` call actually paints."""
+        seen = []
+        real = pygame.draw.circle
+
+        def circle(surface, colour, centre, radius, *a, **kw):
+            seen.append(colour)
+            return real(surface, colour, centre, radius, *a, **kw)
+
+        with mock.patch.object(pygame.draw, "circle", circle):
+            self.particles.draw(self.surface, _Camera(), **kwargs)
+        return len(seen)
+
+    def test_the_default_burst_is_an_event_and_draws_late(self):
+        self.particles.burst(pygame.Vector2(0, 0), (255, 0, 0), count=5)
+        self.assertEqual(self._drawn(under=False), 5)
+        self.assertEqual(self._drawn(under=True), 0)
+
+    def test_an_under_burst_draws_in_the_banded_pass_only(self):
+        self.particles.burst(pygame.Vector2(0, 0), (0, 255, 0), count=5,
+                             under=True)
+        self.assertEqual(self._drawn(under=True), 5)
+        self.assertEqual(self._drawn(under=False), 0)
+
+    def test_no_filter_draws_both(self):
+        self.particles.burst(pygame.Vector2(0, 0), (255, 0, 0), count=3)
+        self.particles.burst(pygame.Vector2(0, 0), (0, 255, 0), count=4,
+                             under=True)
+        self.assertEqual(self._drawn(), 7)
+
+    def test_the_flag_is_reset_when_a_particle_is_recycled(self):
+        """A pooled object outlives its last use, so a stale `under` would
+        strand an event particle in the wrong layer."""
+        self.particles.burst(pygame.Vector2(0, 0), (0, 255, 0), count=64,
+                             under=True)
+        for p in self.particles._pool:
+            p.life = -1.0
+            p.active = False
+        self.particles._pool.sweep()
+        self.particles.burst(pygame.Vector2(0, 0), (255, 0, 0), count=5)
+        self.assertEqual(self._drawn(under=False), 5,
+                         "a recycled particle kept the old layer")
+
+    def test_the_shed_asks_for_the_lower_layer(self):
+        """The one caller that wants it. Checked through `fx.draw` rather
+        than by reading `_shed`, so a refactor that stops passing the flag
+        is caught."""
+        from tests.combat.fakes import FakeEnemy
+
+        body = FakeEnemy(0.0, 0.0)
+        body.elemental.set_aura(ELEMENTS[0], 0.0, 10.0)
+        run = fake_run([body])
+        run.particles = self.particles
+        # The shed is a once-a-frame chance per aura, so drive enough
+        # frames that it cannot plausibly have been skipped every time.
+        for _ in range(400):
+            fx.draw(self.surface, run)
+        under = [p for p in self.particles._pool if p.under]
+        self.assertTrue(under, "the aura shed nothing in 400 frames")
+        self.assertEqual(len(under), len(list(self.particles._pool)),
+                         "the aura shed an event-layer particle")
 
 
 if __name__ == "__main__":

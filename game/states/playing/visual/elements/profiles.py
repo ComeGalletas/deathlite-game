@@ -54,17 +54,36 @@ class ReactionBurst:
     events, and each has to start at its own first frame -- so the frame is
     taken by index off the individual flash's age (`frame_at`).
     """
-    __slots__ = ("key", "rig", "seconds", "size", "_assets", "_frames",
-                 "_natural")
+    __slots__ = ("key", "rig", "seconds", "size", "label_fill",
+                 "label_ring", "_assets", "_frames", "_natural")
 
     def __init__(self, key: str, spec: dict, assets) -> None:
+        from combat.elements.ids import element_from_key
+
         self.key = key
         self.rig = str(spec["rig"])
         self.seconds = float(spec["seconds"])
         self.size = float(spec["size"])
+        # Which of the pair is the label's fill and which its ring, or
+        # None for "follow REACTION_PAIRS order".
+        label = spec.get("label") or {}
+        self.label_fill = (element_from_key(label["fill"])
+                           if "fill" in label else None)
+        self.label_ring = (element_from_key(label["ring"])
+                           if "ring" in label else None)
         self._assets = assets
         self._frames = None
         self._natural = None
+
+    def label_pair(self, default):
+        """`(fill, ring)` for this reaction's popped name.
+
+        `default` is the pair in `REACTION_PAIRS` order, which is what
+        most of them use.
+        """
+        if self.label_fill is None or self.label_ring is None:
+            return default
+        return (self.label_fill, self.label_ring)
 
     @property
     def natural(self):

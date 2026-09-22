@@ -320,11 +320,45 @@ def _check_element_visuals(data: dict[str, Any]) -> dict[str, Any]:
             if float(spec[field]) <= 0.0:
                 raise ContentError(
                     f"element_visuals.json: reaction {key}.{field} must be > 0")
+        _check_reaction_label(key, spec.get("label"))
 
     statuses = data.get("statuses")
     if not isinstance(statuses, dict):
         raise ContentError("element_visuals.json: `statuses` must be an object")
     return data
+
+
+def _check_reaction_label(key: str, label: Any) -> None:
+    """A reaction's optional label order names two *different* elements of
+    that reaction's own pair.
+
+    Checked rather than trusted: naming the wrong element would silently
+    colour a word in a hue that has nothing to do with the reaction, and
+    naming the same one twice would draw a ring the same colour as its
+    fill, which reads as no ring at all."""
+    if label is None:
+        return
+    from combat.elements.config import REACTION_PAIRS
+    from combat.elements.ids import reaction_from_key
+
+    if not isinstance(label, dict):
+        raise ContentError(
+            f"element_visuals.json: reaction {key}.label must be an object")
+    missing = {"fill", "ring"} - set(label)
+    if missing:
+        raise ContentError(
+            f"element_visuals.json: reaction {key}.label has no "
+            f"{sorted(missing)} -- name both or neither")
+    allowed = {e.key for e in REACTION_PAIRS[reaction_from_key(key)]}
+    for field in ("fill", "ring"):
+        if label[field] not in allowed:
+            raise ContentError(
+                f"element_visuals.json: reaction {key}.label.{field} is "
+                f"{label[field]!r}, which is not one of {sorted(allowed)}")
+    if label["fill"] == label["ring"]:
+        raise ContentError(
+            f"element_visuals.json: reaction {key}.label names "
+            f"{label['fill']!r} twice -- the ring would vanish")
 
 
 def _check_element_rigs(visuals: dict[str, Any], sprites: dict[str, dict]) -> None:

@@ -135,8 +135,12 @@ def _shed(run, body, profile, budget) -> None:
     if not budget.take(profile.element, 1):
         return
     p = profile.particles
+    # `under`: the shed is part of the aura, and the aura draws behind the
+    # body wearing it (M10 rule 3). Without this the one elemental visual
+    # the elements package does not draw itself would be the one visual
+    # still sitting on top of the crowd.
     run.particles.burst(body.pos, profile.colour, count=1, speed=p.speed,
-                        life=p.life, radius=p.radius)
+                        life=p.life, radius=p.radius, under=True)
 
 
 def _ring(surface, center, radius: int, colour, alpha: int, width: int) -> None:

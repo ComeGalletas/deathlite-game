@@ -55,11 +55,21 @@ def fake_run(enemies=()):
     from game.states.playing.visual.elements import ElementVisuals
 
     class _Particles:
+        """Records bursts instead of pooling them.
+
+        `draw` is a no-op rather than absent: since M11 the elemental
+        under-pass paints the aura's shed itself, so a stub without it
+        turns every drawing test in this module into an AttributeError.
+        """
+
         def __init__(self):
             self.bursts = []
 
         def burst(self, pos, colour, **kw):
             self.bursts.append((pos, colour, kw))
+
+        def draw(self, surface, camera, under=None, keep=None):
+            pass
 
     run = SimpleNamespace(
         enemies=list(enemies), boss=None, camera=_Camera(),

@@ -40,6 +40,13 @@ def run(target, variant, config, ctx) -> bool:
     # side reaching across the seam to ask how long its own effect lasted.
     ctx.world.add_flash(target.pos, variant.reaction, _flash_radius(config),
                         ctx.now)
+    # And its name, for the same reason the flash is here rather than in
+    # each of the six: they all go off the same way. One reaction fires on
+    # one body -- the one whose aura was consumed -- so a label per
+    # reaction is a label on every enemy a reaction triggers on, which is
+    # what was asked for. Superconduct's jumps and Overload's shockwave
+    # *touch* other bodies without reacting on them, and stay silent.
+    ctx.world.add_label(target.pos, variant.reaction)
     return True
 
 

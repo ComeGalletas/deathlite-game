@@ -126,6 +126,10 @@ def infuse(ps, seed: int) -> None:
 
 
 def element_report(ps) -> str:
+    from game import config
+
+    peak = getattr(ps, "_numbers_peak", 0)
+    cap = config.MAX_DAMAGE_NUMBERS
     run = ps.run
     el = run.elements
     vis = run.element_visuals
@@ -135,7 +139,9 @@ def element_report(ps) -> str:
             f"reactions {el.stats.reactions_total} "
             f"({el.stats.deferred_total} deferred, {el.pending} held)  "
             f"areas {len(run.wind_areas)}  fx {len(run.element_fx)}\n"
-            f"            particles {len(run.particles)}  budget {budget}")
+            f"            particles {len(run.particles)}  budget {budget}\n"
+            f"            damage numbers peak {peak} / {cap} "
+            f"({peak / cap:.0%} of the pool)")
 
 
 def element_pump(ps, per_frame: int, seed: int = 3):
@@ -196,6 +202,13 @@ def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
         if pump is not None:
             pump()
         times.append((time.perf_counter() - t0) * 1000.0)
+        # M11: elemental damage numbers outlive a weapon's, so the floating
+        # number pool is the thing that could saturate. A full pool drops
+        # whatever asks next -- possibly the weapon's own number, the one
+        # that matters more -- so the peak decides how long "a bit longer"
+        # is allowed to be.
+        ps._numbers_peak = max(getattr(ps, "_numbers_peak", 0),
+                               len(ps.run.damage_numbers))
         if render:
             view = ps.camera.visible_rect()
             in_view.append(sum(1 for e in ps.enemies

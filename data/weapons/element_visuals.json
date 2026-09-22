@@ -69,12 +69,23 @@
       "`size` is the sprite's drawn width in world pixels at the smallest",
       "a reaction ever is; the resolver hands the flash a radius from the",
       "reaction's own reach, and the drawn size scales with it, so a",
-      "wide-reaching Overload looks wider than a Frostburn on one body."
+      "wide-reaching Overload looks wider than a Frostburn on one body.",
+      "",
+      "`label` is optional and names which of the two elements is the",
+      "*fill* of the popped reaction name and which is the *ring* round it",
+      "(M11 C). Left out, they follow REACTION_PAIRS order. It exists",
+      "because that order is taxonomy -- it also decides the blend and the",
+      "art -- and which colour reads better on the inside of a word is a",
+      "separate question with a separate answer."
     ],
     "frostburn": {
       "rig": "reaction_frostburn",
       "seconds": 0.5,
-      "size": 46
+      "size": 46,
+      "label": {
+        "fill": "ice",
+        "ring": "fire"
+      }
     },
     "overload": {
       "rig": "reaction_overload",

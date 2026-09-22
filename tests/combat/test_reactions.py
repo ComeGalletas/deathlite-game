@@ -382,5 +382,50 @@ class ThroughTheHitSiteTests(unittest.TestCase):
                                places=4)
 
 
+# --- the reaction label (M11 C) ------------------------------------------------------
+
+class ReactionLabelTests(unittest.TestCase):
+    """One label per reaction, on the body it fired on."""
+
+    def _fire(self, reaction, bystanders=0):
+        """Prime a body with the reaction's pair and trigger it."""
+        from combat.elements.config import REACTION_PAIRS
+
+        first, second = REACTION_PAIRS[reaction]
+        target = tough()
+        others = [tough(x=20.0 * (i + 1)) for i in range(bystanders)]
+        resolver, world, _tracked = build([target, *others])
+        react(resolver, target, first, second)
+        return world, target
+
+    def test_every_reaction_asks_for_its_name(self):
+        for reaction in ReactionId:
+            with self.subTest(reaction=reaction.key):
+                world, target = self._fire(reaction)
+                self.assertEqual(len(world.labels), 1,
+                                 "exactly one label per reaction")
+                pos, got = world.labels[0]
+                self.assertIs(got, reaction)
+                self.assertEqual(tuple(pos), tuple(target.pos),
+                                 "the label belongs to the body that reacted")
+
+    def test_one_element_on_its_own_says_nothing(self):
+        target = tough()
+        resolver, world, _tracked = build([target])
+        resolver.apply(target, ElementId.FIRE, weapon_id="sword",
+                       hit_damage=100.0, now=0.0)
+        self.assertEqual(world.labels, [])
+
+    def test_a_bystander_a_reaction_only_touches_stays_silent(self):
+        """Superconduct's jumps and Overload's shockwave reach other bodies
+        without reacting on them. "Every enemy that gets a reaction
+        triggered" means the body whose aura was consumed, not everything
+        the blast happened to touch."""
+        world, target = self._fire(ReactionId.OVERLOAD, bystanders=3)
+        self.assertEqual(len(world.labels), 1)
+        self.assertEqual(tuple(world.labels[0][0]), tuple(target.pos))
+
+
 if __name__ == "__main__":
     unittest.main()
+

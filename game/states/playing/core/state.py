@@ -576,7 +576,9 @@ class PlayingState(State):
             element_fx.begin_frame(run)
             self._draw_world(surface)
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
-            run.particles.draw(surface, run.camera)
+            # Only the event particles: the aura's shed is `under` and was
+            # already painted with its own terrace inside `_draw_world`.
+            run.particles.draw(surface, run.camera, under=False)
             run.damage_numbers.draw(surface, run.camera)
             element_fx.draw_reactions(surface, run)     # over everything, and brief
             self.renderer.collider_overlay(surface)     # dev-only, on top of the world

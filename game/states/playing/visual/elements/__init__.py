@@ -80,12 +80,29 @@ def draw_under(surface, run, level=None) -> None:
     if visuals is None:
         return
     now = run.stats["time"]
+    _shed_particles(surface, run, level)
     transient.draw_areas(surface, run, visuals.profiles, now, level)
     visuals.auras_drawn += layers.draw_auras(
         surface, run, visuals.profiles, now, visuals.budget, level)
     layers.draw_statuses(surface, run, visuals.profiles, now, level)
     transient.draw_transient(surface, run, visuals.profiles, now, level,
                              over=False)
+
+
+def _shed_particles(surface, run, level) -> None:
+    """The aura's shed, with this terrace and under its bodies.
+
+    Lowest of the elemental layers: these are motes coming off a body, so
+    they belong beneath even the tornado and the jump arcs.
+    """
+    particles = getattr(run, "particles", None)
+    if particles is None:
+        return
+    keep = None
+    if level is not None:
+        def keep(pos, _level=level, _run=run):
+            return not transient.off_band(_run, _level, pos)
+    particles.draw(surface, run.camera, under=True, keep=keep)
 
 
 def draw_reactions(surface, run) -> None:
