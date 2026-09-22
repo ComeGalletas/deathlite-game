@@ -52,11 +52,17 @@ def draw_indicators(surface, ps, level=None) -> None:
         surface.blit(disc, (int(sx) - rr, int(sy) - rr))
 
 
-def spawn_impact(ps, *, pos, radius, rig, weapon_id="", anim: str = "loop") -> None:
+def spawn_impact(ps, *, pos, radius, rig, weapon_id="", anim: str = "loop",
+                 element=None) -> None:
     """Queue the impact sheet at `pos`, scaled to the circle's diameter. A
     weapon with no rig (or a rig with no frames) shows nothing. `anim` names
     the strip: the Hammer's rig has one (`loop`); the totem bolt's `burst`
     shares its rig with the orb the bolt flies with."""
+    # The Hammer's slam is authored once per element (M13); the totem
+    # bolt's burst has no variants and resolves straight back to itself.
+    if rig and anim == "loop":
+        from game.states.playing.visual import elements as element_fx
+        rig = element_fx.variant_rig(ps.game.assets, rig, element)
     if not rig or ps.game.assets.frame_count(rig, anim) <= 0:
         return
     ps._impacts.append({"anim": Animator(ps.game.assets, rig, start=anim),

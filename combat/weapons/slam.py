@@ -72,6 +72,7 @@ def land(weapon, ctx) -> None:
         element=weapon.attack_element)
     if ctx.spawn_impact is not None:
         ctx.spawn_impact(pos=pos, radius=radius, rig=str(d.get("impact_rig", "")),
+                         element=weapon.attack_element,
                          weapon_id=weapon.weapon_id)
     fx = weapon.effects
     if weapon.effect("shockwave_radius") > 0.0:

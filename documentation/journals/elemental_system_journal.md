@@ -1548,9 +1548,9 @@ happened to place is not the subject.
       while the two coral FireWind bursts cover the ones they are on.
 - [x] F3. Full suite.
 
-## M11 Elemental feedback (PROPOSED)
+## M11 Elemental feedback (DONE)
 
-Requested 2026-09-21, **not yet confirmed**. Three things, all about the
+Requested and confirmed 2026-09-21, built the same day. Three things, all about the
 player being able to read what the elemental system is doing to a crowd.
 
 1. The aura's shed particles draw **behind** the bodies, like everything
@@ -1744,6 +1744,151 @@ wrong as soon as a blessing widens it. If it ever wants art, the shape
 that works is a hybrid -- an authored core at 1x inside the procedural
 ring.
 
+## M12 Colours in the data, and Thunder goes purple (CONFIRMED)
+
+Requested and confirmed 2026-09-21.
+
+1. **Thunder is purple, `#6C4AA3`.** No more yellow.
+2. **A reaction's colour is simply the combination of its two elements**
+   (owner, asked and answered), so it stays derived from the pair rather
+   than becoming an override -- the pair's element colours are already in
+   the JSON, so the combination already is data. What needed re-deciding
+   was **Overload's art**, whose pair stopped being two warm colours.
+3. The two look-alikes -- the `shock` status tint and the magic rod's own
+   `thunder_*` art -- are left alone, confirmed.
+
+And the rule that came with it, which is wider than this milestone: **it is
+not acceptable to have discontinued references or appearances.** A
+deliberate, commented duplicate of a value is still a duplicate; prose that
+states the old value is still wrong; a cut asset with the old value baked
+in still has to be recut. The survey below is part of the change, not
+follow-up work.
+
+### A. Reaction colours become data -- **dropped, answered instead**
+
+The proposal was an optional `colours` override per reaction in
+`element_visuals.json`. The owner's answer made it unnecessary: **a
+reaction's colour is simply the combination of its two elements**. The
+pair is taxonomy (`REACTION_PAIRS`) and the element colours are already
+data, so the combination already *is* data and an override entry would
+have been a second way to say the same thing -- exactly the sort of
+duplicate this milestone is otherwise removing.
+
+`transient.blend_colours` is unchanged and remains the one place a
+reaction palette is built.
+
+What the question actually surfaced was the **art**: Overload and
+Superconduct were each a single authored row picked when one of their two
+elements was yellow, and neither states its pair any more. See C3 and C4.
+
+### B. Thunder goes purple -- done
+
+- [x] B1. `elements.thunder.colour` is `[108, 74, 163]`.
+- [x] B2/C1. `overlays.py` no longer keeps its own copy. It calls
+      `aura_colour(key)`, which reads the game's data, with an empty
+      `_READABLE` map for the day something genuinely needs a contrast
+      nudge -- so a divergence would have to be written down rather than
+      drifting. Verified returning `(108, 74, 163)`.
+- [x] B3/C2. `thunder.png` and `thunderwind.png` re-cut on a purple ramp,
+      `(58, 36, 92)` to `(168, 132, 226)` at gamma 0.8, chosen by eye
+      against the two authored alternatives (see below).
+- [x] B4. Every remaining statement that Thunder is yellow: the rig
+      `_note`s, the CREDITS usage entry, the cut script's docstring, and
+      its ramp comment -- rewritten hue-neutral, because the lesson it
+      records (why a per-channel multiply fails on the grey row) is true
+      of any colour and should outlive this one.
+
+**Why not an authored purple row.** Rows 8 and 1 were rendered beside the
+remap. Row 8 is a near-black indigo that disappears against grass; row 1 is
+a saturated magenta that would fight Frostburn, which already owns it. The
+grey row remaps onto any ramp exactly, which is why it was the row to take
+in the first place, so it hits `#6C4AA3` on the nose.
+
+### C. The two reactions whose pair changed -- done
+
+- [x] C3. **Overload** was coral, picked when its pair was fire orange and
+      thunder yellow. It is now the grey row remapped **across its own
+      pair**: purple in the shadows, a hot orange core. One authored row is
+      one colour and a reaction has two elements.
+- [x] C4. **Superconduct** got the same treatment on the owner's word --
+      purple shadows to an icy highlight. It had been cyan, which read as
+      ice alone.
+- [x] C5/C6. The `shock` status tint and the magic rod's own `thunder_*`
+      art are **left alone**, confirmed. The first is a weapon-blessing
+      status that happened to share a hue with the old Thunder and no
+      longer does; the second is the rod's own projectile and cast art,
+      which an *uninfused* rod still fires. Written down here so neither is
+      "fixed" later on the strength of its name.
+
+**The three Wind reactions are deliberately not pair-ramped.** FireWind,
+IceWind and ThunderWind are one swirl in three colours because they are the
+same mechanic with different payloads, and reading as a family is worth
+more there than naming the pair. ThunderWind did change -- from the old
+yellow to the new purple -- because that is its payload's colour, not
+because it became a pair ramp.
+
+### D. Tests and close out -- done
+
+`tests/render/test_element_colours.py`, 7 tests and 17 subtests.
+
+- [x] D1. The dev inspector's colours match the data, for all four
+      elements. Two tests beside it: that `_AURA_COLOURS` has not come
+      back at all -- the *shape* the defect took, which a future edit could
+      reintroduce while keeping both tables in step today and leaving the
+      first test passing -- and that `_READABLE` is still empty, so any
+      contrast override has to be written down rather than forked.
+- [x] D2. Superseded by dropping A: there is no override to test.
+- [x] D3. Screenshots delivered.
+- [x] D4. Full suite: 3131 passed, 1 skipped, before the Overload fix
+      below; re-run after it.
+
+**The art has to be tested against the data, and nothing was doing it.**
+The aura and reaction strips are *cut* assets with a colour baked in.
+Changing a number in `element_visuals.json` cannot reach them -- only
+re-running the cut script can -- and no other test in the suite looks at a
+pixel. So a colour change that forgot the art would have shown up only when
+somebody eventually noticed. The new tests compare the strips' **hue** to
+the declared colour: hue rather than RGB distance, because the claim being
+made is "still the same colour family" and the art is a whole ramp against
+one declared point. Measured deltas are 0 to 11 degrees against a 45 degree
+threshold, so a retune has four times the headroom and a 150-degree mistake
+like yellow-for-purple still cannot pass.
+
+#### It immediately caught a real one
+
+Overload's pair ramp -- authored as "thunder's purple in the shadows,
+fire's orange in the core", approved from a screenshot, and shipped --
+contained **no purple at all**. Fire sits at 22 degrees and Thunder at 263,
+nearly opposite on the wheel, so interpolating between them in RGB runs
+through muddy red rather than through either end; and the source row's
+darkest pixels only reach about a fifth of the way along the ramp, so the
+purple end was never sampled. Measured on the old strip: 0 % of its
+coloured pixels anywhere near thunder's hue, against the test's 5 % floor.
+
+The fix is a deeper, more saturated dark end and a gamma above 1 so values
+stay low for longer: `(68, 24, 185)` to `(255, 168, 64)` at gamma 1.5. The
+strip is now 72 % thunder and 20 % fire -- a violet body with a hot orange
+core, which is what was wanted.
+
+Superconduct needed none of this and is 100 % ice / 72 % thunder on the
+first try, because ice and thunder are *adjacent* hues: anything between
+them is already both. That contrast is the whole lesson. **A pair ramp
+works when the pair is adjacent on the colour wheel and has to be forced
+when it is not**, and the only way to know which happened is to count.
+
+It is worth saying plainly that the picture looked fine. Two screenshots
+were taken of that strip, one of them a deliberate candidate comparison,
+and neither showed the problem -- a warm purple-grey reads as "purple
+enough" beside an orange core. The measurement disagreed and the
+measurement was right.
+
+### Ordering
+
+M12 before M11's part B. M11 planned an outline-and-lift treatment partly
+to separate Thunder from the crit gold; purple separates itself, so doing
+the colour first means that work is sized against the colours that ship
+rather than against one that is about to change.
+
 ## Does every island offer an element? (surveyed 2026-09-21)
 
 Asked by the owner. There are two doors into the elemental system: the
@@ -1785,6 +1930,210 @@ so 40 of the 41 "islands with no buff building" were arenas behaving
 correctly, and the real figure was 1. The layout has no `boss_room_id`
 attribute -- the check silently read `None` and never excluded anything --
 and `room.kind == "boss"` is the test that works.
+
+## M13 An infused weapon looks infused (PROPOSED)
+
+Requested 2026-09-21, **not yet confirmed**. An infused weapon's *attack*
+should show its element. Two ways were put: authored sprites that enhance
+the effect, or a coloured alpha over the attack's own appearance. The owner
+then asked to look in the reserve for something that could *replace* a
+melee attack -- a cone for the Sword -- and consider a tint or a coloured
+version of it.
+
+### What is element-aware today: almost nothing
+
+One line, `core/effects.py:75`. A projectile's `color` -- the primitive dot
+and the dust-trail particles -- is blended toward the element. Every
+**authored** attack visual is element-blind: the Sword's slash, the
+Daggers' slash and stab, the Hammer's impact, the Bomb's explosion, the
+Rod's bolt and arcane circle, the Bow's arrow, the Ember Ring's orbiters
+and both summons. An infused Hammer looks exactly like a plain one until
+the aura appears on whatever it hit.
+
+### Can the existing art take a tint? Mostly not
+
+Mean saturation of each attack's opaque pixels, which is what decides
+whether a multiply tint can work on it:
+
+| rig | mean sat | a multiply tint would |
+|---|---|---|
+| `thunder_ball` | **0.00** | work perfectly -- it is greyscale |
+| `dust_puff` | 0.11 | work |
+| `daggers_slash` | 0.12 | work |
+| `explosion_small` | 0.50 | dull it |
+| `grave_totem` | 0.51 | dull it |
+| `spirit_wolf` | 0.57 | muddy it |
+| `explosion` | 0.57 | muddy it |
+| `hammer_impact` | 0.58 | muddy it |
+| `sword_slash_up` | 0.68 | muddy it |
+| `totem_bolt_fire` | 0.80 | wreck it |
+| `arcane_circle` | 0.90 | wreck it |
+| `soul_slash` | 0.91 | wreck it |
+| `ember` | 1.00 | wreck it |
+
+**Three of sixteen are neutral enough to multiply.** The Thunder remap's
+lesson again: a multiply by a saturated colour crushes every channel the
+tint is low in. So "a coloured alpha" cannot mean one `BLEND_RGBA_MULT`
+across the board.
+
+### The reserve answers it: for melee, replace the art
+
+The pack's sheets carry **nine colour rows of the same animation**, so a
+"coloured version" is not something to compute -- it is already drawn.
+
+Scored all 180 sheets for wide, thin, low-fill shapes and then looked,
+because a score cannot tell a sweep from a smear:
+
+| weapon | sheet | shape |
+|---|---|---|
+| Sword | `Part 11/509` (13f) | three or four curved blades fanned in an arc -- a cone sweep |
+| Daggers, slash | `Part 12/578` (11f) | parallel claw streaks, fast and narrow |
+| Daggers, stab | `Part 8/395` (9f) | a thin lens driven forward |
+| Hammer, slam | `Part 13/615` (14f) | a radial star from the point of impact |
+
+Rendered across the rows a weapon would wear -- the neutral grey for an
+uninfused weapon, then the four elements -- all four read and the steel
+column reads as plain steel. **So the melee weapons need no tint at all**:
+five authored variants each.
+
+Thunder is the same exception it has been since M12. No purple row, so its
+variant is the grey row remapped, exactly as `thunder.png` and
+`thunderwind.png` already are.
+
+### The proposal: replace melee, tint the rest
+
+The two ways the owner put are not alternatives; they are the right answer
+for different weapons.
+
+- **Melee -- replace.** Sword, Hammer and Daggers get new art, five
+  variants each. Authored colour beats a computed one, which is this
+  project's own preference (`authored-tiles-over-procedural-edges`).
+- **Everything else -- tint.** The arrow, the Rod's bolt and arcane
+  circle, the Bomb's explosion, the orbiters and the two summons all carry
+  identity that is theirs rather than the element's, and replacing them is
+  a different and much larger job. They take M11's lift-multiply-blend,
+  already proven on saturated pixel art here.
+- `thunder_ball`, at 0.00 saturation, takes the asset cache's existing
+  `tint=` multiply instead: cheaper, already cached per tint, and better on
+  greyscale.
+
+**This also settles the alpha-56 rigs by replacing them.**
+`sword_slash_down` and `daggers_stab` are drawn at a maximum alpha of 56
+where their own up-swings reach 255 -- about a fifth of the opacity. Both
+are on the replacement list, so whether that was deliberate stops
+mattering.
+
+### The colour values to use
+
+`element_visuals.json` `elements.<key>.colour`, through the accessors that
+already exist:
+
+    element_fx.tint(element)              -> the element's RGB
+    element_fx.blend(colour, toward, amt) -> what the trail already uses
+
+No new colour data. M12 put the elements' colours in one place and took the
+duplicate out of `overlays.py`; this must not add a third. A tint strength
+belongs in `element_visuals.json` beside `aura.rig_scale`.
+
+### Todo (M13)
+
+**A. Cut the melee art** -- done
+
+- [x] A1. Twenty strips: four attacks, five variants each.
+- [x] A2. `assets/effects/weapons/<weapon>/`, single-row, no `row` index.
+- [x] A3. The art they replace archived unmodified in
+      `assets/unused/superseded-weapon-fx/`.
+- [x] A4. `assets/CREDITS.md` usage entry.
+
+| attack | source | frames | frame | anchor |
+|---|---|---|---|---|
+| `sword/slash_*` | Part 11/509 | 13 | 62 x 53 | 31, 27 |
+| `daggers/slash_*` | Part 12/578 | 11 | 64 x 40 | 32, 20 |
+| `daggers/stab_*` | Part 8/395 | 9 | 58 x 27 | 29, 13 |
+| `hammer/impact_*` | Part 13/615 | 14 | 63 x 59 | 32, 30 |
+
+#### Every variant carries its suffix, `plain` included
+
+The first cut gave `plain` the bare name -- `slash.png` -- and that landed
+straight on top of `daggers/slash.png` and `daggers/stab.png`, which are
+tracked files the *current* rigs still read. Both were restored from the
+index and the scheme changed: `slash_plain`, `slash_fire`, and so on. The
+old art keeps its own names until the wiring moves off it, and none of the
+five is named unlike its siblings.
+
+#### What the Daggers were actually showing
+
+`weapon_visuals.json` plays `[daggers_stab]` and keeps `daggers_slash`
+under a `_slash_disabled` key. The Sword plays `[sword_slash_down,
+sword_slash_up]` in sequence. So of the three melee effects on screen, the
+two faint ones -- `slash_down` and `daggers_stab`, both at a maximum alpha
+of 56 -- were the Daggers' *only* effect and the Sword's opening frame.
+Replacing them is most of the visible gain here, before any element is
+involved.
+
+**B. Wire the melee rigs** -- done
+
+- [x] B1. Twenty rigs in `weapon_sprites.json`.
+- [x] B2. `elements.variant_rig(assets, base, element)` resolves a base to
+      its element's colour, and the slash and slam painters call it. The
+      data now names *bases*: `sword_slash`, `daggers_stab`,
+      `hammer_impact`.
+- [x] B3. Sizes, anchors and timings re-measured.
+
+#### The resolver has to be told, not left to guess
+
+`variant_rig` first tried the obvious thing: look for `base_<element>`, then
+`base_plain`, then `base`. That resolved `totem_bolt` + fire to
+**`totem_bolt_fire`**, which exists and is the Grave Totem bolt's flame
+tail. Name guessing across one flat rig namespace finds things it did not
+mean to. It now treats a rig as variant-cut only when its `_plain` exists,
+which is the marker that says the family was cut on purpose.
+
+#### The Sword is one strip now, and the Daggers got faster
+
+The Sword played `[sword_slash_down, sword_slash_up]` back to back; the
+replacement is a single fanned arc, so the sequence is one entry long. The
+machinery is unchanged and still tested, because a sequence weapon's cone
+draws no slash of its own and would show nothing if it broke.
+
+The Daggers' new strips came off the cut at 0.32 s and 0.37 s against a
+0.1 s hit and a 0.4 s cooldown -- the crescent would still have been on
+screen at the next swing. Both are now about 0.2 s.
+
+#### Eleven tests followed the art
+
+They were pinning provenance -- this strip is row 18 of
+`Combat-Sheet.png`, that one is row 13, the impact is five frames, the
+cells are square, the splash sits eight crop pixels low. All true of the
+art M13 replaced and none of it true now. Each was rewritten to what still
+holds rather than deleted, and two came out **stronger** for it: the frame
+count now has to tile the strip's width *and* match its height, where it
+used to assert squareness; and the daggers' upper time bound is now
+against the cooldown, which is the thing that actually matters, rather
+than 1.5x the hit, which was a statement about a five-frame strip.
+
+The Hammer also needed `content` and `over_circle` copied onto the new
+rigs: `slam_fx.impact_size` reads both, and without them the splash lost
+its quarter overhang and would have been drawn square.
+
+**C. Tint the rest**
+
+- [ ] C1. M11's lift-multiply-blend moved out of `rendering.py` into a
+      shared home, named for what it does rather than for auras.
+- [ ] C2. Strength in `element_visuals.json`, validated in `content.py`.
+- [ ] C3. The projectile, orbiter, explosion and summon painters ask for
+      it. A summon's element is its summoning weapon's.
+- [ ] C4. `thunder_ball` uses the asset cache's `tint=`.
+
+**D. Tests and close out**
+
+- [ ] D1. Every melee weapon has all five variants and they all load.
+- [ ] D2. An infused attack's frame differs from the plain one, per
+      element; an uninfused weapon draws `plain`.
+- [ ] D3. The tint is cached per (frame, element), not copied per frame.
+- [ ] D4. No third copy of an element colour, asserted the way M12 asserts
+      the dev inspector.
+- [ ] D5. Screenshot per element, full suite.
 
 ## Progress
 

@@ -135,6 +135,30 @@ def sweep(run, now: float) -> None:
     transient.sweep(run, now)
 
 
+def variant_rig(assets, base: str, element=None) -> str:
+    """`base` in the colour of `element`, or its plain colour.
+
+    The melee attacks are authored once per state -- `sword_slash_plain`,
+    `sword_slash_fire`, and so on -- rather than tinted, because the pack
+    they come from drew all nine colours of each animation and an authored
+    colour beats a computed one (M13).
+
+    A rig is only treated as variant-cut when its `_plain` exists. That
+    guard is not ceremony: `variant_rig(assets, "totem_bolt", FIRE)` would
+    otherwise resolve to `totem_bolt_fire`, which is a real rig and is the
+    Grave Totem bolt's flame tail -- nothing to do with an infusion. Name
+    guessing across a flat rig namespace finds things it did not mean to,
+    and `_plain` is the marker that says this family was cut on purpose.
+    """
+    if assets.frame_count(f"{base}_plain", "loop") <= 0:
+        return base
+    if element:
+        name = f"{base}_{element.key}"
+        if assets.frame_count(name, "loop") > 0:
+            return name
+    return f"{base}_plain"
+
+
 def tint(element):
     """The element's colour, for callers outside a run (the build pane)."""
     from game.content import get_content

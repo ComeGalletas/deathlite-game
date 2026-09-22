@@ -97,10 +97,12 @@ class TransientFx:
         s.reset(**kw)
         return s
 
-    def spawn_impact(self, *, pos, radius, rig, weapon_id="", anim="loop") -> None:
+    def spawn_impact(self, *, pos, radius, rig, weapon_id="", anim="loop",
+                     element=None) -> None:
         """CR1: the Hammer's impact sheet at the blow; the totem bolt's burst."""
         from game.states.playing.visual import slam_fx
         slam_fx.spawn_impact(self.ps, pos=pos, radius=radius, rig=rig,
+                             element=element,
                              weapon_id=weapon_id, anim=anim)
 
     def spawn_hero_hazard(self, *, pos, radius, dps, duration, weapon_id="",

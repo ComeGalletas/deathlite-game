@@ -169,6 +169,15 @@ fill when a file is missing.
   (`arcane_circle.png`, `thunder_ball.png`, `thunder_aura.png`). The pack is
   kept unmodified under `assets/unused/unordered-effects/` and is not read at
   run time.
+- **750+ Effect and FX Pixel All** — the melee attack effects
+  (`elemental_system_journal.md`, M13), cut by the same script into
+  `assets/effects/weapons/`: the Sword's `slash_*` (Part 11/509, a fanned
+  arc), the Daggers' `slash_*` (Part 12/578) and `stab_*` (Part 8/395), and
+  the Hammer's `impact_*` (Part 13/615). Five variants each — `plain` from
+  the pack's neutral row, `fire` / `ice` / `wind` from their own, `thunder`
+  from the neutral row remapped, since the pack has no purple. The art they
+  replace is archived unmodified in
+  `assets/unused/superseded-weapon-fx/`.
 - **Super Pixel Effects Gigapack** — the freeze status
   (`assets/effects/elements/freeze.png`), cut from `spell_ice_001` large blue
   by the same script: a block of ice that forms over forty frames and

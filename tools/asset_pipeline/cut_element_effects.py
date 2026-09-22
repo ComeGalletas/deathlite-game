@@ -61,6 +61,7 @@ import pygame  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 OUT_ELEMENTS = ROOT / "assets" / "effects" / "elements"
 OUT_REACTIONS = ROOT / "assets" / "effects" / "reactions"
+OUT_WEAPONS = ROOT / "assets" / "effects" / "weapons"
 
 # Set by `main` from `--reserve`, which defaults to `assets/unused`. It is a
 # flag rather than a constant because that folder is gitignored, so a git
@@ -125,6 +126,22 @@ PURPLE = ((58, 36, 92), (168, 132, 226), 0.8)
 # anything between them is already both.
 OVERLOAD_PAIR = ((68, 24, 185), (255, 168, 64), 1.5)       # purple -> fire orange
 SUPERCONDUCT_PAIR = ((92, 56, 140), (150, 214, 255), 0.9)  # purple -> ice blue
+
+# Which row a melee attack wears for each state it can be in (M13). An
+# uninfused weapon takes the neutral row, which reads as steel; the rest
+# take their element's own. Thunder is the same exception it has been since
+# M12 -- the pack has no purple row, so it is the neutral row remapped.
+#
+# This is why the melee attacks need no tint at all. A "coloured version"
+# of the effect is not something to compute from the element's RGB; the
+# pack already drew it, and an authored colour beats a derived one.
+WEAPON_VARIANTS = (
+    ("plain", 5, None),
+    ("fire", 0, None),
+    ("ice", 2, None),
+    ("thunder", 5, PURPLE),
+    ("wind", 3, None),
+)
 
 
 class Cut:
@@ -270,6 +287,27 @@ def cut_one(cut: Cut, dry: bool) -> dict:
     }
 
 
+# The melee attacks, one source sheet each (M13). Chosen by scoring all
+# 180 sheets for wide, thin, low-fill shapes and then looking, because a
+# score cannot tell a sweep from a smear.
+#
+# They replace art that two of them badly needed replacing: `slash_down`
+# and `daggers_stab` are drawn at a maximum alpha of 56 where their own
+# siblings reach 255, so the Sword's opening swing and the Daggers' only
+# enabled effect were both about a fifth as visible as they look in the
+# file.
+MELEE = (
+    ("sword", "slash", 11, "509",
+     "three or four curved blades fanned in an arc -- the Sword's cone"),
+    ("daggers", "slash", 12, "578",
+     "parallel claw streaks, fast and narrow"),
+    ("daggers", "stab", 8, "395",
+     "a thin lens driven forward"),
+    ("hammer", "impact", 13, "615",
+     "a radial star from the point of impact"),
+)
+
+
 FREEZE = ("Fantasy Spells/spell_ice_001/spell_ice_001_large_blue", 128)
 
 
@@ -305,6 +343,24 @@ def cut_freeze(dry: bool) -> dict:
     }
 
 
+def cut_melee(dry: bool) -> list:
+    """Every melee attack in every state, from one source sheet each."""
+    rows = []
+    for weapon, action, part, sheet, note in MELEE:
+        for variant, row, ramp in WEAPON_VARIANTS:
+            # Every variant carries its suffix, `plain` included. The
+            # alternative -- `plain` taking the bare name -- would have the
+            # new art land on top of the files the old rigs are still
+            # reading, and one of the five would be named unlike its
+            # siblings for no reason.
+            name = f"{action}_{variant}"
+            cut = Cut(name, OUT_WEAPONS / weapon, part, sheet, row,
+                      recolour=ramp, note=f"{weapon} {action}, {variant}: {note}")
+            rows.append(cut_one(cut, dry))
+            rows[-1]["name"] = f"{weapon}/{name}"
+    return rows
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dry-run", action="store_true",
@@ -328,14 +384,15 @@ def main(argv=None) -> int:
 
     rows = [cut_one(cut, args.dry_run) for cut in CUTS]
     rows.append(cut_freeze(args.dry_run))
+    rows.extend(cut_melee(args.dry_run))
 
-    print(f"\n{'name':<14}{'frames':>7}  {'frame':<11}{'anchor':<11}"
-          f"{'file':<34}source")
-    print("-" * 110)
+    print(f"\n{'name':<22}{'frames':>7}  {'frame':<11}{'anchor':<11}"
+          f"{'file':<40}source")
+    print("-" * 122)
     for r in rows:
-        print(f"{r['name']:<14}{r['frames']:>7}  "
+        print(f"{r['name']:<22}{r['frames']:>7}  "
               f"{str(r['frame']):<11}{str(r['anchor']):<11}"
-              f"{r['file']:<34}{r['source']}")
+              f"{r['file']:<40}{r['source']}")
     print(f"\n{'(dry run -- nothing written)' if args.dry_run else 'written'}")
     return 0
 
