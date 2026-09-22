@@ -162,7 +162,7 @@
     "frame": [192, 192],
     "content": [34, 13, 130, 138],
     "anchor": [96, 96],
-    "scale": [184, 184],
+    "scale": [40, 40],
     "anims": {
       "loop": {
         "file": "enemies/hex_shaman/hex_shaman_explosion_spell.png",
