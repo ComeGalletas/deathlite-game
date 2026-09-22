@@ -1309,7 +1309,7 @@ seen. Flagged above; the count schedule was left alone as asked.
 - [x] `ENEMY_LIVE_CAP` 250
 - [x] Tests updated (`tests/spawn` 134 passed)
 - [x] Re-measured curve delivered
-- [ ] Frame cost at 250 live re-measured with `tools/benchmarks/spawn_stress.py`
+- [x] Frame cost at 250 live re-measured with `tools/benchmarks/spawn_stress.py` *(DOC-003: measured in `enemy_despawn_journal.md` (SPN-003): 250 live at p50 6.22 ms, no frame over budget)*
       -- not run here; the 150 -> 250 raise is expected to cost frames
 
 ### Suite

@@ -158,7 +158,7 @@ Conventions that apply to every item below:
 
 ## S8 — Resource points (future)
 
-- [ ] First consumer (chests, breakables or ambient gems) reads
+- [x] First consumer (chests, breakables or ambient gems) reads *(DOC-003: chests read `layout.resource_points` (`world/gen/chests.py`, CB-9))*
       `layout.resource_points` instead of searching; tag semantics
       confirmed against what that system needs.
 
