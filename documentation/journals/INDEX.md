@@ -10,6 +10,11 @@ someone confirms it. Each carries a `**Legacy ID:**` line under its title
 (DOC-001.3) — grep `Legacy ID:` to list them. Their sections predate the
 standard and are not rewritten to it.
 
+CMB-006 is the one exception to `legacy` status: its journal was stamped
+with a `Legacy ID:` line because it was written before DOC-001 landed on
+its branch, but the work finished under the standard and is tracked as
+`done` (DOC-003).
+
 **Next free:** CMB-009 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
 PRG-003 · AUD-004 · SYS-009 · TST-003 · BLD-003 · DOC-004
 
@@ -86,12 +91,17 @@ PRG-003 · AUD-004 · SYS-009 · TST-003 · BLD-003 · DOC-004
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
-| DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | in progress | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
+| DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
 
 ## Plans and designs
 
 Only links whose owner is clear from the document are filled in; the rest
 are `unassigned` until someone confirms which requirement they serve.
+DOC-003 assigned three from the document's own pointers: the forge tables
+cite the six-blessings journal, the boss free-roam todo names the enemy AI
+journal as its companion, and the fluidity plan's done items are logged in
+the spawn master journal. The other three are surveys or references that
+serve no single requirement.
 
 | document | serves |
 |---|---|
@@ -107,8 +117,8 @@ are `unassigned` until someone confirms which requirement they serve.
 | [plans/web_plan.md](../plans/web_plan.md) | BLD-001 |
 | [designs/death_must_die_lite_game_spec.md](../designs/death_must_die_lite_game_spec.md) | SYS-003 |
 | [designs/sprite_functionality.md](../designs/sprite_functionality.md) | unassigned |
-| [designs/weapon_blessing_forge_tables.md](../designs/weapon_blessing_forge_tables.md) | unassigned |
-| [plans/boss_free_roam_todo.md](../plans/boss_free_roam_todo.md) | unassigned |
-| [plans/fluidity_plan.md](../plans/fluidity_plan.md) | unassigned |
+| [designs/weapon_blessing_forge_tables.md](../designs/weapon_blessing_forge_tables.md) | PRG-001 |
+| [plans/boss_free_roam_todo.md](../plans/boss_free_roam_todo.md) | ENT-001 |
+| [plans/fluidity_plan.md](../plans/fluidity_plan.md) | SPN-001 |
 | [plans/pending_plans.md](../plans/pending_plans.md) | unassigned |
 | [plans/test_suite_review.md](../plans/test_suite_review.md) | unassigned |

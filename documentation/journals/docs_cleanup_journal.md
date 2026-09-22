@@ -1,7 +1,7 @@
 # Documentation cleanup — journal
 
 **ID:** DOC-003 · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
-**Type:** process · **Status:** in progress ·
+**Type:** process · **Status:** done ·
 **Branch:** claude/doc-003-doc-cleanup (worktree `.claude/worktrees/doc-003-doc-cleanup`)
 
 ---
@@ -55,8 +55,39 @@ by path.
 - [x] DOC-003.5 — Entities and UI: bomb fish, roster expansion, gnome split, imp, spear goblin, key icons, buff buildings, assets WA5
 - [x] DOC-003.6 — Stale text: `FUNCTIONAL_README.md` `MENU_SCRIM`, `spawn_tables.json` `_unused_comment`, `pending_plans.md` status
 - [x] DOC-003.7 — Cross-references: ENT-012.D2 → WLD-011, WLD-011 → WLD-012, SYS-007 *Open* → SYS-008 and `state.py` size, CMB-007 → CMB-008
-- [ ] DOC-003.8 — Index: assign the unassigned plans, note CMB-006's legacy stamp, results, close
+- [x] DOC-003.8 — Index: assign the unassigned plans, note CMB-006's legacy stamp, results, close
 
 ## DOC-003 — Results
 
-*(filled in by DOC-003.8)*
+No tests run: documentation only. The one `data/` edit is a comment string
+(DOC-003.D3), re-parsed as JSON before it was written.
+
+**Unticked boxes:** about 180 before, **33 after**. The count was taken with
+`grep -rn -- "- \[ \]" documentation`, leaving out this journal. Every box
+that remains is real open work:
+
+| where | open |
+|---|---|
+| `elemental_system_journal.md` | the owner's sign-off on "one application per window" (time mode) |
+| `ELEMENTAL_SYSTEM_DESIGN.md` | buff buildings draw no element; 9.8 lacks jump-node and Wind-area counters; 10.3 dev extras (hot-reload, reaction log, spawn a building with an element) |
+| `combat_balance_journal.md` | CB-2 G: the "no target → no attack" playtest and the reach values |
+| `worldgen_modularity_todo.md` | R4: push sweep assertions down to hand-built grids |
+| `spawn_groups_journal.md` | G6 remainder: elite item income, group-weight review |
+| `test_suite_review.md` | the digest tests' world source, coverage gaps and `coverage` as a dependency, the seed and tileset skips, §6 organisation, §7 nits, the balance-number audit |
+| `enemy_roster_expansion_journal.md` | an in-game screenshot of Bonepicker and Gaffjaw firing |
+| `assets_journal.md` | WA5: the summon render tests |
+| `pygbag.md` | W9 GitHub Pages deploy (the owner's call, no CI) and the optional bundle trim |
+
+**New IDs, proposed:** CMB-008 (design §13 q.12), SYS-008 (cross-process run
+reproducibility), WLD-012 (props beside bridge mouths).
+
+**Corrected on the way:** the agent-assisted review said M6's time mode had
+been built without `next_element_at`, but `Weapon._next_element_at` exists
+(`combat/weapons/core.py`), so the box was noted as shipped as planned. The
+elemental journal's M13 heading still read "PROPOSED" although its Progress
+entry records it done; the heading now says "DONE".
+
+**Deferred:** none of the open work above was in scope. The legacy
+journals' own status lines were left alone, except
+`worldgen_modularity_todo.md`, whose "not started" was plainly wrong, and
+`training_dummy_journal.md`'s "Todo — not started".
