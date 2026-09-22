@@ -10,7 +10,7 @@ someone confirms it. Each carries a `**Legacy ID:**` line under its title
 (DOC-001.3) — grep `Legacy ID:` to list them. Their sections predate the
 standard and are not rewritten to it.
 
-**Next free:** CMB-007 · ENT-012 · SPN-004 · WLD-011 · RND-005 · UI-012 ·
+**Next free:** CMB-007 · ENT-013 · SPN-004 · WLD-011 · RND-005 · UI-012 ·
 PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-002
 
 ## Requirements
@@ -22,7 +22,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-002
 | CMB-003 | Training dummy and DPS meter | CMB, UI | feature | legacy | [training_dummy_journal.md](training_dummy_journal.md) | — | 2026-09-11 |
 | CMB-004 | Bomb blast radius | CMB | balance | legacy | [bomb_blast_journal.md](bomb_blast_journal.md) | — | 2026-09-12 |
 | CMB-005 | Elemental system | CMB, RND | feature | legacy | [elemental_system_journal.md](elemental_system_journal.md) | — | 2026-09-21 |
-| CMB-006 | Reaction damage rework | CMB | feature | in progress | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | main | 2026-09-22 |
+| CMB-006 | Reaction damage rework | CMB | feature | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |
 | ENT-003 | Chaser collider | ENT | bug | legacy | [chaser_collider_journal.md](chaser_collider_journal.md) | — | 2026-09-15 |
@@ -34,6 +34,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-002
 | ENT-009 | The Whirlspear (spear goblin) | ENT | feature | legacy | [spear_goblin_journal.md](spear_goblin_journal.md) | — | 2026-09-17 |
 | ENT-010 | Ranged range, wind-up and animation | ENT | feature | legacy | [ranged_windup_journal.md](ranged_windup_journal.md) | — | 2026-09-19 |
 | ENT-011 | Fish huts and seahorse boats | ENT, WLD | feature | legacy | [fish_hut_journal.md](fish_hut_journal.md) | — | 2026-09-20 |
+| ENT-012 | Enemy tuning (Stoutpaw shield, Tusked Lance radius) | ENT | balance | done | [enemy_tuning_journal.md](enemy_tuning_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
