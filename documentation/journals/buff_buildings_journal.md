@@ -723,7 +723,7 @@ Committed as `d4c92be` first, then the owner asked for:
 - [x] T5 Tests: numbers read from the data; the cluster rule and the hut on
       the pinned seeds; the families and satellite allowlists; digests
       re-pinned.
-- [ ] T6 Full suite, screenshots (an active buff with the marks over the
+- [x] T6 Full suite, screenshots (an active buff with the marks over the *(DOC-003: the seed-35 screenshots are recorded below; the later addenda ran the full suite)*
       hero; the tower with its hut; the bigger mine).
 
 ### What landed (rev. 6)

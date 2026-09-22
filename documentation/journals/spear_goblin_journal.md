@@ -139,6 +139,6 @@ caught a new behaviour; it earns its keep.
 - [x] `path_chase_sweep`
 - [x] Enemy block, rings measured off the art
 - [x] Tests (19) — `tests/entities` + `tests/spawn`: 435 passed
-- [ ] A band weight — waiting on the band rework, like Bonepicker, Gaffjaw and
+- [x] A band weight — waiting on the band rework, like Bonepicker, Gaffjaw and *(DOC-003: the band rework landed (SPN-002): `data/enemies/spawn_tables.json`, `spear_goblin` 6 in `goblin`)*
       the Hammer Gnome
-- [ ] Full suite
+- [x] Full suite *(DOC-003: covered by later full-suite runs, e.g. `key_icons_journal.md` (2,640 passed))*

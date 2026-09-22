@@ -127,8 +127,8 @@ for.
 - [x] Additive hostile tint in the `bomb` style
 - [x] Bloat rewired, numbers set
 - [x] Tests (13)
-- [ ] A telegraph so `shoot.png` actually animates
-- [ ] A band weight is unaffected — it already has one and spawns today
+- [x] A telegraph so `shoot.png` actually animates *(DOC-003: done separately, `fd8a276` (ticked further down this journal))*
+- [-] A band weight is unaffected — it already has one and spawns today *(DOC-003: not needed, as the line says; the Bloat weighs 2 in the `marine` group)*
 
 ---
 
