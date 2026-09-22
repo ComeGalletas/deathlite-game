@@ -10,7 +10,7 @@ someone confirms it. Each carries a `**Legacy ID:**` line under its title
 (DOC-001.3) — grep `Legacy ID:` to list them. Their sections predate the
 standard and are not rewritten to it.
 
-**Next free:** CMB-008 · ENT-013 · SPN-004 · WLD-011 · RND-005 · UI-012 ·
+**Next free:** CMB-008 · ENT-013 · SPN-004 · WLD-012 · RND-005 · UI-012 ·
 PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 
 ## Requirements
@@ -49,6 +49,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | WLD-008 | Rock collider | WLD | bug | legacy | [rock_collider_journal.md](rock_collider_journal.md) | — | 2026-09-16 |
 | WLD-009 | Buff buildings | WLD, PRG | feature | legacy | [buff_buildings_journal.md](buff_buildings_journal.md) | — | 2026-09-20 |
 | WLD-010 | Special island facilities | WLD | feature | parked | [special_facilities_journal.md](special_facilities_journal.md) | — | 2026-09-20 |
+| WLD-011 | Bridge clearance for large bodies | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | RND-001 | Asset integration | RND | feature | legacy | [assets_journal.md](assets_journal.md) | — | 2026-08-27 |
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
