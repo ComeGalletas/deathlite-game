@@ -10,8 +10,8 @@ someone confirms it. Each carries a `**Legacy ID:**` line under its title
 (DOC-001.3) — grep `Legacy ID:` to list them. Their sections predate the
 standard and are not rewritten to it.
 
-**Next free:** CMB-008 · ENT-013 · SPN-004 · WLD-012 · RND-005 · UI-012 ·
-PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
+**Next free:** CMB-009 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
+PRG-003 · AUD-004 · SYS-009 · TST-003 · BLD-003 · DOC-004
 
 ## Requirements
 
@@ -24,6 +24,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | CMB-005 | Elemental system | CMB, RND | feature | legacy | [elemental_system_journal.md](elemental_system_journal.md) | — | 2026-09-21 |
 | CMB-006 | Reaction damage rework | CMB | feature | done (balance confirmed in play) | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-007 | Elemental design doc brought to the shipped behaviour (open questions closed bar one) | CMB, DOC | process | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| CMB-008 | Particle and damage-number limits under a dense reaction cascade (design §13 q.12) | CMB, RND | feature | proposed | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) (found in) | — | 2026-09-22 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |
 | ENT-003 | Chaser collider | ENT | bug | legacy | [chaser_collider_journal.md](chaser_collider_journal.md) | — | 2026-09-15 |
@@ -50,6 +51,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | WLD-009 | Buff buildings | WLD, PRG | feature | legacy | [buff_buildings_journal.md](buff_buildings_journal.md) | — | 2026-09-20 |
 | WLD-010 | Special island facilities | WLD | feature | parked | [special_facilities_journal.md](special_facilities_journal.md) | — | 2026-09-20 |
 | WLD-011 | Bridge clearance for large bodies | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| WLD-012 | Keep props a wide body's radius clear of bridge mouths | WLD, ENT | bug | proposed | [bridge_clearance_journal.md](bridge_clearance_journal.md) (found in) | — | 2026-09-22 |
 | RND-001 | Asset integration | RND | feature | legacy | [assets_journal.md](assets_journal.md) | — | 2026-08-27 |
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
@@ -77,12 +79,14 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | SYS-005 | PlayingState refactor | SYS | refactor | legacy | [playing_state_refactor.md](playing_state_refactor.md) | — | 2026-08-29 |
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
+| SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | proposed | [structure_review_journal.md](structure_review_journal.md) (found in) | — | 2026-09-22 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | in progress | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
 
 ## Plans and designs
 
