@@ -41,6 +41,13 @@ class AuraStyle:
 
 
 @dataclass(frozen=True)
+class Wash:
+    """How strongly an element colours a sprite it does not replace."""
+    lift: float
+    alpha: int
+
+
+@dataclass(frozen=True)
 class Budget:
     per_frame: int
     per_element: int
@@ -173,6 +180,7 @@ class VisualSet:
                                  if not k.startswith("_")})
         budget = {k: v for k, v in data["budget"].items() if not k.startswith("_")}
         self.budget = Budget(int(budget["per_frame"]), int(budget["per_element"]))
+        self.wash = Wash(float(data["wash"]["lift"]), int(data["wash"]["alpha"]))
         self._by_id = {
             element: ElementVisualProfile(element, data["elements"][element.key],
                                           assets)

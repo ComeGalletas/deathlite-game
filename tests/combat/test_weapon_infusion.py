@@ -294,5 +294,92 @@ class FiringTests(unittest.TestCase):
         self.assertEqual(stamped, [True, False, True, False])
 
 
+class TheLookFollowsTheInfusionTests(unittest.TestCase):
+    """`infusion` is not `element`, and M13 needs both.
+
+    `attack_element` is the element this attack *applies*, which is the
+    right rule for damage and the wrong one for paint. M13 first painted
+    from it and the screenshot showed what that means: the Ember Ring, the
+    Grave Totem and the Spirit Wolf are the three time-mode weapons, whose
+    spawns are stamped with nothing at all, so all three came out in their
+    plain colours at every element. The Daggers, at `interval: 2`, were
+    drawn plain on two swings in three.
+
+    So every spawn also carries `infusion` -- what the weapon is -- and the
+    painters read that. Nothing about damage changed; `element` still says
+    what lands.
+    """
+
+    def spawns(self, wid, element, attacks=4, **over):
+        from tests.combat.test_weapons import make_context
+
+        target = FakeEnemy(60.0, 0.0)
+        w = weapon(wid, element, **over)
+        out = []
+        for _ in range(attacks):
+            w._cd = 0.0
+            spawned: list[dict] = []
+            w.update(0.0, make_context([target], spawned))
+            self.assertTrue(spawned, f"{wid} fired")
+            out.append(spawned[0])
+        return out
+
+    def test_an_attack_mode_weapon_looks_infused_on_every_attack(self):
+        """The Daggers apply on one swing in three and look infused on all
+        three -- which swing spends the element is a balance detail, not
+        something to read off the sprite."""
+        kws = self.spawns("bow", FIRE, interval=2)
+        self.assertEqual([bool(k.get("element")) for k in kws],
+                         [True, False, False, True])
+        self.assertEqual([k.get("infusion") for k in kws], [FIRE] * 4)
+
+    def test_a_time_mode_weapon_looks_infused_although_it_stamps_nothing(self):
+        """The regression this class exists for. `attack_element` is
+        documented as NONE for these, so painting from it left every
+        orbiter and both summons plain."""
+        for wid in TIME_WEAPONS:
+            with self.subTest(weapon=wid):
+                w = weapon(wid, ICE)
+                w._begin_attack()
+                self.assertEqual(w.attack_element, ElementId.NONE)
+                self.assertEqual(w.element, ICE)
+
+    def test_an_orbiter_carries_the_infusion(self):
+        from tests.combat.test_weapons import make_context
+
+        target = FakeEnemy(20.0, 0.0)
+        w = weapon("ember_ring", ICE)
+        spawned: list[dict] = []
+        w.update(0.0, make_context([target], spawned))
+        self.assertTrue(spawned, "the ring formed")
+        for kw in spawned:
+            self.assertEqual(kw.get("element"), ElementId.NONE)
+            self.assertEqual(kw.get("infusion"), ICE)
+
+    def test_an_uninfused_weapon_carries_no_infusion(self):
+        for kw in self.spawns("bow", ElementId.NONE):
+            self.assertFalse(kw.get("infusion"))
+
+    def test_a_pooled_projectile_does_not_inherit_the_last_infusion(self):
+        """`acquire()` does not clear fields; `reset` does, and it has to
+        set this one even when the caller passes nothing."""
+        from entities.projectile import Projectile
+
+        p = Projectile()
+        p.infusion = FIRE
+        p.reset(pos=pygame.Vector2(), vel=pygame.Vector2(), damage=1.0,
+                radius=1.0, lifetime=1.0)
+        self.assertEqual(p.infusion, ElementId.NONE)
+
+    def test_a_pooled_summon_does_not_inherit_the_last_infusion(self):
+        from entities.summon import Summon
+
+        s = Summon()
+        s.infusion = FIRE
+        s.reset(kind="totem", pos=pygame.Vector2(), damage=1.0, lifetime=1.0,
+                color=(1, 1, 1), tags=())
+        self.assertEqual(s.infusion, ElementId.NONE)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -50,16 +50,6 @@ _HAZARD_FILL_FLOOR = 10
 _TINT_CACHE: dict[int, tuple] = {}     # id(frame) -> (frame, tinted copy)
 _TINT_CACHE_CAP = 128
 
-# The elemental aura tint (M10). `_AURA_TINT_LIFT` is how far the element's
-# colour is pulled toward white before it multiplies: a straight multiply by
-# a saturated colour crushes every channel the tint is low in, and a skeleton
-# under Ice would go from bone to navy. Lifted, it shifts hue and barely
-# darkens. `_AURA_TINT_ALPHA` is how much of that lands on the sprite.
-_AURA_TINT_LIFT = 0.45
-_AURA_TINT_ALPHA = 102                 # 40% of 255
-_AURA_TINT_CACHE: dict[tuple, tuple] = {}
-_AURA_TINT_CACHE_CAP = 256
-
 
 def hit_tinted(frame):
     """A red-tinted copy of a sprite frame -- the damage flash for rigs with no
@@ -78,33 +68,6 @@ def hit_tinted(frame):
     if len(_TINT_CACHE) >= _TINT_CACHE_CAP:
         _TINT_CACHE.clear()
     _TINT_CACHE[id(frame)] = (frame, out)
-    return out
-
-
-def aura_tinted(frame, element, colour):
-    """A copy of `frame` washed toward `colour`, or `frame` itself when the
-    wash would be invisible.
-
-    Cached by `(id(frame), element)` for the same reason `hit_tinted` is:
-    the animation frames are the asset cache's own objects, so the same one
-    comes back for every frame of an aura's several seconds, and copying it
-    each time would be a per-enemy allocation per frame. The source is kept
-    in the entry so its id cannot be recycled under the cache.
-    """
-    key = (id(frame), int(element))
-    hit = _AURA_TINT_CACHE.get(key)
-    if hit is not None and hit[0] is frame:
-        return hit[1]
-    lift = _AURA_TINT_LIFT
-    wash = tuple(int(c + (255 - c) * lift) for c in colour)
-    over = frame.copy()
-    over.fill((*wash, 255), special_flags=pygame.BLEND_RGBA_MULT)
-    over.set_alpha(_AURA_TINT_ALPHA)
-    out = frame.copy()
-    out.blit(over, (0, 0))
-    if len(_AURA_TINT_CACHE) >= _AURA_TINT_CACHE_CAP:
-        _AURA_TINT_CACHE.clear()
-    _AURA_TINT_CACHE[key] = (frame, out)
     return out
 
 
@@ -522,24 +485,34 @@ class WorldRenderer:
                 continue
             sx, sy = ps.camera.world_to_screen(ex["pos"])
             anim = ex.get("anim")
-            if anim is not None and self._blit_burst(surface, anim, sx, sy, ex["radius"] * z):
+            if anim is not None and self._blit_burst(surface, anim, sx, sy,
+                                                     ex["radius"] * z,
+                                                     ex.get("infusion")):
                 continue
             frac = ex["t"] / ex["dur"]
             pygame.draw.circle(surface, (255, 180, 90),
                                (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
 
-    def _blit_burst(self, surface, anim, sx, sy, radius_px: float) -> bool:
+    def _blit_burst(self, surface, anim, sx, sy, radius_px: float,
+                    infusion=None) -> bool:
         assets = self.ps.game.assets
-        rig = assets.rig(anim.rig) or {}
-        bw, bh = assets.scale_for(anim.rig) or (0, 0)
+        from game.states.playing.visual import elements as element_fx
+        # An infused blast detonates in its element's colour (M13). The
+        # Animator holds the plain rig and keeps timing the strip; only the
+        # sheet the frame is taken from changes, and the variants are
+        # frame-for-frame copies of it.
+        name = element_fx.variant_rig(assets, anim.rig, infusion)
+        rig = assets.rig(name) or {}
+        bw, bh = assets.scale_for(name) or (0, 0)
         fireball = float(rig.get("fireball") or bw)
         if not bw or not fireball:
             return False
         k = 2.0 * radius_px / fireball          # rig px -> screen px
-        frame = anim.frame(size=(max(1, round(bw * k)), max(1, round(bh * k))))
+        frame = assets.frame(name, anim.anim, anim.index,
+                             size=(max(1, round(bw * k)), max(1, round(bh * k))))
         if frame is None:
             return False
-        ax, ay = assets.anchor(anim.rig)
+        ax, ay = assets.anchor(name)
         surface.blit(frame, (sx - ax * k, sy - ay * k))
         return True
 
@@ -713,9 +686,10 @@ class WorldRenderer:
             # A primed body wears its element, lightly (M10). Not while it is
             # flashing: a hit is the more urgent thing to see and it is over
             # in a quarter of a second.
-            tint = aura_colour(run, e)
-            if tint is not None:
-                frame = aura_tinted(frame, *tint)
+            primed = aura_colour(run, e)
+            if primed is not None:
+                from game.states.playing.visual import elements as element_fx
+                frame = element_fx.washed(frame, primed[0])
         ax, ay = self.anchor_for(rig, flip)
         self._blit_character(
             surface, frame,

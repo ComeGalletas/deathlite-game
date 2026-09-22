@@ -45,11 +45,12 @@ def spawn_from_cone(ps, proj) -> None:
     fx = getattr(proj, "fx", None)
     if proj.cone_half_angle <= 0.0 or not is_sequence(fx):
         return
-    # The rigs the visual names are *bases*; the element the attack is
-    # carrying picks which colour of each is drawn (M13). A weapon with no
-    # infusion gets the plain one, which reads as steel.
+    # The rigs the visual names are *bases*; the weapon's infusion picks
+    # which colour of each is drawn (M13). The infusion and not the
+    # attack's element: the Daggers apply theirs on one swing in three,
+    # and all three should still look infused.
     assets = ps.game.assets
-    rigs = [element_fx.variant_rig(assets, str(r), getattr(proj, "element", None))
+    rigs = [element_fx.variant_rig(assets, str(r), getattr(proj, "infusion", None))
             for r in fx["slash"]]
     durs = rig_durations(assets, rigs)
     if sum(durs) <= 0.0:

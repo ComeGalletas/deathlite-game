@@ -1,0 +1,907 @@
+{
+  "_doc": [
+    "GENERATED -- do not edit by hand.",
+    "",
+    "One rig per (infusable effect, element). The art is the base rig's",
+    "own sheets rotated onto the element's hue, because a runtime tint",
+    "cannot turn an orange flame blue and a runtime hue rotation costs",
+    "about 2.4 ms a frame (M13 C, elemental_system_journal.md).",
+    "",
+    "To change any of it -- the art, the `infused` tuning, anything --",
+    "change the base rig in weapon_sprites.json and re-run",
+    "    python -m tools.asset_pipeline.recolour_element_variants",
+    "A test runs the same tool with --check and fails on a drift."
+  ],
+  "bomb_fire": {
+    "frame": [
+      128,
+      128
+    ],
+    "content": [
+      40,
+      20,
+      48,
+      72
+    ],
+    "scale": [
+      24,
+      36
+    ],
+    "anchor": [
+      12,
+      22
+    ],
+    "anims": {
+      "spin": {
+        "file": "infused/bomb_fire/bomb_spinning.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": true
+      },
+      "fuse": {
+        "file": "infused/bomb_fire/bomb_fuse_lit.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true
+      }
+    },
+    "_generated": "bomb recoloured for fire by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit bomb and re-run."
+  },
+  "bomb_ice": {
+    "frame": [
+      128,
+      128
+    ],
+    "content": [
+      40,
+      20,
+      48,
+      72
+    ],
+    "scale": [
+      24,
+      36
+    ],
+    "anchor": [
+      12,
+      22
+    ],
+    "anims": {
+      "spin": {
+        "file": "infused/bomb_ice/bomb_spinning.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": true
+      },
+      "fuse": {
+        "file": "infused/bomb_ice/bomb_fuse_lit.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true
+      }
+    },
+    "_generated": "bomb recoloured for ice by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit bomb and re-run."
+  },
+  "bomb_thunder": {
+    "frame": [
+      128,
+      128
+    ],
+    "content": [
+      40,
+      20,
+      48,
+      72
+    ],
+    "scale": [
+      24,
+      36
+    ],
+    "anchor": [
+      12,
+      22
+    ],
+    "anims": {
+      "spin": {
+        "file": "infused/bomb_thunder/bomb_spinning.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": true
+      },
+      "fuse": {
+        "file": "infused/bomb_thunder/bomb_fuse_lit.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true
+      }
+    },
+    "_generated": "bomb recoloured for thunder by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit bomb and re-run."
+  },
+  "bomb_wind": {
+    "frame": [
+      128,
+      128
+    ],
+    "content": [
+      40,
+      20,
+      48,
+      72
+    ],
+    "scale": [
+      24,
+      36
+    ],
+    "anchor": [
+      12,
+      22
+    ],
+    "anims": {
+      "spin": {
+        "file": "infused/bomb_wind/bomb_spinning.png",
+        "frames": 4,
+        "fps": 12,
+        "loop": true
+      },
+      "fuse": {
+        "file": "infused/bomb_wind/bomb_fuse_lit.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true
+      }
+    },
+    "_generated": "bomb recoloured for wind by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit bomb and re-run."
+  },
+  "ember_fire": {
+    "frame": [
+      47,
+      75
+    ],
+    "content": [
+      4,
+      2,
+      34,
+      73
+    ],
+    "scale": [
+      16,
+      34
+    ],
+    "anims": {
+      "loop": {
+        "file": "infused/ember_fire/spritesheet.png",
+        "frames": 16,
+        "fps": 18,
+        "loop": true
+      }
+    },
+    "_generated": "ember recoloured for fire by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit ember and re-run."
+  },
+  "ember_ice": {
+    "frame": [
+      47,
+      75
+    ],
+    "content": [
+      4,
+      2,
+      34,
+      73
+    ],
+    "scale": [
+      16,
+      34
+    ],
+    "anims": {
+      "loop": {
+        "file": "infused/ember_ice/spritesheet.png",
+        "frames": 16,
+        "fps": 18,
+        "loop": true
+      }
+    },
+    "_generated": "ember recoloured for ice by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit ember and re-run."
+  },
+  "ember_thunder": {
+    "frame": [
+      47,
+      75
+    ],
+    "content": [
+      4,
+      2,
+      34,
+      73
+    ],
+    "scale": [
+      16,
+      34
+    ],
+    "anims": {
+      "loop": {
+        "file": "infused/ember_thunder/spritesheet.png",
+        "frames": 16,
+        "fps": 18,
+        "loop": true
+      }
+    },
+    "_generated": "ember recoloured for thunder by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit ember and re-run."
+  },
+  "ember_wind": {
+    "frame": [
+      47,
+      75
+    ],
+    "content": [
+      4,
+      2,
+      34,
+      73
+    ],
+    "scale": [
+      16,
+      34
+    ],
+    "anims": {
+      "loop": {
+        "file": "infused/ember_wind/spritesheet.png",
+        "frames": 16,
+        "fps": 18,
+        "loop": true
+      }
+    },
+    "_generated": "ember recoloured for wind by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit ember and re-run."
+  },
+  "explosion_fire": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      40,
+      18,
+      112,
+      142
+    ],
+    "scale": [
+      112,
+      140
+    ],
+    "anchor": [
+      56,
+      75
+    ],
+    "fireball": 108,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_fire/explosion_2.png",
+        "frames": 10,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion recoloured for fire by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion and re-run."
+  },
+  "explosion_ice": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      40,
+      18,
+      112,
+      142
+    ],
+    "scale": [
+      112,
+      140
+    ],
+    "anchor": [
+      56,
+      75
+    ],
+    "fireball": 108,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_ice/explosion_2.png",
+        "frames": 10,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion recoloured for ice by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion and re-run."
+  },
+  "explosion_small_fire": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      61,
+      58,
+      68,
+      68
+    ],
+    "scale": [
+      68,
+      68
+    ],
+    "anchor": [
+      34,
+      36
+    ],
+    "fireball": 64,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_small_fire/explosion_1.png",
+        "frames": 8,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion_small recoloured for fire by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion_small and re-run."
+  },
+  "explosion_small_ice": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      61,
+      58,
+      68,
+      68
+    ],
+    "scale": [
+      68,
+      68
+    ],
+    "anchor": [
+      34,
+      36
+    ],
+    "fireball": 64,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_small_ice/explosion_1.png",
+        "frames": 8,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion_small recoloured for ice by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion_small and re-run."
+  },
+  "explosion_small_thunder": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      61,
+      58,
+      68,
+      68
+    ],
+    "scale": [
+      68,
+      68
+    ],
+    "anchor": [
+      34,
+      36
+    ],
+    "fireball": 64,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_small_thunder/explosion_1.png",
+        "frames": 8,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion_small recoloured for thunder by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion_small and re-run."
+  },
+  "explosion_small_wind": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      61,
+      58,
+      68,
+      68
+    ],
+    "scale": [
+      68,
+      68
+    ],
+    "anchor": [
+      34,
+      36
+    ],
+    "fireball": 64,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_small_wind/explosion_1.png",
+        "frames": 8,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion_small recoloured for wind by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion_small and re-run."
+  },
+  "explosion_thunder": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      40,
+      18,
+      112,
+      142
+    ],
+    "scale": [
+      112,
+      140
+    ],
+    "anchor": [
+      56,
+      75
+    ],
+    "fireball": 108,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_thunder/explosion_2.png",
+        "frames": 10,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion recoloured for thunder by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion and re-run."
+  },
+  "explosion_wind": {
+    "frame": [
+      192,
+      192
+    ],
+    "content": [
+      40,
+      18,
+      112,
+      142
+    ],
+    "scale": [
+      112,
+      140
+    ],
+    "anchor": [
+      56,
+      75
+    ],
+    "fireball": 108,
+    "anims": {
+      "burst": {
+        "file": "infused/explosion_wind/explosion_2.png",
+        "frames": 10,
+        "fps": 20,
+        "loop": false
+      }
+    },
+    "_generated": "explosion recoloured for wind by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit explosion and re-run."
+  },
+  "grave_totem_fire": {
+    "frame": [
+      64,
+      96
+    ],
+    "scale": [
+      32,
+      48
+    ],
+    "anchor": [
+      16,
+      34
+    ],
+    "anims": {
+      "appear": {
+        "file": "infused/grave_totem_fire/totem_appear.png",
+        "frames": 8,
+        "fps": 12,
+        "loop": false
+      },
+      "idle": {
+        "file": "infused/grave_totem_fire/totem_idle.png",
+        "frames": 7,
+        "fps": 8,
+        "loop": true
+      },
+      "attack": {
+        "file": "infused/grave_totem_fire/totem_attack.png",
+        "frames": 7,
+        "fps": 14,
+        "loop": false
+      },
+      "disappear": {
+        "file": "infused/grave_totem_fire/totem_disappear.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": false
+      }
+    },
+    "_generated": "grave_totem recoloured for fire by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit grave_totem and re-run."
+  },
+  "grave_totem_ice": {
+    "frame": [
+      64,
+      96
+    ],
+    "scale": [
+      32,
+      48
+    ],
+    "anchor": [
+      16,
+      34
+    ],
+    "anims": {
+      "appear": {
+        "file": "infused/grave_totem_ice/totem_appear.png",
+        "frames": 8,
+        "fps": 12,
+        "loop": false
+      },
+      "idle": {
+        "file": "infused/grave_totem_ice/totem_idle.png",
+        "frames": 7,
+        "fps": 8,
+        "loop": true
+      },
+      "attack": {
+        "file": "infused/grave_totem_ice/totem_attack.png",
+        "frames": 7,
+        "fps": 14,
+        "loop": false
+      },
+      "disappear": {
+        "file": "infused/grave_totem_ice/totem_disappear.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": false
+      }
+    },
+    "_generated": "grave_totem recoloured for ice by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit grave_totem and re-run."
+  },
+  "grave_totem_thunder": {
+    "frame": [
+      64,
+      96
+    ],
+    "scale": [
+      32,
+      48
+    ],
+    "anchor": [
+      16,
+      34
+    ],
+    "anims": {
+      "appear": {
+        "file": "infused/grave_totem_thunder/totem_appear.png",
+        "frames": 8,
+        "fps": 12,
+        "loop": false
+      },
+      "idle": {
+        "file": "infused/grave_totem_thunder/totem_idle.png",
+        "frames": 7,
+        "fps": 8,
+        "loop": true
+      },
+      "attack": {
+        "file": "infused/grave_totem_thunder/totem_attack.png",
+        "frames": 7,
+        "fps": 14,
+        "loop": false
+      },
+      "disappear": {
+        "file": "infused/grave_totem_thunder/totem_disappear.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": false
+      }
+    },
+    "_generated": "grave_totem recoloured for thunder by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit grave_totem and re-run."
+  },
+  "grave_totem_wind": {
+    "frame": [
+      64,
+      96
+    ],
+    "scale": [
+      32,
+      48
+    ],
+    "anchor": [
+      16,
+      34
+    ],
+    "anims": {
+      "appear": {
+        "file": "infused/grave_totem_wind/totem_appear.png",
+        "frames": 8,
+        "fps": 12,
+        "loop": false
+      },
+      "idle": {
+        "file": "infused/grave_totem_wind/totem_idle.png",
+        "frames": 7,
+        "fps": 8,
+        "loop": true
+      },
+      "attack": {
+        "file": "infused/grave_totem_wind/totem_attack.png",
+        "frames": 7,
+        "fps": 14,
+        "loop": false
+      },
+      "disappear": {
+        "file": "infused/grave_totem_wind/totem_disappear.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": false
+      }
+    },
+    "_generated": "grave_totem recoloured for wind by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit grave_totem and re-run."
+  },
+  "spirit_wolf_fire": {
+    "frame": [
+      48,
+      48
+    ],
+    "content": [
+      7,
+      10,
+      35,
+      23
+    ],
+    "scale": [
+      32,
+      21
+    ],
+    "anchor": [
+      16,
+      16
+    ],
+    "grid": [
+      5,
+      19
+    ],
+    "anims": {
+      "run_left": {
+        "file": "infused/spirit_wolf_fire/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 5
+      },
+      "run_right": {
+        "file": "infused/spirit_wolf_fire/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 6
+      },
+      "bite_left": {
+        "file": "infused/spirit_wolf_fire/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 13
+      },
+      "bite_right": {
+        "file": "infused/spirit_wolf_fire/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 14
+      },
+      "idle": {
+        "file": "infused/spirit_wolf_fire/wolf-spectral.png",
+        "frames": 4,
+        "fps": 4,
+        "loop": true,
+        "row": 18
+      }
+    },
+    "_generated": "spirit_wolf recoloured for fire by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit spirit_wolf and re-run."
+  },
+  "spirit_wolf_ice": {
+    "frame": [
+      48,
+      48
+    ],
+    "content": [
+      7,
+      10,
+      35,
+      23
+    ],
+    "scale": [
+      32,
+      21
+    ],
+    "anchor": [
+      16,
+      16
+    ],
+    "grid": [
+      5,
+      19
+    ],
+    "anims": {
+      "run_left": {
+        "file": "infused/spirit_wolf_ice/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 5
+      },
+      "run_right": {
+        "file": "infused/spirit_wolf_ice/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 6
+      },
+      "bite_left": {
+        "file": "infused/spirit_wolf_ice/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 13
+      },
+      "bite_right": {
+        "file": "infused/spirit_wolf_ice/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 14
+      },
+      "idle": {
+        "file": "infused/spirit_wolf_ice/wolf-spectral.png",
+        "frames": 4,
+        "fps": 4,
+        "loop": true,
+        "row": 18
+      }
+    },
+    "_generated": "spirit_wolf recoloured for ice by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit spirit_wolf and re-run."
+  },
+  "spirit_wolf_thunder": {
+    "frame": [
+      48,
+      48
+    ],
+    "content": [
+      7,
+      10,
+      35,
+      23
+    ],
+    "scale": [
+      32,
+      21
+    ],
+    "anchor": [
+      16,
+      16
+    ],
+    "grid": [
+      5,
+      19
+    ],
+    "anims": {
+      "run_left": {
+        "file": "infused/spirit_wolf_thunder/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 5
+      },
+      "run_right": {
+        "file": "infused/spirit_wolf_thunder/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 6
+      },
+      "bite_left": {
+        "file": "infused/spirit_wolf_thunder/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 13
+      },
+      "bite_right": {
+        "file": "infused/spirit_wolf_thunder/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 14
+      },
+      "idle": {
+        "file": "infused/spirit_wolf_thunder/wolf-spectral.png",
+        "frames": 4,
+        "fps": 4,
+        "loop": true,
+        "row": 18
+      }
+    },
+    "_generated": "spirit_wolf recoloured for thunder by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit spirit_wolf and re-run."
+  },
+  "spirit_wolf_wind": {
+    "frame": [
+      48,
+      48
+    ],
+    "content": [
+      7,
+      10,
+      35,
+      23
+    ],
+    "scale": [
+      32,
+      21
+    ],
+    "anchor": [
+      16,
+      16
+    ],
+    "grid": [
+      5,
+      19
+    ],
+    "anims": {
+      "run_left": {
+        "file": "infused/spirit_wolf_wind/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 5
+      },
+      "run_right": {
+        "file": "infused/spirit_wolf_wind/wolf-spectral.png",
+        "frames": 4,
+        "fps": 10,
+        "loop": true,
+        "row": 6
+      },
+      "bite_left": {
+        "file": "infused/spirit_wolf_wind/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 13
+      },
+      "bite_right": {
+        "file": "infused/spirit_wolf_wind/wolf-spectral.png",
+        "frames": 5,
+        "fps": 16,
+        "loop": false,
+        "row": 14
+      },
+      "idle": {
+        "file": "infused/spirit_wolf_wind/wolf-spectral.png",
+        "frames": 4,
+        "fps": 4,
+        "loop": true,
+        "row": 18
+      }
+    },
+    "_generated": "spirit_wolf recoloured for wind by tools/asset_pipeline/recolour_element_variants.py -- do not edit; edit spirit_wolf and re-run."
+  }
+}

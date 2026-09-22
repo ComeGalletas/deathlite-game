@@ -33,6 +33,30 @@
     "marker_gap": 8,
     "rig_scale": 2.1
   },
+  "wash": {
+    "_doc": [
+      "How strongly an element colours a **primed enemy's** sprite (M10).",
+      "",
+      "Two numbers, and both are needed. `lift` pulls the element's colour",
+      "toward white *before* it multiplies: a straight multiply by a",
+      "saturated colour crushes every channel the tint is low in, and a",
+      "bone-white skeleton under Ice would go navy. `alpha` is how much of",
+      "that lands on the sprite.",
+      "",
+      "Settled at 102 of 255 by the owner, who was shown the same crowd at",
+      "102, 150 and 190 and kept the slightest (M11).",
+      "",
+      "It is not how an attack wears its element. M13 tried that and",
+      "measured it out: a multiply can only darken toward the overlap of two",
+      "hues, so on saturated art it never reaches the element's colour at any",
+      "strength -- stronger only means muddier. Attacks are recoloured",
+      "offline instead, by tools/asset_pipeline/recolour_element_variants.py",
+      "for the effects that keep their own art and by cut_element_effects.py",
+      "for the melee swings, which are replaced outright."
+    ],
+    "lift": 0.45,
+    "alpha": 102
+  },
   "budget": {
     "_doc": [
       "Elemental particles are capped per frame, separately from the pool's",

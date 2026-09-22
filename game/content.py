@@ -44,10 +44,17 @@ def _load(name: str) -> dict[str, Any]:
 def _merge_sprites(*names: str) -> dict[str, Any]:
     """Load several sprite-rig files into one flat namespace. A rig may appear
     in more than one file (a shared rig, copied on purpose) as long as the
-    copies are identical."""
+    copies are identical.
+
+    A top-level `_`-prefixed key is documentation, not a rig -- the same
+    convention the tuning blocks use. `infused_sprites.json` is generated
+    and leads with a `_doc` saying so, and everything that walks this
+    namespace would otherwise have to know that."""
     merged: dict[str, Any] = {}
     for name in names:
         for rig, spec in _load(name).items():
+            if rig.startswith("_"):
+                continue
             if rig in merged and merged[rig] != spec:
                 raise ContentError(
                     f"sprite rig {rig!r} differs between files (last: {name})")
@@ -289,6 +296,7 @@ def _check_element_visuals(data: dict[str, Any]) -> dict[str, Any]:
     for block, fields in (("aura", ("ring_pad", "ring_width", "alpha",
                                     "locked_alpha", "marker_size",
                                     "marker_gap", "rig_scale")),
+                          ("wash", ("lift", "alpha")),
                           ("budget", ("per_frame", "per_element"))):
         if not isinstance(data.get(block), dict):
             raise ContentError(f"element_visuals.json: `{block}` must be an object")
@@ -457,7 +465,8 @@ class Content:
         # merge back into one flat `sprites` namespace here.
         self.sprites: dict[str, dict] = _merge_sprites(
             "heroes/character_sprites.json", "enemies/enemy_sprites.json",
-            "weapons/weapon_sprites.json", "loot/prop_sprites.json")
+            "weapons/weapon_sprites.json", "weapons/infused_sprites.json",
+            "loot/prop_sprites.json")
         _check_element_rigs(self.element_visuals, self.sprites)
         self.terrain: dict = _load("world/terrain.json")
         # Buff buildings (journal: buff_buildings_journal.md): the five

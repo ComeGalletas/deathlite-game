@@ -2116,24 +2116,177 @@ The Hammer also needed `content` and `over_circle` copied onto the new
 rigs: `slam_fx.impact_size` reads both, and without them the splash lost
 its quarter overhang and would have been drawn square.
 
-**C. Tint the rest**
+**C. The rest are recoloured, not tinted** -- done, rebuilt once
 
-- [ ] C1. M11's lift-multiply-blend moved out of `rendering.py` into a
-      shared home, named for what it does rather than for auras.
-- [ ] C2. Strength in `element_visuals.json`, validated in `content.py`.
-- [ ] C3. The projectile, orbiter, explosion and summon painters ask for
-      it. A summon's element is its summoning weapon's.
-- [ ] C4. `thunder_ball` uses the asset cache's `tint=`.
+The first build tinted them. It was wrong, and the measurement that found
+it is the useful part of this section.
 
-**D. Tests and close out**
+- [x] C1. M11's `aura_tinted` moved into `elements.washed(frame, element)`.
+      It keeps the one surface it was built and tuned for: a primed enemy's
+      body.
+- [x] C2. Its strength is a `wash` block in `element_visuals.json`,
+      validated in `content.py`. No new colour -- the hue is
+      `element_fx.tint`, which M12 made the single source.
+- [x] C3. Every effect that keeps its own art is **recoloured offline**,
+      four sheets per rig, by
+      `tools/asset_pipeline/recolour_element_variants.py`. The painters
+      resolve a rig through `variant_rig` and blit it; nothing is computed
+      at draw time.
+- [x] C4. Dropped, as before: `thunder_ball` needs no special case.
 
-- [ ] D1. Every melee weapon has all five variants and they all load.
-- [ ] D2. An infused attack's frame differs from the plain one, per
-      element; an uninfused weapon draws `plain`.
-- [ ] D3. The tint is cached per (frame, element), not copied per frame.
-- [ ] D4. No third copy of an element colour, asserted the way M12 asserts
-      the dev inspector.
-- [ ] D5. Screenshot per element, full suite.
+#### Why the tint could not work, at any strength
+
+The wash is a multiply. Multiplying an orange flame by a blue tint cannot
+produce blue -- it can only darken toward where the two hues overlap, which
+is olive. Rendered at four strengths (lift .45 / alpha 102, .30/150,
+.20/190, .10/225), turning it up did not make the orbiter bluer, it made it
+muddier. There is no good number between invisible and mud.
+
+It worked on the enemies because it was tuned on them: a bone-white
+skeleton is nearly unsaturated, and white times anything is that thing. The
+attack art is the opposite -- the orbiter measures 1.00 saturation, the
+totem bolt 0.93 -- so the same mechanism had nothing to work with.
+
+#### And why it is done offline
+
+A proper HSV **hue rotation** -- keep value, keep saturation, turn the hue
+-- does produce the colours, with every pixel of shading intact. Measured
+at **2.4 ms a frame** uncached, in pure Python, per element. That is about
+forty times the wash, and the wash's own cache was already sitting at
+391 of 512 entries in a 120-enemy fight, so a miss would have been a
+visible hitch rather than a rounding error.
+
+So the rotation runs once, in a tool, and the game blits an ordinary
+sprite. This is not a new idea here: `recolour_totem_fire.py` made exactly
+this argument in 2026-09 for one file ("orange x blue is mud"), and this
+generalises it.
+
+| | cost |
+|---|---|
+| wash, runtime | +0.62 ms draw at 120 enemies, cache 391/512 |
+| hue rotation, runtime | ~2.4 ms per frame per element, uncached |
+| recoloured offline | nil -- it is a sprite |
+
+Re-measured after the change, the wash's draw delta is within noise
+(-0.07 ms across 400 frames) and it is called 51.6 times a frame for
+**enemy bodies alone** -- so the attacks were never much of its cost, and
+the cache pressure is M10's, not M13's. At 408 of 512 a clear would
+recompute about 51 washes in one frame, roughly 0.6 ms, once. Measured and
+closed.
+
+#### The source art is expected to change, so nothing is transcribed
+
+The melee variants are cut from a pack that is not in the repo; they are as
+fixed as any authored art. These are derived from sheets that **ship**, and
+any of them can be redrawn or repointed tomorrow without a word about the
+four copies that just went stale.
+
+So the tool is declarative end to end. A family opts in by carrying an
+`infused` block in `weapon_sprites.json`; the tool reads the sheets from
+that rig's own anims, writes `assets/infused/<rig>_<element>/`, and
+regenerates `data/weapons/infused_sprites.json` in full. Changing the art,
+the tuning or the rig itself is one re-run:
+
+    python -m tools.asset_pipeline.recolour_element_variants
+
+and a test runs the same tool with `--check`, which rebuilds the whole tree
+in memory and fails on any difference -- a changed source, a changed
+`infused` block, a hand-edited PNG and an orphaned file all come out as the
+same failure.
+
+The six families: `ember`, `bomb`, `explosion`, `explosion_small`,
+`grave_totem`, `spirit_wolf`. Twenty-four rigs, forty sheets, 456 KB.
+
+#### The rotation, and what it deliberately does not do
+
+Each sheet is turned by **one** angle, from its own dominant hue (a
+saturation-weighted circular mean, so the black outline and the transparent
+corner do not vote) onto the element's. Value and alpha are untouched. That
+keeps the art's internal colour relationships: a flame whose core is hotter
+than its edge still has a core hotter than its edge, in the new colour.
+
+`spread` (0.85 by default) is how much of a pixel's distance from its
+family's hue survives, and `sat_floor`, `sat_gain` and `value_gain` are
+there for art too grey to rotate. None of the six needed anything but the
+default -- the least saturated is the Bomb at 0.44 -- so all six `infused`
+blocks are empty, which is the honest state to leave them in.
+
+#### The look follows the infusion, not the hit that spends it
+
+The screenshot caught the second real bug in M13 C, and it had been there
+since A: the Ember Ring, the Grave Totem and the Spirit Wolf came out plain
+at **every** element.
+
+They are the three `time`-mode weapons, and `Weapon.attack_element` is
+documented as `NONE` for those -- their element is claimed per hit by
+`take_element_window` rather than stamped on the spawn -- so the painters,
+reading the projectile's stamp, had nothing to read. The Daggers had a
+quieter version of it: `interval: 2`, so two swings in three were drawn
+plain. Four of nine weapons, and the wash's near-invisibility had hidden
+all of it.
+
+`attack_element` is the right rule for damage and the wrong one for paint.
+An infused weapon *is* infused the whole time; which particular hit spends
+the element is a balance detail, not something the player should have to
+read off a sprite. So every spawn now carries a second, cosmetic field:
+
+| field | means | read by |
+|---|---|---|
+| `element` | what this hit applies | the hit resolver -- unchanged |
+| `infusion` | what the weapon is | every painter |
+
+On `Projectile` and on `Summon` (whose `element`, added earlier in M13 and
+never read for damage, simply became `infusion`), set on every `reset` so a
+pooled object cannot wear the last one's colour. Seven spawn sites pass it.
+
+Seven tests pin it, including the two pool-reset ones and the case that
+started this: a time-mode weapon stamps nothing and still looks infused.
+One existing test followed the change --
+`test_an_infused_sword_draws_its_element` set `element`, which is now the
+wrong field -- and gained a sibling that pins the distinction directly: a
+swing that applies nothing still draws its colour.
+
+#### Three variants are close to their plain, and that is not a bug
+
+Measured hue distance from each family's own colour:
+
+| family | plain | fire | ice | thunder | wind |
+|---|---|---|---|---|---|
+| `ember` | 29 | **8** | 175 | 127 | 105 |
+| `bomb` | 223 | 163 | **15** | 44 | 85 |
+| `explosion` | 39 | 17 | 166 | 136 | 95 |
+| `explosion_small` | 36 | 14 | 169 | 133 | 98 |
+| `grave_totem` | 196 | 173 | **10** | 68 | 61 |
+| `spirit_wolf` | 175 | 153 | 30 | 89 | 40 |
+
+A fire-infused Ember Ring looks almost like a plain one, because a plain
+Ember Ring is already fire; an ice-infused Grave Totem looks almost like a
+plain one, because the Totem is already a blue flame. Manufacturing a
+difference -- a brightness lift on every variant, say -- would push twenty
+other sheets away from their source's authored shading to fix three, and
+the element is still being said by the aura, the particles and the damage
+number. Left alone, and written down so it is a known property rather than
+a surprise.
+
+**D. Tests and close out** -- done
+
+- [x] D1. Every melee weapon has all five variants and they all load; every
+      infusable rig has all four, with the base's geometry, frame counts and
+      timings, and an untouched alpha channel.
+- [x] D2. Each variant's mean hue is its element's, within 45 degrees --
+      the same measurement M12 put on the aura strips, and worth more here
+      because a hue rotation has exactly one way to be wrong and no way to
+      look wrong in a thumbnail.
+- [x] D3. The wash is cached per (frame, element), not copied per frame;
+      and it is no longer on the draw path of anything but an enemy.
+- [x] D4. No third copy of an element colour: the tool reads
+      `element_visuals.json`, and `variant_rig` refuses to guess a family
+      from a name -- `totem_bolt` plus fire is still `totem_bolt`.
+- [x] D5. Screenshot per element for the recoloured effects, in play, and
+      the full suite: **3190 passed, 1 skipped**, 1000 subtests. The
+      screenshot earned its place twice over -- it is what caught the
+      `infusion` bug, which no test in the suite was looking for and which
+      had been shipping since A.
 
 ## Progress
 
@@ -2252,3 +2405,29 @@ its quarter overhang and would have been drawn square.
   Screenshot delivered: four infusions at once, the Thunder chain's arcs,
   two tornadoes and five of the six reactions inside five seconds of
   ordinary play.
+
+- 2026-09-22: M13 done. An infused weapon now looks infused, by two
+  mechanisms chosen by measurement rather than preference. The **melee**
+  attacks are replaced outright -- the reserve pack draws nine colour rows
+  of every animation, so the Sword's arc, the Daggers' streaks and thrust
+  and the Hammer's star were each cut five times, and two of the five rigs
+  they replace were drawn at a maximum alpha of 56 where their siblings
+  reach 255, so most of the visible gain arrives before any element does.
+  **Everything else** keeps its own art and is hue-rotated offline, four
+  sheets per rig, by the new
+  `tools/asset_pipeline/recolour_element_variants.py`: the Ember Ring's
+  flame, the Bomb and both its explosions, the Grave Totem and the Spirit
+  Wolf. That second half was **built twice**. The first build tinted them
+  with M11's wash, which is a multiply, and a multiply cannot turn an
+  orange flame blue -- rendered at four strengths, turning it up only made
+  it muddier. A hue rotation does work and costs ~2.4 ms a frame uncached,
+  so it runs in a tool instead and the game blits an ordinary sprite; the
+  wash went back to the one surface it was tuned for, a primed enemy's
+  body, where its cost is now within noise. Because these sources ship and
+  can be redrawn at any time, nothing about them is transcribed: a family
+  opts in with an `infused` block, the tool reads that rig's own sheets,
+  and a test runs it with `--check` so a replaced sprite cannot silently
+  leave four stale copies behind. Three variants land near their plain --
+  fire on a flame, ice on a blue totem -- which is written down as a
+  measured property rather than papered over. Screenshot delivered: the
+  four recoloured effects, plain and four elements, in play.

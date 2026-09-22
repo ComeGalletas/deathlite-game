@@ -205,7 +205,7 @@ class SwingSequenceTests(unittest.TestCase):
 
     def test_an_infused_sword_draws_its_element(self):
         """The whole point of M13: the rig in the data is a base and the
-        attack's element picks which colour of it is drawn."""
+        weapon's infusion picks which colour of it is drawn."""
         from combat.elements.ids import ELEMENTS
 
         fx = get_content().weapon_visual("sword").fx
@@ -213,10 +213,24 @@ class SwingSequenceTests(unittest.TestCase):
             with self.subTest(element=element.key):
                 ps, slash_fx = self._ps()
                 cone = self._cone(fx)
-                cone.element = element
+                cone.infusion = element
                 slash_fx.spawn_from_cone(ps, cone)
                 self.assertEqual(ps._slashes[0]["rigs"],
                                  [f"sword_slash_{element.key}"])
+
+    def test_it_is_the_infusion_that_picks_the_colour_not_the_hit(self):
+        """`element` is what this hit *applies* and is not the same thing.
+        Painting from it left the three time-mode weapons plain at every
+        element and drew the Daggers plain on two swings in three, because
+        both stamp `NONE` on the attacks that do not apply (M13 C)."""
+        from combat.elements.ids import ElementId
+
+        ps, slash_fx = self._ps()
+        cone = self._cone(get_content().weapon_visual("sword").fx)
+        cone.element = ElementId.NONE
+        cone.infusion = ElementId.FIRE
+        slash_fx.spawn_from_cone(ps, cone)
+        self.assertEqual(ps._slashes[0]["rigs"], ["sword_slash_fire"])
 
     def test_the_draw_asks_each_rig_for_its_frame_in_turn(self):
         ps, slash_fx = self._ps()

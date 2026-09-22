@@ -551,6 +551,7 @@ class Weapon:
             lifetime=lifetime,
             weapon_id=self.weapon_id,
             tags=self.tags,
+            infusion=self.element,
             speed=self._summon_speed(),
             attack_range=float(d["summon_attack_range"]),
             attack_interval=self._summon_attack_interval(),
@@ -671,7 +672,7 @@ class Weapon:
                 visual=self.visual_id,
                 source_tags=self.tags, is_crit=dmg.is_crit,
                 chain_left=chain_left, chain_range=chain_range,
-                element=self.attack_element)
+                element=self.attack_element, infusion=self.element)
         return True
 
     def _cone_directions(self, cone_dir: pygame.Vector2) -> list:
@@ -703,7 +704,7 @@ class Weapon:
                 cone_half_angle=math.radians(half),
                 stun_chance=stun_chance, stun_duration=stun_duration,
                 swing=self._shots,                      # CR2: picks the slash
-                element=self.attack_element)
+                element=self.attack_element, infusion=self.element)
         fx = self.effects
         impact = ctx.origin + cone_dir * (area * 0.55)
         if self.effect("shockwave_radius") > 0.0:
@@ -716,7 +717,7 @@ class Weapon:
                 src_weight=src_weight * 0.5, weapon_id=self.weapon_id,
                 visual=self.visual_id, source_tags=self.tags + ("shockwave",),
                 is_crit=dmg.is_crit, style="blast", no_block=True,
-                element=self.attack_element)
+                element=self.attack_element, infusion=self.element)
         if self.effect("hazard_radius") > 0.0 and ctx.spawn_hazard is not None:
             ctx.spawn_hazard(
                 pos=impact, radius=self.effect("hazard_radius"),
@@ -763,7 +764,7 @@ class Weapon:
                 rehit_interval=rehit,
                 # Orbiters never fire an attack, so they are time mode and
                 # carry nothing: the hit site asks the weapon instead.
-                element=self.attack_element)
+                element=self.attack_element, infusion=self.element)
             if o is None:
                 break
             self._orbiters.append(o)

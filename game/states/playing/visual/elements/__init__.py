@@ -19,6 +19,8 @@ This package replaces the placeholder `visual/element_fx.py` of M3.
 """
 from __future__ import annotations
 
+import pygame
+
 from game.states.playing.visual.elements import layers, transient
 from game.states.playing.visual.elements.budget import ParticleBudget
 from game.states.playing.visual.elements.profiles import get_visuals
@@ -135,28 +137,90 @@ def sweep(run, now: float) -> None:
     transient.sweep(run, now)
 
 
+_WASH_CACHE: dict[tuple, tuple] = {}
+_WASH_CACHE_CAP = 512
+
+
+def washed(frame, element, profiles=None):
+    """`frame` coloured toward `element`, or `frame` itself for no element.
+
+    How a **primed enemy** wears the element that is on it. The element's
+    colour is lifted most of the way to white, multiplied over the frame
+    and laid back at `wash.alpha`, which shifts an enemy's hue without
+    darkening it -- a straight multiply by a saturated colour would crush
+    every channel the tint is low in and turn a bone-white skeleton navy.
+
+    It is not how an *attack* wears its element, though M13 first built it
+    that way. A multiply can only ever darken toward the overlap of two
+    hues, so on saturated art -- the orbiter is 1.00 saturation -- it
+    cannot produce the element's colour at any strength: measured at four,
+    stronger only meant muddier. Those sprites are recoloured offline
+    instead (`recolour_element_variants.py`) and resolved by
+    `variant_rig`, which also costs nothing to draw.
+
+    Cached on `(id(frame), element)`, with the source kept in the entry so
+    its id cannot be recycled under the cache. The frames handed in are the
+    asset cache's own surfaces, so the same one comes back for every frame
+    of an animation and copying it per draw would be the expensive way to
+    do this.
+    """
+    if not element or frame is None:
+        return frame
+    key = (id(frame), int(element))
+    hit = _WASH_CACHE.get(key)
+    if hit is not None and hit[0] is frame:
+        return hit[1]
+    if profiles is None:
+        from game.content import get_content
+        profiles = get_visuals(get_content())
+    style = profiles.wash
+    colour = profiles.tint(element)
+    pale = tuple(int(c + (255 - c) * style.lift) for c in colour)
+    over = frame.copy()
+    over.fill((*pale, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    over.set_alpha(style.alpha)
+    out = frame.copy()
+    out.blit(over, (0, 0))
+    if len(_WASH_CACHE) >= _WASH_CACHE_CAP:
+        _WASH_CACHE.clear()
+    _WASH_CACHE[key] = (frame, out)
+    return out
+
+
 def variant_rig(assets, base: str, element=None) -> str:
     """`base` in the colour of `element`, or its plain colour.
 
-    The melee attacks are authored once per state -- `sword_slash_plain`,
-    `sword_slash_fire`, and so on -- rather than tinted, because the pack
-    they come from drew all nine colours of each animation and an authored
-    colour beats a computed one (M13).
+    Two kinds of family arrive here, and each says which it is in the data.
 
-    A rig is only treated as variant-cut when its `_plain` exists. That
-    guard is not ceremony: `variant_rig(assets, "totem_bolt", FIRE)` would
-    otherwise resolve to `totem_bolt_fire`, which is a real rig and is the
-    Grave Totem bolt's flame tail -- nothing to do with an infusion. Name
-    guessing across a flat rig namespace finds things it did not mean to,
-    and `_plain` is the marker that says this family was cut on purpose.
+    A melee attack is **replaced**. The pack it comes from drew all nine
+    colours of every animation, so `sword_slash` has no rig of its own and
+    five siblings carry the art: `sword_slash_plain` and one per element.
+    The `_plain` sibling is the marker.
+
+    Everything else is **recoloured**. The rig keeps its own art for an
+    uninfused weapon and declares an `infused` block, from which
+    `tools/asset_pipeline/recolour_element_variants.py` generates the four
+    element rigs. There is deliberately no `_plain`: it would be a second
+    copy of sheets the base already owns, and a copy is a thing that goes
+    stale when the art it was copied from is replaced.
+
+    Neither is guessed from a name. `variant_rig(assets, "totem_bolt",
+    FIRE)` would otherwise resolve to `totem_bolt_fire`, which is a real
+    rig and is the Grave Totem bolt's flame tail -- nothing to do with an
+    infusion. Name guessing across a flat rig namespace finds things it did
+    not mean to.
     """
-    if assets.frame_count(f"{base}_plain", "loop") <= 0:
+    if assets.rig(f"{base}_plain") is not None:
+        plain = f"{base}_plain"
+    elif (assets.rig(base) or {}).get("infused") is not None:
+        plain = base
+    else:
         return base
     if element:
         name = f"{base}_{element.key}"
-        if assets.frame_count(name, "loop") > 0:
+        if assets.rig(name) is not None:
             return name
-    return f"{base}_plain"
+    return plain
 
 
 def tint(element):

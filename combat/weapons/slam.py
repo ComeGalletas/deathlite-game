@@ -69,10 +69,10 @@ def land(weapon, ctx) -> None:
         source_tags=weapon.tags, is_crit=dmg.is_crit, style="hidden", no_block=True,
         stun_chance=float(d.get("stun_chance", 0.0)) + weapon.bonus["stun_chance"],
         stun_duration=float(d.get("stun_duration", 0.0)) + weapon.bonus["stun_duration"],
-        element=weapon.attack_element)
+        element=weapon.attack_element, infusion=weapon.element)
     if ctx.spawn_impact is not None:
         ctx.spawn_impact(pos=pos, radius=radius, rig=str(d.get("impact_rig", "")),
-                         element=weapon.attack_element,
+                         infusion=weapon.element,
                          weapon_id=weapon.weapon_id)
     fx = weapon.effects
     if weapon.effect("shockwave_radius") > 0.0:
@@ -85,7 +85,7 @@ def land(weapon, ctx) -> None:
             src_weight=src_weight * 0.5, weapon_id=weapon.weapon_id,
             visual=weapon.visual_id, source_tags=weapon.tags + ("shockwave",),
             is_crit=sdmg.is_crit, style="blast", no_block=True,
-            element=weapon.attack_element)
+            element=weapon.attack_element, infusion=weapon.element)
     if weapon.effect("hazard_radius") > 0.0 and ctx.spawn_hazard is not None:
         ctx.spawn_hazard(
             pos=pos, radius=weapon.effect("hazard_radius"),
