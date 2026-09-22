@@ -12,6 +12,7 @@
 import os
 import random
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -22,6 +23,15 @@ import pygame
 from entities.ai import Blackboard, build_behavior
 from entities.ai.machine import ATTACK_SLOT
 from game.content import get_content
+
+
+def _source_paths() -> dict:
+    """Where the imp's art is, and where its editor source is archived."""
+    root = Path(__file__).resolve().parents[3]
+    return {"root": root,
+            "shipped": root / "assets" / "enemies" / "imp",
+            "archived": root / "assets" / "unused" / "enemies" / "imp" / "Imp.aseprite"}
+
 
 DT = 1 / 60
 
@@ -204,25 +214,38 @@ class RigTests(unittest.TestCase):
         self.assertFalse(e._attacking)
         self.assertEqual(e._anim_name(), "attack_end")
 
-    def test_the_editor_source_is_not_shipped(self):
-        """`.aseprite` sources live in `assets/unused/`, per CREDITS.
+    def test_the_editor_source_is_archived_and_not_shipped(self):
+        """`.aseprite` sources are kept, and kept out of the shipped folders.
 
-        Two claims, and only the first is checkable everywhere. That the
-        source does not ship beside the strip is a statement about tracked
-        content, so it holds in any checkout. That it is *over in*
-        `assets/unused/` is not: that folder is gitignored
-        (`.gitignore:46`), so it exists in a working copy that carries the
-        reserve art and in no fresh clone or `git worktree` at all. Asserted
-        unconditionally it passed on one machine and failed everywhere else,
-        CI included, which says nothing about the imp.
+        Both halves are asserted, because both are now true in every
+        checkout. The source does not sit beside the strip the game loads,
+        and it *is* archived where `CREDITS.md` says it is.
+
+        The second half used to `skipTest` itself, and the reason was a
+        contradiction in the repo rather than anything about the imp.
+        `CREDITS.md` promised the source was "archived ... rather than
+        deleted", while `.gitignore` swept it up twice over -- once as
+        `*.aseprite` ("asset cruft") and again inside the whole-folder
+        `assets/unused/` exclusion. So the file lived in exactly one working
+        copy and in no clone or `git worktree`, and a test that asserted the
+        promise passed on one machine and failed everywhere else. Skipping
+        made the suite green but checked nothing. The reserve block in
+        `.gitignore` now re-includes editor sources -- 52 KB, and the source
+        for art we ship -- so the promise is one the suite can hold it to.
         """
-        from pathlib import Path
-        root = Path(__file__).resolve().parents[3]
-        self.assertFalse(list((root / "assets" / "enemies" / "imp").glob("*.aseprite")))
-        unused = root / "assets" / "unused"
-        if not unused.is_dir():
-            self.skipTest("assets/unused/ is gitignored and absent from this checkout")
-        self.assertTrue((unused / "enemies" / "imp" / "Imp.aseprite").exists())
+        imp = _source_paths()
+        self.assertEqual(sorted(p.name for p in imp["shipped"].glob("*.aseprite")), [],
+                         "an editor source is shipped beside the loaded strip")
+        self.assertTrue(imp["archived"].is_file(),
+                        f"the archived editor source is missing: {imp['archived']}")
+
+    def test_credits_names_the_folder_the_source_is_archived_in(self):
+        """The doc and the disk are pinned to each other, because it was
+        exactly their drifting apart that hid the problem above: CREDITS
+        described an arrangement `.gitignore` had quietly stopped keeping."""
+        imp = _source_paths()
+        credits = (imp["root"] / "assets" / "CREDITS.md").read_text(encoding="utf-8")
+        self.assertIn("assets/unused/enemies/imp/", credits)
 
 
 class RosterTests(unittest.TestCase):

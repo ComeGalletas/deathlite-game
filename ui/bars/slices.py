@@ -18,7 +18,13 @@ from __future__ import annotations
 import pygame
 
 _cache: dict[tuple, pygame.Surface | None] = {}
-_CACHE_MAX = 512
+# Sized for the overhead enemy bars (journal: enemy_health_bar_journal.md).
+# The HUD alone needs a couple of hundred entries -- a long bar at every fill
+# position it passes through -- and the enemy bars add one family per distinct
+# track length times that track's own fill positions, which is several hundred
+# more. Over the cap the whole cache is dropped and the HUD's bars rebuild
+# with it, so the cap has to clear the working set rather than sit inside it.
+_CACHE_MAX = 1536
 
 
 def caps(assets, rig: str) -> tuple[int, int]:

@@ -18,7 +18,11 @@ effects in `assets/sound_effects/`.
 this file. `.DS_Store` files were removed, and `.aseprite` editor sources are kept
 out of the shipped folders -- the one that came with the imp is archived under
 `assets/unused/enemies/imp/` rather than deleted, which is where source art lives
-in this project. `assets/enemies/` and its siblings hold only sprites the game
+in this project. That archive is **tracked**: the reserve library around it is
+gitignored for its size, but the editor sources inside it are re-included
+(`.gitignore`, the reserve block), because a source for art we ship belongs in
+history and in every clone. `tests/entities/ai/test_imp.py` holds this file to
+both halves of the promise. `assets/enemies/` and its siblings hold only sprites the game
 loads, plus a set of reserve packs kept for future use.
 
 | Field | Value |

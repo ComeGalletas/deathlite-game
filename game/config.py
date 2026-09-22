@@ -644,6 +644,50 @@ HUD_BOSS_FILL: str = "bar_hex_fill_red"
 HUD_BOSS_WIDTH: float = 0.5
 HUD_BOSS_BOTTOM: int = 28
 
+# --- the overhead enemy health bar ---------------------------------------
+# Drawn over any enemy standing below full HP (journal:
+# enemy_health_bar_journal.md). The boss is excluded structurally: it is not a
+# member of `run.enemies`, so the enemy draw path never sees it, and it keeps
+# the bottom-centre HUD bar above.
+#
+# Frameless -- the bare trough and fill of the same hex family, whose art is 5
+# native px tall, so at x1 every enemy carries the same 5-px bar whatever its
+# size. The framed housing is 11 native px and reads as chrome over a crowd of
+# forty bodies; set ENEMY_HP_BAR_FRAMED to bring it back.
+#
+# x1 rather than x2 (owner, 2026-09-22, off a four-way comparison): at x2 the
+# bar stood 10 px and read as a piece of HUD parked on the enemy. The scale is
+# an integer because the art is pixel art on a whole-pixel grid, so halving it
+# is the one step available -- the lengths below were then cut to about three
+# quarters so the whole bar came down together.
+ENEMY_HP_BAR_FRAME: str = "bar_hex_frame_grey"
+ENEMY_HP_BAR_FILL: str = "bar_hex_fill_red"
+ENEMY_HP_BAR_EMPTY: str = "bar_hex_empty"
+ENEMY_HP_BAR_FRAMED: bool = False
+ENEMY_HP_BAR_SCALE: int = 1
+# Length by *maximum* HP, the owner's rule: a tank carries a visibly longer bar
+# than a mook and the fill inside it reads as the fraction left.
+#
+# Square root, not linear. The roster spans 5 HP (bumblebee) to 290 (troll) and
+# the director multiplies max HP by up to 2.4x over a run
+# (`spawn/budget.stat_multipliers`), so the live range is ~5-700: px-per-HP
+# either makes the bumblebee a two-pixel nub or the late troll wider than the
+# screen. The curve gives 22 native px at the floor, 28 for a 20-HP skull, 68
+# for a bear and the 84-px ceiling from the troll up. At x1 those are screen px.
+#
+# The floor and the ceiling are *even*, and so is every length between them,
+# which is not cosmetic: `ui/bars/meters` keys its cache on (width, filled) and
+# clears wholesale when full, so a continuous width across sixty live enemies
+# would thrash it.
+ENEMY_HP_BAR_REF_HP: float = 20.0
+ENEMY_HP_BAR_REF_WIDTH: int = 27
+ENEMY_HP_BAR_MIN_WIDTH: int = 22
+ENEMY_HP_BAR_MAX_WIDTH: int = 84
+# Gap (native px, before the art scale) between the top of the enemy's sprite
+# and the bottom of its bar. Doubled with the drop to x1, so the bar keeps the
+# 6 screen px of air it had over the head at x2.
+ENEMY_HP_BAR_GAP: int = 6
+
 # --- Audio ---------------------------------------------------------------
 # Volume step for the Options screen (0..1). Every slider snaps to this grid;
 # the players clamp to [0, 1]. All three volume rows -- the master, the music

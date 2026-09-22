@@ -26,7 +26,13 @@ import pygame
 from ui.bars import slices
 
 _cache: dict[tuple, pygame.Surface | None] = {}
-_CACHE_MAX = 512
+# Sized for the overhead enemy bars (journal: enemy_health_bar_journal.md).
+# The HUD alone needs a couple of hundred entries -- a long bar at every fill
+# position it passes through -- and the enemy bars add one family per distinct
+# track length times that track's own fill positions, which is several hundred
+# more. Over the cap the whole cache is dropped and the HUD's bars rebuild
+# with it, so the cap has to clear the working set rather than sit inside it.
+_CACHE_MAX = 1536
 
 
 def _well(assets, frame: str) -> tuple[int, int, int, int] | None:
@@ -36,6 +42,22 @@ def _well(assets, frame: str) -> tuple[int, int, int, int] | None:
     if not well or len(well) != 4:
         return None
     return tuple(int(v) for v in well)          # type: ignore[return-value]
+
+
+def inset(assets, *, frame: str) -> int | None:
+    """Native px the housing `frame` spends either side of the fill track.
+
+    `bar(width=...)` takes the bar's *outer* width, but a caller that sizes
+    the **track** -- the part that carries meaning -- asks for `track +
+    inset(...)`. The overhead enemy bar does, because its length states an
+    enemy's maximum HP and a 6-px track inside a 14-px bar would say almost
+    nothing. `None` when the art is missing, as everywhere else here.
+    """
+    well = _well(assets, frame)
+    housing = assets.image(frame)
+    if well is None or housing is None:
+        return None
+    return housing.get_width() - well[2]
 
 
 def bar(assets, *, frame: str, fill: str, empty: str, width: int,

@@ -143,8 +143,10 @@ class DefensiveStatTests(unittest.TestCase):
         self.assertAlmostEqual(p.take_damage(40), 40 * 0.5 * 0.7 - 4)
 
     def test_no_roll_lands_plain_damage(self):
+        # Neither roll fires, so nothing multiplies the hit -- armor still
+        # comes off it, and is read from the hero rather than assumed 0.
         p = hero("kestrel", rng=_FixedRng(0.5, 0.5))
-        self.assertAlmostEqual(p.take_damage(40), 40.0)
+        self.assertAlmostEqual(p.take_damage(40), 40.0 - p.stats["armor"])
         self.assertEqual(p.last_defense, "")
 
     def test_block_strength_is_a_stat_so_a_blessing_can_raise_it(self):

@@ -18,7 +18,10 @@ htmlcov/
 save.json
 save.json.*
 
-# Asset cruft (editor sources / OS metadata) -- the game only loads PNGs
+# Asset cruft (OS metadata) and editor sources anywhere the game loads from --
+# the game only loads PNGs, and a source file sitting beside a shipped strip is
+# shipped to every player. The reserve's own sources are re-included below:
+# an `.aseprite` we keep on purpose is version control's business, not cruft.
 *.aseprite
 .DS_Store
 Thumbs.db
@@ -43,7 +46,24 @@ dist/web/out/
 # folders the data names). Untracked since 2026-09-12 -- ~300 MB, most of it the
 # 61,783-file effects Gigapack that now lives inside it. The pack is also named
 # on its own, matched at any depth, so dragging it back out cannot un-ignore it.
-assets/unused/
+#
+# The editor sources under it are the exception, and are tracked. `CREDITS.md`
+# promises the `.aseprite` that came with the imp is "archived ... rather than
+# deleted"; ignoring it made that promise unkeepable -- the file lived in one
+# working copy and in no clone or `git worktree`, and the test asserting it had
+# to skip itself everywhere else. It is 52 KB, and it is the source for art we
+# ship, so it belongs in history. The four lines below are order-sensitive:
+#
+#   1. exclude everything under the reserve,
+#   2. re-include its *directories* so git can descend into them at all
+#      (git cannot re-include a file whose parent directory is excluded),
+#   3. re-include the editor sources, which also beats the blanket
+#      `*.aseprite` above because a later pattern wins,
+#   4. re-exclude the Gigapack *last*, so git prunes its 61,783 files at the
+#      directory instead of walking them on every `git status`.
+assets/unused/**
+!assets/unused/**/
+!assets/unused/**/*.aseprite
 Super Pixel Effects Gigapack/
 
 # Editors and merge leftovers
