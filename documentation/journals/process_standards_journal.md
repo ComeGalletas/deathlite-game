@@ -1,7 +1,7 @@
 # Process standards — journal
 
 **ID:** DOC-001 · **System:** process · **Type:** process ·
-**Status:** in progress · **Branch:** main (not committed yet — see DOC-001.D5)
+**Status:** done · **Branch:** main
 
 ---
 
@@ -45,12 +45,15 @@ Decisions the request left open:
   retroactive IDs in creation order within their system, listed in the
   index with status `legacy`. Each file carries a `**Legacy ID:**` line under
   its title (DOC-001.3); their sections are not rewritten to the standard.
-- **DOC-001.D4 — Memory conflict found.** The spent-source-sheet rule has
-  the cut's pinning test skip when the source is gone; the later rule says
-  a test never skips to green. Flagged in `CLAUDE.md` §3 for the owner.
-- **DOC-001.D5 — This request's own branch.** It only adds three new
-  documentation files, so it was written on `main` without committing, and
-  the owner is asked which branch to commit it on.
+- **DOC-001.D4 — Memory conflict, resolved.** The spent-source-sheet rule
+  had the cut's pinning test skip when the source was gone; the later rule
+  says a test never skips to green. The owner pointed to the imp fix
+  (`914039e`: `.gitignore` re-includes editor sources, the archive test
+  asserts unconditionally), so "never skip" wins. The review found three
+  cut-script tests still skipping on exit 2 (`tests/render/test_spawn_fx.py`,
+  `test_totem_bolt.py`, `test_totem_sprite.py`), logged as TST-002 (proposed).
+- **DOC-001.D5 — This request's own branch.** Owner chose `main`, with no
+  test run since no code is touched; still one commit per task.
 
 ## DOC-001 — Proposed additions (included in `CLAUDE.md`)
 
@@ -75,6 +78,14 @@ Decisions the request left open:
 
 - [x] DOC-001.1 — Write `CLAUDE.md` (process standard + condensed standing rules) → `1e1225e`
 - [x] DOC-001.2 — Create `INDEX.md` with retroactive IDs for existing journals → `712775d`
-- [x] DOC-001.3 — Stamp a `**Legacy ID:**` line under each legacy journal's title (owner approved; tagged as legacy so they grep apart)
-- [ ] DOC-001.4 — Resolve DOC-001.D4 with the owner and update memory + `CLAUDE.md`
-- [ ] DOC-001.5 — Commit on the branch the owner chooses
+- [x] DOC-001.3 — Stamp a `**Legacy ID:**` line under each legacy journal's title (owner approved; tagged as legacy so they grep apart) → `a4bd438`
+- [x] DOC-001.4 — Resolve DOC-001.D4 and update memory + `CLAUDE.md`; open TST-002 as proposed
+- [x] DOC-001.5 — Commit on `main`, one commit per task
+
+## DOC-001 — Results
+
+Four commits on `main` (`1e1225e`, `712775d`, `a4bd438`, and the DOC-001.4
+commit). No tests run: documentation only, as the owner directed. Memory
+updated in step: a pinned `requirement-ids-journals-commits` entry, a pointer
+from the journal-per-request entry, and the spent-source-sheet entry no
+longer prescribes a skip.

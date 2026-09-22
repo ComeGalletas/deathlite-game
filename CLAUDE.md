@@ -175,7 +175,8 @@ the rules that apply to every change.
 - Derived art stays regenerable: a `tools/asset_pipeline/` script reading
   its inputs from data, full rewrites, and a `--check` mode a test runs.
 - A spent source sheet is archived in an `unused/` folder beside the strip
-  it was cut into; record the cut in `assets_journal.md`.
+  it was cut into, and must stay reachable so the cut's test still runs;
+  record the cut in `assets_journal.md`.
 - Prefer authored tile/autotile variants over procedural edges; an
   authored sprite replaces the procedural indicator under it.
 
@@ -193,6 +194,10 @@ the rules that apply to every change.
 
 - This file and the memory must not disagree. When a standing rule
   changes, change it here and in memory in the same step.
-- Known inconsistency to resolve (DOC-001.D4): the spent-source-sheet
-  memory says the cut's pinning test skips when the source is gone, which
-  contradicts "a test never skips itself to green".
+- Resolved (DOC-001.D4): "a test never skips itself to green" wins over the
+  older spent-source-sheet wording that let a cut's pinning test skip when
+  its source was gone. The imp's archive test was fixed that way in
+  `914039e` (`.gitignore` re-includes editor sources so the check always
+  runs). Three cut-script tests still carry the old skip — `tests/render/
+  test_spawn_fx.py`, `test_totem_bolt.py`, `test_totem_sprite.py` — and are
+  proposed as TST-002.

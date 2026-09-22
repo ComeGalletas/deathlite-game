@@ -11,7 +11,7 @@ someone confirms it. Each carries a `**Legacy ID:**` line under its title
 standard and are not rewritten to it.
 
 **Next free:** CMB-007 · ENT-012 · SPN-004 · WLD-011 · RND-005 · UI-012 ·
-PRG-003 · AUD-004 · SYS-008 · TST-002 · BLD-003 · DOC-002
+PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-002
 
 ## Requirements
 
@@ -75,9 +75,10 @@ PRG-003 · AUD-004 · SYS-008 · TST-002 · BLD-003 · DOC-002
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
+| TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | proposed | — (not opened) | — | 2026-09-22 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
-| DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | in progress | [process_standards_journal.md](process_standards_journal.md) | main | 2026-09-22 |
+| DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | main | 2026-09-22 |
 
 ## Plans and designs
 
