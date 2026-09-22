@@ -4,7 +4,7 @@ The ring states the exact damage edge and the disc states the area; both
 are what a player reads, so the art is layered between them and never
 replaces either. It plays once, at its own speed, timed to *end* as the
 pool does -- which reads as the blast going off rather than as the pool
-simmering for three and a half seconds.
+simmering out its life.
 """
 import os
 import unittest

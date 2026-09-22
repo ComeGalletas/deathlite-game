@@ -571,10 +571,14 @@ only cue, and it is on the caster, not on the ground.
 | `hex_shaman/hex_shaman_transformation_spell.png` | -- | -- | nothing |
 
 The spell sheet is laid out exactly like the shaman's own attack strip,
-so it needs no special slicing. One number is a happy accident worth
-keeping: `hazard_radius` is 92, so the damage circle is **184 px** across,
-and a spell frame is **192 px**. Drawn at its native size the art lands
-within 4 % of the circle it is meant to represent.
+so it needs no special slicing. One number *was* a happy accident: at the
+original tuning `hazard_radius` was 92, so the damage circle was **184 px**
+across against a **192 px** spell frame, and the art drawn at its native
+size landed within 4 % of the circle it represents. The 2026-09-21 balance
+pass took the radius to **20**, so the circle is 40 px and the rig is scaled
+to about a fifth of the sheet. The coincidence is gone; the rule that
+replaced it -- `scale` is always `2 * hazard_radius` -- is what keeps the two
+honest, and it is pinned by a test.
 
 ### Proposal
 
@@ -586,7 +590,7 @@ small pieces, in the project's usual order (data -> entity -> painter).
     "hex_shaman_explosion_spell": {
       "frame": [192, 192],
       "anchor": [96, 96],          // centre: a pool is placed by its middle
-      "scale": [184, 184],         // == 2 * hazard_radius
+      "scale": [40, 40],           // == 2 * hazard_radius
       "anims": { "loop": { "file": "enemies/hex_shaman/hex_shaman_explosion_spell.png",
                            "frames": 10, "fps": 14, "loop": false } }
     }
@@ -620,8 +624,9 @@ then the existing ring on top.
 ### The three decisions this needs
 
 - **One-shot or looping.** The strip is 10 frames at 14 fps = 0.71 s; the
-  pool lives 3.5 s. An explosion reads as a one-shot, so the proposal
-  holds the final frame for the remaining 2.8 s. If the last frame is not
+  pool lived 3.5 s when this was written (0.9 s since the 2026-09-21
+  retune -- see the note under *What shipped*). An explosion reads as a
+  one-shot, so the proposal holds the final frame for the remaining 2.8 s. If the last frame is not
   a stable "lingering" pose, the alternatives are to loop the whole strip
   (reads as a pulsing pool) or to loop a tail slice (frames 6-9, say).
   **Look at the sheet before choosing**; this is an art question, not a
@@ -663,14 +668,24 @@ still readable without competing; **the art is flair only**; and it plays
 as the blast going off rather than as the pool simmering.
 
 That last point is the one real departure from the proposal, and it is
-better. Stretching 10 frames over 3.5 s would have been 2.9 fps -- a
-slideshow. Played at its own 14 fps against the tail of the pool, the
-strip runs at the speed it was drawn for and lands its final frame exactly
-as the pool expires.
+better. Stretching 10 frames over the pool's life would have been a
+slideshow -- 2.9 fps against the 3.5 s pool of the day. Played at its own
+14 fps against the tail of the pool, the strip runs at the speed it was
+drawn for and lands its final frame exactly as the pool expires.
+
+**Pool life, since the 2026-09-21 retune.** `hazard_duration` is now
+**0.9 s** (the numbers above were written against 3.5 s, the default the
+warlock inherited before the key was set explicitly). Nothing in the
+painter cares: `_hazard_sprite` derives the strip's span from the rig
+itself (`frames / fps`) and starts it when `hz.life` drops below that span,
+so "the pool's last 0.7 s" self-adjusts. What changes is only how much of
+the pool it covers -- about four fifths of a 0.9 s pool instead of a fifth
+of a 3.5 s one. The intent survives the retune: the strip still *ends* as
+the pool does.
 
 | piece | what |
 |---|---|
-| `data/enemy_sprites.json` | rig `hex_shaman_explosion_spell`: 10 frames of 192, `content` `[34, 13, 130, 138]`, `anchor` centre, `scale` `[184, 184]` |
+| `data/enemy_sprites.json` | rig `hex_shaman_explosion_spell`: 10 frames of 192, `content` `[34, 13, 130, 138]`, `anchor` centre, `scale` `[40, 40]` (`2 * hazard_radius`, 184 before the 2026-09-21 retune) |
 | `data/enemies.json` | `warlock.hazard_sprite` names the rig |
 | `entities/hazard.py` | `Hazard.sprite`, carried, never read by the damage path |
 | `melee.py` / `effects.py` / `context.py` | `hazard_sprite` threaded from the cast to the pool |

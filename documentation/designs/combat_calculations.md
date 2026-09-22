@@ -792,11 +792,23 @@ def take_damage(self, amount: float, armor: float = 0.0) -> float:
 - Pre-CB-1 this was `max(0, (21/120)·0.7 − 4)` = **0** every frame — immune.
   Fixed; see `../journals/BUG_JOURNAL.md` entry #1.
 
-### 5c · Warlock hazard on Kestrel (armor 0)
+### 5c · Hex shaman hazard on Kestrel (armor 0)
 
-- `hazard_dps` = 23 (18 + the bump), `tick_interval` = 0.5 → bite = `23 · 0.5`
-  = **11.5**, once per 0.5 s; Windborne, no incoming multiplier.
-- `dealt = max(0, 11.5 − 0)` = **11.5** per bite → **23 HP/s**; over the 3.5 s
-  pool ≈ 7 bites ≈ 80 HP.
-- The same pool on Aegis moving (armor 4): `max(0, 11.5 − 4)` = **7.5** per bite
-  → **15 HP/s** (mitigated, not immune).
+Retuned 2026-09-21 — the data key is `hex_shaman` (`warlock` in the older
+sections above), and the pool went `hazard_dps` 23 → **3**, `hazard_radius`
+92 → **20**, `hazard_duration` 1.8 → **0.9**.
+
+- `hazard_dps` = 3, `tick_interval` = 0.5 → bite = `3 · 0.5` = **1.5**, once
+  per 0.5 s; Windborne, no incoming multiplier.
+- `dealt = max(0, 1.5 − 0)` = **1.5** per bite → **3 HP/s**. The pool lives
+  0.9 s, and `Hazard.due_damage` pays only *whole* intervals, so standing in
+  one from the moment it lands is **1 bite ≈ 1.5 HP** — the trailing 0.4 s
+  never completes a second interval.
+- The same pool on Aegis (armor 4): `max(0, 1.5 − 4)` = **0** per bite —
+  **immune**, before Bulwark is even considered. Armor is subtracted per bite
+  (`entities/player.py`), so any hero with armor ≥ 1.5 takes nothing from this
+  pool at all. Worth knowing rather than discovering: this is the same shape as
+  the pre-CB-1 bug in 5b, except here it falls out of the tuning rather than
+  from a per-frame divisor. If the pool is meant to threaten an armoured hero,
+  the dps has to clear their armor across a 0.5 s bite (armor 4 needs
+  `hazard_dps` > 8).
