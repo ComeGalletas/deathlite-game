@@ -73,7 +73,7 @@ Decisions the request left open:
 
 ## DOC-001 — Tasks
 
-- [x] DOC-001.1 — Write `CLAUDE.md` (process standard + condensed standing rules)
+- [x] DOC-001.1 — Write `CLAUDE.md` (process standard + condensed standing rules) → `1e1225e`
 - [x] DOC-001.2 — Create `INDEX.md` with retroactive IDs for existing journals
 - [ ] DOC-001.3 — Stamp the ID header onto each legacy journal (awaiting owner)
 - [ ] DOC-001.4 — Resolve DOC-001.D4 with the owner and update memory + `CLAUDE.md`
