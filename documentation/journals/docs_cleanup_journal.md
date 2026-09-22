@@ -49,7 +49,7 @@ by path.
 ## DOC-003 — Tasks
 
 - [x] DOC-003.1 — Open this journal; index rows for DOC-003, CMB-008, SYS-008, WLD-012
-- [ ] DOC-003.2 — Elemental: tick/mark `ELEMENTAL_SYSTEM_DESIGN.md` and the M3–M8 plan boxes in `elemental_system_journal.md`; update §6.3's `elementInterval` text
+- [x] DOC-003.2 — Elemental: tick/mark `ELEMENTAL_SYSTEM_DESIGN.md` and the M3–M8 plan boxes in `elemental_system_journal.md`; update §6.3's `elementInterval` text
 - [ ] DOC-003.3 — Combat: `combat_balance_journal.md` CB-2 G and `training_dummy_journal.md` bench rebuild
 - [ ] DOC-003.4 — World, spawn and tests: `worldgen_modularity_todo.md`, `journal.md` flow field, `spawn_master_todo.md` S8, `spawn_master_journal.md`, `spawn_groups_journal.md`, `test_suite_review.md`
 - [ ] DOC-003.5 — Entities and UI: bomb fish, roster expansion, gnome split, imp, spear goblin, key icons, buff buildings, assets WA5

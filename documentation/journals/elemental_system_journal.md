@@ -281,7 +281,7 @@ and its tests green before the next starts.
       loading, dev mode. Report conflicts (above).
 - [x] Owner answered items 6, 7, 8, 9 on 2026-09-21 (recorded above); the
       design's open items 1–13 stand at their proposals unless changed.
-- [ ] Owner confirms the "one application per window" reading of time mode
+- [ ] Owner confirms the "one application per window" reading of time mode *(DOC-003: still unconfirmed; the code already works this way (`take_element_window`, M6 built))*
       (item 7).
 
 ### M1 Core (`combat/elements/` package) — built 2026-09-21
@@ -498,30 +498,31 @@ time they are seen on screen:
   a heavily-infused weapon that one-shots trash leaves no aura on it.
 
 ### M3 Base elements (original plan)
+*(DOC-003: this plan was replaced by the "M3 Base elements — built" section above; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `fire.py`: hit damage, Fire aura, bound Burn (refresh, no stacking).
-- [ ] `ice.py`: Ice aura, bound Slow stacks, Freeze at X stacks (stacks reset,
+- [-] `fire.py`: hit damage, Fire aura, bound Burn (refresh, no stacking).
+- [-] `ice.py`: Ice aura, bound Slow stacks, Freeze at X stacks (stacks reset,
       aura stays), freeze immunity window, frozen enemies still knocked back
       (already true), optional frozen contact damage through
       `BumpResolver._bump` using the bite formula, once per enemy per
       knockback instance, no knockback transfer.
-- [ ] `thunder.py`: breadth-first branching jumps with `targetsPerJump`,
+- [-] `thunder.py`: breadth-first branching jumps with `targetsPerJump`,
       `jumps`, `maxRange`, `maxTargets`, `falloff`; per-node rule (no aura /
       Thunder aura → damage + aura + spread; other aura → reaction only, stop;
       locked → damage only, spread); visited set per chain.
-- [ ] `systems/collision.py`: `nearest_n(x, y, n, radius, exclude)` on the
+- [-] `systems/collision.py`: `nearest_n(x, y, n, radius, exclude)` on the
       grid (`heapq.nsmallest` over `query_circle`), used by Thunder,
       Superconduct and ThunderWind.
-- [ ] `wind.py` + `WindArea` pooled component on `Run` (follows the inflicted
+- [-] `wind.py` + `WindArea` pooled component on `Run` (follows the inflicted
       enemy, ~1 s, 10 Hz contact checks, once per enemy per instance, radial
       knockback via `knock_split`, `maxActiveWindAreas` cap, payload
       callable). Damage goes straight to `take_damage` (never back into the
       element entry).
-- [ ] `combat.py` hook: after the base hit, `elements.resolve(proj, enemy)`
+- [-] `combat.py` hook: after the base hit, `elements.resolve(proj, enemy)`
       when the projectile carries an element.
-- [ ] Placeholder visuals: tint per element, a ring for the Wind area, a line
+- [-] Placeholder visuals: tint per element, a ring for the Wind area, a line
       per jump.
-- [ ] Tests: the §11 Thunder and Wind checks with seeded stubs from
+- [-] Tests: the §11 Thunder and Wind checks with seeded stubs from
       `tests/combat/fakes.py`.
 
 ## Ordering review: what an element does when its carrier dies (2026-09-21)
@@ -671,15 +672,16 @@ the owner's decision to reuse the existing statuses rather than give the
 elements their own.
 
 ### M4 Reactions (original plan)
+*(DOC-003: this plan was replaced by the "M4 Reactions — built" section above; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `reactions/frostburn.py` (status + lock for its duration),
+- [-] `reactions/frostburn.py` (status + lock for its duration),
       `reactions/overload.py` (target damage + shockwave damage and radial
       knockback, `maxKnockbackSpeed` clamp on `_knock`),
       `reactions/superconduct.py` (target damage + Slow-only spread with
       `thunder.jumps + bonusJumps`, `bonusJumps ≥ 1`).
-- [ ] Secondary hits never apply auras; reaction depth 1 enforced by
+- [-] Secondary hits never apply auras; reaction depth 1 enforced by *(DOC-003: retired later by the R38 cascade, CMB-006)*
       construction (reactions call `take_damage`, not the element entry).
-- [ ] Tests: both trigger directions, variant values, lock lengths, secondary
+- [-] Tests: both trigger directions, variant values, lock lengths, secondary
       hits leave no aura, Superconduct jumps exceed Thunder's.
 
 ### M5 Wind reactions — built 2026-09-21
@@ -725,33 +727,35 @@ reaction's. The fix is to measure the delta across the triggering hit, or to
 switch the priming element's own spread off.
 
 ### M5 Wind reactions (original plan)
+*(DOC-003: this plan was replaced by the "M5 Wind reactions — built" section above; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] FireWind (standalone Burn payload), IceWind (Slow stacks payload, can
+- [-] FireWind (standalone Burn payload), IceWind (Slow stacks payload, can
       freeze), ThunderWind (area + nearest-N strike through the reacting
       enemy, N floored at Thunder's reach).
-- [ ] Tests: payload application, N closest by absolute distance, caps.
+- [-] Tests: payload application, N closest by absolute distance, caps.
 
 ### M6 Weapon element
+*(DOC-003: this plan was replaced by the "M6 Weapon element — built" section below; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `Weapon.element: ElementId = None` runtime field on every weapon,
+- [-] `Weapon.element: ElementId = None` runtime field on every weapon,
       summons included; `element_application` block (`mode` + `interval` or
       `window`) added to every `weapons.json` entry and validated like
       `category` (a taxonomy of two modes in code, the numbers in data).
-- [ ] Attack mode: decided in `_begin_attack`, the flag stamped on every
+- [-] Attack mode: decided in `_begin_attack`, the flag stamped on every
       projectile of that attack (`element` slot on `Projectile`, cleared in
       `reset`); Split Arrow children inherit it.
-- [ ] Time mode: a `next_element_at` timestamp on the `Weapon`, checked at
+- [-] Time mode: a `next_element_at` timestamp on the `Weapon`, checked at *(DOC-003: shipped as planned: `Weapon._next_element_at`, `take_element_window`)*
       hit time in the resolver for any projectile whose `weapon_id` names a
       time-mode weapon (orbiters, Pinball, summon bites and bolts, crater
       ticks all covered by the same test).
-- [ ] `element_interval` / `element_window` as `weapon_bonus` fields so
+- [-] `element_interval` / `element_window` as `weapon_bonus` fields so *(DOC-003: shipped as `element_interval` and `element_window_mult` bonus fields (`combat/weapons/core.py`))*
       blessings can change them.
-- [ ] Dev menu: a "Weapon elements" page (set / change / remove the element
+- [-] Dev menu: a "Weapon elements" page (set / change / remove the element *(DOC-003: shipped as an "Infuse weapons…" row in the dev menu, not its own page)*
       of each held weapon, edit its interval) following the four-edit pattern
       in `dev_menu_state.py`.
-- [ ] Run-status Build pane shows the infusion; `weapon_visuals.json` gets an
+- [-] Run-status Build pane shows the infusion; `weapon_visuals.json` gets an
       element tint hook so element-carrying shots look different.
-- [ ] Tests: interval 0/1/N patterns across projectile counts and pierces,
+- [-] Tests: interval 0/1/N patterns across projectile counts and pierces,
       one element per weapon, replacement.
 
 ### M6 Weapon element — built 2026-09-21
@@ -812,19 +816,20 @@ three, everything else on every attack, and the time-mode weapons every one
 to one and a half seconds.
 
 ### M7 Acquisition
+*(DOC-003: this plan was replaced by the "M7 Acquisition — built" section below; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `Run.unlocked_elements: set` and `snapshot_summary["unlocked_elements"]`.
-- [ ] Elemental buff buildings: `buildings.json` `elements` block (chance,
+- [-] `Run.unlocked_elements: set` and `snapshot_summary["unlocked_elements"]`.
+- [-] Elemental buff buildings: `buildings.json` `elements` block (chance,
       weights); roll at placement; after the buff, the weapon rail overlay
       (Forge template) assigns the element and adds it to the set.
-- [ ] Monastery: interactable on the village monastery obstacle, element
+- [-] Monastery: interactable on the village monastery obstacle, element
       cards (all four) then the weapon rail, `used` after one pick, key
       marker and requirements message when the hero holds no infusable
       weapon.
-- [ ] Run summary: an "Elements" line in the run column; game-over per-weapon
+- [-] Run summary: an "Elements" line in the run column; game-over per-weapon
       rows unchanged (element damage is credited to its source weapon's
       total; the per-effect split is shown in the run-status and dev views).
-- [ ] Tests: Monastery offers four, spent after one, assigns one element to
+- [-] Tests: Monastery offers four, spent after one, assigns one element to
       one weapon; set never duplicates; a new run starts empty.
 
 ### M7 Acquisition — built 2026-09-21
@@ -862,18 +867,19 @@ player to forge a weapon. Both are now the caller's, with the Forge's own
 wording kept as the default.
 
 ### M8 Visual system
+*(DOC-003: this plan was replaced by the "M8 Visual system — built" section below; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `game/states/playing/visual/elements/`: `profiles.py`
+- [-] `game/states/playing/visual/elements/`: `profiles.py`
       (`ElementVisualProfile` per element: tint, particle preset, rigs),
       `component.py` (`ElementVisualComponent` for enemies, buildings,
       weapons), `aura_layer.py` (tint + marker; lock state visible),
       `status_layer.py`, `wind_ring.py`, `jump_arc.py` (pooled), reaction
       blends.
-- [ ] Wire the parked `fire_aura` sheet and the `thunder_aura` rig; cut Ice
+- [-] Wire the parked `fire_aura` sheet and the `thunder_aura` rig; cut Ice
       and Wind equivalents from the reserve art.
-- [ ] Particle LOD: per-element cap and a global element budget under
+- [-] Particle LOD: per-element cap and a global element budget under
       `MAX_PARTICLES`, counted on the F1 overlay.
-- [ ] Screenshot grid of every aura, status, lock and reaction on a crowded
+- [-] Screenshot grid of every aura, status, lock and reaction on a crowded
       screen (milestone deliverable).
 
 ### M8 Visual system — built 2026-09-21
@@ -1933,7 +1939,7 @@ correctly, and the real figure was 1. The layout has no `boss_room_id`
 attribute -- the check silently read `None` and never excluded anything --
 and `room.kind == "boss"` is the test that works.
 
-## M13 An infused weapon looks infused (PROPOSED)
+## M13 An infused weapon looks infused (DONE)
 
 Requested 2026-09-21, **not yet confirmed**. An infused weapon's *attack*
 should show its element. Two ways were put: authored sprites that enhance

@@ -59,8 +59,8 @@
 - A clean split between **static** values (resolved at load) and **dynamic** values (changed at runtime by buffs/blessings).
 
 ### Tasks
-- [ ] **2.1 Element identifiers.** Use a compact integer enum (`ElementId: None=0, Fire=1, Ice=2, Thunder=3, Wind=4`). No string lookups in the hot path.
-- [ ] **2.2 Element interface.** Define a parent interface/abstract class. Suggested shape (adapt to project language):
+- [x] **2.1 Element identifiers.** Use a compact integer enum (`ElementId: None=0, Fire=1, Ice=2, Thunder=3, Wind=4`). No string lookups in the hot path.
+- [x] **2.2 Element interface.** Define a parent interface/abstract class. Suggested shape (adapt to project language):
 
   ```
   interface Element {
@@ -75,14 +75,14 @@
   }
   ```
 
-- [ ] **2.3 Config (JSON tuning).**
+- [x] **2.3 Config (JSON tuning).**
   - One config file per element, plus one for reactions. JSON exposes only the numeric parameters listed in §4 and §5 (damage, duration, interval, radius, count, intensity, caps, lock flags).
   - Validate on load: reject unknown keys, enforce ranges (e.g., `duration > 0`, `jumps >= 0`, `maxTargets >= 1`), fall back to code defaults with a logged warning.
   - At load, bake JSON into an **immutable config object** per element and reaction. No JSON parsing or dictionary lookups during gameplay.
-- [ ] **2.4 Runtime modifiers (buffs, blessings, special effects).**
+- [x] **2.4 Runtime modifiers (buffs, blessings, special effects).**
   - Layer modifiers on top of baked config: `effective = (base + flatBonus) × multiplier`.
   - Cache the effective config. Recompute only when a modifier is added or removed (dirty flag), never per hit.
-- [ ] **2.5 Element registry.** A fixed-size array indexed by `ElementId` holding the element instances and their effective configs.
+- [x] **2.5 Element registry.** A fixed-size array indexed by `ElementId` holding the element instances and their effective configs.
 
 ### Considerations
 - Keep element behavior stateless. All per-enemy state lives in the enemy's aura/status data (§3), so one element instance serves all enemies.
@@ -101,7 +101,7 @@
 - A reaction may lock the slot longer via its own `lockDuration` (Frostburn does). The effective lock is `lockedUntil = now + max(globalReactionAuraCooldown, reaction.lockDuration)`.
 
 ### Tasks
-- [ ] **3.1 Enemy elemental state.** Compact structs on each enemy:
+- [x] **3.1 Enemy elemental state.** Compact structs on each enemy:
 
   ```
   AuraState {
@@ -121,17 +121,17 @@
   ```
 
   Timestamps are absolute, so expiry is a comparison, not a per-frame decrement. Ice stacks live on the **Slow status**, not the aura, so reactions can apply slow stacks without applying an aura (§5).
-- [ ] **3.2 Single-element hit resolution.** For each elemental hit with element `E`:
+- [x] **3.2 Single-element hit resolution.** For each elemental hit with element `E`:
   1. Weapon base damage (existing pipeline).
   2. **Aura slot locked** → apply `E`'s initial effect and effects. No aura, no reaction. *(confirmed)*
      - Fire's Burn and Ice's Slow are normally bound to their aura. On a locked enemy they are applied as **standalone** statuses using the same duration value the aura would have had. Ice stacks still accumulate and can freeze. *(confirmed)*
   3. **Aura = None** → `E` initial effect → set aura `E` → create bound status.
   4. **Aura = E** → `E` initial effect → refresh aura and bound status duration → add stack where applicable (Ice).
   5. **Aura = A ≠ E** → consume aura `A` (its bound status ends) → run reaction `(A, E)` using the variant for trigger `E` (§5.2) → apply the aura lock (§3 rules). **`E`'s initial effect does not apply and `E` leaves no aura.** The reaction fully replaces it. *(confirmed, applies to direct hits and Thunder jumps alike)*
-- [ ] **3.3 Tick pass.** Maintain a list of enemies with ticking statuses (Burn, Frostburn). Iterate only that list, at their tick intervals.
-- [ ] **3.4 Cleanup on death.** Clear aura and statuses, return VFX and pending effects to their pools.
+- [-] **3.3 Tick pass.** Maintain a list of enemies with ticking statuses (Burn, Frostburn). Iterate only that list, at their tick intervals. *(DOC-003: superseded — statuses ride the status framework's own per-frame countdown (elemental journal, M3 notes))*
+- [x] **3.4 Cleanup on death.** Clear aura and statuses, return VFX and pending effects to their pools.
   - **Death mid-resolution** *(confirmed)*: if an enemy dies partway through a jump tree, reaction, or Wind area, it is skipped safely. No effect may reference it afterward, and the chain continues from the other nodes. Use a generation/alive check on enemy handles, not raw references.
-- [ ] **3.5 Enemy elemental profiles (resistances)** *(confirmed)*.
+- [x] **3.5 Enemy elemental profiles (resistances)** *(confirmed)*.
   - **Every enemy can be affected by elements.** There is no full elemental immunity. Bosses and special enemies differ only through **per-enemy-type overrides** of element values or **toggles** for specific effects.
   - Defined in the enemy type's JSON as an optional `elementProfile`. Each entry overrides a specific element/effect value or disables a specific effect. Examples:
 
@@ -151,7 +151,7 @@
     - Thunder jumps through such an enemy follow the same rule as a locked node (§4.3).
   - **Bake at load:** each enemy type gets a resolved profile (defaults merged with overrides). Enemies hold a reference to their type's profile, and the element code reads values through it. Enemies without overrides share one default profile. No per-hit merging.
   - Profile values combine with global element modifiers: `effective = elementEffectiveConfig` adjusted by the enemy profile override or multiplier.
-- [ ] **3.6 Damage & application tracking** *(confirmed)*.
+- [x] **3.6 Damage & application tracking** *(confirmed)*.
   - Every piece of elemental damage is **credited to the effect that dealt it** (Fire hit, Burn, Thunder jump, Overload, Frostburn, frozen contact...), not to a weapon. Every record still carries its **source weapon**.
   - The run keeps two summaries, both **classified by source weapon**:
     - **Damage:** `damage[weapon][effect]`, so totals can be shown per effect (e.g., "Overload: 12,400") and broken down by the weapon that started it.
@@ -202,7 +202,7 @@ Each source carries `maxRange` (max distance to reach a target) and `maxTargets`
 | Freeze immunity after thaw | `freeze.immunityDuration` **[PROPOSAL]** |
 | Aura / slow duration | `aura.duration` |
 
-- [ ] On reaching X stacks: apply Freeze for Y s and reset Slow stacks to 0.
+- [x] On reaching X stacks: apply Freeze for Y s and reset Slow stacks to 0.
 - **Settled in code** *(open question 9)*: the Ice aura remains after a freeze triggers. Freezing touches the stack counter and the statuses, never the aura slot, so it falls out of the implementation rather than needing a branch.
 - **Frozen enemies are not immune to knockback** *(confirmed)*. Wind areas and Overload shockwaves push them away like any other enemy. The freeze stops the enemy's own movement, not external knockback. **[PROPOSAL]** Being knocked back does not end the freeze.
 - **Addendum: frozen contact damage** *(confirmed, optional)*. A frozen enemy that is knocked back by another source can deal contact damage to enemies it collides with while sliding.
@@ -246,7 +246,7 @@ Each source carries `maxRange` (max distance to reach a target) and `maxTargets`
 | Knockback (Z) | `area.knockback` |
 | Max targets per source | `area.maxTargets` |
 
-- [ ] **Wind area is a reusable component** (`WindAreaEffect`) with a swappable **payload**: damage, knockback, and an optional extra effect. The Wind reactions (§5) reuse it with different payloads.
+- [x] **Wind area is a reusable component** (`WindAreaEffect`) with a swappable **payload**: damage, knockback, and an optional extra effect. The Wind reactions (§5) reuse it with different payloads.
 - **[PROPOSAL]** The area follows the inflicted enemy. Each enemy is hit at most once per area instance. The inflicted enemy itself is not knocked back. Contact checks run on spawn and then at a low fixed rate (e.g., 10 Hz) for its lifetime.
 - **Settled in code** *(open question 10)*: late entrants **are** hit. `WindArea` follows its anchor and re-queries at `CHECK_HZ` (10 Hz) for its whole life, contacting each body at most once per area instance.
 
@@ -415,15 +415,16 @@ a cascade decay in value.
 - A new element on an already-infused weapon replaces the old one (§7).
 
 ### Tasks
-- [ ] **6.1 Weapon element data:** a single `element: ElementId` field (default `None`). No arrays or slot indices, so the one-element rule is enforced by the data type itself.
-- [ ] **6.2 Hit entry point:** every weapon hit calls the single-element resolution in §3.2 with the weapon's element (if the attack carries it, §6.3).
-- [ ] **6.3 Element interval** *(confirmed)*: new weapon metadata `elementInterval` (JSON, default `0`).
+- [x] **6.1 Weapon element data:** a single `element: ElementId` field (default `None`). No arrays or slot indices, so the one-element rule is enforced by the data type itself.
+- [x] **6.2 Hit entry point:** every weapon hit calls the single-element resolution in §3.2 with the weapon's element (if the attack carries it, §6.3).
+- [-] **6.3 Element interval** *(confirmed)*: new weapon metadata `elementInterval` (JSON, default `0`). *(DOC-003: superseded — shipped as `element_application`, see the note below)*
+  *(DOC-003: as shipped, each weapon's JSON carries `element_application` — attack mode `{"mode": "attack", "interval": N}` applies on every (N+1)th attack, time mode `{"mode": "time", "window": s}` once per window; see `elemental_system_journal.md` M6 and CMB-007.3.)*
   - `0` → every attack carries the element. `1` → every other attack (inflict, skip, inflict...). `N` → one element attack, then N plain attacks.
   - All weapons are cooldown-based: a weapon fires when its internal cooldown finishes, and **one firing = one attack** *(confirmed)*. There are no continuous/ticking weapons.
   - One counter per weapon, advanced once per attack. Every hit produced by that attack (all projectiles, pierces) shares the attack's element flag, stamped on the projectile/hitbox at spawn. No per-hit checks.
   - Plain attacks deal weapon damage only: no initial effect, no aura, no reaction.
   - **Possible, unused** *(owner, 2026-09-22; open question 5)*: a weapon keeps its infusion across upgrades by construction — the element lives on the weapon object and weapons are upgraded, never replaced (R16) — and nothing in `blessings.json` touches the application cadence. Level-ups changing it is supported in principle and **not required**; it is recorded here as something the data could express later rather than as a gap.
-- [ ] **6.4 Visuals:** the weapon shows its infusion using the shared visual profile (§8). Element-carrying projectiles should look different from plain ones.
+- [x] **6.4 Visuals:** the weapon shows its infusion using the shared visual profile (§8). Element-carrying projectiles should look different from plain ones.
 
 ---
 
@@ -435,21 +436,21 @@ a cascade decay in value.
 - Everything (infusions, unlocked elements) is cleared at run end.
 
 ### 7.1 Special infused buff buildings
-- [ ] On spawn, roll whether the building is elemental and which element (weights in JSON).
-- [ ] On interaction, the player picks one of the 3 equipped weapons. The rolled element is assigned to it, replacing any previous element.
+- [x] On spawn, roll whether the building is elemental and which element (weights in JSON).
+- [x] On interaction, the player picks one of the 3 equipped weapons. The rolled element is assigned to it, replacing any previous element.
 
 ### 7.2 Monastery *(confirmed, redesigned)*
-- [ ] Works like a special infused buff building, but it **does not roll an element**. Instead, the player **picks an element** from a selection, then **picks one weapon** to infuse.
-- [ ] The selection offers **every element in the game** (currently 4), regardless of what's unlocked. *(confirmed)*
-- [ ] **One use per Monastery:** one element, one weapon, then the Monastery is spent. *(confirmed)*
+- [x] Works like a special infused buff building, but it **does not roll an element**. Instead, the player **picks an element** from a selection, then **picks one weapon** to infuse.
+- [x] The selection offers **every element in the game** (currently 4), regardless of what's unlocked. *(confirmed)*
+- [x] **One use per Monastery:** one element, one weapon, then the Monastery is spent. *(confirmed)*
 
 ### 7.3 Unlocked elements *(confirmed)*
-- [ ] Run-scoped **set** of elements the player has obtained this run. No duplicates, so its size can't exceed the element count, and no capacity limit is needed.
-- [ ] Tracked in code for **summary purposes** *(confirmed)*: it's included in the run summary (§3.6) and shown in dev mode. No gameplay system reads it for now.
+- [x] Run-scoped **set** of elements the player has obtained this run. No duplicates, so its size can't exceed the element count, and no capacity limit is needed.
+- [x] Tracked in code for **summary purposes** *(confirmed)*: it's included in the run summary (§3.6) and shown in dev mode. No gameplay system reads it for now.
 
 ### Considerations
 - **Fixed weapon set (confirmed).** The game is survivor-style (Vampire Survivors-like): the player's weapons are a constant set that is never swapped. Weapons only gain levels/stronger versions and fire automatically in their own patterns and timings. The infusion therefore lives on the weapon for the whole run.
-- **[PROPOSAL, confirm]** Weapon upgrades and evolutions keep the weapon's infusion.
+- **[confirmed, R48]** Weapon upgrades and evolutions keep the weapon's infusion. *(DOC-003: answered by §13 R48)*
 - Every weapon's hit path (whatever projectile/hitbox types exist) must route through the same elemental hit entry point (§9.3). Milestone 0 must list every weapon's damage path so none is missed.
 
 ---
@@ -462,12 +463,13 @@ a cascade decay in value.
 - Every reaction shows both elements interacting.
 
 ### Tasks
-- [ ] **8.1 `ElementVisualProfile` per element:** colors, tint, particle preset (existing particle system), sprite/animation refs, default intensity.
-- [ ] **8.2 `ElementVisualComponent`** attachable to any actor: `element`, `anchorOffset`, `scale`, `intensity`. Intensity can be driven by Slow stacks. The same component is used for enemies, buildings, and weapons.
-- [ ] **8.3 Aura vs status visuals.** The aura indicator (reactable marker) and status visuals (burning, slowed, frozen) are distinct layers. The aura must be readable because it's the only in-game indicator. A **locked** aura slot (Frostburn) should also be visually recognizable. **[PROPOSAL]**
-- [ ] **8.4 Wind area visual:** one tornado ring effect (~1 s, scaled to `area.radius`). The Wind reactions reuse it, tinted/particled with the other element's profile (FireWind, IceWind, ThunderWind).
-- [ ] **8.5 Reaction visuals:** each reaction uses a dedicated effect or a generated blend of both profiles. Start with blends and add bespoke effects later.
-- [ ] **8.6 Thunder jumps:** a reusable line/arc effect between nodes, pooled.
+- [x] **8.1 `ElementVisualProfile` per element:** colors, tint, particle preset (existing particle system), sprite/animation refs, default intensity.
+- [-] **8.2 `ElementVisualComponent`** attachable to any actor: `element`, `anchorOffset`, `scale`, `intensity`. Intensity can be driven by Slow stacks. The same component is used for enemies, buildings, and weapons. *(DOC-003: superseded — no generic component; enemies and weapons draw their element directly (`visual/elements/`, `rendering.py`). The building gap is the new box below)*
+- [ ] **Elemental buff buildings show their rolled element.** `Interactable.element` is set (M7) but nothing draws it, so the player learns the element only on use. *(DOC-003: found missing)*
+- [x] **8.3 Aura vs status visuals.** The aura indicator (reactable marker) and status visuals (burning, slowed, frozen) are distinct layers. The aura must be readable because it's the only in-game indicator. A **locked** aura slot (Frostburn) should also be visually recognizable. **[PROPOSAL]**
+- [x] **8.4 Wind area visual:** one tornado ring effect (~1 s, scaled to `area.radius`). The Wind reactions reuse it, tinted/particled with the other element's profile (FireWind, IceWind, ThunderWind).
+- [x] **8.5 Reaction visuals:** each reaction uses a dedicated effect or a generated blend of both profiles. Start with blends and add bespoke effects later.
+- [x] **8.6 Thunder jumps:** a reusable line/arc effect between nodes, pooled.
 - **[PROPOSAL]** Distinguish elements by shape/motion as well as color (colorblind accessibility).
 
 ### Considerations
@@ -489,15 +491,15 @@ a cascade decay in value.
 | Enum IDs, spatial grid cell size | Weapon `element`, `elementInterval` counter |
 
 ### Tasks
-- [ ] **9.1 No allocations in the hot path:** pool hit queue entries, jump-tree buffers, Wind areas, VFX instances.
-- [ ] **9.2 Spatial grid:** uniform grid (or the existing one) for closest-Y queries, radius queries, and area contacts. Closest-Y uses a grid query within `maxRange` plus a partial sort. No O(n²) scans.
-- [ ] **9.3 Elemental hit queue:** all elemental hits become queue entries processed in a single pass per frame. Each hit is resolved fully (including its reaction) before the next hit on the same enemy. Enforce `maxReactionsPerFrame`, and defer overflow to the next frame rather than dropping it. Process in a stable order (determinism).
-- [ ] **9.4 Visited marking without allocation:** each chain gets an incrementing ID. Enemies store `lastChainId`, so "already hit" is one integer comparison.
-- [ ] **9.5 Tick only what ticks:** only enemies with ticking statuses are iterated.
-- [ ] **9.6 Timestamp-based timers** for auras, statuses, locks, and areas.
-- [ ] **9.7 Low-rate area checks** (e.g., 10 Hz) for Wind areas. Cap simultaneous areas (`maxActiveWindAreas`).
-- [ ] **9.8 Profiling counters:** active auras, reactions/frame, jump nodes/frame, active Wind areas, particle count. Visible in dev mode.
-- [ ] **9.9 Hit-rate control.** Survivor-style weapons produce many hits per second (multiple projectiles, piercing, persistent damage areas). Without a limit, every tick of a damage area would reapply or react, cascade Thunder jumps constantly, and spawn a Wind area on every contact.
+- [-] **9.1 No allocations in the hot path:** pool hit queue entries, jump-tree buffers, Wind areas, VFX instances. *(DOC-003: superseded — Python, not C: only the VFX are pooled (`visual/elements/transient.py`))*
+- [x] **9.2 Spatial grid:** uniform grid (or the existing one) for closest-Y queries, radius queries, and area contacts. Closest-Y uses a grid query within `maxRange` plus a partial sort. No O(n²) scans.
+- [-] **9.3 Elemental hit queue:** all elemental hits become queue entries processed in a single pass per frame. Each hit is resolved fully (including its reaction) before the next hit on the same enemy. Enforce `maxReactionsPerFrame`, and defer overflow to the next frame rather than dropping it. Process in a stable order (determinism). *(DOC-003: superseded — hits resolve inline, only reactions are deferred (`combat/elements/resolve.py`))*
+- [-] **9.4 Visited marking without allocation:** each chain gets an incrementing ID. Enemies store `lastChainId`, so "already hit" is one integer comparison. *(DOC-003: superseded — a chain marks visited enemies in its own `id()` set (`spread.py`))*
+- [x] **9.5 Tick only what ticks:** only enemies with ticking statuses are iterated.
+- [x] **9.6 Timestamp-based timers** for auras, statuses, locks, and areas.
+- [x] **9.7 Low-rate area checks** (e.g., 10 Hz) for Wind areas. Cap simultaneous areas (`maxActiveWindAreas`).
+- [ ] **9.8 Profiling counters:** active auras, reactions/frame, jump nodes/frame, active Wind areas, particle count. Visible in dev mode. *(DOC-003: auras, reactions/frame, held reactions, particles and element fx are in the F1 metrics (`devtools/dev_flags.py`); jump nodes/frame and active Wind areas are still missing)*
+- [x] **9.9 Hit-rate control.** Survivor-style weapons produce many hits per second (multiple projectiles, piercing, persistent damage areas). Without a limit, every tick of a damage area would reapply or react, cascade Thunder jumps constantly, and spawn a Wind area on every contact.
   - Handled by two confirmed mechanisms, both cheap: the weapon `elementInterval` (§6.3), which is one counter per weapon decided at attack spawn, and the global reaction aura cooldown (§3), which is one timestamp comparison per enemy. No per-enemy-per-weapon cooldown tables are needed.
   - Aura *refreshes* on the same element are not rate-limited, but they are just a timestamp write.
 
@@ -508,9 +510,9 @@ a cascade decay in value.
 
 ## 10. Developer Mode
 
-- [ ] **10.1 Aura inspector:** toggle a label/icon above every enemy showing aura element, remaining time, lock state, and active statuses with stacks.
-- [ ] **10.2 Weapon element editor:** set, change, or remove the element of any equipped weapon, and edit its `elementInterval`.
-- [ ] **10.3 Extra tools [PROPOSAL]:**
+- [x] **10.1 Aura inspector:** toggle a label/icon above every enemy showing aura element, remaining time, lock state, and active statuses with stacks.
+- [x] **10.2 Weapon element editor:** set, change, or remove the element of any equipped weapon, and edit its `elementInterval`.
+- [ ] **10.3 Extra tools [PROPOSAL]:** *(DOC-003: force aura built (dev menu); hot-reload, reaction log and spawn-building-with-element not built)*
   - Force-apply an aura to the enemy under the cursor.
   - Spawn a buff building with a chosen element, or a Monastery.
   - Reaction log (pair, target, damage, targets reached vs caps).
@@ -523,17 +525,17 @@ a cascade decay in value.
 
 ## 11. Testing & Acceptance
 
-- [ ] **Aura/status:** every element leaves an aura; bound status duration equals aura duration; consuming an aura ends its bound status; same-element hit refreshes both; Ice freezes at exactly X stacks.
-- [ ] **Reactions:** each pair yields the same reaction type in both orders; per-trigger overrides apply only in their direction; the incoming element (direct hit or Thunder jump) deals no initial effect and leaves no aura on reaction; every reaction locks the aura slot for `max(global cooldown, lockDuration)`; locked enemies still take damage and effects, and Fire/Ice apply standalone Burn/Slow; Overload and Frostburn leave no aura on anything they reach, while the Wind three and Superconduct prime what they reach with their own element and a spread aura meeting a different one starts another reaction (§5.3, §5.4); a reaction's figure is read from both source hits and is identical whichever of the two landed second; the same figure reaches the carrier and every body the reaction touches, floored on the carrier alone; a body that has just reacted refuses a spread aura; a cascade larger than the frame budget defers rather than drops; Superconduct jumps always exceed Thunder jumps; ThunderWind hits exactly the N closest enemies in range.
-- [ ] **Thunder:** `jumps = 0` hits only the target; `jumps = 1, Y = 3` hits at most 4 enemies; no-aura targets receive a Thunder aura; different-aura targets take no jump damage, react, and stop spreading; no enemy hit twice; `maxTargets` and `maxRange` are respected.
-- [ ] **Wind:** area lasts `area.duration`; each enemy is hit at most once per area; knockback is radial; reaction payloads apply correctly.
-- [ ] **Weapons:** `elementInterval` 0/1/N produces the expected inflict/skip pattern, and all hits of one attack share its flag; a weapon can never hold more than one element; a new element replaces the old one.
-- [ ] **Run scope:** a Monastery offers all elements and is spent after one use; unlocked elements appear in the run summary; infusions and unlocked elements are cleared at run end; the unlocked set never holds duplicates; the Monastery assigns exactly one chosen element to exactly one weapon; element buffs apply to that element on every weapon.
-- [ ] **Profiles:** enemies without overrides use the default profile; a boss override (e.g., higher freeze threshold) applies only to that enemy type; a disabled effect never applies while its aura and reactions still work; an enemy with `aura.enabled = false` takes element damage and statuses but never holds an aura or reacts.
-- [ ] **Tracking:** every elemental damage event is recorded under its effect and source weapon; summed per-effect totals match total elemental damage dealt; application and reaction counts match dev-mode logs; enemies dying mid-chain leave no dangling references.
-- [ ] **JSON:** validation rejects bad values and unknown keys.
-- [ ] **Stress test:** 100 enemies with auras, repeated Thunder jumps, Overload, and multiple Wind areas. Record frame time and particle counts per milestone.
-- [ ] **Visual review:** screenshot grid of every aura, status, lock, and reaction on a crowded screen.
+- [x] **Aura/status:** every element leaves an aura; bound status duration equals aura duration; consuming an aura ends its bound status; same-element hit refreshes both; Ice freezes at exactly X stacks.
+- [x] **Reactions:** each pair yields the same reaction type in both orders; per-trigger overrides apply only in their direction; the incoming element (direct hit or Thunder jump) deals no initial effect and leaves no aura on reaction; every reaction locks the aura slot for `max(global cooldown, lockDuration)`; locked enemies still take damage and effects, and Fire/Ice apply standalone Burn/Slow; Overload and Frostburn leave no aura on anything they reach, while the Wind three and Superconduct prime what they reach with their own element and a spread aura meeting a different one starts another reaction (§5.3, §5.4); a reaction's figure is read from both source hits and is identical whichever of the two landed second; the same figure reaches the carrier and every body the reaction touches, floored on the carrier alone; a body that has just reacted refuses a spread aura; a cascade larger than the frame budget defers rather than drops; Superconduct jumps always exceed Thunder jumps; ThunderWind hits exactly the N closest enemies in range.
+- [x] **Thunder:** `jumps = 0` hits only the target; `jumps = 1, Y = 3` hits at most 4 enemies; no-aura targets receive a Thunder aura; different-aura targets take no jump damage, react, and stop spreading; no enemy hit twice; `maxTargets` and `maxRange` are respected.
+- [x] **Wind:** area lasts `area.duration`; each enemy is hit at most once per area; knockback is radial; reaction payloads apply correctly.
+- [x] **Weapons:** `elementInterval` 0/1/N produces the expected inflict/skip pattern, and all hits of one attack share its flag; a weapon can never hold more than one element; a new element replaces the old one. *(DOC-003: done for the shipped `element_application` shape (`tests/combat/test_weapon_infusion.py`))*
+- [x] **Run scope:** a Monastery offers all elements and is spent after one use; unlocked elements appear in the run summary; infusions and unlocked elements are cleared at run end; the unlocked set never holds duplicates; the Monastery assigns exactly one chosen element to exactly one weapon; element buffs apply to that element on every weapon.
+- [x] **Profiles:** enemies without overrides use the default profile; a boss override (e.g., higher freeze threshold) applies only to that enemy type; a disabled effect never applies while its aura and reactions still work; an enemy with `aura.enabled = false` takes element damage and statuses but never holds an aura or reacts.
+- [x] **Tracking:** every elemental damage event is recorded under its effect and source weapon; summed per-effect totals match total elemental damage dealt; application and reaction counts match dev-mode logs; enemies dying mid-chain leave no dangling references.
+- [x] **JSON:** validation rejects bad values and unknown keys.
+- [x] **Stress test:** 100 enemies with auras, repeated Thunder jumps, Overload, and multiple Wind areas. Record frame time and particle counts per milestone. *(DOC-003: done before the R38 cascade (`spawn_stress --elements`, elemental journal M9); the cascade case is CMB-008)*
+- [x] **Visual review:** screenshot grid of every aura, status, lock, and reaction on a crowded screen.
 
 ---
 
