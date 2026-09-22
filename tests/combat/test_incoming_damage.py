@@ -112,22 +112,27 @@ class ContactBiteTests(unittest.TestCase):
         self.assertGreater(hp0 - p.player.hp, 0.0)
 
     def test_at_most_one_bite_per_interval_then_another(self):
-        game, p = _run(hero_index=1)                    # Kestrel, armor 0
+        game, p = _run(hero_index=1)                    # Kestrel
+        # The subject here is the cadence, not armor, so the hero's own armor
+        # is read rather than assumed -- it was 0 until the heroes were
+        # retuned, and this test is about one bite per interval either way.
+        bite = 9 * T - p.player.stats["armor"]           # contact_damage 9
         p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp
         _advance(game, T * 0.6)                         # < one interval past the first
         one_bite = hp0 - p.player.hp
-        self.assertAlmostEqual(one_bite, 9 * T, places=2)   # exactly one bite (armor 0)
+        self.assertAlmostEqual(one_bite, bite, places=2)    # exactly one bite
         _advance(game, T)                              # cross the next boundary
-        self.assertAlmostEqual(hp0 - p.player.hp, 2 * (9 * T), places=1)
+        self.assertAlmostEqual(hp0 - p.player.hp, 2 * bite, places=1)
 
     def test_two_enemies_bite_on_independent_timers(self):
-        game, p = _run(hero_index=1)                    # armor 0
+        game, p = _run(hero_index=1)
+        bite = 9 * T - p.player.stats["armor"]
         p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp
         game.state_machine.update(DT)                   # both bite once this frame
-        self.assertAlmostEqual(hp0 - p.player.hp, 2 * (9 * T), places=3)
+        self.assertAlmostEqual(hp0 - p.player.hp, 2 * bite, places=3)
 
     def test_entering_the_attack_state_clears_the_contact_cooldown(self):
         """A charge / blink is a discrete impact -- it must land on first overlap
@@ -156,13 +161,15 @@ class ContactBiteTests(unittest.TestCase):
 # --------------------------------------------------------------------------
 class HazardBiteTests(unittest.TestCase):
     def test_total_over_a_pool_life_is_dps_times_duration(self):
-        game, p = _run(hero_index=1)                    # armor 0, no trait
+        game, p = _run(hero_index=1)                    # Kestrel, no trait
         p.player.hp = 1000.0
         p._spawn_hazard(p.player.pos.copy(), 120, 23, 3.5)   # dps 23, 3.5 s
         hp0 = p.player.hp
         _advance(game, 3.6)
-        # bites at 0.5,1.0,...,3.5 -> 7 * (23*0.5) = 80.5
-        self.assertAlmostEqual(hp0 - p.player.hp, 7 * (23 * T), delta=23 * T)
+        # bites at 0.5,1.0,...,3.5 -> 7 * (23*0.5 - armor). Armor is taken off
+        # each bite whole, so it is read from the hero rather than assumed 0.
+        bite = 23 * T - p.player.stats["armor"]
+        self.assertAlmostEqual(hp0 - p.player.hp, 7 * bite, delta=bite)
 
     def test_same_total_faster_hazard(self):
         # (dps 23, dur 3.5, tick 0.5) vs (dps 46, dur 1.75, tick 0.25):
