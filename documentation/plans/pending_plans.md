@@ -1,5 +1,25 @@
 # Pending plans — what is built but not wired
 
+> **Status, 2026-09-22 (DOC-003).** This survey is a snapshot of
+> 2026-09-11; most of it has shipped since. Checked against the code:
+>
+> - **Shipped:** Flurry, Sticky Bomb and Weak Point are in
+>   `data/weapons/blessings.json` (§1); Options, the Sanctuary, Rankings and
+>   the end screens take the mouse (UI-001, UI-005, UI-008, SYS-007 B) (§3);
+>   the HUD was rebuilt (UI-003) (§4); the `shoot` cue plays, and music and
+>   sound effects landed (AUD-001, AUD-003) (§5); chests read
+>   `layout.resource_points` (§6); the six-weapon design moved to
+>   `documentation/designs/`, and the `MENU_SCRIM` text was corrected in
+>   `FUNCTIONAL_README.md` (§9).
+> - **Still open:** the Echo and Fragmentation blessings (§1); vendoring the
+>   pygame wheel for a static host (§7); the test debt now tracked in
+>   `test_suite_review.md` (§8).
+> - **Waiting on the owner:** the W9 GitHub Pages deploy (§7) needs a GitHub
+>   Actions workflow; with no CI in this project, it is the owner's call
+>   whether a deploy-only workflow is wanted.
+>
+> The rest of this file is kept as written.
+
 Survey taken 2026-09-11 on `main` at `86aaa3f`, by booting the game rather
 than by reading the other plans. Everything listed here is **unwired work, not
 broken work**: the full suite was green when the list was made (1,641 passed,

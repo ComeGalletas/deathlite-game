@@ -314,10 +314,11 @@ is missing. The full walk from `generate_world` to a drawn frame is
 [`world/README.md`](world/README.md).
 
 The **start menu** is the one screen with its own palette (`config.MENU_*`):
-black background, white text. `Assets.picture()` loads `assets/ui/title.png`
-(if present) and it's scaled to fill the screen as a backdrop, with a
-translucent scrim (`config.MENU_SCRIM`) behind the option list. No file → the
-`config.TITLE` string is drawn as the fallback and the screen stays plain black.
+black background, white text. The backdrop is
+`assets/ui/start_screen/menu_background.png` (`config.MENU_BACKGROUND_IMAGE`),
+or the 21:9 `menu_background_long.png` on an ultrawide render; it falls back to
+`config.MENU_TITLE_IMAGE`, then to the flat `MENU_BG` fill. The logo above the
+option list is `config.MENU_LOGO_IMAGE`; without it the title is drawn as text.
 
 Every third-party pack (character sprites, terrain, title art) and its licence
 must be confirmed in `assets/CREDITS.md` before distribution. Delivered audio
