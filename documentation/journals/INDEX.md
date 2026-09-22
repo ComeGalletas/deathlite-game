@@ -76,7 +76,7 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-002
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
-| TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | proposed | — (not opened) | — | 2026-09-22 |
+| TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | main | 2026-09-22 |
