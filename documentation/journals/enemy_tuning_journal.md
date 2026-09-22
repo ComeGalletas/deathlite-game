@@ -36,9 +36,17 @@ sword hits rather than a wall, and elemental damage starts landing almost
 immediately.
 
 **ENT-012.D2 — The Tusked Lance's radius.** 44 → 40, the pig-rider boss
-(`the_tusked_lance`, ENT-002). A four-pixel collider shrink; the owner's
-reason is not recorded here. It brings the boss to the same radius as its
-sprite's stablemates and slightly loosens how early a charge connects.
+(`the_tusked_lance`, ENT-002). **So it can cross bridges** (owner,
+2026-09-22). The boss free-roams, and at 44 its collider caught on the
+crossings between islands, leaving it stuck on whichever island it spawned on
+instead of following the hero.
+
+Worth knowing for the next time it snags: a bridge deck is **one tile wide**,
+`TILE_PX` = 64, so its half-width is 32 — still under the 40 this leaves. The
+radius is therefore not the whole story; whatever clearance the movement
+resolver allows a body over a walkway edge is doing the rest. If the boss
+catches again, the lever is the deck width or that tolerance, not another
+four pixels off a collider already wider than the plank it walks on.
 
 Neither value is read anywhere but the enemy definitions, so there is nothing
 else to keep in step.
@@ -58,6 +66,14 @@ values, then one commit per value.
 `tests/combat`, `tests/entities` and `tests/spawn` with both values in place:
 **1083 passed, 345 subtests passed**. No test pinned either number.
 
-Open: **ENT-012.D2's rationale is inferred, not stated.** If the radius change
-was for something specific — a charge that overshot, a sprite that read too
-wide — say so and it goes in the decision above.
+Both rationales are the owner's own, given on 2026-09-22; nothing
+here is inferred.
+
+## ENT-012 — Tasks (continued)
+
+- [x] ENT-012.3 — Record why the radius changed
+
+`a61e6f6`'s own message still reads as plain tuning: the reason arrived
+after it was committed, and rewording a commit that already has three
+on top of it needs a history rewrite this environment refuses. The
+decision above is the record; `ENT-012.D2` is the citable form of it.
