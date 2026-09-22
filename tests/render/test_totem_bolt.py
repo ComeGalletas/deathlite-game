@@ -57,16 +57,15 @@ class SheetTests(unittest.TestCase):
         self.assertEqual(spec["frames"], 7)
 
     def test_the_sheets_match_the_scripts(self):
-        """Exit 2 from either script means its source has been archived away
-        from the folder and `unused/` both; the sheets themselves are still
-        pinned by the tests above."""
+        """Both scripts regenerate their sheets and compare. Their sources,
+        `proyectile.png` and `fire.png`, are tracked in the grave_totem
+        folder, so they are present in every clone and worktree: exit 2
+        (source missing) is a failure, not a reason to skip (TST-002)."""
         from tools.asset_pipeline import cut_totem_bolt_sheets, recolour_totem_fire
         for script in (cut_totem_bolt_sheets, recolour_totem_fire):
             with self.subTest(script=script.__name__):
-                code = script.main(["--check"])
-                if code == 2:
-                    self.skipTest("the source has been archived away entirely")
-                self.assertEqual(code, 0)
+                self.assertEqual(script.main(["--check"]), 0,
+                                 f"{script.__name__} --check failed (2 = source missing)")
 
     def test_the_recoloured_flame_is_blue_everywhere(self):
         """No opaque pixel of the tail is redder than it is blue -- the ramp

@@ -60,8 +60,8 @@ now holds everywhere. One task per test module, then the results.
 ## TST-002 — Tasks
 
 - [x] TST-002.1 — Open this journal and move the index row to in progress
-- [x] TST-002.2 — `test_spawn_fx.py`: assert `cut_spawn_sheet --check` exits 0
-- [ ] TST-002.3 — `test_totem_bolt.py`: assert `cut_totem_bolt_sheets` and
+- [x] TST-002.2 — `test_spawn_fx.py`: assert `cut_spawn_sheet --check` exits 0 → `e87dbdd`
+- [x] TST-002.3 — `test_totem_bolt.py`: assert `cut_totem_bolt_sheets` and
   `recolour_totem_fire --check` exit 0
 - [ ] TST-002.4 — `test_totem_sprite.py`: assert `cut_totem_sheets --check`
   exits 0
