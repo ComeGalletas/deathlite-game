@@ -30,8 +30,8 @@
     "base_stats": {
       "max_hp": 92,
       "move_speed": 170,
-      "armor": 0,
-      "pickup_radius": 150,
+      "armor": 3,
+      "pickup_radius": 160,
       "evasion_chance": 0.10
     }
   },
@@ -48,8 +48,8 @@
     "base_stats": {
       "max_hp": 96,
       "move_speed": 140,
-      "armor": 0,
-      "pickup_radius": 190,
+      "armor": 3,
+      "pickup_radius": 200,
       "luck": 2
     }
   }

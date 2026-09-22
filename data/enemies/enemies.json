@@ -185,10 +185,10 @@
     "experience_reward": 12, "behavior": "fsm_warlock", "color": [150, 90, 200],
     "tags": ["caster", "area-denial"], "is_elite": true, "sprite": "hex_shaman",
     "contact_damage_enabled": false,
-    "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8,
+    "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8, 
     "cast_duration": 0.3, "cast_recover": 1.8, "cast_interval": 3.2,
     "hazard_sprite": "hex_shaman_explosion_spell",
-    "hazard_radius": 20, "hazard_dps": 3, "hazard_duration": 0.9
+    "hazard_radius": 20, "hazard_dps": 6, "hazard_duration": 0.9
   },
   "training_dummy": {
     "name": "Training Dummy", "hp": 1, "speed": 0,
