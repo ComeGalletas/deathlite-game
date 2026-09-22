@@ -448,15 +448,15 @@ ring. Full suite 597 -> 618, green.
       aim unchanged; `frost_shards` still fans 3, all toward the target.
 
 #### G - Balance / playtest
-- [ ] The whole game is now "no target -> no attack". Verify it still feels
+- [ ] The whole game is now "no target -> no attack". Verify it still feels *(DOC-003: still needs a playtest; nothing recorded)*
       active (swarms mean reach is hit almost always) and that a lone far enemy
       correctly makes the hero idle.
-- [ ] Tune the projectile `reach` values -- too short = dead time between packs,
+- [ ] Tune the projectile `reach` values -- too short = dead time between packs, *(DOC-003: the six-weapon rework (CMB-002) set new values — bow 460, rod 400, bomb 100, ember ring 140 in `data/weapons/weapons.json` — but no playtest of them is recorded)*
       too long = never idles. Start ~400, adjust in a playtest.
-- [ ] Melee: `soul_scythe` reaches exactly its cone; confirm it does not feel
+- [-] Melee: `soul_scythe` reaches exactly its cone; confirm it does not feel *(DOC-003: obsolete — `soul_scythe` left the roster in the six-weapon rework (CMB-002))*
       shorter than the visible arc. `cooldown 1.0` may want a small cut to offset
       gated downtime.
-- [ ] Note whether a `+reach` blessing / affix is worth adding (area blessings
+- [x] Note whether a `+reach` blessing / affix is worth adding (area blessings *(DOC-003: answered — reach blessings exist, e.g. `daggers_extended_reach` in `data/weapons/blessings.json`)*
       already do it indirectly via decision 2).
 
 ### Touch list
