@@ -2487,7 +2487,7 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 
 ## CMB-009 — Tasks
 
-- [ ] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
+- [x] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
 - [ ] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
 - [ ] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
 - [ ] CMB-009.4 — Reaction log overlay (plan §3)
@@ -2495,4 +2495,34 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 
 ## CMB-009 — Results
 
-*(filled in as the tasks land)*
+**Branch:** `claude/cmb-009-elemental-extras`, cut from
+`claude/doc-004-proposal-journals` (which carries this block), owner's
+instruction to continue on a new branch as before (2026-09-23).
+
+### CMB-009.1 — The glow
+
+- `visual/elements/building_glow.py::BuildingGlow` over `GlowCache`, owned
+  by `ElementVisuals` (`None` when `buildings.json` has no `elements` block,
+  since then no building is ever elemental). `WorldRenderer.interactables`
+  draws it where it used to skip a buff building outright, so it paints in
+  the flat terrace pass, under the building art.
+- `data/world/buildings.json` → `elements.glow`: `scale` 3.4 (diameter over
+  the building's interaction diameter), `alpha_min` 90, `alpha_max` 130,
+  `period` 3.0 s, `steps` 6. `_check_building_glow` (`game/content.py`)
+  requires every field, orders the alphas inside 0–255 and refuses a
+  non-positive scale.
+- **Tuning from the screenshot (D1).** The first values, alpha 40–64 at
+  scale 3.0, were close to invisible: only the ice glow read, over grass.
+  90–130 at 3.4 reads as a soft wash round the foot of each building and is
+  still faint; Thunder's purple is the weakest of the four over olive
+  ground. These stay the owner's to tune.
+- `tests/render/test_building_glow.py`: 11 tests, 8 subtests — the glow
+  takes the element's tint, stays at or under `alpha_max`, reaches past the
+  building, is absent on a plain or used building, breathes inside its two
+  alphas, and the data check refuses a missing block, a missing field and
+  bad alphas.
+- **Screenshot:** seed 35, one building per element — fire (vampire),
+  ice (magnet) and wind (pinball) as rolled; thunder assigned to a plain
+  magnet because no building rolled it on that seed, labelled as such.
+- **Tests:** `tests/render` + `tests/playing` + `tests/systems` +
+  `tests/combat` — 1448 passed, 461 subtests, 0 skipped (6 min 1 s).

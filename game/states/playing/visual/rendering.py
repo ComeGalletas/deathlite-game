@@ -272,7 +272,13 @@ class WorldRenderer:
             if it.kind == "forge" and self._forge_skinned():
                 continue        # the forge obstacle carries the art
             if ps.buffs.is_buff(it.kind):
-                continue        # a buff building: the obstacle draws it
+                # A buff building: the obstacle draws it. An elemental one
+                # gets its element's glow here, under the art (CMB-009.1).
+                visuals = getattr(run, "element_visuals", None)
+                if visuals is not None and visuals.building_glow is not None:
+                    visuals.building_glow.draw(surface, run.camera, it,
+                                               visuals.tint, run.stats["time"])
+                continue
             if it.kind == "fountain":
                 heal = self._heal_frames(z)
                 if heal is not None:
