@@ -78,6 +78,13 @@ class DevFlags:
             if not run.dev_mode:
                 return False                     # spawn-point overlay is dev-only
             self.show_spawn_points = not self.show_spawn_points
+        elif key == keys["reload_elements"]:
+            if not run.dev_mode:
+                return False                     # a tuning tool: dev-only
+            from game.states.playing.devtools.element_reload import (
+                reload_element_data)
+            ok, message = reload_element_data(run)
+            run.notice(message, seconds=2.5 if ok else 6.0)
         else:
             return False
         return True

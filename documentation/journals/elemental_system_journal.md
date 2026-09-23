@@ -2489,7 +2489,7 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 
 - [x] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
 - [x] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
-- [ ] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
+- [x] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
 - [ ] CMB-009.4 — Reaction log overlay (plan §3)
 - [ ] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
 
@@ -2539,3 +2539,33 @@ instruction to continue on a new branch as before (2026-09-23).
 - `tests/combat/test_elements_base.py::ThunderTests::test_the_jump_nodes_are_counted_per_frame_and_in_total`.
 - **Tests:** `tests/combat` + `tests/flows` + `tests/devtools` — 748
   passed, 132 subtests, 0 skipped (5 min 2 s).
+
+### CMB-009.3 — Hot-reload of the element data
+
+- **F9**, developer runs only like F7/F8 (`config.DEBUG_KEYS
+  ["reload_elements"]`, SDL keycode 1073741890, unused before). Routed as
+  the other keys are: `Game._handle_debug_key` → `PlayingState` →
+  `DevFlags.handle_debug_key`, which shows the result as a run notice
+  (2.5 s, or 6 s for a failure so the reason can be read).
+- `devtools/element_reload.py::reload_element_data(run)`: re-reads
+  `weapons/elements.json` and `weapons/reactions.json` through the content
+  loader, validates them with the boot's own checks, and builds a **fresh
+  `ElementRegistry`** from them before touching anything — so a file that
+  validates but cannot bake fails there too. Only then does the run's
+  registry `adopt` it (`combat/elements/registry.py`), and `run.content`
+  takes the new dicts.
+- **CMB-009.D3 — What a reload keeps.** `adopt` swaps the data (global
+  block, element and reaction bases, reaction table) and drops the baked
+  caches; it keeps the element objects and the modifier layers, so a buff
+  or blessing the run holds applies on top of the new numbers. Not reached:
+  a Wind area already on the field keeps its seeded config until it ends,
+  and `element_visuals.json` (presentation, not tuning) is not reloaded.
+- Docs: the F-key table in `FUNCTIONAL_README.md`, the F1–F9 range in
+  `README.md` and the keycode comment in `game/config.py`.
+- `tests/devtools/test_element_reload.py`: 8 tests — a changed value
+  reaches the live registry and `run.content`; the run's modifiers survive
+  and stack on the new data; bad data and an unreadable file keep the old
+  values; F9 has its own key, reloads and says so in a developer run, and
+  does nothing in a normal one.
+- **Tests:** `tests/devtools` + `tests/combat` + `tests/flows` — 756 passed,
+  132 subtests, 0 skipped (5 min 8 s).
