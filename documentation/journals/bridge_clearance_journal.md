@@ -110,6 +110,8 @@ it is a different subsystem and a different requirement.
 - **Constraint:** A generation change, so the world digests are re-pinned
   and a screenshot is delivered (the generator leads, the tests follow).
   No collider change — WLD-011's leniency stays as it is.
+- **and then:** the owner chose the recommended WLD-012.D1 — the clearance
+  follows the data (2026-09-23).
 
 ## WLD-012 — Confirmed reading
 
@@ -128,7 +130,7 @@ it is a different subsystem and a different requirement.
   out prop-blocked bridges with `propped(...)`, and
   `test_a_prop_beside_a_mouth_still_blocks_a_wide_body` pins the defect and
   asks to be deleted when it is fixed.
-- **WLD-012.D1 — The clearance follows the data (recommended, to confirm).**
+- **WLD-012.D1 — The clearance follows the data (confirmed by the owner, 2026-09-23).**
   The margin is the largest `radius` among the non-flying bosses and
   enemies in `data/enemies/`, derived at run start, so a wider walker added
   later is covered without a code change. The alternative is a fixed
