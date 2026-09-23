@@ -80,7 +80,7 @@ the owner named come first; the rest turned up in the same sweep.
   field, no field pocket)
 - `tests/display/test_native.py:32` — SDL not reachable through ctypes
 - `tests/playing/test_interactables.py:108` — no fountain in this layout
-- `tests/render/test_biome.py:211, 229, 242, 257, 274, 297, 596` — tileset missing
+- ~~`tests/render/test_biome.py:211, 229, 242, 257, 274, 297, 596` — tileset missing~~ done as TST-003
 - `tests/render/test_element_colours.py:393` — numpy not installed
 - `tests/render/test_ghost.py:124` — no skinned sign clear on this seed
 - `tests/render/test_hostile_glow.py:83` — shot expired or hit something
@@ -124,7 +124,7 @@ the owner named come first; the rest turned up in the same sweep.
   git, so in a healthy checkout the skip never fires; it could only hide a
   broken one.
 - **TST-003.D1 — One helper, not seven asserts.** A module-level
-  `_require_tiles(ok, what)` that fails with the sheet path read from
+  `_require_tiles(test, ok)` that fails with the sheet path read from
   `terrain.json`, so the message says which file is missing.
 
 ## TST-003 — Plan
@@ -136,7 +136,7 @@ the owner named come first; the rest turned up in the same sweep.
 
 - [x] TST-003.1 — Replace the seven skips with the shared assertion
 - [x] TST-003.2 — Run the biome module, `tests/render` and `tests/world`; record the counts
-- [ ] TST-003.3 — Tick `test_suite_review.md` §5, results, index to done
+- [x] TST-003.3 — Tick `test_suite_review.md` §5, results, index to done
 
 ## TST-003 — Results
 

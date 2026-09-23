@@ -258,7 +258,7 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 - [ ] For the layout-content skips, search the four pinned seeds for one that has *(DOC-003: interactables fixed (`test_interactables.py`); the seed-dependent skips left are listed in `cut_script_skips_journal.md` (TST-002, *Follow-up candidates*))*
       the feature and assert it is found, rather than skipping. `tests/worlds.py`
       makes this nearly free.
-- [ ] For `"tileset missing"`, decide whether a missing tileset should be a *(DOC-003: decided by the owner 2026-09-22 — yes, a missing tileset fails; the change is TST-003, proposed)*
+- [x] For `"tileset missing"`, decide whether a missing tileset should be a *(DOC-003: decided by the owner 2026-09-22 — yes, a missing tileset fails; done as TST-003, `925502c`)*
       failure. The game ships the assets; a silent skip hides a broken checkout.
 - [-] Add a CI-style check (or a line in the commit checklist) that the run *(DOC-003: superseded — the owner rules out CI and gates; the standing rule "a test never skips itself to green" (`CLAUDE.md` §2) covers it)*
       reports 0 skips, so a new conditional skip has to be deliberate.
