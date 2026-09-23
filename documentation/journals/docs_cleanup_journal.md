@@ -18,6 +18,14 @@
   legacy journals are annotated, not rewritten to the standard.
 - **and then:** the owner confirmed "one application per window" for the
   time mode, and said the W9 GitHub Pages deploy is not needed for now.
+- **and then:** the owner closed CB-2 G (still feels active; the reach
+  values were fine at the playtest but are still being tuned) and the G6
+  remainder (reviewed and fine for the task, likewise still being tuned);
+  asked for a new plan holding the remaining elemental extras and a faint
+  glow behind elemental buff buildings; decided the "tileset missing" test
+  skips become failures and that `coverage` stays a test-only tool, not a
+  declared dependency (a coverage run with an HTML report was asked for
+  separately); and asked for the PR.
 
 ## DOC-003 — Confirmed reading
 
@@ -60,6 +68,8 @@ by path.
 - [x] DOC-003.8 — Index: assign the unassigned plans, note CMB-006's legacy stamp, results, close
 - [x] DOC-003.9 — Record the owner's answers: tick the time-mode confirmation, park W9
 - [x] DOC-003.10 — `CLAUDE.md` §2/§3 and memory: the digest command moved to `tools.verification.world_digest`; TST-002 is done, not proposed
+- [x] DOC-003.11 — Close CB-2 G and the G6 remainder; record the tileset and `coverage` decisions in `test_suite_review.md`; TST-003 proposed for the tileset skips
+- [ ] DOC-003.12 — CMB-009 proposed: `plans/elemental_extras_plan.md`, its requirement block in the elemental journal, pointers from the design doc, index rows
 
 ## DOC-003 — Results
 

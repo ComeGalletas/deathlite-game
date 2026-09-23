@@ -16,7 +16,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-009 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
-PRG-003 · AUD-004 · SYS-009 · TST-003 · BLD-003 · DOC-004
+PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-004
 
 ## Requirements
 
@@ -87,6 +87,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-003 · BLD-003 · DOC-004
 | SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | proposed | [structure_review_journal.md](structure_review_journal.md) (found in) | — | 2026-09-22 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
+| TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | proposed | [test_suite_review.md](../plans/test_suite_review.md) (decided in) | — | 2026-09-22 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
