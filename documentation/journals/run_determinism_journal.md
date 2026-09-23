@@ -18,6 +18,8 @@
   full same-seed determinism is a goal is the owner's call before the
   investigation in SYS-008.4 is started. No gameplay change: a fixed run
   must play as it does now, only reproducibly.
+- **and then:** the owner confirmed full same-seed determinism is the goal
+  and gave the go for SYS-008.4 (2026-09-23).
 
 ## SYS-008 — Confirmed reading
 
@@ -54,7 +56,7 @@ workarounds so the digest tool proves the result on its own.
 - [ ] SYS-008.1 — A test that runs the run digest in two child processes with different `PYTHONHASHSEED` values and compares; expected to fail, recorded as the baseline
 - [ ] SYS-008.2 — Watchdog stagger and tracks keyed by a spawn serial, not `id()` (D1)
 - [ ] SYS-008.3 — Locate the hash-order iteration (bisect the spawn path under fixed hash seeds) and sort it where it is consumed (D2)
-- [ ] SYS-008.4 — Locate the memory-order dependence behind seed 123 (object sets, `id()`-keyed dicts that are iterated) and remove it — open-ended; waits on the owner's go
+- [ ] SYS-008.4 — Locate the memory-order dependence behind seed 123 (object sets, `id()`-keyed dicts that are iterated) and remove it — open-ended; the owner gave the go on 2026-09-23
 - [ ] SYS-008.5 — Remove both workarounds from `run_digest.py`, re-pin `run_digests.json`, and make SYS-008.1 an ordinary test; index to done
 
 ## SYS-008 — Results
