@@ -146,11 +146,42 @@ moves them.
 
 ## WLD-012 — Tasks
 
-- [ ] WLD-012.1 — Identify the placement stage and the check that let the seed-35 prop through
-- [ ] WLD-012.2 — Keep props a widest-walker radius clear of every bridge mouth (D1)
+- [x] WLD-012.1 — Identify the placement stage and the check that let the seed-35 prop through — see *WLD-012.1 — Finding* below
+- [ ] WLD-012.2 — Keep props a widest-walker radius clear of every bridge ~~mouth~~ deck, its whole length (D1, D2)
 - [ ] WLD-012.3 — Replace the pinning test with "every bridge on the pinned seeds crosses at the widest walker's radius"; drop the `propped` filter
 - [ ] WLD-012.4 — Re-pin the world digests; record how many props moved, as a rate over the seeds
 - [ ] WLD-012.5 — Screenshot of the seed-35 bridge before and after
+
+### WLD-012.1 — Finding (2026-09-23)
+
+**Branch:** `claude/wld-012-bridge-deck-clearance`, cut from
+`claude/doc-004-proposal-journals` (which carries this journal).
+
+It is not a mouth. Driving a radius-40 body over every deck and listing
+what it touches (a probe over the crossing test's `decks` / `walk`):
+
+| seed | bridge | deck | blocker | where | walk |
+|---|---|---|---|---|---|
+| 35 | 2 (horizontal) | x 10624–11072, y 3904–3968 | `rock`, radius 19.5, biome `meadow` | x 10840 — the **middle** of the deck — 19 px below its edge, on land the deck runs beside | stalls at 41 % |
+
+- It comes from the ordinary obstacle scatter (`_scatter_room` →
+  `_spot_ok`, `world/gen/scatter.py`). `_spot_ok` keeps an obstacle's
+  circle out of the mouth rectangles (`_corridor_doorways`), the flight
+  keep-outs and the clear discs — nothing keeps it off the **long side** of
+  a deck, because a deck normally crosses water. This one runs along a
+  coast for part of its length, and the scatter seated a rock beside it.
+- **Rate:** 1 blocked deck out of 36 on the three pinned seeds; none on
+  fourteen more seeds probed (1–6, 8–13, 21, 41). No fish hut, house,
+  building or village prop blocks a deck on any of them.
+- **WLD-012.D2 — A band along the deck, not a wider mouth.** Every
+  bridge gets a keep-out rectangle centred on its centre line, the deck's
+  length, with a half-width of the widest walker's radius (D1). `_blocks`
+  already tests an obstacle's *circle* against a rect, so it rejects
+  exactly the obstacles whose surface would come within that radius of the
+  centre line — which is the condition for a body of that radius to touch
+  them while crossing. The band joins the scatter's `all_doors` (houses,
+  buff buildings, the island scatter and the tree top-up read that list)
+  and the village pass's per-island doors.
 
 ## WLD-012 — Results
 
