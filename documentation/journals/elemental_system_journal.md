@@ -281,7 +281,7 @@ and its tests green before the next starts.
       loading, dev mode. Report conflicts (above).
 - [x] Owner answered items 6, 7, 8, 9 on 2026-09-21 (recorded above); the
       design's open items 1–13 stand at their proposals unless changed.
-- [ ] Owner confirms the "one application per window" reading of time mode *(DOC-003: still unconfirmed; the code already works this way (`take_element_window`, M6 built))*
+- [x] Owner confirms the "one application per window" reading of time mode *(DOC-003: confirmed by the owner 2026-09-22; the code already works this way, `take_element_window`)*
       (item 7).
 
 ### M1 Core (`combat/elements/` package) — built 2026-09-21

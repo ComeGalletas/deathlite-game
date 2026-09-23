@@ -14,9 +14,8 @@
 > - **Still open:** the Echo and Fragmentation blessings (§1); vendoring the
 >   pygame wheel for a static host (§7); the test debt now tracked in
 >   `test_suite_review.md` (§8).
-> - **Waiting on the owner:** the W9 GitHub Pages deploy (§7) needs a GitHub
->   Actions workflow; with no CI in this project, it is the owner's call
->   whether a deploy-only workflow is wanted.
+> - **Parked:** the W9 GitHub Pages deploy (§7), not needed for now (owner,
+>   2026-09-22).
 >
 > The rest of this file is kept as written.
 
