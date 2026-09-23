@@ -39,6 +39,17 @@ from world.terrain import decor
 from world.gen.biomes import floor_palette, scatter_mix
 from world.terrain.sheets import TileSheets
 
+
+def _require_tiles(test, ok):
+    """Fail, not skip, when the tileset did not load (TST-003). The sheets are
+    tracked in git, so a missing one is a broken checkout the suite has to
+    report rather than step around."""
+    if not ok:
+        with open(os.path.join("data", "world", "terrain.json"), encoding="utf-8") as fh:
+            sheet = json.load(fh)["floor_sheet"]
+        test.fail(f"tileset missing: {os.path.join(ASSETS_DIR, sheet)} did not load")
+
+
 POOL = ["a.png", "b.png", "c.png"]
 SHORE = {"a.png", "b.png", "c.png", "base.png"}
 # `b` shares a material with the ground the islands rise from, the way
@@ -207,8 +218,7 @@ class BakedWorldTests(unittest.TestCase):
 
     def test_every_raised_level_of_every_island_gets_a_pool_sheet(self):
         layout, sheets = self._sheets(21)
-        if not sheets.ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, sheets.ok)
         raised = 0
         for room in layout.rooms:
             if not room.grid:
@@ -225,8 +235,7 @@ class BakedWorldTests(unittest.TestCase):
         happens on an island; the topography chooses it by what shape the island
         is, and the two are orthogonal."""
         layout, sheets = self._sheets(21)
-        if not sheets.ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, sheets.ok)
         for room in layout.rooms:
             if not room.grid:
                 continue
@@ -238,8 +247,7 @@ class BakedWorldTests(unittest.TestCase):
     def test_only_a_sheet_with_surf_may_meet_the_sea(self):
         """Unless the topography opts out, which `boss` does on purpose."""
         layout, sheets = self._sheets(21)
-        if not sheets.ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, sheets.ok)
         for room in layout.rooms:
             if not room.grid:
                 continue
@@ -253,8 +261,7 @@ class BakedWorldTests(unittest.TestCase):
 
     def test_two_islands_of_one_world_differ(self):
         layout, sheets = self._sheets(21)
-        if not sheets.ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, sheets.ok)
         pals = {tuple(sorted(sheets.biome_palette(r).items()))
                 for r in layout.rooms if r.grid and r.floor >= 0}
         self.assertGreater(len(pals), 1)
@@ -270,8 +277,7 @@ class BakedWorldTests(unittest.TestCase):
         boundaries and **zero** with the same biome on both sides.
         """
         layout, sheets = self._sheets(21)
-        if not sheets.ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, sheets.ok)
         checked = 0
         for room in layout.rooms:
             if not room.grid:
@@ -293,8 +299,7 @@ class BakedWorldTests(unittest.TestCase):
         """`sheet_for` with no room cannot know which island was meant, so it
         must not reach into a topography's sheets at all."""
         layout, sheets = self._sheets(21)
-        if not sheets.ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, sheets.ok)
         self.assertEqual(sheets.sheet_for(0, "default"),
                          sheets.palettes.get("default", sheets.floor_sheet))
     def test_the_bake_reads_the_palette_rather_than_re_deriving_it(self):
@@ -592,8 +597,7 @@ class TreeGroupTests(unittest.TestCase):
     def test_a_tree_is_skinned_from_its_own_terrace_group(self):
         layout = W.layout(41)
         gm = W.baked(41)
-        if not gm._tiles_ok:
-            self.skipTest("tileset missing")
+        _require_tiles(self, gm._tiles_ok)
         checked = 0
         for i, o in enumerate(gm.obstacles):
             if o.kind != "tree" or not o.biome:

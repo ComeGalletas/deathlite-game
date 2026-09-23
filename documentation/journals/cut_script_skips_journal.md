@@ -134,7 +134,7 @@ the owner named come first; the rest turned up in the same sweep.
 
 ## TST-003 — Tasks
 
-- [ ] TST-003.1 — Replace the seven skips with the shared assertion
+- [x] TST-003.1 — Replace the seven skips with the shared assertion
 - [ ] TST-003.2 — Run the biome module, `tests/render` and `tests/world`; record the counts
 - [ ] TST-003.3 — Tick `test_suite_review.md` §5, results, index to done
 
