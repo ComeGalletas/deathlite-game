@@ -31,6 +31,7 @@ class DevFlags:
         self.show_aim = False           # dev menu: CB-5 manual-aim line
         self.show_auras = False         # dev menu: elemental aura inspector
         self.show_reaction_log = False  # dev menu: CMB-009.4 reaction log
+        self.building_turn = 0          # CMB-009.5: next buff kind to seat
 
     def apply_unlimited_hp(self, run) -> None:
         """Dev toggle: HP never ends a frame lower than it started (it may still

@@ -2491,7 +2491,7 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 - [x] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
 - [x] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
 - [x] CMB-009.4 — Reaction log overlay (plan §3)
-- [ ] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
+- [x] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
 
 ## CMB-009 — Results
 
@@ -2610,3 +2610,41 @@ instruction to continue on a new branch as before (2026-09-23).
   `tests/screens` + `tests/render` + `tests/playing` — 2024 passed, 487
   subtests, 0 skipped (13 min 22 s), then the log, dev-mode and screens
   tests again against the final overlay — 631 passed, 22 subtests.
+
+### CMB-009.5 — Spawn an elemental building
+
+- Dev menu: **"Spawn elemental building..."** (after "Infuse weapons...")
+  opens an ELEMENTAL BUILDING page of the four elements; ENTER seats one
+  beside the hero and the status line says which.
+- `devtools/element_building.py::spawn_elemental_building(ps, element)`
+  builds it the way the world does: `world.gen.buildings._seat` for the
+  compound (the primary carries the art, the satellites only collide),
+  `GameMap.obstacles`' setter so the obstacle index is rebuilt,
+  `reskin_obstacle` with the kind's first rig at the bake's size, and an
+  `Interactable` carrying the element on the run's list — so using it runs
+  the ordinary buff, then the infusion picker for its element.
+- The kind takes the buff kinds in turn (`DevFlags.building_turn`), so
+  every building can be tried; the spot is the first on rings of 3, 4.5, 6
+  and 8 tiles round the hero where every circle of the compound is on
+  walkable ground and clear of every obstacle.
+- **CMB-009.D4 — What it does not do.** The navigation field is baked at
+  run start and is not rebuilt, so enemies do not route round a spawned
+  building; they collide with it and slide, as round any obstacle the
+  field did not know. The spot search takes any walkable ground, so a
+  building can land on another terrace than the hero's. Both are
+  acceptable for a dev tool; a run that needs a real one takes a seed.
+- `tests/devtools/test_element_building.py` (integration tier, listed in
+  `conftest.INTEGRATION`, pinned seed): 7 tests — seated as a compound
+  with its art and in the rebuilt index; placed where the spot search said
+  and near the hero; carries the chosen element; the kinds come in turn;
+  using it runs the buff and opens the element's weapon picker; no room
+  says so and adds nothing; the dev-menu page exists.
+- **Screenshot:** a seed-7 developer run with one building of each
+  element seated by the tool, each with its CMB-009.1 glow.
+- **Tests:** `tests/devtools` + `tests/screens` + `test_dev_mode` +
+  `test_interactables` + `test_infusion_sources` — 718 passed, 28
+  subtests, 0 skipped (6 min 13 s).
+
+**CMB-009 closed** (2026-09-23): all five tasks landed, each in its own
+commit. The design document's three open boxes it answered (§8.2's
+building visual, §9.8's counters, §10.3's extras) are ticked there.
