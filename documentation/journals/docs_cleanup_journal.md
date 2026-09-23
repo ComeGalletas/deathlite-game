@@ -59,15 +59,16 @@ by path.
 - [x] DOC-003.7 — Cross-references: ENT-012.D2 → WLD-011, WLD-011 → WLD-012, SYS-007 *Open* → SYS-008 and `state.py` size, CMB-007 → CMB-008
 - [x] DOC-003.8 — Index: assign the unassigned plans, note CMB-006's legacy stamp, results, close
 - [x] DOC-003.9 — Record the owner's answers: tick the time-mode confirmation, park W9
-- [ ] DOC-003.10 — `CLAUDE.md` §2/§3 and memory: the digest command moved to `tools.verification.world_digest`; TST-002 is done, not proposed
+- [x] DOC-003.10 — `CLAUDE.md` §2/§3 and memory: the digest command moved to `tools.verification.world_digest`; TST-002 is done, not proposed
 
 ## DOC-003 — Results
 
 No tests run: documentation only. The one `data/` edit is a comment string
 (DOC-003.D3), re-parsed as JSON before it was written.
 
-**Unticked boxes:** 184 before, **31 after** (33 at DOC-003.8, less the two
-the owner answered in DOC-003.9). The count was taken with
+**Unticked boxes:** 184 before, **30 after** (32 at DOC-003.8, less the two
+the owner answered in DOC-003.9; an earlier "33" counted this journal's own
+D1 text, which contains the pattern). The count was taken with
 `grep -rn -- "- \[ \]" documentation`, leaving out this journal. Every box
 that remains is real open work:
 
