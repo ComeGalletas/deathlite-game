@@ -37,7 +37,8 @@ from __future__ import annotations
 
 import random
 
-from world.gen.scatter import _blocks, _corridor_doorways  # noqa: F401  -- `_blocks` re-exported for the tests
+from world.gen.scatter import (_blocks, _corridor_doorways,  # noqa: F401  -- `_blocks` re-exported for the tests
+                               _deck_keepouts, _doors_near, _keep_clear_pad)
 from world.gen.settings import settings_or_config
 from world.gen.tuning import VILLAGE_KIND
 from world.gen.village.pen import _pen_fits, _pen_tiles, _place_pen  # noqa: F401
@@ -54,6 +55,10 @@ def place_villages(rooms, corridors, seed: int, settings=None) -> tuple[list, li
     island, in island order. Draws nothing from the world stream."""
     s = settings_or_config(settings)
     doorways = _corridor_doorways(rooms, corridors)
+    # The deck bands the scatter keeps clear (WLD-012), for the same reason.
+    from game.content import get_content
+    decks = _deck_keepouts(corridors, get_content().widest_walker_radius())
+    pad = _keep_clear_pad()
     # The painted reach of every kind (LD-Z) comes off the rig data; the
     # import is local for the reason the scatter's is -- this module stays
     # importable without the asset layer.
@@ -65,7 +70,8 @@ def place_villages(rooms, corridors, seed: int, settings=None) -> tuple[list, li
         if room.kind != VILLAGE_KIND:
             continue
         rng = random.Random(f"{seed}:village:{room.id}")
-        site = _Site(room, doorways.get(room.id, []), rng, terrain)
+        doors = doorways.get(room.id, []) + _doors_near(decks, room.rect, pad)
+        site = _Site(room, doors, rng, terrain)
         village = _lay_out(site, s.town_hall)
         out.extend(site.placed)
         villages.append(village)

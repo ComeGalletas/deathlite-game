@@ -11,6 +11,10 @@ A deck is one tile, `TILE_PX` = 64, and `is_walkable` probes a body as a
 four-point cross, so before the fix the widest radius that could cross was
 **31** -- under every boss in the game.
 
+WLD-012 closed the other half: placement keeps every obstacle a
+widest-walker radius off each deck's centre line (`scatter._deck_keepouts`),
+so no bridge needs excusing as "propped" any more.
+
 Seeds are pinned and worlds come from the shared cache: these consume a
 generated world, and an unpinned one would make the whole module a coin flip.
 Nothing here mutates a world.
@@ -20,6 +24,7 @@ import unittest
 import pygame
 
 from game import config
+from game.content import get_content
 from tests import worlds as W
 
 SEEDS = (35, 7, 42)
@@ -30,6 +35,9 @@ BOSS_R = 40.0
 # What could cross before the fix, so a regression shows up as "only the
 # small ones still make it" rather than as a total failure.
 SMALL_R = 24.0
+# The body placement keeps every deck clear for (WLD-012.D1): read from the
+# data, as the generator reads it.
+WALKER_R = get_content().widest_walker_radius()
 
 
 def decks(seed):
@@ -97,52 +105,49 @@ class BridgeCrossingTests(unittest.TestCase):
                 self.assertEqual(width, config.TILE_PX,
                                  f"seed {seed}: deck {width} px")
 
-    def test_a_boss_sized_body_crosses_every_unobstructed_bridge(self):
-        """The bug, in one assertion. Before the fix this was 0 % on every
-        bridge of every seed.
-
-        "Unobstructed" is doing real work and is not a way of excusing a
-        failure: this rule is about *geometry*, and a prop parked beside a
-        mouth blocks through the obstacle test underneath, which the fix
-        deliberately leaves alone. The next test names those separately so
-        they stay visible rather than being quietly absorbed here."""
+    def test_a_boss_sized_body_crosses_every_bridge(self):
+        """The bug, in one assertion. Before WLD-011 this was 0 % on every
+        bridge of every seed; until WLD-012 one bridge on seed 35 still
+        stalled at 41 %, on a rock the scatter had seated beside its deck."""
         for seed in SEEDS:
             gm = W.game_map(seed)
             for i, (corridor, horizontal) in enumerate(decks(seed)):
-                if propped(gm, corridor, horizontal, BOSS_R):
-                    continue
                 got = walk(gm, corridor, horizontal, BOSS_R)
                 self.assertEqual(
                     got, 1.0,
                     f"seed {seed} bridge {i}: a radius-{BOSS_R:.0f} body "
                     f"stalled {got * 100:.0f} % along a clear deck")
 
-    def test_a_prop_beside_a_mouth_still_blocks_a_wide_body(self):
-        """A known, separate defect, pinned so it cannot be forgotten.
-
-        Placement keeps props off the deck but not far enough back from it:
-        on seed 35 one sits 19 px past the planks with a 19.5 px radius, and
-        a radius-40 body's exclusion circle cannot clear it, so that bridge
-        stays shut to the boss. Fixing it is a placement change -- keep props
-        a largest-body radius clear of a mouth -- not a collider one.
-
-        If placement is fixed, this test fails and should be deleted."""
+    def test_no_obstacle_reaches_the_widest_walker_on_any_deck(self):
+        """WLD-012: placement keeps every deck clear for the widest body that
+        walks, not only its two mouths. Seed 35 had a rock 19 px beside the
+        middle of a deck that runs along a coast; it is what this replaces
+        the old pinning test for."""
         blocked = [(seed, i)
                    for seed in SEEDS
                    for i, (corridor, horizontal) in enumerate(decks(seed))
-                   if propped(W.game_map(seed), corridor, horizontal, BOSS_R)]
-        self.assertTrue(
-            blocked,
-            "no bridge is prop-blocked any more -- placement was fixed, so "
-            "delete this test and drop the filter from the one above")
+                   if propped(W.game_map(seed), corridor, horizontal, WALKER_R)]
+        self.assertEqual(blocked, [],
+                         f"a radius-{WALKER_R:.0f} body brushes an obstacle "
+                         f"on these decks")
+
+    def test_the_widest_walker_crosses_every_bridge(self):
+        """The same guarantee through the real resolver, at the radius the
+        data says -- so a wider walker added later is checked here too."""
+        for seed in SEEDS:
+            gm = W.game_map(seed)
+            for i, (corridor, horizontal) in enumerate(decks(seed)):
+                got = walk(gm, corridor, horizontal, WALKER_R)
+                self.assertEqual(
+                    got, 1.0,
+                    f"seed {seed} bridge {i}: a radius-{WALKER_R:.0f} body "
+                    f"stalled {got * 100:.0f} % along the deck")
 
     def test_small_bodies_still_cross(self):
         """The leniency must not have broken what already worked."""
         for seed in SEEDS:
             gm = W.game_map(seed)
             for i, (corridor, horizontal) in enumerate(decks(seed)):
-                if propped(gm, corridor, horizontal, SMALL_R):
-                    continue
                 self.assertEqual(walk(gm, corridor, horizontal, SMALL_R), 1.0,
                                  f"seed {seed} bridge {i}")
 
@@ -163,8 +168,8 @@ class BridgeCrossingTests(unittest.TestCase):
 
     def test_obstacles_are_still_enforced_on_a_bridge(self):
         """Only the floor probe is relaxed. The obstacle test below it is
-        untouched, so a prop by a mouth still blocks -- which is how the one
-        remaining stall on seed 35 was diagnosed as placement, not geometry."""
+        untouched, so a prop on a deck still blocks -- which is how the last
+        stall on seed 35 was diagnosed as placement, not geometry (WLD-012)."""
         gm = W.game_map(35)
         blocked = 0
         for obstacle in W.layout(35).obstacles:

@@ -147,9 +147,9 @@ moves them.
 ## WLD-012 — Tasks
 
 - [x] WLD-012.1 — Identify the placement stage and the check that let the seed-35 prop through — see *WLD-012.1 — Finding* below
-- [ ] WLD-012.2 — Keep props a widest-walker radius clear of every bridge ~~mouth~~ deck, its whole length (D1, D2)
-- [ ] WLD-012.3 — Replace the pinning test with "every bridge on the pinned seeds crosses at the widest walker's radius"; drop the `propped` filter
-- [ ] WLD-012.4 — Re-pin the world digests; record how many props moved, as a rate over the seeds
+- [x] WLD-012.2 — Keep props a widest-walker radius clear of every bridge ~~mouth~~ deck, its whole length (D1, D2)
+- [x] WLD-012.3 — Replace the pinning test with "every bridge on the pinned seeds crosses at the widest walker's radius"; drop the `propped` filter — landed in the WLD-012.2 commit: a generator change and the tests it invalidates have to land together for that commit to be green
+- [x] WLD-012.4 — Re-pin the world digests; record how many props moved, as a rate over the seeds — landed in the WLD-012.2 commit, same reason
 - [ ] WLD-012.5 — Screenshot of the seed-35 bridge before and after
 
 ### WLD-012.1 — Finding (2026-09-23)
@@ -185,4 +185,33 @@ what it touches (a probe over the crossing test's `decks` / `walk`):
 
 ## WLD-012 — Results
 
-*(filled in as the tasks land)*
+**Built.**
+- `Content.widest_walker_radius()` (`game/content.py`): the largest
+  `radius` over enemies and bosses without a `flying` tag — 40 today, the
+  Tusked Lance (D1).
+- `scatter._deck_keepouts(corridors, clearance)`: one band per bridge, the
+  deck's length, `clearance` either side of its centre line (D2). It joins
+  the scatter's `all_doors` and, filtered by `_doors_near`, the village
+  pass's per-island doors.
+- `tests/world/test_bridge_crossing.py`: the pinning test is replaced by
+  `test_no_obstacle_reaches_the_widest_walker_on_any_deck` and
+  `test_the_widest_walker_crosses_every_bridge` (radius from the data); the
+  `propped` filter is gone from the boss and small-body crossing tests.
+
+**Rate** (bands stubbed out vs in, same process, 12 seeds — 35, 7, 42,
+1234, 1–6, 8, 9): **1 obstacle in a band over 128 decks**, the seed-35
+rock. The layouts still move on most seeds, by up to 3 obstacles of
+~470–710: a placement try that now lands in a band is turned away and
+retried, which shifts the scatter's draws after it. That is the whole
+digest change — layout on 35, 7, 42 and 1234, bake on 35, 42 and 1234 —
+re-pinned with `python -m tools.verification.world_digest --write`.
+
+**Screenshot:** seed 35, bridge 2, before and after, the band and a
+radius-40 body drawn over it — the boulder under the middle of the deck is
+gone; the rest of that island's scatter reshuffled as the rate predicts.
+
+**Tests** (the whole default suite, in two runs):
+`tests/world` + `tests/entities` + `tests/spawn` + `tests/playing` —
+**1160 passed, 539 subtests, 0 skipped** (7 min 35 s); everything else —
+**2093 passed, 486 subtests, 0 skipped** (8 min 48 s). 3253 in all, one more
+than the 3252 before: the pinning test became two guarantees.
