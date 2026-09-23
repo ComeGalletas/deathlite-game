@@ -142,3 +142,14 @@ journals' own status lines were left alone, except
 - [x] DOC-004.4 — CMB-008 journal block
 - [x] DOC-004.5 — SYS-008 journal (new file)
 - [x] DOC-004.6 — CMB-009 confirmed reading and tasks
+- [x] DOC-004.7 — Results; index to done
+
+## DOC-004 — Results
+
+All five requirements have a journal with requirement, confirmed reading,
+plan and tasks; the index points at each directly (no "found in" left).
+Decisions the journals leave to the owner: WLD-012.D1 (clearance follows the
+data or a fixed number) and SYS-008's go-ahead for the open-ended
+SYS-008.4. TST-003 was built on this branch and is done (`925502c`,
+results in `cut_script_skips_journal.md`); the other four stay `proposed`.
+No tests run for the journals themselves.
