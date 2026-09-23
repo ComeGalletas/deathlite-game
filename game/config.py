@@ -1055,6 +1055,11 @@ DEBUG_KEYS = {
 # required for normal play.
 DEBUG_OVERLAY_DEFAULT: bool = False
 
+# CMB-009.4: how many reactions the dev reaction log keeps (a ring buffer,
+# newest first on screen), and how many of them the overlay lists.
+REACTION_LOG_CAPACITY: int = 64
+REACTION_LOG_LINES: int = 14
+
 
 # --- Controls (CB-5 manual aim) ------------------------------------------
 # The hero attacks where the player points; auto-aim is the fallback. See

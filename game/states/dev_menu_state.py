@@ -49,7 +49,7 @@ from ui.menu_nav import MenuNav
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
-              "aim_line", "auras", "all_rooms", "freeze", "difficulty",
+              "aim_line", "auras", "reaction_log", "all_rooms", "freeze", "difficulty",
               "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
               "force_aura", "infuse", "game_over", "victory",
               "reset", "exit", "close")
@@ -62,6 +62,7 @@ _LABELS = {
     "spawn_points": "Spawn points",
     "aim_line":     "Aim line",
     "auras":        "Aura inspector",
+    "reaction_log": "Reaction log",
     "all_rooms":    "Activate all rooms",
     "freeze":       "Freeze spawns",
     "difficulty":   "Difficulty",
@@ -262,6 +263,9 @@ class DevMenuState(State):
         elif rid == "auras":
             p._dev_show_auras = not p._dev_show_auras
             self._status = f"Aura inspector {'ON' if p._dev_show_auras else 'off'}"
+        elif rid == "reaction_log":
+            p._dev_show_reaction_log = not p._dev_show_reaction_log
+            self._status = f"Reaction log {'ON' if p._dev_show_reaction_log else 'off'}"
         elif rid == "all_rooms":
             m = p.spawn.master
             m.all_active = not m.all_active
@@ -685,6 +689,8 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_show_aim else "   [  ]"
         elif rid == "auras" and p is not None:
             label += "   [ON]" if p._dev_show_auras else "   [  ]"
+        elif rid == "reaction_log" and p is not None:
+            label += "   [ON]" if p._dev_show_reaction_log else "   [  ]"
         elif rid == "all_rooms" and p is not None:
             label += "   [ON]" if p.spawn.master.all_active else "   [  ]"
         elif rid == "freeze" and p is not None:

@@ -2490,7 +2490,7 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 - [x] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
 - [x] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
 - [x] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
-- [ ] CMB-009.4 — Reaction log overlay (plan §3)
+- [x] CMB-009.4 — Reaction log overlay (plan §3)
 - [ ] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
 
 ## CMB-009 — Results
@@ -2569,3 +2569,44 @@ instruction to continue on a new branch as before (2026-09-23).
   does nothing in a normal one.
 - **Tests:** `tests/devtools` + `tests/combat` + `tests/flows` — 756 passed,
   132 subtests, 0 skipped (5 min 8 s).
+
+### CMB-009.4 — The reaction log
+
+- `combat/elements/reaction_log.py`: `ReactionLog`, a fixed ring of
+  `LoggedReaction(serial, time, reaction, aura, trigger, damage, depth,
+  deferred)`, newest first. Kept in every run (`build_resolver` sets
+  `resolver.log`), one append per reaction, so turning the overlay on shows
+  what already happened. `config.REACTION_LOG_CAPACITY` 64,
+  `REACTION_LOG_LINES` 14 shown.
+- The resolver feeds it from `_run_reaction`, the one place a reaction
+  runs — at once or a frame late:
+  - **damage** is what the reaction dealt through its own context:
+    `HitContext.deal` now keeps a running `dealt`, read before and after the
+    runner. What a cascade it set off deals is logged on that reaction's
+    own line, not added to this one.
+  - **depth** (CMB-009.D5) is how many reactions were running when this
+    one was triggered — 0 for a weapon's hit, 1 for one set off inside
+    another's run (a tornado or Superconduct laying an aura). A held
+    reaction carries its depth in `PendingReaction.depth`.
+  - **deferred** marks a reaction the per-frame budget held over.
+  - Time is run seconds, not a frame number: the resolver has no frame
+    counter, and the serial already orders them.
+- Overlay: the dev menu's new **"Reaction log"** row (after "Aura
+  inspector") toggles `DevFlags.show_reaction_log`; `overlays.
+  reaction_log_overlay` draws the newest 14 in a panel down the right
+  edge, clear of the HUD. The first draft coloured each line by its aura
+  element; Thunder's purple was unreadable on the dark panel, so the text
+  is now light with two swatches in front — aura, then trigger.
+- `tests/combat/test_reaction_log.py`: 10 tests — pair, damage, serial and
+  time logged; a reaction set off inside another is depth 1 and finishes
+  first; a reaction's damage excludes its cascade's; a budget-held
+  reaction is logged when it runs, flagged; the ring keeps its capacity;
+  `clear` empties it; no log records nothing; the overlay's lines flag a
+  cascade and a hold; the dev-menu row exists; nothing draws outside a
+  developer run.
+- **Screenshot:** a seed-7 developer run with six real reactions driven
+  through the run's resolver, the panel over the terrain.
+- **Tests:** `tests/combat` + `tests/devtools` + `tests/flows` +
+  `tests/screens` + `tests/render` + `tests/playing` — 2024 passed, 487
+  subtests, 0 skipped (13 min 22 s), then the log, dev-mode and screens
+  tests again against the final overlay — 631 passed, 22 subtests.

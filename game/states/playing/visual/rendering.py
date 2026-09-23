@@ -847,5 +847,8 @@ class WorldRenderer:
     def aura_overlay(self, surface) -> None:
         overlays.aura_overlay(surface, self.ps)
 
+    def reaction_log_overlay(self, surface) -> None:
+        overlays.reaction_log_overlay(surface, self.ps)
+
     def collider_overlay(self, surface) -> None:
         overlays.collider_overlay(surface, self.ps)

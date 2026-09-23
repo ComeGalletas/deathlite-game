@@ -75,6 +75,9 @@ class HitContext:
     # (the world refuses damage to a dead target, so that part is
     # automatic). A reaction that writes to its target must check this.
     carrier_dead: bool = False
+    # Everything this context has dealt, for the reaction log (CMB-009.4):
+    # a reaction reads it before and after it runs.
+    dealt: float = 0.0
     # Set when this hit is one node of a Thunder chain already in flight
     # (`thunder.ChainNode`). `None` means a root hit, which is the only kind
     # that may start a new chain -- without it every jump would branch a
@@ -96,7 +99,9 @@ class HitContext:
             return 0.0
         # The world records it: one place, so a Wind area that outlives
         # this context still lands in the same books.
-        return self.resolver.world.deal(target, amount, self.weapon_id, effect)
+        got = self.resolver.world.deal(target, amount, self.weapon_id, effect)
+        self.dealt += got or 0.0
+        return got
 
     def deal_spec(self, target, spec, effect: str) -> float:
         """The same, for a `DamageSpec` resolved against the hit that carried
@@ -168,6 +173,7 @@ class PendingReaction:
     config: object
     ctx: HitContext
     queued_at: float
+    depth: int = 0           # cascade depth when it was triggered (CMB-009.4)
 
 
 @dataclass
@@ -224,6 +230,11 @@ class ElementalResolver:
         self.reaction_runner = reaction_runner
         self.stats = ResolverStats()
         self._pending: list[PendingReaction] = []
+        # CMB-009.4: an optional `ReactionLog` the dev overlay reads, and how
+        # many reactions are running right now -- a reaction triggered while
+        # one runs is part of its cascade.
+        self.log = None
+        self._depth = 0
 
     # --- frame -----------------------------------------------------------
     def begin_frame(self, now: float) -> int:
@@ -241,7 +252,8 @@ class ElementalResolver:
             # the blast was owed to the enemies around it, and the
             # reaction reads only its position.
             if self._budget_left():
-                self._run_reaction(entry.target, entry.variant, entry.config, entry.ctx)
+                self._run_reaction(entry.target, entry.variant, entry.config,
+                                   entry.ctx, depth=entry.depth, deferred=True)
                 ran += 1
             else:
                 self._pending.append(entry)
@@ -413,12 +425,13 @@ class ElementalResolver:
             self.tracking.record_reaction(ctx.weapon_id, variant.reaction)
 
         if not self._budget_left():
-            self._pending.append(PendingReaction(target, variant, config, ctx, ctx.now))
+            self._pending.append(PendingReaction(target, variant, config, ctx,
+                                                 ctx.now, depth=self._depth))
             self.stats.deferred_now += 1
             self.stats.deferred_total += 1
             return Outcome.DEFERRED
 
-        self._run_reaction(target, variant, config, ctx)
+        self._run_reaction(target, variant, config, ctx, depth=self._depth)
         return Outcome.REACTION
 
     def _lock_seconds(self, config) -> float:
@@ -428,11 +441,24 @@ class ElementalResolver:
         own = config.lock_duration if config.lock_aura_slot else 0.0
         return max(base, own)
 
-    def _run_reaction(self, target, variant, config, ctx) -> None:
+    def _run_reaction(self, target, variant, config, ctx, *, depth: int = 0,
+                      deferred: bool = False) -> None:
         self.stats.reactions_this_frame += 1
         self.stats.reactions_total += 1
+        before = ctx.dealt
         if self.reaction_runner is not None:
-            self.reaction_runner(target, variant, config, ctx)
+            self._depth += 1
+            try:
+                self.reaction_runner(target, variant, config, ctx)
+            finally:
+                self._depth -= 1
+        if self.log is not None:
+            from combat.elements.reaction_log import LoggedReaction
+            self.log.record(LoggedReaction(
+                serial=self.stats.reactions_total, time=ctx.now,
+                reaction=variant.reaction.key, aura=variant.aura.key,
+                trigger=variant.incoming.key, damage=ctx.dealt - before,
+                depth=depth, deferred=deferred))
 
     def _done(self, outcome: Outcome) -> Outcome:
         self.stats.note(outcome)
@@ -452,3 +478,6 @@ class ElementalResolver:
     def clear(self) -> None:
         self._pending.clear()
         self.stats = ResolverStats()
+        self._depth = 0
+        if self.log is not None:
+            self.log.clear()

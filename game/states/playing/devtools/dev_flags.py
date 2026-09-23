@@ -30,6 +30,7 @@ class DevFlags:
         self.show_spawn_points = False  # F8 / dev menu: generated spawn points
         self.show_aim = False           # dev menu: CB-5 manual-aim line
         self.show_auras = False         # dev menu: elemental aura inspector
+        self.show_reaction_log = False  # dev menu: CMB-009.4 reaction log
 
     def apply_unlimited_hp(self, run) -> None:
         """Dev toggle: HP never ends a frame lower than it started (it may still
