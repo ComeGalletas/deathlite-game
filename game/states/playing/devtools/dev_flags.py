@@ -110,6 +110,11 @@ class DevFlags:
         d.set_metric("reactions", f"{el.stats.reactions_this_frame}/frame "
                                   f"{el.stats.reactions_total} total "
                                   f"{el.pending} held")
+        # CMB-009.2: the two §9.8 counters the metrics lacked.
+        d.set_metric("thunder jumps", f"{el.stats.jump_nodes_this_frame}/frame "
+                                      f"{el.stats.jump_nodes_total} total")
+        d.set_metric("wind areas", f"{len(run.wind_areas)}/"
+                                   f"{el.registry.global_cfg.max_active_wind_areas}")
         vis = run.element_visuals
         if vis is not None:
             d.set_metric("element fx", f"{vis.report()}  "

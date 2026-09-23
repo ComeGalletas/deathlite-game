@@ -2488,7 +2488,7 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 ## CMB-009 — Tasks
 
 - [x] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
-- [ ] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
+- [x] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
 - [ ] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
 - [ ] CMB-009.4 — Reaction log overlay (plan §3)
 - [ ] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
@@ -2526,3 +2526,16 @@ instruction to continue on a new branch as before (2026-09-23).
   magnet because no building rolled it on that seed, labelled as such.
 - **Tests:** `tests/render` + `tests/playing` + `tests/systems` +
   `tests/combat` — 1448 passed, 461 subtests, 0 skipped (6 min 1 s).
+
+### CMB-009.2 — The counters
+
+- `ResolverStats.jump_nodes_this_frame` / `jump_nodes_total`
+  (`combat/elements/resolve.py`), bumped by `Thunder.spread` with the
+  number of enemies the chain reached (the struck one not counted) and
+  reset in `begin_frame` with the reaction counter.
+- F1 metrics (`devtools/dev_flags.py`): "thunder jumps" (per frame and
+  total) and "wind areas" (live against `max_active_wind_areas`, 6).
+  Read back from a live seed-7 run: `0/frame 0 total` and `0/6`.
+- `tests/combat/test_elements_base.py::ThunderTests::test_the_jump_nodes_are_counted_per_frame_and_in_total`.
+- **Tests:** `tests/combat` + `tests/flows` + `tests/devtools` — 748
+  passed, 132 subtests, 0 skipped (5 min 2 s).

@@ -175,6 +175,10 @@ class ResolverStats:
     """Counters the debug overlay reads (§9.8)."""
     reactions_this_frame: int = 0
     reactions_total: int = 0
+    # Enemies a Thunder chain jumped to, the struck one not counted
+    # (CMB-009.2, design §9.8).
+    jump_nodes_this_frame: int = 0
+    jump_nodes_total: int = 0
     deferred_now: int = 0
     deferred_total: int = 0
     applications: int = 0
@@ -226,6 +230,7 @@ class ElementalResolver:
         """Reset the reaction budget and run whatever last frame held over.
         Returns how many deferred reactions ran."""
         self.stats.reactions_this_frame = 0
+        self.stats.jump_nodes_this_frame = 0
         self.stats.deferred_now = 0
         if not self._pending:
             return 0
