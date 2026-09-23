@@ -69,32 +69,34 @@ by path.
 - [x] DOC-003.9 — Record the owner's answers: tick the time-mode confirmation, park W9
 - [x] DOC-003.10 — `CLAUDE.md` §2/§3 and memory: the digest command moved to `tools.verification.world_digest`; TST-002 is done, not proposed
 - [x] DOC-003.11 — Close CB-2 G and the G6 remainder; record the tileset and `coverage` decisions in `test_suite_review.md`; TST-003 proposed for the tileset skips
-- [ ] DOC-003.12 — CMB-009 proposed: `plans/elemental_extras_plan.md`, its requirement block in the elemental journal, pointers from the design doc, index rows
+- [x] DOC-003.12 — CMB-009 proposed: `plans/elemental_extras_plan.md`, its requirement block in the elemental journal, pointers from the design doc, index rows
 
 ## DOC-003 — Results
 
 No tests run: documentation only. The one `data/` edit is a comment string
 (DOC-003.D3), re-parsed as JSON before it was written.
 
-**Unticked boxes:** 184 before, **30 after** (32 at DOC-003.8, less the two
-the owner answered in DOC-003.9; an earlier "33" counted this journal's own
-D1 text, which contains the pattern). The count was taken with
-`grep -rn -- "- \[ \]" documentation`, leaving out this journal. Every box
-that remains is real open work:
+**Unticked boxes:** 184 before, **26 after**: 32 at DOC-003.8 (an earlier
+"33" counted this journal's own D1 text, which contains the pattern), 30
+after the owner's answers in DOC-003.9, 26 after DOC-003.11. The count was
+taken with `grep -rn -- "- \[ \]" documentation`, leaving out this journal.
+Every box that remains is real open work:
 
 | where | open |
 |---|---|
-| `ELEMENTAL_SYSTEM_DESIGN.md` | buff buildings draw no element; 9.8 lacks jump-node and Wind-area counters; 10.3 dev extras (hot-reload, reaction log, spawn a building with an element) |
-| `combat_balance_journal.md` | CB-2 G: the "no target → no attack" playtest and the reach values |
+| `ELEMENTAL_SYSTEM_DESIGN.md` | buff buildings draw no element; 9.8 lacks jump-node and Wind-area counters; 10.3 dev extras — all three planned as CMB-009 |
 | `worldgen_modularity_todo.md` | R4: push sweep assertions down to hand-built grids |
-| `spawn_groups_journal.md` | G6 remainder: elite item income, group-weight review |
-| `test_suite_review.md` | the digest tests' world source, coverage gaps and `coverage` as a dependency, the seed and tileset skips, §6 organisation, §7 nits, the balance-number audit |
+| `test_suite_review.md` | the digest tests' world source, coverage gaps, the seed skips, the tileset skips (decided: fail, TST-003), §6 organisation, §7 nits, the balance-number audit |
 | `enemy_roster_expansion_journal.md` | an in-game screenshot of Bonepicker and Gaffjaw firing |
 | `assets_journal.md` | WA5: the summon render tests |
 | `pygbag.md` | the optional bundle trim (W9 parked by the owner) |
 
 **New IDs, proposed:** CMB-008 (design §13 q.12), SYS-008 (cross-process run
-reproducibility), WLD-012 (props beside bridge mouths).
+reproducibility), WLD-012 (props beside bridge mouths), TST-003 (a missing
+tileset fails), CMB-009 (elemental extras, `plans/elemental_extras_plan.md`).
+
+**Closed by the owner, 2026-09-22:** CB-2 G and the G6 remainder — fine at
+the review, still being tuned, so later values supersede the ones recorded.
 
 **Corrected on the way:** the agent-assisted review said M6's time mode had
 been built without `next_element_at`, but `Weapon._next_element_at` exists

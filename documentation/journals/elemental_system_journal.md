@@ -2439,3 +2439,22 @@ a surprise.
   fire on a flame, ice on a blue totem -- which is written down as a
   measured property rather than papered over. Screenshot delivered: the
   four recoloured effects, plain and four elements, in play.
+
+---
+
+## CMB-009 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Plan the elemental work still missing after CMB-005/006/007.
+- **Details:** The remaining dev extras from design §10.3 (hot-reload of the
+  element data, a reaction log, spawning a building with a chosen element),
+  the two §9.8 profiling counters (Thunder jump nodes per frame, active Wind
+  areas), and a faint alpha glow in the element's tint behind an elemental
+  buff building, which today shows its element only on use.
+- **Constraint:** Planned only, status `proposed`; the plan lives in its own
+  file, `documentation/plans/elemental_extras_plan.md`.
+
+## CMB-009 — Plan
+
+See `documentation/plans/elemental_extras_plan.md`: the glow first (the one
+player-facing item), then the counters (CMB-008's cascade measurement wants
+them), then the three dev tools. Tasks are numbered when it is taken up.

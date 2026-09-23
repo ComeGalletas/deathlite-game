@@ -15,7 +15,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-009 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
+**Next free:** CMB-010 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
 PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-004
 
 ## Requirements
@@ -30,6 +30,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-004
 | CMB-006 | Reaction damage rework | CMB | feature | done (balance confirmed in play) | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-007 | Elemental design doc brought to the shipped behaviour (open questions closed bar one) | CMB, DOC | process | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-008 | Particle and damage-number limits under a dense reaction cascade (design §13 q.12) | CMB, RND | feature | proposed | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) (found in) | — | 2026-09-22 |
+| CMB-009 | Elemental extras: building glow, §9.8 counters, §10.3 dev tools | CMB, RND, SYS | feature | proposed | [elemental_system_journal.md](elemental_system_journal.md) | — | 2026-09-22 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |
 | ENT-003 | Chaser collider | ENT | bug | legacy | [chaser_collider_journal.md](chaser_collider_journal.md) | — | 2026-09-15 |
@@ -106,7 +107,8 @@ serve no single requirement.
 
 | document | serves |
 |---|---|
-| [plans/ELEMENTAL_SYSTEM_DESIGN.md](../plans/ELEMENTAL_SYSTEM_DESIGN.md) | CMB-005, CMB-006 |
+| [plans/ELEMENTAL_SYSTEM_DESIGN.md](../plans/ELEMENTAL_SYSTEM_DESIGN.md) | CMB-005, CMB-006, CMB-007 |
+| [plans/elemental_extras_plan.md](../plans/elemental_extras_plan.md) | CMB-009 |
 | [plans/weapon_system_plan.md](../plans/weapon_system_plan.md) | CMB-002 |
 | [designs/six_weapon_system_design.md](../designs/six_weapon_system_design.md) | CMB-002 |
 | [designs/combat_calculations.md](../designs/combat_calculations.md) | CMB-001 |
