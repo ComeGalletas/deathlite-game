@@ -16,7 +16,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-010 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
-PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-004
+PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
 
 ## Requirements
 
@@ -94,6 +94,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-004
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
+| DOC-004 | Journals for the five proposed requirements (CMB-008, CMB-009, SYS-008, WLD-012, TST-003) | DOC | process | in progress | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-004-proposal-journals | 2026-09-23 |
 
 ## Plans and designs
 
