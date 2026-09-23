@@ -82,6 +82,8 @@ change correctly.
 
 ### Still open: a prop can shut a bridge
 
+*(DOC-003: tracked as **WLD-012**, proposed.)*
+
 One bridge on seed 35 stays closed to a radius-40 body, and it is **not**
 geometry. A prop sits 19 px past the planks with a 19.5 px radius, so a
 radius-40 body's exclusion circle (59.5 px) reaches across the deck's centre

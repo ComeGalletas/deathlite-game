@@ -11,7 +11,7 @@ Milestones are prefixed **R**. Each ends with the **full suite green**
 determinism A/B check (same seed → byte-identical `WorldLayout`). **Nothing is
 committed unless the user asks.**
 
-**Status:** not started. Written against the tree at `b0114d6`, suite at
+**Status:** done except R4 (DOC-003, 2026-09-22: every other phase shipped as WLD-003, see `world_refactor_plan_journal.md`). Originally written against the tree at `b0114d6`, suite at
 945 passed / 1 skipped.
 
 ---
@@ -37,11 +37,11 @@ constraint is suite runs rather than typing.
 
 ### R1 — Session-scoped world fixtures
 
-- [ ] Add `tests/conftest.py` with a session-scoped fixture keyed by
+- [x] Add `tests/conftest.py` with a session-scoped fixture keyed by *(DOC-003: built as the shared cache `tests/worlds.py` rather than a conftest fixture (WLD-003 P0))*
       `(seed, built)`, returning a shared `GameMap`.
-- [ ] Migrate the six modules that hand-rolled a module-level `_MAPS` /
+- [x] Migrate the six modules that hand-rolled a module-level `_MAPS` /
       `_WORLDS` cache onto it.
-- [ ] Migrate the rest, which currently rebuild per test.
+- [x] Migrate the rest, which currently rebuild per test.
 
 **Why.** There is no `conftest.py` in the project at all. Six test modules
 independently reinvented the same cache; everything else rebuilds. The suite
@@ -60,10 +60,10 @@ small — a dozen fully built worlds is under a minute.
 
 ### R2 — Tier the suite, and name the tiers
 
-- [ ] Register `unit`, `world` and `sweep` markers in `pytest.ini`.
-- [ ] Mark the existing suites. Most of what exists is tier `world` wearing
+- [x] Register `unit`, `world` and `sweep` markers in `pytest.ini`.
+- [x] Mark the existing suites. Most of what exists is tier `world` wearing
       tier `sweep`'s clothes.
-- [ ] Make the default invocation run `unit` + `world` only.
+- [x] Make the default invocation run `unit` + `world` only. *(DOC-003: `pytest.ini` `addopts = -m "not sweep"`; an `integration` tier was added since)*
 
 | Tier | Builds | Target | When |
 |---|---|---|---|
@@ -87,10 +87,10 @@ the generator itself. It should stay in `sweep` and say so.
 
 ### R3 — Equivalence tests for the mirrored pairs
 
-- [ ] `walk_links` ↔ `_flight_opens` — adjacency, every cell of a world.
-- [ ] `GameMap._point_ok` ↔ `_point_on_floor` — the floor test.
-- [ ] `GameMap.inset_ok` ↔ `_point_inset_ok` — the terrace margin.
-- [ ] `can_step` ↔ the baked `step_mask` — already partly covered by
+- [x] `walk_links` ↔ `_flight_opens` — adjacency, every cell of a world. *(DOC-003: R3 pairs in `tests/world/test_mirrors.py` and `test_elevation.py`)*
+- [x] `GameMap._point_ok` ↔ `_point_on_floor` — the floor test.
+- [x] `GameMap.inset_ok` ↔ `_point_inset_ok` — the terrace margin.
+- [x] `can_step` ↔ the baked `step_mask` — already partly covered by
       `test_step_mask_matches_the_rule`; extend it to every direction.
 
 **Why.** Five rules are implemented twice on purpose, each documented as a
@@ -113,7 +113,7 @@ not evidence.
 
 ### R4 — Push assertions down from worlds to rules
 
-- [ ] Audit the per-cell sweeps: which need a *generated* world, and which need
+- [ ] Audit the per-cell sweeps: which need a *generated* world, and which need *(DOC-003: still open — WLD-003 set R4 aside as off the critical path)*
       only *a* grid?
 - [ ] Convert the second kind to hand-built grids in tier `unit`.
 - [ ] Keep the generated sweeps for what only they can prove — that an
@@ -146,14 +146,14 @@ batch*
 
 ### R5 — Create `world/rules/`
 
-- [ ] New package `world/rules/`.
-- [ ] Move `world/frontier.py` and `world/inset.py` into it unchanged.
-- [ ] Move the pure predicates out of `world/elevation.py` — `can_cross`,
+- [x] New package `world/rules/`.
+- [x] Move `world/frontier.py` and `world/inset.py` into it unchanged. *(DOC-003: `world/rules/frontier.py`, `world/rules/inset.py`)*
+- [x] Move the pure predicates out of `world/elevation.py` — `can_cross`,
       `can_step`, `diagonal_blocked`.
-- [ ] Delete the header paragraphs in both leaf modules explaining why they sit
+- [x] Delete the header paragraphs in both leaf modules explaining why they sit
       at the root of `world/`. **That deletion is the tell that the move is
       right.**
-- [ ] Add a layering guard test: nothing in `world/rules/` imports `world.gen`
+- [x] Add a layering guard test: nothing in `world/rules/` imports `world.gen` *(DOC-003: `tests/world/test_layering.py`)*
       or `world.terrain`.
 
 **Why.** `world.terrain` imports `world.gen`, so a rule shared by generation and
@@ -171,11 +171,11 @@ it three.
 
 ### R6 — Cut the `terrain → gen` edge
 
-- [ ] Resolve each terrace's sheet at generation and store it on `Room` — it is
+- [-] Resolve each terrace's sheet at generation and store it on `Room` — it is *(DOC-003: done by another route — terrace sheets are resolved through `world/rules/biome.py`, not stored on `Room` (WLD-003 P4))*
       already half there, on `Room.palette`.
-- [ ] Point `world/terrain/biome.py`, `world/terrain/sheets.py` and
+- [x] Point `world/terrain/biome.py`, `world/terrain/sheets.py` and *(DOC-003: the lookup moved into `world/rules/biome.py` (see R6's first box))*
       `world/terrain/decor/budget.py` at the stored value.
-- [ ] Extend the layering guard: `world.terrain` imports nothing from
+- [x] Extend the layering guard: `world.terrain` imports nothing from
       `world.gen`.
 
 **Why.** Those three imports are all the same thing — a palette decision made at
@@ -194,10 +194,10 @@ before accepting it.
 
 ### R7 — Split `world/pathfinding.py`
 
-- [ ] `nav/lattice.py` — `NavGrid`, the walkable/corridor/blocked masks.
-- [ ] `nav/clearance.py` — the chamfer transform.
-- [ ] `nav/field.py` — `FlowField` and `NavField`.
-- [ ] Have the elevation mask import the real predicates from `world.rules`
+- [x] `nav/lattice.py` — `NavGrid`, the walkable/corridor/blocked masks. *(DOC-003: `world/nav/{lattice,clearance,field}.py`; the shim went in the SYS-007 structure review)*
+- [x] `nav/clearance.py` — the chamfer transform.
+- [x] `nav/field.py` — `FlowField` and `NavField`.
+- [x] Have the elevation mask import the real predicates from `world.rules`
       instead of reimplementing them, so it becomes a **cache** rather than a
       mirror.
 
@@ -216,9 +216,9 @@ that drifted twice in the last milestone.
 
 ### R8 — Retire the flat and verticality world models *(optional)*
 
-- [ ] Decide whether anything still ships on `WORLD_VERTICALITY` or the flat
+- [x] Decide whether anything still ships on `WORLD_VERTICALITY` or the flat *(DOC-003: retired by the owner 2026-09-02, `world/legacy/` removed (WLD-003 P5))*
       path.
-- [ ] If not: delete `world/legacy/` (851 lines), the 21 flag references across
+- [x] If not: delete `world/legacy/` (851 lines), the 21 flag references across
       `world/`, `game/` and `entities/`, and the 9 test modules pinning the
       flag-off path.
 

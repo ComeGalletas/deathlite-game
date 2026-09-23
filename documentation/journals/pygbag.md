@@ -244,7 +244,7 @@ does not survive a reload.
 - [x] W6 — `README.md` "Play in the browser" section + pointers in `journal.md` / `transcript.md`
 - [x] W7 — `config.apply_web_profile()`: 60 fps + 1280×720 @ zoom 1.2 (same FOV); `main_web.py` folded into `main.py --web`
 - [x] W8 — pygbag files moved to `web/` (`pygbag.ini`, `build.sh`, `serve.sh`, README); `build/` gitignored; root clean
-- [ ] W9 — `.nojekyll` + `.github/workflows/deploy-web.yml` (sketch above); enable Pages (GitHub Actions source)
+- [-] W9 — `.nojekyll` + `.github/workflows/deploy-web.yml` (sketch above); enable Pages (GitHub Actions source) *(DOC-003: parked — the owner said on 2026-09-22 it is not needed for now; reopen as a new BLD requirement if wanted)*
 - [ ] (optional) trim the browser bundle — audio synth runs at load; measure and, if slow in WASM, pre-bake the 8 buffers
 
 ---

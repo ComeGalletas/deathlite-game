@@ -213,7 +213,7 @@ At 91.3 % the gaps are narrow and specific. In priority order:
       case, where the per-minute and dps rates divide by the survival time.
 - [ ] **`game/states/meta_state.py` — 22.5 % (86 missed).** Meta-progression
       screen. The same fake-game approach should reach most of it.
-- [ ] **`game/states/victory_state.py` — 31.4 %.** Win path.
+- [x] **`game/states/victory_state.py` — 31.4 %.** Win path. *(DOC-003: `tests/screens/test_victory.py` (42 tests) landed 2026-09-12; coverage not re-measured)*
 - [ ] **`world/gen/village_tidy.py` — 67.8 %** and **`game/states/playing/slam_fx.py`
       — 70.8 %.** Both new in the current working tree; worth topping up before
       the rework lands rather than after.
@@ -235,7 +235,7 @@ they accounted for the whole gap between the headline 85.8 % and the real
       `tools/*` and `tools/benchmarks/spawn_stress.py`, and carries the run/report commands
       in a comment at the top.
 - [x] `.coverage`, `.coverage.*` and `htmlcov/` added to `.gitignore`.
-- [ ] Still open: decide whether `coverage` becomes a declared dev dependency.
+- [-] Still open: decide whether `coverage` becomes a declared dev dependency. *(DOC-003: decided by the owner 2026-09-22: no — `coverage` is a test-only tool, run by hand with `.coveragerc`, never a declared dependency)*
       It is currently just `pip install coverage` by hand — the `.coveragerc`
       header says so, but nothing installs it.
 
@@ -255,12 +255,12 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 **Todo**
 
-- [ ] For the layout-content skips, search the four pinned seeds for one that has
+- [ ] For the layout-content skips, search the four pinned seeds for one that has *(DOC-003: interactables fixed (`test_interactables.py`); the seed-dependent skips left are listed in `cut_script_skips_journal.md` (TST-002, *Follow-up candidates*))*
       the feature and assert it is found, rather than skipping. `tests/worlds.py`
       makes this nearly free.
-- [ ] For `"tileset missing"`, decide whether a missing tileset should be a
+- [ ] For `"tileset missing"`, decide whether a missing tileset should be a *(DOC-003: decided by the owner 2026-09-22 — yes, a missing tileset fails; the change is TST-003, proposed)*
       failure. The game ships the assets; a silent skip hides a broken checkout.
-- [ ] Add a CI-style check (or a line in the commit checklist) that the run
+- [-] Add a CI-style check (or a line in the commit checklist) that the run *(DOC-003: superseded — the owner rules out CI and gates; the standing rule "a test never skips itself to green" (`CLAUDE.md` §2) covers it)*
       reports 0 skips, so a new conditional skip has to be deliberate.
 
 ---
@@ -274,7 +274,7 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
       `test_manual_aim`, `test_summons`, `test_weapons`, `test_weapons_reach` and
       `test_weapons_special`, although `tests/combat/fakes.py` is the designated
       home. Consolidate.
-- [ ] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15
+- [ ] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15 *(DOC-003: now 1,076 lines)*
       classes are character-select. Split out `test_character_select.py`.
 - [ ] The six weapon modules are keyed by the plan phase that produced them
       (`test_weapons` = Milestone 2, `test_weapons_special` = Milestone 4,
@@ -285,7 +285,7 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 - [ ] `tests/entities/ai/test_fsm_enemies.py` (Milestone 9) and
       `tests/entities/ai/test_ai_behaviors_fsm.py` both cover charger / teleporter /
       warlock. Merge.
-- [ ] 50 modules open with the plan phase they were written in (`"""Milestone 2:`,
+- [ ] 50 modules open with the plan phase they were written in (`"""Milestone 2:`, *(DOC-003: 39 modules still open with a phase tag (was 50))*
       `"""R4 --`, `"""CB-2:`, `"""LD-9 phase D7:`). Those plans are done; retitle
       by subject and keep the phase reference only where it explains *why* a
       thing is pinned.
@@ -309,7 +309,7 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
       JSONs (`aegis.stats["max_hp"] == 160`, `H["damage"] == 25`). Audit them:
       where the number is a contract, keep it; where it is tuning, assert the
       invariant (ordering, ratio, range) so a balance pass does not report a bug.
-- [ ] README says **863 tests** in two places (the "Run the tests" section and the
+- [x] README says **863 tests** in two places (the "Run the tests" section and the *(DOC-003: no "863" left in `README.md`; §2 already records it)*
       tree at the bottom). Actual is 1,633.
 
 ---

@@ -194,18 +194,18 @@ merchant, and anything added later through `Interactable`):
 - [x] 7. Run the suite; boot a pinned-seed run, stand on a chest and on the
       sanctuary, deliver screenshots of the idle and held-E prompts; check
       the notice/prompt spacing at the forge.
-- [ ] 8. Log results here (test counts, screenshots, anything deferred).
+- [x] 8. Log results here (test counts, screenshots, anything deferred). *(DOC-003: logged in the results below)*
 
 Later passes (not started; listed so the module is shaped for them):
 
-- [ ] Pause menu / Options: a "Controls" block listing move, aim, attack,
+- [x] Pause menu / Options: a "Controls" block listing move, aim, attack, *(DOC-003: pass 4, `ui/controls_block.py`)*
       interact, auto-attack toggle and TAB with grey reference caps, driven
       by `config.KEY_LAYOUTS` so it follows the chosen layout.
-- [ ] Wide caps (`SPACE`, `SHIFT`, `TAB`) via the wired `btn_*_wide` rigs.
-- [ ] Mouse-button glyphs beside the caps for click-to-attack, once a
+- [x] Wide caps (`SPACE`, `SHIFT`, `TAB`) via the wired `btn_*_wide` rigs. *(DOC-003: `ui/keycap.py` wide rigs)*
+- [x] Mouse-button glyphs beside the caps for click-to-attack, once a *(DOC-003: pass 5, `ui/keycap.py` `MOUSE`)*
       mouse sprite is chosen (`assets/ui/pointers/arrow.png` is the cursor,
       not a button glyph).
-- [ ] Tutorial / first-run hints ("W A S D to move") over the hero at run
+- [x] Tutorial / first-run hints ("W A S D to move") over the hero at run *(DOC-003: built as the Options "Tutorials" toggle, `core/hints.py`)*
       start, reusing `draw_keycap` in the world layer.
 
 ## Progress
@@ -323,7 +323,7 @@ Decisions, answered the same day:
       world block; delete `_key_prompt` and the bottom prompt.
 - [x] 4. Tests as above; run the suite.
 - [x] 5. Screenshots: chest, sanctuary, forge, shrine, idle and held.
-- [ ] 6. Log results here.
+- [x] 6. Log results here. *(DOC-003: logged in *Results (2026-09-19)* below)*
 
 ### Results (2026-09-19)
 

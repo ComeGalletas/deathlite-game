@@ -479,10 +479,10 @@ works.
 - [x] R4 — Gnoll → Bonepicker
 - [x] R5 — Harpoon Shark → Gaffjaw
 - [x] R6 — Spitter's acorn
-- [ ] R7 — spawn tables (blocked on the band rework)
-- [ ] R8 — rename every enemy to match its art
+- [x] R7 — spawn tables (blocked on the band rework) *(DOC-003: the band rework landed (SPN-002): `data/enemies/spawn_tables.json`, `harpoon_shark` in `marine`, `gnoll` in `wild_beasts`)*
+- [x] R8 — rename every enemy to match its art *(DOC-003: built 2026-09-17, see R8 above)*
 - [x] Tests (21 new) and a scale/anchor render
-- [ ] In-game screenshot of both firing (needs R7 — they cannot spawn yet)
+- [ ] In-game screenshot of both firing (needs R7 — they cannot spawn yet) *(DOC-003: no longer blocked; R7 is done)*
 
 ---
 

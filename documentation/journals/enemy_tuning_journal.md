@@ -46,6 +46,10 @@ island it spawned on instead of following the hero.
 > impassable, and 40 fails exactly as 44 did. The value is kept — it is the
 > owner's and it harms nothing — but the bug it was aimed at is still open.
 > See **ENT-012.D3**.
+>
+> **Resolved by WLD-011** (`f1b4aa3`, 2026-09-22): `is_walkable` now gives a
+> body on a bridge the same corridor leniency the nav field already had, so
+> radius 40 crosses. See `bridge_clearance_journal.md`. *(DOC-003)*
 
 **ENT-012.D3 — Why the boss cannot cross, and what would fix it.** Not a
 tuning problem. Two rules disagree:

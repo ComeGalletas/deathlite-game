@@ -774,7 +774,7 @@ New coverage:
 
 ### G6 - Balance pass
 
-- [ ] Only once it runs. Five never-seen enemies enter play at once here and
+- [-] Only once it runs. Five never-seen enemies enter play at once here and *(DOC-003: superseded by the G6 first pass and the G6 remainder below)*
       the weights are proposals; expect to re-tune
 
 ---
@@ -1661,7 +1661,7 @@ benching.
 - [x] G6 first pass - `residents.combat` -> 1 (68 bodies down to 29) and the
       common cadence base 5 -> 2, which front-loads the run rather than
       speeding it up (field at 15 s: 46 -> 91). Committed as `e383f7e`
-- [ ] G6 remainder - the common ladder is now flat (2 -> 1 after one step;
+- [x] G6 remainder - the common ladder is now flat (2 -> 1 after one step; *(DOC-003: reviewed by the owner 2026-09-22 and fine for this task — the elite item income and the group weights stand; both are still being tuned, so later values supersede these)*
       `common_decay` 0.25 would restore the gradient), elite item income is
       up ~69 % since G1, and the proposed group weights have never been
       reviewed

@@ -242,7 +242,7 @@ Example (k = 2 off the warlock pool): `dps 23 → 46`, `duration 3.5 → 1.75`,
 
 ## CB-2 - Every weapon has a reach ring - weapon categories
 
-**Status:** in progress. All 6 decisions resolved with the user (2026-08-29).
+**Status:** done (G closed by the owner 2026-09-22, DOC-003). All 6 decisions resolved with the user (2026-08-29).
 Checklist **A**-**F** done (data, `combat/weapons.py`, `entities/summon.py`,
 spawn plumbing, dev overlay, tests -- suite 597 -> 618, green). Only **G**
 (balance playtest, needs a human) is left. Design + checklist below.
@@ -448,15 +448,15 @@ ring. Full suite 597 -> 618, green.
       aim unchanged; `frost_shards` still fans 3, all toward the target.
 
 #### G - Balance / playtest
-- [ ] The whole game is now "no target -> no attack". Verify it still feels
+- [x] The whole game is now "no target -> no attack". Verify it still feels *(DOC-003: playtested by the owner 2026-09-22 — it still feels active)*
       active (swarms mean reach is hit almost always) and that a lone far enemy
       correctly makes the hero idle.
-- [ ] Tune the projectile `reach` values -- too short = dead time between packs,
+- [x] Tune the projectile `reach` values -- too short = dead time between packs, *(DOC-003: the owner found the current values (bow 460, rod 400, bomb 100, ember ring 140) fine at the 2026-09-22 playtest; they are still being tuned, so later values supersede these)*
       too long = never idles. Start ~400, adjust in a playtest.
-- [ ] Melee: `soul_scythe` reaches exactly its cone; confirm it does not feel
+- [-] Melee: `soul_scythe` reaches exactly its cone; confirm it does not feel *(DOC-003: obsolete — `soul_scythe` left the roster in the six-weapon rework (CMB-002))*
       shorter than the visible arc. `cooldown 1.0` may want a small cut to offset
       gated downtime.
-- [ ] Note whether a `+reach` blessing / affix is worth adding (area blessings
+- [x] Note whether a `+reach` blessing / affix is worth adding (area blessings *(DOC-003: answered — reach blessings exist, e.g. `daggers_extended_reach` in `data/weapons/blessings.json`)*
       already do it indirectly via decision 2).
 
 ### Touch list

@@ -183,7 +183,7 @@ the rules that apply to every change.
   (`tests/boot.py: start_run(game, seed=...)`).
 - The generator leads, the tests follow: a sanctioned world change may
   remove or replace a generation test; re-pin `tests/world/digests.json`
-  with `python -m world.digest --write`. Prefer rates over seed sweeps to
+  with `python -m tools.verification.world_digest --write`. Prefer rates over seed sweeps to
   single pinned outcomes, recorded in docstrings and the journal.
 - Share cached worlds between tests; avoid per-test rebuilds.
 
@@ -216,6 +216,6 @@ the rules that apply to every change.
   older spent-source-sheet wording that let a cut's pinning test skip when
   its source was gone. The imp's archive test was fixed that way in
   `914039e` (`.gitignore` re-includes editor sources so the check always
-  runs). Three cut-script tests still carry the old skip — `tests/render/
-  test_spawn_fx.py`, `test_totem_bolt.py`, `test_totem_sprite.py` — and are
-  proposed as TST-002.
+  runs). The three cut-script tests that still carried the old skip —
+  `tests/render/test_spawn_fx.py`, `test_totem_bolt.py`,
+  `test_totem_sprite.py` — were fixed the same way as TST-002 (done).

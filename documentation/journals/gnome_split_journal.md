@@ -214,8 +214,8 @@ retired `gnome` rig, and the bees' new collider and drawn size.
 - [x] Enemy blocks: Hammer Gnome, Beekeeper, bigger bees
 - [x] Spawn tables re-keyed (Beekeeper only)
 - [x] Tests
-- [ ] Hammer Gnome into a band — waiting on the band rework
-- [ ] Full suite
+- [x] Hammer Gnome into a band — waiting on the band rework *(DOC-003: the band rework landed (SPN-002): `data/enemies/spawn_tables.json`, `hammer_gnome` 6 in `gnomes`)*
+- [x] Full suite *(DOC-003: covered by later full-suite runs, e.g. `key_icons_journal.md` (2,640 passed))*
 
 ---
 

@@ -2130,7 +2130,8 @@ gradient in O(1) with no per-enemy path, waypoint, or repath state.
   needed at first.
 
 ### Design decisions
-- [ ] **Dual grid, kept for now.** `32 px` field for enemies with radius
+*(DOC-003: every decision below shipped with M1–M6; `world/nav/field.py` keeps the two radius classes in `_NAV_CLASSES` and `config.ENEMY_NAV_REBUILD_INTERVAL` is 0.4 s. Some tunings, such as the separation and stuck timings, moved later; `game/config.py` holds the current values.)*
+- [x] **Dual grid, kept for now.** `32 px` field for enemies with radius
   `<= 16 px`; `48 px` field for radius `> 16 px`. Grid size trades path precision
   against rebuild cost; the clearance test still uses the actual radius. Two
   fields are rebuilt per cycle (one per resolution). **Reevaluation trigger:** if
@@ -2138,40 +2139,40 @@ gradient in O(1) with no per-enemy path, waypoint, or repath state.
   passable on one but not the other, the fields routing differently around the
   same obstacle, enemies clumping at a class boundary -- collapse to a single
   `32 px` grid with per-radius-class clearance and drop the `48 px` field.
-- [ ] **Full-world coverage -- off-screen enemies are pathed too.** The field
+- [x] **Full-world coverage -- off-screen enemies are pathed too.** The field
   rebuild covers every reachable cell, not a radius around the player, so an
   enemy two rooms away still follows a correct route. This is the deliberately
   costlier choice; the performance section covers keeping it affordable.
-- [ ] Obstacles are blocked by their collision radius (via the clearance bake).
-- [ ] No gameplay path-length cap; only a technical node/relaxation safeguard to
+- [x] Obstacles are blocked by their collision radius (via the clearance bake).
+- [x] No gameplay path-length cap; only a technical node/relaxation safeguard to
   protect the frame.
-- [ ] Rebuild the field on a fixed staggered interval (`~0.4 s`), not every
+- [x] Rebuild the field on a fixed staggered interval (`~0.4 s`), not every
   frame. Rebuild early when the player crosses into a new navigation cell.
-- [ ] Change direction gradually when the sampled gradient shifts (slew the
+- [x] Change direction gradually when the sampled gradient shifts (slew the
   steering vector, don't snap it).
-- [ ] Consider an enemy stuck when its position barely changes for `~0.8 s`
+- [x] Consider an enemy stuck when its position barely changes for `~0.8 s`
   (was 2.5 s -- too slow for fast movers); response is a brief perpendicular
   nudge drawn from the seeded run RNG, not a full replan.
-- [ ] Separation radius `~1.5x` the collision radius (a weak, capped push); the
+- [x] Separation radius `~1.5x` the collision radius (a weak, capped push); the
   bare radius still lets sprites overlap heavily. Use the existing per-frame
   `SpatialGrid`, never an all-pairs scan.
-- [ ] **Determinism:** the field is a pure function of the player cell + the
+- [x] **Determinism:** the field is a pure function of the player cell + the
   static grid; separation uses no RNG; the unstick nudge draws from `self.rng`.
   Existing determinism tests must keep passing.
 
 ### Performance approach
-- [ ] Rebuild each field with a **bucket-queue BFS / Dijkstra** (costs are near
+- [x] Rebuild each field with a **bucket-queue BFS / Dijkstra** (costs are near
   uniform -- 1 orthogonal, ~1.41 diagonal), not a binary heap.
-- [ ] Stagger the two field rebuilds and offset them from other heavy phases so
+- [x] Stagger the two field rebuilds and offset them from other heavy phases so
   they do not all land on one frame; amorte / time-slice a rebuild across two
   frames if profiling shows a spike (world is up to 6000 px per side -> ~36k
   cells at 32 px, ~15k at 48 px).
-- [ ] Bake NavGrid walkable mask + clearance once at run start; never scan
+- [x] Bake NavGrid walkable mask + clearance once at run start; never scan
   obstacles per frame.
-- [ ] Gradient sampling is O(1) per enemy per frame -- no per-enemy search, no
+- [x] Gradient sampling is O(1) per enemy per frame -- no per-enemy search, no
   repath bookkeeping to stagger.
-- [ ] Enable for basic chasers first; extend to other movers after profiling.
-- [ ] Debug-overlay counters: field-rebuild ms, live enemy count, frame time in
+- [x] Enable for basic chasers first; extend to other movers after profiling.
+- [x] Debug-overlay counters: field-rebuild ms, live enemy count, frame time in
   a crowded scene, before turning the flag on by default.
 
 ### Implementation order
@@ -2353,7 +2354,7 @@ out -- ~2x rebuild cost for a small gain):
   their own. Tests: `test_obstacles` -- a diagonal move boxed on move + both
   slides hops free toward the goal (short hop, still walkable); fully ringed ->
   stays put; existing slide test unaffected. Suite 526 -> 528.
-- [ ] Tests: an enemy dropped onto an unreachable cell next to the player still
+- [x] Tests: an enemy dropped onto an unreachable cell next to the player still *(DOC-003: `test_pathfinding`, `test_enemy_nav`, `test_ai_components`, `test_obstacles`)*
   closes the gap (fallback); a wedged enemy frees itself within ~0.5 s; a
   `path_chase` enemy started 1 px off an obstacle edge never overlaps it while
   approaching; `resolve_movement` returns a non-`prev` point for an entity boxed
@@ -3138,7 +3139,7 @@ the system arrow silently.
       difficulty and instructions; a click off everything is inert). Menu +
       mouse + smoke: 63 green. Group A's wider regression (`tests/core` +
       `tests/rendering`): 404 passed.
-- [ ] Tests: hover moves `index`; first release selects, second begins
+- [x] Tests: hover moves `index`; first release selects, second begins *(DOC-003: `tests/screens/test_menu.py`; the difficulty glyphs were replaced by the ribbon switch)*
       (`LoadingState` on the stack with the right `character_id` /
       `difficulty` / `dev`); the glyphs step the difficulty both ways and
       wrap.
