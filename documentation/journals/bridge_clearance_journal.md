@@ -82,7 +82,7 @@ change correctly.
 
 ### Still open: a prop can shut a bridge
 
-*(DOC-003: tracked as **WLD-012**, proposed.)*
+*(DOC-003: tracked as **WLD-012** — done 2026-09-23: it was a scatter rock beside the middle of a coastal deck, not a mouth; see WLD-012 below.)*
 
 One bridge on seed 35 stays closed to a radius-40 body, and it is **not**
 geometry. A prop sits 19 px past the planks with a 19.5 px radius, so a
@@ -150,7 +150,7 @@ moves them.
 - [x] WLD-012.2 — Keep props a widest-walker radius clear of every bridge ~~mouth~~ deck, its whole length (D1, D2)
 - [x] WLD-012.3 — Replace the pinning test with "every bridge on the pinned seeds crosses at the widest walker's radius"; drop the `propped` filter — landed in the WLD-012.2 commit: a generator change and the tests it invalidates have to land together for that commit to be green
 - [x] WLD-012.4 — Re-pin the world digests; record how many props moved, as a rate over the seeds — landed in the WLD-012.2 commit, same reason
-- [ ] WLD-012.5 — Screenshot of the seed-35 bridge before and after
+- [x] WLD-012.5 — Screenshot of the seed-35 bridge before and after
 
 ### WLD-012.1 — Finding (2026-09-23)
 
