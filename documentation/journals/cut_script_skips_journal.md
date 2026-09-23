@@ -135,9 +135,17 @@ the owner named come first; the rest turned up in the same sweep.
 ## TST-003 — Tasks
 
 - [x] TST-003.1 — Replace the seven skips with the shared assertion
-- [ ] TST-003.2 — Run the biome module, `tests/render` and `tests/world`; record the counts
+- [x] TST-003.2 — Run the biome module, `tests/render` and `tests/world`; record the counts
 - [ ] TST-003.3 — Tick `test_suite_review.md` §5, results, index to done
 
 ## TST-003 — Results
 
-*(filled in by TST-003.3)*
+- `tests/render/test_biome.py`: **37 passed, 5 deselected** (the sweep tier),
+  0 skipped — the seven checks that could skip now always run.
+- `tests/render` + `tests/world`: **758 passed, 8 deselected, 623 subtests
+  passed, 0 skipped** (5 min 9 s). The 23 warnings are the headless
+  "no fast renderer available" from `game/display/window.py:132`.
+- The failure path was exercised by hand: `_require_tiles(test, False)`
+  fails with `tileset missing: <assets>/terrain/tiles/tilemaps/tilemap_1.png
+  did not load`.
+- Commit: `925502c` (TST-003.1).
