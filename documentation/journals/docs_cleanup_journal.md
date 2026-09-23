@@ -137,7 +137,7 @@ journals' own status lines were left alone, except
 ## DOC-004 — Tasks
 
 - [x] DOC-004.1 — Open this block; index row
-- [ ] DOC-004.2 — TST-003 journal block
+- [x] DOC-004.2 — TST-003 journal block
 - [ ] DOC-004.3 — WLD-012 journal block
 - [ ] DOC-004.4 — CMB-008 journal block
 - [ ] DOC-004.5 — SYS-008 journal (new file)
