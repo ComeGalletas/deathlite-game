@@ -1,7 +1,7 @@
 # Hexcaller cast wind-up — journal
 
 **ID:** ENT-013 · **System:** entities (+ RND) · **Type:** feature ·
-**Status:** in progress · **Branch:** claude/ent-013-warlock-cast-marker
+**Status:** done · **Branch:** claude/ent-013-warlock-cast-marker
 (stacked on PR #30, in the current worktree — owner, 2026-09-24)
 
 ---
@@ -76,7 +76,7 @@
 - [x] ENT-013.2 — Archive the source frames, the cut script and its strip, the rig
 - [x] ENT-013.3 — The wind-up draw at `cast_at`, data in `enemies.json`
 - [x] ENT-013.4 — Tests and a screenshot
-- [ ] ENT-013.5 — Results; `sprite_functionality.md`'s open note; index to done
+- [x] ENT-013.5 — Results; `sprite_functionality.md`'s open note; index to done
 
 ## ENT-013 — Results
 

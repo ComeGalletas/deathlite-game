@@ -43,7 +43,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | ENT-010 | Ranged range, wind-up and animation | ENT | feature | legacy | [ranged_windup_journal.md](ranged_windup_journal.md) | — | 2026-09-19 |
 | ENT-011 | Fish huts and seahorse boats | ENT, WLD | feature | legacy | [fish_hut_journal.md](fish_hut_journal.md) | — | 2026-09-20 |
 | ENT-012 | Enemy tuning (Stoutpaw shield, Tusked Lance radius) | ENT | balance | done | [enemy_tuning_journal.md](enemy_tuning_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
-| ENT-013 | Hexcaller cast wind-up drawn where it will land | ENT, RND | feature | in progress | [warlock_cast_journal.md](warlock_cast_journal.md) | claude/ent-013-warlock-cast-marker | 2026-09-24 |
+| ENT-013 | Hexcaller cast wind-up drawn where it will land | ENT, RND | feature | done | [warlock_cast_journal.md](warlock_cast_journal.md) | claude/ent-013-warlock-cast-marker | 2026-09-24 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
