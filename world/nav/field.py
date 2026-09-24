@@ -10,7 +10,6 @@ toward the player; `PlayingState` owns it and the enemy AI samples it.
 """
 from __future__ import annotations
 
-import time
 from array import array
 
 import pygame
@@ -77,6 +76,9 @@ class FlowField:
         # runaway guard only -- a full-world fill visits every reachable cell once
         self.relax_cap = 8 * n
         self.relaxations = 0
+        # Relaxations the last `step` spent -- what `NavField.step` charges
+        # against the frame's shared budget.
+        self.last_step_relax = 0
         self.reachable = False
         self.target_cell: tuple[int, int] | None = None
         self._trav = bytearray(n)                 # last rebuild's traversable mask
@@ -162,11 +164,20 @@ class FlowField:
             f.buckets = {0: [si]}
         self._fill = f
 
-    def step(self, budget_s: float | None = None) -> bool:
-        """Advance the fill in progress for up to `budget_s` seconds (`None`:
+    def step(self, budget: int | None = None) -> bool:
+        """Advance the fill in progress by up to `budget` relaxations (`None`:
         to the end). True once the fill is complete and swapped in; False
-        when it yielded with work left."""
+        when it yielded with work left.
+
+        The budget is **work, not time** (SYS-008). It used to be seconds
+        read off `time.perf_counter()`, which made how far a fill got in a
+        frame -- and so the frame a new field swapped in, and every enemy's
+        steering after it -- depend on how fast the machine happened to run
+        that frame: two runs of one seed parted company under load. A count
+        of relaxations costs about the same on one machine and is identical
+        on every one."""
         f = self._fill
+        self.last_step_relax = 0
         if f is None:
             return True
         if f.seed is None:
@@ -181,7 +192,8 @@ class FlowField:
         buckets = f.buckets
         cur, max_bucket, relax, limit = f.cur, f.max_bucket, f.relax, f.limit
         cap = self.relax_cap
-        deadline = None if budget_s is None else time.perf_counter() + budget_s
+        start = relax
+        stop_at = None if budget is None else relax + max(1, int(budget))
         done = True
         while cur <= max_bucket and cur <= limit:
             bucket = buckets.get(cur)
@@ -220,12 +232,11 @@ class FlowField:
                     buckets.setdefault(nc, []).append(v)
                     if nc > max_bucket:
                         max_bucket = nc
-            # The clock is read every 128 relaxations: ~0.2 ms of granularity
-            # against a 3 ms budget, a hundredth of the loop's own cost.
-            if deadline is not None and (relax & 127) == 0 and time.perf_counter() > deadline:
+            if stop_at is not None and relax >= stop_at:
                 done = False
                 break
         f.cur, f.max_bucket, f.relax = cur, max_bucket, relax
+        self.last_step_relax = relax - start
         if not done:
             return False
         self._finish(f)
@@ -403,21 +414,21 @@ class NavField:
     def filling(self) -> bool:
         return any(f.filling for f in self.fields.values())
 
-    def step(self, budget_s: float | None = None) -> bool:
-        """Advance every fill in progress, sharing `budget_s` between them in
-        class order (`None`: run them to the end). True when nothing is left
-        filling."""
-        deadline = None if budget_s is None else time.perf_counter() + budget_s
+    def step(self, budget: int | None = None) -> bool:
+        """Advance every fill in progress, sharing `budget` relaxations
+        between them in class order (`None`: run them to the end). True when
+        nothing is left filling. Work, not time -- see `FlowField.step`."""
+        remaining = budget
         for name in self.classes:
             f = self.fields[name]
             if not f.filling:
                 continue
-            remaining = None
-            if deadline is not None:
-                remaining = deadline - time.perf_counter()
-                if remaining <= 0.0:
-                    return False
-            if not f.step(remaining):
+            if remaining is not None and remaining <= 0:
+                return False
+            done = f.step(remaining)
+            if remaining is not None:
+                remaining -= f.last_step_relax
+            if not done:
                 return False
         self.reachable = any(f.reachable for f in self.fields.values())
         return True
