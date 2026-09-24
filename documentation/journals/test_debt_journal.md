@@ -107,6 +107,16 @@ hits are prose). One subtask per module, the mixer pair together.
   under the dummy driver; it was rewritten. Only a machine that exports a
   *real* driver with no device behind it would fail these — that is a
   broken audio bring-up the test should report.
+- **3.9** `test_element_colours.py::test_the_art_on_disk_is_what_the_tool_would_write_today`
+  skipped without numpy. The test runs
+  `tools.asset_pipeline.recolour_element_variants --check`, which reads the
+  sheets through `pygame.surfarray` and so needs numpy; the game itself does
+  not. The standing rule (`CLAUDE.md` §2, derived art keeps a `--check` a
+  test runs) makes numpy a requirement of the suite, so a missing numpy is a
+  failure that says `pip install numpy`. numpy 1.26.3 is installed here.
+  **TST-004.D3 — for the owner:** the repo has no requirements file, so
+  nothing declares numpy (or pygame). This session does not add one; if the
+  owner wants the test environment written down, that is a separate call.
 
 ## TST-004 — Plan
 
@@ -128,8 +138,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed) → `87086ac`
   - [x] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed) → `fe87682`
   - [x] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed) → `7c1922a`
-  - [x] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)
-  - [ ] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)
+  - [x] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer) → `c616403`
+  - [x] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)
   - [ ] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
 - [ ] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`

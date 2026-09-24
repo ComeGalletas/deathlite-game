@@ -386,11 +386,17 @@ class RecolouredVariantTests(unittest.TestCase):
         rebuilds the whole tree in memory and compares, so a changed
         source, a changed `infused` block and a hand-edited variant all
         come out as the same failure: re-run the tool.
+
+        The tool reads the sheets through `pygame.surfarray`, which needs
+        numpy. The game does not; the suite does, because derived art keeps
+        a `--check` a test runs. A missing numpy is therefore a failure that
+        says what to install, not a skip (TST-004.3.9).
         """
         try:
             import numpy                                   # noqa: F401
-        except ImportError:                 # the game does not need it; the tool does
-            self.skipTest("numpy is not installed")
+        except ImportError:
+            self.fail("numpy is not installed -- the recolour tool's --check "
+                      "needs it (pygame.surfarray): pip install numpy")
         from tools.asset_pipeline import recolour_element_variants as tool
 
         self.assertEqual(tool.main(["--check"]), 0,
