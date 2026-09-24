@@ -78,7 +78,7 @@ asserts the first draw at any phase adds no cache entry.
 
 - [x] RND-005.1 — Measure what a world holds and what the ring leaves cold (above)
 - [x] RND-005.2 — `world/terrain/warm.py`: every non-band scaled surface, warmed as one loading step
-- [ ] RND-005.3 — Tests: every non-band source is cached after loading, and a first draw at any clock phase adds nothing
+- [x] RND-005.3 — Tests: every non-band source is cached after loading, and a first draw at any clock phase adds nothing
 - [ ] RND-005.4 — Results; D1 to the owner
 
 ## RND-005 — Results
@@ -98,3 +98,20 @@ asserts the first draw at any phase adds no cache entry.
   surfaces left are the bands (D1). Load time unchanged within noise
   (2.7 s and 2.5 s against 3.0 s and 2.3 s before).
 - `spawn_master_journal.md`'s warm-up paragraph gains a pointer to it.
+
+### RND-005.3 — The tests
+
+- `test_the_view_is_warmed_before_the_run_starts` no longer pins the
+  renderer clock to a warmed phase: it draws the first frame at five phases
+  (0, 0.13, 0.5, 2.9 and 7.77 s, most of them phases no ring pass drew) and
+  asserts the cache does not grow **at all** (it allowed up to 3 before),
+  and that the "warming the animations" step ran.
+- `test_every_frame_but_the_bands_is_warm_before_the_run_starts`: every
+  surface `scaled_sources` lists is cached after loading, and none of them
+  is a band.
+- **They catch its absence:** with the `warm.warm(gm)` call disabled, both
+  fail — the first frame at phase 0.13 scaled 5 surfaces (118 against 113),
+  and the cold list was not empty; with it restored, both pass.
+- `test_suite_review.md`'s note on the old pinned test says it is unpinned.
+- **Tests:** `tests/flows` + `tests/render` + `tests/world` — 893 passed,
+  625 subtests, 0 skipped (9 min 52 s).

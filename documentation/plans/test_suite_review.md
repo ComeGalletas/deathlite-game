@@ -95,7 +95,9 @@ which is the 62 ms work the warming exists to remove.
 
 - [x] The test now pins `gm.renderer.clock` to a phase the warm ring covered
       before the first draw, so it measures the warming rather than the wall
-      clock. No product change.
+      clock. No product change. *(RND-005, 2026-09-24: no longer pinned — every
+      animation frame is warm now, so the test draws at five phases, ones the
+      ring never drew among them, and asserts the cache does not grow at all.)*
 
 **Worth deciding separately (not done):** in a real run the first frame *does*
 land on an arbitrary phase, so it still scales a handful of small animation
