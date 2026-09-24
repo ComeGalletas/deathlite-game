@@ -34,6 +34,21 @@ session, owner 2026-09-24)
 
 Filled per task as each is read, before its change.
 
+### TST-004.2 — the digest tests
+
+- `tests/world/test_digest.py` hashed `W.baked(seed)` / `W.layout(seed)` —
+  the shared cached worlds of `tests/worlds.py` — while
+  `python -m tools.verification.world_digest --write` hashes a fresh
+  `GameMap(seed)` through `world_digests(seed)`. They agree today; nothing
+  enforced it.
+- **TST-004.D1 — One fresh build per seed, shared by the three pins.** The
+  test now calls `digest.world_digests(seed)` once per seed (a module-level
+  cache) and compares `layout`, `bake` and `draw` against `digests.json`. It
+  also asserts that the pinned file, the writer's `SEEDS` and
+  `tests/worlds.SEEDS` are the same set. The determinism test still compares
+  the cached layout to a fresh one, so the shared world the rest of the suite
+  reads is still tied to the pinned one. Cost: the module runs in 15 s.
+
 ## TST-004 — Plan
 
 One task per source note, in the order given; each is read first, its
@@ -44,8 +59,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 
 ## TST-004 — Tasks
 
-- [x] TST-004.1 — This journal
-- [ ] TST-004.2 — Digest tests through `world_digests`
+- [x] TST-004.1 — This journal → `212e764`
+- [x] TST-004.2 — Digest tests through `world_digests`
 - [ ] TST-004.3 — Remove the conditional skips
 - [ ] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`

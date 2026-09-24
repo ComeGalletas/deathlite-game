@@ -115,8 +115,9 @@ session's next goal.)*
 ### Still open, smaller
 
 *(DOC-005, 2026-09-24: still **pending** — `tests/world/test_digest.py` still hashes `W.baked(seed)` where the writer uses `world_digests`.)*
+*(TST-004, 2026-09-24: done — the three pin tests read `digest.world_digests(seed)`, one fresh build per seed shared between them, and a new test asserts the suite, the writer and `digests.json` pin the same seeds; `test_debt_journal.md`, TST-004.2.)*
 
-- [ ] `test_the_bake_is_pinned` and `test_the_frame_is_pinned` hash
+- [x] `test_the_bake_is_pinned` and `test_the_frame_is_pinned` hash
       `W.baked(seed)` — the *shared cached* world from `tests/worlds.py`, baked
       under whatever ambient config the first caller happened to have — while
       `python -m tools.verification.world_digest --write` hashes a fresh `GameMap`. They agree
