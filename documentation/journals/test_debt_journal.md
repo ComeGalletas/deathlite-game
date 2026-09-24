@@ -177,6 +177,15 @@ The audit, for the modules with per-cell or hand-built rule checks:
   `GameMap`; a hand-built `GameMap` from a `scenes` layout is the next step
   if the owner wants the push-down carried further.
 
+### TST-004.5 — §6 organisation, §7 nits
+
+§6 lists six items and §7 four; §7's fourth (the balance numbers) is
+TST-004.6. One subtask each, in the review's order.
+
+- **5.1** `tests/flows/test_dev_mode.py` still defined `_settle()`, line for
+  line `tests/boot.py::settle`; the copy is gone and its eleven calls use the
+  shared one. Module run: 63 passed.
+
 ## TST-004 — Plan
 
 One task per source note, in the order given; each is read first, its
@@ -200,8 +209,17 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer) → `c616403`
   - [x] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy) → `af7dc2a`
   - [x] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes) → `d0e14a2`
-- [x] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
+- [x] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids → `a292643`
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
+  - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle`
+  - [ ] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py`
+  - [ ] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py`
+  - [ ] TST-004.5.4 — §6: regroup the six weapon modules by subject
+  - [ ] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`
+  - [ ] TST-004.5.6 — §6: retitle the modules that open with a plan phase
+  - [ ] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
+  - [ ] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
+  - [ ] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
 - [ ] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`
