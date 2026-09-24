@@ -183,8 +183,18 @@ The audit, for the modules with per-cell or hand-built rule checks:
 TST-004.6. One subtask each, in the review's order.
 
 - **5.1** `tests/flows/test_dev_mode.py` still defined `_settle()`, line for
-  line `tests/boot.py::settle`; the copy is gone and its eleven calls use the
+  line `tests/boot.py::settle`; the copy is gone and its nine calls use the
   shared one. Module run: 63 passed.
+- **5.2** Five modules (`test_summons`, `test_weapons`, `test_weapons_reach`,
+  `test_weapons_special`, `test_manual_aim`) each defined a `FakeEnemy` that
+  is only a position (plus `alive` in `test_summons`), and three a `FakeProj`
+  bag of attributes. `tests/combat/fakes.py` already had a `FakeEnemy`, but
+  a full one — hp, radius, status, ledger — that a damage path hits; putting
+  that into the fire-path tests would change what targeting sees (radius).
+  **TST-004.D5 — two new shared fakes, not one.** `fakes.FakeTarget` (a
+  point, `alive = True`) and `fakes.FakeProj` sit beside `FakeEnemy`; the
+  five modules import them and their local copies are gone. `tests/combat`
+  + `test_manual_aim.py`: 624 passed.
 
 ## TST-004 — Plan
 
@@ -211,8 +221,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes) → `d0e14a2`
 - [x] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids → `a292643`
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
-  - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle`
-  - [ ] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py`
+  - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle` → `7ed17ce`
+  - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py`
   - [ ] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py`
   - [ ] TST-004.5.4 — §6: regroup the six weapon modules by subject
   - [ ] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`

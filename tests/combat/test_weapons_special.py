@@ -14,18 +14,7 @@ SEED = W.pinned(0)
 
 from combat.weapons import Weapon, FireContext
 from game.content import get_content
-
-
-class FakeEnemy:
-    def __init__(self, x, y):
-        self.pos = pygame.Vector2(x, y)
-
-
-class FakeProj:
-    """Minimal stand-in the orbit maintainer can hold and mutate."""
-    def __init__(self, **kw):
-        self.active = True
-        self.__dict__.update(kw)
+from tests.combat.fakes import FakeProj, FakeTarget
 
 
 def ctx(enemies, sink, anchor=None):
@@ -53,7 +42,7 @@ class ConeTests(unittest.TestCase):
         # CB-2: the sword only swings at a foe inside its reach ring (== the
         # cone tip, its `area`), so the target has to sit within that.
         reach = get_content().weapon("sword")["area"]
-        w.update(0.016, ctx([FakeEnemy(reach * 0.6, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(reach * 0.6, 0)], shots))
         self.assertEqual(len(shots), 1)
         s = shots[0]
         self.assertGreater(s.cone_half_angle, 0.0)
@@ -70,7 +59,7 @@ class OrbitTests(unittest.TestCase):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         want = w._projectile_count()
         shots = []
-        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(60, 0)], shots))
         self.assertEqual(len(shots), want)
         self.assertTrue(all(o.orbit_radius > 0 and o.orbit_speed != 0 for o in shots))
 
@@ -78,15 +67,15 @@ class OrbitTests(unittest.TestCase):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         shots = []
         for _ in range(10):
-            w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+            w.update(0.016, ctx([FakeTarget(60, 0)], shots))
         self.assertEqual(len(shots), w._projectile_count())
 
     def test_extra_projectile_bonus_adds_an_orbiter_and_respaces(self):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         shots = []
-        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(60, 0)], shots))
         w.bonus["projectile_count"] = 1
-        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(60, 0)], shots))
         self.assertEqual(len(shots), w._projectile_count())
         angles = sorted(o.orbit_angle for o in shots)
         # evenly spaced around the circle
@@ -127,12 +116,12 @@ class OrbitTests(unittest.TestCase):
         w = Weapon("ember_ring", get_content().weapon("ember_ring"))
         want = w._projectile_count()
         shots = []
-        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(60, 0)], shots))
         gone = shots[0]
         gone.active = False                            # retired from outside
         gone.active = True                             # ...and recycled:
         gone.weapon_id, gone.orbit_speed, gone.radius, gone.damage = "hammer", 0.0, 65.0, 40.0
-        w.update(0.016, ctx([FakeEnemy(60, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(60, 0)], shots))
         self.assertEqual(len(shots), want + 1)         # a fresh mote replaced it
         self.assertNotIn(gone, w._orbiters)
         self.assertEqual((gone.radius, gone.damage), (65.0, 40.0))
@@ -142,7 +131,7 @@ class ChainTests(unittest.TestCase):
     def test_chain_weapon_tags_projectile_with_chain_charges(self):
         w, d = chain_weapon()
         shots = []
-        w.update(0.016, ctx([FakeEnemy(200, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(200, 0)], shots))
         self.assertEqual(shots[0].chain_left, d["chain_count"])
         self.assertGreater(shots[0].chain_range, 0)
 
@@ -151,7 +140,7 @@ class ChainTests(unittest.TestCase):
         # from data/weapons/weapon_visuals.json on the spawn side.
         w = Weapon("magic_rod", get_content().weapon("magic_rod"))
         shots = []
-        w.update(0.016, ctx([FakeEnemy(200, 0)], shots))
+        w.update(0.016, ctx([FakeTarget(200, 0)], shots))
         self.assertEqual(shots[0].weapon_id, "magic_rod")
         self.assertNotIn("color", shots[0].__dict__)
         self.assertNotIn("style", shots[0].__dict__)

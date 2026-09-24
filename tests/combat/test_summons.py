@@ -7,12 +7,7 @@ import pygame
 from combat.weapons import Weapon, FireContext
 from entities.summon import Summon
 from game.content import get_content
-
-
-class FakeEnemy:
-    def __init__(self, x, y):
-        self.pos = pygame.Vector2(x, y)
-        self.alive = True
+from tests.combat.fakes import FakeTarget
 
 
 class SummonPool:
@@ -33,7 +28,7 @@ class SummonPool:
 
 def fire_ctx(pool, shots, anchor=(0, 0)):
     return FireContext(
-        origin=pygame.Vector2(*anchor), enemies=[FakeEnemy(120, 0)],
+        origin=pygame.Vector2(*anchor), enemies=[FakeTarget(120, 0)],
         damage_multiplier=1.0, attack_speed_multiplier=1.0,
         projectile_speed_multiplier=1.0, area_multiplier=1.0,
         fallback_dir=pygame.Vector2(1, 0),
@@ -189,7 +184,7 @@ class SummonBehaviourTests(unittest.TestCase):
                 attack_interval=0.5)
         shots = []
         for _ in range(30):
-            s.update(1 / 30, self._ctx(shots, [FakeEnemy(100, 0)]))
+            s.update(1 / 30, self._ctx(shots, [FakeTarget(100, 0)]))
         self.assertTrue(shots)
         self.assertGreater(shots[0]["vel"].length(), 0)
 
@@ -199,7 +194,7 @@ class SummonBehaviourTests(unittest.TestCase):
                 color=(1, 2, 3), tags=("summon",), speed=240, attack_range=70)
         shots = []
         for _ in range(15):
-            s.update(1 / 30, self._ctx(shots, [FakeEnemy(600, 0)]))
+            s.update(1 / 30, self._ctx(shots, [FakeTarget(600, 0)]))
         self.assertGreater(s.pos.x, 5)
 
     def test_summon_expires_after_its_lifetime(self):
@@ -216,18 +211,18 @@ class SummonBehaviourTests(unittest.TestCase):
         s = self._wolf(reach=280.0)
         shots = []
         for _ in range(60):                       # hero at origin, foe at 600 > 280
-            s.update(1 / 60, self._ctx(shots, [FakeEnemy(600, 0)]))
+            s.update(1 / 60, self._ctx(shots, [FakeTarget(600, 0)]))
         self.assertEqual(s.pos, pygame.Vector2(0, 0))       # never moved
         self.assertEqual(s.vel, pygame.Vector2(0, 0))
         self.assertEqual(shots, [])                          # no bite
-        self.assertIsNone(s._acquire_target(self._ctx([], [FakeEnemy(600, 0)])))
+        self.assertIsNone(s._acquire_target(self._ctx([], [FakeTarget(600, 0)])))
         self.assertEqual(s._anim_name(None), "idle")         # the SLEEP strip
 
     def test_wolf_wakes_and_bites_when_the_enemy_is_inside_the_leash_ring(self):
         s = self._wolf(reach=280.0)
         shots = []
         for _ in range(180):
-            s.update(1 / 60, self._ctx(shots, [FakeEnemy(150, 0)]))
+            s.update(1 / 60, self._ctx(shots, [FakeTarget(150, 0)]))
         self.assertGreater(s.pos.x, 5)                       # closed on the foe
         self.assertTrue(shots)                               # and bit it
 
@@ -235,7 +230,7 @@ class SummonBehaviourTests(unittest.TestCase):
         s = self._wolf(reach=280.0)
         s.pos.update(400, 0)                                 # dragged out: 400 > 280
         before = s.pos.x
-        s.update(1 / 60, self._ctx([], [FakeEnemy(900, 0)]))  # a further foe must not hold it
+        s.update(1 / 60, self._ctx([], [FakeTarget(900, 0)]))  # a further foe must not hold it
         self.assertLess(s.pos.x, before)                     # moved back toward the hero
         self.assertLess(s.vel.x, 0)
         self.assertEqual(s._anim_name(None), "run_left")     # running, not sleeping
@@ -247,7 +242,7 @@ class SummonBehaviourTests(unittest.TestCase):
                 attack_interval=0.4, reach=360)
         shots = []
         for _ in range(60):                       # hero has wandered 5000 px away
-            s.update(1 / 30, self._ctx(shots, [FakeEnemy(200, 0)], player=(5000, 0)))
+            s.update(1 / 30, self._ctx(shots, [FakeTarget(200, 0)], player=(5000, 0)))
         self.assertTrue(shots)                    # still zaps a foe by its base
 
 

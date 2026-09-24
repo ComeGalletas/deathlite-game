@@ -11,11 +11,7 @@ import pygame
 
 from combat.weapons import Weapon, FireContext
 from game.content import get_content
-
-
-class FakeEnemy:
-    def __init__(self, x, y):
-        self.pos = pygame.Vector2(x, y)
+from tests.combat.fakes import FakeTarget
 
 
 def make_context(enemies, sink, **over):
@@ -45,19 +41,19 @@ class WeaponTests(unittest.TestCase):
     def test_fires_immediately_then_respects_cooldown(self):
         shots = []
         w = Weapon("bolt", dict(BOLT))
-        w.update(0.016, make_context([FakeEnemy(100, 0)], shots))
+        w.update(0.016, make_context([FakeTarget(100, 0)], shots))
         self.assertEqual(len(shots), 1)
-        w.update(0.5, make_context([FakeEnemy(100, 0)], shots))  # still cooling
+        w.update(0.5, make_context([FakeTarget(100, 0)], shots))  # still cooling
         self.assertEqual(len(shots), 1)
-        w.update(0.6, make_context([FakeEnemy(100, 0)], shots))  # 1.1s elapsed
+        w.update(0.6, make_context([FakeTarget(100, 0)], shots))  # 1.1s elapsed
         self.assertEqual(len(shots), 2)
 
     def test_attack_speed_shortens_cooldown(self):
         shots = []
         w = Weapon("bolt", dict(BOLT))
-        ctx = make_context([FakeEnemy(50, 0)], shots, attack_speed_multiplier=2.0)
+        ctx = make_context([FakeTarget(50, 0)], shots, attack_speed_multiplier=2.0)
         w.update(0.016, ctx)
-        w.update(0.55, make_context([FakeEnemy(50, 0)], shots,
+        w.update(0.55, make_context([FakeTarget(50, 0)], shots,
                                     attack_speed_multiplier=2.0))
         self.assertEqual(len(shots), 2)  # cooldown halved to 0.5s
 
@@ -66,7 +62,7 @@ class WeaponTests(unittest.TestCase):
         d = dict(BOLT)
         w = Weapon("bolt", d)
         w.bonus["projectile_count"] = 2  # -> 3 projectiles
-        w.update(0.016, make_context([FakeEnemy(0, 100)], shots))
+        w.update(0.016, make_context([FakeTarget(0, 100)], shots))
         self.assertEqual(len(shots), 3)
         # Velocities differ (arc), but all point roughly downward toward target.
         vels = {(round(s["vel"].x, 2), round(s["vel"].y, 2)) for s in shots}
@@ -78,22 +74,22 @@ class WeaponTests(unittest.TestCase):
         w.update(0.016, make_context([], shots, fallback_dir=pygame.Vector2(0, 0)))
         self.assertEqual(shots, [])
         # Should retry quickly rather than wait a full second.
-        w.update(0.2, make_context([FakeEnemy(10, 0)], shots))
+        w.update(0.2, make_context([FakeTarget(10, 0)], shots))
         self.assertEqual(len(shots), 1)
 
     def test_damage_multiplier_flows_into_projectile(self):
         shots = []
         w = Weapon("bolt", dict(BOLT))
-        w.update(0.016, make_context([FakeEnemy(100, 0)], shots,
+        w.update(0.016, make_context([FakeTarget(100, 0)], shots,
                                      damage_multiplier=3.0))
         self.assertEqual(shots[0]["damage"], 30.0)
 
     def test_update_reports_the_fire_beat(self):
         shots = []
         w = Weapon("bolt", dict(BOLT))
-        self.assertTrue(w.update(0.016, make_context([FakeEnemy(100, 0)], shots)))
-        self.assertFalse(w.update(0.5, make_context([FakeEnemy(100, 0)], shots)))   # cooling
-        self.assertTrue(w.update(0.6, make_context([FakeEnemy(100, 0)], shots)))    # ready again
+        self.assertTrue(w.update(0.016, make_context([FakeTarget(100, 0)], shots)))
+        self.assertFalse(w.update(0.5, make_context([FakeTarget(100, 0)], shots)))   # cooling
+        self.assertTrue(w.update(0.6, make_context([FakeTarget(100, 0)], shots)))    # ready again
         # no target -> not a fire beat
         self.assertFalse(w.update(0.016, make_context([], shots,
                                                       fallback_dir=pygame.Vector2(0, 0))))
@@ -104,7 +100,7 @@ class WeaponTests(unittest.TestCase):
             w = Weapon(wid, get_content().weapon(wid))
             for _ in range(5):
                 self.assertFalse(w.update(
-                    0.1, make_context([FakeEnemy(80, 0)], [],
+                    0.1, make_context([FakeTarget(80, 0)], [],
                                       spawn_summon=lambda **kw: None)))
 
 

@@ -1,7 +1,8 @@
 """Light stand-ins for the PLAYING state, for resolver / effects tests that
 should not build a world: a `PlayingState`-shaped namespace with a real
 projectile pool, a grid that returns every enemy, and a hero with no
-blessings. Shared by `test_bomb.py` and `test_stun.py` (six-weapon P1).
+blessings. Shared by `test_bomb.py` and `test_stun.py` (six-weapon P1),
+and the home of the point target and shot stand-ins the fire-path tests use.
 """
 from __future__ import annotations
 
@@ -20,6 +21,27 @@ from game.content import get_content
 from game.states.playing.core.run_ledger import RunLedger
 from entities.projectile import Projectile
 from systems.object_pool import Pool
+
+
+class FakeTarget:
+    """A point to aim at: all a weapon's targeting reads from an enemy.
+
+    The fire-path tests (`test_weapons*`, `test_summons`, `test_manual_aim`)
+    each used to define this as their own `FakeEnemy`; it is the lighter
+    sibling of `FakeEnemy` below, which a damage path can hit."""
+
+    def __init__(self, x, y):
+        self.pos = pygame.Vector2(x, y)
+        self.alive = True
+
+
+class FakeProj:
+    """A spawned shot as a bag of attributes, for the maintainers (orbit,
+    reach) that hold and mutate what `spawn_projectile` hands back."""
+
+    def __init__(self, **kw):
+        self.active = True
+        self.__dict__.update(kw)
 
 
 class FakeEnemy:

@@ -17,20 +17,9 @@ import pygame
 
 from combat.weapons import Weapon, FireContext, CATEGORIES
 from game.content import get_content
+from tests.combat.fakes import FakeProj, FakeTarget
 
 _ALLOWED = set(CATEGORIES)
-
-
-class FakeEnemy:
-    def __init__(self, x, y):
-        self.pos = pygame.Vector2(x, y)
-
-
-class FakeProj:
-    """Bag of attributes the maintainers can hold and mutate."""
-    def __init__(self, **kw):
-        self.active = True
-        self.__dict__.update(kw)
 
 
 def ctx(enemies, sink, *, area=1.0, origin=(0, 0), anchor=None):
@@ -108,15 +97,15 @@ class MeleeGateTests(unittest.TestCase):
         s = w("sword")
         reach = s._reach(1.0)                      # == the sword's area
         shots = []
-        self.assertFalse(s.update(0.016, ctx([FakeEnemy(reach + 1, 0)], shots)))
+        self.assertFalse(s.update(0.016, ctx([FakeTarget(reach + 1, 0)], shots)))
         self.assertEqual(shots, [])
         s._cd = 0.0
-        self.assertTrue(s.update(0.016, ctx([FakeEnemy(reach - 1, 0)], shots)))
+        self.assertTrue(s.update(0.016, ctx([FakeTarget(reach - 1, 0)], shots)))
         self.assertEqual(len(shots), 1)
 
     def test_cooldown_stays_small_while_gated(self):
         s = w("sword")
-        s.update(0.016, ctx([FakeEnemy(999, 0)], []))
+        s.update(0.016, ctx([FakeTarget(999, 0)], []))
         self.assertLessEqual(s._cd, 0.11)          # polling, not the full 1.0s cooldown
 
 
@@ -124,7 +113,7 @@ class ProjectileGateTests(unittest.TestCase):
     def test_out_of_ring_enemy_does_not_trigger(self):
         f = w("bow")
         shots = []
-        self.assertFalse(f.update(0.016, ctx([FakeEnemy(1000, 0)], shots)))
+        self.assertFalse(f.update(0.016, ctx([FakeTarget(1000, 0)], shots)))
         self.assertEqual(shots, [])
 
     def test_random_targeting_only_picks_from_inside_the_ring(self):
@@ -134,7 +123,7 @@ class ProjectileGateTests(unittest.TestCase):
         d["targeting_mode"] = "random"
         d["projectile_count"] = 1
         rnd = Weapon("rnd", d)
-        inside, outside = FakeEnemy(0, 120), FakeEnemy(0, -3000)
+        inside, outside = FakeTarget(0, 120), FakeTarget(0, -3000)
         for _ in range(50):
             rnd._cd = 0.0
             shots = []
@@ -146,7 +135,7 @@ class ProjectileGateTests(unittest.TestCase):
 class AreaScalingTests(unittest.TestCase):
     def test_area_multiplier_widens_the_ring_enough_to_trigger(self):
         s = w("sword")
-        e = FakeEnemy(s._reach(1.0) + 8, 0)        # just outside at x1.0, inside at x1.5
+        e = FakeTarget(s._reach(1.0) + 8, 0)        # just outside at x1.0, inside at x1.5
         self.assertFalse(s.update(0.016, ctx([e], [])))
         s._cd = 0.0
         shots = []
@@ -155,7 +144,7 @@ class AreaScalingTests(unittest.TestCase):
 
     def test_area_bonus_also_widens_the_ring(self):
         f = w("bow")
-        e = FakeEnemy(490, 0)                      # outside reach 460
+        e = FakeTarget(490, 0)                      # outside reach 460
         self.assertFalse(f.update(0.016, ctx([e], [])))
         f._cd = 0.0
         f.bonus["area"] = 50.0                     # reach -> 510
@@ -173,10 +162,10 @@ class OrbitGateTests(unittest.TestCase):
     def test_orbiters_form_when_a_foe_enters_and_drop_when_it_leaves(self):
         ring = w("ember_ring")
         live = []
-        c = ctx([FakeEnemy(100, 0)], live)         # inside reach 140
+        c = ctx([FakeTarget(100, 0)], live)         # inside reach 140
         ring.update(0.016, c)
         self.assertEqual(len([o for o in live if o.active]), ring._projectile_count())
-        c.enemies = [FakeEnemy(500, 0)]            # foe leaves -> hero lowers the ring
+        c.enemies = [FakeTarget(500, 0)]            # foe leaves -> hero lowers the ring
         ring.update(0.016, c)
         self.assertEqual([o for o in live if o.active], [])
 
@@ -186,7 +175,7 @@ class RegressionTests(unittest.TestCase):
 
     def test_rod_cadence_and_aim_unchanged(self):
         b = w("magic_rod")                         # cooldown 0.85, reach 400
-        e = FakeEnemy(80, 0)
+        e = FakeTarget(80, 0)
         shots = []
         self.assertTrue(b.update(0.016, ctx([e], shots)))     # fires at once
         self.assertFalse(b.update(0.5, ctx([e], shots)))      # still cooling
@@ -199,7 +188,7 @@ class RegressionTests(unittest.TestCase):
         f = w("bow")
         f.bonus["projectile_count"] += 2                      # a three-arrow fan
         shots = []
-        f.update(0.016, ctx([FakeEnemy(0, 200)], shots))      # target on +y
+        f.update(0.016, ctx([FakeTarget(0, 200)], shots))      # target on +y
         self.assertEqual(len(shots), 3)
         self.assertTrue(all(s.vel.y > 0 for s in shots))
 
@@ -235,4 +224,4 @@ class BodyReachTests(unittest.TestCase):
     def test_a_stand_in_with_no_radius_counts_its_centre(self):
         s = w("sword")
         reach = s._reach(1.0)
-        self.assertFalse(s.update(0.016, ctx([FakeEnemy(reach + 1, 0)], [])))
+        self.assertFalse(s.update(0.016, ctx([FakeTarget(reach + 1, 0)], [])))

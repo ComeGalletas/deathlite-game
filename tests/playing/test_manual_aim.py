@@ -29,6 +29,7 @@ from game.content import get_content
 from game.states.playing.core.aim import AimInput, mouse_direction, read_aim
 from systems.camera import Camera
 from tests import worlds as W
+from tests.combat.fakes import FakeProj, FakeTarget
 
 SEED = W.pinned(1)
 
@@ -247,22 +248,10 @@ class ManualAimStateTests(unittest.TestCase):
 
 
 # --- weapons -----------------------------------------------------------------
-class FakeEnemy:
-    def __init__(self, x, y):
-        self.pos = pygame.Vector2(x, y)
-
-
-class FakeProj:
-    def __init__(self, **kw):
-        self.active = True
-        self.__dict__.update(kw)
-
-
 def weapon(wid):
     w = Weapon(wid, get_content().weapon(wid))
     w._cd = 0.0
     return w
-
 
 
 def chain_weapon():
@@ -311,18 +300,18 @@ class ConeTests(unittest.TestCase):
                                          math.radians(half_deg), reach)
 
     def test_angle_filter(self):
-        inside = FakeEnemy(100, 30)        # ~17 deg off the aim
-        outside = FakeEnemy(100, 70)       # ~35 deg
-        behind = FakeEnemy(-100, 0)
+        inside = FakeTarget(100, 30)        # ~17 deg off the aim
+        outside = FakeTarget(100, 70)       # ~35 deg
+        behind = FakeTarget(-100, 0)
         self.assertEqual(self.cone([inside, outside, behind]), [inside])
 
     def test_reach_filter(self):
-        near, far = FakeEnemy(100, 0), FakeEnemy(500, 0)
+        near, far = FakeTarget(100, 0), FakeTarget(500, 0)
         self.assertEqual(self.cone([near, far], reach=400), [near])
         self.assertEqual(self.cone([near, far], reach=float("inf")), [near, far])
 
     def test_enemy_on_the_origin_counts_as_inside(self):
-        on_top = FakeEnemy(0, 0)
+        on_top = FakeTarget(0, 0)
         self.assertEqual(self.cone([on_top]), [on_top])
 
 
@@ -341,22 +330,22 @@ class WeaponAimTests(unittest.TestCase):
     def test_manual_shot_homes_on_the_closest_enemy_in_the_cone(self):
         sink = []
         w = weapon("magic_rod")                                        # reach 400
-        near_in = FakeEnemy(200, 40)                                     # ~11 deg, d=204
-        far_in = FakeEnemy(300, -20)                                     # ~4 deg,  d=301
-        off_axis = FakeEnemy(100, 150)                                   # ~56 deg, nearer
+        near_in = FakeTarget(200, 40)                                     # ~11 deg, d=204
+        far_in = FakeTarget(300, -20)                                     # ~4 deg,  d=301
+        off_axis = FakeTarget(100, 150)                                   # ~56 deg, nearer
         w.update(1 / 60, fire_ctx([off_axis, far_in, near_in], sink, aim=held_keys((1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), bearing(near_in.pos), places=4)
 
     def test_manual_shot_goes_straight_when_the_cone_is_empty(self):
         sink = []
         w = weapon("magic_rod")
-        w.update(1 / 60, fire_ctx([FakeEnemy(100, 150)], sink, aim=held_keys((1, 0))))
+        w.update(1 / 60, fire_ctx([FakeTarget(100, 150)], sink, aim=held_keys((1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), 0.0)
 
     def test_enemy_in_reach_but_outside_the_cone_is_ignored_even_when_nearest(self):
         sink = []
         w = weapon("magic_rod")
-        w.update(1 / 60, fire_ctx([FakeEnemy(0, 60)], sink, aim=held_click((1, 0))))
+        w.update(1 / 60, fire_ctx([FakeTarget(0, 60)], sink, aim=held_click((1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), 0.0)
 
     def test_per_weapon_aim_assist_override(self):
@@ -364,7 +353,7 @@ class WeaponAimTests(unittest.TestCase):
         d["aim_assist_deg"] = 70
         w = Weapon("magic_rod", d); w._cd = 0.0
         sink = []
-        e = FakeEnemy(30, 52)                                            # ~60 deg off the aim
+        e = FakeTarget(30, 52)                                            # ~60 deg off the aim
         w.update(1 / 60, fire_ctx([e], sink, aim=held_click((1, 0))))
         self.assertAlmostEqual(bearing(sink[0].vel), bearing(e.pos), places=4)  # now inside
 
@@ -372,7 +361,7 @@ class WeaponAimTests(unittest.TestCase):
         sink = []
         w = weapon("sword")
         # An enemy inside the assist cone but off-axis must not bend the swing.
-        w.update(1 / 60, fire_ctx([FakeEnemy(40, 15)], sink, aim=held_keys((1, 0))))
+        w.update(1 / 60, fire_ctx([FakeTarget(40, 15)], sink, aim=held_keys((1, 0))))
         self.assertEqual(len(sink), 1)
         self.assertAlmostEqual(bearing(sink[0].cone_dir), 0.0)
         self.assertGreater(sink[0].cone_half_angle, 0.0)
@@ -386,7 +375,7 @@ class WeaponAimTests(unittest.TestCase):
     def test_auto_attack_off_holds_but_keeps_the_weapon_ready(self):
         sink = []
         w = weapon("bow")
-        enemies = [FakeEnemy(100, 0)]
+        enemies = [FakeTarget(100, 0)]
         for _ in range(30):
             self.assertFalse(w.update(1 / 60, fire_ctx(enemies, sink, auto_attack=False)))
         self.assertEqual(sink, [])
@@ -458,14 +447,14 @@ class OrbitOnClickTests(unittest.TestCase):
         self.assertEqual(live, [])
 
     def test_an_enemy_in_reach_still_raises_it_without_any_aim(self):
-        live, w = self.orbiters(None, enemies=[FakeEnemy(50, 0)])
+        live, w = self.orbiters(None, enemies=[FakeTarget(50, 0)])
         self.assertEqual(len(live), w._projectile_count())
 
     def test_auto_attack_off_does_not_lower_the_ring(self):
         # Orbit is not a "swing": the `Q` toggle leaves it alone.
         sink = []
         w = weapon("ember_ring")
-        w.update(1 / 60, fire_ctx([FakeEnemy(50, 0)], sink, auto_attack=False))
+        w.update(1 / 60, fire_ctx([FakeTarget(50, 0)], sink, auto_attack=False))
         self.assertEqual(sum(o.active for o in sink), w._projectile_count())
 
 
