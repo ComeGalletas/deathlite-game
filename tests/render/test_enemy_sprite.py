@@ -177,6 +177,21 @@ class DeathPoofTests(unittest.TestCase):
         self.assertEqual(p._death_fx[-1].radius, e.radius)
         pygame.quit()
 
+    def test_a_live_poof_is_drawn_through_the_whole_scene(self):
+        """SYS-009: the depth sort reads the poof too (`scene.actor_items`),
+        not only the painter -- a whole frame is drawn, with the poof in it."""
+        g, p = self._playing()
+        e = self._kill_one(p, "skull")
+        p._update_death_fx(1 / 60)
+        painted = []
+        real = p.renderer.death_fx
+        p.renderer.death_fx = lambda s, fx: (painted.append(fx), real(s, fx))
+        g.screen.fill((0, 0, 0))
+        g.state_machine.draw(g.screen)
+        self.assertEqual(len(painted), 1)
+        self.assertAlmostEqual(painted[0].pos.x, e.pos.x)
+        pygame.quit()
+
 
 class ProjectileTrailTests(unittest.TestCase):
     """A player projectile carrying `fx.trail` sheds a fading one-shot dust
