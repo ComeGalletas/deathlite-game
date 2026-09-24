@@ -935,7 +935,7 @@ many were stuck:
 
 ---
 
-**ID:** ENT-017 · **System:** entities (+ SYS) · **Type:** refactor · **Status:** in progress ·
+**ID:** ENT-017 · **System:** entities (+ SYS) · **Type:** refactor · **Status:** done ·
 **Branch:** claude/ent-017-behavior-templates (the current worktree, owner 2026-09-24)
 
 ## ENT-017 — Requirement (owner, 2026-09-24)
@@ -1050,6 +1050,41 @@ many were stuck:
   `telegraph_cycle` shapes
 - [x] ENT-017.3 — The bespoke builders (brute, kite, sweep) and `with_aggro`
   read the data with no fallbacks; `MELEE_REACT_SCALE` out of config
-- [ ] ENT-017.4 — Golden-trace parity; tests (every enemy's behaviour has a
+- [x] ENT-017.4 — Golden-trace parity; tests (every enemy's behaviour has a
   template, the templates name only registered things, an enemy overrides
   a template number); results; index
+
+## ENT-017 — Results
+
+- **Data:** `data/enemies/behaviors.json` holds 17 templates and the shared
+  defaults. The desktop build ships the whole `data/` tree, so it is
+  included.
+- **Code:**
+  - `entities/ai/actions.py`: 6 stacks, 9 actions, 1 attack and 2 trigger
+    rules.
+  - `entities/ai/templates.py`: the `move` and `telegraph_cycle` shapes.
+  - `registry.build_behavior` resolves a template first, then a code-built
+    `@behavior`.
+  - `behaviors/simple.py` and ten builders are gone. `brute`, `kite_shoot`
+    and `path_chase_sweep` stay code and read the data with no fallbacks.
+  - `telegraph_cycle` takes `recover_weight`, with no default.
+  - `with_aggro` reads the wander from the shared defaults.
+  - `MELEE_REACT_SCALE` is gone (D5).
+- **What is left of `cfg.get`** in `entities/ai/` is structural, not
+  numeric: the optional `aggro_range` / `pursuit_seconds`, whose presence
+  switches aggro on; the boss's `tags` and `patterns` lists; and a name used
+  for a log line.
+- **Parity (D6):** the golden traces are **byte-identical** before and after:
+  26 behaviours, 1500 frames each, positions, velocities, states, contact
+  damage, animation names and every combat call. A second run on the old
+  code was identical first, so the trace is deterministic.
+- **Tests:** `tests/entities/ai/test_behavior_templates.py` (13):
+  - every enemy's and boss's behaviour has a template;
+  - the templates name only registered things;
+  - everything builds;
+  - the merge order (shared → template → enemy);
+  - an enemy's number reaches its component;
+  - a number removed from the data is a `KeyError`, not a silent default;
+  - the shapes.
+- **Full default suite: 3425 passed, 0 failed, 0 skipped** (11 sweep
+  deselected, 13 min 55 s).
