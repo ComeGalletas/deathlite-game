@@ -1,6 +1,7 @@
 """The Hammer swings before it
 lands. A swing time gates the blow, the direction locks at the start, the
-blow is a circle 40 px ahead with radius 52, Haste shortens the swing and
+blow is a circle `impact_offset` px ahead with radius `area` (40 and 52 as
+agreed; both tuned in play since, and read from the data here), Haste shortens the swing and
 cooldown reductions the cooldown, the forged Hammers swing too, the
 indicator darkens over the swing and the impact sheet plays at the blow (change request 1, weapon_system_journal.md)."""
 import os
@@ -22,6 +23,12 @@ from tests.combat.fakes import FakeEnemy
 C = get_content()
 H = C.weapon("hammer")
 SW = float(H["swing_time"])          # the owner tunes this in play; the tests follow it
+OFF = float(H["impact_offset"])      # the same: the blow's centre ahead of the hero
+
+
+def forge_fx(fid):
+    """A Forging's `effects` block, from the data."""
+    return get_forges(C).get(fid).effects
 
 
 class _Shot:
@@ -61,7 +68,7 @@ class DataTests(unittest.TestCase):
         self.assertEqual(H["special_effect"], "slam")
         self.assertGreater(H["damage"], 0)                # 25 agreed, tuned since (27)
         self.assertGreater(H["swing_time"], 0.0)          # 1.2 agreed, tuned since (0.8)
-        self.assertEqual(H["impact_offset"], 40)
+        self.assertGreater(H["impact_offset"], 0)         # 40 agreed; tuned in play like the rest
         self.assertGreater(H["area"], 0)            # 52 agreed; the owner tunes it in play
         self.assertNotIn("cone_half_angle", H)
         self.assertEqual(H["impact_rig"], "hammer_impact",
@@ -160,10 +167,10 @@ class DataTests(unittest.TestCase):
     def test_reach_is_offset_plus_radius(self):
         w = hammer()
         r = H["area"]
-        self.assertAlmostEqual(w._reach(1.0), 40 + r)
+        self.assertAlmostEqual(w._reach(1.0), OFF + r)
         w.bonus["area"] += 10
-        self.assertAlmostEqual(w._reach(1.0), 50 + r)
-        self.assertAlmostEqual(w._reach(1.5), 40 + (r + 10) * 1.5)
+        self.assertAlmostEqual(w._reach(1.0), OFF + 10 + r)
+        self.assertAlmostEqual(w._reach(1.5), OFF + (r + 10) * 1.5)
 
 
 class SwingTests(unittest.TestCase):
@@ -181,7 +188,7 @@ class SwingTests(unittest.TestCase):
         self.assertEqual(len(shots), 1)
         self.assertEqual(beats, 1)
         s = shots[0]
-        self.assertAlmostEqual(s.pos.x, 40.0)
+        self.assertAlmostEqual(s.pos.x, OFF)
         self.assertAlmostEqual(s.pos.y, 0.0)
         self.assertAlmostEqual(s.radius, H["area"])
         self.assertEqual(s.vel.length(), 0.0)
@@ -200,7 +207,7 @@ class SwingTests(unittest.TestCase):
         w.update(1 / 60, ctx([FakeEnemy(60, 0)], sink))         # locks +x
         for _ in range(int(SW * 60) + 6):
             w.update(1 / 60, ctx([FakeEnemy(0, 60)], sink))     # the target moved
-        self.assertAlmostEqual(sink[0].pos.x, 40.0)
+        self.assertAlmostEqual(sink[0].pos.x, OFF)
         self.assertAlmostEqual(sink[0].pos.y, 0.0)
 
     def test_the_circle_travels_with_the_hero(self):
@@ -209,7 +216,7 @@ class SwingTests(unittest.TestCase):
         w.update(1 / 60, ctx([FakeEnemy(60, 0)], sink))
         for _ in range(int(SW * 60) + 6):
             w.update(1 / 60, ctx([FakeEnemy(60, 0)], sink, origin=pygame.Vector2(100, 30)))
-        self.assertAlmostEqual(sink[0].pos.x, 140.0)
+        self.assertAlmostEqual(sink[0].pos.x, 100.0 + OFF)
         self.assertAlmostEqual(sink[0].pos.y, 30.0)
 
     def test_the_cooldown_runs_from_the_impact(self):
@@ -232,7 +239,7 @@ class SwingTests(unittest.TestCase):
         for _ in range(int(SW * 60) + 6):
             w.update(1 / 60, ctx([], sink))
         self.assertAlmostEqual(sink[0].pos.x, 0.0, places=5)
-        self.assertAlmostEqual(sink[0].pos.y, -40.0)
+        self.assertAlmostEqual(sink[0].pos.y, -OFF)
 
     def test_auto_attack_off_holds_the_swing(self):
         w = hammer()
@@ -276,17 +283,18 @@ class ForgeTests(unittest.TestCase):
         kinds = sorted(getattr(s, "style", "") for s in shots)
         self.assertEqual(kinds, ["blast", "hidden"])
         blast = next(s for s in shots if s.style == "blast")
-        self.assertAlmostEqual(blast.pos.x, 40.0)
-        self.assertAlmostEqual(blast.radius, 90.0)
+        self.assertAlmostEqual(blast.pos.x, OFF)
+        self.assertAlmostEqual(blast.radius, forge_fx("earthshaker")["shockwave_radius"])
 
     def test_meteor_hammer_lands_its_crater_at_the_centre(self):
         w = hammer("meteor_hammer")
         craters = []
         run(w, SW + 0.05, spawn_hazard=lambda **kw: craters.append(kw))
         self.assertEqual(len(craters), 1)
-        self.assertAlmostEqual(craters[0]["pos"].x, 40.0)
-        self.assertAlmostEqual(craters[0]["dps"],
-                               float(w.definition["damage"]) * 0.35)   # the Forge's lighter blow
+        self.assertAlmostEqual(craters[0]["pos"].x, OFF)
+        self.assertAlmostEqual(craters[0]["dps"],        # the Forge's lighter blow
+                               float(w.definition["damage"])
+                               * forge_fx("meteor_hammer")["hazard_dps_mult"])
 
 
 class VisualTests(unittest.TestCase):
@@ -307,7 +315,7 @@ class VisualTests(unittest.TestCase):
         run(w, SW + 0.05, spawn_impact=lambda **kw: impacts.append(kw))
         self.assertEqual(len(impacts), 1)
         self.assertEqual(impacts[0]["rig"], "hammer_impact")
-        self.assertAlmostEqual(impacts[0]["pos"].x, 40.0)
+        self.assertAlmostEqual(impacts[0]["pos"].x, OFF)
         self.assertAlmostEqual(impacts[0]["radius"], H["area"])
 
     def test_pending_swings_report_centre_radius_and_progress(self):
@@ -318,7 +326,7 @@ class VisualTests(unittest.TestCase):
                                                     weapons=[w], stats={"area_multiplier": 1.0}))
         (weapon, centre, radius, progress), = slam_fx.pending_swings(ps)
         self.assertIs(weapon, w)
-        self.assertAlmostEqual(centre.x, 50.0)
+        self.assertAlmostEqual(centre.x, 10.0 + OFF)
         self.assertAlmostEqual(radius, H["area"])
         self.assertAlmostEqual(progress, 0.5, delta=0.03)
 

@@ -297,6 +297,20 @@ One subtask per group of modules:
   `enemies.json`; the BUG_JOURNAL #1 regression reads Aegis's armour and
   asserts what it is about — she has armour, and a bite still lands. 14
   passed.
+- **6.3** `test_hammer_swing.py` and `test_forge.py`: the Hammer's
+  `impact_offset` (40, in eleven blow / blast / crater / impact centres and
+  the reach sums) and every Forging number — Greatsword's damage 42, the
+  twin-dagger fan 22°, Earthshaker's 90 radius and ×0.5, Meteor Hammer's
+  crater 64 / 2.5 s / ×0.35, the fan / multishot / storm counts 4 / 3 / 4,
+  Ballista's and Lance's pierce 8 / 6, the cluster bomb's 3 bomblets at ×0.4
+  / ×0.6, the mines' 0.6 s / 25 s. Now `OFF` reads the offset, and
+  `OV(fid, key)` / `FX(fid, key)` / `forge_fx(fid)` read a Forging's
+  overrides and effects; where the number stood for an identity (Ballista
+  and the Lance pierce more than their base weapon; the fan throws more than
+  one) that is asserted too. The data test's `impact_offset == 40` became
+  `> 0` like the damage and area beside it, which were already relaxed for
+  the same reason. The Forging count (twelve, two per weapon) stays: it is
+  the design. 59 passed.
 
 ### TST-004.7 — coverage of the five modules
 
@@ -405,8 +419,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig` → `535dd0b`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
   - [x] TST-004.6.1 — heroes: `test_characters.py` → `a193fa8`
-  - [x] TST-004.6.2 — incoming damage: `test_incoming_damage.py`
-  - [ ] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py`
+  - [x] TST-004.6.2 — incoming damage: `test_incoming_damage.py` → `df97159`
+  - [x] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py`
   - [ ] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py`
   - [ ] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
   - [ ] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
