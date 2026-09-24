@@ -1,4 +1,4 @@
-"""CB-1: incoming contact / hazard damage lands as timed "bites", so flat armor
+"""Incoming contact / hazard damage lands as timed "bites", so flat armor
 subtracts a meaningful chunk per hit instead of nullifying a per-frame sliver
 (journals/BUG_JOURNAL.md #1).
 
@@ -18,6 +18,7 @@ import pygame
 from entities.hazard import Hazard
 from entities.player import Player
 from game import config
+from game.content import get_content
 from game.game import Game
 from game.states.menu_state import MenuState
 from tests import worlds as W
@@ -26,6 +27,8 @@ SEED = W.pinned(2)
 
 DT = 1.0 / 120.0
 T = config.INCOMING_TICK_INTERVAL          # 0.5 by default
+# The biter the tests stand on the hero, and its bite, from the data (TST-004.6).
+BEE = get_content().enemy("bumblebee")["contact_damage"]
 
 
 def _key(game, k):
@@ -101,13 +104,17 @@ class PlayerTakeDamageUnchangedTests(unittest.TestCase):
 # --------------------------------------------------------------------------
 class ContactBiteTests(unittest.TestCase):
     def test_armored_hero_now_takes_contact_damage(self):
-        """Regression for BUG_JOURNAL #1: Aegis (armor 4) was fully immune."""
-        game, p = _run(hero_index=0)                    # Aegis, armor 4
-        self.assertEqual(p.player.stats["armor"], 4.0)
-        p._spawn_enemy("bumblebee", at=p.player.pos.copy())  # contact_damage 9
+        """Regression for BUG_JOURNAL #1: Aegis, the armoured hero, was fully
+        immune. Her armour and the bee's bite are read from the data; what
+        is pinned is that she has armour, and that a bite still gets through."""
+        game, p = _run(hero_index=0)                    # Aegis
+        armor = get_content().character("aegis")["base_stats"]["armor"]
+        self.assertEqual(p.player.stats["armor"], armor)
+        self.assertGreater(armor, 0.0, "the regression needs an armoured hero")
+        p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp
         game.state_machine.update(DT)                   # one frame -> one bite
-        bite = 9 * T - 4                                # 9*0.5 - armor = 0.5
+        bite = BEE * T - armor
         self.assertAlmostEqual(hp0 - p.player.hp, bite, places=3)
         self.assertGreater(hp0 - p.player.hp, 0.0)
 
@@ -116,7 +123,7 @@ class ContactBiteTests(unittest.TestCase):
         # The subject here is the cadence, not armor, so the hero's own armor
         # is read rather than assumed -- it was 0 until the heroes were
         # retuned, and this test is about one bite per interval either way.
-        bite = 9 * T - p.player.stats["armor"]           # contact_damage 9
+        bite = BEE * T - p.player.stats["armor"]
         p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp
         _advance(game, T * 0.6)                         # < one interval past the first
@@ -127,7 +134,7 @@ class ContactBiteTests(unittest.TestCase):
 
     def test_two_enemies_bite_on_independent_timers(self):
         game, p = _run(hero_index=1)
-        bite = 9 * T - p.player.stats["armor"]
+        bite = BEE * T - p.player.stats["armor"]
         p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         p._spawn_enemy("bumblebee", at=p.player.pos.copy())
         hp0 = p.player.hp

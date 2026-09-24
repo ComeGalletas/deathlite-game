@@ -1,4 +1,4 @@
-"""HI-1: the human island (`documentation/journals/human_island_journal.md`).
+"""The human island (`documentation/journals/human_island_journal.md`).
 
 A village is a room kind, not a special kind: it is chosen by role near the
 start, wears the flat `human` topography, and carries nothing the rest of the

@@ -1,4 +1,4 @@
-"""Six-weapon system P3: Forging (design §7, §8, §13, §18). The twelve
+"""Forging (design §7, §8, §13, §18). The twelve
 Forgings as data, the merge onto a weapon, exclusivity and eligibility, and
 every Forge behaviour that needs code: twin cones, the Earthshaker
 shockwave, the Meteor Hammer crater (a hero-owned hazard), cluster
@@ -22,6 +22,19 @@ from tests.combat.fakes import FakeEnemy, fake_ps
 
 C = get_content()
 F = get_forges(C)
+
+
+def OV(fid, key):
+    """A Forging's override, from `data/weapons/forges.json` (TST-004.6)."""
+    return F.get(fid).overrides[key]
+
+
+def FX(fid, key):
+    """A Forging's effect number, from the data."""
+    return F.get(fid).effects[key]
+
+
+OFF = float(C.weapon("hammer")["impact_offset"])    # the slam's centre ahead of the hero
 SIX = ("sword", "hammer", "daggers", "bow", "magic_rod", "bomb")
 
 
@@ -107,7 +120,8 @@ class ApplyTests(unittest.TestCase):
         w = weapon("sword", "greatsword")
         self.assertEqual(w.forge, "greatsword")
         self.assertEqual(w.name, "Greatsword")
-        self.assertEqual(w.definition["damage"], 42)
+        self.assertEqual(w.definition["damage"], OV("greatsword", "damage"))
+        self.assertNotEqual(OV("greatsword", "damage"), C.weapon("sword")["damage"])
         self.assertEqual(w.definition["class"], "melee")             # untouched
         self.assertEqual(w.definition["special_effect"], "cone")     # untouched
         self.assertEqual(w.visual_id, "greatsword")
@@ -138,7 +152,7 @@ class ApplyTests(unittest.TestCase):
         w = weapon("sword")
         w.bonus["damage"] += 9
         apply_forge(w, F.get("greatsword"))
-        self.assertAlmostEqual(w._damage(), 42 + 9)
+        self.assertAlmostEqual(w._damage(), OV("greatsword", "damage") + 9)
 
 
 class MeleeForgeTests(unittest.TestCase):
@@ -165,8 +179,9 @@ class MeleeForgeTests(unittest.TestCase):
         s = fire(w, [FakeEnemy(30, 0)])                   # inside the shorter reach
         self.assertEqual(len(s), 2)
         angles = sorted(math.degrees(math.atan2(c.cone_dir.y, c.cone_dir.x)) for c in s)
-        self.assertAlmostEqual(angles[0], -22, places=3)
-        self.assertAlmostEqual(angles[1], 22, places=3)
+        off = FX("twin_daggers", "twin_offset_deg")
+        self.assertAlmostEqual(angles[0], -off, places=3)
+        self.assertAlmostEqual(angles[1], off, places=3)
         self.assertLess(s[0].damage, C.weapon("daggers")["damage"])   # the split
 
     def test_cross_cut_widens_the_twin_fan(self):
@@ -174,7 +189,7 @@ class MeleeForgeTests(unittest.TestCase):
         w.bonus["twin_offset_deg"] = 8
         angles = sorted(math.degrees(math.atan2(c.cone_dir.y, c.cone_dir.x))
                         for c in fire(w, [FakeEnemy(30, 0)]))
-        self.assertAlmostEqual(angles[1], 30, places=3)
+        self.assertAlmostEqual(angles[1], FX("twin_daggers", "twin_offset_deg") + 8, places=3)
 
     def test_earthshaker_adds_a_shockwave_blast_at_the_impact(self):
         w = weapon("hammer", "earthshaker")
@@ -183,17 +198,17 @@ class MeleeForgeTests(unittest.TestCase):
         blasts = [x for x in s if getattr(x, "style", "") == "blast"]
         self.assertEqual((len(blows), len(blasts)), (1, 1))
         b = blasts[0]
-        self.assertAlmostEqual(b.radius, 90)
+        self.assertAlmostEqual(b.radius, FX("earthshaker", "shockwave_radius"))
         self.assertIn("shockwave", b.source_tags)
-        self.assertAlmostEqual(b.damage, blows[0].damage * 0.5)
-        self.assertAlmostEqual(b.pos.x, 40.0)             # the circle's centre
+        self.assertAlmostEqual(b.damage, blows[0].damage * FX("earthshaker", "shockwave_damage_mult"))
+        self.assertAlmostEqual(b.pos.x, OFF)              # the circle's centre
         self.assertTrue(b.no_block)
 
     def test_aftershock_widens_the_shockwave(self):
         w = weapon("hammer", "earthshaker")
         w.bonus["shockwave_radius"] = 24
         b = [x for x in fire(w) if getattr(x, "style", "") == "blast"][0]
-        self.assertAlmostEqual(b.radius, 114)
+        self.assertAlmostEqual(b.radius, FX("earthshaker", "shockwave_radius") + 24)
 
     def test_meteor_hammer_leaves_a_crater_through_the_context(self):
         w = weapon("hammer", "meteor_hammer")
@@ -201,10 +216,11 @@ class MeleeForgeTests(unittest.TestCase):
         fire(w, spawn_hazard=lambda **kw: craters.append(kw))
         self.assertEqual(len(craters), 1)
         c = craters[0]
-        self.assertAlmostEqual(c["radius"], 64)
-        self.assertAlmostEqual(c["duration"], 2.5)
-        self.assertAlmostEqual(c["dps"], float(w.definition["damage"]) * 0.35)   # the Forge's lighter blow
-        self.assertAlmostEqual(c["pos"].x, 40.0)          # CR1: at the circle's centre
+        self.assertAlmostEqual(c["radius"], FX("meteor_hammer", "hazard_radius"))
+        self.assertAlmostEqual(c["duration"], FX("meteor_hammer", "hazard_duration"))
+        self.assertAlmostEqual(c["dps"], float(w.definition["damage"])      # the Forge's lighter blow
+                               * FX("meteor_hammer", "hazard_dps_mult"))
+        self.assertAlmostEqual(c["pos"].x, OFF)           # CR1: at the circle's centre
         self.assertEqual(c["weapon_id"], "hammer")
         self.assertIn("crater", c["source_tags"])
 
@@ -264,7 +280,8 @@ class RangedForgeTests(unittest.TestCase):
     def test_fan_of_blades_throws_four(self):
         w = weapon("daggers", "fan_of_blades")
         s = fire(w, [FakeEnemy(150, 0)])
-        self.assertEqual(len(s), 4)
+        self.assertEqual(len(s), OV("fan_of_blades", "projectile_count"))
+        self.assertGreater(len(s), 1)
         self.assertTrue(all(x.vel.length() > 0 for x in s))
         self.assertTrue(all(getattr(x, "cone_half_angle", 0.0) == 0.0 for x in s))
         self.assertEqual(w.category, "projectile")
@@ -272,11 +289,12 @@ class RangedForgeTests(unittest.TestCase):
 
     def test_multishot_and_ballista(self):
         m = fire(weapon("bow", "multishot"), [FakeEnemy(200, 0)])
-        self.assertEqual(len(m), 3)
-        self.assertEqual(len({round(x.vel.y) for x in m}), 3)
+        self.assertEqual(len(m), OV("multishot", "projectile_count"))
+        self.assertEqual(len({round(x.vel.y) for x in m}), len(m))
         b = fire(weapon("bow", "ballista"), [FakeEnemy(200, 0)])
         self.assertEqual(len(b), 1)
-        self.assertEqual(b[0].pierce, 8)
+        self.assertEqual(b[0].pierce, OV("ballista", "pierce"))
+        self.assertGreater(b[0].pierce, C.weapon("bow")["pierce"])
         self.assertGreater(b[0].damage, 3 * C.weapon("bow")["damage"])
 
     def test_arcane_storm_orbits_instead_of_firing(self):
@@ -284,13 +302,14 @@ class RangedForgeTests(unittest.TestCase):
         sink = []
         self.assertFalse(w.update(1 / 60, ctx([FakeEnemy(60, 0)], sink)))
         live = [o for o in sink if o.active]
-        self.assertEqual(len(live), 4)
+        self.assertEqual(len(live), OV("arcane_storm", "projectile_count"))
         self.assertTrue(all(o.orbit_speed != 0 for o in live))
 
     def test_arcane_lance_pierces_a_line(self):
         s = fire(weapon("magic_rod", "arcane_lance"), [FakeEnemy(200, 0)])
         self.assertEqual(len(s), 1)
-        self.assertEqual(s[0].pierce, 6)
+        self.assertEqual(s[0].pierce, OV("arcane_lance", "pierce"))
+        self.assertGreater(s[0].pierce, C.weapon("magic_rod")["pierce"])
         self.assertGreater(s[0].damage, 3 * C.weapon("magic_rod")["damage"])
 
 
@@ -344,22 +363,24 @@ class BombForgeTests(unittest.TestCase):
         bomb, w = self._bomb_projectile(ps, "cluster_bomb")
         ps.fx.update_projectiles(0.1)                      # fuse out -> blast + bomblets
         kids = [p for p in ps.projectiles if p.active and "cluster" in p.source_tags]
-        self.assertEqual(len(kids), 3)
+        n = FX("cluster_bomb", "cluster_count")
+        self.assertEqual(len(kids), n)
         for k in kids:
             self.assertTrue(k.inert)
-            self.assertAlmostEqual(k.damage, 24 * 0.4)
-            self.assertAlmostEqual(k.blast_radius, 72 * 0.6)
+            self.assertAlmostEqual(k.damage, 24 * FX("cluster_bomb", "cluster_damage_mult"))
+            self.assertAlmostEqual(k.blast_radius, 72 * FX("cluster_bomb", "cluster_radius_mult"))
             self.assertGreater(k.vel.length(), 0)
         for _ in range(60):                                # bomblets go off
             ps.fx.update_projectiles(1 / 60)
-        self.assertEqual(len(ps._explosions), 4)          # 1 + 3, no grandchildren
+        self.assertEqual(len(ps._explosions), 1 + n)      # no grandchildren
 
     def test_bomblets_blessing_adds_more(self):
         ps = fake_ps([])
         bomb, w = self._bomb_projectile(ps, "cluster_bomb")
         w.bonus["cluster_count"] = 2
         ps.fx.update_projectiles(0.1)
-        self.assertEqual(len([p for p in ps.projectiles if p.active and "cluster" in p.source_tags]), 5)
+        self.assertEqual(len([p for p in ps.projectiles if p.active and "cluster" in p.source_tags]),
+                         FX("cluster_bomb", "cluster_count") + 2)
 
     def test_minefield_throws_armed_mines(self):
         w = weapon("bomb", "minefield")
@@ -369,8 +390,8 @@ class BombForgeTests(unittest.TestCase):
         s = fire(w, [FakeEnemy(float(w.definition["reach"]) * 0.4, 0)])
         self.assertEqual(len(s), 1)
         self.assertTrue(s[0].mine)
-        self.assertAlmostEqual(s[0].arm_delay, 0.6)
-        self.assertAlmostEqual(s[0].lifetime, 25)
+        self.assertAlmostEqual(s[0].arm_delay, FX("minefield", "mine_arm_delay"))
+        self.assertAlmostEqual(s[0].lifetime, FX("minefield", "mine_lifetime"))
         self.assertTrue(s[0].inert)
 
     def test_a_mine_waits_until_armed_then_trips_on_contact(self):

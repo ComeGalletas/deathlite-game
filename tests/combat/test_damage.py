@@ -1,4 +1,4 @@
-"""Milestone 2: pure damage math."""
+"""Pure damage math."""
 import random
 import unittest
 

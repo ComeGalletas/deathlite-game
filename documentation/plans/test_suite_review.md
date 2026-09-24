@@ -115,8 +115,9 @@ session's next goal.)*
 ### Still open, smaller
 
 *(DOC-005, 2026-09-24: still **pending** — `tests/world/test_digest.py` still hashes `W.baked(seed)` where the writer uses `world_digests`.)*
+*(TST-004, 2026-09-24: done — the three pin tests read `digest.world_digests(seed)`, one fresh build per seed shared between them, and a new test asserts the suite, the writer and `digests.json` pin the same seeds; `test_debt_journal.md`, TST-004.2.)*
 
-- [ ] `test_the_bake_is_pinned` and `test_the_frame_is_pinned` hash
+- [x] `test_the_bake_is_pinned` and `test_the_frame_is_pinned` hash
       `W.baked(seed)` — the *shared cached* world from `tests/worlds.py`, baked
       under whatever ambient config the first caller happened to have — while
       `python -m tools.verification.world_digest --write` hashes a fresh `GameMap`. They agree
@@ -210,6 +211,8 @@ were behaviour-preserving rather than merely test-passing.
 
 ## 4. Coverage gaps worth closing
 
+*(TST-004, 2026-09-24: the three open lines done — `village_tidy` 68.5 → 96.6 %, `validate` 70.0 → 100 %, `mixer_backend` 65.5 → 98.2 %, `debug_overlay` 47.2 → 100 %; `world/gen/graph.py` 59.7 → 61.0 %, the rest of its gap being three helpers nothing calls (owner decision, TST-004.D6). Subset-measured; `test_debt_journal.md` TST-004.7.)*
+
 At 91.3 % the gaps are narrow and specific. In priority order:
 
 - [x] **`game/states/game_over_state.py` — was 0 % (35 stmts).** The death
@@ -222,13 +225,13 @@ At 91.3 % the gaps are narrow and specific. In priority order:
 - [x] **`game/states/meta_state.py` — 22.5 % (86 missed).** Meta-progression
       screen. The same fake-game approach should reach most of it. *(DOC-005: 89.0 % in the 2026-09-22 coverage run — the Sanctuary mouse tests and the screen tests reach it)*
 - [x] **`game/states/victory_state.py` — 31.4 %.** Win path. *(DOC-003: `tests/screens/test_victory.py` (42 tests) landed 2026-09-12; coverage not re-measured)*
-- [ ] **`world/gen/village_tidy.py` — 67.8 %** and **`game/states/playing/slam_fx.py`
+- [x] **`world/gen/village_tidy.py` — 67.8 %** and **`game/states/playing/slam_fx.py`
       — 70.8 %.** Both new in the current working tree; worth topping up before
       the rework lands rather than after. *(DOC-005, 2026-09-22 run: `slam_fx` is at 98.5 % — done; `village_tidy` rose to 79.9 % and is the half still open)*
-- [ ] **`world/gen/graph.py` — 61 %**, **`world/gen/validate.py` — 75 %**,
+- [x] **`world/gen/graph.py` — 61 %**, **`world/gen/validate.py` — 75 %**,
       **`world/gen/height/graph.py` — 80.8 %.** Generation-stage validation is
       exactly the code a pinned-digest suite cannot check. *(DOC-005, 2026-09-22 run: `world/gen/graph.py` 59.7 %, `validate.py` 75.0 % — no better; still open)*
-- [ ] **`systems/mixer_backend.py` — 45.5 %** and **`systems/debug_overlay.py` —
+- [x] **`systems/mixer_backend.py` — 45.5 %** and **`systems/debug_overlay.py` —
       52.8 %.** Lower value; the mixer is partly environment-gated by design. *(DOC-005, 2026-09-22 run: `mixer_backend` 65.5 %, `debug_overlay` 52.8 %; still open, still lower value)*
 
 ### Exclude the tooling from the number — DONE
@@ -263,7 +266,9 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 **Todo**
 
-- [ ] For the layout-content skips, search the four pinned seeds for one that has *(DOC-003: interactables fixed (`test_interactables.py`); the seed-dependent skips left are listed in `cut_script_skips_journal.md` (TST-002, *Follow-up candidates*))*
+*(TST-004, 2026-09-24: done — the last 18 conditional skips (seed-dependent, mixer, numpy, SDL through ctypes, the dead void band) are assertions, hand-built cases or always-runnable checks; TST-004.3 in `test_debt_journal.md`. No live `skipTest` is left in `tests/`.)*
+
+- [x] For the layout-content skips, search the four pinned seeds for one that has *(DOC-003: interactables fixed (`test_interactables.py`); the seed-dependent skips left are listed in `cut_script_skips_journal.md` (TST-002, *Follow-up candidates*))*
       the feature and assert it is found, rather than skipping. `tests/worlds.py`
       makes this nearly free.
 - [x] For `"tileset missing"`, decide whether a missing tileset should be a *(DOC-003: decided by the owner 2026-09-22 — yes, a missing tileset fails; done as TST-003, `925502c`)*
@@ -275,25 +280,27 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 ## 6. Duplication and organisation
 
-- [ ] `tests/flows/test_dev_mode.py:38` defines `_settle()`, a verbatim copy of
+*(TST-004, 2026-09-24: done — all six items; TST-004.5.1–5.6 in `test_debt_journal.md`. The weapon modules are now `test_weapon_roster`, `test_weapon_fire`, `test_weapon_specials`, `test_weapon_blessings` and `test_hammer_swing`; `test_boss.py` keeps its phase tag because the parallel boss refactor owns it.)*
+
+- [x] `tests/flows/test_dev_mode.py:38` defines `_settle()`, a verbatim copy of
       `tests/boot.py::settle`. 17 other modules import the shared one. Delete the
       copy.
-- [ ] Six `FakeEnemy` and three `FakeProj` definitions are scattered across
+- [x] Six `FakeEnemy` and three `FakeProj` definitions are scattered across
       `test_manual_aim`, `test_summons`, `test_weapons`, `test_weapons_reach` and
       `test_weapons_special`, although `tests/combat/fakes.py` is the designated
       home. Consolidate.
-- [ ] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15 *(DOC-003: now 1,076 lines)*
+- [x] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15 *(DOC-003: now 1,076 lines)*
       classes are character-select. Split out `test_character_select.py`.
-- [ ] The six weapon modules are keyed by the plan phase that produced them
+- [x] The six weapon modules are keyed by the plan phase that produced them
       (`test_weapons` = Milestone 2, `test_weapons_special` = Milestone 4,
       `test_weapons_reach` = CB-2, `test_weapon_classes` = P1,
       `test_weapon_effects` = P2, `test_hammer_swing` = change request 1) rather
       than by concern. Now that the six-weapon rework is landing, regroup by
       subject: roster/data, fire path, special effects, blessings.
-- [ ] `tests/entities/ai/test_fsm_enemies.py` (Milestone 9) and
+- [x] `tests/entities/ai/test_fsm_enemies.py` (Milestone 9) and
       `tests/entities/ai/test_ai_behaviors_fsm.py` both cover charger / teleporter /
       warlock. Merge.
-- [ ] 50 modules open with the plan phase they were written in (`"""Milestone 2:`, *(DOC-003: 39 modules still open with a phase tag (was 50))*
+- [x] 50 modules open with the plan phase they were written in (`"""Milestone 2:`, *(DOC-003: 39 modules still open with a phase tag (was 50))*
       `"""R4 --`, `"""CB-2:`, `"""LD-9 phase D7:`). Those plans are done; retitle
       by subject and keep the phase reference only where it explains *why* a
       thing is pinned.
@@ -302,18 +309,21 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 ## 7. Small, specific
 
-- [ ] `tests/combat/test_weapons.py:128`
+*(TST-004, 2026-09-24: the three test nits done — TST-004.5.7–5.9; the balance-number audit is TST-004.6.)*
+
+- [x] `tests/combat/test_weapons.py:128`
       `test_one_multishot_upgrade_does_not_crash_any_weapon` ends on a computed
       expression that is discarded (`math.radians(...) * (count - 1)`). The
       `KeyError` guard is real but invisible; make it an explicit assertion or
       drive the actual fire path.
-- [ ] `tests/systems/test_events.py:26` `test_clear_removes_everything` subscribes a
+- [x] `tests/systems/test_events.py:26` `test_clear_removes_everything` subscribes a
       handler, clears, publishes — and never observes that the handler did not
       fire. Record calls and assert the list is empty.
-- [ ] `tests/render/test_weapon_rigs.py:137`
+- [x] `tests/render/test_weapon_rigs.py:137`
       `test_legacy_true_and_no_fx_keep_the_old_rig` — `soul_slash` is the current
       default for a cone weapon with no visuals entry, not a legacy path. Rename.
-- [ ] ~38 assertions across 20 modules pin exact balance numbers from the data
+*(TST-004, 2026-09-24: done — ~95 found in 24 modules; the tuning ones read `data/` now and assert the relation they stood for, the contracts (owner decisions, design rules, counts a test is named for) stay literal; TST-004.6 in `test_debt_journal.md`.)*
+- [x] ~38 assertions across 20 modules pin exact balance numbers from the data
       JSONs (`aegis.stats["max_hp"] == 160`, `H["damage"] == 25`). Audit them:
       where the number is a contract, keep it; where it is tuning, assert the
       invariant (ordering, ratio, range) so a balance pass does not report a bug.

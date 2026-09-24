@@ -1688,7 +1688,7 @@ used directly.
   confirm the wolf faces its target both ways, bites on contact, and the
   bite-disc is gone. `scale [32,21]` / `anchor [16,16]` kept -- read fine,
   nudge to ~`[36,24]` later if it wants more presence next to big enemies.
-- [ ] **WA5 -- tests + housekeeping.** `tests/rendering/test_summons.py` *(DOC-003: partly done: `.gitignore` `assets/unused/**` covers the guide and colourways, and `tests/combat/test_summons.py` covers wolf behaviour; the render tests (now `tests/render/`) and the README decision are still open)*
+- [ ] **WA5 -- tests + housekeeping.** `tests/rendering/test_summons.py` *(DOC-003: partly done: `.gitignore` `assets/unused/**` covers the guide and colourways, and `tests/combat/test_summons.py` covers wolf behaviour; the render tests (now `tests/render/`) and the README decision are still open)* *(TST-004, 2026-09-24: the render tests are done — `tests/render/test_summons.py`, 14 tests: registry, the bite's `melee` classify, wolf sprite vs. disc fallback, `bite_*` held for `_BITE_ANIM_S` (0.32 s) then `run_*`, run facing follows `vel.x`; `test_debt_journal.md` TST-004.8. Only the README decision is still open.)*
   (registry + classify + wolf sprite-vs-fallback + `bite_*` shows for ~0.25 s
   after a bite + run direction follows `vel.x`). `.gitignore` `wolf-guide.png`
   and the unused `*-colorways/` dirs (or keep -- decide at WA5). `README` Assets

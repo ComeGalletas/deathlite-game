@@ -1,4 +1,4 @@
-"""CB-7: the hero's HP regeneration stat and the Mending blessing.
+"""The hero's HP regeneration stat and the Mending blessing.
 
 Every hero drips `stats["hp_regen"]` HP once per `config.HP_REGEN_INTERVAL`
 seconds. The cadence is a fixed global; only the amount is a stat, and the
@@ -149,37 +149,41 @@ class MendingTests(unittest.TestCase):
         self.assertEqual(b.effects[0].stat, "hp_regen")
         self.assertEqual(b.effects[0].op, "flat")
 
-    def test_each_level_adds_one_hp_to_the_tick(self):
+    def test_each_level_adds_its_table_value_to_the_tick(self):
         p = hero()
+        base = p.hp_regen
         b = CAT.get("mending")
         for level in range(1, b.max_level + 1):
             apply_blessing(p, b)
-            self.assertAlmostEqual(p.hp_regen, 1.0 + level)
+            self.assertAlmostEqual(p.hp_regen, base + b.effects[0].value_at(level))
 
     def test_the_blessing_raises_the_payout_not_the_cadence(self):
         p = hero()
-        apply_blessing(p, CAT.get("mending"))     # Mending I -> 2 HP a tick
+        base = p.hp_regen
+        b = CAT.get("mending")
+        apply_blessing(p, b)                      # Mending I
         p.hp = 50.0
         p.tick_regen(TICK - 0.01)
         self.assertAlmostEqual(p.hp, 50.0)        # still nothing early
         p.tick_regen(0.01)
-        self.assertAlmostEqual(p.hp, 52.0)
+        self.assertAlmostEqual(p.hp, 50.0 + base + b.effects[0].value_at(1))
 
-    def test_at_max_level_the_hero_regenerates_six_hp_a_tick(self):
+    def test_at_max_level_the_tick_pays_the_top_of_the_table(self):
         p = hero()
+        base = p.hp_regen
         b = CAT.get("mending")
         for _ in range(b.max_level):
             apply_blessing(p, b)
         p.hp = 50.0
         p.tick_regen(TICK)
-        self.assertAlmostEqual(p.hp, 56.0)
+        self.assertAlmostEqual(p.hp, 50.0 + base + b.effects[0].value_at(b.max_level))
 
     def test_the_card_text_states_the_real_cadence(self):
         # The description hardcodes the interval; pin it to the constant so
         # retuning `HP_REGEN_INTERVAL` cannot leave the card lying.
         text = CAT.get("mending").describe(1)
         self.assertIn(f"every {config.HP_REGEN_INTERVAL:g}s", text)
-        self.assertIn("+1", text)
+        self.assertIn(f"+{CAT.get('mending').effects[0].value_at(1):g}", text)
 
     def test_regen_cannot_be_driven_negative(self):
         p = hero()

@@ -20,6 +20,16 @@ def weapon(wid):
     return Weapon(wid, get_content().weapon(wid))
 
 
+def base(cid, stat):
+    """A hero's tuned stat as the data gives it, or the code default."""
+    return get_content().character(cid)["base_stats"].get(stat, config.PLAYER_DEFAULTS[stat])
+
+
+def guard(cid="aegis"):
+    """Bulwark's damage multiplier, from the data."""
+    return get_content().character(cid)["trait_params"]["damage_taken_mult"]
+
+
 class _FixedRng:
     """`random()` returns the queued values in order (then 1.0: never rolls)."""
     def __init__(self, *values):
@@ -55,7 +65,9 @@ class CharacterDataTests(unittest.TestCase):
 class CharacterBuildTests(unittest.TestCase):
     def test_base_stats_override_defaults(self):
         aegis, kestrel = hero("aegis"), hero("kestrel")
-        self.assertEqual(aegis.stats["max_hp"], 160)
+        self.assertEqual(aegis.stats["max_hp"], base("aegis", "max_hp"))
+        self.assertNotEqual(base("aegis", "max_hp"), config.PLAYER_DEFAULTS["max_hp"],
+                            "Aegis overrides the default")
         self.assertGreater(kestrel.move_speed, aegis.move_speed)
         self.assertLess(kestrel.stats["max_hp"], aegis.stats["max_hp"])
 
@@ -66,7 +78,8 @@ class CharacterBuildTests(unittest.TestCase):
         self.assertEqual(p.incoming_damage_multiplier(), 1.0)
         p.still_time = 0.5
         self.assertTrue(p.bulwark_active)
-        self.assertAlmostEqual(p.incoming_damage_multiplier(), 0.7)
+        self.assertAlmostEqual(p.incoming_damage_multiplier(), guard())
+        self.assertLess(guard(), 1.0)
 
     def test_bulwark_numbers_come_from_the_data(self):
         c = get_content().character("aegis")["trait_params"]
@@ -109,38 +122,46 @@ class TraitWeaponModTests(unittest.TestCase):
 
 
 class DefensiveStatTests(unittest.TestCase):
-    """Design §20: base evasion 5 % (Kestrel 10 %); block only on Aegis at
-    30 %; a block removes 50 %; both roll before the trait and armour."""
+    """Design §20: a base evasion every hero shares, Kestrel's higher; block
+    only on Aegis; a block removes `block_strength`; both roll before the
+    trait and armour. The code defaults are pinned; the heroes' tuned stats
+    are read from `data/` and held to those relations (TST-004.6)."""
 
     def test_hero_bases(self):
         self.assertAlmostEqual(config.PLAYER_DEFAULTS["evasion_chance"], 0.05)
         self.assertAlmostEqual(config.PLAYER_DEFAULTS["block_chance"], 0.0)
         self.assertAlmostEqual(config.PLAYER_DEFAULTS["block_strength"], 0.5)
-        self.assertAlmostEqual(hero("aegis").stats["evasion_chance"], 0.05)
-        self.assertAlmostEqual(hero("nihil").stats["evasion_chance"], 0.05)
-        self.assertAlmostEqual(hero("kestrel").stats["evasion_chance"], 0.10)
-        self.assertAlmostEqual(hero("aegis").stats["block_chance"], 0.30)
-        self.assertAlmostEqual(hero("kestrel").stats["block_chance"], 0.0)
-        self.assertAlmostEqual(hero("nihil").stats["block_chance"], 0.0)
+        for cid in ("aegis", "nihil", "kestrel"):
+            for stat in ("evasion_chance", "block_chance"):
+                self.assertAlmostEqual(hero(cid).stats[stat], base(cid, stat), msg=f"{cid} {stat}")
+        self.assertGreater(base("kestrel", "evasion_chance"), base("aegis", "evasion_chance"))
+        self.assertGreater(base("kestrel", "evasion_chance"), base("nihil", "evasion_chance"))
+        self.assertGreater(base("aegis", "block_chance"), 0.0)
+        self.assertEqual(base("kestrel", "block_chance"), 0.0)
+        self.assertEqual(base("nihil", "block_chance"), 0.0)
 
     def test_evasion_negates_the_hit(self):
-        p = hero("kestrel", rng=_FixedRng(0.01))            # under 10 %: evaded
+        p = hero("kestrel", rng=_FixedRng(0.01))            # under Kestrel's evasion: evaded
+        self.assertLess(0.01, p.stats["evasion_chance"])
         hp = p.hp
         self.assertEqual(p.take_damage(40), 0.0)
         self.assertEqual(p.hp, hp)
         self.assertEqual(p.last_defense, "evaded")
 
     def test_block_halves_the_hit_before_armour(self):
-        # Aegis: armour 4. Evasion roll misses (0.9), block roll lands (0.1).
+        # Evasion roll misses (0.9), block roll lands (0.1).
         p = hero("aegis", rng=_FixedRng(0.9, 0.1))
         p.still_time = 0.0
-        self.assertAlmostEqual(p.take_damage(40), 40 * 0.5 - 4)
+        self.assertLess(0.1, p.stats["block_chance"])
+        self.assertAlmostEqual(p.take_damage(40),
+                               40 * p.stats["block_strength"] - p.stats["armor"])
         self.assertEqual(p.last_defense, "blocked")
 
     def test_block_then_bulwark_then_armour(self):
         p = hero("aegis", rng=_FixedRng(0.9, 0.1))
-        p.still_time = 1.0                                    # guard up: x0.7
-        self.assertAlmostEqual(p.take_damage(40), 40 * 0.5 * 0.7 - 4)
+        p.still_time = 1.0                                    # guard up
+        self.assertAlmostEqual(p.take_damage(40),
+                               40 * p.stats["block_strength"] * guard() - p.stats["armor"])
 
     def test_no_roll_lands_plain_damage(self):
         # Neither roll fires, so nothing multiplies the hit -- armor still
@@ -153,7 +174,7 @@ class DefensiveStatTests(unittest.TestCase):
         from progression.stats import FLAT, Modifier
         p = hero("aegis", rng=_FixedRng(0.9, 0.1))
         p.add_modifiers(Modifier("block_strength", FLAT, 0.25, "test"))
-        self.assertAlmostEqual(p.take_damage(40), 40 * 0.25 - 4)
+        self.assertAlmostEqual(p.take_damage(40), 40 * 0.25 - p.stats["armor"])
 
     def test_a_bare_player_rolls_with_its_own_rng(self):
         p = Player(0, 0)

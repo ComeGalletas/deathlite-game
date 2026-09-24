@@ -216,7 +216,8 @@ class BlessingDamageScaleTests(unittest.TestCase):
                         self.assertEqual(e_new, e_old, f"{bid}: a non-damage effect moved")
             # Heavy Blade: damage up, its weight and slower swing untouched.
             hb = catalog.by_id["sword_heavy_blade"]
-            self.assertAlmostEqual(hb.effects[0].levels[-1], 20 * 1.25)
+            self.assertAlmostEqual(hb.effects[0].levels[-1],
+                                   before["sword_heavy_blade"].effects[0].levels[-1] * 1.25)
             self.assertEqual(hb.effects[1].levels, before["sword_heavy_blade"].effects[1].levels)
             self.assertEqual(hb.effects[2].levels, before["sword_heavy_blade"].effects[2].levels)
         finally:
@@ -248,8 +249,9 @@ class BlessingDamageScaleTests(unittest.TestCase):
             finally:
                 restore()
 
-        self.assertAlmostEqual(sword_plus_edge(1.0), 15.0)
-        self.assertAlmostEqual(sword_plus_edge(1.25), 15.0 * 1.25)
+        top = get_catalog(get_content()).by_id["sword_sharpened_edge"].effects[0].levels[-1]
+        self.assertAlmostEqual(sword_plus_edge(1.0), top)            # tuned in blessings.json
+        self.assertAlmostEqual(sword_plus_edge(1.25), top * 1.25)
 
 
 class MeasurementTests(unittest.TestCase):

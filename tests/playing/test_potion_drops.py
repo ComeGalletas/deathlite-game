@@ -1,4 +1,4 @@
-"""CB-8 in the run: the potion pickup, collection, and the drop wiring.
+"""The potion pickup, collection, and the drop wiring.
 
 Covers `entities.potion.HealthPotion` against a stub hero, then the real
 `PlayingState` paths -- the kill roll, the pool cap, the run stats, and the

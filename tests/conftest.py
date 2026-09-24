@@ -23,6 +23,13 @@ SWEEP = (
     "test_the_average_island_carries_two_to_three",
 )
 
+# Hand-built grids under a `world` prefix: rules checked on drawings small
+# enough to read, nothing generated (worldgen R4). Listed before `WORLD` so
+# the `tests/world/` prefix does not claim them.
+UNIT = (
+    "tests/world/grids/",
+)
+
 # Modules that read generated worlds (through tests/worlds.py or directly).
 WORLD = (
     "tests/world/",
@@ -56,7 +63,7 @@ INTEGRATION = (
     "tests/playing/test_potion_drops.py",
     "tests/screens/test_hero_select_preview.py",
     "tests/playing/test_manual_aim.py",
-    "tests/combat/test_weapons_special.py",
+    "tests/combat/test_weapon_specials.py",
     "tests/flows/test_controls.py",
     "tests/flows/test_dev_mode.py",
     "tests/flows/test_hero_unlock.py",
@@ -70,6 +77,7 @@ INTEGRATION = (
     "tests/render/test_hostile_glow.py",
     "tests/screens/test_level_up.py",
     "tests/screens/test_menu.py",
+    "tests/screens/test_character_select.py",
     "tests/screens/test_mouse.py",
     "tests/screens/test_options.py",
     "tests/screens/test_pause.py",
@@ -87,6 +95,8 @@ def pytest_collection_modifyitems(config, items):
         path = item.nodeid.replace("\\", "/")
         if any(path.startswith(p) for p in SWEEP):
             item.add_marker(pytest.mark.sweep)
+        elif any(path.startswith(p) for p in UNIT):
+            item.add_marker(pytest.mark.unit)
         elif any(path.startswith(p) for p in WORLD):
             item.add_marker(pytest.mark.world)
         elif any(path.startswith(p) for p in INTEGRATION):

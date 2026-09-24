@@ -1,4 +1,4 @@
-"""LD-9 phase D7: aggro range and the pursuit timer.
+"""Aggro range and the pursuit timer.
 
 Before this, every enemy chased from anywhere on the map for ever. On the
 height-map worlds that is untenable -- movement between terraces is by

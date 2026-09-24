@@ -1,4 +1,4 @@
-"""CB-3: `BumpResolver` (unit bumping) + the hero-shove and weapon-hit
+"""`BumpResolver` (unit bumping) + the hero-shove and weapon-hit
 knockback that share `combat.knockback.knock_split`.
 
 `BumpResolver` only needs `ps.enemies`, `ps.boss`, `ps.player`, each a body

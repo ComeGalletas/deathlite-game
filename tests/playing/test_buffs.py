@@ -23,7 +23,7 @@ from game.states.playing.core import interactions
 from game.states.playing.visual import key_marker
 from tests import worlds as W
 from tests.boot import start_run
-from tests.combat.test_weapons import BOLT
+from tests.combat.test_weapon_fire import BOLT
 
 SEED = W.pinned(2)
 _RUN = None

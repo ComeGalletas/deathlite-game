@@ -1,4 +1,4 @@
-"""Milestone 2: object pool acquire / sweep / cap / reuse / clear."""
+"""Object pool acquire / sweep / cap / reuse / clear."""
 import unittest
 
 from systems.object_pool import Pool

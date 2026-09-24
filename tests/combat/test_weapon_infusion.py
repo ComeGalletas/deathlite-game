@@ -279,7 +279,7 @@ class FiringTests(unittest.TestCase):
     def test_firing_an_infused_weapon_stamps_its_projectiles(self):
         """End to end: the weapon fires itself, and the spread reaches the
         projectile without anything in between being told about elements."""
-        from tests.combat.test_weapons import make_context
+        from tests.combat.test_weapon_fire import make_context
 
         target = FakeEnemy(60.0, 0.0)
         w = weapon("bow", FIRE, interval=1)
@@ -311,7 +311,7 @@ class TheLookFollowsTheInfusionTests(unittest.TestCase):
     """
 
     def spawns(self, wid, element, attacks=4, **over):
-        from tests.combat.test_weapons import make_context
+        from tests.combat.test_weapon_fire import make_context
 
         target = FakeEnemy(60.0, 0.0)
         w = weapon(wid, element, **over)
@@ -345,7 +345,7 @@ class TheLookFollowsTheInfusionTests(unittest.TestCase):
                 self.assertEqual(w.element, ICE)
 
     def test_an_orbiter_carries_the_infusion(self):
-        from tests.combat.test_weapons import make_context
+        from tests.combat.test_weapon_fire import make_context
 
         target = FakeEnemy(20.0, 0.0)
         w = weapon("ember_ring", ICE)

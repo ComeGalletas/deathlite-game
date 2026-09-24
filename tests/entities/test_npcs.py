@@ -1,4 +1,4 @@
-"""HI-3: the villagers (`entities/npc.py`, `game/states/playing/core/npcs.py`).
+"""The villagers (`entities/npc.py`, `game/states/playing/core/npcs.py`).
 
 Driven through a real headless run so the NPCs are built from the same
 `Village` records and step against the same map the game uses. One run per
@@ -217,12 +217,11 @@ class VillagerTests(unittest.TestCase):
         # Beyond the aggro radius of this lancer, and of every other one:
         # another post may stand between here and there.
         lancers = self._by_kind("lancer")
-        for ang in range(0, 360, 30):
-            far = n.base() + pygame.Vector2(n.aggro + 3 * config.TILE_PX, 0).rotate(ang)
-            if all(far.distance_to(l.pos) > l.aggro * 1.5 for l in lancers):
-                break
-        else:
-            self.skipTest("no spot clear of every lancer's aggro radius")
+        rings = [n.base() + pygame.Vector2(n.aggro + tiles * config.TILE_PX, 0).rotate(ang)
+                 for tiles in (3, 5, 8) for ang in range(0, 360, 30)]
+        far = next((q for q in rings
+                    if all(q.distance_to(l.pos) > l.aggro * 1.5 for l in lancers)), None)
+        self.assertIsNotNone(far, "no spot clear of every lancer's aggro radius")
         foe = Enemy("turtle", get_content().enemy("turtle"), far.x, far.y)
         p.enemies.append(foe)
         try:
@@ -284,7 +283,7 @@ class VillagerTests(unittest.TestCase):
             got = p.game_map.resolve_movement(p.player.pos, target, r)
             self.assertEqual(got, target)
             return
-        self.skipTest("no villager standing in the open on this seed")
+        self.fail("no villager standing in the open on this seed")
 
     def test_villagers_are_seeded_by_the_world(self):
         """The same seed builds the same people in the same places."""

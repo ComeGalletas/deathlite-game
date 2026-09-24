@@ -1,4 +1,4 @@
-"""R1 -- the composable-AI scaffold (`entities/ai/`): Blackboard, Steering, the
+"""The composable-AI scaffold (`entities/ai/`): Blackboard, Steering, the
 Component/Transition/Behavior machine, and the name registry. No behaviours or
 game wiring yet -- just that the pieces compose."""
 import random

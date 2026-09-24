@@ -71,6 +71,8 @@ now holds everywhere. One task per test module, then the results.
 
 *(DOC-005, 2026-09-24: the tileset skips are gone (TST-003). The rest are still in `tests/` and still **pending**. `tests/world/test_elevation.py:136` can never fire (`HEIGHTMAP_COAST_KEEP` is 2) and can simply be removed; the others are seed- or environment-dependent (SDL through ctypes, numpy, the mixer))*
 
+*(TST-004, 2026-09-24: done — every site below is an assertion, a hand-built case or an always-runnable check; one subtask per module, TST-004.3.1–3.10 in `test_debt_journal.md`. The grep now finds no live skip in `tests/`.)*
+
 Other conditional `skipTest` calls found by `grep -rn skipTest tests`. The four
 the owner named come first; the rest turned up in the same sweep.
 

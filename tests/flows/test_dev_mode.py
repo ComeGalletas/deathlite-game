@@ -16,6 +16,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from tests.boot import settle
 from tests.nearby import spots_near
 from tests import worlds as W
 
@@ -37,18 +38,6 @@ def _game():
 
 def _key(game, k):
     game.state_machine.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k))
-
-
-def _settle(game, limit=5000):
-    """Drive the loading screen, if that is where the game is, until the run
-    has started."""
-    from game.states.loading_state import LoadingState
-    for _ in range(limit):
-        if not isinstance(game.state_machine.current, LoadingState):
-            break
-        game.state_machine.update(1 / 60)
-        game._render()
-    return game.state_machine.current
 
 
 def _start_dev_run(game, seed=SEED):
@@ -77,7 +66,7 @@ class DevFlagPropagationTests(unittest.TestCase):
         self.assertIsInstance(game.state_machine.current, CharacterSelectState)
         self.assertTrue(game.state_machine.current._dev)
         _key(game, pygame.K_RETURN)
-        playing = _settle(game)
+        playing = settle(game)
         self.assertIsInstance(playing, PlayingState)
         self.assertTrue(playing.dev_mode)
 
@@ -86,7 +75,7 @@ class DevFlagPropagationTests(unittest.TestCase):
         game.state_machine.change(MenuState(game))
         _key(game, pygame.K_RETURN)      # Start new game
         _key(game, pygame.K_RETURN)      # pick hero
-        self.assertFalse(_settle(game).dev_mode)
+        self.assertFalse(settle(game).dev_mode)
 
 
 class DevRunDoesNotSaveTests(unittest.TestCase):
@@ -144,7 +133,7 @@ class DevRunDoesNotSaveTests(unittest.TestCase):
                 break
             game.state_machine.update(1 / 60)
             game._render()
-        fresh = _settle(game)                            # the restart loads first
+        fresh = settle(game)                            # the restart loads first
         self.assertIsInstance(fresh, PlayingState)
         self.assertIsNot(fresh, playing)
         self.assertTrue(fresh.dev_mode)
@@ -159,7 +148,7 @@ class DevRunDoesNotSaveTests(unittest.TestCase):
         game = _game()
         playing = _start_dev_run(game)
         playing._end_run(victory=True)                  # e.g. a dev boss kill
-        fresh = _settle(game)                            # restarts through the loader
+        fresh = settle(game)                            # restarts through the loader
         self.assertIsInstance(fresh, PlayingState)
         self.assertTrue(fresh.dev_mode)
 
@@ -190,7 +179,7 @@ class DevMenuTests(unittest.TestCase):
         # regular run -- backquote does nothing
         game = _game()
         _start_regular_run(game)
-        playing = _settle(game)
+        playing = settle(game)
         _key(game, pygame.K_BACKQUOTE)
         self.assertIs(game.state_machine.current, playing)
         # dev run -- it opens as an overlay
@@ -278,7 +267,7 @@ class DevMenuTests(unittest.TestCase):
         seed = playing.run_seed
         playing.player.weapons.append(playing.player.weapons[0])
         menu._activate("reset")
-        fresh = _settle(game)                            # the restart loads first
+        fresh = settle(game)                            # the restart loads first
         self.assertIsInstance(fresh, PlayingState)
         self.assertIsNot(fresh, playing)
         self.assertTrue(fresh.dev_mode)
@@ -344,7 +333,7 @@ class DevMenuTests(unittest.TestCase):
         # regular run: F7 (routed through the game-loop debug-key handler) is inert
         game = _game()
         _start_regular_run(game)
-        regular = _settle(game)
+        regular = settle(game)
         self.assertIsInstance(regular, PlayingState)
         self.assertFalse(game._handle_debug_key(pygame.K_F7))   # not consumed
         self.assertFalse(regular._dev_show_colliders)
@@ -410,7 +399,7 @@ class DevMenuTests(unittest.TestCase):
         game2.state_machine.change(MenuState(game2))
         _key(game2, pygame.K_RETURN)
         _key(game2, pygame.K_RETURN)
-        regular = _settle(game2)
+        regular = settle(game2)
         self.assertIsInstance(regular, PlayingState)
         regular._dev_show_aim = True
         regular._aim = AimInput(pygame.Vector2(1, 0), "keys", held=True)
@@ -462,7 +451,7 @@ class DevMenuTests(unittest.TestCase):
     def test_f8_toggles_the_spawn_overlay_only_in_a_dev_run(self):
         game = _game()
         _start_regular_run(game)
-        regular = _settle(game)
+        regular = settle(game)
         self.assertIsInstance(regular, PlayingState)
         self.assertFalse(game._handle_debug_key(pygame.K_F8))   # not consumed
         self.assertFalse(regular._dev_show_spawn_points)

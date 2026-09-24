@@ -1,4 +1,4 @@
-"""Terrain Phase T1: data/world/terrain.json + Assets.tile() + decoration rigs.
+"""The terrain data: data/world/terrain.json + Assets.tile() + decoration rigs.
 
 Plumbing only — nothing draws terrain yet. Verifies the metadata is coherent
 and the loader slices tiles / decoration strips correctly, degrading to None on

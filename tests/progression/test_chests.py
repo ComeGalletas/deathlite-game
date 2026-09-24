@@ -104,7 +104,7 @@ class BlessingTests(unittest.TestCase):
         got = self._sample("uncommon")
         self.assertEqual(set(got), {None, "common"})
         rate = 1.0 - got.count(None) / len(got)
-        self.assertAlmostEqual(rate, 0.35, delta=0.05)
+        self.assertAlmostEqual(rate, T["chests"]["uncommon"]["blessing"]["chance"], delta=0.05)
 
     def test_a_rare_chest_always_carries_one(self):
         got = self._sample("rare")
@@ -114,7 +114,9 @@ class BlessingTests(unittest.TestCase):
     def test_a_rare_chest_leans_common(self):
         got = self._sample("rare")
         self.assertGreater(got.count("common"), got.count("uncommon"))
-        self.assertAlmostEqual(got.count("common") / len(got), 0.65, delta=0.05)
+        w = T["chests"]["rare"]["blessing"]["weights"]
+        self.assertAlmostEqual(got.count("common") / len(got), w["common"] / sum(w.values()),
+                               delta=0.05)
 
     def test_an_epic_chest_always_carries_one(self):
         got = self._sample("epic")
@@ -124,7 +126,9 @@ class BlessingTests(unittest.TestCase):
     def test_an_epic_chest_leans_uncommon(self):
         got = self._sample("epic")
         self.assertGreater(got.count("uncommon"), got.count("rare"))
-        self.assertAlmostEqual(got.count("uncommon") / len(got), 0.65, delta=0.05)
+        w = T["chests"]["epic"]["blessing"]["weights"]
+        self.assertAlmostEqual(got.count("uncommon") / len(got), w["uncommon"] / sum(w.values()),
+                               delta=0.05)
 
     def test_no_tier_offers_a_blessing_richer_than_its_own(self):
         """An uncommon chest cannot hand out a rare blessing, and so on."""

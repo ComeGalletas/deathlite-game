@@ -25,16 +25,49 @@ class NativeShimTests(unittest.TestCase):
         pygame.display.init()
         pygame.display.set_mode((320, 180))
 
+    def _with_lib(self, lib):
+        """Run with `native._lib` swapped for `lib` (restored afterwards) and
+        the kept wrapper cleared. The wrapper the test makes is left kept:
+        dropping it is the dangling-pointer crash this module pins."""
+        saved = native._lib
+        self.addCleanup(setattr, native, "_lib", saved)
+        native._lib, native._wrapper = lib, None
+
     def test_the_window_wrapper_is_made_once_and_kept(self):
-        native._wrapper = None
+        """The keeping is `_window`'s own Python, so it is checked against a
+        stand-in SDL library that answers `SDL_GetWindowFromID` for pygame's
+        real display window. That runs on every platform: a pip wheel's SDL
+        is bundled under a mangled name that `ctypes.util.find_library`
+        cannot find off Windows, and the check used to skip there
+        (TST-004.3.10). The real library is covered below."""
+        from types import SimpleNamespace
+
+        def get_window_from_id(wid):
+            return 0x1000 + int(wid)              # any non-null "pointer"
+
+        self._with_lib(SimpleNamespace(SDL_GetWindowFromID=get_window_from_id))
         sdl, ptr = native._window()
-        if ptr is None:
-            self.skipTest("SDL not reachable through ctypes on this driver")
+        self.assertIsNotNone(ptr)
         first = native._wrapper
         self.assertIsNotNone(first)
         sdl2, ptr2 = native._window()
         self.assertIs(native._wrapper, first)          # not a new wrapper per call
         self.assertEqual(ptr2, ptr)
+
+    def test_the_real_library_reaches_the_window_where_the_game_ships(self):
+        """On Windows -- the platform the game is packaged for -- pygame's
+        own `SDL2.dll` is always loadable, so the real round trip is
+        asserted there, wrapper kept included. Elsewhere `_window` must
+        answer a pointer or degrade to `(None, None)`, never raise."""
+        self._with_lib(None)                      # load it afresh
+        sdl, ptr = native._window()
+        if sys.platform == "win32":
+            self.assertIsNotNone(ptr, "SDL2.dll not reachable through ctypes")
+            first = native._wrapper
+            self.assertEqual(native._window()[1], ptr)
+            self.assertIs(native._wrapper, first)
+        else:
+            self.assertTrue((sdl, ptr) == (None, None) or ptr)
 
     def test_every_shim_degrades_instead_of_raising(self):
         # Whatever the driver says, the answers are a bool or None.

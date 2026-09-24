@@ -1,4 +1,4 @@
-"""LD-9/LD-10: the per-island biome.
+"""The per-island biome.
 
 The height-map worlds used to read a fixed `floor -> sheet` map, so every island
 on every seed wore the same tileset at the same height. Which tilesets an island

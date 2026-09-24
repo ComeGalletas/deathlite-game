@@ -1,6 +1,6 @@
-"""Six-weapon system P4 (design §10, §11): the per-enemy hit memory, the
+"""The per-enemy hit memory, the
 Rod's mark, the six explicit synergies, Hunter's Mark, and the 1.5 s window
-every one of them shares and states."""
+every one of them shares and states (design §10, §11)."""
 import os
 import unittest
 

@@ -1,4 +1,4 @@
-"""Phase 4 D5: the Rankings screen -- per-difficulty best-run records reached
+"""The Rankings screen -- per-difficulty best-run records reached
 from the menu, back to the menu on ESC/ENTER, renders with and without data."""
 import os
 import tempfile
