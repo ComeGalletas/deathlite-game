@@ -313,6 +313,8 @@ The title reads **"Game Over"** instead of "You Died". One string in
 
 ### Deferred
 
+*(DOC-005, 2026-09-24: the victory screen's summary panel is **done** (`ui/end_screen.py`). A "best DPS" record is still **pending**, never asked for (`game/save.py` `_RECORD_KEYS`))*
+
 - **The victory screen** still draws the old nine-line readout. It can take
   the panel in one line (`RunSummaryPanel(self.stats).draw(...)`) — the
   summary it receives already carries the rows. Left out because the request

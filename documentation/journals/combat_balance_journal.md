@@ -817,6 +817,8 @@ is exact and deterministic.
 
 ### Follow-ups (not blocking)
 
+*(DOC-005, 2026-09-24: both still **pending**. The skull `attack` strip is still 7 frames at 14 fps (0.5 s) against a swing of 0.725 s now (`data/enemies/enemy_sprites.json`, `enemies.json`), so the gap has grown — about 10 fps would cover it. `MELEE_REACT_SCALE` is still local to `entities/ai/behaviors/simple.py`; move it only if another system needs it)*
+
 - **Sprite sync:** the `skull` `attack` strip (7 frames @ 14 fps = 0.5 s) now
   finishes ~0.19 s before the swing ends and holds its last frame. Cut its
   `attack.fps` in `data/sprites.json` to ~11 so one swing spans the stretched
@@ -1099,6 +1101,8 @@ Click and aim key at the same time: click wins.
 
 ### Open follow-ups (not blocking)
 
+*(DOC-005, 2026-09-24: the dev-only aim line is **done** (the dev menu's "Aim line" row). Gamepad right-stick aim is still **pending**: `read_aim` (`core/aim.py`) reads the mouse and the keys only)*
+
 - An aim line is **dev-mode only**, behind its own dev-menu toggle. Planned
   in `dev_mode_journal.md` ("Aim line" entry), not here; nothing about it
   ships to normal gameplay.
@@ -1201,6 +1205,8 @@ time-to-kill pass and not a threat or economy pass.
     run — a machine-speed flake, not a data regression.
 
 ### Follow-ups (not blocking)
+
+*(DOC-005, 2026-09-24: levelling pace is **done** by another route, the XP-curve work (CB-10 and its follow-ups below). Boss HP is **answered by the owner**: bosses stay on the +50 % curve now that a second boss (the Tusked Lance, 9,990 HP) exists)*
 
 - The economy was deliberately left alone, so every enemy now pays the same XP
   for ~60 % more time-to-kill. If levelling feels slow after a playtest,
@@ -1615,6 +1621,8 @@ suite read it.
   turns a chest into a stash you can come back to.
 
 ### Follow-ups (not blocking)
+
+*(DOC-005, 2026-09-24: the gold sink is **pending** as PRG-003 (owner: none is integrated yet). Chests opened are counted (`stats["chests"]`) but not shown on the run summary — **pending**. The unused chest skins wait on a legendary tier or a boss reward — **pending**)*
 
 - **The gold sink** is the known gap, deliberately left alone at the owner's
   instruction. When gold consumption becomes its own feature, ~490 gold a
