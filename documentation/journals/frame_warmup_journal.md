@@ -1,7 +1,7 @@
 # Frame warm-up — journal
 
 **ID:** RND-005 · **System:** rendering (+ SYS) · **Type:** feature ·
-**Status:** in progress · **Branch:** claude/sys-008-run-determinism (the
+**Status:** done (D1 open to the owner) · **Branch:** claude/sys-008-run-determinism (the
 owner's choice, 2026-09-24: stay on the current branch)
 
 ---
@@ -79,7 +79,7 @@ asserts the first draw at any phase adds no cache entry.
 - [x] RND-005.1 — Measure what a world holds and what the ring leaves cold (above)
 - [x] RND-005.2 — `world/terrain/warm.py`: every non-band scaled surface, warmed as one loading step
 - [x] RND-005.3 — Tests: every non-band source is cached after loading, and a first draw at any clock phase adds nothing
-- [ ] RND-005.4 — Results; D1 to the owner
+- [x] RND-005.4 — Results; D1 to the owner
 
 ## RND-005 — Results
 
@@ -115,3 +115,12 @@ asserts the first draw at any phase adds no cache entry.
 - `test_suite_review.md`'s note on the old pinned test says it is unpinned.
 - **Tests:** `tests/flows` + `tests/render` + `tests/world` — 893 passed,
   625 subtests, 0 skipped (9 min 52 s).
+
+### RND-005.4 — Closed
+
+A run's first frame now scales nothing at any animation phase: every foam,
+bridge, decor, obstacle and shadow frame is warm before the run starts, for
+~35 MB and ~14 ms of loading. No screenshot: nothing on screen changes, only
+when the scaling happens. **Left to the owner (D1):** whether the terrace
+bands should be warmed too — 280–410 MB more a world, against a 2–11 ms
+hitch the first time each band comes on screen.
