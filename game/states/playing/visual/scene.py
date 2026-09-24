@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from game import config
 from game.states.playing.visual import elements as element_fx
-from game.states.playing.visual import slam_fx, slash_fx
+from game.states.playing.visual import cast_marker, slam_fx, slash_fx
 
 
 def depth_items(ps) -> list:
@@ -85,6 +85,7 @@ def draw_flat_effects(ps, surface, level: int) -> None:
     ren.interactables(surface, level)
     ren.chests(surface, level)     # CB-9: treasure chests
     ren.hazards(surface, level)
+    cast_marker.draw(surface, ps, level)          # ENT-013: where a cast will land
     slam_fx.draw_indicators(surface, ps, level)   # CR1: the pending swing
     ren.gems(surface, level)
     ren.potions(surface, level)   # CB-8: health potion drops
