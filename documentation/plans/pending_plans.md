@@ -11,11 +11,29 @@
 >   `layout.resource_points` (§6); the six-weapon design moved to
 >   `documentation/designs/`, and the `MENU_SCRIM` text was corrected in
 >   `FUNCTIONAL_README.md` (§9).
-> - **Still open:** the Echo and Fragmentation blessings (§1); vendoring the
->   pygame wheel for a static host (§7); the test debt now tracked in
->   `test_suite_review.md` (§8).
+> - ~~**Still open:** the Echo and Fragmentation blessings (§1)~~ — see the
+>   2026-09-24 update below; vendoring the pygame wheel for a static host
+>   (§7); the test debt now tracked in `test_suite_review.md` (§8).
 > - **Parked:** the W9 GitHub Pages deploy (§7), not needed for now (owner,
 >   2026-09-22).
+>
+> **Update, 2026-09-24 (DOC-005).** A second pass over §1–§9:
+>
+> - **Closed:** Echo and Fragmentation stay dropped — the six-blessings
+>   rework chose six per weapon without them, and the owner closed them
+>   pending the coming weapon rework (§1). Weak Point on *wounded* targets is
+>   deliberate (§1). The Forge now offers a weapon picker
+>   (`core/locations.py`) (§1). The HUD's blessing list moved to the TAB
+>   screen, which reads the catalog's names (§4).
+> - **Still pending:** Kestrel and Nihil's `attack2` / `guard` sheets and an
+>   on-screen `mark` overlay (§2); an auto-attack / aim toggle in Options —
+>   still only the in-run `Q` key (§3); the web build's wheel vendoring,
+>   finer loading steps with a progress bar, a manifest-driven pack and
+>   browser spawn-master settings, waiting on the web build (§7); the test
+>   debt in `test_suite_review.md` (§8).
+> - **Closed by the owner:** more sound cues (hammer impact, blast, stun,
+>   Forging, card taken, interactable used) — the sounds are fine for now;
+>   more of them and a tweak of the whole set come later (§5).
 >
 > The rest of this file is kept as written.
 

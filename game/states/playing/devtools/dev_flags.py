@@ -30,6 +30,8 @@ class DevFlags:
         self.show_spawn_points = False  # F8 / dev menu: generated spawn points
         self.show_aim = False           # dev menu: CB-5 manual-aim line
         self.show_auras = False         # dev menu: elemental aura inspector
+        self.show_reaction_log = False  # dev menu: CMB-009.4 reaction log
+        self.building_turn = 0          # CMB-009.5: next buff kind to seat
 
     def apply_unlimited_hp(self, run) -> None:
         """Dev toggle: HP never ends a frame lower than it started (it may still
@@ -78,6 +80,13 @@ class DevFlags:
             if not run.dev_mode:
                 return False                     # spawn-point overlay is dev-only
             self.show_spawn_points = not self.show_spawn_points
+        elif key == keys["reload_elements"]:
+            if not run.dev_mode:
+                return False                     # a tuning tool: dev-only
+            from game.states.playing.devtools.element_reload import (
+                reload_element_data)
+            ok, message = reload_element_data(run)
+            run.notice(message, seconds=2.5 if ok else 6.0)
         else:
             return False
         return True
@@ -110,6 +119,11 @@ class DevFlags:
         d.set_metric("reactions", f"{el.stats.reactions_this_frame}/frame "
                                   f"{el.stats.reactions_total} total "
                                   f"{el.pending} held")
+        # CMB-009.2: the two §9.8 counters the metrics lacked.
+        d.set_metric("thunder jumps", f"{el.stats.jump_nodes_this_frame}/frame "
+                                      f"{el.stats.jump_nodes_total} total")
+        d.set_metric("wind areas", f"{len(run.wind_areas)}/"
+                                   f"{el.registry.global_cfg.max_active_wind_areas}")
         vis = run.element_visuals
         if vis is not None:
             d.set_metric("element fx", f"{vis.report()}  "

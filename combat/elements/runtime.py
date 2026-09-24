@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import logging
 
+from game import config
 from combat.elements import reactions
 from combat.elements.profiles import log_notes, resolve
+from combat.elements.reaction_log import ReactionLog
 from combat.elements.registry import get_registry
 from combat.elements.resolve import ElementalResolver
 from combat.elements.world import RunWorld
@@ -37,5 +39,10 @@ def build_resolver(run) -> ElementalResolver:
                  overridden, len(profiles))
 
     tracking = getattr(run.ledger, "elements", None)
-    return ElementalResolver(registry, profiles=profiles, tracking=tracking,
-                             world=RunWorld(run), reaction_runner=reactions.run)
+    resolver = ElementalResolver(registry, profiles=profiles, tracking=tracking,
+                                 world=RunWorld(run), reaction_runner=reactions.run)
+    # CMB-009.4: the dev overlay's reaction log. Kept in every run -- one
+    # append per reaction into a fixed ring -- so turning the overlay on
+    # shows what already happened rather than starting empty.
+    resolver.log = ReactionLog(config.REACTION_LOG_CAPACITY)
+    return resolver

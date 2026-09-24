@@ -11,6 +11,7 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --live 200 --lod 2      # a heavier crowd, half-rate LOD
     python -m tools.benchmarks.spawn_stress --render                # time the draw as well
     python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
+    python -m tools.benchmarks.spawn_stress --cascade --render      # CMB-008: a staged reaction cascade
 
 Headless: the dummy SDL drivers are set before pygame is imported, so
 this runs anywhere the tests do. Numbers land in
@@ -125,6 +126,121 @@ def infuse(ps, seed: int) -> None:
         enemy.max_hp = enemy.hp = 1e9            # nothing dies, nothing respawns
 
 
+def cascade_setup(ps, radius: float = 220.0, prime: bool = True) -> None:
+    """CMB-008: stage the reaction cascade on purpose (after `infuse`).
+
+    The live crowd is packed into a disc of `radius` px round the hero --
+    inside a tornado's reach and a Superconduct jump's -- and primed with
+    the four elements in turn, so neighbours hold *different* auras. Any
+    aura a reaction spreads (a Wind reaction's tornado, a Superconduct
+    tree) then lands on a body holding another element and sets off the
+    next reaction, which is the chain the R38 rework made possible.
+
+    `prime=False` packs the crowd the same way and primes nothing -- the
+    `--pack` control, so what crowding costs on its own can be told apart
+    from what the cascade costs.
+    """
+    import math
+    import random
+
+    from combat.elements.ids import ELEMENTS
+
+    rng = random.Random(7)
+    home = ps.player.pos
+    now = ps.stats["time"]
+    placed = 0
+    for i, enemy in enumerate(ps.enemies):
+        for _try in range(40):
+            a = rng.uniform(0.0, math.tau)
+            d = radius * math.sqrt(rng.random())
+            x, y = home.x + math.cos(a) * d, home.y + math.sin(a) * d
+            if ps.game_map.is_walkable(type(home)(x, y), enemy.radius):
+                enemy.pos.update(x, y)
+                placed += 1
+                break
+        if prime:
+            enemy.elemental.set_aura(ELEMENTS[i % len(ELEMENTS)], now, 600.0)
+    ps._cascade_placed = placed
+
+
+class Instruments:
+    """Per-frame readings for the CMB-008 cascade measurement, taken by
+    wrapping -- nothing in the game is changed to be measured.
+
+    * the resolver gets a large `ReactionLog`, for the cascade-depth
+      histogram;
+    * the damage-number pool's `add` / `add_label` are wrapped to count
+      what they refused: element numbers ask `low_priority` and yield the
+      pool's top quarter; weapon numbers and reaction labels do not.
+    """
+
+    def __init__(self, ps) -> None:
+        from combat.elements.reaction_log import ReactionLog
+
+        self.ps = ps
+        self.reactions, self.backlog, self.refused, self.numbers = [], [], [], []
+        self.asked = {"low": 0, "high": 0, "label": 0}
+        self.dropped = {"low": 0, "high": 0, "label": 0}
+        ps.run.elements.log = ReactionLog(1_000_000)
+        pool = ps.run.damage_numbers
+        add, add_label = pool.add, pool.add_label
+
+        def counted_add(*a, low_priority=False, **k):
+            key = "low" if low_priority else "high"
+            before = len(pool)
+            add(*a, low_priority=low_priority, **k)
+            self.asked[key] += 1
+            self.dropped[key] += len(pool) == before
+
+        def counted_label(*a, **k):
+            before = len(pool)
+            add_label(*a, **k)
+            self.asked["label"] += 1
+            self.dropped["label"] += len(pool) == before
+
+        pool.add, pool.add_label = counted_add, counted_label
+
+    def frame(self) -> None:
+        run = self.ps.run
+        el = run.elements
+        self.reactions.append(el.stats.reactions_this_frame)
+        self.backlog.append(el.pending)
+        vis = run.element_visuals
+        self.refused.append(vis.budget.refused if vis else 0)
+        self.numbers.append(len(run.damage_numbers))
+
+    def report(self) -> str:
+        from collections import Counter
+
+        from game import config
+
+        el = self.ps.run.elements
+        cap = el.registry.global_cfg.max_reactions_per_frame
+        r = sorted(self.reactions)
+        at_cap = sum(1 for x in self.reactions if x >= cap)
+        n = len(self.backlog)
+        q = max(1, n // 4)
+        early = sum(self.backlog[:q]) / q
+        late = sum(self.backlog[-q:]) / q
+        depth = Counter(e.depth for e in el.log.newest())
+        depth_txt = "  ".join(f"d{k} {v}" for k, v in sorted(depth.items())) or "none"
+        pool = config.MAX_DAMAGE_NUMBERS
+        drops = "  ".join(
+            f"{k} {self.dropped[k]}/{self.asked[k]}" for k in ("high", "label", "low"))
+        return (
+            f"  cascade   placed {getattr(self.ps, '_cascade_placed', '-')}  "
+            f"reactions/frame p50 {_percentile(r, 0.5)} p99 {_percentile(r, 0.99)} "
+            f"max {r[-1] if r else 0}  at cap {cap}: {at_cap}/{len(r)}\n"
+            f"            backlog mean first quarter {early:.1f}  last quarter "
+            f"{late:.1f}  max {max(self.backlog, default=0)}  "
+            f"(draining if the last is not above the first)\n"
+            f"            depth {depth_txt}\n"
+            f"            particles refused/frame p50 "
+            f"{_percentile(sorted(self.refused), 0.5)} max {max(self.refused, default=0)}\n"
+            f"            damage numbers peak {max(self.numbers, default=0)}/{pool}  "
+            f"refused (dropped/asked): {drops}")
+
+
 def element_report(ps) -> str:
     from game import config
 
@@ -176,7 +292,7 @@ def element_pump(ps, per_frame: int, seed: int = 3):
 
 
 def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
-        render: bool = False, pump=None) -> tuple:
+        render: bool = False, pump=None, instruments=None) -> tuple:
     """Frame times in milliseconds for `frames` updates with the hero
     jittering by up to `jitter` px each frame.
 
@@ -202,6 +318,8 @@ def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
         if pump is not None:
             pump()
         times.append((time.perf_counter() - t0) * 1000.0)
+        if instruments is not None:
+            instruments.frame()
         # M11: elemental damage numbers outlive a weapon's, so the floating
         # number pool is the thing that could saturate. A full pool drops
         # whatever asks next -- possibly the weapon's own number, the one
@@ -247,36 +365,58 @@ def main(argv=None) -> int:
                     help="element-carrying hits resolved per frame, over "
                          "and above what the weapons land (implies "
                          "--elements)")
+    ap.add_argument("--cascade", action="store_true",
+                    help="CMB-008: pack the crowd round the hero and prime "
+                         "neighbours with different auras so reactions "
+                         "chain; reports reactions per frame, the backlog, "
+                         "cascade depth and the damage-number refusals "
+                         "(implies --elements)")
+    ap.add_argument("--pack", action="store_true",
+                    help="the --cascade crowd, packed round the hero, with no "
+                         "elements at all: the control for --cascade")
     ap.add_argument("--profile", action="store_true")
     args = ap.parse_args(argv)
     from game import config
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod)
-    elements = args.elements or args.element_rate > 0
+    elements = args.elements or args.element_rate > 0 or args.cascade
     pump = None
+    instruments = None
     if elements:
         infuse(ps, args.seed)
         if args.element_rate > 0:
             pump = element_pump(ps, args.element_rate, args.seed)
     run(ps, 60, render=args.render, pump=pump)       # warm the caches
+    if args.pack and not args.cascade:
+        cascade_setup(ps, prime=False)
+    if args.cascade:
+        # Staged *after* the warm-up: a primed crowd spends most of its
+        # auras in its first second, and that burst is the cascade this
+        # measures -- warming on it would leave only the aftermath.
+        cascade_setup(ps)
+        instruments = Instruments(ps)
     if args.profile:
         import cProfile
         import pstats
         prof = cProfile.Profile()
         prof.enable()
         times, draws, in_view = run(ps, args.frames, render=args.render,
-                                    pump=pump)
+                                    pump=pump, instruments=instruments)
         prof.disable()
         print(report(times, ps))
         if elements:
             print(element_report(ps))
+        if instruments is not None:
+            print(instruments.report())
         pstats.Stats(prof).sort_stats("cumulative").print_stats(28)
     else:
         times, draws, in_view = run(ps, args.frames, render=args.render,
-                                    pump=pump)
+                                    pump=pump, instruments=instruments)
         print(f"seed {args.seed} lod {lod}  " + report(times, ps))
         if elements:
             print(element_report(ps))
+        if instruments is not None:
+            print(instruments.report())
         if args.render:
             d, v = sorted(draws), sorted(in_view)
             print(f"  draw   p50 {_percentile(d, 0.5):.2f}  "

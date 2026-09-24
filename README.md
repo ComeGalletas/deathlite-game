@@ -73,7 +73,7 @@ explore it, survive the escalating waves, and the boss (**The First Hunger**)
 appears in its arena near the end of the run and drops an item. Salvage and
 loot carry over between runs via the Sanctuary.
 
-The developer-mode keys (F1–F8, the dev menu) are listed in
+The developer-mode keys (F1–F9, the dev menu) are listed in
 [`FUNCTIONAL_README.md`](FUNCTIONAL_README.md); none of them is needed to play.
 
 ### Display

@@ -605,6 +605,8 @@ one is exactly two.
 
 ### Still open
 
+*(DOC-005, 2026-09-24: all seven **done** since: placement for twenty bodies (rewritten after G0, `spawn/placement.py`), the cap settled once per company, live difficulty switching and the hard unlock scaled by `timeline_pace` (`spawn/budget.py`), `stat_multipliers` kept, the S2 director fixture retired, and the five never-spawning enemies each in a group)*
+
 **Placement for twenty bodies** — still unprototyped, still the piece most
 likely to decide whether this feels good.
 

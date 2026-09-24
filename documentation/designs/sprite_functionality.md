@@ -707,6 +707,8 @@ restarting.
 
 ### Still open
 
+*(DOC-005, 2026-09-24: still **pending**, and wanted: the Warlock's 0.8 s wind-up marks nothing on the ground — the telegraph ring is drawn only for enemies with a `slam_radius` (`visual/rendering.py`))*
+
 The 0.8 s wind-up still marks nothing on the ground -- the telegraph ring
 in `one_enemy` is gated on `slam_radius`, which only the brute has. The
 owner has said the wind-up flag would help and that it belongs before the

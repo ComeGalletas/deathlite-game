@@ -23,6 +23,7 @@ import pygame
 
 from game.states.playing.visual.elements import layers, transient
 from game.states.playing.visual.elements.budget import ParticleBudget
+from game.states.playing.visual.elements.building_glow import BuildingGlow
 from game.states.playing.visual.elements.profiles import get_visuals
 from game.states.playing.visual.elements.transient import (  # noqa: F401
     ARC_SECONDS, Arc, Flash, mix)
@@ -40,6 +41,10 @@ class ElementVisuals:
         self.budget = ParticleBudget(self.profiles.budget.per_frame,
                                      self.profiles.budget.per_element)
         self.auras_drawn = 0
+        # CMB-009.1: the glow under an elemental buff building. No `elements`
+        # block means no building is ever elemental, so there is no glow.
+        block = content.buildings.get("elements")
+        self.building_glow = BuildingGlow(block["glow"]) if block else None
 
     def update(self, dt: float) -> None:
         """Advance the shared per-element animation clocks."""

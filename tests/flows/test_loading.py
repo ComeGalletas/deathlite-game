@@ -63,19 +63,41 @@ class LoadingStateTests(unittest.TestCase):
         self.assertIsInstance(p, PlayingState)
         warm = [l for l in labels if str(l).startswith("warming the view")]
         self.assertEqual(len(warm), len(LoadingState._WARM_RING))
+        self.assertIn("warming the animations", labels)
         gm = p.game_map
         before = len(gm._blit_cache)
         self.assertGreater(before, 20, "the loading screen warmed nothing")
-        # Foam and decor pick their frame from `TerrainRenderer.seconds()`, which
-        # falls back to `pygame.time.get_ticks()` -- process uptime. The warm
-        # pass samples `_WARM_FOAM_PHASES`, so whether the first draw lands on a
-        # warmed frame depended on how long the suite had been running: this
-        # passed alone and failed after a few hundred other tests. Pin the clock
-        # to a phase the ring covered, so what is measured is the warming.
-        gm.renderer.clock = lambda: LoadingState._WARM_FOAM_PHASES[0]
-        p.draw(game.screen)
-        self.assertLessEqual(len(gm._blit_cache) - before, 3,
-                             "the run's first frame still filled the cache")
+        # Foam and decor pick their frame from `TerrainRenderer.seconds()`, so a
+        # run's first frame lands on an arbitrary phase. It used to be pinned
+        # here to a phase the ring covered, because any other one still scaled
+        # a few frames; since RND-005 every animation frame is warm, so the
+        # first draw at *any* phase -- these include ones no ring pass drew --
+        # adds nothing at all.
+        for phase in (0.0, 0.13, 0.5, 2.9, 7.77):
+            gm.renderer.clock = lambda t=phase: t
+            p.draw(game.screen)
+            self.assertEqual(len(gm._blit_cache), before,
+                             f"a first frame at phase {phase} still filled the cache")
+        pygame.quit()
+
+    def test_every_frame_but_the_bands_is_warm_before_the_run_starts(self):
+        """RND-005: the loading screen scales every surface the renderer can
+        show except the terrace bands -- all foam, bridge, decor, obstacle and
+        shadow frames, not only the ones the warm ring drew. The bands are
+        left to first sight by the owner's call (RND-005.D1)."""
+        from world.terrain.warm import scaled_sources
+
+        game = _game()
+        game.state_machine.change(LoadingState(game), seed=SEED)
+        _drive(game)
+        gm = game.state_machine.current.game_map
+        sources = scaled_sources(gm)
+        self.assertGreater(len(sources), 100, "the world holds almost nothing to warm")
+        cold = [s for s in sources if id(s) not in gm._blit_cache]
+        self.assertEqual(cold, [], f"{len(cold)} of {len(sources)} surfaces left cold")
+        bands = {id(s) for _b, s, _l in gm._grid_surfs}
+        self.assertFalse(bands & {id(s) for s in sources},
+                         "the bands are not part of the warm set (D1)")
         pygame.quit()
 
     def test_the_hero_animates_while_it_waits(self):

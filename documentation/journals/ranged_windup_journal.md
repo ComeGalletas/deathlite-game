@@ -169,6 +169,8 @@ body aggroed but out of reach shows no tell at all.
 
 ## Left open
 
+*(DOC-005, 2026-09-24: Skitter and Stinger's unused attack art stays unused by decision. The difficulty playtest is **closed here** — the owner folds it into the coming weapon rework, which will take in the current ranged weapons too)*
+
 * **Skitter and Stinger** still have unreachable attack art, by decision.
 * The difficulty of all of this is untested -- the owner is running that
   themselves. Nothing here was balanced against G1's elite item income or

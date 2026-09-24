@@ -118,6 +118,7 @@ There is no CI and none is planned: the suite is run locally, for stability.
 | F2–F6 | Spawn enemy / grant XP / force level / spawn boss / toggle invuln |
 | F7 | Toggle the **collision-shape overlay** — *developer runs only*; also a dev-menu row |
 | F8 | Toggle the generated **spawn points** overlay — developer runs only |
+| F9 | **Reload the element data** (`data/weapons/elements.json`, `reactions.json`) into the live run; bad data is refused and the old values kept — developer runs only |
 | ` / ~ | The **dev menu** in a developer run: HP / attack / overlay toggles, spawn any enemy, grant any blessing, item or weapon, apply any Forging, remove owned weapons, switch difficulty live, freeze spawns, activate every room, place the training dummy, reset the run |
 
 Debug keys are never required for normal play. To see the real circular
@@ -136,7 +137,9 @@ obstacle bodies in green, pickup radius and projectile hitboxes dimmer.
 - `tools/verification/run_digest.py` — a fingerprint of a headless run (two
   pinned seeds, 720 frames, debug spawns thrown in): `--check` after a
   change to the run's wiring says whether the same seed still plays the
-  same frames. Pins Python's hash seed itself; not a test.
+  same frames. Not a test itself; `tests/flows/test_run_determinism.py`
+  runs its script in four processes at once and checks they agree
+  (SYS-008: a seed plays the same run under any hash seed and any load).
 - `tools/gen_weapon_tables.py` — generates the weapon / blessing / forge
   reference tables from the data JSON (Markdown for `documentation/designs/`,
   plus an HTML body); run from the repo root with the output paths as

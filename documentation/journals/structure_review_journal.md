@@ -479,7 +479,7 @@ test. `run_digests.json` re-pinned for the new import graph (see *Open*).
 Found on the way and not part of this review's scope; each needs its own
 decision.
 
-- *(DOC-003: this item and the next are tracked as **SYS-008**, proposed — `run_determinism_journal.md`.)*
+- *(DOC-003: this item and the next are tracked as **SYS-008** — `run_determinism_journal.md`. Resolved 2026-09-23: the drift was the flow-field fill's wall-clock slice plus the watchdog's `id()` stagger; no hash-order iteration was found once those were fixed, and `run_digest` needs no workarounds.)*
 - **The run is not reproducible across processes.** Two independent
   causes, both in the spawn path: `spawn/watchdog.py::_stagger` seeds an
   enemy's first sample from `id(enemy)`, and something further down the

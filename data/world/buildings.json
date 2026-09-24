@@ -1018,6 +1018,21 @@
       "ice": 1,
       "thunder": 1,
       "wind": 1
+    },
+    "glow": {
+      "_doc": [
+        "CMB-009.1: the faint disc in the element's colour under an",
+        "elemental buff building, drawn before the building art so only the",
+        "rim shows. `scale` is its diameter as a multiple of the building's",
+        "interaction diameter; the alpha breathes between `alpha_min` and",
+        "`alpha_max` (0-255) over `period` seconds, quantised to `steps`",
+        "cached surfaces. First values, to be tuned from the screenshot."
+      ],
+      "scale": 3.4,
+      "alpha_min": 90,
+      "alpha_max": 130,
+      "period": 3.0,
+      "steps": 6
     }
   }
 }

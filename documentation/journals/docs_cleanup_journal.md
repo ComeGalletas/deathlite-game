@@ -1,6 +1,6 @@
 # Documentation cleanup — journal
 
-**ID:** DOC-003 (+ DOC-004) · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
+**ID:** DOC-003 (+ DOC-004, DOC-005) · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
 **Type:** process · **Status:** done ·
 **Branch:** claude/doc-003-doc-cleanup (worktree `.claude/worktrees/doc-003-doc-cleanup`)
 
@@ -153,3 +153,81 @@ data or a fixed number) and SYS-008's go-ahead for the open-ended
 SYS-008.4. TST-003 was built on this branch and is done (`925502c`,
 results in `cut_script_skips_journal.md`); the other four stay `proposed`.
 No tests run for the journals themselves.
+
+---
+
+## DOC-005 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Record the second documentation review: the narrative
+  "open / deferred / follow-up / still open" sections DOC-003 did not cover,
+  each checked against the code, and the owner's answers to the decisions it
+  raised.
+- **Details:** The owner's answers (2026-09-24): boss HP stays on the +50 %
+  curve with the second boss; no gold sink exists yet, so it is pending; the
+  ranged wind-up and its playtest fold into the coming weapon rework; the
+  "TAB build" hint stays on the pause screen only; the locality grace (6 s)
+  and dwell (1 s) stay, deliberately constant so the difficulties stay
+  apart; warm every animation frame the loading screen can, in its own
+  journal as this session's next goal if it is too big for this
+  requirement; split the 2026-09-16 music entry into its own journal, and
+  close the web-only music options because the web build is not yet
+  considered finished; Echo and Fragmentation stay dropped, closed pending
+  the coming weapon rework; the sounds are fine for now (more and a
+  whole-set tweak later), closed.
+- **Constraint:** On the current branch (`claude/sys-008-run-determinism`).
+  Documentation only.
+
+## DOC-005 — Confirmed reading
+
+Three read-only passes over about thirty sections (DOC-003.D1's box states
+still apply; a prose item gets a `*(DOC-005: …)*` note instead of a box).
+
+- **DOC-005.D1 — Answered decisions are closed where they were asked.** Each
+  gets a note in its own section saying what the owner chose and when.
+- **DOC-005.D2 — New IDs only where the owner asked for pending work.** The
+  gold sink becomes **PRG-003** (proposed); the frame warm-up becomes
+  **RND-005** (proposed, next). The other pending items stay recorded in
+  their sections as pending, as DOC-003 left the open boxes, and get an ID
+  when one is taken up.
+- **DOC-005.D3 — "Weapon rework" is a future requirement, not yet an ID.**
+  Items the owner deferred to it (the ranged wind-up playtest, Echo,
+  Fragmentation) are closed with a pointer to it rather than left open.
+
+## DOC-005 — Tasks
+
+- [x] DOC-005.1 — Open this block; index rows for DOC-005, PRG-003, RND-005
+- [x] DOC-005.2 — Combat, entities and UI sections: combat balance follow-ups, enemy AI, game over, ranged wind-up, run status, training dummy, PlayingState refactor, sprite functionality
+- [x] DOC-005.3 — World, spawn and test sections: level design, rock collider, world refactor, the development journal, spawn groups, spawn master todo, test-suite review (fresh coverage, the warm-up decision), TST-002 follow-ups
+- [x] DOC-005.4 — Assets, audio and build: assets follow-ups, music (split the 2026-09-16 entry, close the web options), sound effects, desktop packaging, pygbag, pending plans
+- [x] DOC-005.5 — RND-005 journal (frame warm-up) and PRG-003 journal (gold sink), both proposed
+- [x] DOC-005.6 — Results; index to done
+
+## DOC-005 — Results
+
+About thirty narrative sections annotated with a `*(DOC-005: …)*` note, each
+item checked against the code by three read-only passes; the 23 open boxes
+DOC-003 left were re-read on every branch tip. Documentation only, except
+comments: the music split moved seven references (three code comments, two
+test docstrings, the sound-effects journal, the index) and a memory entry to
+`music_tracks_journal.md`; the touched Python files still compile.
+
+**Closed by the owner, 2026-09-24:** boss HP keeps the +50 % curve; the TAB
+hint stays on the pause screen; the locality grace and dwell stay constant;
+the ranged wind-up playtest, Echo and Fragmentation fold into the coming
+weapon rework; the web-only music options wait on the web build; the extra
+sound cues are closed (more sounds and a whole-set tweak later); the music
+entry is split.
+
+**New IDs, proposed:** PRG-003 (a gold sink — none exists; the Merchant is
+parked with the special facilities) and RND-005 (warm every animation frame,
+the session's next goal).
+
+**Still pending, recorded in place** — each gets an ID when taken up:
+
+| area | pending |
+|---|---|
+| gameplay / UI | Warlock wind-up ground marker; skull `attack` at ~10 fps; chests opened on the run summary; auto-attack / aim toggle in Options; `mark` overlay; Kestrel / Nihil `attack2` and `guard` sheets; gamepad aim; a best-DPS record; absolute damage in the DPS overlay; unused chest skins (waits on a legendary tier) |
+| architecture | the boss on the shared AI components; `push_radius`; `data/behaviors.json`; `_blit_rig` frame and anchor selection; `TimedVisual`; `MELEE_REACT_SCALE` to config if needed |
+| rendering polish | soft shadow strip; pixel-perfect camera; live zoom slider |
+| tests | digest tests through `world_digests`; ~16 conditional skips (`test_elevation.py:136` removable); worldgen R4; the §6/§7 tidy-ups; the balance-number audit; coverage of `world/gen/graph.py`, `validate.py`, `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`; WA5's summon render tests; the Bonepicker / Gaffjaw screenshot |
+| web build (on hold) | wheel vendoring, loading steps and progress bar, manifest pack, browser spawn settings, the bundle trim |

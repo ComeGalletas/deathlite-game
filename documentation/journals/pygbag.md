@@ -232,6 +232,8 @@ does not survive a reload.
 
 ## TODO
 
+*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished)*
+
 - [x] W1 — async loop + `main.py` / `main_web.py` entry points
 - [x] W2 — `config.SAVE_ENABLED`, save read/write skipped when off
 - [x] W3 — `systems/mixer_backend.py` adapter, `audio.py` routed through it
