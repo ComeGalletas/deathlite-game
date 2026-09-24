@@ -46,7 +46,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 | ENT-013 | Hexcaller cast wind-up drawn where it will land | ENT, RND | feature | done | [warlock_cast_journal.md](warlock_cast_journal.md) | claude/ent-013-warlock-cast-marker | 2026-09-24 |
 | ENT-014 | Skull attack animation slowed to cover its swing | ENT, RND | balance | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
 | ENT-015 | The boss on the shared AI components | ENT | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
-| ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | proposed | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | in progress | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | proposed | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |

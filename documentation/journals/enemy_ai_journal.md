@@ -821,3 +821,65 @@ This block follows the DOC-001 layout; the entries above predate it.
   the suite. It is recorded here; the behaviour itself is pinned by
   `test_boss.py`, `test_boss_pig_rider.py` and `test_boss_patterns.py`.
 
+
+---
+
+**ID:** ENT-016 · **System:** entities · **Type:** feature · **Status:** in progress ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+## ENT-016 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Give the enemy crowd its own push radius, and lower it so
+  enemies can stack and cross bridges instead of getting stuck.
+- **Details:** R6's parked `push_radius` crowd-collision pass. The owner
+  asked to consider a lower value, so more enemies share a deck.
+- **Constraint:** The hero's own collisions with enemies stay as they are;
+  the change is enemy-against-enemy.
+
+## ENT-016 — Confirmed reading
+
+- Two things push enemies apart today:
+  1. **`Separation`** (`entities/ai/components/crowd.py`) steers each
+     walker away from neighbours inside `1.6 ×` its radius (data
+     `separation_mult`), capped at 0.6 of a heading.
+  2. **The CB-3 bump pass** (`game/states/playing/core/physics.py`) shoves
+     any two bodies whose colliders overlap: `rr = a.radius + b.radius`,
+     with an impulse of `BUMP_GAIN × penetration` split by weight.
+  It is the second that is a hard crowd collision, and its radius is the
+  full collider. Nothing called `push_radius` exists.
+- A bridge deck is one tile (64 px) wide, and `is_walkable` keeps a body's
+  cross inside it. Two 22–26 px bodies (bear, turtle, troll) cannot stand
+  side by side on it. So a pack arriving at a mouth has to file through,
+  while every overlap it makes is shoved back apart.
+- **ENT-016.D1 — The push radius is a fraction of the collider,
+  enemy-against-enemy only.** `config.CROWD_PUSH_RADIUS_FRAC`: two enemies
+  bump when their centres are closer than `frac × (ra + rb)`. Enemy ↔ hero
+  and enemy ↔ boss keep the full radii (the boss still shoulders through a
+  pack). A single global number, like the other CB-3 knobs, in config.
+- **ENT-016.D2 — Measured, not guessed.** A bench,
+  `tools/benchmarks/bridge_crowd.py`:
+  - A mixed pack of 24 is set at one mouth of a real bridge, on three
+    pinned seeds, with the hero standing still on the far island.
+  - It counts how many cross, and how fast, at several fractions and
+    separation settings.
+  - The value is picked from its table.
+
+## ENT-016 — Plan
+
+- The knob in the bump pass (default 1.0, so nothing moves until it is
+  set).
+- The bench.
+- Pick the value from the bench, and set it with its arithmetic in
+  config's comment.
+- **Tests:**
+  - Two enemies at `0.9 × (ra + rb)` do not bump at a lowered fraction, but
+    the hero still does.
+  - A fast bench case pinned as a rate (the pack crosses a bridge), not a
+    single outcome.
+
+## ENT-016 — Tasks
+
+- [x] ENT-016.1 — This block
+- [ ] ENT-016.2 — `CROWD_PUSH_RADIUS_FRAC` in the bump pass
+- [ ] ENT-016.3 — The bridge-crowd bench and its table
+- [ ] ENT-016.4 — The value; tests; results
