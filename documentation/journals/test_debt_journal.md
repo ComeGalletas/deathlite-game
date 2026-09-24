@@ -1,9 +1,8 @@
 # Test debt — journal
 
 **ID:** TST-004 · **System:** tests · **Type:** refactor ·
-**Status:** in progress (TST-004.1–.8 done; TST-004.9 with the owner's local
-session) · **Branch:** claude/tst-004-test-debt (remote session, owner
-2026-09-24)
+**Status:** done (merged in #35; TST-004.9 in #34) · **Branch:**
+claude/tst-004-test-debt (remote session, owner 2026-09-24)
 
 ---
 
@@ -452,8 +451,9 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py` → `72ce8a1`
 - [x] TST-004.8 — Summon render tests (WA5) → `a719226`
-- [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session (kept by the
-  owner's local session; not this branch's work)
+- [x] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session (kept by the
+  owner's local session; not this branch's work) → `bd8cd43` (#34), delivered to
+  the owner and recorded in `enemy_roster_expansion_journal.md`
 - [x] TST-004.10 — Run the default suite and record the results (discovered: the
   closing run needed its own commit)
 
@@ -496,3 +496,21 @@ edited. No test exposed a bug in the game.
 - **TST-004.8** — WA5's README note is still the owner's call.
 - **TST-004.9** — the Bonepicker/Gaffjaw screenshot stays with the local
   session.
+
+**The owner's answers on the items left for them (2026-09-24),** taken up as
+TST-005, WLD-013, RND-006 (`claude/ent-017-behavior-templates`):
+
+- **D3 — numpy:** allowed for tests and the asset-pipeline scripts only,
+  never as a game dependency. It gets a line in `CLAUDE.md`'s test rules
+  (TST-005.1).
+- **D6 — `graph.py`:** delete the three unused helpers (WLD-013).
+- **World tier speed:**
+  - The three chest determinism tests share one world build (TST-005.2).
+  - The buff-building count moves to `sweep` (TST-005.3).
+- **Literals kept as the owner's decisions:**
+  - `test_buffs.py` keeps its fixed values.
+  - `test_gnome_split.py` stops depending on fixed values (TST-005.4).
+- **WA5:** close it. The blanket `assets/unused/**` rule already ignores the
+  extra wolf sprites, so the plan's call for wolf-specific ignore rules goes,
+  and the journal's old paths are updated (RND-006).
+
