@@ -271,3 +271,65 @@ already failing on `main`). The post-move run is recorded below.
 After the move: 2153 passed, the same single pre-existing failure, and a
 headless run (`PlayingState.enter`, 120 frames, one `draw`) completes with the
 renderer, ledger and meter resolving from `visual/`, `core/` and `devtools/`.
+
+---
+
+**ID:** SYS-009 · **System:** core systems (+ RND, ENT) · **Type:** refactor ·
+**Status:** in progress · **Branch:** claude/doc-006-ui-013-dps-table (the
+current worktree, owner 2026-09-24)
+
+This block follows the DOC-001 layout; the entries above predate it.
+
+## SYS-009 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Close the three small architecture follow-ups: one
+  sprite-blit core, a `TimedVisual` for the transient effects, and
+  `MELEE_REACT_SCALE` in config.
+- **Details:** The owner's first architecture priority, before the boss, the
+  crowd push and the behaviour data (DOC-006).
+- **Constraint:** A refactor. What is drawn, and when, stays the same.
+
+## SYS-009 — Confirmed reading
+
+- **Blitting.** `visual/rendering.py` has four sprite paths: `enemy_sprite`,
+  `boss`, `player` (through `hero_sprite_frame`) and `death_fx`. Each one
+  repeats the same core:
+  1. The flip, from the facing and the rig's `face`.
+  2. The frame at `scale_for(rig) × zoom`.
+  3. The anchor, mirrored with the flip.
+  4. The screen point less the anchor, plus `sprite_drop(radius)`.
+  5. `_blit_character`.
+  Only step 5 is shared. The extras differ (the hurt tint, the element wash,
+  the invulnerability ring, the boss's telegraphs, the missing-art fallback)
+  and stay with each actor.
+- **Transient effects.** `run._death_fx` holds positional
+  `[anim, pos, facing, scale, radius]` lists. `run._explosions` holds
+  `{pos, radius, t, dur, infusion?, anim?}` dicts, built in four places in
+  `core/effects.py`. Their readers are the renderer (`death_fx`,
+  `explosions`), the update sweeps, `test_enemy_sprite.py` (positional
+  indexes) and `test_bomb.py` (keys).
+- **`MELEE_REACT_SCALE`** (1.25) is a module constant in
+  `entities/ai/behaviors/simple.py`. It stretches the default melee
+  `MELEE_ATTACK_TELEGRAPH` / `MELEE_ATTACK_ACTIVE`.
+- **SYS-009.D1 — Two helpers on `WorldRenderer`:**
+  - `rig_frame(anim, facing, scale)` returns the frame and the flip.
+  - `blit_rig(surface, frame, rig, flip, pos, radius, scale)` anchors,
+    drops and blits.
+  All four paths use them. They stay methods because the state's delegators
+  and the tests reach the painters by name.
+- **SYS-009.D2 — One `TimedVisual` dataclass** (`core/timed_visual.py`) for
+  both containers: `pos`, `anim`, `radius`, `t`, `dur`, `facing`, `scale`,
+  `infusion`. It is finished when its `dur` runs out, or, with no `dur`, when
+  its animation does. It compares by identity, as the dicts' readers expect
+  (`assertIn(ex, ps._explosions)` after an update).
+- **SYS-009.D3 — `MELEE_REACT_SCALE` moves to `game/config.py`** beside the
+  other combat-feel constants. The two defaults in `simple.py` read it from
+  there, and the rest is unchanged.
+
+## SYS-009 — Tasks
+
+- [x] SYS-009.1 — This block
+- [ ] SYS-009.2 — `MELEE_REACT_SCALE` to `game/config.py`
+- [ ] SYS-009.3 — `TimedVisual` for `_death_fx` and `_explosions`; their tests
+- [ ] SYS-009.4 — `rig_frame` / `blit_rig` for the four sprite paths
+- [ ] SYS-009.5 — Results; the follow-up notes; index to done
