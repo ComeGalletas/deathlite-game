@@ -1,16 +1,23 @@
-"""Six-weapon system P1: the weapon roster and its taxonomy (design §3, §3.7,
-§19). Six weapons -- three melee, three ranged -- plus three summons, every
-one declaring a `class`; the fields each fire path reads are present in the
-data, not defaulted in code."""
+"""The weapon roster and its data (six-weapon design §3, §3.7, §19): six
+weapons -- three melee, three ranged -- plus three summons, every one
+declaring a `class` and a `category`; the fields each fire path reads are
+present in the data, not defaulted in code.
+
+Regrouped by subject in TST-004.5: this module was `test_weapon_classes.py`
+(six-weapon P1) and took in the category checks from `test_weapons_reach.py`
+and the spread-data checks from `test_weapons.py`.
+"""
+import math
 import unittest
 
-from combat.weapons import CLASSES, SPECIAL_EFFECTS, Weapon
+from combat.weapons import CATEGORIES, CLASSES, SPECIAL_EFFECTS, Weapon
 from game import config
 from game.content import get_content
 
 SIX = {"sword", "hammer", "daggers", "bow", "magic_rod", "bomb"}
 SUMMONS = {"ember_ring", "grave_totem", "spirit_wolf"}
 RETIRED = {"arcane_bolt", "frost_shards", "thunder_orb", "soul_scythe"}
+_ALLOWED = set(CATEGORIES)
 
 
 def w(wid):
@@ -140,6 +147,61 @@ class IdentityTests(unittest.TestCase):
     def test_the_bomb_is_slow_and_wide(self):
         self.assertGreater(self.d("bomb")["cooldown"], self.d("bow")["cooldown"])
         self.assertGreater(self.d("bomb")["blast_radius"], self.d("sword")["area"] * 0.9)
+
+
+class CategoryTests(unittest.TestCase):
+    def test_every_def_declares_an_allowed_category(self):
+        for wid in get_content().weapons:
+            self.assertIn(w(wid).category, _ALLOWED, wid)
+
+    def test_expected_category_per_weapon(self):
+        want = {
+            "sword": "melee", "hammer": "melee", "daggers": "melee",
+            "bow": "projectile", "magic_rod": "projectile", "bomb": "projectile",
+            "ember_ring": "orbit", "grave_totem": "summon",
+            "spirit_wolf": "summon",
+        }
+        for wid, cat in want.items():
+            self.assertEqual(w(wid).category, cat, wid)
+
+    def test_category_is_required_metadata(self):
+        # weapons.json carries every field now -- a def with no `category`
+        # (validated against the CATEGORIES constant) is bad data, not a
+        # fall-through.
+        d = dict(get_content().weapon("magic_rod"))
+        d.pop("category", None)
+        with self.assertRaises(ValueError):
+            Weapon("magic_rod", d)
+
+
+class ProjectileSpreadDataTests(unittest.TestCase):
+    """Every weapon that fans its shots must say how wide the fan is.
+
+    A `<weapon>:projectiles` upgrade is generated for *every* owned weapon
+    (`progression/upgrades._weapon_upgrades`), so any projectile weapon can be
+    pushed past one shot in a real run. `Weapon._fire_projectiles` reads
+    `spread_deg` with a hard subscript at that point -- deliberately, since a
+    default in code would be per-weapon tuning living outside the data -- so a
+    weapon missing the field crashes the run the moment the player takes its
+    projectile upgrade. Two of the retired weapons once shipped without it.
+    """
+
+    def test_every_projectile_weapon_declares_a_spread(self):
+        for wid, cfg in get_content().weapons.items():
+            if cfg.get("category") != "projectile":
+                continue
+            self.assertIn("spread_deg", cfg, wid)
+            self.assertGreater(float(cfg["spread_deg"]), 0.0, wid)
+
+    def test_one_multishot_upgrade_does_not_crash_any_weapon(self):
+        """The failure this guards is a KeyError deep in a firing path, so it is
+        worth exercising rather than only asserting the data."""
+        for wid, cfg in get_content().weapons.items():
+            w = Weapon(wid, cfg)
+            w.bonus["projectile_count"] += 1
+            count = w._projectile_count()
+            if count > 1 and cfg.get("category") == "projectile":
+                math.radians(float(cfg["spread_deg"])) * (count - 1)
 
 
 if __name__ == "__main__":

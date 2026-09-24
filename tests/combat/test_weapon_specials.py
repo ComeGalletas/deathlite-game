@@ -1,4 +1,6 @@
-"""Milestone 4: the three special weapon effects -- cone, orbit, chain params."""
+"""The special weapon effects: the cone, the orbit, the chain, and the main
+weapon's attack animation. (Milestone 4; `test_weapons_special.py` until
+TST-004.5 regrouped the weapon modules by subject.)"""
 import math
 import os
 import tempfile

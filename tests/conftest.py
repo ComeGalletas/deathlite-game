@@ -63,7 +63,7 @@ INTEGRATION = (
     "tests/playing/test_potion_drops.py",
     "tests/screens/test_hero_select_preview.py",
     "tests/playing/test_manual_aim.py",
-    "tests/combat/test_weapons_special.py",
+    "tests/combat/test_weapon_specials.py",
     "tests/flows/test_controls.py",
     "tests/flows/test_dev_mode.py",
     "tests/flows/test_hero_unlock.py",

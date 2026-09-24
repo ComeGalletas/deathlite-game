@@ -26,7 +26,7 @@ from systems.object_pool import Pool
 class FakeTarget:
     """A point to aim at: all a weapon's targeting reads from an enemy.
 
-    The fire-path tests (`test_weapons*`, `test_summons`, `test_manual_aim`)
+    The fire-path tests (`test_weapon_*`, `test_summons`, `test_manual_aim`)
     each used to define this as their own `FakeEnemy`; it is the lighter
     sibling of `FakeEnemy` below, which a damage path can hit."""
 

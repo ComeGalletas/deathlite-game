@@ -204,6 +204,22 @@ TST-004.6. One subtask each, in the review's order.
   changed. The new module is listed in `conftest.INTEGRATION` beside
   `test_menu.py` (it boots a `Game`). Before 86 tests, after 39 + 47; the two
   modules and `test_dev_mode.py` together: 173 passed.
+- **5.4** The six weapon modules were named for the plan phase that wrote
+  them. Regrouped by the subjects §6 names, with `git mv` so history follows:
+
+  | subject | module | was |
+  |---|---|---|
+  | roster / data | `test_weapon_roster.py` | `test_weapon_classes.py` + `CategoryTests` (`test_weapons_reach`) + `ProjectileSpreadDataTests` (`test_weapons`) |
+  | fire path | `test_weapon_fire.py` | `test_weapons.py` + the seven reach-ring classes of `test_weapons_reach.py` |
+  | special effects | `test_weapon_specials.py` | `test_weapons_special.py` |
+  | blessings | `test_weapon_blessings.py` | `test_weapon_effects.py` |
+  | the hammer's swing | `test_hammer_swing.py` | unchanged — one weapon's mechanics |
+
+  `test_weapons_reach.py` is gone, its classes moved whole. The two modules
+  that imported helpers from `tests.combat.test_weapons` (`make_context`,
+  `BOLT`) import them from `test_weapon_fire`; `conftest.INTEGRATION` names
+  `test_weapon_specials.py`. Test count unchanged: 9 + 20 + 18 before, 24 +
+  23 after. `tests/combat` + `tests/playing/test_buffs.py`: 590 passed.
 
 ## TST-004 — Plan
 
@@ -232,8 +248,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
   - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle` → `7ed17ce`
   - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py` → `22c7a6b`
-  - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py`
-  - [ ] TST-004.5.4 — §6: regroup the six weapon modules by subject
+  - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py` → `6c627e9`
+  - [x] TST-004.5.4 — §6: regroup the six weapon modules by subject
   - [ ] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`
   - [ ] TST-004.5.6 — §6: retitle the modules that open with a plan phase
   - [ ] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
