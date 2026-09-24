@@ -1103,6 +1103,8 @@ Click and aim key at the same time: click wins.
 
 *(DOC-005, 2026-09-24: the dev-only aim line is **done** (the dev menu's "Aim line" row). Gamepad right-stick aim is still **pending**: `read_aim` (`core/aim.py`) reads the mouse and the keys only)*
 
+*(DOC-006, 2026-09-24: gamepad aim is **closed** — the owner is not considering gamepads for now)*
+
 - An aim line is **dev-mode only**, behind its own dev-menu toggle. Planned
   in `dev_mode_journal.md` ("Aim line" entry), not here; nothing about it
   ships to normal gameplay.
@@ -1623,6 +1625,8 @@ suite read it.
 ### Follow-ups (not blocking)
 
 *(DOC-005, 2026-09-24: the gold sink is **pending** as PRG-003 (owner: none is integrated yet). Chests opened are counted (`stats["chests"]`) and now shown on the run summary — **done** as UI-012 (at the end of this journal). The unused chest skins wait on a legendary tier or a boss reward — **pending**)*
+
+*(DOC-006, 2026-09-24: the unused chest skins are **closed** — the owner plans no more chests for now. The tiers stay data-driven so one can be added later: see `documentation/designs/chest_tiers.md`)*
 
 - **The gold sink** is the known gap, deliberately left alone at the owner's
   instruction. When gold consumption becomes its own feature, ~490 gold a

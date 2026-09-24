@@ -107,7 +107,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
 | DOC-004 | Journals for the five proposed requirements (CMB-008, CMB-009, SYS-008, WLD-012, TST-003) | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-004-proposal-journals | 2026-09-23 |
 | DOC-005 | Second documentation review: the narrative open sections, and the owner's answers | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
-| DOC-006 | Third review: the owner's answers on the DOC-005 leftovers, the order of work | DOC | process | in progress | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| DOC-006 | Third review: the owner's answers on the DOC-005 leftovers, the order of work | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 
 ## Plans and designs
 

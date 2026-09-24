@@ -315,6 +315,8 @@ The title reads **"Game Over"** instead of "You Died". One string in
 
 *(DOC-005, 2026-09-24: the victory screen's summary panel is **done** (`ui/end_screen.py`). A "best DPS" record is still **pending**, never asked for (`game/save.py` `_RECORD_KEYS`))*
 
+*(DOC-006, 2026-09-24: the best-DPS record is **closed**, not needed (owner). The weapons table's forge names running their level into the damage figure are fixed as UI-013, below)*
+
 - **The victory screen** still draws the old nine-line readout. It can take
   the panel in one line (`RunSummaryPanel(self.stats).draw(...)`) — the
   summary it receives already carries the rows. Left out because the request

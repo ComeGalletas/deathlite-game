@@ -293,7 +293,7 @@ the session's next goal).
 ## DOC-006 — Tasks
 
 - [x] DOC-006.1 — Open this block; index rows; TST-004 handed to the remote session
-- [ ] DOC-006.2 — In-place notes for the closed items; the chest docs say how a tier is added; the pending register rewritten
+- [x] DOC-006.2 — In-place notes for the closed items; the chest docs say how a tier is added; the pending register rewritten
 
 ## DOC-006 — Order of work (kept current)
 
@@ -311,3 +311,37 @@ the session's next goal).
 
 Parked: rendering polish (soft shadow strip, pixel-perfect camera, live zoom
 slider). On hold: the web build.
+
+## DOC-006 — Results
+
+- **DOC-006 notes added** under the DOC-005 notes they answer:
+  - `combat_balance_journal.md`: gamepad aim and the chest skins, closed.
+  - `game_over_journal.md`: the best-DPS record, closed; UI-013 noted.
+  - `training_dummy_journal.md`: absolute damage in the overlay, closed.
+  - `enemy_ai_journal.md`: ENT-015 / 016 / 017.
+  - `playing_state_refactor.md`: SYS-009.
+- **`pending_plans.md`:** Kestrel and Nihil struck through as complete; its
+  update block records the aim toggle closed and the `mark` overlay still
+  pending.
+- **New `documentation/designs/chest_tiers.md`:** every place a chest tier
+  is named, the order for adding one, and the one wrinkle to fold when that
+  happens (the tier list and placement weights repeated in
+  `world/gen/tuning.py`).
+- Documentation only; no tests to run.
+
+**The pending register after DOC-006.** It replaces DOC-005's table. The
+order of work above is the queue:
+
+| area | pending |
+|---|---|
+| gameplay / UI | UI-013 the weapons table; the `mark` overlay (DOC-006.D3); PRG-003 the gold sink |
+| architecture | SYS-009; ENT-015; ENT-016; ENT-017 |
+| tests | TST-004.1–.8 (remote session); TST-004.9 the Bonepicker / Gaffjaw screenshot |
+| rendering polish (parked) | soft shadow strip; pixel-perfect camera; live zoom slider |
+| web build (on hold) | wheel vendoring, loading steps and progress bar, manifest pack, browser spawn settings, the bundle trim |
+
+Closed by DOC-006: the aim toggle (pause hint only), Kestrel / Nihil
+`attack2` / `guard`, gamepad aim, the best-DPS record, absolute damage in
+the DPS overlay, the unused chest skins. The Warlock marker (ENT-013), the
+skull `attack` fps (ENT-014) and chests on the run summary (UI-012) shipped
+in #32 and #33.

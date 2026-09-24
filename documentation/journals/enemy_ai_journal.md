@@ -430,6 +430,8 @@ JSON; a new *kind* of move is one component file + one line in a builder.
 ### Follow-ups parked
 
 *(DOC-005, 2026-09-24: all three still **pending**: the boss still runs its own state machine (`entities/boss.py`, nothing from `entities.ai`), there is no `push_radius` system (only steering separation), and `data/behaviors.json` does not exist)*
+
+*(DOC-006, 2026-09-24: all three taken up by the owner — the boss on the shared components as **ENT-015**, the crowd push radius as **ENT-016** (set low enough that enemies stack and cross bridges rather than stick), behaviour shape into data as **ENT-017**)*
 - Port `Boss` onto the same components (its phase FSM is the last bespoke AI).
 - `push_radius` enemy-vs-enemy crowd-collision pass as its own system.
 - `data/behaviors.json` so behaviour *shape* is data too, not just numbers.

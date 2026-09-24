@@ -278,6 +278,8 @@ breakdown mid-run.
 
 *(DOC-005, 2026-09-24: "only the Sword measured" is **done** — the sections below measure ten loadouts, then 180 builds. The breakdown line's absolute damage is still **pending**: the overlay shows shares only (`devtools/dps_meter.py`); the bench already reports absolutes)*
 
+*(DOC-006, 2026-09-24: absolute damage in the overlay is **closed**, not needed (owner))*
+
 - The breakdown line shows percentages only. Absolute damage per source is in
   `DpsMeter.breakdown()` and could be surfaced if the percentages prove too
   coarse when several weapons are up.

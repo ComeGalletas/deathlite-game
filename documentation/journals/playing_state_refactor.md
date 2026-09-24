@@ -215,6 +215,8 @@ PlayingState` and `from game.states.playing import PlayingState` work.
 
 *(DOC-005, 2026-09-24: still **pending**, both: only the last step of `_blit_rig` is shared (`_blit_character` in `visual/rendering.py`; each actor still picks its own frame and anchor), and `TimedVisual` is still deferred in `core/effects.py`'s docstring. The SYS-007 split moved these files but did neither. `_report_debug` staying central needs no action)*
 
+*(DOC-006, 2026-09-24: both taken up as **SYS-009**, with `MELEE_REACT_SCALE` moved to `game/config.py` — the owner's first architecture priority)*
+
 - **`_blit_rig`** — fold the enemy / boss / player sprite-blit cores in
   `rendering.py` into one helper (the per-entity extras — state rings, phase
   telegraphs, invuln ring — stay separate).
