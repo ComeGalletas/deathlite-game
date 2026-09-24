@@ -220,6 +220,14 @@ TST-004.6. One subtask each, in the review's order.
   `BOLT`) import them from `test_weapon_fire`; `conftest.INTEGRATION` names
   `test_weapon_specials.py`. Test count unchanged: 9 + 20 + 18 before, 24 +
   23 after. `tests/combat` + `tests/playing/test_buffs.py`: 590 passed.
+- **5.5** `tests/entities/ai/test_fsm_enemies.py` (4 tests) drove the
+  shipped charger / teleporter / warlock enemies through a real `Enemy`;
+  `test_ai_behaviors_fsm.py` (7) drives the same three behaviours on fakes.
+  Not duplicates — one checks the behaviour, the other the shipped data
+  wearing it — so the merge keeps both as the module's two halves, the
+  real-`Enemy` half under its own section header with its helpers (`make`,
+  `fs`, `ctx`) unchanged; no name collides with the fake half's `_enemy` /
+  `_ctx`. Neither module is a boss test. 11 passed.
 
 ## TST-004 — Plan
 
@@ -249,8 +257,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle` → `7ed17ce`
   - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py` → `22c7a6b`
   - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py` → `6c627e9`
-  - [x] TST-004.5.4 — §6: regroup the six weapon modules by subject
-  - [ ] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`
+  - [x] TST-004.5.4 — §6: regroup the six weapon modules by subject → `df68421`
+  - [x] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`
   - [ ] TST-004.5.6 — §6: retitle the modules that open with a plan phase
   - [ ] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
   - [ ] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
