@@ -278,25 +278,27 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 ## 6. Duplication and organisation
 
-- [ ] `tests/flows/test_dev_mode.py:38` defines `_settle()`, a verbatim copy of
+*(TST-004, 2026-09-24: done — all six items; TST-004.5.1–5.6 in `test_debt_journal.md`. The weapon modules are now `test_weapon_roster`, `test_weapon_fire`, `test_weapon_specials`, `test_weapon_blessings` and `test_hammer_swing`; `test_boss.py` keeps its phase tag because the parallel boss refactor owns it.)*
+
+- [x] `tests/flows/test_dev_mode.py:38` defines `_settle()`, a verbatim copy of
       `tests/boot.py::settle`. 17 other modules import the shared one. Delete the
       copy.
-- [ ] Six `FakeEnemy` and three `FakeProj` definitions are scattered across
+- [x] Six `FakeEnemy` and three `FakeProj` definitions are scattered across
       `test_manual_aim`, `test_summons`, `test_weapons`, `test_weapons_reach` and
       `test_weapons_special`, although `tests/combat/fakes.py` is the designated
       home. Consolidate.
-- [ ] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15 *(DOC-003: now 1,076 lines)*
+- [x] `tests/screens/test_menu.py` is 952 lines and two subjects — 9 of its 15 *(DOC-003: now 1,076 lines)*
       classes are character-select. Split out `test_character_select.py`.
-- [ ] The six weapon modules are keyed by the plan phase that produced them
+- [x] The six weapon modules are keyed by the plan phase that produced them
       (`test_weapons` = Milestone 2, `test_weapons_special` = Milestone 4,
       `test_weapons_reach` = CB-2, `test_weapon_classes` = P1,
       `test_weapon_effects` = P2, `test_hammer_swing` = change request 1) rather
       than by concern. Now that the six-weapon rework is landing, regroup by
       subject: roster/data, fire path, special effects, blessings.
-- [ ] `tests/entities/ai/test_fsm_enemies.py` (Milestone 9) and
+- [x] `tests/entities/ai/test_fsm_enemies.py` (Milestone 9) and
       `tests/entities/ai/test_ai_behaviors_fsm.py` both cover charger / teleporter /
       warlock. Merge.
-- [ ] 50 modules open with the plan phase they were written in (`"""Milestone 2:`, *(DOC-003: 39 modules still open with a phase tag (was 50))*
+- [x] 50 modules open with the plan phase they were written in (`"""Milestone 2:`, *(DOC-003: 39 modules still open with a phase tag (was 50))*
       `"""R4 --`, `"""CB-2:`, `"""LD-9 phase D7:`). Those plans are done; retitle
       by subject and keep the phase reference only where it explains *why* a
       thing is pinned.
@@ -305,15 +307,17 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 ## 7. Small, specific
 
-- [ ] `tests/combat/test_weapons.py:128`
+*(TST-004, 2026-09-24: the three test nits done — TST-004.5.7–5.9; the balance-number audit is TST-004.6.)*
+
+- [x] `tests/combat/test_weapons.py:128`
       `test_one_multishot_upgrade_does_not_crash_any_weapon` ends on a computed
       expression that is discarded (`math.radians(...) * (count - 1)`). The
       `KeyError` guard is real but invisible; make it an explicit assertion or
       drive the actual fire path.
-- [ ] `tests/systems/test_events.py:26` `test_clear_removes_everything` subscribes a
+- [x] `tests/systems/test_events.py:26` `test_clear_removes_everything` subscribes a
       handler, clears, publishes — and never observes that the handler did not
       fire. Record calls and assert the list is empty.
-- [ ] `tests/render/test_weapon_rigs.py:137`
+- [x] `tests/render/test_weapon_rigs.py:137`
       `test_legacy_true_and_no_fx_keep_the_old_rig` — `soul_slash` is the current
       default for a cone weapon with no visuals entry, not a legacy path. Rename.
 - [ ] ~38 assertions across 20 modules pin exact balance numbers from the data

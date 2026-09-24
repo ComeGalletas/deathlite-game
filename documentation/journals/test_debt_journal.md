@@ -251,6 +251,11 @@ TST-004.6. One subtask each, in the review's order.
   subscribed a no-op, cleared and published — nothing could fail. Two
   recording handlers on two events now, and the recorded list must be empty
   after `clear()`. 4 passed.
+- **5.9** `tests/render/test_weapon_rigs.py::test_legacy_true_and_no_fx_keep_the_old_rig`
+  pins what `cone.slash_rig` returns for `fx.slash: true` and for a shot
+  with no `fx` — `soul_slash`, the current default, not a legacy path.
+  Renamed `test_slash_true_or_no_fx_swings_the_default_soul_slash`, with a
+  docstring saying so.
 
 ## TST-004 — Plan
 
@@ -276,7 +281,7 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy) → `af7dc2a`
   - [x] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes) → `d0e14a2`
 - [x] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids → `a292643`
-- [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
+- [x] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
   - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle` → `7ed17ce`
   - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py` → `22c7a6b`
   - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py` → `6c627e9`
@@ -284,8 +289,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm` → `dbd372a`
   - [x] TST-004.5.6 — §6: retitle the modules that open with a plan phase → `13daf4f`
   - [x] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts → `631043e`
-  - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
-  - [ ] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`
+  - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler → `d618e61`
+  - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
 - [ ] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`
