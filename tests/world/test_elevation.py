@@ -132,13 +132,12 @@ class PackingTests(unittest.TestCase):
 
     def test_the_coast_leaves_its_guaranteed_void_band(self):
         keep = config.HEIGHTMAP_COAST_KEEP
-        if not keep:
-            self.skipTest("no void band configured")
+        # The room-overlap guarantee above rests on this band, so it is part
+        # of the contract rather than an optional setting.
+        self.assertGreaterEqual(keep, 1, "HEIGHTMAP_COAST_KEEP must leave a void band")
         for seed in SEEDS:
             layout, _gm, _ix = _world(seed)
             for room in layout.rooms:
-                if not room.grid:
-                    continue
                 w, h = room.tile_dims
                 land = [p for p, c in room.grid.items()
                         if c.kind in WALKABLE_KINDS]

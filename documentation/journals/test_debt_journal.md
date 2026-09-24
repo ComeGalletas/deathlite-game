@@ -49,6 +49,18 @@ Filled per task as each is read, before its change.
   the cached layout to a fresh one, so the shared world the rest of the suite
   reads is still tied to the pinned one. Cost: the module runs in 15 s.
 
+### TST-004.3 — the conditional skips
+
+`grep -rn "skipTest|skipIf|skipUnless|pytest.skip" tests` finds 18 live
+sites in 12 modules (the `test_interactables.py:12` and `test_imp.py:224`
+hits are prose). One subtask per module, the mixer pair together.
+
+- **3.1** `test_elevation.py:136` skipped when `HEIGHTMAP_COAST_KEEP` was
+  falsy; it is 2 in `game/config.py` and the room-overlap guarantee
+  (`world/gen/placement.py:67`) depends on it, so the skip is now an
+  assertion that the band is at least 1. The `if not room.grid: continue`
+  under it was the retired flat world's guard and went with it.
+
 ## TST-004 — Plan
 
 One task per source note, in the order given; each is read first, its
@@ -60,8 +72,18 @@ last commit, and its counts go in Results with 0 skipped as the target.
 ## TST-004 — Tasks
 
 - [x] TST-004.1 — This journal → `212e764`
-- [x] TST-004.2 — Digest tests through `world_digests`
+- [x] TST-004.2 — Digest tests through `world_digests` → `f1e620f`
 - [ ] TST-004.3 — Remove the conditional skips
+  - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip
+  - [ ] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed)
+  - [ ] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed)
+  - [ ] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed)
+  - [ ] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
+  - [ ] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
+  - [ ] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
+  - [ ] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)
+  - [ ] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)
+  - [ ] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
 - [ ] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
