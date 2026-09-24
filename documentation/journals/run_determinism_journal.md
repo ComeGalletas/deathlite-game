@@ -1,7 +1,7 @@
 # Run determinism — journal
 
 **ID:** SYS-008 · **System:** core systems (+ SPN) · **Type:** bug ·
-**Status:** in progress · **Branch:** claude/sys-008-run-determinism
+**Status:** done · **Branch:** claude/sys-008-run-determinism
 
 ---
 
@@ -53,11 +53,11 @@ workarounds so the digest tool proves the result on its own.
 
 ## SYS-008 — Tasks
 
-- [ ] SYS-008.1 — A test that runs the run digest in two child processes with different `PYTHONHASHSEED` values and compares; expected to fail, recorded as the baseline
+- [x] SYS-008.1 — A test that runs the run digest in two child processes with different `PYTHONHASHSEED` values and compares; expected to fail, recorded as the baseline — landed with SYS-008.5 as four processes: a red test cannot be committed as done, so the baseline was recorded by the probes instead, and the test was shown to fail on the old code before the fix went in (below)
 - [x] SYS-008.2 — Watchdog stagger and tracks keyed by a spawn serial, not `id()` (D1)
-- [ ] SYS-008.3 — Locate the hash-order iteration (bisect the spawn path under fixed hash seeds) and sort it where it is consumed (D2)
+- [-] SYS-008.3 — Locate the hash-order iteration (bisect the spawn path under fixed hash seeds) and sort it where it is consumed (D2) — not reproduced: with the clock and the watchdog fixed, the full digest is identical under hash seeds 0–3 and a random one; the "two enemy mixes by hash seed" was the wall-clock drift landing on different runs. D2 stands for any future case.
 - [x] SYS-008.4 — Locate the memory-order dependence behind seed 123 (object sets, `id()`-keyed dicts that are iterated) and remove it — open-ended; the owner gave the go on 2026-09-23
-- [ ] SYS-008.5 — Remove both workarounds from `run_digest.py`, re-pin `run_digests.json`, and make SYS-008.1 an ordinary test; index to done
+- [x] SYS-008.5 — Remove both workarounds from `run_digest.py`, re-pin `run_digests.json`, and make SYS-008.1 an ordinary test; index to done
 
 ## SYS-008 — Results
 
@@ -116,3 +116,30 @@ which is why seed 7 looked stable and seed 123 "drifted over the day".
 
 **Tests:** `tests/spawn` + `tests/entities` + `test_enemy_nav` +
 `test_pathfinding` — 569 passed, 217 subtests, 0 skipped.
+
+### SYS-008.5 — No workarounds, and a test that holds it
+
+- `tools/verification/run_digest.py` no longer re-executes itself under a
+  pinned `PYTHONHASHSEED` and no longer flattens the watchdog stagger.
+  With both gone, five digests run **side by side** under hash seeds 0, 1,
+  2, 3 and `random` all give seed 7 `52abf361d8365ae2472d` and seed 123
+  `dabda4b02be72c498764`, now pinned in `run_digests.json` (the old pins
+  moved because the watchdog and the fill budget change when things
+  happen, not whether the run repeats).
+- `tests/flows/test_run_determinism.py` (integration tier, in
+  `conftest.INTEGRATION`): four child processes run the digest's script on
+  seed 123 at once, under hash seeds 1–4, and must agree. It compares the
+  runs with each other, not with the pin, so a gameplay change that moves
+  the run does not break it. About 5 s: the worlds come from the disk cache.
+- **It catches the bug.** With the pre-SYS-008.4 `field.py`, `config.py`
+  and `navigation.py` put back (from `447af30`), the test failed **3 times
+  out of 3**; with the committed files restored, it passes.
+- Docs: `FUNCTIONAL_README.md`'s tool list and the structure review's
+  *Open* item say it is resolved.
+- **Tests:** the full default suite — **3253 passed, 8 deselected (sweep),
+  1025 subtests, 0 skipped** (15 min 3 s): the 3252 before plus the new
+  determinism test. It ran on the committed code, after the old files used
+  to prove the test were put back.
+
+**SYS-008 closed** (2026-09-23): a seed now plays the same run in any
+process, under any hash seed and any machine load.

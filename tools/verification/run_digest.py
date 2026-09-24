@@ -28,15 +28,12 @@ from pathlib import Path
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-# A run's enemy mix also depends on Python's per-process string-hash seed
-# (structure review, D: two stable outcomes per seed, both reproducible
-# under a fixed `PYTHONHASHSEED`; the roster sorts its names, so the set
-# that iterates in hash order sits further down the spawn / placement path
-# and is not yet located). The digest is only meaningful under one hash
-# seed, so this re-runs itself with it pinned when the caller did not.
-if os.environ.get("PYTHONHASHSEED") is None:
-    os.environ["PYTHONHASHSEED"] = "0"
-    os.execv(sys.executable, [sys.executable, "-m", "tools.verification.run_digest", *sys.argv[1:]])
+# No workarounds (SYS-008). This used to re-run itself under a pinned
+# `PYTHONHASHSEED` and flatten the spawn watchdog's stagger, because one
+# seed did not always play the same run. The causes were the flow-field
+# fill's wall-clock slice and the watchdog's `id()`-based stagger; both are
+# fixed, and a run is now the same in any process, under any hash seed and
+# any load -- `tests/flows/test_run_determinism.py` holds it there.
 
 SEEDS = (7, 123)
 FRAMES = 720                     # 12 s of run
@@ -59,11 +56,6 @@ def run_digest(seed: int) -> str:
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(_menu(game))
     ps = start_run(game, seed=seed)
-    # The spawn watchdog staggers each enemy's first sample by `id(enemy)`,
-    # a memory address, so two runs of one seed part company the moment a
-    # recycle lands in one and not the other. Flattened here: this measures
-    # the run's wiring, not that stagger.
-    ps.spawn.master.watchdog._stagger = lambda enemy: 0.0
     dt = 1 / 60
     for frame in range(FRAMES):
         if frame in (30, 90, 150):

@@ -136,7 +136,9 @@ obstacle bodies in green, pickup radius and projectile hitboxes dimmer.
 - `tools/verification/run_digest.py` — a fingerprint of a headless run (two
   pinned seeds, 720 frames, debug spawns thrown in): `--check` after a
   change to the run's wiring says whether the same seed still plays the
-  same frames. Pins Python's hash seed itself; not a test.
+  same frames. Not a test itself; `tests/flows/test_run_determinism.py`
+  runs its script in four processes at once and checks they agree
+  (SYS-008: a seed plays the same run under any hash seed and any load).
 - `tools/gen_weapon_tables.py` — generates the weapon / blessing / forge
   reference tables from the data JSON (Markdown for `documentation/designs/`,
   plus an HTML body); run from the repo root with the output paths as
