@@ -1,7 +1,7 @@
 # Mark overlay — journal
 
 **ID:** RND-007 · **System:** rendering (+ CMB) · **Type:** feature ·
-**Status:** in progress · **Branch:** claude/rnd-007-mark-overlay (the current
+**Status:** done · **Branch:** claude/rnd-007-mark-overlay (the current
 worktree, cut from `main` after #36 — owner, 2026-09-24)
 
 ---
@@ -96,5 +96,49 @@ worktree, cut from `main` after #36 — owner, 2026-09-24)
 - [x] RND-007.2 — Archive the frames; the cut script with its recolour and leader erase; the strip; the rig; credits
 - [x] RND-007.3 — `status_visuals.json`; the overlay module; the fallback ring's colour
 - [x] RND-007.4 — Tests and a screenshot
-- [ ] RND-007.5 — Results; index to done
+- [x] RND-007.5 — Results; index to done
 - [x] RND-007.6 — Found on the first screenshot: size and centre the brackets from the body's resting pose, not the rig's crop (which carries swing room and bracketed a bear at twice its size)
+
+## RND-007 — Results
+
+- **Art (RND-007.2):**
+  - `assets/effects/status/mark.png` is 14 frames, 2016 × 144.
+  - It is cut from the archived frames by
+    `tools/asset_pipeline/cut_mark_brackets.py`, which erases the scanner
+    panel's leader and recolours to raspberry. `--check` exits 0.
+  - The rig `status_mark` plays at 14 fps, so the lock-on breathes once a
+    second.
+  - The `CREDITS.md` line is added.
+  - **The first leader rule failed.** The leader starts left of centre, so
+    "the left half's top row" read its stroke as a bracket top. The script
+    now reads the top from the left brackets' vertical strokes and clears
+    everything above it.
+- **Data:** `data/weapons/status_visuals.json` `mark` holds the sprite, the
+  colour `(219, 33, 95)`, the recolour at hue 340, `box` 62, `over_body`
+  1.25, `fade` 0.3 and `shown_with_effects` `["syn_vs_marked"]`.
+- **Draw (RND-007.3):** `game/states/playing/visual/status_marks.py` is
+  called from `one_enemy` and `boss` right after the body's sprite. The
+  fallback ring's `mark` tint is the data's raspberry.
+- **RND-007.6 — found on the first screenshot:**
+  - A rig's `scale` is its whole content crop, swing room included: the
+    bear is 113 × 96 against a 66 × 53 body. So the brackets framed a bear
+    at twice its size, centred on the crop.
+  - `body_box` now measures the resting idle frame's visible bounds, cached
+    per rig and zoom. The brackets are sized from it and centred on it with
+    the sprite's own anchor, mirror and drop.
+- **Colour:**
+  - The art's median hue is 340°, 42° from fire (22°). The pack's own red
+    was 8° from fire.
+  - The test holds the gap above 30° and the hue within 4° of the data's.
+- **Tests:**
+  - `tests/render/test_mark_brackets.py` (6): `--check`, the archive, the
+    rig, no leader, the hue, the fallback ring.
+  - `tests/render/test_mark_overlay.py` (8): the gating, the fade, the
+    sizing, the centring either way it faces, the draw order, the ring.
+  - 14 passed; `tests/render` + `tests/playing` 766 passed before the fix.
+    **Full default suite: 3439 passed, 0 failed, 0 skipped** (11 sweep deselected, 16 min 16 s).
+- **Screenshot:**
+  - Seed 35, Rod + Daggers with Marked Prey (`syn_vs_marked` 0.3): the
+    marked bear is bracketed tightly in raspberry.
+  - The same scene without the blessing draws nothing.
+

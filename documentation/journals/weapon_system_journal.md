@@ -371,6 +371,7 @@ and glow work): `tests/combat tests/progression tests/core` = 313 passed in
 
 - Weapon art for the six (a dagger, a rod, a bomb sprite, a sword swing
   beyond the slash rig) and an on-screen mark overlay stay open: no assets.
+  *(RND-007, 2026-09-24: **done** — raspberry lock-on brackets drawn on a marked enemy while the hero holds a blessing that reads the mark; `mark_overlay_journal.md`)*
 - Kestrel's and Nihil's second attack and guard sheets are the user's to
   add; the rig data and the rule are ready for them.
 - The character-select preview still cycles idle / walk / attack; showing

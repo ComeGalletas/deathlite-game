@@ -305,8 +305,8 @@ the session's next goal).
 5. **ENT-017:** behaviour shape into data.
 6. **TST-004.9:** the Bonepicker / Gaffjaw screenshot.
    TST-004.1–.8 run in the remote session in parallel.
-7. **The `mark` overlay:** waits on the owner's call about the weapon
-   rework.
+7. ~~**The `mark` overlay:** waits on the owner's call about the weapon
+   rework.~~ *(RND-007, 2026-09-24: **done** — raspberry lock-on brackets drawn on a marked enemy while the hero holds a blessing that reads the mark; `mark_overlay_journal.md`)*
 8. **PRG-003:** the gold sink, when the owner has a design.
 
 Parked: rendering polish (soft shadow strip, pixel-perfect camera, live zoom

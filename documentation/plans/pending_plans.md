@@ -93,6 +93,7 @@ because the asset does not.
 - **The `mark` status has no on-screen overlay.** It shows only as a status
   ring in the primitive fallback or under `config.SHOW_ENEMY_STATE_RINGS`,
   so the Rod's synergies read as pure arithmetic to the player.
+  *(RND-007, 2026-09-24: **done** — raspberry lock-on brackets drawn on a marked enemy while the hero holds a blessing that reads the mark; `mark_overlay_journal.md`)*
 - **`assets/unused/` holds 40 MB across ~520 files** that neither code nor
   data names: 159 character strips (archer, monk, lancer defence poses), 85
   effect sheets, `chests.png`, 76 UI pieces. Some of it is content waiting for
