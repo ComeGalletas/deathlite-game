@@ -6,9 +6,9 @@ what the nudge cannot -- a body embedded in a cliff after a knockback, one
 lost off the world, one that has made no headway for seconds while
 trying to.
 
-Every live enemy is sampled once per `sample_interval`, staggered by its
-identity so a hundred bodies spread over a second rather than all landing
-on one frame. Two verdicts:
+Every live enemy is sampled once per `sample_interval`, staggered by the
+order the watchdog first saw it so a hundred bodies spread over a second
+rather than all landing on one frame. Two verdicts:
 
 **Off floor** -- the spot under the body is not floor (`host.is_walkable`
 at its radius) and not a bridge, or no island and no bridge holds it at
@@ -50,9 +50,14 @@ class Verdict:
 
 
 class _Track:
-    __slots__ = ("next_sample", "samples", "held_since")
+    __slots__ = ("enemy", "next_sample", "samples", "held_since")
 
-    def __init__(self, next_sample: float) -> None:
+    def __init__(self, enemy, next_sample: float) -> None:
+        # The body this track follows. Tracks are found by `id()`, and an id
+        # is a memory address a new enemy can reuse the moment an old one is
+        # freed; checking the owner keeps a newcomer from inheriting a dead
+        # body's samples (SYS-008).
+        self.enemy = enemy
         self.next_sample = next_sample
         self.samples: list[pygame.Vector2] = []
         self.held_since: float | None = None
@@ -70,9 +75,19 @@ class Watchdog:
         self.contact_margin = float(knobs["contact_margin"])
         self._tracks: dict[int, _Track] = {}
         self.flagged = 0
+        self._seen = 0
 
-    def _stagger(self, enemy) -> float:
-        return (id(enemy) // 16 % 1000) / 1000.0 * self.sample_interval
+    # The golden-ratio step: consecutive serials land far apart in the
+    # interval and never bunch, whatever order the bodies arrive in.
+    _SPREAD = 0.6180339887498949
+
+    def _stagger(self, serial: int) -> float:
+        """How far into the first interval the `serial`-th body the watchdog
+        has seen is sampled. It used to be derived from `id(enemy)`, a memory
+        address, so two runs of one seed sampled -- and recycled -- on
+        different frames and parted company (SYS-008). The serial is the
+        order of first sight, which the seed decides."""
+        return (serial * self._SPREAD) % 1.0 * self.sample_interval
 
     def update(self, host, now: float) -> list[Verdict]:
         live = host.live_enemies()
@@ -85,8 +100,9 @@ class Watchdog:
             if not getattr(e, "alive", True):
                 continue
             tr = self._tracks.get(id(e))
-            if tr is None:
-                tr = self._tracks[id(e)] = _Track(now + self._stagger(e))
+            if tr is None or tr.enemy is not e:
+                tr = self._tracks[id(e)] = _Track(e, now + self._stagger(self._seen))
+                self._seen += 1
             if now < tr.next_sample:
                 continue
             tr.next_sample = now + self.sample_interval

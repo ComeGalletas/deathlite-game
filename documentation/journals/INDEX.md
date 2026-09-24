@@ -85,7 +85,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
 | SYS-005 | PlayingState refactor | SYS | refactor | legacy | [playing_state_refactor.md](playing_state_refactor.md) | — | 2026-08-29 |
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
-| SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | proposed | [run_determinism_journal.md](run_determinism_journal.md) | — | 2026-09-22 |
+| SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | in progress | [run_determinism_journal.md](run_determinism_journal.md) | claude/sys-008-run-determinism | 2026-09-22 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
