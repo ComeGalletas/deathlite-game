@@ -75,9 +75,36 @@
 - [x] ENT-013.1 — Open this journal; index row
 - [x] ENT-013.2 — Archive the source frames, the cut script and its strip, the rig
 - [x] ENT-013.3 — The wind-up draw at `cast_at`, data in `enemies.json`
-- [ ] ENT-013.4 — Tests and a screenshot
+- [x] ENT-013.4 — Tests and a screenshot
 - [ ] ENT-013.5 — Results; `sprite_functionality.md`'s open note; index to done
 
 ## ENT-013 — Results
 
-*(filled in as the tasks land)*
+- **Art (ENT-013.2):** the 16 Gigapack frames archived and tracked in
+  `assets/enemies/hex_shaman/unused/cast_charge/`;
+  `tools/asset_pipeline/cut_cast_charge.py` joins them into
+  `hex_shaman_cast_charge.png` (1024 × 64), `--check` exits 0; the rig plays
+  all 16 at 20 fps; `CREDITS.md` usage line added.
+- **Draw (ENT-013.3):** `game/states/playing/visual/cast_marker.py`, called
+  from the flat-effects pass right after the hazard pools. Data:
+  `hex_shaman.cast_marker` = `{"sprite": "hex_shaman_cast_charge",
+  "footprint_alpha": [60, 200]}`.
+- **ENT-013.D4 — Tuned on the screenshot:** the first build drew the
+  charge-up at 52 px; the Hexcaller aims at the hero's feet, so with the
+  hero standing in the spot the marker hid under the body. The charge-up is
+  **76 px**, so it shows round a body standing in it; the footprint layer
+  keeps the hazard's exact size, so the true area stays honest.
+- **Screenshot:** seed 35, the hero steps 90 px aside once the wind-up
+  starts — at 0.05 s a dashed violet ring and scattered orbs, at 0.42 s the
+  orbs gathering, at 0.75 s a bright pink core over the pale footprint ring,
+  then the hazard pool landing on exactly that spot with the hero clear.
+- **Tests (ENT-013.4):** `tests/render/test_cast_charge.py` (3: the cut's
+  `--check`, the 16 archived frames, the rig) and
+  `tests/render/test_cast_marker.py` (8: drawn at `cast_at` and not at the
+  caster; nothing outside the wind-up, without a snapshot, or on an enemy
+  with no `cast_marker`; the footprint's progress ramp; the footprint is the
+  hazard sprite at the hazard's size; the data; drawn after the hazard pools)
+  — **11 passed**. The broader `tests/render` + `tests/playing` +
+  `tests/entities` run on the new draw was still in progress when these
+  were committed, at the owner's request to push; its count is recorded in
+  the next commit.
