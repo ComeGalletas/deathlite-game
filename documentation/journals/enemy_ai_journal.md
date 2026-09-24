@@ -683,7 +683,7 @@ interrupted. The existing boss, flying and smoke suites are unchanged.
 
 ---
 
-**ID:** ENT-015 · **System:** entities · **Type:** refactor · **Status:** in progress ·
+**ID:** ENT-015 · **System:** entities · **Type:** refactor · **Status:** done ·
 **Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
 
 This block follows the DOC-001 layout; the entries above predate it.
@@ -772,5 +772,52 @@ This block follows the DOC-001 layout; the entries above predate it.
 - [x] ENT-015.1 — This block
 - [x] ENT-015.2 — The pattern registry and the four patterns
 - [x] ENT-015.3 — `boss_patterns` behaviour; `Boss` on it; `bosses.json`
-- [ ] ENT-015.4 — Parity A/B against the old `Boss`; tests
-- [ ] ENT-015.5 — Results; index
+- [x] ENT-015.4 — Parity A/B against the old `Boss`; tests
+- [x] ENT-015.5 — Results; index
+
+## ENT-015 — Results
+
+- **ENT-015.2** (`782ed38`): `entities/ai/patterns.py`.
+  - `@boss_pattern` registers `radial_barrage`, `charge`, `summon_brood` and
+    `sweep`. `charge`'s dash is the shared `Charge` component.
+  - `valid_patterns` drops an unknown or incomplete block with a log line.
+  - `tests/entities/ai/test_boss_patterns.py`: 6 tests. Every shipped
+    pattern is registered and complete, bad data is dropped, and each
+    pattern's effect is checked.
+- **ENT-015.3** (`63a8f8e`):
+  - `entities/ai/behaviors/boss.py` registers `boss_patterns`.
+  - `Boss` runs its cycle on it. `entities/boss.py` is 296 → about 250
+    lines, and the four phase handlers, `_seek`, `_approach`,
+    `_fire_pattern`, `_enter` and `_next_pattern` are gone.
+  - `bosses.json` names `"behavior": "boss_patterns"` and `"intro": 1.4`.
+  - `test_flying.py`'s seek test and `test_boss_pig_rider.py`'s
+    pattern-bite test go through `SeekTarget` and the registry.
+- **ENT-015.D6 — The phase clock counts down, as it did.** The machine's
+  own clock counts up (`entered += dt`), and summing lands a boundary like
+  0.45 s a frame away from the old subtraction. `PhaseClock` keeps the
+  countdown in the blackboard, which also makes `phase_t` a plain view.
+- **Parity A/B** (ENT-015.4):
+  - **Setup:** the committed `Boss` and the new one, loaded side by side,
+    were driven by the same scripted context for 3000 frames per boss:
+    - the player circling;
+    - a walk out of sight and back;
+    - three chills;
+    - a flow field that bends 25° and has a no-route band;
+    - a wall for walkers.
+  - **Compared every frame:** position, velocity, phase, pattern, the phase
+    clock, contact damage, `closing`, `telegraph_fraction`, the animation
+    name, and every shot, summon and melee call.
+  - **Result:** everything discrete is equal on every frame, for both bosses
+    (The First Hunger: 104 combat calls over 10 phase/pattern pairs; The
+    Tusked Lance: 4 sweeps over 7 pairs). The largest position gap is
+    **4.5e-13 px**. It is float associativity:
+    `Steering` computes `(dir × 0.3) × speed` where the old code computed
+    `(dir × speed) × 0.3`, and it does not grow.
+  - The pinned run digests (`python -m tools.verification.run_digest
+    --check`) **match**.
+- **Tests:** `tests/entities`, `tests/combat`, `tests/render`,
+  `tests/screens/test_hud.py`, `tests/flows`: **1499 passed, 0 skipped**.
+- The A/B needs the deleted `Boss` beside the new one, so it cannot live in
+  the suite. It is recorded here; the behaviour itself is pinned by
+  `test_boss.py`, `test_boss_pig_rider.py` and `test_boss_patterns.py`.
+

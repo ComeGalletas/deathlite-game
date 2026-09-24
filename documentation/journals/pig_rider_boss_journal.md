@@ -96,6 +96,9 @@ triple-charge free of code.
 * `entities/boss.py` — a `sweep` branch in `_fire_pattern`, calling
   `ctx.melee_hit`. That verb has been on the `Combat` protocol and implemented
   in `effects.py` the whole time with no caller; this is its first boss use.
+  *(ENT-015, 2026-09-24: the patterns are now registered building blocks in
+  `entities/ai/patterns.py`, `sweep` among them, run by the shared machine's
+  `boss_patterns` behaviour.)*
 * `entities/boss.py` — `_anim_name` now plays **walk** during a charge's active
   phase instead of attack. A galloping pig reads as a charge; a held spear pose
   sliding across the ground does not. This improves The First Hunger too.
