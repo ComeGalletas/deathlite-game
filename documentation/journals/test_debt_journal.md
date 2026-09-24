@@ -518,7 +518,7 @@ TST-005, WLD-013, RND-006 (`claude/ent-017-behavior-templates`):
 ---
 
 **IDs:** TST-005, WLD-013 · **Systems:** tests, world · **Types:** refactor ·
-**Status:** in progress · **Branch:** claude/ent-017-behavior-templates (the
+**Status:** TST-005 done; WLD-013 in progress · **Branch:** claude/ent-017-behavior-templates (the
 current worktree, cut from `main` after #34 and #35 — owner, 2026-09-24)
 
 ## TST-005 — Requirement (owner, 2026-09-24)
@@ -559,7 +559,29 @@ current worktree, cut from `main` after #34 and #35 — owner, 2026-09-24)
 - [x] TST-005.1 — numpy in `CLAUDE.md`'s test rules, tests and asset scripts only
 - [x] TST-005.2 — `PurityTests` share one world build
 - [x] TST-005.3 — `BuffBuildingCountTests` into `sweep`; re-time the world tier
-- [ ] TST-005.4 — `test_gnome_split.py` without fixed values
+- [x] TST-005.4 — `test_gnome_split.py` without fixed values
+
+## TST-005 — Results
+
+- **TST-005.1:** `CLAUDE.md`'s test rules name pygame and numpy. numpy is
+  for tests and asset scripts only; the same rule is kept in memory.
+- **TST-005.2:** `PurityTests` builds one world per seed, 4 builds instead
+  of 10, and the determinism check compares against the suite's shared
+  cache. About 16 s → 5.7 s.
+- **TST-005.3:**
+  - Moving only the rate test did not help: the sibling test in the class
+    then paid the same ~30 s forty-seed build.
+  - So the whole forty-seed `BuffBuildingCountTests` is `sweep`, and a new
+    `PinnedSeedBuffBuildingTests` keeps the guarantee (no island without a
+    building) and the ceiling in `world`, on the pinned seeds the tier
+    builds anyway.
+  - **World tier: 4 min 32 s → 3 min 58 s** (573 passed).
+- **TST-005.4:** `test_gnome_split.py` asserts relations:
+  - the gnome is tougher, harder-hitting and slower than the Husk;
+  - the drawn bee covers its collider;
+  - the bee's `scale` keeps the art's `content` proportions.
+  No tuning value is pinned. `test_buffs.py` is unchanged, since its values
+  are the owner's decisions. 22 passed.
 
 ## WLD-013 — Requirement (owner, 2026-09-24)
 

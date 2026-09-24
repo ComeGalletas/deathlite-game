@@ -102,7 +102,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
 | TST-004 | Test debt: digests, conditional skips, R4, §6/§7, balance audit, coverage, summon renders | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/tst-004-test-debt (remote session) | 2026-09-24 |
-| TST-005 | numpy as a test-only tool; a faster world tier; the gnome split without fixed values | TST | refactor | proposed | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
+| TST-005 | numpy as a test-only tool; a faster world tier; the gnome split without fixed values | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
