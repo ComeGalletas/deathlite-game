@@ -1119,5 +1119,20 @@
       59
     ],
     "over_circle": 1.25
+  },
+  "status_mark": {
+    "_note": "RND-007: the `mark` status's lock-on brackets (data/weapons/status_visuals.json), cut and recoloured to raspberry by tools/asset_pipeline/cut_mark_brackets.py. 14 frames of the brackets tightening and opening again, looping; drawn centred on the body, sized from the status visual's `box` and `over_body`.",
+    "frame": [144, 144],
+    "content": [0, 0, 144, 144],
+    "anchor": [72, 72],
+    "scale": [144, 144],
+    "anims": {
+      "loop": {
+        "file": "effects/status/mark.png",
+        "frames": 14,
+        "fps": 14,
+        "loop": true
+      }
+    }
   }
 }

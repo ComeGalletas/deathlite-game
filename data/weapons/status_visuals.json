@@ -1,0 +1,14 @@
+{
+  "_comment": "RND-007: how a status is drawn on the enemy that carries it. One block per status id (combat/status.py). `sprite` is the rig drawn over the body; `colour` the procedural ring's ink when there is no art (the primitive fallback, SHOW_ENEMY_STATE_RINGS). `recolour` is read by the cut script (tools/asset_pipeline/cut_mark_brackets.py), not at draw time: the strip is recoloured offline. `box` is the art's own frame-box in source px, drawn at `over_body` x the body's drawn size. `fade` is how long before the status ends the art fades out. `shown_with_effects` gates the art: it shows only while a weapon the hero holds has one of these effects above 0 -- a mark nothing reads is noise (owner, 2026-09-24).",
+
+  "mark": {
+    "_note": "The Rod's mark (1.5 s, SYNERGY_WINDOW_S). Raspberry, hue 340: reads as red but stays apart from fire's orange (22), the HP-bar red (~0) and thunder's violet (265). The Gigapack's own red is hue 14, too close to fire. Brackets from scifi_analyze_001 (the lock-on breathe, frames 109-119 then 0-2).",
+    "sprite": "status_mark",
+    "colour": [219, 33, 95],
+    "recolour": {"hue": 340, "sat_mult": 1.1, "val_mult": 0.95, "keep_below_sat": 0.12},
+    "box": 62,
+    "over_body": 1.25,
+    "fade": 0.3,
+    "shown_with_effects": ["syn_vs_marked"]
+  }
+}

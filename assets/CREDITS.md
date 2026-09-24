@@ -218,3 +218,10 @@ fill when a file is missing.
   `scifi_charge_up_003_small_violet` (16 frames, unmodified) into one strip,
   by `tools/asset_pipeline/cut_cast_charge.py`; the source frames are
   archived beside it in `assets/enemies/hex_shaman/unused/cast_charge/`.
+- **Super Pixel Effects Gigapack** — the `mark` status's lock-on brackets
+  (RND-007): `assets/effects/status/mark.png` is cut from the pack's
+  `scifi_analyze_001_large_red` (frames 109–119 and 0–2, the brackets-only
+  run) by `tools/asset_pipeline/cut_mark_brackets.py`. The script erases the
+  scanner panel's leader line and recolours the frames from the pack's
+  orange-red to raspberry (hue 340). The source frames are archived beside
+  it in `assets/effects/status/unused/mark/`.
