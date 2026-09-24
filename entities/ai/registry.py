@@ -1,9 +1,17 @@
-"""Name -> Behavior builder.
+"""Name -> Behavior.
 
-`@behavior("kite_shoot")` registers a builder `fn(cfg) -> Behavior`, where `cfg`
-is the enemy's `data/enemies/enemies.json` block. `build_behavior(name, cfg)` resolves
-it. Behaviour modules (`entities/ai/behaviors/*`) register on import; the game
-imports them once at start-up.
+A behaviour name (`enemies.json` / `bosses.json` `behavior`) resolves in two
+places, in order (ENT-017):
+
+1. **A template** in `data/enemies/behaviors.json`. Its numbers merge shared
+   defaults -> the template's -> the enemy's block, and its `shape` builds
+   the machine: a generic shape in `entities/ai/templates.py`, or a
+   code-built one registered here.
+2. **A code-built behaviour** registered with `@behavior(name)`, a builder
+   `fn(cfg) -> Behavior` (the bespoke shapes in `entities/ai/behaviors/*`,
+   and tests' own demo behaviours). It still gets the shared defaults.
+
+Behaviour modules register on import; the game imports them once at start-up.
 """
 from __future__ import annotations
 
@@ -24,18 +32,36 @@ def behavior(name: str):
 
 
 def build_behavior(name: str, cfg: dict | None = None) -> Behavior:
-    try:
-        builder = _BUILDERS[name]
-    except KeyError:
+    from entities.ai import templates
+    tpl = templates.template(name)
+    if tpl is None and name not in _BUILDERS:
         raise KeyError(f"unknown ai behavior {name!r}; "
-                       f"registered: {sorted(_BUILDERS)}") from None
-    cfg = cfg or {}
+                       f"registered: {registered()}")
+    merged = templates.merged(tpl, cfg or {})
+    if tpl is None:
+        built = _BUILDERS[name](merged)
+    else:
+        shape = tpl["shape"]
+        if shape in templates.SHAPES:
+            built = templates.SHAPES[shape](tpl, merged)
+        elif shape in _BUILDERS:
+            built = _BUILDERS[shape](merged)
+        else:
+            raise KeyError(f"behavior {name!r}: unknown shape {shape!r}")
     # LD-9 D7: every behaviour is gated behind the aggro check from one place
     # rather than in twelve builders. A type with no `aggro_range` /
     # `pursuit_seconds` in its JSON block comes back untouched.
     from entities.ai.components.aggro import with_aggro
-    return with_aggro(builder(cfg), cfg)
+    return with_aggro(built, merged)
+
+
+def code_shapes() -> list[str]:
+    """The code-built behaviours and shapes (`@behavior`)."""
+    return sorted(_BUILDERS)
 
 
 def registered() -> list[str]:
-    return sorted(_BUILDERS)
+    """Every name `build_behavior` resolves: the templates and the code-built
+    behaviours."""
+    from entities.ai import templates
+    return sorted(set(_BUILDERS) | set(templates.names()))

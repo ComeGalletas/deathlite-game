@@ -337,7 +337,9 @@ This block follows the DOC-001 layout; the entries above predate it.
 
 ## SYS-009 — Results
 
-- **SYS-009.2** (`f62bee0`): `config.MELEE_REACT_SCALE` (1.25). The melee
+- **SYS-009.2** (`f62bee0`): `config.MELEE_REACT_SCALE` (1.25). *(ENT-017, 2026-09-24: superseded. The melee timing defaults
+  moved into `data/enemies/behaviors.json` as their resolved 0.1875 / 0.4375
+  s, so the scale left config again; see ENT-017.D5 in `enemy_ai_journal.md`.)* The melee
   defaults are unchanged at 0.1875 s / 0.4375 s. `tests/entities/ai`:
   237 passed.
 - **SYS-009.3** (`05231c6`): `core/timed_visual.py`.

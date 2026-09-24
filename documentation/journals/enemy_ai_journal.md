@@ -1045,10 +1045,10 @@ many were stuck:
 
 - [x] ENT-017.1 — The owner picks A (and the reading of "the data files
   need to be moved" stands)
-- [ ] ENT-017.2 — `data/enemies/behaviors.json`; `entities/ai/actions.py`;
+- [x] ENT-017.2 — `data/enemies/behaviors.json`; `entities/ai/actions.py`;
   `registry.build_behavior` resolves templates; the generic `move` and
   `telegraph_cycle` shapes
-- [ ] ENT-017.3 — The bespoke builders (brute, kite, sweep) and `with_aggro`
+- [x] ENT-017.3 — The bespoke builders (brute, kite, sweep) and `with_aggro`
   read the data with no fallbacks; `MELEE_REACT_SCALE` out of config
 - [ ] ENT-017.4 — Golden-trace parity; tests (every enemy's behaviour has a
   template, the templates name only registered things, an enemy overrides

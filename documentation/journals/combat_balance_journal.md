@@ -817,7 +817,7 @@ is exact and deterministic.
 
 ### Follow-ups (not blocking)
 
-*(DOC-005, 2026-09-24: the sprite sync is **done** as ENT-014 (below): the skull `attack` strip, 7 frames, went from 14 fps (0.5 s) to 10 fps (0.70 s) against a swing of 0.725 s (`data/enemies/enemy_sprites.json`, `enemies.json`). The other follow-up is still **pending**. *(SYS-009, 2026-09-24: done — `MELEE_REACT_SCALE` moved to `game/config.py` at the owner's request)* `MELEE_REACT_SCALE` is still local to `entities/ai/behaviors/simple.py`; move it only if another system needs it)*
+*(DOC-005, 2026-09-24: the sprite sync is **done** as ENT-014 (below): the skull `attack` strip, 7 frames, went from 14 fps (0.5 s) to 10 fps (0.70 s) against a swing of 0.725 s (`data/enemies/enemy_sprites.json`, `enemies.json`). The other follow-up is still **pending**. *(SYS-009, 2026-09-24: done — `MELEE_REACT_SCALE` moved to `game/config.py` at the owner's request)* *(ENT-017, 2026-09-24: then folded into the data — the melee defaults are 0.1875 / 0.4375 s in `data/enemies/behaviors.json`, their comment giving the 0.15 / 0.35 × 1.25 arithmetic, and the constant is gone)* `MELEE_REACT_SCALE` is still local to `entities/ai/behaviors/simple.py`; move it only if another system needs it)*
 
 - **Sprite sync:** the `skull` `attack` strip (7 frames @ 14 fps = 0.5 s) now
   finishes ~0.19 s before the swing ends and holds its last frame. Cut its

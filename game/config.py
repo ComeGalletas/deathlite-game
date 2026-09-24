@@ -1000,14 +1000,6 @@ BOSS_CLOSING_SPEED_MULT: float = 3.0
 #     interval > armor / (rate * bulwark)
 INCOMING_TICK_INTERVAL: float = 0.5
 
-# The stretch on the default melee wind-up and swing (CB-4), so the player can
-# read the telegraph and step out before the hitbox lands. Scales
-# `MELEE_ATTACK_TELEGRAPH` / `MELEE_ATTACK_ACTIVE` in
-# `entities/ai/behaviors/simple.py`; an enemy's own `attack_telegraph` /
-# `attack_active` in the data are absolute and ignore it. Moved here from
-# `simple.py` (SYS-009) so a difficulty or accessibility setting can reach it.
-MELEE_REACT_SCALE: float = 1.25
-
 # --- Combat: hero HP regeneration (CB-7) ---------------------------------
 # The hero restores `player.stats["hp_regen"]` HP once every this many seconds.
 # Only the *amount* is a stat; the cadence is fixed so the drip stays readable

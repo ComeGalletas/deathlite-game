@@ -1,4 +1,5 @@
-"""`entities/ai/behaviors/simple.py` -- `chase`, `path_chase`, `swarm`."""
+"""The simple movers -- `chase`, `path_chase`, `swarm` -- now `move`
+templates in `data/enemies/behaviors.json` (ENT-017)."""
 import random
 import unittest
 from types import SimpleNamespace
