@@ -15,6 +15,8 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from entities.ai import build_behavior
+from entities.ai.components import SeekTarget
+from entities.ai.steering import Steering
 from entities.boss import Boss
 from entities.enemy import Enemy
 from game.content import get_content
@@ -170,10 +172,25 @@ class SeekTests(unittest.TestCase):
         from types import SimpleNamespace
         player = pygame.Vector2(300, 0)
         field = pygame.Vector2(0, 1)                    # the field says "go south"
-        ctx = SimpleNamespace(player_pos=player, nav_dir=lambda p, r: pygame.Vector2(field))
+        ctx = SimpleNamespace(player_pos=player, dt=1 / 60,
+                              nav_dir=lambda p, r: pygame.Vector2(field))
         flyer, walker = _boss(), _boss(flying=False)
-        self.assertAlmostEqual(flyer._seek(ctx).x, 1.0, places=3)   # straight at the player
-        self.assertAlmostEqual(walker._seek(ctx).y, 1.0, places=3)  # follows the field
+
+        def heading(b, seek):
+            acc = Steering()
+            seek.tick(b, ctx, ctx, acc)
+            return acc.direction()
+
+        # ENT-015: the boss seeks through shared `SeekTarget`s -- the one it
+        # closes in with, and the drift of every phase of its cycle.
+        for b, want in ((flyer, (1.0, 0.0)), (walker, (0.0, 1.0))):
+            seeks = [b._closer] + [c for comps in b._behavior.states.values()
+                                   for c in comps if isinstance(c, SeekTarget)]
+            self.assertGreater(len(seeks), 1)
+            for seek in seeks:
+                d = heading(b, seek)
+                self.assertAlmostEqual(d.x, want[0], places=3)   # flyer: at the player
+                self.assertAlmostEqual(d.y, want[1], places=3)   # walker: the field
 
 
 class BroodTests(unittest.TestCase):

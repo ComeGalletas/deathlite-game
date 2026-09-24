@@ -65,7 +65,11 @@ class BumpResolver:
                 if key in seen:
                     continue
                 seen.add(key)
-                self._bump(a, b, contact=True)
+                # ENT-016: two enemies push at a fraction of their colliders,
+                # so a pack can compress and file across a one-tile deck; the
+                # boss still shoulders through at its full radius.
+                frac = (1.0 if b is boss else config.CROWD_PUSH_RADIUS_FRAC)
+                self._bump(a, b, contact=True, reach=frac)
 
         # hero <-> enemy / boss
         p = run.player
@@ -75,16 +79,24 @@ class BumpResolver:
                 if getattr(e, "alive", True):
                     self._bump(p, e)
 
-    def _bump(self, a, b, contact: bool = False) -> None:
+    def _bump(self, a, b, contact: bool = False, reach: float = 1.0) -> None:
+        """Shove `a` and `b` apart if they are closer than `reach` x their
+        summed radii (the push radius; 1.0 is the colliders touching).
+
+        The frozen-contact rule keeps the full colliders whatever the push
+        radius: an ice slide clips what it touches, and a crowd allowed to
+        compress (ENT-016) must not quietly make ice clip less."""
         delta = a.pos - b.pos
         d2 = delta.length_squared()
-        rr = a.radius + b.radius
-        if d2 >= rr * rr or d2 < 1e-9:
+        touch = a.radius + b.radius
+        if d2 >= touch * touch or d2 < 1e-9:
             return                                   # not overlapping / coincident
-        pen = min(rr - d2 ** 0.5, rr * _PEN_CAP_FRAC)
-        push_a, push_b = knock_split(a.weight, b.weight, config.BUMP_GAIN * pen)
-        a.apply_knockback(delta, push_a)             # a shoved away from b
-        b.apply_knockback(-delta, push_b)            # b shoved away from a
+        rr = touch * reach
+        if d2 < rr * rr:
+            pen = min(rr - d2 ** 0.5, rr * _PEN_CAP_FRAC)
+            push_a, push_b = knock_split(a.weight, b.weight, config.BUMP_GAIN * pen)
+            a.apply_knockback(delta, push_a)         # a shoved away from b
+            b.apply_knockback(-delta, push_b)        # b shoved away from a
         if contact:
             # Only ever between two bodies: a sliding frozen enemy hurts
             # other enemies, never the hero (whose damage path is its

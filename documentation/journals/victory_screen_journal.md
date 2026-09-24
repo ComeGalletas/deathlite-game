@@ -260,6 +260,12 @@ them through the run-ended event. Deliberately last, and droppable.
   earlier version of this note claimed three columns were unaffected; that was
   wrong and the code comment has been corrected.
 
+  *(UI-013, 2026-09-24: superseded. The 498 missed the forge names ("Meteor
+  Hammer  Lv 9", 216 px ran its level into the damage). The level now has its
+  own cell, names are trimmed to their room, and the minimum is measured from
+  every `weapons.json` and `forges.json` name (`weapons_min_width`, 549 px
+  today). See `game_over_journal.md`, UI-013.)*
+
   Tests: `test_victory.py` grew `ColumnWidthTests` (the split is pure
   arithmetic, so it is asserted directly — the overlap it prevents is invisible
   to a "did anything draw" check) and `HeroColumnTests`. The first-clear and

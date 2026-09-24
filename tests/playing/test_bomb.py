@@ -307,7 +307,7 @@ class BlastAreaTests(unittest.TestCase):
 
         ps, blast = self._detonate([target, far])            # unmodified
         self.assertAlmostEqual(blast.radius, self.BASE)
-        self.assertAlmostEqual(ps._explosions[0]["radius"], self.BASE)
+        self.assertAlmostEqual(ps._explosions[0].radius, self.BASE)
         CombatResolver(ps).projectile_hits()
         self.assertEqual(far.hp, 100.0, "the base blast does not reach it")
 
@@ -315,7 +315,7 @@ class BlastAreaTests(unittest.TestCase):
         ps, blast = self._detonate([FakeEnemy(NEAR, 0), far],
                                    blast_radius_mult=1.75)
         self.assertAlmostEqual(blast.radius, self.BASE * 1.75)
-        self.assertAlmostEqual(ps._explosions[0]["radius"], self.BASE * 1.75)
+        self.assertAlmostEqual(ps._explosions[0].radius, self.BASE * 1.75)
         CombatResolver(ps).projectile_hits()
         self.assertLess(far.hp, 100.0, "the widened blast does")
 
@@ -399,23 +399,23 @@ class BombletFxTests(unittest.TestCase):
         from game.assets import get_assets
         ps, fx, _w, bomblets = self._cluster()
         self.assertEqual(len(ps._explosions), 1)                  # the parent's
-        self.assertEqual(ps._explosions[0]["anim"].rig, "explosion")
+        self.assertEqual(ps._explosions[0].anim.rig, "explosion")
         for _ in range(40):                                       # bomblet fuses
             fx.update_projectiles(1 / 60)
-        small = [e for e in ps._explosions if e["anim"].rig == "explosion_small"]
+        small = [e for e in ps._explosions if e.anim.rig == "explosion_small"]
         self.assertEqual(len(small), len(bomblets))
         a = get_assets()
         for e in small:
-            self.assertEqual(e["anim"].anim, "burst")
+            self.assertEqual(e.anim.anim, "burst")
             self.assertAlmostEqual(
-                e["dur"], a.frame_count("explosion_small", "burst")
+                e.dur, a.frame_count("explosion_small", "burst")
                 / a.fps("explosion_small", "burst"))
 
     def test_burst_visual_still_falls_back_to_the_ring_for_a_missing_rig(self):
         fx = TransientFx(fake_ps([]))
         entry = fx.burst_visual(pygame.Vector2(), 40.0, rig="no_such_rig")
-        self.assertNotIn("anim", entry)
-        self.assertAlmostEqual(entry["dur"], 0.35)
+        self.assertIsNone(entry.anim)
+        self.assertAlmostEqual(entry.dur, 0.35)
 
     # --- the ball in flight ----------------------------------
     def test_a_bomblet_holds_the_fuse_and_never_rolls(self):
@@ -532,9 +532,9 @@ class BurstVisualTests(unittest.TestCase):
     def test_the_bomb_burst_carries_the_explosion_animation(self):
         from game.assets import get_assets
         ps, fx, ex = self._detonated()
-        self.assertEqual(ex["anim"].rig, "explosion")
-        self.assertEqual(ex["anim"].anim, "burst")
-        self.assertAlmostEqual(ex["radius"], 72)      # the blast_radius above
+        self.assertEqual(ex.anim.rig, "explosion")
+        self.assertEqual(ex.anim.anim, "burst")
+        self.assertAlmostEqual(ex.radius, 72)      # the blast_radius above
         a = get_assets()
         # Frame count read off the rig, not pinned at 10: re-cutting the
         # explosion strip is an art change, and the claim here is that the
@@ -542,16 +542,16 @@ class BurstVisualTests(unittest.TestCase):
         frames = a.frame_count("explosion", "burst")
         self.assertGreater(frames, 0)
         self.assertFalse(a.loops("explosion", "burst"))
-        self.assertAlmostEqual(ex["dur"], frames / a.fps("explosion", "burst"))
+        self.assertAlmostEqual(ex.dur, frames / a.fps("explosion", "burst"))
 
     def test_the_burst_advances_and_is_culled_when_the_strip_ends(self):
         ps, fx, ex = self._detonated()
-        fx.update_explosions(ex["dur"] / 2)
-        self.assertEqual(ex["anim"].t, ex["dur"] / 2)
-        self.assertFalse(ex["anim"].finished)
+        fx.update_explosions(ex.dur / 2)
+        self.assertEqual(ex.anim.t, ex.dur / 2)
+        self.assertFalse(ex.anim.finished)
         self.assertIn(ex, ps._explosions)
-        fx.update_explosions(ex["dur"] / 2 + 0.001)
-        self.assertTrue(ex["anim"].finished)
+        fx.update_explosions(ex.dur / 2 + 0.001)
+        self.assertTrue(ex.anim.finished)
         self.assertNotIn(ex, ps._explosions)
 
     def test_the_renderer_scales_the_burst_to_the_blast_diameter(self):
@@ -570,7 +570,7 @@ class BurstVisualTests(unittest.TestCase):
         surf = pygame.Surface((800, 800), pygame.SRCALPHA)
         WorldRenderer(r_ps).explosions(surf)
         bb = surf.get_bounding_rect(min_alpha=1)
-        cx, cy = ex["pos"].x + 200, ex["pos"].y + 200
+        cx, cy = ex.pos.x + 200, ex.pos.y + 200
         self.assertTrue(bb.collidepoint(cx, cy))
         self.assertAlmostEqual(bb.centerx, cx, delta=8)   # centred on the blast
         self.assertAlmostEqual(bb.width, 2 * 72, delta=10)   # fireball spans the diameter

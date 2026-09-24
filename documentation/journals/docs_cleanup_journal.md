@@ -1,6 +1,6 @@
 # Documentation cleanup — journal
 
-**ID:** DOC-003 (+ DOC-004, DOC-005) · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
+**ID:** DOC-003 (+ DOC-004, DOC-005, DOC-006) · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
 **Type:** process · **Status:** done ·
 **Branch:** claude/doc-003-doc-cleanup (worktree `.claude/worktrees/doc-003-doc-cleanup`)
 
@@ -231,3 +231,117 @@ the session's next goal).
 | rendering polish | soft shadow strip; pixel-perfect camera; live zoom slider |
 | tests | digest tests through `world_digests`; ~16 conditional skips (`test_elevation.py:136` removable); worldgen R4; the §6/§7 tidy-ups; the balance-number audit; coverage of `world/gen/graph.py`, `validate.py`, `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`; WA5's summon render tests; the Bonepicker / Gaffjaw screenshot |
 | web build (on hold) | wheel vendoring, loading steps and progress bar, manifest pack, browser spawn settings, the bundle trim |
+
+---
+
+## DOC-006 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Record the owner's answers to the items still pending after
+  DOC-005 and set the order of the work that follows.
+- **Details:** The owner's answers (2026-09-24):
+  - The auto-attack / aim toggle stays a hint in the pause menu, with no
+    Options row.
+  - Kestrel and Nihil will not get `attack2` / `guard` animations: complete.
+  - Gamepads are not considered for now.
+  - The DPS extras (a best-DPS record, absolute damage in the overlay) are
+    not needed. Instead, polish the run summary's weapons table, where
+    forge names run their level into the damage figures.
+  - No more chests for now. The design stays modular so tiers can be added
+    later, but that is not a pending task.
+  - Architecture:
+    - Move the boss onto the shared AI's patterns.
+    - Add a crowd push radius, set low enough that enemies can stack and
+      cross bridges instead of getting stuck.
+    - Move behaviour shape into the data files.
+    - Items 4–6 (`_blit_rig`, `TimedVisual`, `MELEE_REACT_SCALE`) are easy,
+      so they go first.
+  - Split the test debt and hand it to a parallel remote session.
+- **Constraint:** A new branch, `claude/doc-006-ui-013-dps-table`, cut from
+  `main` after #33. Nothing was left to commit on the previous branch.
+
+## DOC-006 — Confirmed reading
+
+- The pause menu's Controls block (`ui/controls_block.py`) already lists the
+  auto-attack key, "Q  Auto attack", so the toggle item closes without code.
+- The run summary's weapons table (`ui/run_summary.py`, `_draw_damage`)
+  prints `"<name>  Lv <n>"` from the left edge and the Damage / Share / DPS
+  cells at 150 / 84 / 0 px from the right. The column's 498 px minimum was
+  measured against `weapons.json` names only ("Grave Totem  Lv 9", 186 px).
+  The forge names are longer ("Meteor Hammer  Lv 9" is 216 px), and a
+  7-figure damage leaves only 199 px, so the level prints over the damage.
+  Reproduced on the victory layout.
+- The chest tiers are data: `data/loot/chests.json` holds each tier's payout,
+  and `progression/chests.py` / `world/gen/chests.py` read the tiers by name.
+- **DOC-006.D1 — IDs allocated:**
+  - **UI-013:** the weapons table.
+  - **TST-004:** the test debt, in a remote session on
+    `claude/tst-004-test-debt`, journal `test_debt_journal.md`.
+    TST-004.9, the Bonepicker / Gaffjaw screenshot, stays with this
+    session.
+  - **SYS-009:** `_blit_rig` + `TimedVisual` + `MELEE_REACT_SCALE`.
+  - **ENT-015:** the boss on the shared AI components.
+  - **ENT-016:** the crowd push radius.
+  - **ENT-017:** behaviour shape moved into data.
+- **DOC-006.D2 — "The data files need to be moved" is read as the
+  architecture list's item 3:** behaviour shape moves from code into a data
+  file (`data/enemies/behaviors.json`), beside the enemy data it configures.
+- **DOC-006.D3 — The `mark` overlay stays pending.** It was expanded for the
+  owner (an authored effect on marked enemies, declared on the status, shown
+  only while a blessing reads the mark). The owner has not yet said whether
+  it waits for the weapon rework.
+
+## DOC-006 — Tasks
+
+- [x] DOC-006.1 — Open this block; index rows; TST-004 handed to the remote session
+- [x] DOC-006.2 — In-place notes for the closed items; the chest docs say how a tier is added; the pending register rewritten
+
+## DOC-006 — Order of work (kept current)
+
+1. **UI-013:** the weapons table.
+2. **SYS-009:** `_blit_rig` + `TimedVisual` + `MELEE_REACT_SCALE`
+   (the owner's priority).
+3. **ENT-015:** the boss on the shared AI.
+4. **ENT-016:** the crowd push radius.
+5. **ENT-017:** behaviour shape into data.
+6. **TST-004.9:** the Bonepicker / Gaffjaw screenshot.
+   TST-004.1–.8 run in the remote session in parallel.
+7. **The `mark` overlay:** waits on the owner's call about the weapon
+   rework.
+8. **PRG-003:** the gold sink, when the owner has a design.
+
+Parked: rendering polish (soft shadow strip, pixel-perfect camera, live zoom
+slider). On hold: the web build.
+
+## DOC-006 — Results
+
+- **DOC-006 notes added** under the DOC-005 notes they answer:
+  - `combat_balance_journal.md`: gamepad aim and the chest skins, closed.
+  - `game_over_journal.md`: the best-DPS record, closed; UI-013 noted.
+  - `training_dummy_journal.md`: absolute damage in the overlay, closed.
+  - `enemy_ai_journal.md`: ENT-015 / 016 / 017.
+  - `playing_state_refactor.md`: SYS-009.
+- **`pending_plans.md`:** Kestrel and Nihil struck through as complete; its
+  update block records the aim toggle closed and the `mark` overlay still
+  pending.
+- **New `documentation/designs/chest_tiers.md`:** every place a chest tier
+  is named, the order for adding one, and the one wrinkle to fold when that
+  happens (the tier list and placement weights repeated in
+  `world/gen/tuning.py`).
+- Documentation only; no tests to run.
+
+**The pending register after DOC-006.** It replaces DOC-005's table. The
+order of work above is the queue:
+
+| area | pending |
+|---|---|
+| gameplay / UI | UI-013 the weapons table; the `mark` overlay (DOC-006.D3); PRG-003 the gold sink |
+| architecture | SYS-009; ENT-015; ENT-016; ENT-017 |
+| tests | TST-004.1–.8 (remote session); TST-004.9 the Bonepicker / Gaffjaw screenshot |
+| rendering polish (parked) | soft shadow strip; pixel-perfect camera; live zoom slider |
+| web build (on hold) | wheel vendoring, loading steps and progress bar, manifest pack, browser spawn settings, the bundle trim |
+
+Closed by DOC-006: the aim toggle (pause hint only), Kestrel / Nihil
+`attack2` / `guard`, gamepad aim, the best-DPS record, absolute damage in
+the DPS overlay, the unused chest skins. The Warlock marker (ENT-013), the
+skull `attack` fps (ENT-014) and chests on the run summary (UI-012) shipped
+in #32 and #33.

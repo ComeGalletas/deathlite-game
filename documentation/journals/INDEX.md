@@ -15,8 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-010 · ENT-015 · SPN-004 · WLD-013 · RND-006 · UI-013 ·
-PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
+**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-013 · RND-006 · UI-014 ·
+PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 
 ## Requirements
 
@@ -45,6 +45,9 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | ENT-012 | Enemy tuning (Stoutpaw shield, Tusked Lance radius) | ENT | balance | done | [enemy_tuning_journal.md](enemy_tuning_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | ENT-013 | Hexcaller cast wind-up drawn where it will land | ENT, RND | feature | done | [warlock_cast_journal.md](warlock_cast_journal.md) | claude/ent-013-warlock-cast-marker | 2026-09-24 |
 | ENT-014 | Skull attack animation slowed to cover its swing | ENT, RND | balance | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
+| ENT-015 | The boss on the shared AI components | ENT | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | proposed | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
@@ -77,6 +80,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | UI-010 | Key icons (keycaps) | UI, RND | feature | legacy | [key_icons_journal.md](key_icons_journal.md) | — | 2026-09-19 |
 | UI-011 | Enemy health bar | UI, ENT | feature | legacy | [enemy_health_bar_journal.md](enemy_health_bar_journal.md) | — | 2026-09-22 |
 | UI-012 | Chests opened shown on the run summary | UI, PRG | feature | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
+| UI-013 | Run summary weapons table: the level never overlaps the damage | UI | bug | done | [game_over_journal.md](game_over_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
@@ -91,9 +95,11 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
 | SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | claude/sys-008-run-determinism | 2026-09-22 |
+| SYS-009 | One sprite-blit core, a `TimedVisual` for transient effects, `MELEE_REACT_SCALE` to config | SYS, RND, ENT | refactor | done | [playing_state_refactor.md](playing_state_refactor.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
+| TST-004 | Test debt: digests, conditional skips, R4, §6/§7, balance audit, coverage, summon renders | TST | refactor | in progress | [test_debt_journal.md](test_debt_journal.md) | claude/tst-004-test-debt (remote session) | 2026-09-24 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
@@ -101,6 +107,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
 | DOC-004 | Journals for the five proposed requirements (CMB-008, CMB-009, SYS-008, WLD-012, TST-003) | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-004-proposal-journals | 2026-09-23 |
 | DOC-005 | Second documentation review: the narrative open sections, and the owner's answers | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
+| DOC-006 | Third review: the owner's answers on the DOC-005 leftovers, the order of work | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 
 ## Plans and designs
 

@@ -103,8 +103,8 @@ class EllipsizeTests(unittest.TestCase):
         from progression.items import generate_item
         from ui import run_summary
 
-        mins = [m for _d, m in (run_summary._COLUMNS[c]
-                                for c in run_summary.VICTORY_COLUMNS)]
+        mins = run_summary.column_minimums(
+            run_summary.VICTORY_COLUMNS, run_summary.RunSummaryPanel({})._row)
         space = 1600 - 2 * 60 - (len(mins) - 1) * 20
         content = run_summary.column_widths(space, mins)[0] - 56
         c = get_content()

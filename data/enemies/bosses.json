@@ -11,6 +11,8 @@
     "color": [180, 40, 70],
     "tags": ["boss", "flying"],
     "sprite": "giant_bat",
+    "behavior": "boss_patterns",
+    "intro": 1.4,
     "patterns": [
       {
         "id": "radial_barrage",
@@ -51,6 +53,8 @@
     "color": [214, 122, 150],
     "tags": ["boss"],
     "sprite": "pig_rider",
+    "behavior": "boss_patterns",
+    "intro": 1.4,
     "patterns": [
       {
         "id": "charge",

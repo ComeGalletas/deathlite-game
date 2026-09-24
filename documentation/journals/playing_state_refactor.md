@@ -215,6 +215,8 @@ PlayingState` and `from game.states.playing import PlayingState` work.
 
 *(DOC-005, 2026-09-24: still **pending**, both: only the last step of `_blit_rig` is shared (`_blit_character` in `visual/rendering.py`; each actor still picks its own frame and anchor), and `TimedVisual` is still deferred in `core/effects.py`'s docstring. The SYS-007 split moved these files but did neither. `_report_debug` staying central needs no action)*
 
+*(DOC-006, 2026-09-24: both taken up as **SYS-009**, with `MELEE_REACT_SCALE` moved to `game/config.py` — the owner's first architecture priority)*
+
 - **`_blit_rig`** — fold the enemy / boss / player sprite-blit cores in
   `rendering.py` into one helper (the per-entity extras — state rings, phase
   telegraphs, invuln ring — stay separate).
@@ -269,3 +271,104 @@ already failing on `main`). The post-move run is recorded below.
 After the move: 2153 passed, the same single pre-existing failure, and a
 headless run (`PlayingState.enter`, 120 frames, one `draw`) completes with the
 renderer, ledger and meter resolving from `visual/`, `core/` and `devtools/`.
+
+---
+
+**ID:** SYS-009 · **System:** core systems (+ RND, ENT) · **Type:** refactor ·
+**Status:** done · **Branch:** claude/doc-006-ui-013-dps-table (the
+current worktree, owner 2026-09-24)
+
+This block follows the DOC-001 layout; the entries above predate it.
+
+## SYS-009 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Close the three small architecture follow-ups: one
+  sprite-blit core, a `TimedVisual` for the transient effects, and
+  `MELEE_REACT_SCALE` in config.
+- **Details:** The owner's first architecture priority, before the boss, the
+  crowd push and the behaviour data (DOC-006).
+- **Constraint:** A refactor. What is drawn, and when, stays the same.
+
+## SYS-009 — Confirmed reading
+
+- **Blitting.** `visual/rendering.py` has four sprite paths: `enemy_sprite`,
+  `boss`, `player` (through `hero_sprite_frame`) and `death_fx`. Each one
+  repeats the same core:
+  1. The flip, from the facing and the rig's `face`.
+  2. The frame at `scale_for(rig) × zoom`.
+  3. The anchor, mirrored with the flip.
+  4. The screen point less the anchor, plus `sprite_drop(radius)`.
+  5. `_blit_character`.
+  Only step 5 is shared. The extras differ (the hurt tint, the element wash,
+  the invulnerability ring, the boss's telegraphs, the missing-art fallback)
+  and stay with each actor.
+- **Transient effects.** `run._death_fx` holds positional
+  `[anim, pos, facing, scale, radius]` lists. `run._explosions` holds
+  `{pos, radius, t, dur, infusion?, anim?}` dicts, built in four places in
+  `core/effects.py`. Their readers are the renderer (`death_fx`,
+  `explosions`), the update sweeps, `test_enemy_sprite.py` (positional
+  indexes) and `test_bomb.py` (keys).
+- **`MELEE_REACT_SCALE`** (1.25) is a module constant in
+  `entities/ai/behaviors/simple.py`. It stretches the default melee
+  `MELEE_ATTACK_TELEGRAPH` / `MELEE_ATTACK_ACTIVE`.
+- **SYS-009.D1 — Two helpers on `WorldRenderer`:**
+  - `rig_frame(anim, facing, scale)` returns the frame and the flip.
+  - `blit_rig(surface, frame, rig, flip, pos, radius, scale)` anchors,
+    drops and blits.
+  All four paths use them. They stay methods because the state's delegators
+  and the tests reach the painters by name.
+- **SYS-009.D2 — One `TimedVisual` dataclass** (`core/timed_visual.py`) for
+  both containers: `pos`, `anim`, `radius`, `t`, `dur`, `facing`, `scale`,
+  `infusion`. It is finished when its `dur` runs out, or, with no `dur`, when
+  its animation does. It compares by identity, as the dicts' readers expect
+  (`assertIn(ex, ps._explosions)` after an update).
+- **SYS-009.D3 — `MELEE_REACT_SCALE` moves to `game/config.py`** beside the
+  other combat-feel constants. The two defaults in `simple.py` read it from
+  there, and the rest is unchanged.
+
+## SYS-009 — Tasks
+
+- [x] SYS-009.1 — This block
+- [x] SYS-009.2 — `MELEE_REACT_SCALE` to `game/config.py`
+- [x] SYS-009.3 — `TimedVisual` for `_death_fx` and `_explosions`; their tests
+- [x] SYS-009.4 — `rig_frame` / `blit_rig` for the four sprite paths
+- [x] SYS-009.5 — Results; the follow-up notes; index to done
+- [x] SYS-009.6 — Found by the SYS-009.4 A/B run: `scene.actor_items` still read a poof as a list (`run.death_fx`, the alias the first search missed); fixed, with a test that draws a whole frame with a live poof
+
+## SYS-009 — Results
+
+- **SYS-009.2** (`f62bee0`): `config.MELEE_REACT_SCALE` (1.25). The melee
+  defaults are unchanged at 0.1875 s / 0.4375 s. `tests/entities/ai`:
+  237 passed.
+- **SYS-009.3** (`05231c6`): `core/timed_visual.py`.
+  - The four `_explosions` producers and `spawn_death_fx` build
+    `TimedVisual`s, and the two update sweeps step them with `update` and
+    drop them on `finished`.
+  - The renderer reads fields by name. The ring's `t / dur` is `progress`.
+  - `test_bomb.py` and `test_enemy_sprite.py` read fields by name, and the
+    new `test_timed_visual.py` has 3 tests.
+  - `tests/playing`, `render`, `combat`, `entities`: **1640 passed**.
+- **SYS-009.6** (`dff728f`) — **a miss in .3, caught before it shipped.** The
+  depth sort (`scene.actor_items`) reaches the poofs through `run.death_fx`,
+  the alias without the underscore, which the first search did not match.
+  Any frame drawn with a live poof raised. None of the suite's tests draws a
+  frame while a poof is alive, so all 1640 passed with it broken. The .4
+  A/B run found it on its first frame after a kill. It is fixed, and a new
+  test draws a whole frame with a live poof (it fails on the old read).
+- **SYS-009.4** (`3b8ba80`): `WorldRenderer.rig_frame` / `blit_rig`.
+  - `enemy_sprite`, `boss`, `player` / `hero_sprite_frame` and `death_fx`
+    use them and keep only their own extras.
+  - `hints.py`'s calls (`hero_sprite_frame`, `_hero_flip`, `anchor_for`)
+    are unchanged.
+- **A/B, same process:** the committed renderer and the new one painted the
+  same live seeded scene for 240 frames:
+  - 4 enemies, including hurt and element-washed ones.
+  - A death poof.
+  - The boss, with facing flips and a hurt flash.
+  - The hero, both facings and hurt.
+  **No pixel differs** on any path. A cross-process hash could not be used:
+  the scene is not frame-deterministic between processes (the same code
+  gave two different hashes).
+- `tests/render` + `tests/playing` + the hero-select preview: **747 passed**
+  after .4.
+

@@ -124,8 +124,8 @@ def actor_items(ps) -> list:
             lambda s, e=e: ps._draw_one_enemy(s, e)) for e in run.enemies
            if view.collidepoint(e.pos.x, e.pos.y)]
     for fx in run.death_fx:
-        if view.collidepoint(fx[1].x, fx[1].y):
-            out.append((lvl(fx[1].x, fx[1].y), fx[1].y,
+        if view.collidepoint(fx.pos.x, fx.pos.y):
+            out.append((lvl(fx.pos.x, fx.pos.y), fx.pos.y,
                         lambda s, fx=fx: ps._draw_death_fx(s, fx)))
     for fx in run.spawn_fx:
         body = fx[1]

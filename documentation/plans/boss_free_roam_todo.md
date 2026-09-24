@@ -23,7 +23,8 @@ Conventions, as everywhere:
   carries `tags: ["boss", "flying"]`. `Boss.flying` makes the collider
   skip the terrace margin, the elevation rule, the radius probes and
   every obstacle (`GameMap.is_walkable(flying=True)`), and `Boss._seek`
-  beelines instead of reading the flow field. **It still may not leave
+  beelines instead of reading the flow field *(ENT-015: now its
+  `SeekTarget`s run `via="straight"`)*. **It still may not leave
   the island**: the flying floor is `floor.over_island` (any height-map
   cell) plus the bridges, so the sea is a wall and the boss slides along
   the coast.

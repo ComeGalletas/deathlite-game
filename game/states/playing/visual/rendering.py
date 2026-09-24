@@ -125,6 +125,36 @@ class WorldRenderer:
         else:
             r.record_character(drawn.copy(), dest, character_y, cacheable=False)
 
+    # --- the shared sprite core (SYS-009) ---------------------------
+    # Every character sprite -- enemy, boss, hero, death poof -- is drawn the
+    # same way: its rig's frame at `scale_for(rig)` x a scale (the zoom, times
+    # the poof's own size), mirrored when the body faces left on a
+    # right-facing rig, then anchored at its feet, dropped below the collider
+    # centre and shaded. What differs per actor -- the hurt tint, the element
+    # wash, the invulnerability ring, the boss's telegraphs, the missing-art
+    # fallback -- stays with the actor, between these two calls.
+    def rig_frame(self, anim, facing: int, scale: float):
+        """`(frame, flip)`: `anim`'s current frame at `scale`, mirrored for
+        a left-facing body on a right-facing rig. The frame is None when the
+        rig's art is missing."""
+        assets = self.ps.game.assets
+        flip = facing < 0 and assets.face(anim.rig) == "right"
+        bw, bh = assets.scale_for(anim.rig)
+        size = (max(1, round(bw * scale)), max(1, round(bh * scale)))
+        return anim.frame(size=size, flip=flip), flip
+
+    def blit_rig(self, surface, frame, rig: str, flip: bool, pos,
+                 radius: float, scale: float) -> None:
+        """Blit `frame` with the rig's feet anchor on `pos`, dropped by the
+        body's `radius` (`sprite_drop`), shaded and recorded for the ghost
+        pass."""
+        run = getattr(self, "run", self.ps)
+        ax, ay = self.anchor_for(rig, flip)
+        sx, sy = run.camera.world_to_screen(pos)
+        self._blit_character(
+            surface, frame,
+            (sx - ax * scale, sy - ay * scale + self.sprite_drop(radius)), pos.y)
+
     # --- feedback / hud-adjacent overlays --------------------------
     def feedback_overlays(self, surface: pygame.Surface, box: pygame.Surface | None = None) -> None:
         """The vignette and the hit flash cover the whole render surface;
@@ -488,17 +518,14 @@ class WorldRenderer:
         run = getattr(self, "run", ps)
         z = run.camera.zoom
         for ex in run._explosions:
-            if self._off_band(level, ex["pos"]):
+            if self._off_band(level, ex.pos):
                 continue
-            sx, sy = ps.camera.world_to_screen(ex["pos"])
-            anim = ex.get("anim")
-            if anim is not None and self._blit_burst(surface, anim, sx, sy,
-                                                     ex["radius"] * z,
-                                                     ex.get("infusion")):
+            sx, sy = ps.camera.world_to_screen(ex.pos)
+            if ex.anim is not None and self._blit_burst(surface, ex.anim, sx, sy,
+                                                        ex.radius * z, ex.infusion):
                 continue
-            frac = ex["t"] / ex["dur"]
             pygame.draw.circle(surface, (255, 180, 90),
-                               (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
+                               (int(sx), int(sy)), int(ex.radius * ex.progress * z), 3)
 
     def _blit_burst(self, surface, anim, sx, sy, radius_px: float,
                     infusion=None) -> bool:
@@ -604,21 +631,12 @@ class WorldRenderer:
     def death_fx(self, surface, fx) -> None:
         ps = self.ps
         run = getattr(self, "run", ps)
-        anim, pos, facing, scale, radius = fx
-        z = run.camera.zoom
-        scale *= z
-        assets = ps.game.assets
-        bw, bh = assets.scale_for("dead")
-        size = (max(1, round(bw * scale)), max(1, round(bh * scale)))
-        flip = facing < 0 and assets.face("dead") == "right"
-        frame = anim.frame(size=size, flip=flip)
+        scale = fx.scale * run.camera.zoom
+        frame, flip = self.rig_frame(fx.anim, fx.facing, scale)
         if frame is None:
             return
-        ax, ay = self.anchor_for("dead", flip)
-        sx, sy = ps.camera.world_to_screen(pos)
-        drop = self.sprite_drop(radius)     # match the sprite this poof replaced
-        self._blit_character(
-            surface, frame, (sx - ax * scale, sy - ay * scale + drop), pos.y)
+        # Dropped by the poofed body's radius, to match the sprite it replaced.
+        self.blit_rig(surface, frame, fx.anim.rig, flip, fx.pos, fx.radius, scale)
 
     # --- the enemy spawn burst ---------------------------------
     _SPAWN_RIG = "enemy_spawn"
@@ -682,14 +700,9 @@ class WorldRenderer:
         ps = self.ps
         run = getattr(self, "run", ps)
         z = run.camera.zoom
-        assets = ps.game.assets
-        rig = e.anim.rig
-        flip = e._facing < 0 and assets.face(rig) == "right"
-        bw, bh = assets.scale_for(rig)
-        frame = e.anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))),
-                             flip=flip)
-        sx, sy = run.camera.world_to_screen(e.pos)
+        frame, flip = self.rig_frame(e.anim, e._facing, z)
         if frame is None:                        # sprite file missing -> primitive
+            sx, sy = run.camera.world_to_screen(e.pos)
             pygame.draw.circle(surface, e.color, (int(sx), int(sy)),
                                round(e.radius * z))
             return
@@ -703,10 +716,7 @@ class WorldRenderer:
             if primed is not None:
                 from game.states.playing.visual import elements as element_fx
                 frame = element_fx.washed(frame, primed[0])
-        ax, ay = self.anchor_for(rig, flip)
-        self._blit_character(
-            surface, frame,
-            (sx - ax * z, sy - ay * z + self.sprite_drop(e.radius)), e.pos.y)
+        self.blit_rig(surface, frame, e.anim.rig, flip, e.pos, e.radius, z)
 
     def boss(self, surface) -> None:
         ps = self.ps
@@ -717,21 +727,13 @@ class WorldRenderer:
         z = run.camera.zoom
         sx, sy = run.camera.world_to_screen(b.pos)
         br = b.radius * z
-        assets = ps.game.assets
         frame = None
         if b.anim is not None:
-            rig = b.anim.rig
-            flip = b._facing < 0 and assets.face(rig) == "right"
-            bw, bh = assets.scale_for(rig)
-            frame = b.anim.frame(size=(max(1, round(bw * z)), max(1, round(bh * z))),
-                                 flip=flip)
+            frame, flip = self.rig_frame(b.anim, b._facing, z)
         if frame is not None:
             if b._hurt_t > 0.0:
                 frame = hit_tinted(frame)
-            ax, ay = self.anchor_for(rig, flip)
-            self._blit_character(
-                surface, frame,
-                (sx - ax * z, sy - ay * z + self.sprite_drop(b.radius)), b.pos.y)
+            self.blit_rig(surface, frame, b.anim.rig, flip, b.pos, b.radius, z)
         else:
             colour = (255, 255, 255) if b.hit_flash > 0 else b.color
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
@@ -764,16 +766,13 @@ class WorldRenderer:
 
         frame = self.hero_sprite_frame()
         if frame is not None:
-            # `anchor` is the pixel in the final sprite that sits on the world
-            # position (bottom-centre-ish -- the art is bottom-heavy); the drop
-            # then seats it below the collider centre (config.SPRITE_ANCHOR_DROP).
-            ax, ay = self.anchor_for(ps._hero_anim.rig, self._hero_flip())
+            # The rig's anchor is the pixel that sits on the world position
+            # (bottom-centre-ish -- the art is bottom-heavy); the drop then
+            # seats it below the collider centre (config.SPRITE_ANCHOR_DROP).
             if run.player._hurt_t > 0.0:
                 frame = hit_tinted(frame)
-            self._blit_character(
-                surface, frame,
-                (sx - ax * z, sy - ay * z + self.sprite_drop(ps.player.radius)),
-                ps.player.pos.y)
+            self.blit_rig(surface, frame, ps._hero_anim.rig, self._hero_flip(),
+                          run.player.pos, run.player.radius, z)
             if ps.player.invulnerable:
                 pygame.draw.circle(surface, (255, 120, 120), (sx, sy),
                                    round(pr + 4 * z), width=2)
@@ -794,12 +793,7 @@ class WorldRenderer:
         run = getattr(self, "run", ps)
         if ps._hero_anim is None:
             return None
-        rig = ps._hero_anim.rig
-        z = run.camera.zoom
-        bw, bh = ps.game.assets.scale_for(rig)
-        return ps._hero_anim.frame(
-            size=(max(1, round(bw * z)), max(1, round(bh * z))),
-            flip=self._hero_flip())
+        return self.rig_frame(ps._hero_anim, run.player._facing, run.camera.zoom)[0]
 
     # --- projectiles / summons (per-family draw in the sub-packages) ---
     def _draw_ctx(self) -> DrawCtx:

@@ -17,6 +17,8 @@
 > - **Parked:** the W9 GitHub Pages deploy (§7), not needed for now (owner,
 >   2026-09-22).
 >
+> **Update, 2026-09-24 (DOC-006).** Kestrel and Nihil's `attack2` / `guard` sheets are complete (they will not get them). The auto-attack / aim toggle stays the pause menu's hint (`Q  Auto attack` in the Controls block), with no Options row, so it is closed. The `mark` overlay stays pending. The order of work is in `docs_cleanup_journal.md` (DOC-006).
+>
 > **Update, 2026-09-24 (DOC-005).** A second pass over §1–§9:
 >
 > - **Closed:** Echo and Fragmentation stay dropped — the six-blessings
@@ -84,7 +86,7 @@ because the asset does not.
 - **No weapon art for the six.** A dagger, a rod, a bomb sprite and a sword
   swing beyond the slash rig. The hero-select preview still cycles idle / walk
   / attack and cannot show the chosen main weapon until this exists.
-- **Kestrel and Nihil have no `attack2` or `guard` sheets.** The attack
+- ~~**Kestrel and Nihil have no `attack2` or `guard` sheets.**~~ *(DOC-006, 2026-09-24: **complete** — the owner decided they will not get them; the rule doing nothing for them is intended)* The attack
   alternation and the Bulwark guard pose are written, tested and live for
   Aegis; for the other two heroes the rule silently does nothing. The rig data
   is ready for the sheets.

@@ -430,6 +430,8 @@ JSON; a new *kind* of move is one component file + one line in a builder.
 ### Follow-ups parked
 
 *(DOC-005, 2026-09-24: all three still **pending**: the boss still runs its own state machine (`entities/boss.py`, nothing from `entities.ai`), there is no `push_radius` system (only steering separation), and `data/behaviors.json` does not exist)*
+
+*(DOC-006, 2026-09-24: all three taken up by the owner — the boss on the shared components as **ENT-015**, the crowd push radius as **ENT-016** (set low enough that enemies stack and cross bridges rather than stick), behaviour shape into data as **ENT-017**)*
 - Port `Boss` onto the same components (its phase FSM is the last bespoke AI).
 - `push_radius` enemy-vs-enemy crowd-collision pass as its own system.
 - `data/behaviors.json` so behaviour *shape* is data too, not just numbers.
@@ -678,3 +680,312 @@ view; out of sight for 20 s the boss fires nothing, summons nothing, keeps
 player and animates `walk`; back in range a held radial telegraph resumes
 from its held value and animates `attack`; a committed charge is not
 interrupted. The existing boss, flying and smoke suites are unchanged.
+
+---
+
+**ID:** ENT-015 · **System:** entities · **Type:** refactor · **Status:** done ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+This block follows the DOC-001 layout; the entries above predate it.
+
+## ENT-015 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Move the boss onto the shared AI components, so its attack
+  patterns are building blocks the game can reuse.
+- **Details:** The last bespoke AI, parked since R6. The owner asked for the
+  boss patterns in the DOC-006 review, "those will work for the game".
+- **Constraint:** A refactor. Both bosses fight exactly as they do now: the
+  same cycle, timings, speeds, shots and summons, and the same out-of-sight
+  closing with its held clock.
+
+## ENT-015 — Confirmed reading
+
+- `entities/boss.py` runs its own four-phase loop: `intro` (1.4 s) →
+  `telegraph` → `active` → `recover` → the next pattern. The clock counts
+  down in `phase_t`.
+  - While telegraphing and recovering it drifts toward the player at
+    0.25 / 0.5 × `speed` (0.3 in the intro), by its own `_seek`: the flow
+    field, straight when there is no route, and straight always for a
+    flyer.
+  - Out of `vision_range` it only closes in, at `closing_speed_mult`, and the
+    pattern clock holds. A committed charge runs out first.
+  - Chill slows it, except during a charge's dash.
+  - `_fire_pattern` fires on `telegraph → active`: a bullet ring
+    (`radial_barrage`), a locked dash direction (`charge`), a summon
+    (`summon_brood`) or a melee ring (`sweep`). An unknown id falls through
+    silently.
+  - A boss with no patterns just seeks.
+- The shared AI (`entities/ai/`) already has what those phases do:
+  - The state machine, with per-actor state on a `Blackboard`.
+  - `SeekTarget(via="nav"|"straight", weight)`: a lone weight under 1 moves
+    at that fraction of `speed`, which is exactly the boss's drift.
+  - `Charge`: a dash along `bb.slot(ATTACK_SLOT)["dir"]`, with contact damage.
+  - `Combat.fire_projectile` / `summon` / `melee_hit`.
+- Tests and the renderer read `phase`, `pattern`, `phase_t` (the time left),
+  `phase_len`, `telegraph_fraction` and `closing`. One test writes `phase`
+  and `pattern`. `test_boss_pig_rider.py` calls `_fire_pattern` directly, to
+  prove every pattern id in the data does something.
+- **ENT-015.D1 — A pattern registry**, `entities/ai/patterns.py`:
+  - `@boss_pattern("charge", requires=(...))` registers a pattern's `fire`
+    (the one-shot on `telegraph → active`) and an optional `active` (per
+    frame during the dangerous window).
+  - The four patterns are the first entries. `charge`'s `active` is the
+    shared `Charge` component.
+  - A new boss is a pattern list in `bosses.json`; a new kind of attack is
+    one registered function.
+- **ENT-015.D2 — `behaviors/boss.py`** registers `boss_patterns`: the four
+  phases as machine states. The drift is `SeekTarget(weight=0.3 / 0.25 /
+  0.5, slew=0)`, straight for a flyer. The transitions read the current
+  pattern's own `telegraph` / `duration` / `recover`. A boss with no patterns
+  gets a one-state seek.
+- **ENT-015.D3 — `Boss` keeps what is not AI:**
+  - Stats, damage, the animator and facing.
+  - The closing gate: out of sight, the machine is not ticked, so its clock
+    holds as before, and a `SeekTarget` closes in.
+  - The chill rule.
+  - `phase` / `pattern` / `phase_t` / `phase_len` become views onto the
+    machine and the blackboard.
+- **ENT-015.D4 — Invalid pattern data fails soft, when the boss is built.** A
+  pattern with an unknown id, or missing a key its registration requires, is
+  dropped from the cycle with a log line. A boss is never refused. This
+  follows the standing spawn-data rule. The shipped data is pinned by a test.
+- **ENT-015.D5 — `bosses.json` names the behaviour and the intro.**
+  `"behavior": "boss_patterns"` and `"intro": 1.4` on both bosses. These were
+  code values; the data-driven rule moves them to data.
+
+## ENT-015 — Plan
+
+- `entities/ai/patterns.py`, `entities/ai/behaviors/boss.py`, and `Boss`
+  slimmed to use them. `bosses.json`: `behavior`, `intro`.
+- **Parity:** the committed `Boss` and the new one, loaded side by side, are
+  driven by the same scripted context: the player circling, walking out of
+  sight and back, and a chill. Every frame, position, velocity, phase,
+  pattern and every shot / summon / melee call must match, for both bosses,
+  flying and walking.
+- **Tests:** `test_boss.py` and `test_boss_pig_rider.py` move from
+  `_fire_pattern` / `_charge_dir` to the registry. A new test covers the
+  registry, invalid data being dropped, and every shipped pattern being
+  registered and complete.
+
+## ENT-015 — Tasks
+
+- [x] ENT-015.1 — This block
+- [x] ENT-015.2 — The pattern registry and the four patterns
+- [x] ENT-015.3 — `boss_patterns` behaviour; `Boss` on it; `bosses.json`
+- [x] ENT-015.4 — Parity A/B against the old `Boss`; tests
+- [x] ENT-015.5 — Results; index
+
+## ENT-015 — Results
+
+- **ENT-015.2** (`782ed38`): `entities/ai/patterns.py`.
+  - `@boss_pattern` registers `radial_barrage`, `charge`, `summon_brood` and
+    `sweep`. `charge`'s dash is the shared `Charge` component.
+  - `valid_patterns` drops an unknown or incomplete block with a log line.
+  - `tests/entities/ai/test_boss_patterns.py`: 6 tests. Every shipped
+    pattern is registered and complete, bad data is dropped, and each
+    pattern's effect is checked.
+- **ENT-015.3** (`63a8f8e`):
+  - `entities/ai/behaviors/boss.py` registers `boss_patterns`.
+  - `Boss` runs its cycle on it. `entities/boss.py` is 296 → about 250
+    lines, and the four phase handlers, `_seek`, `_approach`,
+    `_fire_pattern`, `_enter` and `_next_pattern` are gone.
+  - `bosses.json` names `"behavior": "boss_patterns"` and `"intro": 1.4`.
+  - `test_flying.py`'s seek test and `test_boss_pig_rider.py`'s
+    pattern-bite test go through `SeekTarget` and the registry.
+- **ENT-015.D6 — The phase clock counts down, as it did.** The machine's
+  own clock counts up (`entered += dt`), and summing lands a boundary like
+  0.45 s a frame away from the old subtraction. `PhaseClock` keeps the
+  countdown in the blackboard, which also makes `phase_t` a plain view.
+- **Parity A/B** (ENT-015.4):
+  - **Setup:** the committed `Boss` and the new one, loaded side by side,
+    were driven by the same scripted context for 3000 frames per boss:
+    - the player circling;
+    - a walk out of sight and back;
+    - three chills;
+    - a flow field that bends 25° and has a no-route band;
+    - a wall for walkers.
+  - **Compared every frame:** position, velocity, phase, pattern, the phase
+    clock, contact damage, `closing`, `telegraph_fraction`, the animation
+    name, and every shot, summon and melee call.
+  - **Result:** everything discrete is equal on every frame, for both bosses
+    (The First Hunger: 104 combat calls over 10 phase/pattern pairs; The
+    Tusked Lance: 4 sweeps over 7 pairs). The largest position gap is
+    **4.5e-13 px**. It is float associativity:
+    `Steering` computes `(dir × 0.3) × speed` where the old code computed
+    `(dir × speed) × 0.3`, and it does not grow.
+  - The pinned run digests (`python -m tools.verification.run_digest
+    --check`) **match**.
+- **Tests:** `tests/entities`, `tests/combat`, `tests/render`,
+  `tests/screens/test_hud.py`, `tests/flows`: **1499 passed, 0 skipped**.
+- The A/B needs the deleted `Boss` beside the new one, so it cannot live in
+  the suite. It is recorded here; the behaviour itself is pinned by
+  `test_boss.py`, `test_boss_pig_rider.py` and `test_boss_patterns.py`.
+
+
+---
+
+**ID:** ENT-016 · **System:** entities · **Type:** feature · **Status:** done ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+## ENT-016 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Give the enemy crowd its own push radius, and lower it so
+  enemies can stack and cross bridges instead of getting stuck.
+- **Details:** R6's parked `push_radius` crowd-collision pass. The owner
+  asked to consider a lower value, so more enemies share a deck.
+- **Constraint:** The hero's own collisions with enemies stay as they are;
+  the change is enemy-against-enemy.
+
+## ENT-016 — Confirmed reading
+
+- Two things push enemies apart today:
+  1. **`Separation`** (`entities/ai/components/crowd.py`) steers each
+     walker away from neighbours inside `1.6 ×` its radius (data
+     `separation_mult`), capped at 0.6 of a heading.
+  2. **The CB-3 bump pass** (`game/states/playing/core/physics.py`) shoves
+     any two bodies whose colliders overlap: `rr = a.radius + b.radius`,
+     with an impulse of `BUMP_GAIN × penetration` split by weight.
+  It is the second that is a hard crowd collision, and its radius is the
+  full collider. Nothing called `push_radius` exists.
+- A bridge deck is one tile (64 px) wide, and `is_walkable` keeps a body's
+  cross inside it. Two 22–26 px bodies (bear, turtle, troll) cannot stand
+  side by side on it. So a pack arriving at a mouth has to file through,
+  while every overlap it makes is shoved back apart.
+- **ENT-016.D1 — The push radius is a fraction of the collider,
+  enemy-against-enemy only.** `config.CROWD_PUSH_RADIUS_FRAC`: two enemies
+  bump when their centres are closer than `frac × (ra + rb)`. Enemy ↔ hero
+  and enemy ↔ boss keep the full radii (the boss still shoulders through a
+  pack). A single global number, like the other CB-3 knobs, in config.
+- **ENT-016.D2 — Measured, not guessed.** A bench,
+  `tools/benchmarks/bridge_crowd.py`:
+  - A mixed pack of 24 is set at one mouth of a real bridge, on three
+    pinned seeds, with the hero standing still on the far island.
+  - It counts how many cross, and how fast, at several fractions and
+    separation settings.
+  - The value is picked from its table.
+
+## ENT-016 — Plan
+
+- The knob in the bump pass (default 1.0, so nothing moves until it is
+  set).
+- The bench.
+- Pick the value from the bench, and set it with its arithmetic in
+  config's comment.
+- **Tests:**
+  - Two enemies at `0.9 × (ra + rb)` do not bump at a lowered fraction, but
+    the hero still does.
+  - A fast bench case pinned as a rate (the pack crosses a bridge), not a
+    single outcome.
+
+## ENT-016 — Results
+
+**The bench** (`python -m tools.benchmarks.bridge_crowd --seconds 40`). Each
+cell is crossed/pack, then the time half the pack took to cross, then how
+many were stuck:
+
+| seed | bridge | 1.0 | 0.75 | 0.6 | 0.45 |
+|---|---|---|---|---|---|
+| 35 | 0-1 | 24/24 · 9.9 s · 0 | 24/24 · 9.2 s · 0 | 24/24 · 8.9 s · 0 | 24/24 · 8.7 s · 0 |
+| 35 | 0-1 (lane 2) | 24/24 · 11.1 s · 0 | 24/24 · 9.7 s · 0 | 24/24 · 9.0 s · 0 | 24/24 · 9.0 s · 0 |
+| 7 | 0-1 | 24/24 · 10.6 s · 0 | 23/24 · 9.0 s · 0 | 21/24 · 8.2 s · 1 | 18/24 · 8.4 s · 0 |
+| 7 | 0-1 (lane 2) | 24/24 · 9.2 s · 0 | 24/24 · 8.0 s · 0 | 24/24 · 8.2 s · 0 | 24/24 · 7.8 s · 0 |
+| 42 | 0-1 (1984 px deck) | 16/24 · 36.2 s · 0 | 16/24 · 34.3 s · 0 | 15/24 · 34.0 s · 0 | 19/24 · 35.0 s · 0 |
+| 42 | 0-2 (832 px deck) | 24/24 · 13.5 s · 0 | 24/24 · 12.0 s · 0 | 24/24 · 12.0 s · 0 | 24/24 · 11.8 s · 0 |
+| **all** | | **136/144 · 11.1 s · 0** | **135/144 · 9.7 s · 0** | **132/144 · 9.0 s · 1** | **133/144 · 9.0 s · 0** |
+
+- **ENT-016.D3 — 0.75.** No pack jams at any fraction once the bench
+  measures a clean crowd. Lowering the push radius mainly makes the file
+  move faster: half across 13 % sooner at 0.75, and 19 % at 0.6. Below 0.75,
+  one seed-7 bridge ends with fewer bodies across (21, then 18 of 24): a
+  pack compressed that far jostles back over the line round the hero. 0.75
+  takes most of the speed-up and none of that loss.
+- **The seed-42 long deck** is a walk, not a jam. At 1984 px, a turtle at
+  55 px/s needs 36 s, so a third of the pack is still on the deck at 40 s,
+  at every fraction.
+- **The bench's first run was wrong, twice.** Both are fixed, and recorded
+  so the first table is not trusted:
+  1. The spawn master's zone pass (which runs before its `frozen` gate)
+     slept a pack left on the hero's old island, and its watchdog recycles
+     a body it judges stuck. Both are now off in the bench.
+  2. The hero levelled up mid-trial on seed 42. The offering paused the run,
+     and every later trial sat frozen behind it: the "stuck 24" rows. The
+     bench now switches XP off and asserts the run is never overlaid.
+- **In play,** the watchdog's recycling is what a real jam would look like:
+  bodies disappearing at a mouth rather than piling up. The bench saw no
+  jam for it to hide.
+- **Tests:**
+  - `tests/playing/test_bump.py::PushRadiusTests` (5).
+  - Two CB-3 tests are re-expressed against the push radius: one placed its
+    bodies inside the collider but outside the new radius, and one computed
+    the penetration cap against the full radius.
+  - `tests/playing/test_bridge_crowd.py` (integration tier): a pack of 12 on
+    seed 35 crosses at ≥ 90 %, with none stuck, and the shipped value is the
+    benched one.
+  - The pinned run digests moved (seeds 7 and 123: the crowd packs tighter)
+    and are re-pinned with `python -m tools.verification.run_digest --write`.
+  - `tests/playing`, `entities`, `combat`, `flows`, `spawn`: **1542 passed,
+    0 skipped**.
+
+## ENT-016 — Tasks
+
+- [x] ENT-016.1 — This block
+- [x] ENT-016.2 — `CROWD_PUSH_RADIUS_FRAC` in the bump pass
+- [x] ENT-016.3 — The bridge-crowd bench and its table
+- [x] ENT-016.4 — The value; tests; results
+
+---
+
+**ID:** ENT-017 · **System:** entities (+ SYS) · **Type:** refactor · **Status:** proposed ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+## ENT-017 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Move enemy behaviour shape out of code and into the data
+  files.
+- **Details:** R6's parked `data/behaviors.json`. The owner said "the data
+  files need to be moved" in the DOC-006 review; DOC-006.D2 reads it as this
+  item.
+- **Constraint:** Every enemy behaves as it does now.
+
+## ENT-017 — Confirmed reading
+
+- `entities/ai/behaviors/` registers 13 builders. `enemies.json` uses 11 of
+  them (`path_chase_attack` ×5, `kite_shoot` ×4, `path_chase` ×2, and one
+  each of the rest), and bosses use `boss_patterns` (ENT-015).
+- A builder decides the **shape**: the states, which components sit in
+  each, and the transitions. It is code, plus two things:
+  1. **Hooks**, the one-off actions that fire on a transition. The charger
+     locks its dash (`lock_dir`), a melee enemy drops a hitbox
+     (`spawn_hit`), the brute slams, the warlock snapshots its cast, the
+     teleporter blinks. These are behaviour, not numbers.
+  2. **Value defaults in code**: `cfg.get("charge_speed", 620)`,
+     `cfg.get("slam_interval", 3.5)`, `MELEE_ATTACK_*`, and many more. The
+     data-driven rule says per-entity numbers live in the data, and code
+     keeps no value fallbacks. Every one of these breaks it.
+- **ENT-017.D1 — The owner's call (asked):** how far "shape into data" goes.
+  - **A. Behaviour templates in data (recommended).** A new
+    `data/enemies/behaviors.json` holds each behaviour's template:
+    - the builder shape it uses (`telegraph_cycle`, `single`, `brute`, …);
+    - the chase stack;
+    - the hook it fires, by name;
+    - **all of its default numbers**, moved out of code.
+    An enemy's own `enemies.json` keys override the template's. The
+    builders become shapes reading their numbers from the merged block,
+    with no `cfg.get(…, default)` left.
+    - New variants are data.
+    - The code-defaults debt is paid.
+    - The hooks stay a small named registry, as the boss patterns are.
+    - Size: medium. Parity can be checked with the ENT-015 A/B method.
+  - **B. A full data state machine.** `behaviors.json` spells out states,
+    component lists with parameters, and transitions with named predicates
+    and hooks; one generic builder assembles any behaviour.
+    - The most flexible option.
+    - Large: a predicate language, and every builder rewritten.
+    - Much harder to read than the current builders for the same result.
+  - **C. Only the numbers.** Move the value defaults into data and leave the
+    shapes in code. This is A without the templates.
+
+## ENT-017 — Tasks
+
+- [ ] ENT-017.1 — The owner picks A / B / C (and confirms the reading of
+  "the data files need to be moved")

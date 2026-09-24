@@ -2,9 +2,10 @@
 the rule that picks which boss a run faces.
 
 The boss pool only means something if a pattern id that nothing handles is
-caught -- `_fire_pattern` falls through silently on an unknown id, so a typo in
-`bosses.json` would ship a boss that telegraphs and then does nothing at all.
-`EveryPatternBitesTests` is the guard for that, over every boss in the data.
+caught -- a typo in `bosses.json` would otherwise ship a boss that telegraphs
+and then does nothing at all. Since ENT-015 an unknown id is dropped from the
+cycle with a log line (`entities/ai/patterns.py`); `EveryPatternBitesTests`
+fires every shipped pattern through the registry and checks it bites.
 """
 import random
 import unittest
@@ -12,6 +13,8 @@ from types import SimpleNamespace
 
 import pygame
 
+from entities.ai import patterns
+from entities.ai.machine import ATTACK_SLOT
 from entities.boss import Boss
 from game.content import get_content
 from game import config
@@ -255,12 +258,15 @@ class EveryPatternBitesTests(unittest.TestCase):
             b = Boss(boss_id, content.boss(boss_id), 0, 0)
             for pattern in b.cfg["patterns"]:
                 sink = new_sink()
-                b.pattern = pattern
-                b._charge_dir = pygame.Vector2()
-                b._fire_pattern(sink_ctx(1 / 60, sink))
+                b.bb.slot(ATTACK_SLOT).pop("dir", None)
+                pat = patterns.get(pattern["id"])
+                self.assertIsNotNone(pat, f"{boss_id}: no pattern {pattern['id']!r}")
+                ctx = sink_ctx(1 / 60, sink)
+                pat.fire(b, ctx, ctx, pattern)
+                locked = b.bb.slot(ATTACK_SLOT).get("dir")
                 did = (any(sink[k] for k in
                            ("fired", "summoned", "blasts", "hazards", "melee"))
-                       or b._charge_dir.length_squared() > 0)
+                       or (locked is not None and locked.length_squared() > 0))
                 self.assertTrue(did, f"{boss_id}: pattern "
                                      f"{pattern['id']!r} did nothing")
 

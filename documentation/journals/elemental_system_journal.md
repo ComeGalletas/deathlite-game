@@ -147,7 +147,7 @@ Everything below was verified in the worktree on 2026-09-21.
 - `RunLedger.record(amount, source)` keys by source string. Per-weapon rows
   and "other" rows exist; there is no second dimension for "effect".
   `Rewards.snapshot_summary` feeds `ui/run_summary.py`, whose columns are a
-  registry (`_COLUMNS`) with a tight width budget (weapons column min 498 px,
+  registry (`_COLUMNS`) with a tight width budget (weapons column min 498 px — measured from the data since UI-013,
   other rows capped at 2, must fit 1280×720 for the web build).
 - The run-status screen (TAB) has a Build pane per weapon with a Forge
   before/after diff; an infusion line fits there.
