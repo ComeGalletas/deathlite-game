@@ -97,3 +97,4 @@ worktree, cut from `main` after #36 — owner, 2026-09-24)
 - [x] RND-007.3 — `status_visuals.json`; the overlay module; the fallback ring's colour
 - [ ] RND-007.4 — Tests and a screenshot
 - [ ] RND-007.5 — Results; index to done
+- [x] RND-007.6 — Found on the first screenshot: size and centre the brackets from the body's resting pose, not the rig's crop (which carries swing room and bracketed a bear at twice its size)
