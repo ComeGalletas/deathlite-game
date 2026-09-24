@@ -1,5 +1,7 @@
-"""The island graph: adjacency, BFS distances, and which island is what --
-its kind (what happens there) and its topography (what shape it is)."""
+"""The island graph: BFS distances over the islands' links, and which island
+is what -- its kind (what happens there) and its topography (what shape it
+is). (WLD-013 removed the retired generator's plateau helpers, `_adjacency`,
+`_rooted_tree` and `_grow_subtree`, which `_assign_floors` used.)"""
 from __future__ import annotations
 
 from collections import deque
@@ -7,52 +9,6 @@ from collections import deque
 from world.layout import Room
 from world.gen.settings import settings_or_config
 from world.gen.tuning import SPECIAL_KINDS, VILLAGE_KIND
-
-
-def _adjacency(rooms, edges) -> dict:
-    adj = {r.id: [] for r in rooms}
-    for a, b in edges:
-        adj[a].append(b)
-        adj[b].append(a)
-    for rid in adj:
-        adj[rid].sort()
-    return adj
-
-
-def _rooted_tree(rooms, edges, root):
-    """`(parent, children)` for the room tree rooted at `root`. `edges` is
-    already `(parent_in_growth, child)` but generation may root elsewhere, so
-    re-root from `root` explicitly."""
-    adj = _adjacency(rooms, edges)
-    parent = {root: -1}
-    kids = {r.id: [] for r in rooms}
-    q = deque([root])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if v not in parent:
-                parent[v] = u
-                kids[u].append(v)
-                q.append(v)
-    return parent, kids
-
-
-def _grow_subtree(seed: int, kids: dict, size: int, blocked: set) -> list:
-    """Deterministic BFS over the seed's **descendants only** (down `kids`), up
-    to `size` rooms, skipping any subtree rooted at a `blocked` room. The result
-    is always a connected subtree whose single boundary edge is `seed`'s edge to
-    its parent -- so a raised region grown this way needs exactly one stair."""
-    out: list = []
-    q = deque([seed])
-    while q and len(out) < size:
-        cur = q.popleft()
-        if cur in blocked:
-            continue
-        out.append(cur)
-        for k in kids[cur]:
-            q.append(k)
-    return out
-
 
 
 def _distances(rooms: list[Room], source: int) -> dict[int, int]:

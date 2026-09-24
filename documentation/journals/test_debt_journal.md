@@ -518,7 +518,7 @@ TST-005, WLD-013, RND-006 (`claude/ent-017-behavior-templates`):
 ---
 
 **IDs:** TST-005, WLD-013 · **Systems:** tests, world · **Types:** refactor ·
-**Status:** TST-005 done; WLD-013 in progress · **Branch:** claude/ent-017-behavior-templates (the
+**Status:** done · **Branch:** claude/ent-017-behavior-templates (the
 current worktree, cut from `main` after #34 and #35 — owner, 2026-09-24)
 
 ## TST-005 — Requirement (owner, 2026-09-24)
@@ -599,4 +599,12 @@ retired flat-verticality generator. The world refactor (`d084480`) removed
 
 ## WLD-013 — Tasks
 
-- [ ] WLD-013.1 — Delete them; the world tests and digests
+- [x] WLD-013.1 — Delete them; the world tests and digests
+
+## WLD-013 — Results
+
+- The three helpers (about 45 lines) are gone from `world/gen/graph.py`, and
+  its docstring says why. `deque` stays, because `_distances` uses it.
+- `tests/world/test_digest.py` (the pinned world digests) and
+  `tests/world/grids` (the island-graph rules): **73 passed**, so generation
+  is unchanged.
