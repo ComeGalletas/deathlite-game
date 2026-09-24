@@ -883,3 +883,60 @@ This block follows the DOC-001 layout; the entries above predate it.
 - [x] ENT-016.2 — `CROWD_PUSH_RADIUS_FRAC` in the bump pass
 - [ ] ENT-016.3 — The bridge-crowd bench and its table
 - [ ] ENT-016.4 — The value; tests; results
+
+---
+
+**ID:** ENT-017 · **System:** entities (+ SYS) · **Type:** refactor · **Status:** proposed ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+## ENT-017 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Move enemy behaviour shape out of code and into the data
+  files.
+- **Details:** R6's parked `data/behaviors.json`. The owner said "the data
+  files need to be moved" in the DOC-006 review; DOC-006.D2 reads it as this
+  item.
+- **Constraint:** Every enemy behaves as it does now.
+
+## ENT-017 — Confirmed reading
+
+- `entities/ai/behaviors/` registers 13 builders. `enemies.json` uses 11 of
+  them (`path_chase_attack` ×5, `kite_shoot` ×4, `path_chase` ×2, and one
+  each of the rest), and bosses use `boss_patterns` (ENT-015).
+- A builder decides the **shape**: the states, which components sit in
+  each, and the transitions. It is code, plus two things:
+  1. **Hooks**, the one-off actions that fire on a transition. The charger
+     locks its dash (`lock_dir`), a melee enemy drops a hitbox
+     (`spawn_hit`), the brute slams, the warlock snapshots its cast, the
+     teleporter blinks. These are behaviour, not numbers.
+  2. **Value defaults in code**: `cfg.get("charge_speed", 620)`,
+     `cfg.get("slam_interval", 3.5)`, `MELEE_ATTACK_*`, and many more. The
+     data-driven rule says per-entity numbers live in the data, and code
+     keeps no value fallbacks. Every one of these breaks it.
+- **ENT-017.D1 — The owner's call (asked):** how far "shape into data" goes.
+  - **A. Behaviour templates in data (recommended).** A new
+    `data/enemies/behaviors.json` holds each behaviour's template:
+    - the builder shape it uses (`telegraph_cycle`, `single`, `brute`, …);
+    - the chase stack;
+    - the hook it fires, by name;
+    - **all of its default numbers**, moved out of code.
+    An enemy's own `enemies.json` keys override the template's. The
+    builders become shapes reading their numbers from the merged block,
+    with no `cfg.get(…, default)` left.
+    - New variants are data.
+    - The code-defaults debt is paid.
+    - The hooks stay a small named registry, as the boss patterns are.
+    - Size: medium. Parity can be checked with the ENT-015 A/B method.
+  - **B. A full data state machine.** `behaviors.json` spells out states,
+    component lists with parameters, and transitions with named predicates
+    and hooks; one generic builder assembles any behaviour.
+    - The most flexible option.
+    - Large: a predicate language, and every builder rewritten.
+    - Much harder to read than the current builders for the same result.
+  - **C. Only the numbers.** Move the value defaults into data and leave the
+    shapes in code. This is A without the templates.
+
+## ENT-017 — Tasks
+
+- [ ] ENT-017.1 — The owner picks A / B / C (and confirms the reading of
+  "the data files need to be moved")
