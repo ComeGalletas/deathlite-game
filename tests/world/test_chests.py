@@ -132,11 +132,21 @@ class PlacementTests(unittest.TestCase):
 
 
 class PurityTests(unittest.TestCase):
+    """One fresh build per seed, shared by the class (TST-005.2): the three
+    tests used to build ten worlds between them. The second build the
+    determinism test needs is the suite's shared cache (`tests/worlds`),
+    which is built independently through `GameMap`."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.fresh = {seed: generate_world(seed) for seed in W.SEEDS}
+
     def test_the_stage_takes_nothing_from_the_worlds_rng(self):
         """Re-running the stage on a finished layout cannot move anything
-        above it: its RNG is private, keyed by seed and island."""
-        for seed in W.SEEDS:
-            layout = generate_world(seed)
+        above it: its RNG is private, keyed by seed and island. (It re-runs
+        on the shared fresh builds; passing means it changed nothing, so the
+        other tests still see the worlds as generated.)"""
+        for seed, layout in self.fresh.items():
             before = _geometry_digest(layout)
             first = list(layout.chests)
             place_chests(layout)
@@ -145,13 +155,12 @@ class PurityTests(unittest.TestCase):
                 self.assertEqual(list(layout.chests), first)
 
     def test_one_seed_seats_one_set_of_chests(self):
-        for seed in (35, 42):
-            a = generate_world(seed).chests
-            b = generate_world(seed).chests
-            self.assertEqual(a, b)
+        for seed, layout in self.fresh.items():
+            with self.subTest(seed=seed):
+                self.assertEqual(layout.chests, W.layout(seed).chests)
 
     def test_different_seeds_seat_different_chests(self):
-        sets = {tuple(generate_world(s).chests) for s in W.SEEDS}
+        sets = {tuple(layout.chests) for layout in self.fresh.values()}
         self.assertEqual(len(sets), len(W.SEEDS))
 
 

@@ -1,4 +1,4 @@
-"""CB-5: the pause screen is a cursor menu -- Resume / Key layout / Quit to
+"""The pause screen is a cursor menu -- Resume / Key layout / Quit to
 menu. `Q` (the in-run auto-attack toggle) must never quit from here, and the
 layout row cycles and persists exactly like the Options row.
 """

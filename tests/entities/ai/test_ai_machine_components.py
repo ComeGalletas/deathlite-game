@@ -1,4 +1,4 @@
-"""R4 -- timing/predicate plumbing and the attack/action components, ticked
+"""Timing/predicate plumbing and the attack/action components, ticked
 against fakes. Plus a mini telegraph->attack->recover machine wired from the
 new pieces to prove the FSM pattern composes."""
 import random

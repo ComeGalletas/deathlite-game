@@ -323,24 +323,96 @@ class ColumnWidthTests(unittest.TestCase):
                          run_summary.column_widths(1420, [0, 0, 0]))
 
     def test_the_weapons_minimum_applies_at_three_columns_as_well(self):
-        """Not a four-column-only rule.
-
-        The three-column equal share is 480 px, which leaves 424 px of content
-        for a weapon row that can want 430 -- so the game-over screen could
-        already print a long weapon name through a seven-figure damage. The
-        minimum widens that column rather than leaving the overlap latent.
-        """
+        """Not a four-column-only rule: the three-column equal share is
+        narrower than the widest weapon row, so the game-over screen widens
+        its weapons column too rather than leaving the overlap latent."""
+        _display()
+        floor = run_summary.weapons_min_width(run_summary.RunSummaryPanel({})._row)
         space = 1600 - 2 * 60 - 2 * 20
-        self.assertLess(space // 3, 498, "the premise of this test has moved")
-        self.assertEqual(run_summary.column_widths(space, [0, 0, 498])[2], 498)
+        self.assertLess(space // 3, floor, "the premise of this test has moved")
+        # At least: the last column also absorbs the split's rounding.
+        self.assertGreaterEqual(run_summary.column_widths(space, [0, 0, floor])[2], floor)
 
     def test_the_shipped_victory_set_clears_the_weapons_minimum(self):
-        mins = [m for _d, m in
-                (run_summary._COLUMNS[c] for c in run_summary.VICTORY_COLUMNS)]
+        _display()
+        mins = run_summary.column_minimums(run_summary.VICTORY_COLUMNS,
+                                           run_summary.RunSummaryPanel({})._row)
         space = 1600 - 2 * 60 - (len(mins) - 1) * 20
         widths = run_summary.column_widths(space, mins)
         for want, got in zip(mins, widths, strict=True):
             self.assertGreaterEqual(got, want)
+
+
+class _TextFont:
+    """A font and a surface that remember which text was blitted where."""
+
+    def __init__(self, font):
+        self._font, self.texts = font, {}
+
+    def render(self, text, *args):
+        img = self._font.render(text, *args)
+        self.texts[id(img)] = (text, img)
+        return img
+
+    def size(self, text):
+        return self._font.size(text)
+
+
+class _BlitLog(pygame.Surface):
+    def __init__(self, fonts, *args):
+        super().__init__(*args)
+        self.fonts, self.drawn = fonts, []
+
+    def blit(self, img, dest, *args, **kwargs):
+        rect = super().blit(img, dest, *args, **kwargs)
+        for f in self.fonts:
+            hit = f.texts.get(id(img))
+            if hit is not None and hit[1] is img:
+                self.drawn.append((hit[0], rect))
+        return rect
+
+
+class WeaponsTableTests(_Base):
+    """UI-013: a weapon's name and level never reach its damage figure.
+
+    The worst case, not a sample: every name a held weapon can carry (each
+    `weapons.json` entry and each forge override), at a two-digit level,
+    against a 7- and an 8-figure damage, on the three- and four-column
+    screens."""
+
+    def _rows(self, columns, name, damage):
+        panel = run_summary.RunSummaryPanel({
+            **LEDGER_STATS, "damage_dealt": damage * 2,
+            "weapon_rows": [{"name": name, "level": 31, "damage": damage,
+                             "share": 0.5, "dps": 999.9}]})
+        panel._row = _TextFont(panel._row)
+        surf = _BlitLog([panel._row], (1600, 900))
+        panel.draw(surf, None, end_screen.PANEL_TOP, end_screen.PANEL_BOTTOM,
+                   columns=columns)
+        return surf.drawn
+
+    def test_no_name_or_level_reaches_the_damage(self):
+        from game.content import get_content
+        c = get_content()
+        names = sorted({v["name"] for table in (c.weapons, c.forges)
+                        for v in table.values() if isinstance(v, dict) and "name" in v})
+        self.assertIn("Meteor Hammer", names)
+        for columns in (run_summary.COLUMNS, run_summary.VICTORY_COLUMNS):
+            for damage in (1_212_400.0, 12_124_000.0):
+                for name in names:
+                    with self.subTest(columns=len(columns), damage=damage, name=name):
+                        drawn = self._rows(columns, name, damage)
+                        at = [t for t, _r in drawn].index("Lv 31")
+                        (text, name_r), (_lv, lv_r), (_d, dmg_r) = drawn[at - 1:at + 2]
+                        self.assertTrue(name.startswith(text.rstrip("…").rstrip(".")),
+                                        (name, text))
+                        self.assertLess(name_r.right, lv_r.left, f"{text!r} into its level")
+                        self.assertLess(lv_r.right, dmg_r.left, "the level into the damage")
+
+    def test_the_widest_name_shows_in_full_at_a_seven_figure_damage(self):
+        """The measured floor is there so a forge name is not cut short."""
+        drawn = self._rows(run_summary.VICTORY_COLUMNS, "Meteor Hammer", 1_212_400.0)
+        self.assertIn("Meteor Hammer", [t for t, _r in drawn])
 
 
 class HeroColumnTests(_Base):
@@ -427,6 +499,48 @@ class GoldTests(_Base):
         self.assertFalse([t for t in drawn if "alvage" in t],
                          "the salvage row printed the raw currency, which is "
                          "not what Game._on_run_ended actually banks")
+
+
+class ChestTests(_Base):
+    """UI-012: the chests opened are on the run summary."""
+
+    def test_the_run_column_shows_the_chests_opened(self):
+        drawn = _drawn_text({**LEDGER_STATS, "chests": 4})
+        at = drawn.index("Chests")
+        self.assertEqual(drawn[at + 1], "4")
+        self.assertLess(drawn.index("Potions"), at, "chests read before potions")
+
+    def test_an_older_summary_without_the_count_reads_zero(self):
+        older = {k: v for k, v in LEDGER_STATS.items() if k != "chests"}
+        drawn = _drawn_text(older)
+        self.assertEqual(drawn[drawn.index("Chests") + 1], "0")
+
+    def test_a_long_items_list_stays_inside_the_run_column(self):
+        """The extra row pushed the tenth item's "+N more" line across the
+        frame; the list now gives way to the rows above it."""
+        items = [{"name": f"Ashen Signet {i}", "rarity": "rare"} for i in range(14)]
+        panel = run_summary.RunSummaryPanel({**LEDGER_STATS, "chests": 6,
+                                             "dropped_items": items})
+        areas, rows = {}, []
+        real_col, real_line = panel._column, panel._line
+
+        def col(surface, assets, rect, title, colour):
+            areas[title] = real_col(surface, assets, rect, title, colour)
+            return areas[title]
+
+        def line(surface, area, y, text, **kw):
+            if area is areas.get("Run"):
+                rows.append((y, str(text)))
+            return real_line(surface, area, y, text, **kw)
+
+        panel._column, panel._line = col, line
+        panel.draw(pygame.Surface((1600, 900)), None, end_screen.PANEL_TOP,
+                   end_screen.PANEL_BOTTOM, columns=run_summary.VICTORY_COLUMNS)
+        last_y, last_text = rows[-1]
+        self.assertTrue(last_text.startswith("+"), last_text)
+        self.assertEqual(last_text, f"+{14 - (len(rows) - 1)} more items")
+        self.assertLessEqual(last_y + run_summary.S(run_summary.ROW_STEP) // 2,
+                             areas["Run"].bottom, f"{last_text!r} crosses the frame")
 
 
 class PaletteTests(unittest.TestCase):

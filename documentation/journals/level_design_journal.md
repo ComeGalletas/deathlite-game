@@ -1121,6 +1121,8 @@ walls off the top of the run and is wrong.
   baselines are untouched; flag on differs only on seeds where a run is planned.
 
 #### R4 - Render the run -- DONE (2026-08-29), one choice open
+
+*(DOC-005, 2026-09-24: the "one choice open" is **settled** further down this same entry — the owner kept the notch above each ramp step open, and `_RAMP_FILL_ABOVE` no longer exists in the code. The heading is simply older than the answer)*
 - [x] `data/terrain.json`: `slots.ramp = {"w": [36, 45], "e": [39, 48]}`, keyed
       by descent direction -> `[top, bottom]`.
 - [x] `paint_cliff` builds `ramp_step` by walking the run out from the single
@@ -1984,6 +1986,8 @@ found 134 cliff-skirt-vs-geometry overlaps. Root causes:
   change). `_CLIFF_FILL_MAX` is a `world/map.py` module constant.
 
 ### Deferred
+
+*(DOC-005, 2026-09-24: the soft shadow strip to replace the stacked hard-edged `shadow.png` blob is still **pending**, optional polish (`world/terrain/grid_paint.py`). The missing N/E/W rim faces are **obsolete** — the height-map world leaves those faces uncut on purpose and `slots.raised` draws them)*
 
 * The `shadow.png` blob still reads a little hard-edged / large where a run of
   near-grounded columns each seed one; a dedicated soft strip could replace the

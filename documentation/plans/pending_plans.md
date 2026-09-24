@@ -1,5 +1,44 @@
 # Pending plans — what is built but not wired
 
+> **Status, 2026-09-22 (DOC-003).** This survey is a snapshot of
+> 2026-09-11; most of it has shipped since. Checked against the code:
+>
+> - **Shipped:** Flurry, Sticky Bomb and Weak Point are in
+>   `data/weapons/blessings.json` (§1); Options, the Sanctuary, Rankings and
+>   the end screens take the mouse (UI-001, UI-005, UI-008, SYS-007 B) (§3);
+>   the HUD was rebuilt (UI-003) (§4); the `shoot` cue plays, and music and
+>   sound effects landed (AUD-001, AUD-003) (§5); chests read
+>   `layout.resource_points` (§6); the six-weapon design moved to
+>   `documentation/designs/`, and the `MENU_SCRIM` text was corrected in
+>   `FUNCTIONAL_README.md` (§9).
+> - ~~**Still open:** the Echo and Fragmentation blessings (§1)~~ — see the
+>   2026-09-24 update below; vendoring the pygame wheel for a static host
+>   (§7); the test debt now tracked in `test_suite_review.md` (§8).
+> - **Parked:** the W9 GitHub Pages deploy (§7), not needed for now (owner,
+>   2026-09-22).
+>
+> **Update, 2026-09-24 (DOC-006).** Kestrel and Nihil's `attack2` / `guard` sheets are complete (they will not get them). The auto-attack / aim toggle stays the pause menu's hint (`Q  Auto attack` in the Controls block), with no Options row, so it is closed. The `mark` overlay stays pending. The order of work is in `docs_cleanup_journal.md` (DOC-006).
+>
+> **Update, 2026-09-24 (DOC-005).** A second pass over §1–§9:
+>
+> - **Closed:** Echo and Fragmentation stay dropped — the six-blessings
+>   rework chose six per weapon without them, and the owner closed them
+>   pending the coming weapon rework (§1). Weak Point on *wounded* targets is
+>   deliberate (§1). The Forge now offers a weapon picker
+>   (`core/locations.py`) (§1). The HUD's blessing list moved to the TAB
+>   screen, which reads the catalog's names (§4).
+> - **Still pending:** Kestrel and Nihil's `attack2` / `guard` sheets and an
+>   on-screen `mark` overlay (§2); an auto-attack / aim toggle in Options —
+>   still only the in-run `Q` key (§3); the web build's wheel vendoring,
+>   finer loading steps with a progress bar, a manifest-driven pack and
+>   browser spawn-master settings, waiting on the web build (§7); the test
+>   debt in `test_suite_review.md` (§8).
+> - **Closed by the owner:** more sound cues (hammer impact, blast, stun,
+>   Forging, card taken, interactable used) — the sounds are fine for now;
+>   more of them and a tweak of the whole set come later (§5).
+>
+> The rest of this file is kept as written.
+
 Survey taken 2026-09-11 on `main` at `86aaa3f`, by booting the game rather
 than by reading the other plans. Everything listed here is **unwired work, not
 broken work**: the full suite was green when the list was made (1,641 passed,
@@ -47,13 +86,14 @@ because the asset does not.
 - **No weapon art for the six.** A dagger, a rod, a bomb sprite and a sword
   swing beyond the slash rig. The hero-select preview still cycles idle / walk
   / attack and cannot show the chosen main weapon until this exists.
-- **Kestrel and Nihil have no `attack2` or `guard` sheets.** The attack
+- ~~**Kestrel and Nihil have no `attack2` or `guard` sheets.**~~ *(DOC-006, 2026-09-24: **complete** — the owner decided they will not get them; the rule doing nothing for them is intended)* The attack
   alternation and the Bulwark guard pose are written, tested and live for
   Aegis; for the other two heroes the rule silently does nothing. The rig data
   is ready for the sheets.
 - **The `mark` status has no on-screen overlay.** It shows only as a status
   ring in the primitive fallback or under `config.SHOW_ENEMY_STATE_RINGS`,
   so the Rod's synergies read as pure arithmetic to the player.
+  *(RND-007, 2026-09-24: **done** — raspberry lock-on brackets drawn on a marked enemy while the hero holds a blessing that reads the mark; `mark_overlay_journal.md`)*
 - **`assets/unused/` holds 40 MB across ~520 files** that neither code nor
   data names: 159 character strips (archer, monk, lancer defence poses), 85
   effect sheets, `chests.png`, 76 UI pieces. Some of it is content waiting for

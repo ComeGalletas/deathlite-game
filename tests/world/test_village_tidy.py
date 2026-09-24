@@ -1,4 +1,4 @@
-"""LD-Z: the village tidy pass (`world/gen/village_tidy.py`).
+"""The village tidy pass (`world/gen/village_tidy.py`).
 
 What the layout pass leaves, made clean: nothing paints over the forge,
 the heal zone or the town hall; no building paints over another; the heal

@@ -130,9 +130,11 @@ def with_aggro(base: Behavior, cfg: dict) -> Behavior:
     while idle in base.states:
         idle += "_"
     states = dict(base.states)
-    states[idle] = [Wander(speed=cfg.get("idle_speed", _WANDER_SPEED),
-                           hold=tuple(cfg.get("idle_hold", _WANDER_HOLD)),
-                           pause=cfg.get("idle_pause", _WANDER_PAUSE))]
+    # The wander's numbers are the shared `defaults` in
+    # data/enemies/behaviors.json unless the enemy sets its own (ENT-017).
+    states[idle] = [Wander(speed=cfg["idle_speed"],
+                           hold=tuple(cfg["idle_hold"]),
+                           pause=cfg["idle_pause"])]
 
     transitions = list(base.transitions) + [
         Transition(frm=idle, to=base.initial,

@@ -269,3 +269,67 @@ def aura_overlay(surface, ps) -> None:
             x = int(sx) - img.get_width() // 2
             surface.blit(shadow, (x + 1, top + i * 12 + 1))
             surface.blit(img, (x, top + i * 12))
+
+
+_LOG_MARGIN = 10            # px from the screen's right edge
+_LOG_TOP = 120              # px from the top, clear of the HUD bars
+_LOG_ROW = 13               # px per line
+_LOG_BG = (12, 12, 18, 170)
+_LOG_TEXT = (225, 225, 235)
+_LOG_DIM = (150, 150, 165)
+
+
+def reaction_log_lines(log, n: int) -> list:
+    """`[(text, (aura colour, trigger colour))]` for the newest `n`
+    reactions, newest first -- the overlay's rows, split out so a test can
+    read them without a screen.
+
+    `#serial  time  reaction  aura>trigger  damage`, then `cascade N` when
+    another reaction set it off and `held` when the budget made it wait a
+    frame. The text stays light; the two elements show as swatches in
+    front of it, because Thunder's purple is unreadable as text on the
+    dark panel."""
+    rows = []
+    for e in log.newest(n):
+        pair = f"{e.aura}>{e.trigger}"
+        text = (f"#{e.serial:<4} {e.time:6.1f}s  {e.reaction:<12} "
+                f"{pair:<16}{e.damage:6.1f}")
+        if e.depth:
+            text += f"  cascade {e.depth}"
+        if e.deferred:
+            text += "  held"
+        rows.append((text, (aura_colour(e.aura), aura_colour(e.trigger))))
+    return rows
+
+
+def reaction_log_overlay(surface, ps) -> None:
+    """The reaction log (CMB-009.4, design §10.3): the last reactions the run
+    fired, newest on top, down the right edge of the screen. Toggle with the
+    dev menu's 'Reaction log' row. The log itself is kept in every run
+    (`ElementalResolver.log`), so turning this on shows what has already
+    happened."""
+    if not (ps.dev_mode and ps._dev_show_reaction_log):
+        return
+    log = getattr(ps.run.elements, "log", None)
+    if log is None:
+        return
+    font = fonts.mono(10)
+    rows = reaction_log_lines(log, config.REACTION_LOG_LINES)
+    title = f"reactions  {len(log)}/{log.capacity} kept"
+    lines = [(title, None)] + (rows or [("none yet", None)])
+    swatch = _LOG_ROW - 5
+    indent = 6 + 2 * (swatch + 2) + 4
+    width = max(font.size(text)[0] for text, _c in lines) + indent + 6
+    height = _LOG_ROW * len(lines) + 8
+    x = surface.get_width() - width - _LOG_MARGIN
+    panel = pygame.Surface((width, height), pygame.SRCALPHA)
+    panel.fill(_LOG_BG)
+    surface.blit(panel, (x, _LOG_TOP))
+    for i, (text, colours) in enumerate(lines):
+        y = _LOG_TOP + 4 + i * _LOG_ROW
+        if colours is not None:
+            for k, colour in enumerate(colours):
+                pygame.draw.rect(surface, colour,
+                                 (x + 6 + k * (swatch + 2), y + 2, swatch, swatch))
+        surface.blit(font.render(text, True, _LOG_TEXT if colours else _LOG_DIM),
+                     (x + indent, y))

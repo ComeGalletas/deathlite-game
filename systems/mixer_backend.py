@@ -37,7 +37,7 @@ SYNTH_RATE = 22050
 
 # What the desktop device is actually opened at. This used to be SYNTH_RATE in
 # mono, so that the synthesised cues needed no conversion at all. Music changed
-# the trade (owner, 2026-09-16, `documentation/journals/music_journal.md`): the
+# the trade (owner, 2026-09-16, `documentation/journals/music_tracks_journal.md`): the
 # two streamed tracks are 44.1/48 kHz stereo masters, and a 22050 Hz mono device
 # downmixed them to one channel at roughly telephone bandwidth. `make_sound`
 # already resamples from SYNTH_RATE and interleaves to the device's channel

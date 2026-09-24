@@ -1,7 +1,9 @@
 """The boss (spec 3.7).
 
-A small finite-state machine cycles authored attack patterns, each with a
-visible telegraph before the dangerous frames. Not "a big enemy with more HP":
+It cycles authored attack patterns, each with a visible telegraph before the
+dangerous frames -- on the shared AI machine since ENT-015: the cycle is the
+`boss_patterns` behaviour (`entities/ai/behaviors/boss.py`) and each pattern a
+registered building block (`entities/ai/patterns.py`). Not "a big enemy with more HP":
 it has three distinct patterns (radial bullet ring, telegraphed charge, brood
 summon), a health bar (drawn by the HUD) and a currency reward on death.
 
@@ -11,13 +13,17 @@ Duck-types the bits of `Enemy` the combat loop needs: `pos`, `radius`, `alive`,
 """
 from __future__ import annotations
 
-import math
-
 import pygame
 
 from combat.damage import apply_armor
 from combat.elements.aura import ElementalState
 from combat.status import StatusState
+from entities.ai.behaviors.boss import enter
+from entities.ai.blackboard import Blackboard
+from entities.ai.components import SeekTarget
+from entities.ai.machine import ATTACK_SLOT
+from entities.ai.registry import build_behavior
+from entities.ai.steering import Steering
 from game import config
 from game.assets import get_assets
 from systems.animation import Animator
@@ -66,9 +72,9 @@ class Boss:
         self.tags = tuple(definition.get("tags", ("boss",)))
         # `flying`: over the world rather than on it. The collider drops the
         # terrace margin, the elevation rule and every obstacle for it
-        # (`GameMap.is_walkable(flying=True)`), and `_seek` beelines instead
-        # of following the flow field -- a field that rounds walls and climbs
-        # stairs is routing for a body that has to walk.
+        # (`GameMap.is_walkable(flying=True)`), and it seeks in a straight
+        # line instead of following the flow field -- a field that rounds
+        # walls and climbs stairs is routing for a body that has to walk.
         self.flying = "flying" in self.tags
         self.is_elite = True
         self.weight = float("inf")            # CB-3: immovable; only shoves others
@@ -85,13 +91,16 @@ class Boss:
         self.shield_hp = 0.0
         self.explode_radius = 0.0
 
-        self._patterns = list(definition.get("patterns", []))
-        self._pattern_index = -1
-        self.pattern: dict = {}
-        self.phase = "intro"          # intro -> telegraph -> active -> recover
-        self.phase_t = 1.4
-        self.phase_len = 1.4
-        self._charge_dir = pygame.Vector2()
+        # The attack cycle: intro -> telegraph -> active -> recover, pattern
+        # by pattern, on the shared machine; its state lives on `bb`.
+        self.bb = Blackboard()
+        self._behavior = build_behavior(definition["behavior"], definition)
+        self._cycles = "intro" in self._behavior.states
+        if self._cycles:
+            enter(self, definition["intro"])
+        # Out of sight it closes in on the flow field (straight for a flyer).
+        self._closer = SeekTarget(via="straight" if self.flying else "nav",
+                                  slew=0.0, weight=1.0)
 
         # Sprite animation (same contract as Enemy: idle / walk / attack, no
         # hurt/death strip -> the renderer red-tints on hit + plays the shared
@@ -139,15 +148,39 @@ class Boss:
             return 0.0
         return 1.0 - max(0.0, self.phase_t / self.phase_len)
 
-    # --- FSM ----------------------------------------------------
-    def _enter(self, phase: str, length: float) -> None:
-        self.phase = phase
-        self.phase_t = self.phase_len = max(0.0001, length)
+    # --- the attack cycle (ENT-015: `behaviors/boss.py`) -----------
+    # The cycle runs on the shared AI machine; these are views onto it, under
+    # the names the renderer, the HUD and the tests have always read.
+    @property
+    def phase(self) -> str:
+        return self._behavior.state_of(self)
 
-    def _next_pattern(self) -> None:
-        self._pattern_index = (self._pattern_index + 1) % len(self._patterns)
-        self.pattern = self._patterns[self._pattern_index]
-        self._enter("telegraph", float(self.pattern.get("telegraph", 0.8)))
+    @phase.setter
+    def phase(self, name: str) -> None:
+        self._behavior.set_state(self, name)
+
+    @property
+    def pattern(self) -> dict:
+        return self.bb.slot(ATTACK_SLOT).get("pattern") or {}
+
+    @pattern.setter
+    def pattern(self, p: dict) -> None:
+        self.bb.slot(ATTACK_SLOT)["pattern"] = p
+
+    @property
+    def phase_t(self) -> float:
+        """Seconds left in the current phase."""
+        return self.bb.slot(ATTACK_SLOT).get("left", 0.0)
+
+    @property
+    def phase_len(self) -> float:
+        return self.bb.slot(ATTACK_SLOT).get("len", 0.0)
+
+    @property
+    def telegraph_fraction(self) -> float:
+        if self.phase != "telegraph" or self.phase_len <= 0:
+            return 0.0
+        return 1.0 - max(0.0, self.phase_t / self.phase_len)
 
     def _anim_name(self) -> str:
         if not self.alive:
@@ -183,27 +216,22 @@ class Boss:
         self.contact_damage = self._base_contact
         chill = self.status.speed_multiplier()
 
-        if not self._patterns:
-            self.vel = self._seek(ctx) * self.speed
-            self.pos = self._move(ctx, self.vel * dt * chill)
-            return
+        # Out of sight: close in, and nothing else. The machine is not ticked,
+        # so its clock holds where it is and a telegraph that was half done
+        # resumes half done. A committed charge (`active`) runs its course
+        # first -- it is the one phase that is already a dash at the player.
+        # A boss with no pattern cycle only ever comes for the player.
+        if self._cycles:
+            far = (ctx.player_pos - self.pos).length_squared() > self.vision_range ** 2
+            self.closing = far and self.phase != "active"
+            if self.closing:
+                acc = Steering()
+                self._closer.tick(self, ctx, ctx, acc)
+                self.vel = acc.resolve(self.speed * self.closing_speed)
+                self.pos = self._move(ctx, self.vel * dt * chill)
+                return
 
-        # Out of sight: close in, and nothing else. The pattern clock holds
-        # where it is, so a telegraph that was half done resumes half done.
-        # A committed charge (`active`) runs its course first -- it is the
-        # one phase that is already a dash at the player.
-        far = (ctx.player_pos - self.pos).length_squared() > self.vision_range ** 2
-        self.closing = far and self.phase != "active"
-        if self.closing:
-            self.vel = self._seek(ctx) * self.speed * self.closing_speed
-            self.pos = self._move(ctx, self.vel * dt * chill)
-            return
-
-        self.phase_t -= dt
-        handler = getattr(self, f"_phase_{self.phase}", None)
-        if handler:
-            handler(ctx)
-
+        self._behavior.tick(self, ctx, ctx)      # ctx satisfies Perception + Combat
         # Chill does not slow the committed charge dash.
         scale = (1.0 if self.pattern.get("id") == "charge" and self.phase == "active"
                  else chill)
@@ -221,76 +249,3 @@ class Boss:
             return
         self._absorb(amount, source, effect)
         ctx.report_damage(amount)
-
-    def _seek(self, ctx) -> pygame.Vector2:
-        """Unit heading toward the player: the shared flow field (so the boss
-        rounds walls and climbs stairs after the player -- LD-1 decision 2),
-        straight line when the field has no route from here. Committed dash
-        patterns bypass this and beeline, and so does a `flying` boss --
-        the field routes for a body that walks."""
-        nav = None if self.flying else getattr(ctx, "nav_dir", None)
-        if nav is not None:
-            d = nav(self.pos, self.radius)
-            if d.length_squared() > 1e-6:
-                return d.normalize()
-        d = ctx.player_pos - self.pos
-        return d.normalize() if d.length_squared() > 1 else pygame.Vector2()
-
-    # drift slowly toward the player unless a pattern overrides velocity
-    def _approach(self, ctx, factor: float = 0.5) -> None:
-        self.vel = self._seek(ctx) * self.speed * factor
-
-    def _phase_intro(self, ctx) -> None:
-        self._approach(ctx, 0.3)
-        if self.phase_t <= 0.0:
-            self._next_pattern()
-
-    def _phase_telegraph(self, ctx) -> None:
-        self._approach(ctx, 0.25)
-        if self.phase_t <= 0.0:
-            self._fire_pattern(ctx)
-            self._enter("active", float(self.pattern.get("duration", 0.3)))
-
-    def _phase_active(self, ctx) -> None:
-        if self.pattern.get("id") == "charge":
-            self.vel = self._charge_dir * float(self.pattern.get("charge_speed", 700))
-            self.contact_damage = float(self.pattern.get("charge_damage", self._base_contact))
-        else:
-            self.vel = pygame.Vector2()
-        if self.phase_t <= 0.0:
-            self._enter("recover", float(self.pattern.get("recover", 1.5)))
-
-    def _phase_recover(self, ctx) -> None:
-        self._approach(ctx, 0.5)
-        if self.phase_t <= 0.0:
-            self._next_pattern()
-
-    # --- pattern effects ------------------------------------
-    def _fire_pattern(self, ctx) -> None:
-        pid = self.pattern.get("id")
-        if pid == "radial_barrage":
-            n = int(self.pattern.get("bullets", 18))
-            spd = float(self.pattern.get("bullet_speed", 180))
-            dmg = float(self.pattern.get("bullet_damage", 10))
-            for i in range(n):
-                ang = (math.tau / n) * i
-                ctx.fire_projectile(
-                    pos=self.pos,
-                    vel=pygame.Vector2(math.cos(ang), math.sin(ang)) * spd,
-                    damage=dmg, radius=7)
-        elif pid == "charge":
-            d = ctx.player_pos - self.pos
-            self._charge_dir = d.normalize() if d.length_squared() > 1 else pygame.Vector2(1, 0)
-        elif pid == "summon_brood":
-            ctx.summon(self.pattern.get("summon_id", "bumblebee"), self.pos,
-                       int(self.pattern.get("summon_count", 6)))
-        elif pid == "sweep":
-            # A ring of melee centred on the boss, for a weapon that swings all
-            # the way round the wielder rather than reaching in one direction.
-            # The hitbox is static, which is correct: `_phase_active` holds the
-            # boss still for every pattern except `charge`, so the boss and its
-            # sweep stay on the same spot for the swing.
-            ctx.melee_hit(self.pos,
-                          float(self.pattern.get("sweep_radius", 140)),
-                          float(self.pattern.get("sweep_damage", 25)),
-                          float(self.pattern.get("duration", 0.3)))

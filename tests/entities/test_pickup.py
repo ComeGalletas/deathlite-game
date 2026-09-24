@@ -1,4 +1,4 @@
-"""Milestone 3: XP gem homing + collection behaviour."""
+"""XP gem homing + collection behaviour."""
 import unittest
 
 import pygame

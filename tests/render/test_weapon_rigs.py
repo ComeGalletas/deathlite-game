@@ -1,7 +1,7 @@
-"""Change request 2 (weapon_system_journal.md): the weapon effect sheets
+"""The weapon effect sheets
 moved into per-weapon folders; every rig must resolve on disk; the Sword
 swings two slashes from Combat-Sheet.png, the first flipped vertically, and
-alternates them by the attack's ordinal."""
+alternates them by the attack's ordinal (change request 2, weapon_system_journal.md)."""
 import os
 import unittest
 from types import SimpleNamespace
@@ -119,7 +119,9 @@ class SlashChoiceTests(unittest.TestCase):
         self.assertIsNone(cone_mod.slash_rig(self._p({"slash": False}, 1)))
         self.assertIsNone(cone_mod.slash_rig(self._p({"slash": []}, 1)))
 
-    def test_legacy_true_and_no_fx_keep_the_old_rig(self):
+    def test_slash_true_or_no_fx_swings_the_default_soul_slash(self):
+        """`soul_slash` is the current default for a cone with `slash: true`
+        or no visuals entry at all, not a legacy path."""
         self.assertEqual(cone_mod.slash_rig(self._p({"slash": True}, 2)), "soul_slash")
         self.assertEqual(cone_mod.slash_rig(SimpleNamespace()), "soul_slash")
 

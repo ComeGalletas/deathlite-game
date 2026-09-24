@@ -71,6 +71,23 @@ for c in origin/main origin/master main master; do
   git rev-parse -q --verify "$c" >/dev/null && BASE=$c
 done
 [ -n "$BASE" ] || { echo "STOP: cannot find a base branch"; exit 1; }
+**Tests**
+- No CI exists or is planned; the suite checks stability locally. Do not
+  propose CI, hooks or gates. The `sweep` tier runs only when asked
+  (`python -m pytest -m sweep`).
+- The suite needs pygame and **numpy**. numpy is for the tests and the
+  `tools/asset_pipeline/` scripts only (they read sheets through
+  `pygame.surfarray`); it is never a game dependency, never imported by game
+  code, and stays out of the desktop and web builds (`dist/README.md`).
+  `coverage` is the same: a test tool, not a declared dependency.
+- A test never skips itself to green; make the check runnable instead.
+- Tests that boot a run or consume a generated world pin a seed
+  (`tests/boot.py: start_run(game, seed=...)`).
+- The generator leads, the tests follow: a sanctioned world change may
+  remove or replace a generation test; re-pin `tests/world/digests.json`
+  with `python -m tools.verification.world_digest --write`. Prefer rates over seed sweeps to
+  single pinned outcomes, recorded in docstrings and the journal.
+- Share cached worlds between tests; avoid per-test rebuilds.
 
 # solo: no worktree, no owner prefix, no session id, so it also works under
 # agents that set no session variable. switch -c would carry uncommitted work
@@ -405,3 +422,12 @@ STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-of
 - End responses with the next action, not a recap of what was just done.
 
 When Julien asks for something, the answer is the finished product — not a plan. Tests included. Evals included. Docs included.
+- This file and the memory must not disagree. When a standing rule
+  changes, change it here and in memory in the same step.
+- Resolved (DOC-001.D4): "a test never skips itself to green" wins over the
+  older spent-source-sheet wording that let a cut's pinning test skip when
+  its source was gone. The imp's archive test was fixed that way in
+  `914039e` (`.gitignore` re-includes editor sources so the check always
+  runs). The three cut-script tests that still carried the old skip —
+  `tests/render/test_spawn_fx.py`, `test_totem_bolt.py`,
+  `test_totem_sprite.py` — were fixed the same way as TST-002 (done).

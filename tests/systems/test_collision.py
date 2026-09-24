@@ -1,4 +1,4 @@
-"""Milestone 2: spatial grid broad-phase + circle overlap."""
+"""Spatial grid broad-phase + circle overlap."""
 import unittest
 
 import pygame

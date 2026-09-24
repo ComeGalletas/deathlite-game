@@ -64,7 +64,7 @@ class Thunder(Element):
         """Run the whole jump tree from `origin`. Returns how many enemies
         the chain reached, not counting the one that was hit."""
         world = ctx.world
-        return breadth_first(
+        reached = breadth_first(
             world, origin,
             jumps=cfg.jumps, per_jump=cfg.targets_per_jump,
             max_range=cfg.max_range, max_targets=cfg.max_targets,
@@ -72,6 +72,10 @@ class Thunder(Element):
                 hit, ctx, level, cfg.falloff ** level),
             arc=lambda a, b: world.add_arc(a, b, ElementId.THUNDER,
                                            ctx.now + ARC_SECONDS))
+        stats = ctx.resolver.stats
+        stats.jump_nodes_this_frame += reached
+        stats.jump_nodes_total += reached
+        return reached
 
     @staticmethod
     def strike(target, ctx, level: int, falloff: float) -> bool:

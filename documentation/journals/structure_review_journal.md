@@ -479,6 +479,7 @@ test. `run_digests.json` re-pinned for the new import graph (see *Open*).
 Found on the way and not part of this review's scope; each needs its own
 decision.
 
+- *(DOC-003: this item and the next are tracked as **SYS-008** — `run_determinism_journal.md`. Resolved 2026-09-23: the drift was the flow-field fill's wall-clock slice plus the watchdog's `id()` stagger; no hash-order iteration was found once those were fixed, and `run_digest` needs no workarounds.)*
 - **The run is not reproducible across processes.** Two independent
   causes, both in the spawn path: `spawn/watchdog.py::_stagger` seeds an
   enemy's first sample from `id(enemy)`, and something further down the
@@ -496,5 +497,8 @@ decision.
   so it is not there. Read the tool as: seed 7 is the pin, and a "moved"
   123 is evidence only when pre and post trees are dumped back to back
   and compared (which is how D was checked -- identical for both seeds).
+- **`state.py` has grown since D4.** 737 lines when D4 closed, 777 on
+  2026-09-22 (DOC-003). Still under the 1,302 it started from, but D4 wrote
+  the number down so it could not drift silently; this is the note.
 - **`generate_world_steps`** is still 104 lines: the linear pipeline with
   its stage comments. Left as the one place the stage order can be read.

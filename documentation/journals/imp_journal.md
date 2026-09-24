@@ -169,4 +169,4 @@ points at `assets/unused/enemies/imp/`.
 - [x] Enemy block, pool measured off the art
 - [x] Tests (20) — `tests/entities` + `tests/spawn`: 455 passed
 - [x] `CREDITS.md` — Tiny Swords, confirmed by the owner
-- [ ] A band weight — waiting on the band rework, like the other four
+- [x] A band weight — waiting on the band rework, like the other four *(DOC-003: the band rework landed (SPN-002): `data/enemies/spawn_tables.json`, `imp` 1 in `dark`)*

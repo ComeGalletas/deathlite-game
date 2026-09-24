@@ -1,9 +1,10 @@
 """The recorded cues and the footstep cadence
 (`documentation/journals/sound_effects_journal.md`, 2026-09-16).
 
-The cue *files* are checked on disk, which works headless; the loading and
-mixing path needs a real device and is skipped under the dummy driver, in the
-style of `test_audio.py`.
+The cue *files* are checked on disk; the loading and mixing path needs a
+mixer, which SDL's dummy audio driver provides headless -- a device that
+plays nothing -- so it always runs, and a manager that did not come up is a
+failure rather than a skip (TST-004.3.8).
 """
 import array
 import contextlib
@@ -149,12 +150,15 @@ class FootstepCadenceTests(unittest.TestCase):
         self.assertEqual(f._travelled, 0.0)
 
 
+_NO_MIXER = ("the mixer did not come up under SDL_AUDIODRIVER="
+             f"{os.environ.get('SDL_AUDIODRIVER')!r}; the dummy driver provides one")
+
+
 class ManagerTests(unittest.TestCase):
     def setUp(self):
         pygame.init()
         self.mgr = AudioManager(EventBus())
-        if not self.mgr.enabled:
-            self.skipTest("mixer unavailable in this environment")
+        self.assertTrue(self.mgr.enabled, _NO_MIXER)
 
     def test_recorded_cues_are_in_the_library(self):
         for name in config.SOUND_EFFECTS:
@@ -217,8 +221,7 @@ class RoomGrowlTests(unittest.TestCase):
         self.assertEqual(len(self.played), 1)
 
     def test_the_bus_is_wired(self):
-        if not self.mgr.enabled:
-            self.skipTest("mixer unavailable in this environment")
+        self.assertTrue(self.mgr.enabled, _NO_MIXER)
         self.bus.publish(Events.ROOM_ACTIVATED, room=1, woke=0, seeded=2)
         self.assertEqual(len(self.played), 1)
 

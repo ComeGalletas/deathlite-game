@@ -158,7 +158,7 @@ Conventions that apply to every item below:
 
 ## S8 — Resource points (future)
 
-- [ ] First consumer (chests, breakables or ambient gems) reads
+- [x] First consumer (chests, breakables or ambient gems) reads *(DOC-003: chests read `layout.resource_points` (`world/gen/chests.py`, CB-9))*
       `layout.resource_points` instead of searching; tag semantics
       confirmed against what that system needs.
 
@@ -195,6 +195,8 @@ the master).
 - [x] Journal entry.
 
 ## Open questions to settle before S4
+
+*(DOC-005, 2026-09-24: all three **settled**: residents scale their count by difficulty only and their makeup by the run's step (`spawn/master.py`); a summoner's brood counts against `live_cap` (`owner="summon"`); and the locality **grace 6 s / dwell 1 s stay, by the owner's decision** — deliberately constant so the difficulties stay apart)*
 
 - Should residents scale with difficulty only, or also with the run
   fraction at first visit? (Design assumes both.)

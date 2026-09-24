@@ -301,6 +301,8 @@ New modules: `game/assets.py` (loader + cache), `systems/animation.py`
 (`Animator`), `data/sprites.json` (metadata). Test count 181 → **215**.
 
 ### Follow-ups (not blocking)
+
+*(DOC-005, 2026-09-24: all **done or obsolete**: `CREDITS.md` has no placeholders left; every rig carries its own anchor and scale; the Soul Scythe disc became a translucent sector with a sprite; every enemy has its own rig (no tinted Orc stand-in), 26 in `enemy_sprites.json`)*
 - Fill in `assets/CREDITS.md` and confirm the pack's licence before distributing.
 - Anchor / scale for both rigs are a first eyeball tune — pure `sprites.json`.
 - Soul Scythe cone draws as an opaque disc for 0.14 s (pre-existing) — redo as a
@@ -1565,7 +1567,9 @@ now for a later "benched wolf" milestone.
 
 `assets/characters/summons/spectral/wolf-spectral.png` -- **240 x 912**, a
 **5-col x 19-row grid of 48 x 48 frames** (not a strip). `wolf-guide.png` is the
-legend; rows are directional anims:
+legend; rows are directional anims. *(RND-006: the guide and both colourway
+folders now live in the reserve, `assets/unused/characters/summons/`,
+covered by the blanket `assets/unused/**` ignore rule.)*
 
 | row | anim | f | row | anim | f |
 |--|--|--|--|--|--|
@@ -1575,7 +1579,8 @@ legend; rows are directional anims:
 
 The wolf blob sits ~x[11,38] y[11,36] inside each 48 cell. There is **no idle
 row** -- use SLEEP (row 18) as the resting/benched idle. 17 `wolf-colorways/`
-and 17 `wolfshadow-colorways/` recolours exist (same layout) -- parked.
+and 17 `wolfshadow-colorways/` recolours exist (same layout) -- parked, in
+`assets/unused/characters/summons/`.
 
 The loader is horizontal-strip only (`_build_frames` slices `rect = (i*fw, 0,
 fw, fh)`). Rather than split 240x912 into ~10 strips per colourway, add a
@@ -1686,11 +1691,16 @@ used directly.
   confirm the wolf faces its target both ways, bites on contact, and the
   bite-disc is gone. `scale [32,21]` / `anchor [16,16]` kept -- read fine,
   nudge to ~`[36,24]` later if it wants more presence next to big enemies.
-- [ ] **WA5 -- tests + housekeeping.** `tests/rendering/test_summons.py`
+- [x] **WA5 -- tests + housekeeping.** `tests/rendering/test_summons.py` *(DOC-003: partly done: `.gitignore` `assets/unused/**` covers the guide and colourways, and `tests/combat/test_summons.py` covers wolf behaviour; the render tests (now `tests/render/`) and the README decision are still open)* *(TST-004, 2026-09-24: the render tests are done — `tests/render/test_summons.py`, 14 tests: registry, the bite's `melee` classify, wolf sprite vs. disc fallback, `bite_*` held for `_BITE_ANIM_S` (0.32 s) then `run_*`, run facing follows `vel.x`; `test_debt_journal.md` TST-004.8. Only the README decision is still open.)*
   (registry + classify + wolf sprite-vs-fallback + `bite_*` shows for ~0.25 s
-  after a bite + run direction follows `vel.x`). `.gitignore` `wolf-guide.png`
+  after a bite + run direction follows `vel.x`). ~~`.gitignore` `wolf-guide.png`
   and the unused `*-colorways/` dirs (or keep -- decide at WA5). `README` Assets
-  note if warranted. Journal tick.
+  note if warranted.~~ Journal tick. *(RND-006, 2026-09-24: **closed** by the
+  owner. No wolf-specific ignore rules: the guide and the 34 colourways are in
+  the reserve, `assets/unused/characters/summons/`, which `assets/unused/**`
+  already ignores, so the call for dedicated entries is dropped. No README
+  note: `CREDITS.md` credits the art and the reserve is documented. The
+  colourways stay parked below.)*
 
 **Parked:** 4-directional wolf (rows 4/7/12/15); EAT / HOWL anims; the 34
 colourway recolours (blessing-tinted / per-hero wolves); `wolfshadow` as a
@@ -3411,3 +3421,23 @@ archived under `unused/` after the cut.
   `test_render_cull.test_far_enemies_are_not_in_the_actor_pass`. Tiers
   run clean afterwards: render 302, spawn 130, playing 222, flows 106,
   devtools + entities + combat 491.
+
+---
+
+## RND-006 — Close the wolf-art plan (WA5) (owner, 2026-09-24)
+
+- **Objective:** Close WA5, and drop its call for wolf-specific ignore rules
+  for the extra wolf sprites.
+- **Reading:** `wolf-guide.png`, `wolf-colorways/` and
+  `wolfshadow-colorways/` sit in `assets/unused/characters/summons/`. The
+  single `assets/unused/**` rule in `.gitignore` already covers them, and
+  none of them is tracked. The only fixed references were WA5's
+  instruction to add dedicated `.gitignore` entries, and this journal's
+  sheet notes, which gave no location.
+- **Done:**
+  - WA5 is ticked, with its `.gitignore` / README instruction struck through
+    and the decision noted.
+  - The sheet notes give the reserve path.
+  - `.gitignore` is unchanged: it never had wolf entries, and needs none.
+  - Documentation only.
+

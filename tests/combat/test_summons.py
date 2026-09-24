@@ -1,4 +1,4 @@
-"""Milestone 9: summon weapons (spec 5.8) -- maintained count, lifetime,
+"""Summon weapons (spec 5.8) -- maintained count, lifetime,
 damage via ordinary friendly projectiles."""
 import unittest
 
@@ -7,12 +7,7 @@ import pygame
 from combat.weapons import Weapon, FireContext
 from entities.summon import Summon
 from game.content import get_content
-
-
-class FakeEnemy:
-    def __init__(self, x, y):
-        self.pos = pygame.Vector2(x, y)
-        self.alive = True
+from tests.combat.fakes import FakeTarget
 
 
 class SummonPool:
@@ -31,9 +26,17 @@ class SummonPool:
         return s
 
 
+TOTEM = get_content().weapon("grave_totem")
+# The totem's timings, read from the data (TST-004.6): the gap after the field
+# empties, the weapon's cooldown and a totem's life on the field.
+GAP = float(TOTEM["summon_replant_delay"])
+COOLDOWN = float(TOTEM["cooldown"])
+LIFE = float(TOTEM["summon_lifetime"])
+
+
 def fire_ctx(pool, shots, anchor=(0, 0)):
     return FireContext(
-        origin=pygame.Vector2(*anchor), enemies=[FakeEnemy(120, 0)],
+        origin=pygame.Vector2(*anchor), enemies=[FakeTarget(120, 0)],
         damage_multiplier=1.0, attack_speed_multiplier=1.0,
         projectile_speed_multiplier=1.0, area_multiplier=1.0,
         fallback_dir=pygame.Vector2(1, 0),
@@ -108,12 +111,12 @@ class TotemReplantTests(unittest.TestCase):
         """Plant the totem, run the cooldown out, then expire it."""
         w.update(1 / 60, fire_ctx(pool, shots))
         self.assertEqual(len(pool.made), 1)
-        self._planted(w, pool, shots, 7.0)              # cooldown (6 s) long gone
+        self._planted(w, pool, shots, COOLDOWN + 1.0)   # the cooldown long gone
         self.assertEqual(len(pool.made), 1)
         pool.made[0].active = False                     # it leaves
 
     def test_the_data_carries_the_delay(self):
-        self.assertEqual(get_content().weapon("grave_totem")["summon_replant_delay"], 5.0)
+        self.assertGreater(GAP, 0.0, "the totem leaves the field empty for a while")
         self.assertEqual(get_content().weapon("spirit_wolf")["summon_replant_delay"], 0.0)
 
     def test_one_totem_stands_at_a_time_and_twin_totems_makes_it_two(self):
@@ -128,37 +131,38 @@ class TotemReplantTests(unittest.TestCase):
         w.bonus["projectile_count"] = 1                 # Twin Totems I
         self.assertEqual(w._projectile_count(), 2)
 
-    def test_no_replant_for_five_seconds_after_a_totem_leaves(self):
+    def test_no_replant_for_the_gap_after_a_totem_leaves(self):
         w = Weapon("grave_totem", get_content().weapon("grave_totem"))
         pool, shots = SummonPool(), []
         self._one_up_and_expired(w, pool, shots)
-        self.assertEqual(self._planted(w, pool, shots, 4.9), 0)
+        self.assertEqual(self._planted(w, pool, shots, GAP - 0.1), 0)
         self.assertEqual(self._planted(w, pool, shots, 0.2), 1)
 
     def test_quick_plant_shortens_the_gap(self):
         w = Weapon("grave_totem", get_content().weapon("grave_totem"))
-        w.bonus["cooldown_mult"] = 0.5                  # Quick Plant V -> 2.5 s
+        w.bonus["cooldown_mult"] = 0.5                  # Quick Plant V: half the gap
         pool, shots = SummonPool(), []
         self._one_up_and_expired(w, pool, shots)
-        self.assertEqual(self._planted(w, pool, shots, 2.4), 0)
+        self.assertEqual(self._planted(w, pool, shots, GAP * 0.5 - 0.1), 0)
         self.assertEqual(self._planted(w, pool, shots, 0.2), 1)
 
     def test_with_two_slots_the_gap_waits_for_the_field_to_empty(self):
         """Twin Totems. One of two leaving does not open the gap -- the
         field still has a totem on it, and the freed slot refills on the
-        weapon's own cooldown. Only the last one leaving starts the 5 s."""
+        weapon's own cooldown. Only the last one leaving starts the gap."""
+        self.assertGreater(LIFE, COOLDOWN + 1.0, "the first totem still stands at the second plant")
         w = Weapon("grave_totem", get_content().weapon("grave_totem"))
         w.bonus["projectile_count"] = 1                 # Twin Totems -> two slots
         pool, shots = SummonPool(), []
-        self._planted(w, pool, shots, 7.0)              # planted at 0 s and 6 s
+        self._planted(w, pool, shots, COOLDOWN + 1.0)   # planted at 0 s and one cooldown on
         self.assertEqual(len(pool.made), 2)
         pool.made[0].active = False                     # one of the two goes
-        self.assertEqual(self._planted(w, pool, shots, 5.1), 1,
+        self.assertEqual(self._planted(w, pool, shots, COOLDOWN - 0.9), 1,
                          "the freed slot waited although a totem was still up")
         for made in pool.made:                          # now empty the field
             made.active = False
         w._cd = 0.0                                     # isolate the gap from the cooldown
-        self.assertEqual(self._planted(w, pool, shots, 4.9), 0)
+        self.assertEqual(self._planted(w, pool, shots, GAP - 0.1), 0)
         self.assertGreaterEqual(self._planted(w, pool, shots, 0.2), 1)
 
     def test_the_gap_does_not_delay_the_first_plant(self):
@@ -189,7 +193,7 @@ class SummonBehaviourTests(unittest.TestCase):
                 attack_interval=0.5)
         shots = []
         for _ in range(30):
-            s.update(1 / 30, self._ctx(shots, [FakeEnemy(100, 0)]))
+            s.update(1 / 30, self._ctx(shots, [FakeTarget(100, 0)]))
         self.assertTrue(shots)
         self.assertGreater(shots[0]["vel"].length(), 0)
 
@@ -199,7 +203,7 @@ class SummonBehaviourTests(unittest.TestCase):
                 color=(1, 2, 3), tags=("summon",), speed=240, attack_range=70)
         shots = []
         for _ in range(15):
-            s.update(1 / 30, self._ctx(shots, [FakeEnemy(600, 0)]))
+            s.update(1 / 30, self._ctx(shots, [FakeTarget(600, 0)]))
         self.assertGreater(s.pos.x, 5)
 
     def test_summon_expires_after_its_lifetime(self):
@@ -216,18 +220,18 @@ class SummonBehaviourTests(unittest.TestCase):
         s = self._wolf(reach=280.0)
         shots = []
         for _ in range(60):                       # hero at origin, foe at 600 > 280
-            s.update(1 / 60, self._ctx(shots, [FakeEnemy(600, 0)]))
+            s.update(1 / 60, self._ctx(shots, [FakeTarget(600, 0)]))
         self.assertEqual(s.pos, pygame.Vector2(0, 0))       # never moved
         self.assertEqual(s.vel, pygame.Vector2(0, 0))
         self.assertEqual(shots, [])                          # no bite
-        self.assertIsNone(s._acquire_target(self._ctx([], [FakeEnemy(600, 0)])))
+        self.assertIsNone(s._acquire_target(self._ctx([], [FakeTarget(600, 0)])))
         self.assertEqual(s._anim_name(None), "idle")         # the SLEEP strip
 
     def test_wolf_wakes_and_bites_when_the_enemy_is_inside_the_leash_ring(self):
         s = self._wolf(reach=280.0)
         shots = []
         for _ in range(180):
-            s.update(1 / 60, self._ctx(shots, [FakeEnemy(150, 0)]))
+            s.update(1 / 60, self._ctx(shots, [FakeTarget(150, 0)]))
         self.assertGreater(s.pos.x, 5)                       # closed on the foe
         self.assertTrue(shots)                               # and bit it
 
@@ -235,7 +239,7 @@ class SummonBehaviourTests(unittest.TestCase):
         s = self._wolf(reach=280.0)
         s.pos.update(400, 0)                                 # dragged out: 400 > 280
         before = s.pos.x
-        s.update(1 / 60, self._ctx([], [FakeEnemy(900, 0)]))  # a further foe must not hold it
+        s.update(1 / 60, self._ctx([], [FakeTarget(900, 0)]))  # a further foe must not hold it
         self.assertLess(s.pos.x, before)                     # moved back toward the hero
         self.assertLess(s.vel.x, 0)
         self.assertEqual(s._anim_name(None), "run_left")     # running, not sleeping
@@ -247,7 +251,7 @@ class SummonBehaviourTests(unittest.TestCase):
                 attack_interval=0.4, reach=360)
         shots = []
         for _ in range(60):                       # hero has wandered 5000 px away
-            s.update(1 / 30, self._ctx(shots, [FakeEnemy(200, 0)], player=(5000, 0)))
+            s.update(1 / 30, self._ctx(shots, [FakeTarget(200, 0)], player=(5000, 0)))
         self.assertTrue(shots)                    # still zaps a foe by its base
 
 

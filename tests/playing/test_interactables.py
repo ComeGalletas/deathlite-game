@@ -1,4 +1,4 @@
-"""Milestone 10: special-location interactables (spec 5.5).
+"""Special-location interactables (spec 5.5).
 
 Driven through a real headless PlayingState so the effects hit the same code the
 game runs (drops, heals, blessing grants).
@@ -104,8 +104,9 @@ class EffectTests(unittest.TestCase):
     def test_fountain_heals_to_full(self):
         _, p = fresh_playing()
         it = self._get(p, "fountain")
-        if it is None:
-            self.skipTest("no fountain in this layout")
+        # The sanctuary heal is a village's (HI-1), and every world has a
+        # village -- the forge tests below rest on the same fact.
+        self.assertIsNotNone(it, "every world has a village, so a sanctuary heal")
         p.player.hp = 1
         p._use_fountain(it)
         self.assertEqual(p.player.hp, p.player.max_hp)
@@ -119,7 +120,8 @@ class EffectTests(unittest.TestCase):
         self.assertFalse(it.used)
         self.assertGreater(p._notice_t, 0.0)
         self.assertIn("needs", p._notice_text)
-        self.assertIn("2 more", p._notice_text)             # sword at 0 of 2
+        need = game.content.offering["forge_requires_levels"]   # tuned in offering.json
+        self.assertIn(f"{need} more", p._notice_text)       # sword at 0 of the requirement
         game._render()                                      # the notice draws (owner bug: `_hud`)
         pygame.quit()
 

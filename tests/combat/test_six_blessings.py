@@ -22,6 +22,16 @@ from tests.combat.test_summons import SummonPool, fire_ctx
 
 C = get_content()
 CAT = get_catalog(C)
+
+
+def level_value(bid, key, n):
+    """What blessing `bid` sets `key` to at level `n`, from the data
+    (`data/weapons/blessings.json`) -- the tuned number the test used to
+    carry (TST-004.6)."""
+    for e in C.blessings[bid]["effects"]:
+        if key in (e.get("field"), e.get("key")):
+            return e["levels"][n - 1]
+    raise KeyError((bid, key))
 DT = 1 / 60
 
 
@@ -76,15 +86,18 @@ class CritDamageTests(unittest.TestCase):
         w.update(DT, sink_ctx([FakeEnemy(100, 0)], sink, crit_multiplier=2.0,
                               rng=random.Random(1)))
         self.assertTrue(sink[0]["is_crit"])
-        self.assertAlmostEqual(sink[0]["damage"], 10 * 2.5)
+        # the bow's own damage, times the 2.0 crit multiplier plus the +0.5 above
+        self.assertAlmostEqual(sink[0]["damage"], C.weapon("bow")["damage"] * 2.5)
 
     def test_critical_edge_carries_chance_and_damage(self):
         p = hero("sword")
         for _ in range(5):
             apply_blessing(p, CAT.get("sword_critical_edge"))
         w = p.weapons[0]
-        self.assertAlmostEqual(w.bonus["crit_chance"], 0.25)
-        self.assertAlmostEqual(w.bonus["crit_damage"], 0.5)
+        self.assertAlmostEqual(w.bonus["crit_chance"], level_value("sword_critical_edge", "crit_chance", 5))
+        self.assertAlmostEqual(w.bonus["crit_damage"], level_value("sword_critical_edge", "crit_damage", 5))
+        self.assertGreater(w.bonus["crit_chance"], 0.0)
+        self.assertGreater(w.bonus["crit_damage"], 0.0)
 
 
 class EmberRingTests(unittest.TestCase):
@@ -193,8 +206,10 @@ class OnHitStatusTests(unittest.TestCase):
         p = hero("ember_ring")
         apply_blessing(p, CAT.get("ember_ring_scorch"))
         w = p.weapons[0]
-        self.assertAlmostEqual(w.effects["burn_on_hit_frac"], 0.04)
-        self.assertAlmostEqual(w.effects["burn_on_hit_duration"], 2.0)
+        self.assertAlmostEqual(w.effects["burn_on_hit_frac"],
+                               level_value("ember_ring_scorch", "burn_on_hit_frac", 1))
+        self.assertAlmostEqual(w.effects["burn_on_hit_duration"],
+                               level_value("ember_ring_scorch", "burn_on_hit_duration", 1))
 
 
 class FlurryTests(unittest.TestCase):

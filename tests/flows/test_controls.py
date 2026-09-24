@@ -1,4 +1,4 @@
-"""CB-5 group A: the controls configuration and the active key layout.
+"""The controls configuration and the active key layout.
 
 `config.KEY_LAYOUTS` holds raw SDL keycodes (the module is imported before
 `pygame.init()`), so the first test pins them against `pygame.K_*`; the rest

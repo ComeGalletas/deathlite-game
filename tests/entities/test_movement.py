@@ -1,4 +1,4 @@
-"""Milestone 1 pure-logic tests: input direction, frame-rate independent
+"""Pure logic: input direction, frame-rate independent
 movement, world clamping, damage/armor."""
 import unittest
 

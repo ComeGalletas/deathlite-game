@@ -1,6 +1,6 @@
 # Cut-script test skips — journal
 
-**ID:** TST-002 · **System:** tests (+ RND) · **Type:** bug ·
+**ID:** TST-002 (+ TST-003) · **System:** tests (+ RND) · **Type:** bug ·
 **Status:** done · **Branch:** claude/optimistic-poincare-e34af9
 (existing worktree, rebased onto `claude/reaction-damage-rework` so the
 DOC-001 index and `CLAUDE.md` §1 are present — owner's choice, 2026-09-22)
@@ -69,6 +69,10 @@ now holds everywhere. One task per test module, then the results.
 
 ## TST-002 — Follow-up candidates (not in scope)
 
+*(DOC-005, 2026-09-24: the tileset skips are gone (TST-003). The rest are still in `tests/` and still **pending**. `tests/world/test_elevation.py:136` can never fire (`HEIGHTMAP_COAST_KEEP` is 2) and can simply be removed; the others are seed- or environment-dependent (SDL through ctypes, numpy, the mixer))*
+
+*(TST-004, 2026-09-24: done — every site below is an assertion, a hand-built case or an always-runnable check; one subtask per module, TST-004.3.1–3.10 in `test_debt_journal.md`. The grep now finds no live skip in `tests/`.)*
+
 Other conditional `skipTest` calls found by `grep -rn skipTest tests`. The four
 the owner named come first; the rest turned up in the same sweep.
 
@@ -80,7 +84,7 @@ the owner named come first; the rest turned up in the same sweep.
   field, no field pocket)
 - `tests/display/test_native.py:32` — SDL not reachable through ctypes
 - `tests/playing/test_interactables.py:108` — no fountain in this layout
-- `tests/render/test_biome.py:211, 229, 242, 257, 274, 297, 596` — tileset missing
+- ~~`tests/render/test_biome.py:211, 229, 242, 257, 274, 297, 596` — tileset missing~~ done as TST-003
 - `tests/render/test_element_colours.py:393` — numpy not installed
 - `tests/render/test_ghost.py:124` — no skinned sign clear on this seed
 - `tests/render/test_hostile_glow.py:83` — shot expired or hit something
@@ -98,3 +102,54 @@ the owner named come first; the rest turned up in the same sweep.
   were already tracked, and every `--check` exits 0 in this worktree.
 - Deferred: the conditional skips listed under *Follow-up candidates*, per the
   requirement's scope.
+
+---
+
+## TST-003 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Make a missing tileset fail the biome tests instead of
+  skipping them.
+- **Details:** The seven `skipTest("tileset missing")` calls in
+  `tests/render/test_biome.py` become assertions that the tileset loaded,
+  with a message naming what is missing.
+- **Constraint:** Decided by the owner under the never-skip-to-green rule
+  (`test_suite_review.md` §5). Only the tileset skips; the seed-dependent
+  skips in *Follow-up candidates* above stay out of scope.
+
+## TST-003 — Confirmed reading
+
+- Six skips (lines 211, 229, 242, 257, 274, 297) guard on
+  `TileSheets(get_assets(), layout.seed).ok` in `_sheets(21)`; the seventh
+  (596) guards on `W.baked(41)._tiles_ok`. `ok` is true when `floor_sheet`
+  is a string and its probe tile loads (`world/terrain/sheets.py:69`);
+  `_tiles_ok` is the baked map's `terrain.ok` (`world/map.py:415`).
+- The sheets they need — `data/world/terrain.json` `floor_sheet`
+  `terrain/tiles/tilemaps/tilemap_1.png` and its siblings — are tracked in
+  git, so in a healthy checkout the skip never fires; it could only hide a
+  broken one.
+- **TST-003.D1 — One helper, not seven asserts.** A module-level
+  `_require_tiles(test, ok)` that fails with the sheet path read from
+  `terrain.json`, so the message says which file is missing.
+
+## TST-003 — Plan
+
+`tests/render/test_biome.py` only. Run `tests/render/test_biome.py`, then the
+`render` folder and the world tier, before committing.
+
+## TST-003 — Tasks
+
+- [x] TST-003.1 — Replace the seven skips with the shared assertion
+- [x] TST-003.2 — Run the biome module, `tests/render` and `tests/world`; record the counts
+- [x] TST-003.3 — Tick `test_suite_review.md` §5, results, index to done
+
+## TST-003 — Results
+
+- `tests/render/test_biome.py`: **37 passed, 5 deselected** (the sweep tier),
+  0 skipped — the seven checks that could skip now always run.
+- `tests/render` + `tests/world`: **758 passed, 8 deselected, 623 subtests
+  passed, 0 skipped** (5 min 9 s). The 23 warnings are the headless
+  "no fast renderer available" from `game/display/window.py:132`.
+- The failure path was exercised by hand: `_require_tiles(test, False)`
+  fails with `tileset missing: <assets>/terrain/tiles/tilemaps/tilemap_1.png
+  did not load`.
+- Commit: `925502c` (TST-003.1).

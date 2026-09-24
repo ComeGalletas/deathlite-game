@@ -214,6 +214,8 @@ redistributable needed — Windows 10/11 ship the UCRT.
 
 ## Open questions
 
+*(DOC-005, 2026-09-24: **none** — all four were closed on 2026-09-12, as the section says)*
+
 None — all four originally raised here are closed.
 
 * **Name**, **version** and **no logging** — settled by decisions 3, 6 and 7.

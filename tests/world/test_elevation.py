@@ -19,10 +19,9 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from game import config
-from world.rules.steps import can_cross, can_step, diagonal_blocked
-from world.gen.height.walls import _foot_stone_frees
+from world.rules.steps import can_cross, can_step
 from world.gen.height.graph import reachable, walk_links
-from world.layout import (Cell, GROUND, CLIFF, VSTAIR, EWSTAIR,
+from world.layout import (GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
 from tests import worlds
 from world.nav.field import NavField, FlowField, _INF
@@ -132,13 +131,12 @@ class PackingTests(unittest.TestCase):
 
     def test_the_coast_leaves_its_guaranteed_void_band(self):
         keep = config.HEIGHTMAP_COAST_KEEP
-        if not keep:
-            self.skipTest("no void band configured")
+        # The room-overlap guarantee above rests on this band, so it is part
+        # of the contract rather than an optional setting.
+        self.assertGreaterEqual(keep, 1, "HEIGHTMAP_COAST_KEEP must leave a void band")
         for seed in SEEDS:
             layout, _gm, _ix = _world(seed)
             for room in layout.rooms:
-                if not room.grid:
-                    continue
                 w, h = room.tile_dims
                 land = [p for p, c in room.grid.items()
                         if c.kind in WALKABLE_KINDS]
@@ -195,37 +193,13 @@ class CanCrossTests(unittest.TestCase):
                         flights += 1
             self.assertGreater(changes, 50, f"seed {seed}: no drops to test")
 
-    def test_a_diagonal_cannot_cut_the_corner_of_a_drop(self):
-        """`can_step` composes a diagonal from its right-angle detours, and
-        then refuses it outright between two ground tiles of different levels.
-
-        The second half is not redundant. A lateral crossing's head touches the
-        terrace above it *and* the low ground north of it -- that is what keeps
-        a plateau's side face free of invisible walls -- so the detour through
-        the head is open end to end, and the endpoint rule is the only thing
-        left saying you cannot change level in one diagonal move."""
-        for seed in SEEDS:
-            layout, _gm, ix = _world(seed)
-            for row in range(ix.rows):
-                for col in range(ix.cols):
-                    a = (col, row)
-                    if not ix.has_surface(*a):
-                        continue
-                    for dc, dr in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
-                        b = (col + dc, row + dr)
-                        if not ix.has_surface(*b):
-                            continue
-                        h = (col + dc, row)
-                        v = (col, row + dr)
-                        legs = ((can_cross(ix, a, h) and can_cross(ix, h, b))
-                                or (can_cross(ix, a, v) and can_cross(ix, v, b)))
-                        self.assertEqual(can_step(ix, a, b),
-                                         legs and not diagonal_blocked(ix, a, b))
-
     def test_no_diagonal_ever_changes_level_between_two_terraces(self):
         """The invariant itself, stated without reference to how it is
         implemented: a body never gains or loses a level in one diagonal move
-        with ground under both ends of it."""
+        with ground under both ends of it. How `can_step` composes a
+        diagonal, and the corner beside a lateral crossing the endpoint rule
+        exists to catch, are shown on hand-built grids in
+        `tests/world/grids/test_steps.py` (worldgen R4)."""
         for seed in SEEDS:
             layout, _gm, ix = _world(seed)
             for row in range(ix.rows):
@@ -241,30 +215,6 @@ class CanCrossTests(unittest.TestCase):
                             continue
                         self.assertFalse(can_step(ix, a, b),
                                          f"seed {seed}: {a}->{b} changes level")
-
-    def test_the_endpoint_rule_is_load_bearing(self):
-        """It has to actually catch something, or the test above passes for the
-        wrong reason. These are the corners beside a lateral crossing."""
-        caught = 0
-        for seed in SEEDS:
-            layout, _gm, ix = _world(seed)
-            for row in range(ix.rows):
-                for col in range(ix.cols):
-                    a = (col, row)
-                    if not ix.has_surface(*a):
-                        continue
-                    for dc, dr in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
-                        b = (col + dc, row + dr)
-                        if not ix.has_surface(*b):
-                            continue
-                        h = (col + dc, row)
-                        v = (col, row + dr)
-                        legs = ((can_cross(ix, a, h) and can_cross(ix, h, b))
-                                or (can_cross(ix, a, v) and can_cross(ix, v, b)))
-                        if legs and diagonal_blocked(ix, a, b):
-                            caught += 1
-        self.assertGreater(caught, 0,
-                           "no diagonal is held back by the endpoint rule")
 
 
 class LateralCrossingEdgeTests(unittest.TestCase):
@@ -529,45 +479,6 @@ class FootStoneTests(unittest.TestCase):
                                 f"seed {seed}: foot at {(c, r)} cannot step "
                                 f"onto the floor below it")
         self.assertGreater(checked, 10, "no foot opens onto its own floor")
-
-
-class FootStoneRuleTests(unittest.TestCase):
-    """`_foot_stone_frees` on hand-built grids, where every case is visible."""
-
-    def _grid(self, below):
-        """A foot at (0, 0) arriving on level 0, with `below` laid out south
-        of it as a list of cells starting at (0, 1)."""
-        return {(0, i + 1): cell for i, cell in enumerate(below)}
-
-    def test_bare_ground_under_the_foot_is_fine(self):
-        g = self._grid([Cell(GROUND, level=0)])
-        self.assertTrue(_foot_stone_frees(g, (0, 0), 0))
-
-    def test_nothing_at_all_under_the_foot_is_fine(self):
-        self.assertTrue(_foot_stone_frees({}, (0, 0), 0))
-
-    def test_stone_bottoming_out_on_the_landing_floor_can_be_freed(self):
-        g = self._grid([Cell(CLIFF, level=1, drop=1, row=0),
-                        Cell(GROUND, level=0)])
-        self.assertTrue(_foot_stone_frees(g, (0, 0), 0))
-
-    def test_stone_over_higher_ground_cannot(self):
-        """The four sites this rejects: lifting the stone here would leave a
-        bare level change instead of a wall you can see."""
-        g = self._grid([Cell(CLIFF, level=1, drop=1, row=0),
-                        Cell(GROUND, level=1)])
-        self.assertFalse(_foot_stone_frees(g, (0, 0), 0))
-
-    def test_stone_over_open_water_cannot(self):
-        g = self._grid([Cell(CLIFF, level=1, drop=1, row=0)])
-        self.assertFalse(_foot_stone_frees(g, (0, 0), 0))
-
-    def test_a_two_cell_face_is_taken_as_a_whole(self):
-        g = self._grid([Cell(CLIFF, level=2, drop=2, row=0),
-                        Cell(CLIFF, level=2, drop=2, row=1),
-                        Cell(GROUND, level=0)])
-        self.assertTrue(_foot_stone_frees(g, (0, 0), 0))
-        self.assertFalse(_foot_stone_frees(g, (0, 0), 1))
 
 
 class ColliderTests(unittest.TestCase):

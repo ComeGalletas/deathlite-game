@@ -8,7 +8,8 @@ counters live on `PlayingState` (`_nav`, `_nav_t`, `_nav_rr`,
 this class only mutates them.
 
 A fill is **sliced**: `NavField.begin` starts one and `NavField.step`
-advances it for `config.ENEMY_NAV_FILL_BUDGET` seconds a frame, while the
+advances it by `config.ENEMY_NAV_FILL_BUDGET` relaxations a frame (work, not
+wall clock, so a seed plays the same run on any machine -- SYS-008), while the
 previous field keeps steering until the new one is swapped in. A whole
 fill was 15-19 ms on the LD-10 worlds and fired three times a second as
 the hero walked -- the game's biggest frame-time spike. The periodic

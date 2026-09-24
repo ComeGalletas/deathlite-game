@@ -10,12 +10,13 @@ Columns, left to right, each under a Tiny Swords ribbon (blue / yellow / red,
 dark text on the light art per the owner's rule for text on the sheets):
 
 * **Run** -- survived (or cleared in, on a win), level, kills, the gold
-  *earned*, potions, then the items acquired. Rows that set a new record
-  for the difficulty carry a `best` marker beside the label.
+  *earned*, potions, chests opened, elements, then the items acquired. Rows
+  that set a new record for the difficulty carry a `best` marker beside the
+  label.
 * **Enemies slain** -- kills per enemy type (biggest first, the boss as its
   own row, a total that is the sum of the rows).
-* **Weapons** -- weapon, level, damage, share, DPS over the time the weapon
-  was held; the blessing-proc rows under them; a total row with the run's
+* **Weapons** -- weapon, level (its own cell), damage, share, DPS over the
+  time the weapon was held; the blessing-proc rows under them; a total row with the run's
   damage and run DPS; then the blessings with their levels (owner, 2026-09-12:
   they belong with the build, not with the kills).
 * **Hero** -- opt-in, the victory screen only: trait, the resolved stat
@@ -57,6 +58,25 @@ MAX_OTHER_ROWS = 2
 # The blessings come last in their column and take whatever room is left
 # below the weapons table (six rows in the worst case above, more when the
 # run has fewer weapons or no proc rows), so the cut is computed, not fixed.
+
+# The weapons table (UI-013): the Damage / Share cells' right edges, in design
+# px from the column's right edge; the gap before each cell; the widest
+# damage and level a row is laid out for (`_widest`: the digits are
+# proportional, so they are laid out in the font's widest one); the column's
+# content inset.
+_DAMAGE_X = 150
+_SHARE_X = 84
+_CELL_GAP = 12
+_WIDEST_DAMAGE = "#,###,###"
+_WIDEST_LEVEL = "Lv ##"
+_COLUMN_PAD = 56
+
+
+def _widest(font, pattern: str) -> int:
+    """The width of `pattern` with each `#` as the font's widest digit."""
+    digit = max("0123456789", key=lambda d: font.size(d)[0])
+    return font.size(pattern.replace("#", digit))[0]
+
 
 # The columns `draw` can lay out, and the default set. `hero` is opt-in: every
 # extra column narrows all of them, so whether the run summary is worth four
@@ -139,7 +159,7 @@ class RunSummaryPanel:
         picked = [_COLUMNS[name] for name in columns]
         margin, gap = S(margin), S(gap)
         space = surface.get_width() - 2 * margin - (len(picked) - 1) * gap
-        widths = column_widths(space, [m for _d, m in picked])
+        widths = column_widths(space, column_minimums(columns, self._row))
         x = margin
         for (drawer, _min_w), col_w in zip(picked, widths, strict=True):
             drawer(self, surface, assets,
@@ -247,6 +267,9 @@ class RunSummaryPanel:
         # CB-8: potions picked up, with the HP they actually restored.
         y = self._kv(surface, area, y, "Potions",
                      f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
+        # UI-012: chests opened (CB-9 counts them); they paid out the gold and
+        # the potions above. A summary written before the count reads 0.
+        y = self._kv(surface, area, y, "Chests", s.get("chests", 0))
         # The elements this run obtained (design §7.3). Tracked for the
         # summary only -- no gameplay system reads the set. A run with
         # no infusion says so rather than showing a blank.
@@ -259,11 +282,19 @@ class RunSummaryPanel:
         if not items:
             self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
             return
-        for item in items[:MAX_ITEMS]:
+        # As many as the column still holds, capped at MAX_ITEMS; when some
+        # are left over, one row goes to the "+N more" line instead. UI-012's
+        # Chests row made the 10th item's "more" line cross the frame.
+        step = S(ROW_STEP)
+        room = max(0, (area.bottom - step // 2 - y) // step + 1)
+        shown = min(MAX_ITEMS, room)
+        if len(items) > shown:
+            shown = max(0, shown - (1 if shown == room else 0))
+        for item in items[:shown]:
             name, rarity = _item_name(item)
             y = self._line(surface, area, y, name,
                            colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT))
-        self._more(surface, area, y, len(items) - MAX_ITEMS, "items")
+        self._more(surface, area, y, len(items) - shown, "items")
 
     # --- optional column: the hero the run was played with -------
     def _draw_hero(self, surface, assets, rect) -> None:
@@ -369,10 +400,26 @@ class RunSummaryPanel:
             rows = [{"name": n, "level": lvl, "damage": None, "share": None, "dps": None}
                     for n, lvl in s.get("weapons", ())]
         others = list(s.get("other_rows", ()))
-        # Four columns: name (flexible) | damage | share | dps, right-aligned.
-        x_dps, x_share, x_dmg = area.right, area.right - S(84), area.right - S(150)
+        total = s.get("damage_dealt", 0.0)
+        by_source = s.get("damage_by_source")
+        if by_source:
+            total = sum(by_source.values())
+        # Five cells: name (flexible) | Lv | damage | share | dps. The level has
+        # its own cell (UI-013): tacked onto the name, a forge's longer name
+        # ran it into the damage figure. The Lv cell sits clear of the widest
+        # damage actually drawn (a 7-figure one at least), and every name is
+        # trimmed to the room left of it, so no number can be overdrawn.
+        x_dps, x_share = area.right, area.right - S(_SHARE_X)
+        x_dmg = area.right - S(_DAMAGE_X)
+        damages = [r.get("damage") for r in (*rows, *others)] + [total]
+        dmg_w = max(_widest(self._row, _WIDEST_DAMAGE),
+                    *(self._row.size(fmt_damage(d))[0] for d in damages if d is not None))
+        x_lv = x_dmg - dmg_w - S(_CELL_GAP)
+        level_room = x_lv - area.left
+        name_room = level_room - _widest(self._row, _WIDEST_LEVEL) - S(_CELL_GAP)
         y = area.top + S(ROW_STEP) // 2
-        for label, x in (("Damage", x_dmg), ("Share", x_share), ("DPS", x_dps)):
+        for label, x in (("Lv", x_lv), ("Damage", x_dmg), ("Share", x_share),
+                         ("DPS", x_dps)):
             h = self._small.render(label, True, config.COLOR_TEXT_DIM)
             surface.blit(h, h.get_rect(midright=(x, y)))
         h = self._small.render("Weapon", True, config.COLOR_TEXT_DIM)
@@ -383,13 +430,17 @@ class RunSummaryPanel:
         def row(name, level, dmg, share, dps, *, colour=None, flag=""):
             nonlocal y
             colour = colour or config.COLOR_TEXT
-            label = f"{name}  Lv {level}" if level is not None else str(name)
-            n = self._row.render(label, True, colour)
+            note = self._small.render(flag, True, config.COLOR_ACCENT) if flag else None
+            room = (name_room if level is not None else level_room) \
+                - (note.get_width() + S(8) if note else 0)
+            n = self._row.render(uitext.ellipsize(self._row, str(name), room), True, colour)
             surface.blit(n, n.get_rect(midleft=(area.left, y)))
-            if flag:
-                note = self._small.render(flag, True, config.COLOR_ACCENT)
+            if note is not None:
                 surface.blit(note,
                              note.get_rect(midleft=(area.left + n.get_width() + S(8), y)))
+            if level is not None:
+                lv = self._row.render(f"Lv {level}", True, colour)
+                surface.blit(lv, lv.get_rect(midright=(x_lv, y)))
             cells = ((x_dmg, "-" if dmg is None else fmt_damage(dmg)),
                      (x_share, "-" if share is None else f"{share:.0%}"),
                      (x_dps, "-" if dps is None else fmt_dps(dps)))
@@ -409,33 +460,44 @@ class RunSummaryPanel:
                     colour=config.COLOR_TEXT_DIM)
             y = self._more(surface, area, y, len(others) - MAX_OTHER_ROWS, "sources")
         y = self._rule(surface, area, y + S(4))
-        total = s.get("damage_dealt", 0.0)
-        by_source = s.get("damage_by_source")
-        if by_source:
-            total = sum(by_source.values())
         row("Total", None, float(total), 1.0 if total else 0.0,
             float(total) / t if t > 0 else 0.0, colour=config.COLOR_ACCENT,
             flag=BEST_FLAG if "damage_dealt" in set(s.get("new_records", ())) else "")
         self._draw_blessings(surface, area, y)
 
 
-# (drawer, minimum width). Only the weapons table has a floor, and it is not a
-# taste call: the Damage / Share / DPS cells are right-aligned 150, 84 and 0 px
-# in from the column's right edge, so a name drawn from the left runs *through*
-# its own damage figure once the column is short. Measured rather than guessed:
-# the widest row label over `data/weapons/weapons.json` is "Grave Totem  Lv 9" at 186 px
-# and a seven-figure damage is 94 px, which with the 150 px cell block and the
-# column's 56 px of padding needs 486 -- 498 leaves a little air.
-#
-# This bites at *three* columns too, which was a surprise: the equal share
-# there is 480, leaving 424 px of content for a row that can want 430. So the
-# game-over screen could already print "Grave Totem  Lv 9" through a
-# seven-figure damage, and the minimum widens its weapons column to 498 (the
-# other two to 471) rather than leaving that latent. At four columns the other
-# three take 307 px each, which they fit in.
+def weapons_min_width(font: pygame.font.Font) -> int:
+    """The weapons column's floor, measured from the data (UI-013).
+
+    Not a taste call: the Lv / Damage / Share / DPS cells are right-aligned
+    from the column's right edge, so a short column trims the weapon's name.
+    The floor fits the widest name any held weapon can carry -- every
+    `weapons.json` entry and every `forges.json` override, since a forged
+    weapon shows the forge's name -- beside a two-digit level and a 7-figure
+    damage. It was a hand-measured 498 against `weapons.json` alone, and
+    "Meteor Hammer  Lv 9" ran its level into the damage. A new weapon or
+    forge now widens the column by itself.
+    """
+    from game.content import get_content
+    c = get_content()
+    names = [v["name"] for table in (c.weapons, c.forges)
+             for v in table.values() if isinstance(v, dict) and "name" in v]
+    return (max(font.size(n)[0] for n in names) + S(_CELL_GAP)
+            + _widest(font, _WIDEST_LEVEL) + S(_CELL_GAP)
+            + _widest(font, _WIDEST_DAMAGE) + S(_DAMAGE_X) + S(_COLUMN_PAD))
+
+
+# (drawer, minimum width). Only the weapons table has a floor, and it is
+# measured (`weapons_min_width`) rather than a number, so it is a callable
+# that takes the row font; `column_minimums` resolves it.
 _COLUMNS = {
     "run": (RunSummaryPanel._draw_run, 0),
     "kills": (RunSummaryPanel._draw_kills, 0),
-    "weapons": (RunSummaryPanel._draw_damage, 498),
+    "weapons": (RunSummaryPanel._draw_damage, weapons_min_width),
     "hero": (RunSummaryPanel._draw_hero, 0),
 }
+
+
+def column_minimums(columns, font: pygame.font.Font) -> list[int]:
+    """Each named column's minimum width, with the measured ones resolved."""
+    return [m(font) if callable(m) else m for _d, m in (_COLUMNS[c] for c in columns)]

@@ -1,4 +1,4 @@
-"""CB-9 in the run: the chest props, the interact key, and what opening one
+"""The chest props, the interact key, and what opening one
 actually pays out.
 
 Covers `entities.chest.Chest` against a stub hero and its animation clock,

@@ -276,6 +276,10 @@ breakdown mid-run.
 
 ## Still open
 
+*(DOC-005, 2026-09-24: "only the Sword measured" is **done** — the sections below measure ten loadouts, then 180 builds. The breakdown line's absolute damage is still **pending**: the overlay shows shares only (`devtools/dps_meter.py`); the bench already reports absolutes)*
+
+*(DOC-006, 2026-09-24: absolute damage in the overlay is **closed**, not needed (owner))*
+
 - The breakdown line shows percentages only. Absolute damage per source is in
   `DpsMeter.breakdown()` and could be surfaced if the percentages prove too
   coarse when several weapons are up.
@@ -477,24 +481,24 @@ lesson for reading any future report: a table is only comparable with another
 if `data/weapons.json` has not moved between them, so a report should record
 the commit it was measured at.
 
-**Todo — not started.**
+**Todo — done** (ticked by DOC-003, 2026-09-22).
 
-- [ ] `game/dps_bench.py`: build the run on `PrebuiltWorld(GameMap(), None)`
+- [x] `game/dps_bench.py`: build the run on `PrebuiltWorld(GameMap(), None)` *(DOC-003: built in `tools/benchmarks/dps_bench.py` (the module moved from `game/`))*
       instead of walking the menu into a generated world. One arena, identical
       for every loadout and every invocation.
-- [ ] Place the dummy at a fixed offset from the hero and drop the
+- [x] Place the dummy at a fixed offset from the hero and drop the *(DOC-003: the dummy sits 140 px east of the hero; no `place_seed` left)*
       `random.seed(place_seed)` call and the `place_seed` argument with it.
-- [ ] Keep the freeze and the per-frame cull: an empty arena still gets a
+- [x] Keep the freeze and the per-frame cull: an empty arena still gets a
       director.
-- [ ] Keep the four assertions (hero alive, dummy in the live set, reach,
+- [x] Keep the four assertions (hero alive, dummy in the live set, reach, *(DOC-003: hero alive and dummy live still raise; reach became the fixed 16 px standoff; a silent weapon is reported, not raised)*
       no silent weapon) — they are what caught the last three faults.
-- [ ] Re-measure the ten loadouts and regenerate
+- [x] Re-measure the ten loadouts and regenerate *(DOC-003: `documentation/dps_calcs/dps_report_2026-09-12.md`; the 2026-09-19 reports state their conditions)*
       `documentation/dps_calcs/dps_report_<date>.md`, noting the new conditions
       and that the previous table carried terrain variance between rows.
-- [ ] Compare the new spread against the old 1.33x and record the difference:
+- [x] Compare the new spread against the old 1.33x and record the difference: *(DOC-003: recorded above under “What this costs”: the arena scores the same as a generated world, so the terrain added no spread)*
       how much of that spread was the loadout and how much was the ground it
       happened to be measured on.
-- [ ] A `unit` test that the bench's arena really is empty — no layout, no
+- [x] A `unit` test that the bench's arena really is empty — no layout, no *(DOC-003: `tests/devtools/test_dps_meter.py::BenchArenaTests`)*
       obstacles — so a future change cannot quietly put a world back under it.
 
 ---

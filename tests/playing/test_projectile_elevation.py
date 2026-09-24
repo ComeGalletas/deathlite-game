@@ -1,4 +1,4 @@
-"""LD-9 D10: shots respect elevation.
+"""Shots respect elevation.
 
 The rule, as set with the rest of the phase: a projectile travels over its own
 floor and over anything lower, so firing *down* off a terrace works. Firing

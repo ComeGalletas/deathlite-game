@@ -1,6 +1,6 @@
-"""Six-weapon system P5 (design §20): the hero's attack sheets alternate
+"""The hero's attack sheets alternate
 (attack 1, attack 2, attack 1 ...) and Aegis plays the guard sheet while
-Bulwark is up."""
+Bulwark is up (design §20)."""
 import os
 import unittest
 from types import SimpleNamespace

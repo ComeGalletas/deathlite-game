@@ -479,10 +479,10 @@ works.
 - [x] R4 — Gnoll → Bonepicker
 - [x] R5 — Harpoon Shark → Gaffjaw
 - [x] R6 — Spitter's acorn
-- [ ] R7 — spawn tables (blocked on the band rework)
-- [ ] R8 — rename every enemy to match its art
+- [x] R7 — spawn tables (blocked on the band rework) *(DOC-003: the band rework landed (SPN-002): `data/enemies/spawn_tables.json`, `harpoon_shark` in `marine`, `gnoll` in `wild_beasts`)*
+- [x] R8 — rename every enemy to match its art *(DOC-003: built 2026-09-17, see R8 above)*
 - [x] Tests (21 new) and a scale/anchor render
-- [ ] In-game screenshot of both firing (needs R7 — they cannot spawn yet)
+- [x] In-game screenshot of both firing (needs R7 — they cannot spawn yet) *(DOC-003: no longer blocked; R7 is done)* *(TST-004.9, 2026-09-24: done. On seed 35 in a dev run, both are set in the open field by a still hero. Frames at 3.7 s, 4.9 s and 7.9 s show Bonepicker mid-throw with a bone and Gaffjaw loosing its harpoon. Delivered to the owner; the strip is not committed)*
 
 ---
 

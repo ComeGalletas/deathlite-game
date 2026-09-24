@@ -147,7 +147,7 @@ Everything below was verified in the worktree on 2026-09-21.
 - `RunLedger.record(amount, source)` keys by source string. Per-weapon rows
   and "other" rows exist; there is no second dimension for "effect".
   `Rewards.snapshot_summary` feeds `ui/run_summary.py`, whose columns are a
-  registry (`_COLUMNS`) with a tight width budget (weapons column min 498 px,
+  registry (`_COLUMNS`) with a tight width budget (weapons column min 498 px — measured from the data since UI-013,
   other rows capped at 2, must fit 1280×720 for the web build).
 - The run-status screen (TAB) has a Build pane per weapon with a Forge
   before/after diff; an infusion line fits there.
@@ -281,7 +281,7 @@ and its tests green before the next starts.
       loading, dev mode. Report conflicts (above).
 - [x] Owner answered items 6, 7, 8, 9 on 2026-09-21 (recorded above); the
       design's open items 1–13 stand at their proposals unless changed.
-- [ ] Owner confirms the "one application per window" reading of time mode
+- [x] Owner confirms the "one application per window" reading of time mode *(DOC-003: confirmed by the owner 2026-09-22; the code already works this way, `take_element_window`)*
       (item 7).
 
 ### M1 Core (`combat/elements/` package) — built 2026-09-21
@@ -498,30 +498,31 @@ time they are seen on screen:
   a heavily-infused weapon that one-shots trash leaves no aura on it.
 
 ### M3 Base elements (original plan)
+*(DOC-003: this plan was replaced by the "M3 Base elements — built" section above; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `fire.py`: hit damage, Fire aura, bound Burn (refresh, no stacking).
-- [ ] `ice.py`: Ice aura, bound Slow stacks, Freeze at X stacks (stacks reset,
+- [-] `fire.py`: hit damage, Fire aura, bound Burn (refresh, no stacking).
+- [-] `ice.py`: Ice aura, bound Slow stacks, Freeze at X stacks (stacks reset,
       aura stays), freeze immunity window, frozen enemies still knocked back
       (already true), optional frozen contact damage through
       `BumpResolver._bump` using the bite formula, once per enemy per
       knockback instance, no knockback transfer.
-- [ ] `thunder.py`: breadth-first branching jumps with `targetsPerJump`,
+- [-] `thunder.py`: breadth-first branching jumps with `targetsPerJump`,
       `jumps`, `maxRange`, `maxTargets`, `falloff`; per-node rule (no aura /
       Thunder aura → damage + aura + spread; other aura → reaction only, stop;
       locked → damage only, spread); visited set per chain.
-- [ ] `systems/collision.py`: `nearest_n(x, y, n, radius, exclude)` on the
+- [-] `systems/collision.py`: `nearest_n(x, y, n, radius, exclude)` on the
       grid (`heapq.nsmallest` over `query_circle`), used by Thunder,
       Superconduct and ThunderWind.
-- [ ] `wind.py` + `WindArea` pooled component on `Run` (follows the inflicted
+- [-] `wind.py` + `WindArea` pooled component on `Run` (follows the inflicted
       enemy, ~1 s, 10 Hz contact checks, once per enemy per instance, radial
       knockback via `knock_split`, `maxActiveWindAreas` cap, payload
       callable). Damage goes straight to `take_damage` (never back into the
       element entry).
-- [ ] `combat.py` hook: after the base hit, `elements.resolve(proj, enemy)`
+- [-] `combat.py` hook: after the base hit, `elements.resolve(proj, enemy)`
       when the projectile carries an element.
-- [ ] Placeholder visuals: tint per element, a ring for the Wind area, a line
+- [-] Placeholder visuals: tint per element, a ring for the Wind area, a line
       per jump.
-- [ ] Tests: the §11 Thunder and Wind checks with seeded stubs from
+- [-] Tests: the §11 Thunder and Wind checks with seeded stubs from
       `tests/combat/fakes.py`.
 
 ## Ordering review: what an element does when its carrier dies (2026-09-21)
@@ -671,15 +672,16 @@ the owner's decision to reuse the existing statuses rather than give the
 elements their own.
 
 ### M4 Reactions (original plan)
+*(DOC-003: this plan was replaced by the "M4 Reactions — built" section above; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `reactions/frostburn.py` (status + lock for its duration),
+- [-] `reactions/frostburn.py` (status + lock for its duration),
       `reactions/overload.py` (target damage + shockwave damage and radial
       knockback, `maxKnockbackSpeed` clamp on `_knock`),
       `reactions/superconduct.py` (target damage + Slow-only spread with
       `thunder.jumps + bonusJumps`, `bonusJumps ≥ 1`).
-- [ ] Secondary hits never apply auras; reaction depth 1 enforced by
+- [-] Secondary hits never apply auras; reaction depth 1 enforced by *(DOC-003: retired later by the R38 cascade, CMB-006)*
       construction (reactions call `take_damage`, not the element entry).
-- [ ] Tests: both trigger directions, variant values, lock lengths, secondary
+- [-] Tests: both trigger directions, variant values, lock lengths, secondary
       hits leave no aura, Superconduct jumps exceed Thunder's.
 
 ### M5 Wind reactions — built 2026-09-21
@@ -725,33 +727,35 @@ reaction's. The fix is to measure the delta across the triggering hit, or to
 switch the priming element's own spread off.
 
 ### M5 Wind reactions (original plan)
+*(DOC-003: this plan was replaced by the "M5 Wind reactions — built" section above; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] FireWind (standalone Burn payload), IceWind (Slow stacks payload, can
+- [-] FireWind (standalone Burn payload), IceWind (Slow stacks payload, can
       freeze), ThunderWind (area + nearest-N strike through the reacting
       enemy, N floored at Thunder's reach).
-- [ ] Tests: payload application, N closest by absolute distance, caps.
+- [-] Tests: payload application, N closest by absolute distance, caps.
 
 ### M6 Weapon element
+*(DOC-003: this plan was replaced by the "M6 Weapon element — built" section below; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `Weapon.element: ElementId = None` runtime field on every weapon,
+- [-] `Weapon.element: ElementId = None` runtime field on every weapon,
       summons included; `element_application` block (`mode` + `interval` or
       `window`) added to every `weapons.json` entry and validated like
       `category` (a taxonomy of two modes in code, the numbers in data).
-- [ ] Attack mode: decided in `_begin_attack`, the flag stamped on every
+- [-] Attack mode: decided in `_begin_attack`, the flag stamped on every
       projectile of that attack (`element` slot on `Projectile`, cleared in
       `reset`); Split Arrow children inherit it.
-- [ ] Time mode: a `next_element_at` timestamp on the `Weapon`, checked at
+- [-] Time mode: a `next_element_at` timestamp on the `Weapon`, checked at *(DOC-003: shipped as planned: `Weapon._next_element_at`, `take_element_window`)*
       hit time in the resolver for any projectile whose `weapon_id` names a
       time-mode weapon (orbiters, Pinball, summon bites and bolts, crater
       ticks all covered by the same test).
-- [ ] `element_interval` / `element_window` as `weapon_bonus` fields so
+- [-] `element_interval` / `element_window` as `weapon_bonus` fields so *(DOC-003: shipped as `element_interval` and `element_window_mult` bonus fields (`combat/weapons/core.py`))*
       blessings can change them.
-- [ ] Dev menu: a "Weapon elements" page (set / change / remove the element
+- [-] Dev menu: a "Weapon elements" page (set / change / remove the element *(DOC-003: shipped as an "Infuse weapons…" row in the dev menu, not its own page)*
       of each held weapon, edit its interval) following the four-edit pattern
       in `dev_menu_state.py`.
-- [ ] Run-status Build pane shows the infusion; `weapon_visuals.json` gets an
+- [-] Run-status Build pane shows the infusion; `weapon_visuals.json` gets an
       element tint hook so element-carrying shots look different.
-- [ ] Tests: interval 0/1/N patterns across projectile counts and pierces,
+- [-] Tests: interval 0/1/N patterns across projectile counts and pierces,
       one element per weapon, replacement.
 
 ### M6 Weapon element — built 2026-09-21
@@ -812,19 +816,20 @@ three, everything else on every attack, and the time-mode weapons every one
 to one and a half seconds.
 
 ### M7 Acquisition
+*(DOC-003: this plan was replaced by the "M7 Acquisition — built" section below; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `Run.unlocked_elements: set` and `snapshot_summary["unlocked_elements"]`.
-- [ ] Elemental buff buildings: `buildings.json` `elements` block (chance,
+- [-] `Run.unlocked_elements: set` and `snapshot_summary["unlocked_elements"]`.
+- [-] Elemental buff buildings: `buildings.json` `elements` block (chance,
       weights); roll at placement; after the buff, the weapon rail overlay
       (Forge template) assigns the element and adds it to the set.
-- [ ] Monastery: interactable on the village monastery obstacle, element
+- [-] Monastery: interactable on the village monastery obstacle, element
       cards (all four) then the weapon rail, `used` after one pick, key
       marker and requirements message when the hero holds no infusable
       weapon.
-- [ ] Run summary: an "Elements" line in the run column; game-over per-weapon
+- [-] Run summary: an "Elements" line in the run column; game-over per-weapon
       rows unchanged (element damage is credited to its source weapon's
       total; the per-effect split is shown in the run-status and dev views).
-- [ ] Tests: Monastery offers four, spent after one, assigns one element to
+- [-] Tests: Monastery offers four, spent after one, assigns one element to
       one weapon; set never duplicates; a new run starts empty.
 
 ### M7 Acquisition — built 2026-09-21
@@ -862,18 +867,19 @@ player to forge a weapon. Both are now the caller's, with the Forge's own
 wording kept as the default.
 
 ### M8 Visual system
+*(DOC-003: this plan was replaced by the "M8 Visual system — built" section below; its boxes are marked `[-]` so only open work reads `[ ]`.)*
 
-- [ ] `game/states/playing/visual/elements/`: `profiles.py`
+- [-] `game/states/playing/visual/elements/`: `profiles.py`
       (`ElementVisualProfile` per element: tint, particle preset, rigs),
       `component.py` (`ElementVisualComponent` for enemies, buildings,
       weapons), `aura_layer.py` (tint + marker; lock state visible),
       `status_layer.py`, `wind_ring.py`, `jump_arc.py` (pooled), reaction
       blends.
-- [ ] Wire the parked `fire_aura` sheet and the `thunder_aura` rig; cut Ice
+- [-] Wire the parked `fire_aura` sheet and the `thunder_aura` rig; cut Ice
       and Wind equivalents from the reserve art.
-- [ ] Particle LOD: per-element cap and a global element budget under
+- [-] Particle LOD: per-element cap and a global element budget under
       `MAX_PARTICLES`, counted on the F1 overlay.
-- [ ] Screenshot grid of every aura, status, lock and reaction on a crowded
+- [-] Screenshot grid of every aura, status, lock and reaction on a crowded
       screen (milestone deliverable).
 
 ### M8 Visual system — built 2026-09-21
@@ -1933,7 +1939,7 @@ correctly, and the real figure was 1. The layout has no `boss_room_id`
 attribute -- the check silently read `None` and never excluded anything --
 and `room.kind == "boss"` is the test that works.
 
-## M13 An infused weapon looks infused (PROPOSED)
+## M13 An infused weapon looks infused (DONE)
 
 Requested 2026-09-21, **not yet confirmed**. An infused weapon's *attack*
 should show its element. Two ways were put: authored sprites that enhance
@@ -2433,3 +2439,212 @@ a surprise.
   fire on a flame, ice on a blue totem -- which is written down as a
   measured property rather than papered over. Screenshot delivered: the
   four recoloured effects, plain and four elements, in play.
+
+---
+
+## CMB-009 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Plan the elemental work still missing after CMB-005/006/007.
+- **Details:** The remaining dev extras from design §10.3 (hot-reload of the
+  element data, a reaction log, spawning a building with a chosen element),
+  the two §9.8 profiling counters (Thunder jump nodes per frame, active Wind
+  areas), and a faint alpha glow in the element's tint behind an elemental
+  buff building, which today shows its element only on use.
+- **Constraint:** Planned only, status `proposed`; the plan lives in its own
+  file, `documentation/plans/elemental_extras_plan.md`.
+
+## CMB-009 — Plan
+
+See `documentation/plans/elemental_extras_plan.md`: the glow first (the one
+player-facing item), then the counters (CMB-008's cascade measurement wants
+them), then the three dev tools. Tasks are numbered when it is taken up.
+
+## CMB-009 — Confirmed reading
+
+- **The building.** A buff building that rolled an element carries it on
+  `Interactable.element` (`entities/interactable.py`); the obstacle draws
+  the building, and `WorldRenderer.interactables` skips buff buildings
+  (`visual/rendering.py`), so nothing shows the element. The flat terrace
+  pass (`visual/scene.py` → `ren.interactables(surface, level)`) runs before
+  the actors, which puts a glow drawn there under the building art — the
+  standing order for element effects.
+- **The glow helper.** `visual/glow.py::GlowCache` pre-renders a soft disc
+  per `(diameter, alpha)`, any colour, and `pulse_alpha` gives an optional
+  breath; the element tint is `VisualSet.tint(element)`
+  (`visual/elements/profiles.py`).
+- **The counters.** F1 already shows auras, reactions per frame, held
+  reactions, particles and element fx (`devtools/dev_flags.py`); Thunder
+  jump nodes and active Wind areas are not counted anywhere.
+- **The dev tools.** The dev menu has Force aura and the infusion row;
+  hot-reload, a reaction log and spawn-a-building-with-an-element do not
+  exist.
+- **CMB-009.D1 — Glow strength is decided on a screenshot.** The first
+  build uses a low fixed alpha with a slow, narrow breath; the numbers live
+  in `data/world/buildings.json` and the owner tunes them from the
+  screenshot.
+- **CMB-009.D2 — The Monastery gets no glow.** It rolls no element; the
+  player picks one there.
+
+## CMB-009 — Tasks
+
+- [x] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
+- [x] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
+- [x] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
+- [x] CMB-009.4 — Reaction log overlay (plan §3)
+- [x] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
+
+## CMB-009 — Results
+
+**Branch:** `claude/cmb-009-elemental-extras`, cut from
+`claude/doc-004-proposal-journals` (which carries this block), owner's
+instruction to continue on a new branch as before (2026-09-23).
+
+### CMB-009.1 — The glow
+
+- `visual/elements/building_glow.py::BuildingGlow` over `GlowCache`, owned
+  by `ElementVisuals` (`None` when `buildings.json` has no `elements` block,
+  since then no building is ever elemental). `WorldRenderer.interactables`
+  draws it where it used to skip a buff building outright, so it paints in
+  the flat terrace pass, under the building art.
+- `data/world/buildings.json` → `elements.glow`: `scale` 3.4 (diameter over
+  the building's interaction diameter), `alpha_min` 90, `alpha_max` 130,
+  `period` 3.0 s, `steps` 6. `_check_building_glow` (`game/content.py`)
+  requires every field, orders the alphas inside 0–255 and refuses a
+  non-positive scale.
+- **Tuning from the screenshot (D1).** The first values, alpha 40–64 at
+  scale 3.0, were close to invisible: only the ice glow read, over grass.
+  90–130 at 3.4 reads as a soft wash round the foot of each building and is
+  still faint; Thunder's purple is the weakest of the four over olive
+  ground. These stay the owner's to tune.
+- `tests/render/test_building_glow.py`: 11 tests, 8 subtests — the glow
+  takes the element's tint, stays at or under `alpha_max`, reaches past the
+  building, is absent on a plain or used building, breathes inside its two
+  alphas, and the data check refuses a missing block, a missing field and
+  bad alphas.
+- **Screenshot:** seed 35, one building per element — fire (vampire),
+  ice (magnet) and wind (pinball) as rolled; thunder assigned to a plain
+  magnet because no building rolled it on that seed, labelled as such.
+- **Tests:** `tests/render` + `tests/playing` + `tests/systems` +
+  `tests/combat` — 1448 passed, 461 subtests, 0 skipped (6 min 1 s).
+
+### CMB-009.2 — The counters
+
+- `ResolverStats.jump_nodes_this_frame` / `jump_nodes_total`
+  (`combat/elements/resolve.py`), bumped by `Thunder.spread` with the
+  number of enemies the chain reached (the struck one not counted) and
+  reset in `begin_frame` with the reaction counter.
+- F1 metrics (`devtools/dev_flags.py`): "thunder jumps" (per frame and
+  total) and "wind areas" (live against `max_active_wind_areas`, 6).
+  Read back from a live seed-7 run: `0/frame 0 total` and `0/6`.
+- `tests/combat/test_elements_base.py::ThunderTests::test_the_jump_nodes_are_counted_per_frame_and_in_total`.
+- **Tests:** `tests/combat` + `tests/flows` + `tests/devtools` — 748
+  passed, 132 subtests, 0 skipped (5 min 2 s).
+
+### CMB-009.3 — Hot-reload of the element data
+
+- **F9**, developer runs only like F7/F8 (`config.DEBUG_KEYS
+  ["reload_elements"]`, SDL keycode 1073741890, unused before). Routed as
+  the other keys are: `Game._handle_debug_key` → `PlayingState` →
+  `DevFlags.handle_debug_key`, which shows the result as a run notice
+  (2.5 s, or 6 s for a failure so the reason can be read).
+- `devtools/element_reload.py::reload_element_data(run)`: re-reads
+  `weapons/elements.json` and `weapons/reactions.json` through the content
+  loader, validates them with the boot's own checks, and builds a **fresh
+  `ElementRegistry`** from them before touching anything — so a file that
+  validates but cannot bake fails there too. Only then does the run's
+  registry `adopt` it (`combat/elements/registry.py`), and `run.content`
+  takes the new dicts.
+- **CMB-009.D3 — What a reload keeps.** `adopt` swaps the data (global
+  block, element and reaction bases, reaction table) and drops the baked
+  caches; it keeps the element objects and the modifier layers, so a buff
+  or blessing the run holds applies on top of the new numbers. Not reached:
+  a Wind area already on the field keeps its seeded config until it ends,
+  and `element_visuals.json` (presentation, not tuning) is not reloaded.
+- Docs: the F-key table in `FUNCTIONAL_README.md`, the F1–F9 range in
+  `README.md` and the keycode comment in `game/config.py`.
+- `tests/devtools/test_element_reload.py`: 8 tests — a changed value
+  reaches the live registry and `run.content`; the run's modifiers survive
+  and stack on the new data; bad data and an unreadable file keep the old
+  values; F9 has its own key, reloads and says so in a developer run, and
+  does nothing in a normal one.
+- **Tests:** `tests/devtools` + `tests/combat` + `tests/flows` — 756 passed,
+  132 subtests, 0 skipped (5 min 8 s).
+
+### CMB-009.4 — The reaction log
+
+- `combat/elements/reaction_log.py`: `ReactionLog`, a fixed ring of
+  `LoggedReaction(serial, time, reaction, aura, trigger, damage, depth,
+  deferred)`, newest first. Kept in every run (`build_resolver` sets
+  `resolver.log`), one append per reaction, so turning the overlay on shows
+  what already happened. `config.REACTION_LOG_CAPACITY` 64,
+  `REACTION_LOG_LINES` 14 shown.
+- The resolver feeds it from `_run_reaction`, the one place a reaction
+  runs — at once or a frame late:
+  - **damage** is what the reaction dealt through its own context:
+    `HitContext.deal` now keeps a running `dealt`, read before and after the
+    runner. What a cascade it set off deals is logged on that reaction's
+    own line, not added to this one.
+  - **depth** (CMB-009.D5) is how many reactions were running when this
+    one was triggered — 0 for a weapon's hit, 1 for one set off inside
+    another's run (a tornado or Superconduct laying an aura). A held
+    reaction carries its depth in `PendingReaction.depth`.
+  - **deferred** marks a reaction the per-frame budget held over.
+  - Time is run seconds, not a frame number: the resolver has no frame
+    counter, and the serial already orders them.
+- Overlay: the dev menu's new **"Reaction log"** row (after "Aura
+  inspector") toggles `DevFlags.show_reaction_log`; `overlays.
+  reaction_log_overlay` draws the newest 14 in a panel down the right
+  edge, clear of the HUD. The first draft coloured each line by its aura
+  element; Thunder's purple was unreadable on the dark panel, so the text
+  is now light with two swatches in front — aura, then trigger.
+- `tests/combat/test_reaction_log.py`: 10 tests — pair, damage, serial and
+  time logged; a reaction set off inside another is depth 1 and finishes
+  first; a reaction's damage excludes its cascade's; a budget-held
+  reaction is logged when it runs, flagged; the ring keeps its capacity;
+  `clear` empties it; no log records nothing; the overlay's lines flag a
+  cascade and a hold; the dev-menu row exists; nothing draws outside a
+  developer run.
+- **Screenshot:** a seed-7 developer run with six real reactions driven
+  through the run's resolver, the panel over the terrain.
+- **Tests:** `tests/combat` + `tests/devtools` + `tests/flows` +
+  `tests/screens` + `tests/render` + `tests/playing` — 2024 passed, 487
+  subtests, 0 skipped (13 min 22 s), then the log, dev-mode and screens
+  tests again against the final overlay — 631 passed, 22 subtests.
+
+### CMB-009.5 — Spawn an elemental building
+
+- Dev menu: **"Spawn elemental building..."** (after "Infuse weapons...")
+  opens an ELEMENTAL BUILDING page of the four elements; ENTER seats one
+  beside the hero and the status line says which.
+- `devtools/element_building.py::spawn_elemental_building(ps, element)`
+  builds it the way the world does: `world.gen.buildings._seat` for the
+  compound (the primary carries the art, the satellites only collide),
+  `GameMap.obstacles`' setter so the obstacle index is rebuilt,
+  `reskin_obstacle` with the kind's first rig at the bake's size, and an
+  `Interactable` carrying the element on the run's list — so using it runs
+  the ordinary buff, then the infusion picker for its element.
+- The kind takes the buff kinds in turn (`DevFlags.building_turn`), so
+  every building can be tried; the spot is the first on rings of 3, 4.5, 6
+  and 8 tiles round the hero where every circle of the compound is on
+  walkable ground and clear of every obstacle.
+- **CMB-009.D4 — What it does not do.** The navigation field is baked at
+  run start and is not rebuilt, so enemies do not route round a spawned
+  building; they collide with it and slide, as round any obstacle the
+  field did not know. The spot search takes any walkable ground, so a
+  building can land on another terrace than the hero's. Both are
+  acceptable for a dev tool; a run that needs a real one takes a seed.
+- `tests/devtools/test_element_building.py` (integration tier, listed in
+  `conftest.INTEGRATION`, pinned seed): 7 tests — seated as a compound
+  with its art and in the rebuilt index; placed where the spot search said
+  and near the hero; carries the chosen element; the kinds come in turn;
+  using it runs the buff and opens the element's weapon picker; no room
+  says so and adds nothing; the dev-menu page exists.
+- **Screenshot:** a seed-7 developer run with one building of each
+  element seated by the tool, each with its CMB-009.1 glow.
+- **Tests:** `tests/devtools` + `tests/screens` + `test_dev_mode` +
+  `test_interactables` + `test_infusion_sources` — 718 passed, 28
+  subtests, 0 skipped (6 min 13 s).
+
+**CMB-009 closed** (2026-09-23): all five tasks landed, each in its own
+commit. The design document's three open boxes it answered (§8.2's
+building visual, §9.8's counters, §10.3's extras) are ticked there.

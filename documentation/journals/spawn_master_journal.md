@@ -641,6 +641,9 @@ and lands byte-identical results (pinned). `NavField.begin` / `step` /
 record the target cell at `begin` so the drift trigger does not restart
 the fill every frame. `NavCoordinator` starts fills where it used to
 rebuild and advances them `config.ENEMY_NAV_FILL_BUDGET` (3 ms) a frame.
+*(SYS-008, 2026-09-23: the budget is now 1600 relaxations a frame, not 3 ms
+of wall clock -- the clock made a run depend on the machine's speed; see
+`run_determinism_journal.md`.)*
 
 ### Measured
 
@@ -703,6 +706,11 @@ the run's zoom, the centre at three foam phases, one position per loading
 step ("warming the view N of 9"). `TerrainRenderer._z_surf` fills
 `GameMap._blit_cache` as it draws, and the map is handed to the run with
 that cache, so the run's first frames find every scaled surface ready.
+*(RND-005, 2026-09-24: a last step, "warming the animations", now scales
+every foam, bridge, decor, obstacle and shadow frame the world holds — not
+only the phases the ring drew — so a first frame at any phase scales
+nothing; the terrace bands stay on first sight. See
+`frame_warmup_journal.md`.)*
 
 ### Measured
 
@@ -1309,7 +1317,7 @@ seen. Flagged above; the count schedule was left alone as asked.
 - [x] `ENEMY_LIVE_CAP` 250
 - [x] Tests updated (`tests/spawn` 134 passed)
 - [x] Re-measured curve delivered
-- [ ] Frame cost at 250 live re-measured with `tools/benchmarks/spawn_stress.py`
+- [x] Frame cost at 250 live re-measured with `tools/benchmarks/spawn_stress.py` *(DOC-003: measured in `enemy_despawn_journal.md` (SPN-003): 250 live at p50 6.22 ms, no frame over budget)*
       -- not run here; the 150 -> 250 raise is expected to cost frames
 
 ### Suite

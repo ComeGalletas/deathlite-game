@@ -313,9 +313,100 @@ The title reads **"Game Over"** instead of "You Died". One string in
 
 ### Deferred
 
+*(DOC-005, 2026-09-24: the victory screen's summary panel is **done** (`ui/end_screen.py`). A "best DPS" record is still **pending**, never asked for (`game/save.py` `_RECORD_KEYS`))*
+
+*(DOC-006, 2026-09-24: the best-DPS record is **closed**, not needed (owner). The weapons table's forge names running their level into the damage figure are fixed as UI-013, below)*
+
 - **The victory screen** still draws the old nine-line readout. It can take
   the panel in one line (`RunSummaryPanel(self.stats).draw(...)`) — the
   summary it receives already carries the rows. Left out because the request
   was the game-over screen.
 - **A "best DPS" record** in the rankings would be one key in
   `save._RECORD_KEYS`; not asked for.
+
+---
+
+**ID:** UI-013 · **System:** interface · **Type:** bug · **Status:** done ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+This block follows the DOC-001 layout; the entries above predate it.
+
+## UI-013 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Stop weapon names in the run summary's weapons table from
+  running their level into the damage figures.
+- **Details:** It shows on some weapons and especially on forges. Polish the
+  table only; the DPS extras (a best-DPS record, absolute damage in the
+  overlay) are not wanted (DOC-006).
+- **Constraint:** The table's cells and numbers stay as they are.
+
+## UI-013 — Confirmed reading
+
+- `ui/run_summary.py::_draw_damage` draws `"<name>  Lv <n>"` from the left
+  edge. Damage / Share / DPS are right-aligned 150 / 84 / 0 px from the
+  right edge.
+- The weapons column's 498 px minimum (content 442) was measured against
+  `weapons.json` only ("Grave Totem  Lv 9", 186 px). The forge names in
+  `forges.json` are longer ("Meteor Hammer  Lv 9", 216 px). A 7-figure
+  damage is 93 px, so a label has 199 px before the damage starts.
+  Reproduced: "Meteor Hammer  Lv 9" prints over "1,212,400".
+- A weapon's level is 1 + its blessing levels. Six blessings of five levels
+  each put it as high as 31, so the level takes two digits.
+- **UI-013.D1 — The level gets its own cell.** A right-aligned "Lv" column
+  sits before Damage, so the level never shares space with a number.
+- **UI-013.D2 — The column's minimum is measured from the data.** It is the
+  widest name in `weapons.json` and `forges.json`, plus the level cell and
+  the numeric cells, rather than a hand-measured 498. A new weapon or forge
+  widens the column itself.
+- **UI-013.D3 — A name that still does not fit is ellipsized** to the room
+  left of its level. This covers an 8-figure damage, which also pushes the
+  level cell left. Nothing can overlap, whatever the numbers are.
+
+## UI-013 — Plan
+
+- In `_draw_damage`: place the level cell from the widest damage drawn (at
+  least a 7-figure one), and trim every name to the room it has.
+- A module helper for the weapons minimum, measured with the row font and
+  used by `draw` and the tests.
+- Tests:
+  - Every weapon and forge name at `Lv 31`, with 7- and 8-figure damage, on
+    the 3- and 4-column layouts: no name or level reaches the damage cell.
+  - The other victory columns still meet their contents.
+- A screenshot with the widest forge build.
+
+## UI-013 — Tasks
+
+- [x] UI-013.1 — The level cell, the trimmed names, the measured minimum; tests; screenshot
+
+## UI-013 — Results
+
+- `ui/run_summary.py`:
+  - The weapons table has a right-aligned **Lv** cell, placed clear of the
+    widest damage drawn.
+  - Every name is ellipsized to the room left of its level.
+  - `weapons_min_width(font)` measures the column's floor from every weapon
+    and forge name, and `column_minimums` resolves it for `draw` and the
+    tests.
+- **UI-013.D4 — Laid out in the widest digit.** The body font's digits are
+  proportional, so "8,888,888" was not the widest 7-figure damage
+  ("2,424,800" is wider). The layout patterns use `#` for the font's widest
+  digit. The first test run caught this: "Meteor Hammer" was trimmed at a
+  damage of 2,424,800.
+- **Widths at 1600 × 900:**
+  - Victory screen: the weapons column is 549–550 px (was 498), and the other
+    three are 293 px (were 307). They still fit their contents.
+  - Game-over screen: 550 px, with 445 px for each of the other two.
+- **Tests:**
+  - `tests/screens/test_victory.py::WeaponsTableTests`: every weapon and forge
+    name at `Lv 31`, with 7- and 8-figure damage, on both layouts. The name
+    stops before its level and the level before its damage (84 subtests).
+    "Meteor Hammer" shows in full.
+  - `ColumnWidthTests` now reads the measured floor.
+  - `test_text.py`'s item-name test uses `column_minimums`.
+  - `tests/screens`, `test_hero_unlock`, `test_damage_numbers`: **575 passed,
+    135 subtests, 0 skipped**.
+- **Screenshot:** the widest forge build (Meteor Hammer, Fan of Blades,
+  Arcane Storm, Grave Totem at Lv 9, a 7-figure damage) on the game-over and
+  victory layouts, with no overlap.
+- The old 498 is annotated where it was recorded
+  (`victory_screen_journal.md`, `elemental_system_journal.md`).

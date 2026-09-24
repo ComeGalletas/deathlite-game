@@ -585,6 +585,7 @@ class PlayingState(State):
             self.renderer.spawn_point_overlay(surface)  # dev-only, same layer
             self.renderer.aim_overlay(surface)          # dev-only, same layer
             self.renderer.aura_overlay(surface)         # dev-only, same layer
+            self.renderer.reaction_log_overlay(surface)  # dev-only, screen space
             key_marker.draw(surface, self)              # the interact cap, over its element
             hints_draw.draw(surface, self)              # the opening Move / Attack hints
         finally:
@@ -652,6 +653,7 @@ class PlayingState(State):
     _dev_show_spawn_points = _forward("dev", "show_spawn_points")
     _dev_show_aim = _forward("dev", "show_aim")
     _dev_show_auras = _forward("dev", "show_auras")
+    _dev_show_reaction_log = _forward("dev", "show_reaction_log")
 
     def _apply_dev_unlimited_hp(self) -> None:
         self.dev.apply_unlimited_hp(self.run)

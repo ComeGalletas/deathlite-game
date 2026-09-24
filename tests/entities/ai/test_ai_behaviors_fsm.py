@@ -1,6 +1,14 @@
 """`entities/ai/behaviors/ranged.py` + `melee.py` -- kite_shoot, summoner,
-exploder, brute, fsm_charger, fsm_teleporter, fsm_warlock. Behaviour checks
-against fakes (the flow field is silent, so movement is straight `_toward`)."""
+exploder, brute, fsm_charger, fsm_teleporter, fsm_warlock.
+
+Two halves. The first checks each behaviour against fakes (the flow field is
+silent, so movement is straight `_toward`). The second drives the shipped
+enemies that wear the three FSM behaviours -- charger, teleporter, warlock
+(spec 5.6) -- through a real `Enemy`: the cycle chase -> telegraph -> attack
+-> recover must be visible, and the dangerous frame must follow a telegraph.
+That half was `test_fsm_enemies.py` (Milestone 9) until TST-004.5 merged the
+two modules, which covered the same three behaviours.
+"""
 import random
 import unittest
 from types import SimpleNamespace
@@ -8,6 +16,9 @@ from types import SimpleNamespace
 import pygame
 
 from entities.ai import Blackboard, build_behavior
+from entities.enemy import Enemy
+from game.content import get_content
+from tests.aictx import ai_ctx
 
 
 def _enemy(pos, cfg=None, speed=90.0, radius=15.0, hp=200.0):
@@ -121,6 +132,82 @@ class TelegraphFsmTests(unittest.TestCase):
         self.assertEqual(states, {"chase", "telegraph", "attack", "recover"})
         self.assertGreaterEqual(len(c["hazard"]), 2)
         self.assertEqual(set(c["hazard"]), {92})
+
+
+# --- the shipped FSM enemies, driven through a real `Enemy` ------------------
+def make(eid, x=200, y=0):
+    return Enemy(eid, get_content().enemy(eid), x, y)
+
+
+def fs(e):
+    """The FSM phase name from the composable behaviour machine."""
+    return e.bb.slot("__machine__").get("state")
+
+
+def ctx(dt=1 / 30, player=(0, 0), **cb):
+    calls = {"hazards": []}
+    cb.setdefault(
+        "spawn_hazard",
+        lambda pos, radius, dps, duration, tick_interval=None, sprite=None:
+        calls["hazards"].append((tuple(pos), radius, dps, duration)))
+    return ai_ctx(dt=dt, player=player, **cb), calls
+
+
+class ChargerTests(unittest.TestCase):
+    def test_cycles_states_and_bumps_damage_on_the_dash(self):
+        e = make("minotaur", x=180)
+        states = set()
+        dashed_damage = 0.0
+        for _ in range(600):
+            c, _ = ctx(player=(0, 0))
+            e.update(c)
+            states.add(fs(e))
+            if fs(e) == "attack":
+                dashed_damage = max(dashed_damage, e.contact_damage)
+        self.assertEqual({"chase", "telegraph", "attack", "recover"} & states,
+                         {"chase", "telegraph", "attack", "recover"})
+        self.assertGreater(dashed_damage, e._base_contact)
+
+    def test_telegraphs_before_attacking(self):
+        e = make("minotaur", x=150)
+        seq = []
+        for _ in range(400):
+            c, _ = ctx(player=(0, 0))
+            e.update(c)
+            if not seq or seq[-1] != fs(e):
+                seq.append(fs(e))
+        # find first attack, ensure a telegraph immediately precedes it
+        i = seq.index("attack")
+        self.assertEqual(seq[i - 1], "telegraph")
+
+
+class TeleporterTests(unittest.TestCase):
+    def test_blinks_close_to_the_player(self):
+        e = make("thief", x=800)
+        for _ in range(500):
+            c, _ = ctx(player=(0, 0))
+            e.update(c)
+            if fs(e) in ("attack", "recover"):
+                break
+        self.assertLess((e.pos - pygame.Vector2(0, 0)).length(), 200)
+
+
+class WarlockTests(unittest.TestCase):
+    def test_spawns_a_hazard_after_a_telegraph(self):
+        e = make("hex_shaman", x=260)
+        saw_telegraph = False
+        hazards = []
+        for _ in range(500):
+            c, calls = ctx(player=(0, 0))
+            e.update(c)
+            saw_telegraph = saw_telegraph or e.telegraphing
+            hazards += calls["hazards"]
+        self.assertTrue(saw_telegraph)
+        self.assertTrue(hazards, "warlock never cast a hazard")
+        # hazard was placed roughly where the player was
+        (hx, hy), radius, dps, dur = hazards[0]
+        self.assertLess(abs(hx), 60)
+        self.assertGreater(dps, 0)
 
 
 if __name__ == "__main__":

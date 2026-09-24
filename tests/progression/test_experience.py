@@ -1,4 +1,4 @@
-"""Milestone 3: XP curve + LevelTracker (spec 8: "XP progression")."""
+"""XP curve + LevelTracker (spec 8: "XP progression")."""
 import unittest
 
 from progression.experience import (

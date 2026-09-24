@@ -37,7 +37,7 @@
     "anims": {
       "idle":   {"file": "enemies/skull/idle.png", "frames": 8, "fps": 7, "loop": true},
       "walk":   {"file": "enemies/skull/run.png", "frames": 6, "fps": 9, "loop": true},
-      "attack": {"file": "enemies/skull/attack.png", "frames": 7, "fps": 14, "loop": false}
+      "attack": {"file": "enemies/skull/attack.png", "frames": 7, "fps": 10, "loop": false}
     }
   },
   "spider": {
@@ -169,6 +169,20 @@
         "frames": 10,
         "fps": 14,
         "loop": false
+      }
+    }
+  },
+  "hex_shaman_cast_charge": {
+    "frame": [64, 64],
+    "content": [0, 0, 64, 64],
+    "anchor": [32, 32],
+    "scale": [76, 76],
+    "anims": {
+      "loop": {
+        "file": "enemies/hex_shaman/hex_shaman_cast_charge.png",
+        "frames": 16,
+        "fps": 20,
+        "loop": true
       }
     }
   },

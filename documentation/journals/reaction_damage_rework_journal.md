@@ -361,6 +361,8 @@ are `interval: 0`, every attack. That does not change the answer, but the
 Ember Ring being rate-limited matters: it is a re-hitting orbiter, which is
 exactly the case the cadence exists for.
 
+*(DOC-003: #12 is tracked as **CMB-008** — closed 2026-09-23 by measurement, design §13 R51.)*
+
 #12 is worth keeping open for a reason the original audit could not have had:
 `MAX_PARTICLES` is 1200 and `MAX_DAMAGE_NUMBERS` 200, and the M9 pass measured
 the system at roughly thirty times a real build's load — but that was before
@@ -368,3 +370,140 @@ the R38 cascade. A cascade puts more reactions in a frame than M9 ever saw,
 each with its own flash, label and stream of numbers.
 
 - [x] CMB-007.3 — Record the owner's answers; one question left
+
+---
+
+## CMB-008 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Measure whether the particle and damage-number pools hold
+  under a dense reaction cascade, and close design §13 question 12 with the
+  numbers.
+- **Details:** `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200
+  (`game/config.py`). The M9 stress pass predates the R38 cascade, which puts
+  more reactions per frame on screen, each with its own flash, label and
+  stream of numbers.
+- **Constraint:** Measure first. A cap or budget changes only if the
+  measurement says so, and that change is the owner's call.
+
+## CMB-008 — Confirmed reading
+
+- **Reactions are already rationed.** `global.max_reactions_per_frame` is 8
+  (`data/weapons/elements.json`); the rest wait a frame
+  (`combat/elements/resolve.py`, `stats.deferred_now` / `deferred_total`,
+  `pending`). A cascade shows up as a backlog, not as one unbounded frame.
+- **Particles degrade gracefully.** Elements draw from their own per-frame
+  and per-element allowance (`visual/elements/budget.py`); when it runs out
+  auras keep their rings and stop shedding, and `refused` is counted.
+- ~~**Damage numbers do not.** … Nothing rations elemental numbers against
+  weapon numbers. This is the likely weak point.~~ **Corrected while
+  building CMB-008.1 (2026-09-23):** they are rationed. `ui/damage_numbers.py`
+  refuses a `low_priority` number once the pool is 75 % full
+  (`_LOW_PRIORITY_FULL`), and `RunWorld.deal` sends every elemental number
+  as low priority, so the top quarter stays for weapon numbers. What the
+  reservation does *not* cover is the reaction **label**
+  (`add_label`, not low priority), which a cascade produces one per
+  reacting body — that became the thing to watch.
+- `tools/benchmarks/spawn_stress.py --elements` (with `--element-rate`)
+  already primes every enemy and reports auras, reactions, deferred, held,
+  the particle budget and the damage-number peak against its cap. It does
+  not stage a cascade on purpose.
+- **CMB-008.D1 — What "holds" means.** Frame time within budget (p99 under
+  16.7 ms with `--render`); the deferred backlog drains rather than grows;
+  no weapon damage number dropped. All three reported, each against the M9
+  figures.
+  *Revised on the measurement (2026-09-23):* headless, `--render` draws
+  through SDL's dummy driver in software ("no fast renderer available"),
+  and draw alone is 18 ms at p50 with **no elements at all** — so
+  "update + draw under 16.7 ms" cannot be judged here. The frame criterion
+  becomes the *update* time and the draw time **against a no-element
+  control of the same crowd**, which is what M9 compared too.
+
+## CMB-008 — Plan
+
+Add a cascade scenario to the stress tool, measure it and a real
+cascade-heavy build on the DPS bench, write the table here, and only then
+decide on a fix. The likely fix, if one is needed, is an elemental
+allowance for damage numbers modelled on the particle budget, with its
+limits in data. CMB-009.2's counters (Thunder jump nodes, active Wind areas)
+make the report fuller but are not a prerequisite.
+
+## CMB-008 — Tasks
+
+- [x] CMB-008.1 — `spawn_stress --cascade`: a dense crowd primed with two elements so reactions chain; report frame p50/p99, reactions run/deferred per frame and the backlog trend, particles refused, damage-number peak and drops
+- ~~CMB-008.2 — Measure a cascade-heavy build on the DPS bench for realistic load~~ dropped: the bench measures one dummy with nothing beside it, so no aura can spread and nothing can cascade. The realistic-cadence case is scenario C below — the three infused weapons at their own rate, no pumped hits.
+- [x] CMB-008.3 — Record the table against M9 (elemental journal, M9 *What it costs*)
+- ~~CMB-008.4 — Only if D1 fails: an elemental damage-number allowance, limits in data, with a test that a weapon's number survives a full pool~~ dropped: D1 holds (see the table), and the allowance it describes already exists (`_LOW_PRIORITY_FULL`, the corrected reading above).
+- [x] CMB-008.5 — Close design §13 question 12 with the result; index to done
+
+## CMB-008 — Results
+
+**Branch:** `claude/cmb-008-cascade-limits`, cut from
+`claude/cmb-009-elemental-extras` so the measurement has CMB-009's
+counters and reaction log (owner, 2026-09-23: continue with CMB-008).
+
+### CMB-008.1 — The staged cascade
+
+`tools/benchmarks/spawn_stress.py` gained three things, none of which
+change the game:
+
+- `--cascade`: after the warm-up, the live crowd is packed into a 220 px
+  disc round the hero and primed with the four elements in turn, so
+  neighbours hold different auras and any aura a reaction spreads sets off
+  the next reaction. Staged *after* the 60 warm-up frames: the first try
+  staged it before, the burst spent itself in the warm-up (74 reactions,
+  the number pool at 200/200) and the measured window saw only the
+  aftermath — 9 reactions, none cascading.
+- `Instruments`: per-frame reactions and backlog, the particles the element
+  budget refused, the damage-number pool's size; a large `ReactionLog` on
+  the resolver for the depth histogram; and the pool's `add` /
+  `add_label` wrapped to count what each priority asked for and what was
+  refused.
+- `--pack`: the same packed crowd with no elements at all — the control.
+
+### CMB-008.3 — The measurement (2026-09-23)
+
+Seed 35, LOD 2, 100 live asked, 400 dormant, 600 frames after a 60-frame
+warm-up, `--render` on every run; `python -m tools.benchmarks.spawn_stress`
+with the flags shown. Times in ms. The master keeps spawning while a run
+goes, so the live count at the end differs by scenario (in brackets).
+
+| scenario | update p50 / p99 / max | draw p50 (in view) | reactions/frame p99 · at cap 8 | backlog max · last ¼ | depth | particles refused | numbers peak · dropped weapon / label / element |
+|---|---|---|---|---|---|---|---|
+| A `--render`, no elements (133) | 5.43 / 7.58 / 11.45 | 18.34 (32) | — | — | — | — | — |
+| B `--elements` — M9's primed crowd (125) | 5.03 / 7.45 / 11.71 | 17.83 (29) | — | — | — | 0 | 163 · — |
+| **F `--pack`, no elements — the control** (168) | **8.14 / 14.19 / 20.84** | 18.17 (117) | — | — | — | — | — |
+| **C `--cascade`, weapons only** (150) | **7.64 / 12.28 / 25.62** | 20.30 (107) | 3 · 4 / 600 | 16 · 0.0 | d1 25, d2 18, d3 9 | 0 | 186 · 0/75, 0/98, 186/825 |
+| D `--cascade --element-rate 20` (96) | 6.76 / 10.96 / 14.44 | 23.43 (93) | 8 · 10 / 600 | 6 · 0.0 | up to d5 | 0 | 191 · 0/62, 0/719, 19,771/20,583 |
+| E `--cascade --element-rate 60` (96) | 7.06 / 10.39 / 12.69 | 22.79 (91) | 8 · 34 / 600 | 33 · 0.0 | up to d3 | 0 | 196 · 0/62, 0/751, 49,334/50,115 |
+
+What it says, against D1:
+
+- **Frame time — the cascade costs nothing measurable.** The packed crowd
+  with *no elements* (F) costs more update time than the staged cascade
+  (C): what rose against A is crowding — ~110 bodies inside a 220 px disc,
+  colliding and pathing — not reactions. C's one 25.6 ms frame is the
+  opening burst (a crowd of primed auras all reacting at once), which the
+  budget spread over the next frames. Draw moves with bodies in view, not
+  with elements (C 20.3 at 107 in view against F 18.2 at 117). Against M9,
+  whose runs had update p50 5.8–6.4 ms, A and B sit in the same band.
+- **The backlog drains.** Its last quarter averages 0.0 in every run; the
+  worst is 33 held at 60 pumped hits a frame, and the cap of 8 was reached
+  on at most 34 frames of 600.
+- **No weapon number and no reaction label was dropped** in any run. The
+  pool peaked at 196/200; everything refused was a low-priority element
+  number yielding the reserved quarter, which is the design working. At
+  realistic cadence (C) that is 186 of 825.
+- **Particles never pressed:** the element budget used at most 7 of its 90
+  a frame and refused nothing; the shared pool stayed under 300 of 1200.
+- **Cascades are shallow.** The deepest chain was five reactions, at 20
+  pumped hits a frame; at realistic cadence, three. The aura lock and the
+  per-frame budget are enough of a brake — no depth cap is called for
+  (R47 stands).
+
+### CMB-008.5 — Closed
+
+Design §13 question 12 is closed as **R51**: the limits hold and
+`MAX_PARTICLES` 1200 / `MAX_DAMAGE_NUMBERS` 200 stay. "Still open" in §13
+now reads *None*. No game code changed in CMB-008 — only the stress
+harness — so no test tier covers it; the harness itself was exercised by
+the seven runs above.

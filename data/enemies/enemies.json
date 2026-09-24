@@ -188,7 +188,9 @@
     "prefer_distance": 300, "cast_range": 420, "cast_telegraph": 0.8, 
     "cast_duration": 0.3, "cast_recover": 1.8, "cast_interval": 3.2,
     "hazard_sprite": "hex_shaman_explosion_spell",
-    "hazard_radius": 20, "hazard_dps": 6, "hazard_duration": 0.9
+    "hazard_radius": 20, "hazard_dps": 6, "hazard_duration": 0.9,
+    "_cast_marker_comment": "ENT-013: drawn at the cast's landing spot for the whole wind-up, so it can be stepped out of. The hazard sprite's first frame marks the footprint, fading in from footprint_alpha[0] to [1] (0-255); the charge-up `sprite` loops over it.",
+    "cast_marker": {"sprite": "hex_shaman_cast_charge", "footprint_alpha": [60, 200]}
   },
   "training_dummy": {
     "name": "Training Dummy", "hp": 1, "speed": 0,

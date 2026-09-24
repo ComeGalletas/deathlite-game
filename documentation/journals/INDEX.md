@@ -10,8 +10,13 @@ someone confirms it. Each carries a `**Legacy ID:**` line under its title
 (DOC-001.3) — grep `Legacy ID:` to list them. Their sections predate the
 standard and are not rewritten to it.
 
-**Next free:** CMB-008 · ENT-013 · SPN-004 · WLD-012 · RND-005 · UI-012 ·
-PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
+CMB-006 is the one exception to `legacy` status: its journal was stamped
+with a `Legacy ID:` line because it was written before DOC-001 landed on
+its branch, but the work finished under the standard and is tracked as
+`done` (DOC-003).
+
+**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-014 · RND-008 · UI-014 ·
+PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 
 ## Requirements
 
@@ -24,6 +29,8 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | CMB-005 | Elemental system | CMB, RND | feature | legacy | [elemental_system_journal.md](elemental_system_journal.md) | — | 2026-09-21 |
 | CMB-006 | Reaction damage rework | CMB | feature | done (balance confirmed in play) | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-007 | Elemental design doc brought to the shipped behaviour (open questions closed bar one) | CMB, DOC | process | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| CMB-008 | Particle and damage-number limits under a dense reaction cascade (design §13 q.12) | CMB, RND | feature | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/cmb-008-cascade-limits | 2026-09-22 |
+| CMB-009 | Elemental extras: building glow, §9.8 counters, §10.3 dev tools | CMB, RND, SYS | feature | done | [elemental_system_journal.md](elemental_system_journal.md) | claude/cmb-009-elemental-extras | 2026-09-22 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |
 | ENT-003 | Chaser collider | ENT | bug | legacy | [chaser_collider_journal.md](chaser_collider_journal.md) | — | 2026-09-15 |
@@ -36,6 +43,11 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | ENT-010 | Ranged range, wind-up and animation | ENT | feature | legacy | [ranged_windup_journal.md](ranged_windup_journal.md) | — | 2026-09-19 |
 | ENT-011 | Fish huts and seahorse boats | ENT, WLD | feature | legacy | [fish_hut_journal.md](fish_hut_journal.md) | — | 2026-09-20 |
 | ENT-012 | Enemy tuning (Stoutpaw shield, Tusked Lance radius) | ENT | balance | done | [enemy_tuning_journal.md](enemy_tuning_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| ENT-013 | Hexcaller cast wind-up drawn where it will land | ENT, RND | feature | done | [warlock_cast_journal.md](warlock_cast_journal.md) | claude/ent-013-warlock-cast-marker | 2026-09-24 |
+| ENT-014 | Skull attack animation slowed to cover its swing | ENT, RND | balance | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
+| ENT-015 | The boss on the shared AI components | ENT | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
@@ -50,10 +62,15 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | WLD-009 | Buff buildings | WLD, PRG | feature | legacy | [buff_buildings_journal.md](buff_buildings_journal.md) | — | 2026-09-20 |
 | WLD-010 | Special island facilities | WLD | feature | parked | [special_facilities_journal.md](special_facilities_journal.md) | — | 2026-09-20 |
 | WLD-011 | Bridge clearance for large bodies | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| WLD-012 | Keep props a wide body's radius clear of bridge mouths | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/wld-012-bridge-deck-clearance | 2026-09-22 |
+| WLD-013 | Remove the retired generator's unused island-graph helpers | WLD | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | RND-001 | Asset integration | RND | feature | legacy | [assets_journal.md](assets_journal.md) | — | 2026-08-27 |
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
 | RND-004 | Native-resolution rendering | RND | feature | legacy | [native_resolution_journal.md](native_resolution_journal.md) | — | 2026-09-16 |
+| RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | done | [frame_warmup_journal.md](frame_warmup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
+| RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | done | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
+| RND-007 | The `mark` status drawn as raspberry lock-on brackets, shown with a blessing that reads it | RND, CMB | feature | done | [mark_overlay_journal.md](mark_overlay_journal.md) | claude/rnd-007-mark-overlay | 2026-09-24 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
@@ -65,9 +82,12 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | UI-009 | End banners | UI | feature | legacy | [end_banner_journal.md](end_banner_journal.md) | — | 2026-09-19 |
 | UI-010 | Key icons (keycaps) | UI, RND | feature | legacy | [key_icons_journal.md](key_icons_journal.md) | — | 2026-09-19 |
 | UI-011 | Enemy health bar | UI, ENT | feature | legacy | [enemy_health_bar_journal.md](enemy_health_bar_journal.md) | — | 2026-09-22 |
+| UI-012 | Chests opened shown on the run summary | UI, PRG | feature | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
+| UI-013 | Run summary weapons table: the level never overlaps the damage | UI | bug | done | [game_over_journal.md](game_over_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
-| AUD-001 | Music | AUD | feature | legacy | [music_journal.md](music_journal.md) | — | 2026-09-15 |
+| PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
+| AUD-001 | Music | AUD | feature | legacy | [music_journal.md](music_journal.md), [music_tracks_journal.md](music_tracks_journal.md) (split by DOC-005) | — | 2026-09-15 |
 | AUD-002 | Audio mixer (SFX level) | AUD, UI | feature | legacy | [audio_mixer_journal.md](audio_mixer_journal.md) | — | 2026-09-16 |
 | AUD-003 | Sound effects | AUD | feature | legacy | [sound_effects_journal.md](sound_effects_journal.md) | — | 2026-09-16 |
 | SYS-001 | Bug journal (cross-system log) | all | bug | legacy | [bug_journal.md](bug_journal.md) | — | 2026-08-27 |
@@ -77,21 +97,36 @@ PRG-003 · AUD-004 · SYS-008 · TST-003 · BLD-003 · DOC-003
 | SYS-005 | PlayingState refactor | SYS | refactor | legacy | [playing_state_refactor.md](playing_state_refactor.md) | — | 2026-08-29 |
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
+| SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | claude/sys-008-run-determinism | 2026-09-22 |
+| SYS-009 | One sprite-blit core, a `TimedVisual` for transient effects, `MELEE_REACT_SCALE` to config | SYS, RND, ENT | refactor | done | [playing_state_refactor.md](playing_state_refactor.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
+| TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
+| TST-004 | Test debt: digests, conditional skips, R4, §6/§7, balance audit, coverage, summon renders | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/tst-004-test-debt (remote session) | 2026-09-24 |
+| TST-005 | numpy as a test-only tool; a faster world tier; the gnome split without fixed values | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
+| DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
+| DOC-004 | Journals for the five proposed requirements (CMB-008, CMB-009, SYS-008, WLD-012, TST-003) | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-004-proposal-journals | 2026-09-23 |
+| DOC-005 | Second documentation review: the narrative open sections, and the owner's answers | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
+| DOC-006 | Third review: the owner's answers on the DOC-005 leftovers, the order of work | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 
 ## Plans and designs
 
 Only links whose owner is clear from the document are filled in; the rest
 are `unassigned` until someone confirms which requirement they serve.
+DOC-003 assigned three from the document's own pointers: the forge tables
+cite the six-blessings journal, the boss free-roam todo names the enemy AI
+journal as its companion, and the fluidity plan's done items are logged in
+the spawn master journal. The other three are surveys or references that
+serve no single requirement.
 
 | document | serves |
 |---|---|
-| [plans/ELEMENTAL_SYSTEM_DESIGN.md](../plans/ELEMENTAL_SYSTEM_DESIGN.md) | CMB-005, CMB-006 |
+| [plans/ELEMENTAL_SYSTEM_DESIGN.md](../plans/ELEMENTAL_SYSTEM_DESIGN.md) | CMB-005, CMB-006, CMB-007 |
+| [plans/elemental_extras_plan.md](../plans/elemental_extras_plan.md) | CMB-009 |
 | [plans/weapon_system_plan.md](../plans/weapon_system_plan.md) | CMB-002 |
 | [designs/six_weapon_system_design.md](../designs/six_weapon_system_design.md) | CMB-002 |
 | [designs/combat_calculations.md](../designs/combat_calculations.md) | CMB-001 |
@@ -103,8 +138,8 @@ are `unassigned` until someone confirms which requirement they serve.
 | [plans/web_plan.md](../plans/web_plan.md) | BLD-001 |
 | [designs/death_must_die_lite_game_spec.md](../designs/death_must_die_lite_game_spec.md) | SYS-003 |
 | [designs/sprite_functionality.md](../designs/sprite_functionality.md) | unassigned |
-| [designs/weapon_blessing_forge_tables.md](../designs/weapon_blessing_forge_tables.md) | unassigned |
-| [plans/boss_free_roam_todo.md](../plans/boss_free_roam_todo.md) | unassigned |
-| [plans/fluidity_plan.md](../plans/fluidity_plan.md) | unassigned |
+| [designs/weapon_blessing_forge_tables.md](../designs/weapon_blessing_forge_tables.md) | PRG-001 |
+| [plans/boss_free_roam_todo.md](../plans/boss_free_roam_todo.md) | ENT-001 |
+| [plans/fluidity_plan.md](../plans/fluidity_plan.md) | SPN-001 |
 | [plans/pending_plans.md](../plans/pending_plans.md) | unassigned |
 | [plans/test_suite_review.md](../plans/test_suite_review.md) | unassigned |

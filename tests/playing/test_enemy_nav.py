@@ -1,4 +1,4 @@
-"""M3/M6 -- the dual-resolution `NavField` coordinator, its PlayingState wiring,
+"""The dual-resolution `NavField` coordinator, its PlayingState wiring,
 the staggered per-grid rebuild, and the debug-overlay counter.
 """
 import os
@@ -126,15 +126,20 @@ class PlayingStateNavWiringTests(unittest.TestCase):
 
     def test_steering_from_elsewhere_points_toward_the_player(self):
         _g, p = _playing(1234, True)
-        for off in (pygame.Vector2(0, 220), pygame.Vector2(200, 0),
-                    pygame.Vector2(-180, 120)):
+        # The three hand-picked offsets first, then rings round the player, so
+        # a moved start room shifts the probe rather than retiring the test.
+        offs = [pygame.Vector2(0, 220), pygame.Vector2(200, 0),
+                pygame.Vector2(-180, 120)]
+        offs += [pygame.Vector2(dist, 0).rotate(ang)
+                 for dist in (160, 240, 320) for ang in range(0, 360, 30)]
+        for off in offs:
             probe = p.player.pos + off
             d = p._nav_dir(probe, 14)
             if d.length_squared() < 1e-6:
                 continue
             self.assertGreater(d.dot((p.player.pos - probe).normalize()), 0.0)
             return
-        self.skipTest("no probe landed on the field for this seed")
+        self.fail("no probe round the player landed on the field")
 
     def test_update_nav_repaths_when_the_player_leaves_the_cell(self):
         _g, p = _playing(1234, True)
@@ -303,8 +308,7 @@ class NavRebuildStaggerTests(unittest.TestCase):
                    for dc in (-1, 0, 1) for dr in (-1, 0, 1) if dc or dr):
                 spot = ng.world_of(c, r)
                 break
-        if spot is None:
-            self.skipTest("no field pocket for this seed")
+        self.assertIsNotNone(spot, "no field pocket on the pinned seed (1234)")
         self.assertGreater(p._nav.direction(spot, 14).length(), 0.5)
 
 

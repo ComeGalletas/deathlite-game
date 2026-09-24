@@ -118,6 +118,7 @@ There is no CI and none is planned: the suite is run locally, for stability.
 | F2–F6 | Spawn enemy / grant XP / force level / spawn boss / toggle invuln |
 | F7 | Toggle the **collision-shape overlay** — *developer runs only*; also a dev-menu row |
 | F8 | Toggle the generated **spawn points** overlay — developer runs only |
+| F9 | **Reload the element data** (`data/weapons/elements.json`, `reactions.json`) into the live run; bad data is refused and the old values kept — developer runs only |
 | ` / ~ | The **dev menu** in a developer run: HP / attack / overlay toggles, spawn any enemy, grant any blessing, item or weapon, apply any Forging, remove owned weapons, switch difficulty live, freeze spawns, activate every room, place the training dummy, reset the run |
 
 Debug keys are never required for normal play. To see the real circular
@@ -136,7 +137,9 @@ obstacle bodies in green, pickup radius and projectile hitboxes dimmer.
 - `tools/verification/run_digest.py` — a fingerprint of a headless run (two
   pinned seeds, 720 frames, debug spawns thrown in): `--check` after a
   change to the run's wiring says whether the same seed still plays the
-  same frames. Pins Python's hash seed itself; not a test.
+  same frames. Not a test itself; `tests/flows/test_run_determinism.py`
+  runs its script in four processes at once and checks they agree
+  (SYS-008: a seed plays the same run under any hash seed and any load).
 - `tools/gen_weapon_tables.py` — generates the weapon / blessing / forge
   reference tables from the data JSON (Markdown for `documentation/designs/`,
   plus an HTML body); run from the repo root with the output paths as
@@ -314,10 +317,11 @@ is missing. The full walk from `generate_world` to a drawn frame is
 [`world/README.md`](world/README.md).
 
 The **start menu** is the one screen with its own palette (`config.MENU_*`):
-black background, white text. `Assets.picture()` loads `assets/ui/title.png`
-(if present) and it's scaled to fill the screen as a backdrop, with a
-translucent scrim (`config.MENU_SCRIM`) behind the option list. No file → the
-`config.TITLE` string is drawn as the fallback and the screen stays plain black.
+black background, white text. The backdrop is
+`assets/ui/start_screen/menu_background.png` (`config.MENU_BACKGROUND_IMAGE`),
+or the 21:9 `menu_background_long.png` on an ultrawide render; it falls back to
+`config.MENU_TITLE_IMAGE`, then to the flat `MENU_BG` fill. The logo above the
+option list is `config.MENU_LOGO_IMAGE`; without it the title is drawn as text.
 
 Every third-party pack (character sprites, terrain, title art) and its licence
 must be confirmed in `assets/CREDITS.md` before distribution. Delivered audio

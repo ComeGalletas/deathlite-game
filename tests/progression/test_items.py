@@ -1,4 +1,4 @@
-"""Milestone 7: seeded item generation, rarity distribution, serialisation
+"""Seeded item generation, rarity distribution, serialisation
 (spec 4.4 / 4.5 / 8: "Item generation", "Rarity probabilities")."""
 import random
 import unittest

@@ -1,4 +1,4 @@
-"""Milestone 7: meta-progression purchase rules and run-start application
+"""Meta-progression purchase rules and run-start application
 (spec 4.6)."""
 import unittest
 
@@ -53,7 +53,8 @@ class MetaTests(unittest.TestCase):
 
         s = StatSet({"max_hp": 100.0})
         s.add(*[m for m in mods if m.stat == "max_hp"])
-        self.assertAlmostEqual(s.get("max_hp"), 100.0 * (1 + 0.02 * 3))
+        per_level = c.defs["constitution"]["per_level"]      # tuned in meta_upgrades.json
+        self.assertAlmostEqual(s.get("max_hp"), 100.0 * (1 + per_level * 3))
 
     def test_salvage_multiplier(self):
         c = catalog()

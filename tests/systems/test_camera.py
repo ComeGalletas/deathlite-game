@@ -1,4 +1,4 @@
-"""Milestone 1: camera clamping and world<->screen transforms."""
+"""Camera clamping and world<->screen transforms."""
 import unittest
 
 import pygame

@@ -147,11 +147,13 @@ class HammerGnomeTests(unittest.TestCase):
     def test_it_runs_the_husks_beat(self):
         self.assertEqual(self.gnome["behavior"], self.husk["behavior"])
 
-    def test_it_holds_the_owners_ratios_against_the_husk(self):
-        self.assertEqual(self.gnome["hp"], round(self.husk["hp"] * 1.30))
-        self.assertEqual(self.gnome["contact_damage"],
-                         round(self.husk["contact_damage"] * 1.35))
-        self.assertEqual(self.gnome["speed"], round(self.husk["speed"] * 0.80))
+    def test_it_is_a_tougher_harder_hitting_slower_husk(self):
+        """The shape of the gnome against the Husk, not its numbers
+        (TST-005.4): the data is tuned by hand, so only the relation is
+        pinned."""
+        self.assertGreater(self.gnome["hp"], self.husk["hp"])
+        self.assertGreater(self.gnome["contact_damage"], self.husk["contact_damage"])
+        self.assertLess(self.gnome["speed"], self.husk["speed"])
 
     def test_it_is_heavier_than_the_husk(self):
         self.assertGreater(self.gnome["weight"], self.husk["weight"])
@@ -199,14 +201,20 @@ class BeeSizeTests(unittest.TestCase):
         cls.bee = get_content().enemies["bumblebee"]
         cls.rig = get_content().sprites["bumblebee"]
 
-    def test_the_collider_grew_by_about_a_third(self):
-        self.assertEqual(self.bee["radius"], 9)             # was 7
+    def test_the_drawn_bee_covers_its_collider(self):
+        """The sprite is drawn at least as wide as the body it stands for,
+        whatever the two are tuned to (TST-005.4)."""
+        self.assertGreaterEqual(self.rig["scale"][0], 2 * self.bee["radius"])
 
-    def test_the_drawn_size_grew_with_it(self):
-        self.assertEqual(self.rig["scale"], [30, 46])       # was [23, 35]
+    def test_the_drawn_size_keeps_the_art_s_proportions(self):
+        """`scale` follows the sheet's `content` box, so resizing the bee
+        does not stretch it."""
+        _x, _y, cw, ch = self.rig["content"]
+        sw, sh = self.rig["scale"]
+        self.assertAlmostEqual(sw / sh, cw / ch, delta=0.05 * cw / ch)
 
     def test_the_bee_is_still_a_small_body(self):
-        """Radius 9 stays under the 16 px `large` clearance boundary, so
+        """The bee's radius stays under the small nav class's clearance, so
         placement and the nav classes are untouched."""
         from world.nav.field import _NAV_CLASSES
         small = min(float(c[3]) for c in _NAV_CLASSES)

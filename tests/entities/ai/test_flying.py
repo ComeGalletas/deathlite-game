@@ -15,6 +15,8 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from entities.ai import build_behavior
+from entities.ai.components import SeekTarget
+from entities.ai.steering import Steering
 from entities.boss import Boss
 from entities.enemy import Enemy
 from game.content import get_content
@@ -43,6 +45,24 @@ def _mite_cfg(flying=True) -> dict:
 
 def _mite(flying=True):
     return Enemy("bumblebee", _mite_cfg(flying), 0.0, 0.0)
+
+
+def _open_sea(gm) -> pygame.Vector2:
+    """A point of open sea: on no island and no bridge. The world's corner
+    first (it always has been, on every pinned seed), then along its edges --
+    so a generator change moves the probe rather than retiring the test."""
+    b = gm.layout.bounds
+    probes = [pygame.Vector2(b.left + 2, b.top + 2)]
+    for i in range(1, 64):
+        f = i / 64
+        probes += [pygame.Vector2(b.left + f * b.width, b.top + 2),
+                   pygame.Vector2(b.left + f * b.width, b.bottom - 3),
+                   pygame.Vector2(b.left + 2, b.top + f * b.height),
+                   pygame.Vector2(b.right - 3, b.top + f * b.height)]
+    for p in probes:
+        if gm.room_at(p) is None and not gm.is_walkable(p, 0.0):
+            return p
+    raise AssertionError("no open sea anywhere along the world's edge")
 
 
 class TagTests(unittest.TestCase):
@@ -152,11 +172,14 @@ class ColliderTests(unittest.TestCase):
     def test_resolve_movement_carries_the_flag_through_its_slides(self):
         """A step into a tree: refused for a walker (it slides or stays),
         taken whole for a flyer."""
-        tree = next(o for o in self.gm.obstacles
-                    if o.kind == "tree" and not self.gm.is_walkable(o.pos, 10.0))
+        # The first blocking tree with a clear spot 40 px to its west; most
+        # have one, so the search never goes far.
+        tree = next((o for o in self.gm.obstacles
+                     if o.kind == "tree" and not self.gm.is_walkable(o.pos, 10.0)
+                     and self.gm.is_walkable(pygame.Vector2(o.pos.x - 40, o.pos.y), 10.0)),
+                    None)
+        self.assertIsNotNone(tree, "no blocking tree with a clear approach")
         frm = pygame.Vector2(tree.pos.x - 40, tree.pos.y)
-        if not self.gm.is_walkable(frm, 10.0):
-            self.skipTest("no clear approach to that tree on this seed")
         walked = self.gm.resolve_movement(frm, pygame.Vector2(tree.pos), 10.0)
         flown = self.gm.resolve_movement(frm, pygame.Vector2(tree.pos), 10.0, flying=True)
         self.assertNotEqual(tuple(walked), tuple(tree.pos))
@@ -170,10 +193,25 @@ class SeekTests(unittest.TestCase):
         from types import SimpleNamespace
         player = pygame.Vector2(300, 0)
         field = pygame.Vector2(0, 1)                    # the field says "go south"
-        ctx = SimpleNamespace(player_pos=player, nav_dir=lambda p, r: pygame.Vector2(field))
+        ctx = SimpleNamespace(player_pos=player, dt=1 / 60,
+                              nav_dir=lambda p, r: pygame.Vector2(field))
         flyer, walker = _boss(), _boss(flying=False)
-        self.assertAlmostEqual(flyer._seek(ctx).x, 1.0, places=3)   # straight at the player
-        self.assertAlmostEqual(walker._seek(ctx).y, 1.0, places=3)  # follows the field
+
+        def heading(b, seek):
+            acc = Steering()
+            seek.tick(b, ctx, ctx, acc)
+            return acc.direction()
+
+        # ENT-015: the boss seeks through shared `SeekTarget`s -- the one it
+        # closes in with, and the drift of every phase of its cycle.
+        for b, want in ((flyer, (1.0, 0.0)), (walker, (0.0, 1.0))):
+            seeks = [b._closer] + [c for comps in b._behavior.states.values()
+                                   for c in comps if isinstance(c, SeekTarget)]
+            self.assertGreater(len(seeks), 1)
+            for seek in seeks:
+                d = heading(b, seek)
+                self.assertAlmostEqual(d.x, want[0], places=3)   # flyer: at the player
+                self.assertAlmostEqual(d.y, want[1], places=3)   # walker: the field
 
 
 class BroodTests(unittest.TestCase):
@@ -252,10 +290,7 @@ class FlyerBandTests(unittest.TestCase):
         self.assertGreater(walls, 5, "no cliff wall without a floor on this seed")
 
     def test_over_the_sea_both_bands_are_the_lowest(self):
-        b = self.gm.layout.bounds
-        p = pygame.Vector2(b.left + 2, b.top + 2)
-        if self.gm.room_at(p) is not None:
-            self.skipTest("no open sea at the world's corner on this seed")
+        p = _open_sea(self.gm)
         self.assertEqual(self.gm.renderer.level_at(p.x, p.y), 0)
         self.assertEqual(self.gm.renderer.top_level_at(p.x, p.y), 0)
 
@@ -268,10 +303,7 @@ class ShotsOverTheSeaTests(unittest.TestCase):
 
     def setUp(self):
         self.gm = W.game_map(SEED)
-        b = self.gm.layout.bounds
-        self.sea = pygame.Vector2(b.left + 2, b.top + 2)
-        if self.gm.room_at(self.sea) is not None:
-            self.skipTest("no open sea at the world's corner on this seed")
+        self.sea = _open_sea(self.gm)
 
     def _fx(self):
         from types import SimpleNamespace

@@ -1,8 +1,10 @@
-"""Six-weapon system P2: the weapon blessings that need code beyond a bonus
-field -- Executioner, Weak Point, Demolitionist (conditional damage in the
+"""The weapon blessings that need code beyond a bonus field -- Executioner, Weak Point, Demolitionist (conditional damage in the
 resolver), Split Arrow (children on hit), Bloodletting (heal on the killing
 weapon), Overcharge (every Nth attack), Chain / Seeking / Staggering /
-Bigger Explosion (bonus fields read by the fire path)."""
+Bigger Explosion (bonus fields read by the fire path).
+
+Six-weapon P2; `test_weapon_effects.py` until TST-004.5 regrouped the
+weapon modules by subject."""
 import math
 import os
 import unittest

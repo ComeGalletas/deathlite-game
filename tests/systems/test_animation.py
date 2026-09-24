@@ -1,4 +1,4 @@
-"""Asset Phase B: the frame-timed `Animator` (pure timing logic)."""
+"""The frame-timed `Animator` (pure timing logic)."""
 import unittest
 
 from systems.animation import Animator
