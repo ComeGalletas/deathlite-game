@@ -479,7 +479,7 @@ test. `run_digests.json` re-pinned for the new import graph (see *Open*).
 Found on the way and not part of this review's scope; each needs its own
 decision.
 
-- *(DOC-003: this item and the next are tracked as **SYS-008**, proposed.)*
+- *(DOC-003: this item and the next are tracked as **SYS-008**, proposed — `run_determinism_journal.md`.)*
 - **The run is not reproducible across processes.** Two independent
   causes, both in the spawn path: `spawn/watchdog.py::_stagger` seeds an
   enemy's first sample from `id(enemy)`, and something further down the

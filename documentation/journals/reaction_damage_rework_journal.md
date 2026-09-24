@@ -370,3 +370,60 @@ the R38 cascade. A cascade puts more reactions in a frame than M9 ever saw,
 each with its own flash, label and stream of numbers.
 
 - [x] CMB-007.3 — Record the owner's answers; one question left
+
+---
+
+## CMB-008 — Requirement (owner, 2026-09-22)
+
+- **Objective:** Measure whether the particle and damage-number pools hold
+  under a dense reaction cascade, and close design §13 question 12 with the
+  numbers.
+- **Details:** `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200
+  (`game/config.py`). The M9 stress pass predates the R38 cascade, which puts
+  more reactions per frame on screen, each with its own flash, label and
+  stream of numbers.
+- **Constraint:** Measure first. A cap or budget changes only if the
+  measurement says so, and that change is the owner's call.
+
+## CMB-008 — Confirmed reading
+
+- **Reactions are already rationed.** `global.max_reactions_per_frame` is 8
+  (`data/weapons/elements.json`); the rest wait a frame
+  (`combat/elements/resolve.py`, `stats.deferred_now` / `deferred_total`,
+  `pending`). A cascade shows up as a backlog, not as one unbounded frame.
+- **Particles degrade gracefully.** Elements draw from their own per-frame
+  and per-element allowance (`visual/elements/budget.py`); when it runs out
+  auras keep their rings and stop shedding, and `refused` is counted.
+- **Damage numbers do not.** The pool of 200 drops whatever asks next when
+  full, which can be a weapon's own number (`combat/elements/world.py:31`
+  says so, and is why elemental numbers stay 0.9 s). Nothing rations
+  elemental numbers against weapon numbers. This is the likely weak point.
+- `tools/benchmarks/spawn_stress.py --elements` (with `--element-rate`)
+  already primes every enemy and reports auras, reactions, deferred, held,
+  the particle budget and the damage-number peak against its cap. It does
+  not stage a cascade on purpose.
+- **CMB-008.D1 — What "holds" means.** Frame time within budget (p99 under
+  16.7 ms with `--render`); the deferred backlog drains rather than grows;
+  no weapon damage number dropped. All three reported, each against the M9
+  figures.
+
+## CMB-008 — Plan
+
+Add a cascade scenario to the stress tool, measure it and a real
+cascade-heavy build on the DPS bench, write the table here, and only then
+decide on a fix. The likely fix, if one is needed, is an elemental
+allowance for damage numbers modelled on the particle budget, with its
+limits in data. CMB-009.2's counters (Thunder jump nodes, active Wind areas)
+make the report fuller but are not a prerequisite.
+
+## CMB-008 — Tasks
+
+- [ ] CMB-008.1 — `spawn_stress --cascade`: a dense crowd primed with two elements so reactions chain; report frame p50/p99, reactions run/deferred per frame and the backlog trend, particles refused, damage-number peak and drops
+- [ ] CMB-008.2 — Measure a cascade-heavy build on the DPS bench for realistic load
+- [ ] CMB-008.3 — Record the table against M9 (elemental journal, M9 *What it costs*)
+- [ ] CMB-008.4 — Only if D1 fails: an elemental damage-number allowance, limits in data, with a test that a weapon's number survives a full pool
+- [ ] CMB-008.5 — Close design §13 question 12 with the result; index to done
+
+## CMB-008 — Results
+
+*(filled in as the tasks land)*

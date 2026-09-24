@@ -1,6 +1,6 @@
 # Documentation cleanup — journal
 
-**ID:** DOC-003 · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
+**ID:** DOC-003 (+ DOC-004) · **System:** process (+ CMB, WLD, SPN, ENT, TST, SYS) ·
 **Type:** process · **Status:** done ·
 **Branch:** claude/doc-003-doc-cleanup (worktree `.claude/worktrees/doc-003-doc-cleanup`)
 
@@ -108,3 +108,48 @@ entry records it done; the heading now says "DONE".
 journals' own status lines were left alone, except
 `worldgen_modularity_todo.md`, whose "not started" was plainly wrong, and
 `training_dummy_journal.md`'s "Todo — not started".
+
+---
+
+## DOC-004 — Requirement (owner, 2026-09-23)
+
+- **Objective:** Write the journals for the five proposed requirements
+  CMB-008, SYS-008, WLD-012, TST-003 and CMB-009.
+- **Details:** Each gets its requirement block, confirmed reading, plan and
+  task list as the standard lays them out, from the expansion given to the
+  owner on 2026-09-23. A follow-up to an existing feature goes into that
+  feature's journal; SYS-008 opens a new one.
+- **Constraint:** A new branch (`claude/doc-004-proposal-journals`, cut from
+  DOC-003's tip because the index rows for these IDs exist only there).
+  TST-003 is built first, on the same branch.
+
+## DOC-004 — Confirmed reading
+
+- **DOC-004.D1 — Where each journal lives.** TST-003 → `cut_script_skips_journal.md`
+  (TST-002 listed the tileset skips among its follow-up candidates); WLD-012 →
+  `bridge_clearance_journal.md` (found by WLD-011); CMB-008 →
+  `reaction_damage_rework_journal.md` (the design question CMB-007 left open);
+  CMB-009 → `elemental_system_journal.md` (its requirement and plan are already
+  there); SYS-008 → a new `run_determinism_journal.md`.
+- **DOC-004.D2 — Status.** All stay `proposed` except TST-003, which moves to
+  `in progress` when its first task starts.
+
+## DOC-004 — Tasks
+
+- [x] DOC-004.1 — Open this block; index row
+- [x] DOC-004.2 — TST-003 journal block
+- [x] DOC-004.3 — WLD-012 journal block
+- [x] DOC-004.4 — CMB-008 journal block
+- [x] DOC-004.5 — SYS-008 journal (new file)
+- [x] DOC-004.6 — CMB-009 confirmed reading and tasks
+- [x] DOC-004.7 — Results; index to done
+
+## DOC-004 — Results
+
+All five requirements have a journal with requirement, confirmed reading,
+plan and tasks; the index points at each directly (no "found in" left).
+Decisions the journals leave to the owner: WLD-012.D1 (clearance follows the
+data or a fixed number) and SYS-008's go-ahead for the open-ended
+SYS-008.4. TST-003 was built on this branch and is done (`925502c`,
+results in `cut_script_skips_journal.md`); the other four stay `proposed`.
+No tests run for the journals themselves.

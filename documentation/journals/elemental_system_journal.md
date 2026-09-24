@@ -2458,3 +2458,41 @@ a surprise.
 See `documentation/plans/elemental_extras_plan.md`: the glow first (the one
 player-facing item), then the counters (CMB-008's cascade measurement wants
 them), then the three dev tools. Tasks are numbered when it is taken up.
+
+## CMB-009 — Confirmed reading
+
+- **The building.** A buff building that rolled an element carries it on
+  `Interactable.element` (`entities/interactable.py`); the obstacle draws
+  the building, and `WorldRenderer.interactables` skips buff buildings
+  (`visual/rendering.py`), so nothing shows the element. The flat terrace
+  pass (`visual/scene.py` → `ren.interactables(surface, level)`) runs before
+  the actors, which puts a glow drawn there under the building art — the
+  standing order for element effects.
+- **The glow helper.** `visual/glow.py::GlowCache` pre-renders a soft disc
+  per `(diameter, alpha)`, any colour, and `pulse_alpha` gives an optional
+  breath; the element tint is `VisualSet.tint(element)`
+  (`visual/elements/profiles.py`).
+- **The counters.** F1 already shows auras, reactions per frame, held
+  reactions, particles and element fx (`devtools/dev_flags.py`); Thunder
+  jump nodes and active Wind areas are not counted anywhere.
+- **The dev tools.** The dev menu has Force aura and the infusion row;
+  hot-reload, a reaction log and spawn-a-building-with-an-element do not
+  exist.
+- **CMB-009.D1 — Glow strength is decided on a screenshot.** The first
+  build uses a low fixed alpha with a slow, narrow breath; the numbers live
+  in `data/world/buildings.json` and the owner tunes them from the
+  screenshot.
+- **CMB-009.D2 — The Monastery gets no glow.** It rolls no element; the
+  player picks one there.
+
+## CMB-009 — Tasks
+
+- [ ] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
+- [ ] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
+- [ ] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
+- [ ] CMB-009.4 — Reaction log overlay (plan §3)
+- [ ] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
+
+## CMB-009 — Results
+
+*(filled in as the tasks land)*
