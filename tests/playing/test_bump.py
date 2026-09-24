@@ -100,6 +100,52 @@ class BumpResolverTests(unittest.TestCase):
                                capped.enemies[0]._knock.length(), places=3)
 
 
+class PushRadiusTests(unittest.TestCase):
+    """ENT-016: enemies push each other at `CROWD_PUSH_RADIUS_FRAC` of their
+    colliders; the hero and the boss keep the full radii, and the ice
+    contact rule still sees a full-collider overlap."""
+
+    def setUp(self):
+        self._old = config.CROWD_PUSH_RADIUS_FRAC
+        config.CROWD_PUSH_RADIUS_FRAC = 0.8
+
+    def tearDown(self):
+        config.CROWD_PUSH_RADIUS_FRAC = self._old
+
+    def test_two_enemies_overlapping_less_than_the_fraction_do_not_push(self):
+        a, b = Body(0, 0, 14, 7), Body(0.9 * 28, 0, 14, 7)   # 90 % of 28 apart
+        _resolve(_ps([a, b]))
+        self.assertEqual(a._knock, pygame.Vector2())
+        self.assertEqual(b._knock, pygame.Vector2())
+
+    def test_inside_the_push_radius_they_push_by_that_radius(self):
+        a, b = Body(0, 0, 14, 7), Body(0.5 * 28, 0, 14, 7)
+        _resolve(_ps([a, b]))
+        pen = 0.8 * 28 - 0.5 * 28
+        want, _ = knock_split(7, 7, config.BUMP_GAIN * pen)
+        self.assertAlmostEqual(a._knock.length(), want, places=4)
+
+    def test_the_hero_still_bumps_at_its_full_collider(self):
+        e = Body(0, 0, 14, 7)
+        hero = Body(0.9 * 24, 0, 10, 40)                       # 90 % of 14 + 10
+        _resolve(_ps([e], player=hero))
+        self.assertGreater(hero._knock.length(), 0.0)
+
+    def test_the_boss_still_shoulders_through_at_its_full_collider(self):
+        e = Body(0, 0, 14, 7)
+        boss = Body(0.9 * 54, 0, 40, float("inf"))
+        _resolve(_ps([e], boss=boss))
+        self.assertGreater(e._knock.length(), 0.0)
+
+    def test_ice_contact_still_sees_a_full_collider_overlap(self):
+        a, b = Body(0, 0, 14, 7), Body(0.9 * 28, 0, 14, 7)
+        r = BumpResolver(_ps([a, b]))
+        seen = []
+        r._frozen_contact = lambda x, y: seen.append((x, y))
+        r.resolve()
+        self.assertEqual(len(seen), 1)
+
+
 class HeroShoveTests(unittest.TestCase):
     def _hero_bump(self, enemy_weight, enemy_radius):
         hero = Body(0, 0, config.PLAYER_RADIUS, config.PLAYER_WEIGHT)

@@ -880,6 +880,6 @@ This block follows the DOC-001 layout; the entries above predate it.
 ## ENT-016 — Tasks
 
 - [x] ENT-016.1 — This block
-- [ ] ENT-016.2 — `CROWD_PUSH_RADIUS_FRAC` in the bump pass
+- [x] ENT-016.2 — `CROWD_PUSH_RADIUS_FRAC` in the bump pass
 - [ ] ENT-016.3 — The bridge-crowd bench and its table
 - [ ] ENT-016.4 — The value; tests; results
