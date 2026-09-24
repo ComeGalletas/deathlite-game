@@ -64,8 +64,10 @@ class TableTests(unittest.TestCase):
     def test_three_rarities_weakest_first(self):
         self.assertEqual(ORDER, ["common", "uncommon", "rare"])
 
-    def test_the_heals_are_fifteen_twentyfive_and_fifty(self):
-        self.assertEqual([P.heal_amount(r, T) for r in ORDER], [15.0, 25.0, 50.0])
+    def test_the_heals_come_from_the_data_and_rise_with_rarity(self):
+        heals = [P.heal_amount(r, T) for r in ORDER]
+        self.assertEqual(heals, [float(T["potions"][r]["heal"]) for r in ORDER])
+        self.assertEqual(heals, sorted(set(heals)), "a rarer potion heals more")
 
     def test_each_rarity_maps_to_its_numbered_sprite(self):
         # "use the health potion numeric value name for the sprites rarity":
@@ -85,8 +87,11 @@ class TableTests(unittest.TestCase):
 
 
 class ChanceTests(unittest.TestCase):
-    def test_the_cap_is_twenty_five_percent(self):
-        self.assertAlmostEqual(CURVE["cap"], 0.25)
+    def test_the_cap_is_a_chance(self):
+        # 25 % at the time of writing; the number is tuning (`potions.json`
+        # says so), the rule is that it is a real chance below certainty.
+        self.assertGreater(CURVE["cap"], 0.0)
+        self.assertLess(CURVE["cap"], 1.0)
 
     def test_the_strongest_enemy_sits_at_the_cap(self):
         # The enemy and the cap are both derived: a rebalance that crowns a new

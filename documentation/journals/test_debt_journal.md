@@ -320,6 +320,21 @@ One subtask per group of modules:
   premise the two-slot test needs (a totem outlives one cooldown) is
   asserted. The totem's base count of one stays pinned — its docstring
   explains why one is the design. 66 passed.
+- **6.5** progression: Vitality I's +20 (the heal-by-the-gain test), Heavy
+  Blade's ×1.15, Executioner's 0.35 threshold, Sharpened Edge II's "+5",
+  Constitution's 0.02 per level, Cross Cut's +4°, the potion heals
+  15 / 25 / 50 and the 0.25 drop cap, the chests' 0.35 blessing chance and
+  65/35 weights, and Mending's +1 per level (four tests). Each now reads the
+  blessing's `value_at(level)`, the meta catalogue, `potions.json` or
+  `chests.json`; the relations are asserted where they were the point
+  (Heavy Blade slows, a rarer potion heals more, the cap is a real chance).
+  Three tests were renamed because their names carried the number
+  (`…_fifteen_twentyfive_and_fifty`, `…_twenty_five_percent`,
+  `…_six_hp_a_tick`). Kept as contracts: every blessing has five levels, an
+  offering has three choices, a common chest pays 10–25 gold ("the brief's
+  ten to twenty-five"), thirteen post-Forge blessings, the ×1.15-per-level
+  design rule in `test_six_blessings.py`, Fleet Foot stacking to five. 132
+  passed.
 
 ### TST-004.7 — coverage of the five modules
 
@@ -430,8 +445,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.6.1 — heroes: `test_characters.py` → `a193fa8`
   - [x] TST-004.6.2 — incoming damage: `test_incoming_damage.py` → `df97159`
   - [x] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py` → `6bfae37`
-  - [x] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py`
-  - [ ] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
+  - [x] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py` → `f1d62e4`
+  - [x] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
   - [ ] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py` → `72ce8a1`

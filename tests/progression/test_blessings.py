@@ -156,8 +156,9 @@ class ApplyTests(unittest.TestCase):
     def test_max_hp_blessing_heals_by_the_gain(self):
         p = hero("sword")
         p.hp = 50
-        apply_blessing(p, CAT.get("vitality"))
-        self.assertEqual(p.hp, 70)
+        b = CAT.get("vitality")
+        apply_blessing(p, b)
+        self.assertEqual(p.hp, 50 + b.effects[0].value_at(1))
 
     def test_pct_stat_blessing(self):
         p = hero("sword")
@@ -185,13 +186,17 @@ class ApplyTests(unittest.TestCase):
 
     def test_multi_effect_blessing_touches_every_field(self):
         p = hero("sword")
-        apply_blessing(p, CAT.get("sword_heavy_blade"))
+        b = CAT.get("sword_heavy_blade")
+        slow = next(e for e in b.effects if e.field == "cooldown_mult")
+        apply_blessing(p, b)
         w = weapon(p, "sword")
         self.assertGreater(w.bonus["damage"], 0)
         self.assertGreater(w.bonus["weight"], 0)
-        self.assertAlmostEqual(w.bonus["cooldown_mult"], 1.15)
-        apply_blessing(p, CAT.get("sword_heavy_blade"))
-        self.assertAlmostEqual(w.bonus["cooldown_mult"], 1.15, msg="a fixed tradeoff, not compounding")
+        self.assertAlmostEqual(w.bonus["cooldown_mult"], slow.value_at(1))
+        self.assertGreater(w.bonus["cooldown_mult"], 1.0, "the heavier blade swings slower")
+        apply_blessing(p, b)
+        self.assertAlmostEqual(w.bonus["cooldown_mult"], slow.value_at(2),
+                               msg="the table's total, not compounding")
 
     def test_weapon_effect_sets_a_total(self):
         p = hero("hammer")
@@ -199,7 +204,8 @@ class ApplyTests(unittest.TestCase):
         apply_blessing(p, b); apply_blessing(p, b)
         fx = weapon(p, "hammer").effects
         self.assertAlmostEqual(fx["executioner_mult"], b.effects[0].value_at(2))
-        self.assertAlmostEqual(fx["executioner_threshold"], 0.35)
+        threshold = next(e for e in b.effects if e.key == "executioner_threshold")
+        self.assertAlmostEqual(fx["executioner_threshold"], threshold.value_at(2))
 
     def test_a_weapon_blessing_needs_the_weapon(self):
         with self.assertRaises(ValueError):
@@ -288,7 +294,8 @@ class GatingTests(unittest.TestCase):
         self.assertEqual(u.rarity, "common")
         self.assertEqual(u.kind, "weapon")
         self.assertEqual(u.weapon, "sword")
-        self.assertIn("+5", u.description)          # level II of the x1.15 curve
+        level2 = CAT.get("sword_sharpened_edge").effects[0].value_at(2)
+        self.assertIn(f"+{level2:g}", u.description)        # level II of the table
         self.assertIn("Sword", u.tags)
 
 

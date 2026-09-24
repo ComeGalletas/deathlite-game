@@ -102,7 +102,9 @@ class PostForgeTests(unittest.TestCase):
         p = hero("daggers", levels=2)
         next(u for u in forge_offers(p, C) if u.id == "forge:twin_daggers").apply(p)
         apply_blessing(p, CAT.get("twin_daggers_cross_cut"))
-        self.assertEqual(p.weapons[0].bonus["twin_offset_deg"], 4)
+        cross_cut = CAT.get("twin_daggers_cross_cut").effects[0]
+        self.assertEqual(p.weapons[0].bonus["twin_offset_deg"], cross_cut.value_at(1))
+        self.assertGreater(cross_cut.value_at(1), 0)
 
     def test_catalog_rejects_a_post_forge_blessing_on_the_wrong_weapon(self):
         bad = {"x": {"name": "X", "kind": "weapon", "weapon": "bow", "category": "power",
