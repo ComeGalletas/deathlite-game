@@ -7,7 +7,6 @@ Regrouped by subject in TST-004.5: this module was `test_weapon_classes.py`
 (six-weapon P1) and took in the category checks from `test_weapons_reach.py`
 and the spread-data checks from `test_weapons.py`.
 """
-import math
 import unittest
 
 from combat.weapons import CATEGORIES, CLASSES, SPECIAL_EFFECTS, Weapon
@@ -195,13 +194,33 @@ class ProjectileSpreadDataTests(unittest.TestCase):
 
     def test_one_multishot_upgrade_does_not_crash_any_weapon(self):
         """The failure this guards is a KeyError deep in a firing path, so it is
-        worth exercising rather than only asserting the data."""
+        exercised rather than only asserted on the data: every weapon takes
+        one `projectiles` upgrade and fires through `Weapon.update` at a
+        target in reach. A projectile weapon then lays out one shot per count,
+        fanned `spread_deg` apart (read from the data) edge to edge."""
+        import pygame
+
+        from tests.combat.fakes import FakeTarget
+        from tests.combat.test_weapon_fire import make_context
+
+        fanned = 0
         for wid, cfg in get_content().weapons.items():
-            w = Weapon(wid, cfg)
-            w.bonus["projectile_count"] += 1
-            count = w._projectile_count()
-            if count > 1 and cfg.get("category") == "projectile":
-                math.radians(float(cfg["spread_deg"])) * (count - 1)
+            with self.subTest(weapon=wid):
+                w = Weapon(wid, cfg)
+                w.bonus["projectile_count"] += 1
+                count = w._projectile_count()
+                shots = []
+                w.update(0.016, make_context([FakeTarget(60, 0)], shots,
+                                             spawn_summon=lambda **kw: None))
+                if count > 1 and cfg.get("category") == "projectile":
+                    self.assertEqual(len(shots), count)
+                    first = pygame.Vector2(shots[0]["vel"])
+                    last = pygame.Vector2(shots[-1]["vel"])
+                    self.assertAlmostEqual(
+                        abs(first.angle_to(last)),
+                        float(cfg["spread_deg"]) * (count - 1), places=3)
+                    fanned += 1
+        self.assertGreater(fanned, 0, "no projectile weapon fanned its shots")
 
 
 if __name__ == "__main__":

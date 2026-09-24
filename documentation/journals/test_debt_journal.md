@@ -239,6 +239,14 @@ TST-004.6. One subtask each, in the review's order.
   refactor owns that file. The three chest modules that cite `(CB-9)` after
   their subject already read the way §6 asks. Collection unchanged (3,314
   tests + 8 sweep).
+- **5.7** `test_one_multishot_upgrade_does_not_crash_any_weapon` (now in
+  `test_weapon_roster.py`) computed `math.radians(spread) * (count - 1)` and
+  threw it away; the `KeyError` it guards was only reachable in the data
+  read. It now fires every weapon once through `Weapon.update` with one
+  `projectiles` upgrade, a target at 60 px and a no-op summon hook, and for
+  each projectile weapon asserts `count` shots fanned `spread_deg × (count −
+  1)` edge to edge, `spread_deg` read from the data (bow, rod: 10°; bomb:
+  16°). 23 passed, 9 subtests.
 
 ## TST-004 — Plan
 
@@ -270,8 +278,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py` → `6c627e9`
   - [x] TST-004.5.4 — §6: regroup the six weapon modules by subject → `df68421`
   - [x] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm` → `dbd372a`
-  - [x] TST-004.5.6 — §6: retitle the modules that open with a plan phase
-  - [ ] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
+  - [x] TST-004.5.6 — §6: retitle the modules that open with a plan phase → `13daf4f`
+  - [x] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
   - [ ] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
   - [ ] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
