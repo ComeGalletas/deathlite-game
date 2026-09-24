@@ -520,6 +520,16 @@ class Content:
         except KeyError as exc:
             raise ContentError(f"unknown boss id: {boss_id!r}") from exc
 
+    def widest_walker_radius(self) -> float:
+        """The largest collider radius among the enemies and bosses that walk
+        -- a `flying` tag ignores terrain, so it is left out. World generation
+        keeps every bridge deck this clear (WLD-012), so a wider walker added
+        to the data is covered without a code change."""
+        return max(float(spec["radius"])
+                   for table in (self.enemies, self.bosses)
+                   for spec in table.values()
+                   if "flying" not in spec.get("tags", ()))
+
     def character(self, char_id: str) -> dict:
         try:
             return self.characters[char_id]

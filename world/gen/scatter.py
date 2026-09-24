@@ -139,6 +139,30 @@ def _corridor_doorways(rooms, corridors) -> dict:
     return out
 
 
+def _deck_keepouts(corridors, clearance: float) -> list:
+    """A keep-clear band along every bridge deck: the deck's length, centred
+    on its centre line, `clearance` px either side of it (WLD-012).
+
+    The doorways only guard a bridge's two ends, which is enough while a deck
+    crosses open water. A deck that runs along a coast for part of its length
+    can have land beside its middle, and on seed 35 the scatter seated a rock
+    there that a radius-40 body could not pass. `_blocks` tests an obstacle's
+    circle against the band, so it turns away exactly the obstacles whose
+    edge would come within `clearance` of the centre line -- the condition
+    for a body that wide to touch them while crossing. `clearance` is the
+    widest walker's radius (`Content.widest_walker_radius`)."""
+    out = []
+    for c in corridors:
+        r = c.rect
+        if c.axis == "h":
+            out.append(pygame.Rect(r.left, round(r.centery - clearance),
+                                   r.width, round(2 * clearance)))
+        else:
+            out.append(pygame.Rect(round(r.centerx - clearance), r.top,
+                                   round(2 * clearance), r.height))
+    return out
+
+
 # The fallback mix for a terrace whose biome declares no `scatter` block.
 _DEFAULT_KINDS = ("tree", "rock", "pillar")
 _DEFAULT_WEIGHTS = (4, 3, 2)
@@ -238,6 +262,10 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
     # No obstacle on a flight or its landings: a flight is the only way
     # between two terraces, so one rock there seals a plateau off.
     all_doors.extend(_flight_keepouts(rooms))
+    # Nor beside a deck, where a wide walker would brush it (WLD-012).
+    from game.content import get_content
+    all_doors.extend(_deck_keepouts(corridors,
+                                    get_content().widest_walker_radius()))
     pad = _keep_clear_pad()
     out = []
 
@@ -248,7 +276,6 @@ def _scatter_obstacles(rooms, corridors, rng, start_id, boss_id,
         # The buff buildings (journal: buff_buildings_journal.md), on the
         # same footing as the houses: seated before the trees so the small
         # obstacles below space off them too.
-        from game.content import get_content
         _scatter_buildings(rooms, all_doors, rng, boss_id, out, reach,
                            get_content().buildings, blocks=_blocks,
                            doors_near=_doors_near, uphill_ok=_uphill_ok,
