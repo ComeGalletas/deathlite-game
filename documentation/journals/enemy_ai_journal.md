@@ -680,3 +680,97 @@ view; out of sight for 20 s the boss fires nothing, summons nothing, keeps
 player and animates `walk`; back in range a held radial telegraph resumes
 from its held value and animates `attack`; a committed charge is not
 interrupted. The existing boss, flying and smoke suites are unchanged.
+
+---
+
+**ID:** ENT-015 · **System:** entities · **Type:** refactor · **Status:** in progress ·
+**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+
+This block follows the DOC-001 layout; the entries above predate it.
+
+## ENT-015 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Move the boss onto the shared AI components, so its attack
+  patterns are building blocks the game can reuse.
+- **Details:** The last bespoke AI, parked since R6. The owner asked for the
+  boss patterns in the DOC-006 review, "those will work for the game".
+- **Constraint:** A refactor. Both bosses fight exactly as they do now: the
+  same cycle, timings, speeds, shots and summons, and the same out-of-sight
+  closing with its held clock.
+
+## ENT-015 — Confirmed reading
+
+- `entities/boss.py` runs its own four-phase loop: `intro` (1.4 s) →
+  `telegraph` → `active` → `recover` → the next pattern. The clock counts
+  down in `phase_t`.
+  - While telegraphing and recovering it drifts toward the player at
+    0.25 / 0.5 × `speed` (0.3 in the intro), by its own `_seek`: the flow
+    field, straight when there is no route, and straight always for a
+    flyer.
+  - Out of `vision_range` it only closes in, at `closing_speed_mult`, and the
+    pattern clock holds. A committed charge runs out first.
+  - Chill slows it, except during a charge's dash.
+  - `_fire_pattern` fires on `telegraph → active`: a bullet ring
+    (`radial_barrage`), a locked dash direction (`charge`), a summon
+    (`summon_brood`) or a melee ring (`sweep`). An unknown id falls through
+    silently.
+  - A boss with no patterns just seeks.
+- The shared AI (`entities/ai/`) already has what those phases do:
+  - The state machine, with per-actor state on a `Blackboard`.
+  - `SeekTarget(via="nav"|"straight", weight)`: a lone weight under 1 moves
+    at that fraction of `speed`, which is exactly the boss's drift.
+  - `Charge`: a dash along `bb.slot(ATTACK_SLOT)["dir"]`, with contact damage.
+  - `Combat.fire_projectile` / `summon` / `melee_hit`.
+- Tests and the renderer read `phase`, `pattern`, `phase_t` (the time left),
+  `phase_len`, `telegraph_fraction` and `closing`. One test writes `phase`
+  and `pattern`. `test_boss_pig_rider.py` calls `_fire_pattern` directly, to
+  prove every pattern id in the data does something.
+- **ENT-015.D1 — A pattern registry**, `entities/ai/patterns.py`:
+  - `@boss_pattern("charge", requires=(...))` registers a pattern's `fire`
+    (the one-shot on `telegraph → active`) and an optional `active` (per
+    frame during the dangerous window).
+  - The four patterns are the first entries. `charge`'s `active` is the
+    shared `Charge` component.
+  - A new boss is a pattern list in `bosses.json`; a new kind of attack is
+    one registered function.
+- **ENT-015.D2 — `behaviors/boss.py`** registers `boss_patterns`: the four
+  phases as machine states. The drift is `SeekTarget(weight=0.3 / 0.25 /
+  0.5, slew=0)`, straight for a flyer. The transitions read the current
+  pattern's own `telegraph` / `duration` / `recover`. A boss with no patterns
+  gets a one-state seek.
+- **ENT-015.D3 — `Boss` keeps what is not AI:**
+  - Stats, damage, the animator and facing.
+  - The closing gate: out of sight, the machine is not ticked, so its clock
+    holds as before, and a `SeekTarget` closes in.
+  - The chill rule.
+  - `phase` / `pattern` / `phase_t` / `phase_len` become views onto the
+    machine and the blackboard.
+- **ENT-015.D4 — Invalid pattern data fails soft, when the boss is built.** A
+  pattern with an unknown id, or missing a key its registration requires, is
+  dropped from the cycle with a log line. A boss is never refused. This
+  follows the standing spawn-data rule. The shipped data is pinned by a test.
+- **ENT-015.D5 — `bosses.json` names the behaviour and the intro.**
+  `"behavior": "boss_patterns"` and `"intro": 1.4` on both bosses. These were
+  code values; the data-driven rule moves them to data.
+
+## ENT-015 — Plan
+
+- `entities/ai/patterns.py`, `entities/ai/behaviors/boss.py`, and `Boss`
+  slimmed to use them. `bosses.json`: `behavior`, `intro`.
+- **Parity:** the committed `Boss` and the new one, loaded side by side, are
+  driven by the same scripted context: the player circling, walking out of
+  sight and back, and a chill. Every frame, position, velocity, phase,
+  pattern and every shot / summon / melee call must match, for both bosses,
+  flying and walking.
+- **Tests:** `test_boss.py` and `test_boss_pig_rider.py` move from
+  `_fire_pattern` / `_charge_dir` to the registry. A new test covers the
+  registry, invalid data being dropped, and every shipped pattern being
+  registered and complete.
+
+## ENT-015 — Tasks
+
+- [x] ENT-015.1 — This block
+- [ ] ENT-015.2 — The pattern registry and the four patterns
+- [ ] ENT-015.3 — `boss_patterns` behaviour; `Boss` on it; `bosses.json`
+- [ ] ENT-015.4 — Parity A/B against the old `Boss`; tests
+- [ ] ENT-015.5 — Results; index
