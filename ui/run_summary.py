@@ -10,7 +10,7 @@ Columns, left to right, each under a Tiny Swords ribbon (blue / yellow / red,
 dark text on the light art per the owner's rule for text on the sheets):
 
 * **Run** -- survived (or cleared in, on a win), level, kills, the gold
-  *earned*, potions, then the items acquired. Rows that set a new record
+  *earned*, potions, chests opened, elements, then the items acquired. Rows that set a new record
   for the difficulty carry a `best` marker beside the label.
 * **Enemies slain** -- kills per enemy type (biggest first, the boss as its
   own row, a total that is the sum of the rows).
@@ -247,6 +247,9 @@ class RunSummaryPanel:
         # CB-8: potions picked up, with the HP they actually restored.
         y = self._kv(surface, area, y, "Potions",
                      f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
+        # UI-012: chests opened (CB-9 counts them); they paid out the gold and
+        # the potions above. A summary written before the count reads 0.
+        y = self._kv(surface, area, y, "Chests", s.get("chests", 0))
         # The elements this run obtained (design §7.3). Tracked for the
         # summary only -- no gameplay system reads the set. A run with
         # no infusion says so rather than showing a blank.
@@ -259,11 +262,19 @@ class RunSummaryPanel:
         if not items:
             self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
             return
-        for item in items[:MAX_ITEMS]:
+        # As many as the column still holds, capped at MAX_ITEMS; when some
+        # are left over, one row goes to the "+N more" line instead. UI-012's
+        # Chests row made the 10th item's "more" line cross the frame.
+        step = S(ROW_STEP)
+        room = max(0, (area.bottom - step // 2 - y) // step + 1)
+        shown = min(MAX_ITEMS, room)
+        if len(items) > shown:
+            shown = max(0, shown - (1 if shown == room else 0))
+        for item in items[:shown]:
             name, rarity = _item_name(item)
             y = self._line(surface, area, y, name,
                            colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT))
-        self._more(surface, area, y, len(items) - MAX_ITEMS, "items")
+        self._more(surface, area, y, len(items) - shown, "items")
 
     # --- optional column: the hero the run was played with -------
     def _draw_hero(self, surface, assets, rect) -> None:

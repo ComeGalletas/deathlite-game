@@ -1622,7 +1622,7 @@ suite read it.
 
 ### Follow-ups (not blocking)
 
-*(DOC-005, 2026-09-24: the gold sink is **pending** as PRG-003 (owner: none is integrated yet). Chests opened are counted (`stats["chests"]`) but not shown on the run summary — **pending**. The unused chest skins wait on a legendary tier or a boss reward — **pending**)*
+*(DOC-005, 2026-09-24: the gold sink is **pending** as PRG-003 (owner: none is integrated yet). Chests opened are counted (`stats["chests"]`) and now shown on the run summary — **done** as UI-012 (at the end of this journal). The unused chest skins wait on a legendary tier or a boss reward — **pending**)*
 
 - **The gold sink** is the known gap, deliberately left alone at the owner's
   instruction. When gold consumption becomes its own feature, ~490 gold a
@@ -2003,6 +2003,13 @@ See the combined results below.
 - **UI-012.D1 — Its own row, "Chests", after "Potions".** Chests pay out
   the gold and the potions shown just above it. A missing key reads 0, the
   same way `potions` does.
+- **UI-012.D2 — The items list gives way to the rows above it** (found on
+  the screenshot). One more row pushed a full list's "+N more items" line
+  (10 items shown, 11 or more acquired) across the column's frame. The list
+  now shows as many items as the column still holds, capped at
+  `MAX_ITEMS` 10, and gives up one of them to the "more" line when items are
+  left over. At 1600 × 900 that is 9 items plus "+5 more" for 14 acquired.
+  10 or fewer still show in full.
 
 ## UI-012 — Plan
 
@@ -2012,8 +2019,22 @@ screenshot of the summary.
 
 ## UI-012 — Tasks
 
-- [ ] UI-012.1 — The Chests row, its test, a screenshot, and this block
+- [x] UI-012.1 — The Chests row, its test, a screenshot, and this block
 
 ## ENT-014 / UI-012 — Results
 
-Filled in when both land.
+- **ENT-014.1** (`d459ba1`): the skull rig's `attack` runs at 10 fps, so it
+  plays for 0.70 s of the 0.725 s swing. New test
+  `test_the_husk_attack_animation_covers_its_swing` (it fails at 14 fps).
+  `tests/entities/ai/test_melee_enemies.py` and `tests/systems/test_assets.py`:
+  **33 passed, 30 subtests**.
+- **UI-012.1:** a "Chests" row after "Potions" in the Run column
+  (`ui/run_summary.py`), and the items list fitted to the column
+  (UI-012.D2). `tests/screens/test_victory.py::ChestTests` has 3 tests: the
+  count, an older summary reading 0, and a 14-item list staying inside the
+  frame. `tests/screens`, `tests/flows/test_hero_unlock.py` and
+  `tests/render/test_damage_numbers.py`: **573 passed, 51 subtests,
+  0 skipped**.
+- **Screenshot:** the victory summary with 6 chests, then again with
+  14 items acquired, showing 9 of them plus "+5 more items" inside the
+  frame.
