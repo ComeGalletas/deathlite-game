@@ -35,6 +35,14 @@ class _FakeSound:
         self.channel.level = v
 
 
+# SDL's dummy audio driver (set above, and by every test module) opens a
+# device that plays nothing, so the desktop mixer always comes up under the
+# suite. A manager that is not `enabled` here is a broken bring-up, not an
+# environment to skip in (TST-004.3.8).
+_NO_MIXER = ("the mixer did not come up under SDL_AUDIODRIVER="
+             f"{os.environ.get('SDL_AUDIODRIVER')!r}; the dummy driver provides one")
+
+
 class AudioManagerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -56,8 +64,7 @@ class AudioManagerTests(unittest.TestCase):
 
     def test_library_has_every_cue_when_enabled(self):
         mgr = AudioManager(EventBus())
-        if not mgr.enabled:
-            self.skipTest("mixer unavailable in this environment")
+        self.assertTrue(mgr.enabled, _NO_MIXER)
         for cue in ("shoot", "hit", "enemy_death", "xp", "level_up",
                     "player_hurt", "boss_spawn", "boss_death"):
             self.assertIn(cue, mgr._sounds)
@@ -65,8 +72,7 @@ class AudioManagerTests(unittest.TestCase):
     def test_subscribes_to_event_bus(self):
         bus = EventBus()
         mgr = AudioManager(bus)
-        if not mgr.enabled:
-            self.skipTest("mixer unavailable in this environment")
+        self.assertTrue(mgr.enabled, _NO_MIXER)
         # publishing known events must not raise
         bus.publish(Events.ENEMY_KILLED, pos=None, color=(0, 0, 0), xp=1, tags=())
         bus.publish(Events.BOSS_SPAWNED, name="x")

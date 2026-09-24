@@ -97,6 +97,16 @@ hits are prose). One subtask per module, the mixer pair together.
   (`visual/rendering.py:818`) reads only the shot's position and radius, so
   the shot is now aged by hand (life spent, `age` and position advanced)
   and the test asserts it is still live before comparing surfaces.
+- **3.8** The four mixer skips fired when `AudioManager.enabled` was false.
+  Both modules set `SDL_AUDIODRIVER=dummy` (setdefault) before pygame, and
+  under the dummy driver `DesktopMixer.prepare` opens a 44100 Hz stereo
+  device that plays nothing — checked: `enabled` is true with the variable
+  exported and with it unset. So the mixer is always there under the suite,
+  and the skips are assertions whose message names the driver in use. The
+  `test_sound_effects.py` docstring claimed the mixing path was skipped
+  under the dummy driver; it was rewritten. Only a machine that exports a
+  *real* driver with no device behind it would fail these — that is a
+  broken audio bring-up the test should report.
 
 ## TST-004 — Plan
 
@@ -117,8 +127,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed) → `0ce324e`
   - [x] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed) → `87086ac`
   - [x] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed) → `fe87682`
-  - [x] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
-  - [ ] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)
+  - [x] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed) → `7c1922a`
+  - [x] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)
   - [ ] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)
   - [ ] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
 - [ ] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
