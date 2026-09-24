@@ -275,7 +275,7 @@ renderer, ledger and meter resolving from `visual/`, `core/` and `devtools/`.
 ---
 
 **ID:** SYS-009 · **System:** core systems (+ RND, ENT) · **Type:** refactor ·
-**Status:** in progress · **Branch:** claude/doc-006-ui-013-dps-table (the
+**Status:** done · **Branch:** claude/doc-006-ui-013-dps-table (the
 current worktree, owner 2026-09-24)
 
 This block follows the DOC-001 layout; the entries above predate it.
@@ -332,5 +332,43 @@ This block follows the DOC-001 layout; the entries above predate it.
 - [x] SYS-009.2 — `MELEE_REACT_SCALE` to `game/config.py`
 - [x] SYS-009.3 — `TimedVisual` for `_death_fx` and `_explosions`; their tests
 - [x] SYS-009.4 — `rig_frame` / `blit_rig` for the four sprite paths
-- [ ] SYS-009.5 — Results; the follow-up notes; index to done
+- [x] SYS-009.5 — Results; the follow-up notes; index to done
 - [x] SYS-009.6 — Found by the SYS-009.4 A/B run: `scene.actor_items` still read a poof as a list (`run.death_fx`, the alias the first search missed); fixed, with a test that draws a whole frame with a live poof
+
+## SYS-009 — Results
+
+- **SYS-009.2** (`f62bee0`): `config.MELEE_REACT_SCALE` (1.25). The melee
+  defaults are unchanged at 0.1875 s / 0.4375 s. `tests/entities/ai`:
+  237 passed.
+- **SYS-009.3** (`05231c6`): `core/timed_visual.py`.
+  - The four `_explosions` producers and `spawn_death_fx` build
+    `TimedVisual`s, and the two update sweeps step them with `update` and
+    drop them on `finished`.
+  - The renderer reads fields by name. The ring's `t / dur` is `progress`.
+  - `test_bomb.py` and `test_enemy_sprite.py` read fields by name, and the
+    new `test_timed_visual.py` has 3 tests.
+  - `tests/playing`, `render`, `combat`, `entities`: **1640 passed**.
+- **SYS-009.6** (`dff728f`) — **a miss in .3, caught before it shipped.** The
+  depth sort (`scene.actor_items`) reaches the poofs through `run.death_fx`,
+  the alias without the underscore, which the first search did not match.
+  Any frame drawn with a live poof raised. None of the suite's tests draws a
+  frame while a poof is alive, so all 1640 passed with it broken. The .4
+  A/B run found it on its first frame after a kill. It is fixed, and a new
+  test draws a whole frame with a live poof (it fails on the old read).
+- **SYS-009.4** (`3b8ba80`): `WorldRenderer.rig_frame` / `blit_rig`.
+  - `enemy_sprite`, `boss`, `player` / `hero_sprite_frame` and `death_fx`
+    use them and keep only their own extras.
+  - `hints.py`'s calls (`hero_sprite_frame`, `_hero_flip`, `anchor_for`)
+    are unchanged.
+- **A/B, same process:** the committed renderer and the new one painted the
+  same live seeded scene for 240 frames:
+  - 4 enemies, including hurt and element-washed ones.
+  - A death poof.
+  - The boss, with facing flips and a hurt flash.
+  - The hero, both facings and hurt.
+  **No pixel differs** on any path. A cross-process hash could not be used:
+  the scene is not frame-deterministic between processes (the same code
+  gave two different hashes).
+- `tests/render` + `tests/playing` + the hero-select preview: **747 passed**
+  after .4.
+
