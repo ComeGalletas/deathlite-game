@@ -13,10 +13,8 @@ appends/rebuilds `_explosions` / `_death_fx` / `hazards`, sweeps the pools.
 
 Part of the split tracked in `journals/playing_state_refactor.md` (P5).
 
-Deferred: folding `_death_fx` (a positional `[anim, pos, facing, scale, radius]`
-list) and `_explosions` (a `{pos, radius, t, dur}` dict) into a `TimedVisual`
-dataclass -- `test_enemy_sprite` asserts the list layout, so that is a separate
-change once the logic is isolated here.
+`_death_fx` and `_explosions` hold `TimedVisual` entries
+(`core/timed_visual.py`, SYS-009); they were a positional list and a dict.
 """
 from __future__ import annotations
 
@@ -30,6 +28,7 @@ from entities.melee_hitbox import MeleeHitbox
 from game.events import Events
 from game.assets import get_assets
 from systems.animation import Animator
+from game.states.playing.core.timed_visual import TimedVisual
 from game import config
 
 _HERO_HAZARD_COLOUR = (255, 150, 60)   # P3: the Meteor Hammer's crater
@@ -368,7 +367,7 @@ class TransientFx:
                 else self._BURST_RIG)
 
     def burst_visual(self, pos, radius: float, rig: str | None = None,
-                     infusion=None) -> dict:
+                     infusion=None) -> TimedVisual:
         """An `_explosions` entry that plays `rig`'s one-shot `burst` scaled
         to the blast diameter, and lives exactly as long as the strip.
         Without the rig it is the plain expanding ring the other explosions
@@ -382,12 +381,11 @@ class TransientFx:
         assets = get_assets()
         n = assets.frame_count(rig, "burst")
         if n <= 0:
-            return {"pos": pos, "radius": radius, "t": 0.0, "dur": 0.35,
-                    "infusion": infusion}
-        return {"pos": pos, "radius": radius, "t": 0.0,
-                "dur": n / assets.fps(rig, "burst"),
-                "infusion": infusion,
-                "anim": Animator(assets, rig, start="burst")}
+            return TimedVisual(pygame.Vector2(pos), radius=radius, dur=0.35,
+                               infusion=infusion)
+        return TimedVisual(pygame.Vector2(pos), radius=radius,
+                           dur=n / assets.fps(rig, "burst"), infusion=infusion,
+                           anim=Animator(assets, rig, start="burst"))
 
     _BOMB_RIG = "bomb"
 
@@ -511,8 +509,7 @@ class TransientFx:
         exploder leaves when it dies, and off for the Bloat's thrown bomb."""
         ps = self.ps
         run = getattr(self, "run", ps)
-        run._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
-                               "t": 0.0, "dur": 0.35})
+        run._explosions.append(TimedVisual(pygame.Vector2(pos), radius=radius, dur=0.35))
         run.particles.burst(pos, (255, 160, 80), count=22, speed=260, life=0.5)
         if shake:
             run.shake.add(0.4)
@@ -536,8 +533,7 @@ class TransientFx:
         the DPS meter files the damage under "other"."""
         ps = self.ps
         run = getattr(self, "run", ps)
-        run._explosions.append({"pos": pygame.Vector2(pos), "radius": radius,
-                               "t": 0.0, "dur": 0.3})
+        run._explosions.append(TimedVisual(pygame.Vector2(pos), radius=radius, dur=0.3))
         ps.particles.burst(pos, (255, 150, 70), count=14, speed=200, life=0.4)
         for enemy in ps.grid.query_circle(pos.x, pos.y, radius):
             if enemy.alive and (enemy.pos - pos).length() <= radius + enemy.radius:
@@ -550,25 +546,22 @@ class TransientFx:
         ps = self.ps
         run = getattr(self, "run", ps)
         for ex in run._explosions:
-            ex["t"] += dt
-            if "anim" in ex:
-                ex["anim"].update(dt)
-        ps._explosions = [e for e in ps._explosions if e["t"] < e["dur"]]
+            ex.update(dt)
+        ps._explosions = [e for e in ps._explosions if not e.finished]
 
     # --- shared death poof --------------------------------
     def spawn_death_fx(self, pos, facing: int = 1, scale: float = 1.0,
                        radius: float = float(config.PLAYER_RADIUS)) -> None:
-        self.run._death_fx.append(
-            [Animator(self.ps.game.assets, "dead", start="loop"),
-             pygame.Vector2(pos), 1 if facing >= 0 else -1, float(scale),
-             float(radius)])
+        self.run._death_fx.append(TimedVisual(
+            pygame.Vector2(pos), anim=Animator(self.ps.game.assets, "dead", start="loop"),
+            facing=1 if facing >= 0 else -1, scale=float(scale), radius=float(radius)))
 
     def update_death_fx(self, dt: float) -> None:
         ps = self.ps
         run = getattr(self, "run", ps)
         for fx in run._death_fx:
-            fx[0].update(dt)
-        run._death_fx = [fx for fx in run._death_fx if not fx[0].finished]
+            fx.update(dt)
+        run._death_fx = [fx for fx in run._death_fx if not fx.finished]
 
     # --- enemy spawn burst -----------------------------------
     def spawn_spawn_fx(self, body) -> None:

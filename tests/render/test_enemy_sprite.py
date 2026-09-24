@@ -143,9 +143,9 @@ class DeathPoofTests(unittest.TestCase):
             self.assertNotIn(e, p.enemies)
             self.assertEqual(p.stats["kills"], kills0 + 1)
             self.assertEqual(len(p._death_fx), 1)
-            self.assertEqual(p._death_fx[0][0].rig, "dead")
-            self.assertAlmostEqual(p._death_fx[0][1].x, e.pos.x)
-            self.assertAlmostEqual(p._death_fx[0][3], 0.55)   # enemy poof at 55%
+            self.assertEqual(p._death_fx[0].anim.rig, "dead")
+            self.assertAlmostEqual(p._death_fx[0].pos.x, e.pos.x)
+            self.assertAlmostEqual(p._death_fx[0].scale, 0.55)   # enemy poof at 55%
         pygame.quit()
 
     def test_poof_clears_when_the_one_shot_finishes(self):
@@ -162,8 +162,8 @@ class DeathPoofTests(unittest.TestCase):
         p.player.alive = False
         p.update(1 / 60)
         self.assertGreaterEqual(len(p._death_fx), 1)
-        self.assertEqual(p._death_fx[-1][3], 1.0)          # hero poof at full size
-        self.assertEqual(p._death_fx[-1][4], p.player.radius)   # carries the radius
+        self.assertEqual(p._death_fx[-1].scale, 1.0)          # hero poof at full size
+        self.assertEqual(p._death_fx[-1].radius, p.player.radius)   # carries the radius
         # The run is ending under the end banner (journal: end_banner_journal.md)
         # rather than cut to the summary: the poof gets its time.
         from game.states.end_banner_state import EndBannerState
@@ -174,7 +174,7 @@ class DeathPoofTests(unittest.TestCase):
     def test_enemy_poof_carries_the_enemy_radius(self):
         g, p = self._playing()
         e = self._kill_one(p, "turtle")
-        self.assertEqual(p._death_fx[-1][4], e.radius)
+        self.assertEqual(p._death_fx[-1].radius, e.radius)
         pygame.quit()
 
 

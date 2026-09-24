@@ -488,17 +488,14 @@ class WorldRenderer:
         run = getattr(self, "run", ps)
         z = run.camera.zoom
         for ex in run._explosions:
-            if self._off_band(level, ex["pos"]):
+            if self._off_band(level, ex.pos):
                 continue
-            sx, sy = ps.camera.world_to_screen(ex["pos"])
-            anim = ex.get("anim")
-            if anim is not None and self._blit_burst(surface, anim, sx, sy,
-                                                     ex["radius"] * z,
-                                                     ex.get("infusion")):
+            sx, sy = ps.camera.world_to_screen(ex.pos)
+            if ex.anim is not None and self._blit_burst(surface, ex.anim, sx, sy,
+                                                        ex.radius * z, ex.infusion):
                 continue
-            frac = ex["t"] / ex["dur"]
             pygame.draw.circle(surface, (255, 180, 90),
-                               (int(sx), int(sy)), int(ex["radius"] * frac * z), 3)
+                               (int(sx), int(sy)), int(ex.radius * ex.progress * z), 3)
 
     def _blit_burst(self, surface, anim, sx, sy, radius_px: float,
                     infusion=None) -> bool:
@@ -604,7 +601,7 @@ class WorldRenderer:
     def death_fx(self, surface, fx) -> None:
         ps = self.ps
         run = getattr(self, "run", ps)
-        anim, pos, facing, scale, radius = fx
+        anim, pos, facing, scale, radius = fx.anim, fx.pos, fx.facing, fx.scale, fx.radius
         z = run.camera.zoom
         scale *= z
         assets = ps.game.assets
