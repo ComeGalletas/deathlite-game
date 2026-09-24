@@ -454,6 +454,17 @@ class ThunderTests(unittest.TestCase):
         r.apply(enemies[0], THUNDER, weapon_id="rod", hit_damage=100.0, now=0.0)
         self.assertEqual(len(world.arcs), 2)
 
+    def test_the_jump_nodes_are_counted_per_frame_and_in_total(self):
+        """CMB-009.2 (design §9.8): the enemies a chain jumped to, the struck
+        one not counted, reset each frame and kept in a running total."""
+        r, world, _t, enemies = self.chain(jumps=1, per_jump=3)
+        r.apply(enemies[0], THUNDER, weapon_id="rod", hit_damage=100.0, now=0.0)
+        self.assertEqual(r.stats.jump_nodes_this_frame, 3)
+        self.assertEqual(r.stats.jump_nodes_total, 3)
+        r.begin_frame(0.1)
+        self.assertEqual(r.stats.jump_nodes_this_frame, 0)
+        self.assertEqual(r.stats.jump_nodes_total, 3)
+
     def test_the_chain_flag_is_what_stops_a_node_branching_again(self):
         r, _w, _t, enemies = self.chain(jumps=1, per_jump=1, count=3)
         thunder = r.registry.element(THUNDER)

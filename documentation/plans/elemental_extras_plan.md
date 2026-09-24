@@ -1,10 +1,10 @@
 # Elemental extras — plan
 
-**Serves:** CMB-009 (proposed) · **Journal:** `journals/elemental_system_journal.md`
+**Serves:** CMB-009 (done 2026-09-23 — see the journal block for what was built) · **Journal:** `journals/elemental_system_journal.md`
 (the CMB-009 block) · **Design:** `plans/ELEMENTAL_SYSTEM_DESIGN.md` §8.2, §9.8, §10.3
 
 What the elemental system still lacks after CMB-005/006/007, collected on
-2026-09-22 (DOC-003). Nothing here is built. Every item is a dev tool
+2026-09-22 (DOC-003) and built as CMB-009 on 2026-09-23. Every item is a dev tool
 except the building glow, which is the one the player sees.
 
 ---

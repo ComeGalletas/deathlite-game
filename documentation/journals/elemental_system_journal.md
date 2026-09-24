@@ -2487,12 +2487,164 @@ them), then the three dev tools. Tasks are numbered when it is taken up.
 
 ## CMB-009 — Tasks
 
-- [ ] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
-- [ ] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
-- [ ] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
-- [ ] CMB-009.4 — Reaction log overlay (plan §3)
-- [ ] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
+- [x] CMB-009.1 — The element glow behind elemental buff buildings (plan §1), with tests and a screenshot of all four elements
+- [x] CMB-009.2 — Thunder jump nodes per frame and active Wind areas in the F1 metrics (plan §2)
+- [x] CMB-009.3 — Hot-reload of the element data under a dev key, keeping the old values if validation fails (plan §3)
+- [x] CMB-009.4 — Reaction log overlay (plan §3)
+- [x] CMB-009.5 — Dev-menu row: spawn a buff building beside the hero with a chosen element (plan §3)
 
 ## CMB-009 — Results
 
-*(filled in as the tasks land)*
+**Branch:** `claude/cmb-009-elemental-extras`, cut from
+`claude/doc-004-proposal-journals` (which carries this block), owner's
+instruction to continue on a new branch as before (2026-09-23).
+
+### CMB-009.1 — The glow
+
+- `visual/elements/building_glow.py::BuildingGlow` over `GlowCache`, owned
+  by `ElementVisuals` (`None` when `buildings.json` has no `elements` block,
+  since then no building is ever elemental). `WorldRenderer.interactables`
+  draws it where it used to skip a buff building outright, so it paints in
+  the flat terrace pass, under the building art.
+- `data/world/buildings.json` → `elements.glow`: `scale` 3.4 (diameter over
+  the building's interaction diameter), `alpha_min` 90, `alpha_max` 130,
+  `period` 3.0 s, `steps` 6. `_check_building_glow` (`game/content.py`)
+  requires every field, orders the alphas inside 0–255 and refuses a
+  non-positive scale.
+- **Tuning from the screenshot (D1).** The first values, alpha 40–64 at
+  scale 3.0, were close to invisible: only the ice glow read, over grass.
+  90–130 at 3.4 reads as a soft wash round the foot of each building and is
+  still faint; Thunder's purple is the weakest of the four over olive
+  ground. These stay the owner's to tune.
+- `tests/render/test_building_glow.py`: 11 tests, 8 subtests — the glow
+  takes the element's tint, stays at or under `alpha_max`, reaches past the
+  building, is absent on a plain or used building, breathes inside its two
+  alphas, and the data check refuses a missing block, a missing field and
+  bad alphas.
+- **Screenshot:** seed 35, one building per element — fire (vampire),
+  ice (magnet) and wind (pinball) as rolled; thunder assigned to a plain
+  magnet because no building rolled it on that seed, labelled as such.
+- **Tests:** `tests/render` + `tests/playing` + `tests/systems` +
+  `tests/combat` — 1448 passed, 461 subtests, 0 skipped (6 min 1 s).
+
+### CMB-009.2 — The counters
+
+- `ResolverStats.jump_nodes_this_frame` / `jump_nodes_total`
+  (`combat/elements/resolve.py`), bumped by `Thunder.spread` with the
+  number of enemies the chain reached (the struck one not counted) and
+  reset in `begin_frame` with the reaction counter.
+- F1 metrics (`devtools/dev_flags.py`): "thunder jumps" (per frame and
+  total) and "wind areas" (live against `max_active_wind_areas`, 6).
+  Read back from a live seed-7 run: `0/frame 0 total` and `0/6`.
+- `tests/combat/test_elements_base.py::ThunderTests::test_the_jump_nodes_are_counted_per_frame_and_in_total`.
+- **Tests:** `tests/combat` + `tests/flows` + `tests/devtools` — 748
+  passed, 132 subtests, 0 skipped (5 min 2 s).
+
+### CMB-009.3 — Hot-reload of the element data
+
+- **F9**, developer runs only like F7/F8 (`config.DEBUG_KEYS
+  ["reload_elements"]`, SDL keycode 1073741890, unused before). Routed as
+  the other keys are: `Game._handle_debug_key` → `PlayingState` →
+  `DevFlags.handle_debug_key`, which shows the result as a run notice
+  (2.5 s, or 6 s for a failure so the reason can be read).
+- `devtools/element_reload.py::reload_element_data(run)`: re-reads
+  `weapons/elements.json` and `weapons/reactions.json` through the content
+  loader, validates them with the boot's own checks, and builds a **fresh
+  `ElementRegistry`** from them before touching anything — so a file that
+  validates but cannot bake fails there too. Only then does the run's
+  registry `adopt` it (`combat/elements/registry.py`), and `run.content`
+  takes the new dicts.
+- **CMB-009.D3 — What a reload keeps.** `adopt` swaps the data (global
+  block, element and reaction bases, reaction table) and drops the baked
+  caches; it keeps the element objects and the modifier layers, so a buff
+  or blessing the run holds applies on top of the new numbers. Not reached:
+  a Wind area already on the field keeps its seeded config until it ends,
+  and `element_visuals.json` (presentation, not tuning) is not reloaded.
+- Docs: the F-key table in `FUNCTIONAL_README.md`, the F1–F9 range in
+  `README.md` and the keycode comment in `game/config.py`.
+- `tests/devtools/test_element_reload.py`: 8 tests — a changed value
+  reaches the live registry and `run.content`; the run's modifiers survive
+  and stack on the new data; bad data and an unreadable file keep the old
+  values; F9 has its own key, reloads and says so in a developer run, and
+  does nothing in a normal one.
+- **Tests:** `tests/devtools` + `tests/combat` + `tests/flows` — 756 passed,
+  132 subtests, 0 skipped (5 min 8 s).
+
+### CMB-009.4 — The reaction log
+
+- `combat/elements/reaction_log.py`: `ReactionLog`, a fixed ring of
+  `LoggedReaction(serial, time, reaction, aura, trigger, damage, depth,
+  deferred)`, newest first. Kept in every run (`build_resolver` sets
+  `resolver.log`), one append per reaction, so turning the overlay on shows
+  what already happened. `config.REACTION_LOG_CAPACITY` 64,
+  `REACTION_LOG_LINES` 14 shown.
+- The resolver feeds it from `_run_reaction`, the one place a reaction
+  runs — at once or a frame late:
+  - **damage** is what the reaction dealt through its own context:
+    `HitContext.deal` now keeps a running `dealt`, read before and after the
+    runner. What a cascade it set off deals is logged on that reaction's
+    own line, not added to this one.
+  - **depth** (CMB-009.D5) is how many reactions were running when this
+    one was triggered — 0 for a weapon's hit, 1 for one set off inside
+    another's run (a tornado or Superconduct laying an aura). A held
+    reaction carries its depth in `PendingReaction.depth`.
+  - **deferred** marks a reaction the per-frame budget held over.
+  - Time is run seconds, not a frame number: the resolver has no frame
+    counter, and the serial already orders them.
+- Overlay: the dev menu's new **"Reaction log"** row (after "Aura
+  inspector") toggles `DevFlags.show_reaction_log`; `overlays.
+  reaction_log_overlay` draws the newest 14 in a panel down the right
+  edge, clear of the HUD. The first draft coloured each line by its aura
+  element; Thunder's purple was unreadable on the dark panel, so the text
+  is now light with two swatches in front — aura, then trigger.
+- `tests/combat/test_reaction_log.py`: 10 tests — pair, damage, serial and
+  time logged; a reaction set off inside another is depth 1 and finishes
+  first; a reaction's damage excludes its cascade's; a budget-held
+  reaction is logged when it runs, flagged; the ring keeps its capacity;
+  `clear` empties it; no log records nothing; the overlay's lines flag a
+  cascade and a hold; the dev-menu row exists; nothing draws outside a
+  developer run.
+- **Screenshot:** a seed-7 developer run with six real reactions driven
+  through the run's resolver, the panel over the terrain.
+- **Tests:** `tests/combat` + `tests/devtools` + `tests/flows` +
+  `tests/screens` + `tests/render` + `tests/playing` — 2024 passed, 487
+  subtests, 0 skipped (13 min 22 s), then the log, dev-mode and screens
+  tests again against the final overlay — 631 passed, 22 subtests.
+
+### CMB-009.5 — Spawn an elemental building
+
+- Dev menu: **"Spawn elemental building..."** (after "Infuse weapons...")
+  opens an ELEMENTAL BUILDING page of the four elements; ENTER seats one
+  beside the hero and the status line says which.
+- `devtools/element_building.py::spawn_elemental_building(ps, element)`
+  builds it the way the world does: `world.gen.buildings._seat` for the
+  compound (the primary carries the art, the satellites only collide),
+  `GameMap.obstacles`' setter so the obstacle index is rebuilt,
+  `reskin_obstacle` with the kind's first rig at the bake's size, and an
+  `Interactable` carrying the element on the run's list — so using it runs
+  the ordinary buff, then the infusion picker for its element.
+- The kind takes the buff kinds in turn (`DevFlags.building_turn`), so
+  every building can be tried; the spot is the first on rings of 3, 4.5, 6
+  and 8 tiles round the hero where every circle of the compound is on
+  walkable ground and clear of every obstacle.
+- **CMB-009.D4 — What it does not do.** The navigation field is baked at
+  run start and is not rebuilt, so enemies do not route round a spawned
+  building; they collide with it and slide, as round any obstacle the
+  field did not know. The spot search takes any walkable ground, so a
+  building can land on another terrace than the hero's. Both are
+  acceptable for a dev tool; a run that needs a real one takes a seed.
+- `tests/devtools/test_element_building.py` (integration tier, listed in
+  `conftest.INTEGRATION`, pinned seed): 7 tests — seated as a compound
+  with its art and in the rebuilt index; placed where the spot search said
+  and near the hero; carries the chosen element; the kinds come in turn;
+  using it runs the buff and opens the element's weapon picker; no room
+  says so and adds nothing; the dev-menu page exists.
+- **Screenshot:** a seed-7 developer run with one building of each
+  element seated by the tool, each with its CMB-009.1 glow.
+- **Tests:** `tests/devtools` + `tests/screens` + `test_dev_mode` +
+  `test_interactables` + `test_infusion_sources` — 718 passed, 28
+  subtests, 0 skipped (6 min 13 s).
+
+**CMB-009 closed** (2026-09-23): all five tasks landed, each in its own
+commit. The design document's three open boxes it answered (§8.2's
+building visual, §9.8's counters, §10.3's extras) are ticked there.

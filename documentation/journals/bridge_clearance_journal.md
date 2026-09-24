@@ -82,7 +82,7 @@ change correctly.
 
 ### Still open: a prop can shut a bridge
 
-*(DOC-003: tracked as **WLD-012**, proposed.)*
+*(DOC-003: tracked as **WLD-012** — done 2026-09-23: it was a scatter rock beside the middle of a coastal deck, not a mouth; see WLD-012 below.)*
 
 One bridge on seed 35 stays closed to a radius-40 body, and it is **not**
 geometry. A prop sits 19 px past the planks with a 19.5 px radius, so a
@@ -146,12 +146,72 @@ moves them.
 
 ## WLD-012 — Tasks
 
-- [ ] WLD-012.1 — Identify the placement stage and the check that let the seed-35 prop through
-- [ ] WLD-012.2 — Keep props a widest-walker radius clear of every bridge mouth (D1)
-- [ ] WLD-012.3 — Replace the pinning test with "every bridge on the pinned seeds crosses at the widest walker's radius"; drop the `propped` filter
-- [ ] WLD-012.4 — Re-pin the world digests; record how many props moved, as a rate over the seeds
-- [ ] WLD-012.5 — Screenshot of the seed-35 bridge before and after
+- [x] WLD-012.1 — Identify the placement stage and the check that let the seed-35 prop through — see *WLD-012.1 — Finding* below
+- [x] WLD-012.2 — Keep props a widest-walker radius clear of every bridge ~~mouth~~ deck, its whole length (D1, D2)
+- [x] WLD-012.3 — Replace the pinning test with "every bridge on the pinned seeds crosses at the widest walker's radius"; drop the `propped` filter — landed in the WLD-012.2 commit: a generator change and the tests it invalidates have to land together for that commit to be green
+- [x] WLD-012.4 — Re-pin the world digests; record how many props moved, as a rate over the seeds — landed in the WLD-012.2 commit, same reason
+- [x] WLD-012.5 — Screenshot of the seed-35 bridge before and after
+
+### WLD-012.1 — Finding (2026-09-23)
+
+**Branch:** `claude/wld-012-bridge-deck-clearance`, cut from
+`claude/doc-004-proposal-journals` (which carries this journal).
+
+It is not a mouth. Driving a radius-40 body over every deck and listing
+what it touches (a probe over the crossing test's `decks` / `walk`):
+
+| seed | bridge | deck | blocker | where | walk |
+|---|---|---|---|---|---|
+| 35 | 2 (horizontal) | x 10624–11072, y 3904–3968 | `rock`, radius 19.5, biome `meadow` | x 10840 — the **middle** of the deck — 19 px below its edge, on land the deck runs beside | stalls at 41 % |
+
+- It comes from the ordinary obstacle scatter (`_scatter_room` →
+  `_spot_ok`, `world/gen/scatter.py`). `_spot_ok` keeps an obstacle's
+  circle out of the mouth rectangles (`_corridor_doorways`), the flight
+  keep-outs and the clear discs — nothing keeps it off the **long side** of
+  a deck, because a deck normally crosses water. This one runs along a
+  coast for part of its length, and the scatter seated a rock beside it.
+- **Rate:** 1 blocked deck out of 36 on the three pinned seeds; none on
+  fourteen more seeds probed (1–6, 8–13, 21, 41). No fish hut, house,
+  building or village prop blocks a deck on any of them.
+- **WLD-012.D2 — A band along the deck, not a wider mouth.** Every
+  bridge gets a keep-out rectangle centred on its centre line, the deck's
+  length, with a half-width of the widest walker's radius (D1). `_blocks`
+  already tests an obstacle's *circle* against a rect, so it rejects
+  exactly the obstacles whose surface would come within that radius of the
+  centre line — which is the condition for a body of that radius to touch
+  them while crossing. The band joins the scatter's `all_doors` (houses,
+  buff buildings, the island scatter and the tree top-up read that list)
+  and the village pass's per-island doors.
 
 ## WLD-012 — Results
 
-*(filled in as the tasks land)*
+**Built.**
+- `Content.widest_walker_radius()` (`game/content.py`): the largest
+  `radius` over enemies and bosses without a `flying` tag — 40 today, the
+  Tusked Lance (D1).
+- `scatter._deck_keepouts(corridors, clearance)`: one band per bridge, the
+  deck's length, `clearance` either side of its centre line (D2). It joins
+  the scatter's `all_doors` and, filtered by `_doors_near`, the village
+  pass's per-island doors.
+- `tests/world/test_bridge_crossing.py`: the pinning test is replaced by
+  `test_no_obstacle_reaches_the_widest_walker_on_any_deck` and
+  `test_the_widest_walker_crosses_every_bridge` (radius from the data); the
+  `propped` filter is gone from the boss and small-body crossing tests.
+
+**Rate** (bands stubbed out vs in, same process, 12 seeds — 35, 7, 42,
+1234, 1–6, 8, 9): **1 obstacle in a band over 128 decks**, the seed-35
+rock. The layouts still move on most seeds, by up to 3 obstacles of
+~470–710: a placement try that now lands in a band is turned away and
+retried, which shifts the scatter's draws after it. That is the whole
+digest change — layout on 35, 7, 42 and 1234, bake on 35, 42 and 1234 —
+re-pinned with `python -m tools.verification.world_digest --write`.
+
+**Screenshot:** seed 35, bridge 2, before and after, the band and a
+radius-40 body drawn over it — the boulder under the middle of the deck is
+gone; the rest of that island's scatter reshuffled as the rate predicts.
+
+**Tests** (the whole default suite, in two runs):
+`tests/world` + `tests/entities` + `tests/spawn` + `tests/playing` —
+**1160 passed, 539 subtests, 0 skipped** (7 min 35 s); everything else —
+**2093 passed, 486 subtests, 0 skipped** (8 min 48 s). 3253 in all, one more
+than the 3252 before: the pinning test became two guarantees.
