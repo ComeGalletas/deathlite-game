@@ -514,3 +514,67 @@ TST-005, WLD-013, RND-006 (`claude/ent-017-behavior-templates`):
   extra wolf sprites, so the plan's call for wolf-specific ignore rules goes,
   and the journal's old paths are updated (RND-006).
 
+
+---
+
+**IDs:** TST-005, WLD-013 · **Systems:** tests, world · **Types:** refactor ·
+**Status:** in progress · **Branch:** claude/ent-017-behavior-templates (the
+current worktree, cut from `main` after #34 and #35 — owner, 2026-09-24)
+
+## TST-005 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Settle the test items TST-004 left open.
+- **Details:**
+  - numpy is allowed for tests only.
+  - The world tier gets the recommended speed-up: the chest determinism
+    tests share a build, and the buff-building count moves to `sweep`.
+  - `test_gnome_split.py` no longer depends on fixed values.
+  - `test_buffs.py` keeps its fixed values.
+- **Constraint:** The game stays numpy-free. No test is weakened, only
+  re-tiered or re-expressed.
+
+## TST-005 — Confirmed reading
+
+- **numpy** is imported by three `tools/asset_pipeline/` scripts only.
+  `.venv` and the PyInstaller spec keep it out of both builds, and
+  `dist/README.md` says the suite runs on the system Python.
+- **The world tier**, by `--durations`:
+  - 594 tests, 4 min 32 s.
+  - `test_repair.py::BuffBuildingCountTests::test_almost_every_island_reaches_the_minimum`:
+    29.5 s.
+  - `test_chests.py::PurityTests`: three tests at about 5.3 s each, each
+    building its own worlds.
+- **`test_gnome_split.py` pins four fixed values:**
+  - the bee's radius 9 (it was 7);
+  - its rig scale [30, 46];
+  - the gnome's HP at `round(husk × 1.30)`;
+  - its speed at `round(husk × 0.80)`.
+- **TST-005.D1 — The gnome-split tests assert relations and read the data:**
+  - the bee's radius is the data's, and larger than its old 7;
+  - the rig scale is the data's and keeps its aspect;
+  - the gnome is tougher and slower than the Husk.
+
+## TST-005 — Tasks
+
+- [x] TST-005.1 — numpy in `CLAUDE.md`'s test rules, tests and asset scripts only
+- [ ] TST-005.2 — `PurityTests` share one world build
+- [ ] TST-005.3 — `BuffBuildingCountTests` into `sweep`; re-time the world tier
+- [ ] TST-005.4 — `test_gnome_split.py` without fixed values
+
+## WLD-013 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Remove the unused island-graph helpers.
+- **Details:** `_adjacency`, `_rooted_tree` and `_grow_subtree` in
+  `world/gen/graph.py` (TST-004.D6).
+- **Constraint:** Generation does not change; the pinned world digests
+  still match.
+
+## WLD-013 — Confirmed reading
+
+The three served `_assign_floors`, which raised plateaus room by room in the
+retired flat-verticality generator. The world refactor (`d084480`) removed
+`_assign_floors` and left them with no caller, so they are LD-8 leftovers.
+
+## WLD-013 — Tasks
+
+- [ ] WLD-013.1 — Delete them; the world tests and digests
