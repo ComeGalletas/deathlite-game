@@ -196,6 +196,8 @@ the master).
 
 ## Open questions to settle before S4
 
+*(DOC-005, 2026-09-24: all three **settled**: residents scale their count by difficulty only and their makeup by the run's step (`spawn/master.py`); a summoner's brood counts against `live_cap` (`owner="summon"`); and the locality **grace 6 s / dwell 1 s stay, by the owner's decision** — deliberately constant so the difficulties stay apart)*
+
 - Should residents scale with difficulty only, or also with the run
   fraction at first visit? (Design assumes both.)
 - Grace window and dwell time: 6 s and 1 s are guesses; playtest.

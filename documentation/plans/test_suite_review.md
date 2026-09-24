@@ -106,7 +106,13 @@ for the pygbag web build, but it is a real (small) first-frame cost and the
 choice is yours. Warming just the 16 foam frames would be nearly free and covers
 the most common case, since water is on screen continuously.
 
+*(DOC-005, 2026-09-24: **decided by the owner — warm every frame that can be
+warmed.** Taken up as **RND-005**, `journals/frame_warmup_journal.md`, the
+session's next goal.)*
+
 ### Still open, smaller
+
+*(DOC-005, 2026-09-24: still **pending** — `tests/world/test_digest.py` still hashes `W.baked(seed)` where the writer uses `world_digests`.)*
 
 - [ ] `test_the_bake_is_pinned` and `test_the_frame_is_pinned` hash
       `W.baked(seed)` — the *shared cached* world from `tests/worlds.py`, baked
@@ -211,17 +217,17 @@ At 91.3 % the gaps are narrow and specific. In priority order:
       booted one (the states it hands off to do their work in `enter`, which a
       recording state machine never calls). Includes the death-at-zero-seconds
       case, where the per-minute and dps rates divide by the survival time.
-- [ ] **`game/states/meta_state.py` — 22.5 % (86 missed).** Meta-progression
-      screen. The same fake-game approach should reach most of it.
+- [x] **`game/states/meta_state.py` — 22.5 % (86 missed).** Meta-progression
+      screen. The same fake-game approach should reach most of it. *(DOC-005: 89.0 % in the 2026-09-22 coverage run — the Sanctuary mouse tests and the screen tests reach it)*
 - [x] **`game/states/victory_state.py` — 31.4 %.** Win path. *(DOC-003: `tests/screens/test_victory.py` (42 tests) landed 2026-09-12; coverage not re-measured)*
 - [ ] **`world/gen/village_tidy.py` — 67.8 %** and **`game/states/playing/slam_fx.py`
       — 70.8 %.** Both new in the current working tree; worth topping up before
-      the rework lands rather than after.
+      the rework lands rather than after. *(DOC-005, 2026-09-22 run: `slam_fx` is at 98.5 % — done; `village_tidy` rose to 79.9 % and is the half still open)*
 - [ ] **`world/gen/graph.py` — 61 %**, **`world/gen/validate.py` — 75 %**,
       **`world/gen/height/graph.py` — 80.8 %.** Generation-stage validation is
-      exactly the code a pinned-digest suite cannot check.
+      exactly the code a pinned-digest suite cannot check. *(DOC-005, 2026-09-22 run: `world/gen/graph.py` 59.7 %, `validate.py` 75.0 % — no better; still open)*
 - [ ] **`systems/mixer_backend.py` — 45.5 %** and **`systems/debug_overlay.py` —
-      52.8 %.** Lower value; the mixer is partly environment-gated by design.
+      52.8 %.** Lower value; the mixer is partly environment-gated by design. *(DOC-005, 2026-09-22 run: `mixer_backend` 65.5 %, `debug_overlay` 52.8 %; still open, still lower value)*
 
 ### Exclude the tooling from the number — DONE
 

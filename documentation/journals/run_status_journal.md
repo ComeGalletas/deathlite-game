@@ -265,6 +265,8 @@ art: corner alpha 0 on both, ribbon pixel (179, 166, 69) → (95, 88, 37).
 
 ### Deferred
 
+*(DOC-005, 2026-09-24: the next-level and ladder detail is **obsolete** — the owner chose current-level text only. The "TAB build" hint is **answered by the owner**: it stays on the pause screen only, not the HUD)*
+
 - **Next-level and ladder detail** for a blessing: the owner chose the
   current level only. `BlessingDef.describe(level + 1)` and the effects'
   `levels` lists are there if that changes.

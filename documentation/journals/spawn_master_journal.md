@@ -641,6 +641,9 @@ and lands byte-identical results (pinned). `NavField.begin` / `step` /
 record the target cell at `begin` so the drift trigger does not restart
 the fill every frame. `NavCoordinator` starts fills where it used to
 rebuild and advances them `config.ENEMY_NAV_FILL_BUDGET` (3 ms) a frame.
+*(SYS-008, 2026-09-23: the budget is now 1600 relaxations a frame, not 3 ms
+of wall clock -- the clock made a run depend on the machine's speed; see
+`run_determinism_journal.md`.)*
 
 ### Measured
 

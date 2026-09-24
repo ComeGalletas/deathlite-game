@@ -52,6 +52,8 @@ chaser-collider (seat compensation) precedents:
 
 ## Open decision: the placement drift
 
+*(DOC-005, 2026-09-24: **decided** — the owner chose option A (accept the reshuffle) on 2026-09-16, below)*
+
 Measured by rebuilding the four pinned seeds with the new radius:
 
 | | props/world | rocks/world | rock nn floor | rock nn median |

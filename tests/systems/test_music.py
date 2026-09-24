@@ -1,5 +1,5 @@
 """The streamed music player and the `State.music` wiring
-(`documentation/journals/music_journal.md`, 2026-09-16).
+(`documentation/journals/music_tracks_journal.md`, 2026-09-16).
 
 These run under the SDL dummy audio driver, where `MusicPlayer.enabled` is
 normally False. That is deliberate: the first thing worth proving is that

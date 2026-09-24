@@ -301,6 +301,8 @@ New modules: `game/assets.py` (loader + cache), `systems/animation.py`
 (`Animator`), `data/sprites.json` (metadata). Test count 181 → **215**.
 
 ### Follow-ups (not blocking)
+
+*(DOC-005, 2026-09-24: all **done or obsolete**: `CREDITS.md` has no placeholders left; every rig carries its own anchor and scale; the Soul Scythe disc became a translucent sector with a sprite; every enemy has its own rig (no tinted Orc stand-in), 26 in `enemy_sprites.json`)*
 - Fill in `assets/CREDITS.md` and confirm the pack's licence before distributing.
 - Anchor / scale for both rigs are a first eyeball tune — pure `sprites.json`.
 - Soul Scythe cone draws as an opaque disc for 0.14 s (pre-existing) — redo as a

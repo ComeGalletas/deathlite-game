@@ -1805,6 +1805,8 @@ is explored — small grass/prop surfaces). **Suite 391 → 397** (+6, all in
 
 ### Follow-ups still open (from the plan's considerations)
 
+*(DOC-005, 2026-09-24: the `smoothscale` softening is **obsolete** — terrain scales nearest-neighbour and tiles round to whole pixels (`world/terrain/render.py`, `config.effective_zoom`). A pixel-perfect camera snapped to the zoom grid and a live zoom slider in the dev menu are still **pending**, both optional)*
+
 - Terrain is `smoothscale`d from the 1:1 bake, so marginally softer than the
   pixel-sharp sprites. Fully crisp needs re-baking tiles at `TILE_PX * zoom`
   (touches autotile-edge / water-scroll / anchor maths). Only worth it if it

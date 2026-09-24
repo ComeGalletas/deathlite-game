@@ -496,14 +496,21 @@ ENEMY_PATHFINDING: bool = True
 # Seconds between full field rebuilds toward the player (also rebuilt early once
 # the player drifts a couple of navigation cells from the last rebuild target).
 ENEMY_NAV_REBUILD_INTERVAL: float = 0.4
-# How much of a frame a flow-field fill may take before it yields and picks
-# up next frame (seconds). A fill used to run whole -- 15-19 ms for the
-# small class on the LD-10 worlds, three times a second while the hero
-# walks, the single biggest frame-time spike in the game. Sliced, the
-# previous field keeps steering until the new one lands a few frames
-# later; the two-cell drift trigger already tolerates that lag. `None`
-# runs a fill whole in one frame.
-ENEMY_NAV_FILL_BUDGET: float | None = 0.003
+# How much of a flow-field fill runs a frame before it yields and picks up
+# next frame, in **relaxations** (cells settled). A fill used to run whole
+# -- 15-19 ms for the small class on the LD-10 worlds, three times a second
+# while the hero walks, the single biggest frame-time spike in the game.
+# Sliced, the previous field keeps steering until the new one lands a few
+# frames later; the two-cell drift trigger already tolerates that lag.
+# `None` runs a fill whole in one frame.
+#
+# SYS-008: this was 3 ms of wall clock, which made the frame a new field
+# landed on -- and every enemy's path after it -- depend on the machine's
+# speed that frame, so one seed played two different runs under load. A
+# whole fill measures ~530-670 relaxations per ms here (seeds 35, 7, 123,
+# 2026-09-23), so 1600 buys what the 3 ms did on this machine, and the
+# same amount of work on every machine.
+ENEMY_NAV_FILL_BUDGET: int | None = 1600
 
 # --- Colours (RGB) ---------------------------------------------------------
 COLOR_BG = (16, 16, 22)
@@ -742,7 +749,7 @@ GROWL_ROOM_GAIN: float = 0.45
 GROWL_ROOM_MIN_GAP_MS: int = 6000
 
 # --- Music ---------------------------------------------------------------
-# The streamed background tracks (journal `music_journal.md`, 2026-09-16),
+# The streamed background tracks (journal `music_tracks_journal.md`, 2026-09-16),
 # keyed by the id a `State.music` declares. Paths are relative to
 # `assets.ASSETS_DIR`, the same convention as MENU_BACKGROUND_IMAGE, so a
 # third track is a one-line change here plus the state that asks for it.

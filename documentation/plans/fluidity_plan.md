@@ -98,7 +98,7 @@ the jump path fires several times a second.
 
 Three options, in the order to try them.
 
-**3a. Time-slice the fill -- done (2026-09-03), see the spawn master journal.** Give `FlowField` a `step(budget_ms)` that
+**3a. Time-slice the fill -- done (2026-09-03), see the spawn master journal; the slice became a relaxation count, not milliseconds, in SYS-008 (2026-09-23).** Give `FlowField` a `step(budget_ms)` that
 resumes the bucket loop where it stopped, and double-buffer the cost
 array so the *old* field keeps steering until the new one completes.
 `NavCoordinator` starts a fill and advances it ~3 ms a frame; a 17 ms

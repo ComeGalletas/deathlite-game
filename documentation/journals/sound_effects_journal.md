@@ -12,7 +12,7 @@
   freesound.org.
 
 Delivered into `assets/sound_effects/`. Companion to
-`music_journal.md` — that entry covers the two streamed Pixabay tracks; this
+`music_tracks_journal.md` — that entry covers the two streamed Pixabay tracks; this
 one covers the recorded cues, which are a different mechanism (short
 `pygame.mixer.Sound` buffers on the cue channels, not a stream).
 
@@ -177,6 +177,8 @@ A `_Footsteps` helper in `systems/audio.py`; the run calls
   to 0.160 s at 400 and 0.850 s at 60.
 
 ## Open
+
+*(DOC-005, 2026-09-24: **closed by the owner** — the sounds are fine for now; what they need later is more of them and a tweak of the set as a whole, not these two items)*
 
 - The growl is one recording used for two different moments. If it starts to
   read as repetitive, the Freesound pack it came from has more takes and

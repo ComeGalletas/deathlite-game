@@ -15,8 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-010 · ENT-013 · SPN-004 · WLD-013 · RND-005 · UI-012 ·
-PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
+**Next free:** CMB-010 · ENT-013 · SPN-004 · WLD-013 · RND-006 · UI-012 ·
+PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 
 ## Requirements
 
@@ -62,6 +62,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
 | RND-004 | Native-resolution rendering | RND | feature | legacy | [native_resolution_journal.md](native_resolution_journal.md) | — | 2026-09-16 |
+| RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | proposed (next) | [frame_warmup_journal.md](frame_warmup_journal.md) | — | 2026-09-24 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
@@ -75,7 +76,8 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
 | UI-011 | Enemy health bar | UI, ENT | feature | legacy | [enemy_health_bar_journal.md](enemy_health_bar_journal.md) | — | 2026-09-22 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
-| AUD-001 | Music | AUD | feature | legacy | [music_journal.md](music_journal.md) | — | 2026-09-15 |
+| PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
+| AUD-001 | Music | AUD | feature | legacy | [music_journal.md](music_journal.md), [music_tracks_journal.md](music_tracks_journal.md) (split by DOC-005) | — | 2026-09-15 |
 | AUD-002 | Audio mixer (SFX level) | AUD, UI | feature | legacy | [audio_mixer_journal.md](audio_mixer_journal.md) | — | 2026-09-16 |
 | AUD-003 | Sound effects | AUD | feature | legacy | [sound_effects_journal.md](sound_effects_journal.md) | — | 2026-09-16 |
 | SYS-001 | Bug journal (cross-system log) | all | bug | legacy | [bug_journal.md](bug_journal.md) | — | 2026-08-27 |
@@ -85,7 +87,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
 | SYS-005 | PlayingState refactor | SYS | refactor | legacy | [playing_state_refactor.md](playing_state_refactor.md) | — | 2026-08-29 |
 | SYS-006 | Data layout | SYS | refactor | legacy | [data_layout_journal.md](data_layout_journal.md) | — | 2026-09-12 |
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
-| SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | proposed | [run_determinism_journal.md](run_determinism_journal.md) | — | 2026-09-22 |
+| SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | claude/sys-008-run-determinism | 2026-09-22 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
@@ -95,6 +97,7 @@ PRG-003 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-005
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
 | DOC-004 | Journals for the five proposed requirements (CMB-008, CMB-009, SYS-008, WLD-012, TST-003) | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-004-proposal-journals | 2026-09-23 |
+| DOC-005 | Second documentation review: the narrative open sections, and the owner's answers | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
 
 ## Plans and designs
 
