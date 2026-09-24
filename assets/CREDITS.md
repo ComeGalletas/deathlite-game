@@ -213,3 +213,8 @@ fill when a file is missing.
   `you_won.png` its `symbol_you_won_text_001` (large, yellow), each re-laid as a
   grid sheet by `tools/asset_pipeline/cut_end_banners.py`. The pack itself is
   kept unmodified under `assets/unused/` and is not read at run time.
+- **Super Pixel Effects Gigapack** — the Hexcaller's cast wind-up (ENT-013):
+  `assets/enemies/hex_shaman/hex_shaman_cast_charge.png` joins the pack's
+  `scifi_charge_up_003_small_violet` (16 frames, unmodified) into one strip,
+  by `tools/asset_pipeline/cut_cast_charge.py`; the source frames are
+  archived beside it in `assets/enemies/hex_shaman/unused/cast_charge/`.

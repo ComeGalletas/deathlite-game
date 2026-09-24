@@ -172,6 +172,20 @@
       }
     }
   },
+  "hex_shaman_cast_charge": {
+    "frame": [64, 64],
+    "content": [0, 0, 64, 64],
+    "anchor": [32, 32],
+    "scale": [76, 76],
+    "anims": {
+      "loop": {
+        "file": "enemies/hex_shaman/hex_shaman_cast_charge.png",
+        "frames": 16,
+        "fps": 20,
+        "loop": true
+      }
+    }
+  },
   "hex_shaman": {
     "frame": [192, 192], "content": [32, 41, 134, 96], "scale": [57, 41], "anchor": [26, 41], "face": "right",
     "anims": {

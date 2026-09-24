@@ -709,6 +709,8 @@ restarting.
 
 *(DOC-005, 2026-09-24: still **pending**, and wanted: the Warlock's 0.8 s wind-up marks nothing on the ground — the telegraph ring is drawn only for enemies with a `slam_radius` (`visual/rendering.py`))*
 
+*(ENT-013, 2026-09-24: **done.** For the whole wind-up the snapshotted `cast_at` carries the hazard sprite's first frame at the hazard's size, fading in, under a violet charge-up from the Gigapack — `game/states/playing/visual/cast_marker.py`, data `hex_shaman.cast_marker`. See `journals/warlock_cast_journal.md`.)*
+
 The 0.8 s wind-up still marks nothing on the ground -- the telegraph ring
 in `one_enemy` is gated on `slam_radius`, which only the brute has. The
 owner has said the wind-up flag would help and that it belongs before the
