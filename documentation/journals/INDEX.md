@@ -69,7 +69,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
 | RND-004 | Native-resolution rendering | RND | feature | legacy | [native_resolution_journal.md](native_resolution_journal.md) | — | 2026-09-16 |
 | RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | done | [frame_warmup_journal.md](frame_warmup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
-| RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | proposed | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
+| RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | done | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
