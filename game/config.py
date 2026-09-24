@@ -749,7 +749,7 @@ GROWL_ROOM_GAIN: float = 0.45
 GROWL_ROOM_MIN_GAP_MS: int = 6000
 
 # --- Music ---------------------------------------------------------------
-# The streamed background tracks (journal `music_journal.md`, 2026-09-16),
+# The streamed background tracks (journal `music_tracks_journal.md`, 2026-09-16),
 # keyed by the id a `State.music` declares. Paths are relative to
 # `assets.ASSETS_DIR`, the same convention as MENU_BACKGROUND_IMAGE, so a
 # third track is a one-line change here plus the state that asks for it.

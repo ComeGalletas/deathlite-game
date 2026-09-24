@@ -205,7 +205,7 @@ class VolumeTests(unittest.TestCase):
 
 class MusicVolumeTests(unittest.TestCase):
     """The music level is its own row and its own saved value, independent of
-    the sound-effects level (journals `music_journal.md` and
+    the sound-effects level (journals `music_tracks_journal.md` and
     `audio_mixer_journal.md`, 2026-09-16)."""
 
     def _on_music_row(self):

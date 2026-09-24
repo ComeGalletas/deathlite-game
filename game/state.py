@@ -67,7 +67,7 @@ class State:
     # 2026-09-16). Overlays leave it None: they dim in `draw_backdrop`.
     backdrop: tuple[int, int, int] | None = None
     # Which background track plays while this state is on top of the stack
-    # (journal `music_journal.md`, 2026-09-16). One of:
+    # (journal `music_tracks_journal.md`, 2026-09-16). One of:
     #   * `MUSIC_INHERIT` (the default) -- leave whatever is playing alone;
     #   * a key of `config.MUSIC_TRACKS` ("menu" / "gameplay");
     #   * `None` -- fade out to silence.

@@ -198,6 +198,6 @@ still apply; a prose item gets a `*(DOC-005: …)*` note instead of a box).
 - [x] DOC-005.1 — Open this block; index rows for DOC-005, PRG-003, RND-005
 - [x] DOC-005.2 — Combat, entities and UI sections: combat balance follow-ups, enemy AI, game over, ranged wind-up, run status, training dummy, PlayingState refactor, sprite functionality
 - [x] DOC-005.3 — World, spawn and test sections: level design, rock collider, world refactor, the development journal, spawn groups, spawn master todo, test-suite review (fresh coverage, the warm-up decision), TST-002 follow-ups
-- [ ] DOC-005.4 — Assets, audio and build: assets follow-ups, music (split the 2026-09-16 entry, close the web options), sound effects, desktop packaging, pygbag, pending plans
+- [x] DOC-005.4 — Assets, audio and build: assets follow-ups, music (split the 2026-09-16 entry, close the web options), sound effects, desktop packaging, pygbag, pending plans
 - [ ] DOC-005.5 — RND-005 journal (frame warm-up) and PRG-003 journal (gold sink), both proposed
 - [ ] DOC-005.6 — Results; index to done

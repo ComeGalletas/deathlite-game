@@ -77,7 +77,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
-| AUD-001 | Music | AUD | feature | legacy | [music_journal.md](music_journal.md) | — | 2026-09-15 |
+| AUD-001 | Music | AUD | feature | legacy | [music_journal.md](music_journal.md), [music_tracks_journal.md](music_tracks_journal.md) (split by DOC-005) | — | 2026-09-15 |
 | AUD-002 | Audio mixer (SFX level) | AUD, UI | feature | legacy | [audio_mixer_journal.md](audio_mixer_journal.md) | — | 2026-09-16 |
 | AUD-003 | Sound effects | AUD | feature | legacy | [sound_effects_journal.md](sound_effects_journal.md) | — | 2026-09-16 |
 | SYS-001 | Bug journal (cross-system log) | all | bug | legacy | [bug_journal.md](bug_journal.md) | — | 2026-08-27 |

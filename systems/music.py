@@ -1,4 +1,4 @@
-"""Streamed background music (journal `documentation/journals/music_journal.md`,
+"""Streamed background music (journal `documentation/journals/music_tracks_journal.md`,
 2026-09-16).
 
 Unlike `systems/audio.py`, whose eight cues are synthesised at startup into
