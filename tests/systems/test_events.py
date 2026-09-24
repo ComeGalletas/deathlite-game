@@ -25,9 +25,13 @@ class EventBusTests(unittest.TestCase):
 
     def test_clear_removes_everything(self):
         bus = EventBus()
-        bus.subscribe("x", lambda **kw: None)
+        calls = []
+        bus.subscribe("x", lambda **kw: calls.append("x"))
+        bus.subscribe("y", lambda **kw: calls.append("y"))
         bus.clear()
         bus.publish("x")  # must not raise
+        bus.publish("y")
+        self.assertEqual(calls, [])
 
     def test_one_bad_handler_does_not_block_others(self):
         bus = EventBus()

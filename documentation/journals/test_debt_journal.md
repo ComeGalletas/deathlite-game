@@ -247,6 +247,10 @@ TST-004.6. One subtask each, in the review's order.
   each projectile weapon asserts `count` shots fanned `spread_deg × (count −
   1)` edge to edge, `spread_deg` read from the data (bow, rod: 10°; bomb:
   16°). 23 passed, 9 subtests.
+- **5.8** `tests/systems/test_events.py::test_clear_removes_everything`
+  subscribed a no-op, cleared and published — nothing could fail. Two
+  recording handlers on two events now, and the recorded list must be empty
+  after `clear()`. 4 passed.
 
 ## TST-004 — Plan
 
@@ -279,8 +283,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.4 — §6: regroup the six weapon modules by subject → `df68421`
   - [x] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm` → `dbd372a`
   - [x] TST-004.5.6 — §6: retitle the modules that open with a plan phase → `13daf4f`
-  - [x] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
-  - [ ] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
+  - [x] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts → `631043e`
+  - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
   - [ ] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
 - [ ] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
