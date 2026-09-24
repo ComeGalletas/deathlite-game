@@ -60,6 +60,14 @@ hits are prose). One subtask per module, the mixer pair together.
   (`world/gen/placement.py:67`) depends on it, so the skip is now an
   assertion that the band is at least 1. The `if not room.grid: continue`
   under it was the retired flat world's guard and went with it.
+- **3.2** `test_flying.py` skipped when the first blocking tree had no clear
+  spot 40 px west, and (twice) when the world's top-left corner was not open
+  sea. Both conditions hold on all four pinned seeds today (checked: the
+  corner is sea on 35, 7, 1234 and 42; 186–255 trees have a clear approach).
+  **TST-004.D2 — search, then assert.** The tree test takes the first
+  blocking tree *with* a clear approach; a module helper `_open_sea(gm)`
+  tries the corner, then 252 probes along the four edges, and fails if none
+  is sea. A generator change moves the probe instead of retiring the test.
 
 ## TST-004 — Plan
 
@@ -74,8 +82,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [x] TST-004.1 — This journal → `212e764`
 - [x] TST-004.2 — Digest tests through `world_digests` → `f1e620f`
 - [ ] TST-004.3 — Remove the conditional skips
-  - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip
-  - [ ] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed)
+  - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip → `874f86f`
+  - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed)
   - [ ] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed)
   - [ ] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed)
   - [ ] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
