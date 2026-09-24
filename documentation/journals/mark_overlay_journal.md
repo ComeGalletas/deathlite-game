@@ -93,7 +93,7 @@ worktree, cut from `main` after #36 — owner, 2026-09-24)
 ## RND-007 — Tasks
 
 - [x] RND-007.1 — This journal; the index row
-- [ ] RND-007.2 — Archive the frames; the cut script with its recolour and leader erase; the strip; the rig; credits
+- [x] RND-007.2 — Archive the frames; the cut script with its recolour and leader erase; the strip; the rig; credits
 - [ ] RND-007.3 — `status_visuals.json`; the overlay module; the fallback ring's colour
 - [ ] RND-007.4 — Tests and a screenshot
 - [ ] RND-007.5 — Results; index to done

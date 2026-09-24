@@ -474,6 +474,8 @@ class Content:
         # `weapon_visuals.json` is split from `weapons.json`.
         self.element_visuals: dict = _check_element_visuals(
             _load("weapons/element_visuals.json"))
+        # RND-007: how a status is drawn on the enemy carrying it.
+        self.status_visuals: dict = _load("weapons/status_visuals.json")
         self.meta_upgrades: dict[str, dict] = _load("heroes/meta_upgrades.json")
         # CB-8: health potion drops. Validated here so a table that does not
         # cover every rarity fails at boot, not on the first kill.
