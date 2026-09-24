@@ -1,0 +1,125 @@
+{
+  "_comment": "ENT-017: enemy behaviour templates. An enemy's `behavior` (enemies.json) or a boss's (bosses.json) names one of `behaviors`. Its numbers resolve shared `defaults` -> the template's `defaults` -> the enemy's own block, key by key, so an enemy lists only what differs. `shape` is the machine: `move` (one state, the `move` stacks), `telegraph_cycle` (chase -> telegraph -> attack -> recover), or a code-built one (`brute`, `kite_shoot`, `path_chase_sweep`, `boss_patterns`). Stack, action, attack and trigger names resolve in entities/ai/actions.py; a `trigger` that is not a rule there names a key. Code keeps no value fallbacks: every number is here or in the enemy's block.",
+
+  "defaults": {
+    "_comment": "Shared by every behaviour. The pursuit stack's steering (the old entities/enemy_ai.py constants), the idle wander an aggro-gated enemy does out of range, and the recovery drift after a swing (a fraction of speed).",
+    "nav_slew": 9.0,
+    "seek_weight": 1.0,
+    "separation_mult": 1.6,
+    "separation_cap": 0.6,
+    "obstacle_margin": 14.0,
+    "obstacle_cap": 0.7,
+    "stuck_seconds": 0.4,
+    "nudge_strength": 1.5,
+    "idle_speed": 0.28,
+    "idle_hold": [1.4, 3.2],
+    "idle_pause": 0.45,
+    "recover_weight": 0.3
+  },
+
+  "behaviors": {
+    "chase":   {"shape": "move", "move": ["seek_straight"]},
+    "chaser":  {"shape": "move", "move": ["seek_straight"]},
+    "path_chase": {"shape": "move", "move": ["pursuit"]},
+    "swarm": {
+      "_comment": "Identical to `path_chase` today; kept separate as the tuning hook for the planned tighter crowd behaviour.",
+      "shape": "move", "move": ["pursuit"]
+    },
+    "dummy": {
+      "_comment": "The training dummy: no steering, no attack, no aggro -- one state holding nothing.",
+      "shape": "move", "state": "idle", "move": []
+    },
+    "exploder": {
+      "shape": "move", "move": ["seek_nav", "explode"],
+      "defaults": {"fuse_range": 32}
+    },
+    "summoner": {
+      "_comment": "Flee at full speed inside `keep_away` px, else drift in at `keep_away_close_weight` of speed; a brood every `summon_interval` s.",
+      "shape": "move", "move": ["keep_away", "summon_brood"],
+      "defaults": {"keep_away": 200, "keep_away_close_weight": 0.4,
+                   "summon_interval": 4.0, "summon_id": "bumblebee", "summon_count": 3}
+    },
+
+    "brute": {
+      "shape": "brute",
+      "defaults": {"slam_interval": 3.5, "slam_radius": 120, "slam_damage": 28,
+                   "slam_range": 120, "slam_telegraph": 0.9}
+    },
+
+    "fsm_charger": {
+      "shape": "telegraph_cycle", "chase": "seek_nav", "trigger": "charge_range",
+      "timings": {"telegraph": "charge_telegraph", "active": "charge_duration",
+                  "recover": "charge_recover", "cooldown": "charge_interval"},
+      "on_windup_end": "lock_dash", "attack": "charge",
+      "defaults": {"charge_range": 340, "charge_telegraph": 0.7, "charge_duration": 0.5,
+                   "charge_recover": 1.1, "charge_interval": 3.0,
+                   "charge_speed": 620, "charge_damage": 26}
+    },
+    "fsm_teleporter": {
+      "shape": "telegraph_cycle", "chase": "seek_nav", "trigger": "blink_trigger",
+      "timings": {"telegraph": "blink_telegraph", "active": "blink_duration",
+                  "recover": "blink_recover", "cooldown": "blink_interval"},
+      "on_windup_end": "blink",
+      "defaults": {"blink_trigger": 460, "blink_telegraph": 0.55, "blink_duration": 0.35,
+                   "blink_recover": 0.9, "blink_interval": 2.6,
+                   "blink_min": 20.0, "blink_range": 70, "blink_damage": 16}
+    },
+    "fsm_warlock": {
+      "_comment": "The cast is snapshotted where the hero stands as the wind-up starts and lands there as it ends (the ENT-013 marker draws it in between).",
+      "shape": "telegraph_cycle", "chase": "seek_nav", "trigger": "cast_range",
+      "timings": {"telegraph": "cast_telegraph", "active": "cast_duration",
+                  "recover": "cast_recover", "cooldown": "cast_interval"},
+      "on_windup_start": "cast_snapshot", "on_windup_end": "cast_hazard",
+      "defaults": {"cast_range": 420, "cast_telegraph": 0.8, "cast_duration": 0.2,
+                   "cast_recover": 1.8, "cast_interval": 3.4,
+                   "hazard_radius": 90, "hazard_dps": 20, "hazard_duration": 3.5,
+                   "hazard_tick": null, "hazard_sprite": null}
+    },
+    "path_chase_attack": {
+      "_comment": "The melee poke. The wind-up and swing defaults are 0.15 x 1.25 and 0.35 x 1.25 -- CB-4 stretched them so the player can read the telegraph and step out (combat_balance_journal.md); an enemy's own values are absolute. The trigger is `radius + PLAYER_RADIUS + attack_reach_pad` unless the enemy names an `attack_range`.",
+      "shape": "telegraph_cycle", "chase": "pursuit", "trigger": "melee_reach",
+      "timings": {"telegraph": "attack_telegraph", "active": "attack_active",
+                  "recover": "attack_recover", "cooldown": "attack_cooldown"},
+      "on_windup_end": "poke",
+      "defaults": {"attack_telegraph": 0.1875, "attack_active": 0.4375,
+                   "attack_recover": 0.15, "attack_cooldown": 0.6,
+                   "attack_reach_pad": 5.0}
+    },
+    "path_chase_summon": {
+      "_comment": "The Beekeeper's torch swing: summons and hits on the same transition, on a fixed cooldown with no range gate (owner, 2026-09-17).",
+      "shape": "telegraph_cycle", "chase": "pursuit", "trigger": null,
+      "timings": {"telegraph": "attack_telegraph", "active": "attack_active",
+                  "recover": "attack_recover", "cooldown": "attack_cooldown"},
+      "on_windup_end": "summon_swing",
+      "defaults": {"attack_telegraph": 0.35, "attack_active": 0.45,
+                   "attack_recover": 0.2, "attack_cooldown": 3.2}
+    },
+    "path_chase_breath": {
+      "_comment": "The Imp: rear back, spit a burning pool, watch it break into embers -- its three strips on the cycle's three states. The trigger is `radius + breath_offset + hazard_radius` unless the enemy names an `attack_range`.",
+      "shape": "telegraph_cycle", "chase": "pursuit", "trigger": "breath_reach",
+      "timings": {"telegraph": "attack_telegraph", "active": "attack_active",
+                  "recover": "attack_recover", "cooldown": "attack_cooldown"},
+      "on_windup_start": "rear_back", "on_windup_end": "breath_spit",
+      "on_recover_start": "embers"
+    },
+    "path_chase_sweep": {
+      "_comment": "The Whirlspear's alternating ring sweeps; its shape is code (the wind-up depends on which swing it picked).",
+      "shape": "path_chase_sweep"
+    },
+    "kite_shoot": {
+      "_comment": "Hold `prefer_distance` (+/- `kite_band`) and shoot. `attack_range` defaults to `prefer_distance x attack_range_mult`. A kiter with no `attack_telegraph` (0) keeps the old single-state behaviour.",
+      "shape": "kite_shoot",
+      "defaults": {"prefer_distance": 240, "attack_range_mult": 1.8, "kite_band": 30,
+                   "shoot_interval": 2.0, "shoot_damage": 6, "shot_speed": 220,
+                   "shot_radius": 6, "shot_style": "", "shot_rig": "", "shot_pierce": 0,
+                   "shot_tint": null, "shot_lifetime": 6.0, "shot_stop_after": 0.0,
+                   "shot_blast_radius": 0.0,
+                   "attack_telegraph": 0.0, "attack_active": 0.2, "attack_recover": 0.25}
+    },
+
+    "boss_patterns": {
+      "_comment": "The boss's attack cycle (ENT-015); its patterns and intro are in bosses.json.",
+      "shape": "boss_patterns"
+    }
+  }
+}

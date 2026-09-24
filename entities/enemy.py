@@ -52,7 +52,7 @@ class Enemy:
         self.tags = tuple(definition.get("tags", ()))
         # `flying`: over the world rather than on it, the same tag and the
         # same collider as the boss (`GameMap.is_walkable(flying=True)`); the
-        # behaviour side reads it in `entities/ai/behaviors/simple.py`.
+        # behaviour side reads it in the `pursuit` stack (`entities/ai/actions.py`).
         self.flying = "flying" in self.tags
         self.is_elite = bool(definition.get("is_elite", False))
 

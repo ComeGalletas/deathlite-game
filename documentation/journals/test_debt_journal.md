@@ -1,9 +1,8 @@
 # Test debt — journal
 
 **ID:** TST-004 · **System:** tests · **Type:** refactor ·
-**Status:** in progress (TST-004.1–.8 done; TST-004.9 with the owner's local
-session) · **Branch:** claude/tst-004-test-debt (remote session, owner
-2026-09-24)
+**Status:** done (merged in #35; TST-004.9 in #34) · **Branch:**
+claude/tst-004-test-debt (remote session, owner 2026-09-24)
 
 ---
 
@@ -452,8 +451,9 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py` → `72ce8a1`
 - [x] TST-004.8 — Summon render tests (WA5) → `a719226`
-- [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session (kept by the
-  owner's local session; not this branch's work)
+- [x] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session (kept by the
+  owner's local session; not this branch's work) → `bd8cd43` (#34), delivered to
+  the owner and recorded in `enemy_roster_expansion_journal.md`
 - [x] TST-004.10 — Run the default suite and record the results (discovered: the
   closing run needed its own commit)
 
@@ -496,3 +496,115 @@ edited. No test exposed a bug in the game.
 - **TST-004.8** — WA5's README note is still the owner's call.
 - **TST-004.9** — the Bonepicker/Gaffjaw screenshot stays with the local
   session.
+
+**The owner's answers on the items left for them (2026-09-24),** taken up as
+TST-005, WLD-013, RND-006 (`claude/ent-017-behavior-templates`):
+
+- **D3 — numpy:** allowed for tests and the asset-pipeline scripts only,
+  never as a game dependency. It gets a line in `CLAUDE.md`'s test rules
+  (TST-005.1).
+- **D6 — `graph.py`:** delete the three unused helpers (WLD-013).
+- **World tier speed:**
+  - The three chest determinism tests share one world build (TST-005.2).
+  - The buff-building count moves to `sweep` (TST-005.3).
+- **Literals kept as the owner's decisions:**
+  - `test_buffs.py` keeps its fixed values.
+  - `test_gnome_split.py` stops depending on fixed values (TST-005.4).
+- **WA5:** close it. The blanket `assets/unused/**` rule already ignores the
+  extra wolf sprites, so the plan's call for wolf-specific ignore rules goes,
+  and the journal's old paths are updated (RND-006).
+
+
+---
+
+**IDs:** TST-005, WLD-013 · **Systems:** tests, world · **Types:** refactor ·
+**Status:** done · **Branch:** claude/ent-017-behavior-templates (the
+current worktree, cut from `main` after #34 and #35 — owner, 2026-09-24)
+
+## TST-005 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Settle the test items TST-004 left open.
+- **Details:**
+  - numpy is allowed for tests only.
+  - The world tier gets the recommended speed-up: the chest determinism
+    tests share a build, and the buff-building count moves to `sweep`.
+  - `test_gnome_split.py` no longer depends on fixed values.
+  - `test_buffs.py` keeps its fixed values.
+- **Constraint:** The game stays numpy-free. No test is weakened, only
+  re-tiered or re-expressed.
+
+## TST-005 — Confirmed reading
+
+- **numpy** is imported by three `tools/asset_pipeline/` scripts only.
+  `.venv` and the PyInstaller spec keep it out of both builds, and
+  `dist/README.md` says the suite runs on the system Python.
+- **The world tier**, by `--durations`:
+  - 594 tests, 4 min 32 s.
+  - `test_repair.py::BuffBuildingCountTests::test_almost_every_island_reaches_the_minimum`:
+    29.5 s.
+  - `test_chests.py::PurityTests`: three tests at about 5.3 s each, each
+    building its own worlds.
+- **`test_gnome_split.py` pins four fixed values:**
+  - the bee's radius 9 (it was 7);
+  - its rig scale [30, 46];
+  - the gnome's HP at `round(husk × 1.30)`;
+  - its speed at `round(husk × 0.80)`.
+- **TST-005.D1 — The gnome-split tests assert relations and read the data:**
+  - the bee's radius is the data's, and larger than its old 7;
+  - the rig scale is the data's and keeps its aspect;
+  - the gnome is tougher and slower than the Husk.
+
+## TST-005 — Tasks
+
+- [x] TST-005.1 — numpy in `CLAUDE.md`'s test rules, tests and asset scripts only
+- [x] TST-005.2 — `PurityTests` share one world build
+- [x] TST-005.3 — `BuffBuildingCountTests` into `sweep`; re-time the world tier
+- [x] TST-005.4 — `test_gnome_split.py` without fixed values
+
+## TST-005 — Results
+
+- **TST-005.1:** `CLAUDE.md`'s test rules name pygame and numpy. numpy is
+  for tests and asset scripts only; the same rule is kept in memory.
+- **TST-005.2:** `PurityTests` builds one world per seed, 4 builds instead
+  of 10, and the determinism check compares against the suite's shared
+  cache. About 16 s → 5.7 s.
+- **TST-005.3:**
+  - Moving only the rate test did not help: the sibling test in the class
+    then paid the same ~30 s forty-seed build.
+  - So the whole forty-seed `BuffBuildingCountTests` is `sweep`, and a new
+    `PinnedSeedBuffBuildingTests` keeps the guarantee (no island without a
+    building) and the ceiling in `world`, on the pinned seeds the tier
+    builds anyway.
+  - **World tier: 4 min 32 s → 3 min 58 s** (573 passed).
+- **TST-005.4:** `test_gnome_split.py` asserts relations:
+  - the gnome is tougher, harder-hitting and slower than the Husk;
+  - the drawn bee covers its collider;
+  - the bee's `scale` keeps the art's `content` proportions.
+  No tuning value is pinned. `test_buffs.py` is unchanged, since its values
+  are the owner's decisions. 22 passed.
+
+## WLD-013 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Remove the unused island-graph helpers.
+- **Details:** `_adjacency`, `_rooted_tree` and `_grow_subtree` in
+  `world/gen/graph.py` (TST-004.D6).
+- **Constraint:** Generation does not change; the pinned world digests
+  still match.
+
+## WLD-013 — Confirmed reading
+
+The three served `_assign_floors`, which raised plateaus room by room in the
+retired flat-verticality generator. The world refactor (`d084480`) removed
+`_assign_floors` and left them with no caller, so they are LD-8 leftovers.
+
+## WLD-013 — Tasks
+
+- [x] WLD-013.1 — Delete them; the world tests and digests
+
+## WLD-013 — Results
+
+- The three helpers (about 45 lines) are gone from `world/gen/graph.py`, and
+  its docstring says why. `deque` stays, because `_distances` uses it.
+- `tests/world/test_digest.py` (the pinned world digests) and
+  `tests/world/grids` (the island-graph rules): **73 passed**, so generation
+  is unchanged.

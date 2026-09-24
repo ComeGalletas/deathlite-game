@@ -15,8 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-013 · RND-006 · UI-014 ·
-PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
+**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-014 · RND-007 · UI-014 ·
+PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 
 ## Requirements
 
@@ -47,7 +47,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 | ENT-014 | Skull attack animation slowed to cover its swing | ENT, RND | balance | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
 | ENT-015 | The boss on the shared AI components | ENT | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
-| ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | proposed | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
@@ -63,11 +63,13 @@ PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 | WLD-010 | Special island facilities | WLD | feature | parked | [special_facilities_journal.md](special_facilities_journal.md) | — | 2026-09-20 |
 | WLD-011 | Bridge clearance for large bodies | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | WLD-012 | Keep props a wide body's radius clear of bridge mouths | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/wld-012-bridge-deck-clearance | 2026-09-22 |
+| WLD-013 | Remove the retired generator's unused island-graph helpers | WLD | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | RND-001 | Asset integration | RND | feature | legacy | [assets_journal.md](assets_journal.md) | — | 2026-08-27 |
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
 | RND-004 | Native-resolution rendering | RND | feature | legacy | [native_resolution_journal.md](native_resolution_journal.md) | — | 2026-09-16 |
 | RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | done | [frame_warmup_journal.md](frame_warmup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
+| RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | done | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
@@ -99,7 +101,8 @@ PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
-| TST-004 | Test debt: digests, conditional skips, R4, §6/§7, balance audit, coverage, summon renders | TST | refactor | in progress | [test_debt_journal.md](test_debt_journal.md) | claude/tst-004-test-debt (remote session) | 2026-09-24 |
+| TST-004 | Test debt: digests, conditional skips, R4, §6/§7, balance audit, coverage, summon renders | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/tst-004-test-debt (remote session) | 2026-09-24 |
+| TST-005 | numpy as a test-only tool; a faster world tier; the gnome split without fixed values | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |

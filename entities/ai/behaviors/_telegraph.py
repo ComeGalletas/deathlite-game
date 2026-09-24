@@ -4,7 +4,8 @@
 The attack's one-shot fires on the `telegraph -> attack` transition (exact
 timing, matching the old `on_attack_start`); a continuous attack (a dash) puts a
 per-frame component in the `attack` state instead. `recover` drifts toward the
-player at `recover_weight * speed`. The `Cooldown` sits in `always=[...]` so it
+player at `recover_weight * speed` (the shared `recover_weight` in
+`data/enemies/behaviors.json`, ENT-017). The `Cooldown` sits in `always=[...]` so it
 counts down in every phase, and is reloaded on `recover -> chase`.
 """
 from __future__ import annotations
@@ -15,9 +16,9 @@ from entities.ai.machine import Behavior, Transition
 
 
 def telegraph_cycle(*, chase, trigger_range, telegraph, active, recover, cooldown,
-                    attack=None, on_windup_start=None, on_windup_end=None,
-                    on_recover_start=None, recover_via="nav",
-                    recover_weight=0.3) -> Behavior:
+                    recover_weight, attack=None, on_windup_start=None,
+                    on_windup_end=None, on_recover_start=None,
+                    recover_via="nav") -> Behavior:
     """`trigger_range=None` drops the distance gate: the wind-up then starts
     on the cooldown alone, wherever the actor is standing. That is what the
     Beekeeper wants -- it swings on a timer and the bees are the point, so

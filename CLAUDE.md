@@ -178,6 +178,11 @@ the rules that apply to every change.
 - No CI exists or is planned; the suite checks stability locally. Do not
   propose CI, hooks or gates. The `sweep` tier runs only when asked
   (`python -m pytest -m sweep`).
+- The suite needs pygame and **numpy**. numpy is for the tests and the
+  `tools/asset_pipeline/` scripts only (they read sheets through
+  `pygame.surfarray`); it is never a game dependency, never imported by game
+  code, and stays out of the desktop and web builds (`dist/README.md`).
+  `coverage` is the same: a test tool, not a declared dependency.
 - A test never skips itself to green; make the check runnable instead.
 - Tests that boot a run or consume a generated world pin a seed
   (`tests/boot.py: start_run(game, seed=...)`).

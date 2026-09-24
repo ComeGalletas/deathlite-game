@@ -935,8 +935,8 @@ many were stuck:
 
 ---
 
-**ID:** ENT-017 · **System:** entities (+ SYS) · **Type:** refactor · **Status:** proposed ·
-**Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
+**ID:** ENT-017 · **System:** entities (+ SYS) · **Type:** refactor · **Status:** done ·
+**Branch:** claude/ent-017-behavior-templates (the current worktree, owner 2026-09-24)
 
 ## ENT-017 — Requirement (owner, 2026-09-24)
 
@@ -985,7 +985,106 @@ many were stuck:
   - **C. Only the numbers.** Move the value defaults into data and leave the
     shapes in code. This is A without the templates.
 
+## ENT-017 — Decision (owner, 2026-09-24)
+
+**Option A**: behaviour templates in data. Branch
+`claude/ent-017-behavior-templates`, cut from `main` after #34 and #35.
+
+- **ENT-017.D2 — The template file.** `data/enemies/behaviors.json` has two
+  parts:
+  - `defaults`, shared by every behaviour: the pursuit stack's steering, the
+    idle wander, and the recovery drift.
+  - `behaviors`, one template per name `enemies.json` or `bosses.json` uses.
+    Each template gives:
+    - a **shape** (`move`, `telegraph_cycle`, or a code-built one: `brute`,
+      `kite_shoot`, `path_chase_sweep`, `boss_patterns`);
+    - for the generic shapes, the named **chase stack**, the **trigger**, the
+      four **timing keys**, the named **actions** on the transitions, and the
+      **attack** component;
+    - its own **default numbers**.
+  - An enemy's block overrides the numbers, key by key: shared, then
+    template, then enemy.
+- **ENT-017.D3 — Names resolve in code, in `entities/ai/actions.py`:**
+  - chase stacks: `pursuit`, `seek_nav`, `seek_straight`, `keep_away`,
+    `explode`, `summon_brood`;
+  - actions: `lock_dash`, `blink`, `cast_snapshot`, `cast_hazard`, `poke`,
+    `summon_swing`, `rear_back`, `breath_spit`, `embers`;
+  - attack components: `charge`;
+  - trigger rules: `melee_reach`, `breath_reach`. A trigger that is not a
+    rule names a key.
+  A new variant is data. A new kind of action is one registered function,
+  the same pattern as ENT-015's boss patterns.
+- **ENT-017.D4 — No value fallback left in the builders.**
+  - Every `cfg.get(key, default)` goes. The number moves to the template, and
+    the builders read `cfg[key]`.
+  - Formulas keep their shape, with their constants moved to data: the melee
+    reach `radius + PLAYER_RADIUS + attack_reach_pad`, and the kite reach
+    `prefer_distance × attack_range_mult`.
+  - The components' own dataclass defaults stay, as their constructor API
+    for tests; every builder now passes the data's value.
+- **ENT-017.D5 — `MELEE_REACT_SCALE` leaves config again.**
+  - It scaled the melee timing defaults in code (0.15 × 1.25, 0.35 × 1.25),
+    and SYS-009 had just moved it to `game/config.py`.
+  - With the defaults in data they are simply 0.1875 and 0.4375, and the
+    template's comment gives the arithmetic.
+  - A code multiplier over data defaults would be exactly the fallback D4
+    removes. An enemy's own `attack_telegraph` was never scaled by it, so
+    nothing that plays changes.
+- **ENT-017.D6 — Parity by golden traces.**
+  - Before any code change, 26 behaviours were traced for 1500 frames each
+    through a scripted context (a circling player, a spell out of aggro, a
+    bent flow field, neighbours, a seeded RNG): every enemy in
+    `enemies.json`, plus synthetic `chase`, `chaser`, `swarm`, `exploder`,
+    `summoner`, a flying walker, and an untelegraphed kiter.
+  - Each frame records position, velocity, machine state, contact damage,
+    the animation name and every combat call.
+  - Two runs on the old code are byte-identical, and the new code must
+    reproduce them.
+
 ## ENT-017 — Tasks
 
-- [ ] ENT-017.1 — The owner picks A / B / C (and confirms the reading of
-  "the data files need to be moved")
+- [x] ENT-017.1 — The owner picks A (and the reading of "the data files
+  need to be moved" stands)
+- [x] ENT-017.2 — `data/enemies/behaviors.json`; `entities/ai/actions.py`;
+  `registry.build_behavior` resolves templates; the generic `move` and
+  `telegraph_cycle` shapes
+- [x] ENT-017.3 — The bespoke builders (brute, kite, sweep) and `with_aggro`
+  read the data with no fallbacks; `MELEE_REACT_SCALE` out of config
+- [x] ENT-017.4 — Golden-trace parity; tests (every enemy's behaviour has a
+  template, the templates name only registered things, an enemy overrides
+  a template number); results; index
+
+## ENT-017 — Results
+
+- **Data:** `data/enemies/behaviors.json` holds 17 templates and the shared
+  defaults. The desktop build ships the whole `data/` tree, so it is
+  included.
+- **Code:**
+  - `entities/ai/actions.py`: 6 stacks, 9 actions, 1 attack and 2 trigger
+    rules.
+  - `entities/ai/templates.py`: the `move` and `telegraph_cycle` shapes.
+  - `registry.build_behavior` resolves a template first, then a code-built
+    `@behavior`.
+  - `behaviors/simple.py` and ten builders are gone. `brute`, `kite_shoot`
+    and `path_chase_sweep` stay code and read the data with no fallbacks.
+  - `telegraph_cycle` takes `recover_weight`, with no default.
+  - `with_aggro` reads the wander from the shared defaults.
+  - `MELEE_REACT_SCALE` is gone (D5).
+- **What is left of `cfg.get`** in `entities/ai/` is structural, not
+  numeric: the optional `aggro_range` / `pursuit_seconds`, whose presence
+  switches aggro on; the boss's `tags` and `patterns` lists; and a name used
+  for a log line.
+- **Parity (D6):** the golden traces are **byte-identical** before and after:
+  26 behaviours, 1500 frames each, positions, velocities, states, contact
+  damage, animation names and every combat call. A second run on the old
+  code was identical first, so the trace is deterministic.
+- **Tests:** `tests/entities/ai/test_behavior_templates.py` (13):
+  - every enemy's and boss's behaviour has a template;
+  - the templates name only registered things;
+  - everything builds;
+  - the merge order (shared → template → enemy);
+  - an enemy's number reaches its component;
+  - a number removed from the data is a `KeyError`, not a silent default;
+  - the shapes.
+- **Full default suite: 3425 passed, 0 failed, 0 skipped** (11 sweep
+  deselected, 13 min 55 s).

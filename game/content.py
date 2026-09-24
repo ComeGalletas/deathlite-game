@@ -458,6 +458,8 @@ class Content:
         self.weapon_visuals: dict[str, dict] = _load("weapons/weapon_visuals.json")
         self.enemies: dict[str, dict] = _load("enemies/enemies.json")
         self.bosses: dict[str, dict] = _load("enemies/bosses.json")
+        # ENT-017: the behaviour templates `entities/ai/templates.py` builds.
+        self.behaviors: dict = _load("enemies/behaviors.json")
         self.characters: dict[str, dict] = _load("heroes/characters.json")
         self.blessings: dict[str, dict] = _load("weapons/blessings.json")
         self.offering: dict = _load("weapons/offering.json")        # P2 weights
