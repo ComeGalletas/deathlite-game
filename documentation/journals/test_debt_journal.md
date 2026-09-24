@@ -257,6 +257,42 @@ TST-004.6. One subtask each, in the review's order.
   Renamed `test_slash_true_or_no_fx_swings_the_default_soul_slash`, with a
   docstring saying so.
 
+### TST-004.6 — the balance-number audit
+
+`test_suite_review.md` §7: "where the number is a contract, keep it; where it
+is tuning, assert the invariant", and the requirement adds that tests read
+their values from `data/`. An inventory of `tests/` (the parallel session's
+files excluded) found about 95 assertions in 24 modules pinning a number
+that lives in `data/` — more than the review's ~38, because one value (the
+Hammer's `impact_offset`, 40) accounts for a dozen. Every one was checked
+against the current JSON: all match, so nothing is red today; the debt is
+that a balance pass would turn them red for no reason.
+
+- **TST-004.D7 — the rule applied.** *Tuning* numbers are read from the data
+  (`get_content()`), and where the test was really about a relation (Kestrel
+  evades more than the others, Bulwark reduces damage, a block removes a
+  share) that relation is asserted as well. *Contracts* stay literal: owner
+  decisions recorded as that exact number (the Hammer impact art's
+  `over_circle` 1.25, the corral's fence `render_scale` 0.45, the gnome/husk
+  ratios, the imp's 35 % area cut, the garrison of four or five lancers,
+  `common_cap` starting at 5 (G8)), the "×1.15 per level" design rule, and
+  counts a test is named for (twelve Forgings, five levels a blessing, three
+  choices an offering). Code constants (`config.PLAYER_DEFAULTS`,
+  `INCOMING_TICK_INTERVAL`, the XP curve) are not data and stay pinned.
+- Test fixtures that look like data (a `blast_radius=72` passed in, an
+  inline weapon dict) are not pins and are left alone.
+
+One subtask per group of modules:
+
+- **6.1** `test_characters.py`: Aegis's `max_hp` 160, Bulwark's 0.7, the
+  heroes' evasion 0.05 / 0.10 and block 0.30, and the armour 4 in the block
+  arithmetic were literals. Now a `base(cid, stat)` helper reads
+  `base_stats` (falling back to the code default) and `guard()` reads
+  `damage_taken_mult`; the block arithmetic uses the hero's own `armor` and
+  `block_strength`; the relations (Kestrel evades most, only Aegis blocks,
+  the rolls used really are under the chances) are asserted. The code
+  defaults in `PLAYER_DEFAULTS` stay pinned. 17 passed.
+
 ### TST-004.7 — coverage of the five modules
 
 Paths: `world/gen/graph.py`, `world/gen/validate.py`,
@@ -363,8 +399,14 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler → `d618e61`
   - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig` → `535dd0b`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
+  - [x] TST-004.6.1 — heroes: `test_characters.py`
+  - [ ] TST-004.6.2 — incoming damage: `test_incoming_damage.py`
+  - [ ] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py`
+  - [ ] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py`
+  - [ ] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
+  - [ ] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
-  `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`
+  `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py` → `72ce8a1`
 - [x] TST-004.8 — Summon render tests (WA5) → `a719226`
 - [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session
 
