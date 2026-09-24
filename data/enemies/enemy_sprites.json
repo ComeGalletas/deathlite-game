@@ -37,7 +37,7 @@
     "anims": {
       "idle":   {"file": "enemies/skull/idle.png", "frames": 8, "fps": 7, "loop": true},
       "walk":   {"file": "enemies/skull/run.png", "frames": 6, "fps": 9, "loop": true},
-      "attack": {"file": "enemies/skull/attack.png", "frames": 7, "fps": 14, "loop": false}
+      "attack": {"file": "enemies/skull/attack.png", "frames": 7, "fps": 10, "loop": false}
     }
   },
   "spider": {

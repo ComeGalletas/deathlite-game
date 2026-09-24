@@ -817,7 +817,7 @@ is exact and deterministic.
 
 ### Follow-ups (not blocking)
 
-*(DOC-005, 2026-09-24: both still **pending**. The skull `attack` strip is still 7 frames at 14 fps (0.5 s) against a swing of 0.725 s now (`data/enemies/enemy_sprites.json`, `enemies.json`), so the gap has grown — about 10 fps would cover it. `MELEE_REACT_SCALE` is still local to `entities/ai/behaviors/simple.py`; move it only if another system needs it)*
+*(DOC-005, 2026-09-24: the sprite sync is **done** as ENT-014 (below): the skull `attack` strip, 7 frames, went from 14 fps (0.5 s) to 10 fps (0.70 s) against a swing of 0.725 s (`data/enemies/enemy_sprites.json`, `enemies.json`). The other follow-up is still **pending**. `MELEE_REACT_SCALE` is still local to `entities/ai/behaviors/simple.py`; move it only if another system needs it)*
 
 - **Sprite sync:** the `skull` `attack` strip (7 frames @ 14 fps = 0.5 s) now
   finishes ~0.19 s before the swing ends and holds its last frame. Cut its
@@ -1622,7 +1622,7 @@ suite read it.
 
 ### Follow-ups (not blocking)
 
-*(DOC-005, 2026-09-24: the gold sink is **pending** as PRG-003 (owner: none is integrated yet). Chests opened are counted (`stats["chests"]`) but not shown on the run summary — **pending**. The unused chest skins wait on a legendary tier or a boss reward — **pending**)*
+*(DOC-005, 2026-09-24: the gold sink is **pending** as PRG-003 (owner: none is integrated yet). Chests opened are counted (`stats["chests"]`) and now shown on the run summary — **done** as UI-012 (at the end of this journal). The unused chest skins wait on a legendary tier or a boss reward — **pending**)*
 
 - **The gold sink** is the known gap, deliberately left alone at the owner's
   instruction. When gold consumption becomes its own feature, ~490 gold a
@@ -1938,3 +1938,103 @@ as 36 was.
 **Conclusion: the end-of-run level can rise this far without touching the
 offering.** The risk noted in the previous two entries is closed. The number to
 watch is ~180, and nothing in a 600 s run approaches it.
+
+---
+
+**IDs:** ENT-014, UI-012 · **Systems:** entities (+ RND), interface (+ PRG) ·
+**Types:** balance, feature · **Status:** done ·
+**Branch:** claude/ent-014-ui-012-small-fixes (the current worktree, cut
+from `main` after #32 — owner, 2026-09-24)
+
+Two small follow-ups left open by this journal's CB-4 and CB-9 notes and
+confirmed as pending by DOC-005. They follow the DOC-001 layout; the entries
+above predate it.
+
+## ENT-014 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Slow the skull's `attack` animation so one play covers its
+  swing.
+- **Details:** About 10 fps, per the DOC-005 note.
+- **Constraint:** The swing timings (`attack_telegraph`, `attack_active`)
+  stay as they are; only the art's speed changes.
+
+## ENT-014 — Confirmed reading
+
+- The Husk (`skull`, `path_chase_attack`) swings for `attack_telegraph`
+  0.2875 + `attack_active` 0.4375 = **0.725 s** (`data/enemies/enemies.json`).
+- Its rig's `attack` strip is 7 frames at 14 fps = **0.5 s**
+  (`data/enemies/enemy_sprites.json`), so it has held its last frame for the
+  final 0.225 s of every swing, and that gap has grown since CB-4.
+- The same rig draws the training dummy, which never attacks, so nothing
+  else sees the change.
+- **ENT-014.D1 — 10 fps.** 7 / 10 = 0.70 s, which ends 0.025 s before the
+  swing does, so the strip always plays through and is never cut back to
+  `walk`. The exact match, 7 / 0.725 ≈ 9.66 fps, is less than a frame
+  (1/10 s) different. The bear and turtle are pinned to an exact match;
+  the skull is pinned to within one frame of its swing.
+
+## ENT-014 — Plan
+
+`attack.fps` 14 → 10 on the skull rig. A test in
+`tests/entities/ai/test_melee_enemies.py`: the skull's strip plays within
+one frame of its swing and never runs past it.
+
+## ENT-014 — Tasks
+
+- [x] ENT-014.1 — The rig at 10 fps, its test, and this block
+
+## ENT-014 — Results
+
+See the combined results below.
+
+## UI-012 — Requirement (owner, 2026-09-24)
+
+- **Objective:** Show the chests opened on the run summary.
+- **Details:** The count is already kept in `stats["chests"]`.
+- **Constraint:** The summary still draws a stats dict written before the
+  count existed.
+
+## UI-012 — Confirmed reading
+
+- `game/states/playing/core/chests.py` adds one to `run.stats["chests"]`
+  per opened chest (CB-9), and the run seeds it at 0
+  (`core/state.py`). `ui/run_summary.py`'s Run column shows gold earned,
+  then potions, then elements, but no chests.
+- **UI-012.D1 — Its own row, "Chests", after "Potions".** Chests pay out
+  the gold and the potions shown just above it. A missing key reads 0, the
+  same way `potions` does.
+- **UI-012.D2 — The items list gives way to the rows above it** (found on
+  the screenshot). One more row pushed a full list's "+N more items" line
+  (10 items shown, 11 or more acquired) across the column's frame. The list
+  now shows as many items as the column still holds, capped at
+  `MAX_ITEMS` 10, and gives up one of them to the "more" line when items are
+  left over. At 1600 × 900 that is 9 items plus "+5 more" for 14 acquired.
+  10 or fewer still show in full.
+
+## UI-012 — Plan
+
+One `_kv` row in `RunSummary`'s Run column. A test that the row is drawn
+with the count and that an older dict without the key still draws. A
+screenshot of the summary.
+
+## UI-012 — Tasks
+
+- [x] UI-012.1 — The Chests row, its test, a screenshot, and this block
+
+## ENT-014 / UI-012 — Results
+
+- **ENT-014.1** (`d459ba1`): the skull rig's `attack` runs at 10 fps, so it
+  plays for 0.70 s of the 0.725 s swing. New test
+  `test_the_husk_attack_animation_covers_its_swing` (it fails at 14 fps).
+  `tests/entities/ai/test_melee_enemies.py` and `tests/systems/test_assets.py`:
+  **33 passed, 30 subtests**.
+- **UI-012.1:** a "Chests" row after "Potions" in the Run column
+  (`ui/run_summary.py`), and the items list fitted to the column
+  (UI-012.D2). `tests/screens/test_victory.py::ChestTests` has 3 tests: the
+  count, an older summary reading 0, and a 14-item list staying inside the
+  frame. `tests/screens`, `tests/flows/test_hero_unlock.py` and
+  `tests/render/test_damage_numbers.py`: **573 passed, 51 subtests,
+  0 skipped**.
+- **Screenshot:** the victory summary with 6 chests, then again with
+  14 items acquired, showing 9 of them plus "+5 more items" inside the
+  frame.
