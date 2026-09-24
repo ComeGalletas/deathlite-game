@@ -74,13 +74,17 @@ class HostileGlowTests(unittest.TestCase):
         self.assertEqual(glow[0].get_at((want // 2, want // 2)).a, config.HOSTILE_GLOW["alpha"])
 
     def test_alpha_is_steady_over_the_flight(self):
+        """Aged by hand rather than through `update_projectiles`: the shot is
+        fired at the hero from 60 px, so a simulated half second could end
+        in a hit on the hero or the terrain and leave nothing to draw. The
+        glow reads only the shot's position and collider, so moving it along
+        its flight and spending its life is the whole of "later"."""
         shot = self._shot((60, 0))
         first = self._draw()[0][0]
         shot.lifetime -= 2.0                                     # later in its life
-        for _ in range(30):
-            self.ps.fx.update_projectiles(1 / 60)
-        if not self.ps.hostiles.active:
-            self.skipTest("shot expired or hit something")
+        shot.age += 0.1
+        shot.pos += shot.vel * 0.1                               # 23 px on
+        self.assertTrue(self.ps.hostiles.active)
         self.assertIs(self._draw()[0][0], first)                 # same cached surface
 
     def test_a_barrage_shares_one_surface(self):

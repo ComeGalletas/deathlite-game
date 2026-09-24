@@ -91,6 +91,12 @@ hits are prose). One subtask per module, the mixer pair together.
   list): one sign, the shipped `ghost.kinds` from `data/`, a body behind its
   foot → 0 ghost blits. Checked red: the same map with `sign` added to the
   kinds ghosts once.
+- **3.7** `test_hostile_glow.py::test_alpha_is_steady_over_the_flight`
+  fired a shot at the hero from 60 px, ran `update_projectiles` for half a
+  second and skipped if the shot had hit something. `hostile_projectiles`
+  (`visual/rendering.py:818`) reads only the shot's position and radius, so
+  the shot is now aged by hand (life spent, `age` and position advanced)
+  and the test asserts it is still live before comparing surfaces.
 
 ## TST-004 — Plan
 
@@ -110,8 +116,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed) → `d92dfef`
   - [x] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed) → `0ce324e`
   - [x] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed) → `87086ac`
-  - [x] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
-  - [ ] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
+  - [x] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed) → `fe87682`
+  - [x] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
   - [ ] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)
   - [ ] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)
   - [ ] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
