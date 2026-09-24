@@ -430,9 +430,9 @@ make the report fuller but are not a prerequisite.
 ## CMB-008 — Tasks
 
 - [x] CMB-008.1 — `spawn_stress --cascade`: a dense crowd primed with two elements so reactions chain; report frame p50/p99, reactions run/deferred per frame and the backlog trend, particles refused, damage-number peak and drops
-- [ ] CMB-008.2 — Measure a cascade-heavy build on the DPS bench for realistic load
-- [ ] CMB-008.3 — Record the table against M9 (elemental journal, M9 *What it costs*)
-- [ ] CMB-008.4 — Only if D1 fails: an elemental damage-number allowance, limits in data, with a test that a weapon's number survives a full pool
+- ~~CMB-008.2 — Measure a cascade-heavy build on the DPS bench for realistic load~~ dropped: the bench measures one dummy with nothing beside it, so no aura can spread and nothing can cascade. The realistic-cadence case is scenario C below — the three infused weapons at their own rate, no pumped hits.
+- [x] CMB-008.3 — Record the table against M9 (elemental journal, M9 *What it costs*)
+- ~~CMB-008.4 — Only if D1 fails: an elemental damage-number allowance, limits in data, with a test that a weapon's number survives a full pool~~ dropped: D1 holds (see the table), and the allowance it describes already exists (`_LOW_PRIORITY_FULL`, the corrected reading above).
 - [ ] CMB-008.5 — Close design §13 question 12 with the result; index to done
 
 ## CMB-008 — Results
@@ -459,3 +459,43 @@ change the game:
   `add_label` wrapped to count what each priority asked for and what was
   refused.
 - `--pack`: the same packed crowd with no elements at all — the control.
+
+### CMB-008.3 — The measurement (2026-09-23)
+
+Seed 35, LOD 2, 100 live asked, 400 dormant, 600 frames after a 60-frame
+warm-up, `--render` on every run; `python -m tools.benchmarks.spawn_stress`
+with the flags shown. Times in ms. The master keeps spawning while a run
+goes, so the live count at the end differs by scenario (in brackets).
+
+| scenario | update p50 / p99 / max | draw p50 (in view) | reactions/frame p99 · at cap 8 | backlog max · last ¼ | depth | particles refused | numbers peak · dropped weapon / label / element |
+|---|---|---|---|---|---|---|---|
+| A `--render`, no elements (133) | 5.43 / 7.58 / 11.45 | 18.34 (32) | — | — | — | — | — |
+| B `--elements` — M9's primed crowd (125) | 5.03 / 7.45 / 11.71 | 17.83 (29) | — | — | — | 0 | 163 · — |
+| **F `--pack`, no elements — the control** (168) | **8.14 / 14.19 / 20.84** | 18.17 (117) | — | — | — | — | — |
+| **C `--cascade`, weapons only** (150) | **7.64 / 12.28 / 25.62** | 20.30 (107) | 3 · 4 / 600 | 16 · 0.0 | d1 25, d2 18, d3 9 | 0 | 186 · 0/75, 0/98, 186/825 |
+| D `--cascade --element-rate 20` (96) | 6.76 / 10.96 / 14.44 | 23.43 (93) | 8 · 10 / 600 | 6 · 0.0 | up to d5 | 0 | 191 · 0/62, 0/719, 19,771/20,583 |
+| E `--cascade --element-rate 60` (96) | 7.06 / 10.39 / 12.69 | 22.79 (91) | 8 · 34 / 600 | 33 · 0.0 | up to d3 | 0 | 196 · 0/62, 0/751, 49,334/50,115 |
+
+What it says, against D1:
+
+- **Frame time — the cascade costs nothing measurable.** The packed crowd
+  with *no elements* (F) costs more update time than the staged cascade
+  (C): what rose against A is crowding — ~110 bodies inside a 220 px disc,
+  colliding and pathing — not reactions. C's one 25.6 ms frame is the
+  opening burst (a crowd of primed auras all reacting at once), which the
+  budget spread over the next frames. Draw moves with bodies in view, not
+  with elements (C 20.3 at 107 in view against F 18.2 at 117). Against M9,
+  whose runs had update p50 5.8–6.4 ms, A and B sit in the same band.
+- **The backlog drains.** Its last quarter averages 0.0 in every run; the
+  worst is 33 held at 60 pumped hits a frame, and the cap of 8 was reached
+  on at most 34 frames of 600.
+- **No weapon number and no reaction label was dropped** in any run. The
+  pool peaked at 196/200; everything refused was a low-priority element
+  number yielding the reserved quarter, which is the design working. At
+  realistic cadence (C) that is 186 of 825.
+- **Particles never pressed:** the element budget used at most 7 of its 90
+  a frame and refused nothing; the shared pool stayed under 300 of 1200.
+- **Cascades are shallow.** The deepest chain was five reactions, at 20
+  pumped hits a frame; at realistic cadence, three. The aura lock and the
+  per-frame budget are enough of a brake — no depth cap is called for
+  (R47 stands).
