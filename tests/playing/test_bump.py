@@ -92,7 +92,7 @@ class BumpResolverTests(unittest.TestCase):
 
     def test_penetration_is_clamped_so_a_tunnelling_body_cannot_spike(self):
         rr = (14 + 14) * config.CROWD_PUSH_RADIUS_FRAC      # two enemies: the push radius
-        deep =_ps([Body(0, 0, 14, 7), Body(rr * 0.05, 0, 14, 7)])   # ~95% overlap
+        deep = _ps([Body(0, 0, 14, 7), Body(rr * 0.05, 0, 14, 7)])   # ~95% overlap
         capped = _ps([Body(0, 0, 14, 7), Body(rr * (1.0 - _PEN_CAP_FRAC), 0, 14, 7)])
         _resolve(deep)
         _resolve(capped)
