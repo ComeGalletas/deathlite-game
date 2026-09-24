@@ -329,7 +329,7 @@ This block follows the DOC-001 layout; the entries above predate it.
 ## SYS-009 — Tasks
 
 - [x] SYS-009.1 — This block
-- [ ] SYS-009.2 — `MELEE_REACT_SCALE` to `game/config.py`
+- [x] SYS-009.2 — `MELEE_REACT_SCALE` to `game/config.py`
 - [ ] SYS-009.3 — `TimedVisual` for `_death_fx` and `_explosions`; their tests
 - [ ] SYS-009.4 — `rig_frame` / `blit_rig` for the four sprite paths
 - [ ] SYS-009.5 — Results; the follow-up notes; index to done

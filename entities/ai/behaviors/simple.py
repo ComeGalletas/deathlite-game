@@ -23,13 +23,12 @@ from game import config
 # missing key falls back to the constant.
 #
 # CB (journals/combat_balance_journal.md): the wind-up and the swing were
-# stretched by MELEE_REACT_SCALE so the player can read the telegraph and step
-# out before the MeleeHitbox lands. `attack_recover` / `attack_cooldown` are
-# left alone, so attack *cadence* barely shifts -- only the readable window and
-# the hitbox lifetime grow.
-MELEE_REACT_SCALE = 1.25
-MELEE_ATTACK_TELEGRAPH = 0.15 * MELEE_REACT_SCALE   # 0.1875 s wind-up (reaction window)
-MELEE_ATTACK_ACTIVE = 0.35 * MELEE_REACT_SCALE      # 0.4375 s swing + hitbox lifetime
+# stretched by `config.MELEE_REACT_SCALE` (1.25) so the player can read the
+# telegraph and step out before the MeleeHitbox lands. `attack_recover` /
+# `attack_cooldown` are left alone, so attack *cadence* barely shifts -- only
+# the readable window and the hitbox lifetime grow.
+MELEE_ATTACK_TELEGRAPH = 0.15 * config.MELEE_REACT_SCALE   # 0.1875 s wind-up (reaction window)
+MELEE_ATTACK_ACTIVE = 0.35 * config.MELEE_REACT_SCALE      # 0.4375 s swing + hitbox lifetime
 MELEE_ATTACK_RECOVER = 0.15
 MELEE_ATTACK_COOLDOWN = 0.6
 
