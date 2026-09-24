@@ -22,7 +22,7 @@ from entities.pickup import XP_TIER_COLORS
 from game.states.playing.devtools import overlays
 from game.states.playing.visual.drawctx import DrawCtx
 from game.states.playing.visual.glow import GlowCache
-from game.states.playing.visual import health_bars
+from game.states.playing.visual import health_bars, status_marks
 from game.states.playing.visual.projectiles import draw_projectile
 from game.states.playing.visual.summons import draw_summon
 from progression import chests as _chests
@@ -39,7 +39,9 @@ _ORB_RIGS = {0: "xp_orb_small", 1: "xp_orb_medium", 2: "xp_orb_large"}
 _GEM_CULL_PAD = 64          # world px past the view a gem (and its glow) still draws
 _STATUS_TINT = {"burn": (255, 130, 60), "chill": (140, 210, 255),
                 "shock": (255, 230, 120), "stun": (240, 240, 255),
-                "mark": (210, 170, 255)}
+                # RND-007: the mark's ring is the same raspberry as its
+                # brackets, from data/weapons/status_visuals.json.
+                "mark": tuple(status_marks.spec()["colour"])}
 _HIT_TINT = (150, 30, 30)
 # Hazard fill: alpha at spawn is FLOOR + ALPHA, fading to FLOOR as the pool
 # expires. Halved from 70/20 when the pools gained art -- the disc still has
@@ -586,6 +588,7 @@ class WorldRenderer:
         sprited = e.anim is not None
         if sprited:
             self.enemy_sprite(surface, e)
+            status_marks.draw(self, surface, e)      # RND-007: over the body
         else:
             colour = (255, 255, 255) if e.hit_flash > 0 else e.color
             for sid, tint in _STATUS_TINT.items():
@@ -734,6 +737,7 @@ class WorldRenderer:
             if b._hurt_t > 0.0:
                 frame = hit_tinted(frame)
             self.blit_rig(surface, frame, b.anim.rig, flip, b.pos, b.radius, z)
+            status_marks.draw(self, surface, b)      # RND-007: over the body
         else:
             colour = (255, 255, 255) if b.hit_flash > 0 else b.color
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
