@@ -264,7 +264,9 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 
 **Todo**
 
-- [ ] For the layout-content skips, search the four pinned seeds for one that has *(DOC-003: interactables fixed (`test_interactables.py`); the seed-dependent skips left are listed in `cut_script_skips_journal.md` (TST-002, *Follow-up candidates*))*
+*(TST-004, 2026-09-24: done — the last 18 conditional skips (seed-dependent, mixer, numpy, SDL through ctypes, the dead void band) are assertions, hand-built cases or always-runnable checks; TST-004.3 in `test_debt_journal.md`. No live `skipTest` is left in `tests/`.)*
+
+- [x] For the layout-content skips, search the four pinned seeds for one that has *(DOC-003: interactables fixed (`test_interactables.py`); the seed-dependent skips left are listed in `cut_script_skips_journal.md` (TST-002, *Follow-up candidates*))*
       the feature and assert it is found, rather than skipping. `tests/worlds.py`
       makes this nearly free.
 - [x] For `"tileset missing"`, decide whether a missing tileset should be a *(DOC-003: decided by the owner 2026-09-22 — yes, a missing tileset fails; done as TST-003, `925502c`)*

@@ -117,6 +117,19 @@ hits are prose). One subtask per module, the mixer pair together.
   **TST-004.D3 — for the owner:** the repo has no requirements file, so
   nothing declares numpy (or pygame). This session does not add one; if the
   owner wants the test environment written down, that is a separate call.
+- **3.10** `test_native.py::test_the_window_wrapper_is_made_once_and_kept`
+  skipped when `native._window()` found no SDL through ctypes. On Windows
+  `ctypes.CDLL("SDL2.dll")` loads pygame's own copy, so it ran here; off
+  Windows `find_library("SDL2")` cannot see a pip wheel's mangled bundled
+  SDL and it skipped. The regression it pins (one kept `Window` wrapper —
+  the 2026-09-15 dangling-pointer crash) is `_window`'s own Python, so it
+  now runs against a stand-in library answering `SDL_GetWindowFromID` for
+  pygame's real display window, on every platform. A second test asserts
+  the real round trip on win32 (where the game ships) and, elsewhere, that
+  `_window` answers a pointer or `(None, None)` — a branch, not a skip. The
+  helper leaves the wrapper it made kept: dropping one is the crash itself.
+- After 3.10, `grep -rn "skipTest|skipIf|skipUnless|pytest.skip" tests`
+  finds only the two prose mentions.
 
 ## TST-004 — Plan
 
@@ -130,7 +143,7 @@ last commit, and its counts go in Results with 0 skipped as the target.
 
 - [x] TST-004.1 — This journal → `212e764`
 - [x] TST-004.2 — Digest tests through `world_digests` → `f1e620f`
-- [ ] TST-004.3 — Remove the conditional skips
+- [x] TST-004.3 — Remove the conditional skips
   - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip → `874f86f`
   - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed) → `d76bed9`
   - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed) → `d92dfef`
@@ -139,8 +152,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed) → `fe87682`
   - [x] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed) → `7c1922a`
   - [x] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer) → `c616403`
-  - [x] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)
-  - [ ] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
+  - [x] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy) → `af7dc2a`
+  - [x] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
 - [ ] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
