@@ -105,6 +105,6 @@
   with no `cast_marker`; the footprint's progress ramp; the footprint is the
   hazard sprite at the hazard's size; the data; drawn after the hazard pools)
   — **11 passed**. The broader `tests/render` + `tests/playing` +
-  `tests/entities` run on the new draw was still in progress when these
-  were committed, at the owner's request to push; its count is recorded in
-  the next commit.
+  `tests/entities` run on the new draw (76 px, final data) finished after
+  these were committed and pushed at the owner's request: **1059 passed,
+  448 subtests, 0 skipped** (5 min 57 s).
