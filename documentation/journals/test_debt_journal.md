@@ -292,6 +292,11 @@ One subtask per group of modules:
   `block_strength`; the relations (Kestrel evades most, only Aegis blocks,
   the rolls used really are under the chances) are asserted. The code
   defaults in `PLAYER_DEFAULTS` stay pinned. 17 passed.
+- **6.2** `test_incoming_damage.py`: the bumblebee's `contact_damage` 9 (three
+  bite formulas) and Aegis's armour 4 were literals. `BEE` is read once from
+  `enemies.json`; the BUG_JOURNAL #1 regression reads Aegis's armour and
+  asserts what it is about — she has armour, and a bite still lands. 14
+  passed.
 
 ### TST-004.7 — coverage of the five modules
 
@@ -399,8 +404,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler → `d618e61`
   - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig` → `535dd0b`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
-  - [x] TST-004.6.1 — heroes: `test_characters.py`
-  - [ ] TST-004.6.2 — incoming damage: `test_incoming_damage.py`
+  - [x] TST-004.6.1 — heroes: `test_characters.py` → `a193fa8`
+  - [x] TST-004.6.2 — incoming damage: `test_incoming_damage.py`
   - [ ] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py`
   - [ ] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py`
   - [ ] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
