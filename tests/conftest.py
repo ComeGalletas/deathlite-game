@@ -21,6 +21,10 @@ SWEEP = (
     # same class stay in `world`.
     "tests/world/test_chests.py::CountingRuleTests::"
     "test_the_average_island_carries_two_to_three",
+    # Forty generated worlds for the buff-building counts: ~30 s, the `world`
+    # tier's slowest by a factor of three. The guarantee and the ceiling stay
+    # in `world` on the pinned seeds (`PinnedSeedBuffBuildingTests`, TST-005.3).
+    "tests/world/test_repair.py::BuffBuildingCountTests",
 )
 
 # Hand-built grids under a `world` prefix: rules checked on drawings small

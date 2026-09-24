@@ -834,32 +834,14 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class BuffBuildingCountTests(unittest.TestCase):
-    """An island carries the two to five buff buildings it is promised.
+class _BuffBuildingCounts:
+    """`_islands()` over `SEEDS`, shared by the sweep and the pinned-seed
+    classes below."""
 
-    `placement.per_island` is `[2, 5]` and the scatter honours it, but the
-    repair pass then took some of them back: its Dijkstra paid one unit per
-    obstacle blocking a cell, so a choke held by a tree and a choke held by
-    a building cost the same and it removed whichever it met first.
-    Measured before the weighting: 8.5 % of every building placed was taken
-    back, and 18 of 390 eligible islands over sixty seeds finished under
-    the minimum, one of them with nothing at all.
-
-    A building is now worth several trees to the pass, so a sealed region
-    is opened past the scenery where there is scenery to open it past. What
-    is left -- a handful of islands at one -- is the case where the
-    building genuinely is the only thing between the player and the ground
-    behind it, and there the ground wins. That is the pass doing its job,
-    so this asserts a rate rather than a guarantee.
-
-    Villages are excluded because the village pass owns their island, and
-    the boss arena because its clear disc is the fight.
-    """
-
-    SEEDS = tuple(range(1, 41))
+    SEEDS: tuple = ()
 
     def _islands(self):
-        """`(buff building count)` per eligible island, over the seeds."""
+        """`(seed, room, buff building count)` per eligible island."""
         from game.content import get_content
         from world.gen.buildings import buff_kinds
 
@@ -880,6 +862,50 @@ class BuffBuildingCountTests(unittest.TestCase):
                     continue
                 out.append((seed, rid, n))
         return out
+
+
+class PinnedSeedBuffBuildingTests(_BuffBuildingCounts, unittest.TestCase):
+    """The two hard rules on the suite's pinned seeds, whose worlds the tier
+    builds anyway (TST-005.3): the forty-seed class below is `sweep`."""
+
+    SEEDS = W.SEEDS
+
+    def test_no_island_is_left_without_one(self):
+        bare = [(s, r) for s, r, n in self._islands() if n == 0]
+        self.assertEqual(bare, [], f"islands with no buff building: {bare}")
+
+    def test_none_exceeds_the_ceiling(self):
+        over = [(s, r, n) for s, r, n in self._islands() if n > 5]
+        self.assertEqual(over, [])
+
+
+class BuffBuildingCountTests(_BuffBuildingCounts, unittest.TestCase):
+    """An island carries the two to five buff buildings it is promised.
+
+    `placement.per_island` is `[2, 5]` and the scatter honours it, but the
+    repair pass then took some of them back: its Dijkstra paid one unit per
+    obstacle blocking a cell, so a choke held by a tree and a choke held by
+    a building cost the same and it removed whichever it met first.
+    Measured before the weighting: 8.5 % of every building placed was taken
+    back, and 18 of 390 eligible islands over sixty seeds finished under
+    the minimum, one of them with nothing at all.
+
+    A building is now worth several trees to the pass, so a sealed region
+    is opened past the scenery where there is scenery to open it past. What
+    is left -- a handful of islands at one -- is the case where the
+    building genuinely is the only thing between the player and the ground
+    behind it, and there the ground wins. That is the pass doing its job,
+    so this asserts a rate rather than a guarantee.
+
+    Villages are excluded because the village pass owns their island, and
+    the boss arena because its clear disc is the fight.
+
+    Forty generated worlds, so the whole class is `sweep` (TST-005.3);
+    `PinnedSeedBuffBuildingTests` keeps the guarantee and the ceiling in the
+    `world` tier.
+    """
+
+    SEEDS = tuple(range(1, 41))
 
     def test_no_island_is_left_without_one(self):
         """The floor that is a guarantee. An island with no buff building

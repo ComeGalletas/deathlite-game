@@ -558,7 +558,7 @@ current worktree, cut from `main` after #34 and #35 — owner, 2026-09-24)
 
 - [x] TST-005.1 — numpy in `CLAUDE.md`'s test rules, tests and asset scripts only
 - [x] TST-005.2 — `PurityTests` share one world build
-- [ ] TST-005.3 — `BuffBuildingCountTests` into `sweep`; re-time the world tier
+- [x] TST-005.3 — `BuffBuildingCountTests` into `sweep`; re-time the world tier
 - [ ] TST-005.4 — `test_gnome_split.py` without fixed values
 
 ## WLD-013 — Requirement (owner, 2026-09-24)
