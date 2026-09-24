@@ -311,6 +311,15 @@ One subtask per group of modules:
   `> 0` like the damage and area beside it, which were already relaxed for
   the same reason. The Forging count (twelve, two per weapon) stays: it is
   the design. 59 passed.
+- **6.4** `tests/combat`: the bow's damage 10 and reach 460 (four reach
+  sums), Critical Edge V's 0.25 / 0.5 and Scorch I's 0.04 / 2.0 s, and the
+  Grave Totem's 5 s replant gap with the 6 s cooldown and 8 s life behind
+  the plant windows (4.9 / 5.1 / 2.4 / 7.0 s). A `level_value(bid, key, n)`
+  helper reads a blessing's level from `blessings.json`; `GAP`, `COOLDOWN`
+  and `LIFE` read the totem; every window is written from them, and the
+  premise the two-slot test needs (a totem outlives one cooldown) is
+  asserted. The totem's base count of one stays pinned — its docstring
+  explains why one is the design. 66 passed.
 
 ### TST-004.7 — coverage of the five modules
 
@@ -420,8 +429,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
   - [x] TST-004.6.1 — heroes: `test_characters.py` → `a193fa8`
   - [x] TST-004.6.2 — incoming damage: `test_incoming_damage.py` → `df97159`
-  - [x] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py`
-  - [ ] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py`
+  - [x] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py` → `6bfae37`
+  - [x] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py`
   - [ ] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
   - [ ] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,

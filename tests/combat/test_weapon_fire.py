@@ -141,12 +141,13 @@ class ReachTests(unittest.TestCase):
         self.assertEqual(s._reach(2.0), (area + 20) * 2.0)
 
     def test_projectile_reach_is_field_plus_area_bonus_times_mult(self):
-        f = w("bow")                               # reach 460
-        self.assertEqual(f._reach(1.0), 460.0)
-        self.assertEqual(f._reach(1.5), 690.0)
+        f = w("bow")
+        reach = float(get_content().weapon("bow")["reach"])      # tuned in the data
+        self.assertEqual(f._reach(1.0), reach)
+        self.assertEqual(f._reach(1.5), reach * 1.5)
         f.bonus["area"] = 50.0
-        self.assertEqual(f._reach(1.0), 510.0)
-        self.assertEqual(f._reach(2.0), 1020.0)
+        self.assertEqual(f._reach(1.0), reach + 50.0)
+        self.assertEqual(f._reach(2.0), (reach + 50.0) * 2.0)
 
     def test_a_non_melee_def_without_a_reach_field_is_unbounded(self):
         d = dict(get_content().weapon("bow"))
