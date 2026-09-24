@@ -824,7 +824,7 @@ This block follows the DOC-001 layout; the entries above predate it.
 
 ---
 
-**ID:** ENT-016 · **System:** entities · **Type:** feature · **Status:** in progress ·
+**ID:** ENT-016 · **System:** entities · **Type:** feature · **Status:** done ·
 **Branch:** claude/doc-006-ui-013-dps-table (the current worktree, owner 2026-09-24)
 
 ## ENT-016 — Requirement (owner, 2026-09-24)
@@ -877,12 +877,61 @@ This block follows the DOC-001 layout; the entries above predate it.
   - A fast bench case pinned as a rate (the pack crosses a bridge), not a
     single outcome.
 
+## ENT-016 — Results
+
+**The bench** (`python -m tools.benchmarks.bridge_crowd --seconds 40`). Each
+cell is crossed/pack, then the time half the pack took to cross, then how
+many were stuck:
+
+| seed | bridge | 1.0 | 0.75 | 0.6 | 0.45 |
+|---|---|---|---|---|---|
+| 35 | 0-1 | 24/24 · 9.9 s · 0 | 24/24 · 9.2 s · 0 | 24/24 · 8.9 s · 0 | 24/24 · 8.7 s · 0 |
+| 35 | 0-1 (lane 2) | 24/24 · 11.1 s · 0 | 24/24 · 9.7 s · 0 | 24/24 · 9.0 s · 0 | 24/24 · 9.0 s · 0 |
+| 7 | 0-1 | 24/24 · 10.6 s · 0 | 23/24 · 9.0 s · 0 | 21/24 · 8.2 s · 1 | 18/24 · 8.4 s · 0 |
+| 7 | 0-1 (lane 2) | 24/24 · 9.2 s · 0 | 24/24 · 8.0 s · 0 | 24/24 · 8.2 s · 0 | 24/24 · 7.8 s · 0 |
+| 42 | 0-1 (1984 px deck) | 16/24 · 36.2 s · 0 | 16/24 · 34.3 s · 0 | 15/24 · 34.0 s · 0 | 19/24 · 35.0 s · 0 |
+| 42 | 0-2 (832 px deck) | 24/24 · 13.5 s · 0 | 24/24 · 12.0 s · 0 | 24/24 · 12.0 s · 0 | 24/24 · 11.8 s · 0 |
+| **all** | | **136/144 · 11.1 s · 0** | **135/144 · 9.7 s · 0** | **132/144 · 9.0 s · 1** | **133/144 · 9.0 s · 0** |
+
+- **ENT-016.D3 — 0.75.** No pack jams at any fraction once the bench
+  measures a clean crowd. Lowering the push radius mainly makes the file
+  move faster: half across 13 % sooner at 0.75, and 19 % at 0.6. Below 0.75,
+  one seed-7 bridge ends with fewer bodies across (21, then 18 of 24): a
+  pack compressed that far jostles back over the line round the hero. 0.75
+  takes most of the speed-up and none of that loss.
+- **The seed-42 long deck** is a walk, not a jam. At 1984 px, a turtle at
+  55 px/s needs 36 s, so a third of the pack is still on the deck at 40 s,
+  at every fraction.
+- **The bench's first run was wrong, twice.** Both are fixed, and recorded
+  so the first table is not trusted:
+  1. The spawn master's zone pass (which runs before its `frozen` gate)
+     slept a pack left on the hero's old island, and its watchdog recycles
+     a body it judges stuck. Both are now off in the bench.
+  2. The hero levelled up mid-trial on seed 42. The offering paused the run,
+     and every later trial sat frozen behind it: the "stuck 24" rows. The
+     bench now switches XP off and asserts the run is never overlaid.
+- **In play,** the watchdog's recycling is what a real jam would look like:
+  bodies disappearing at a mouth rather than piling up. The bench saw no
+  jam for it to hide.
+- **Tests:**
+  - `tests/playing/test_bump.py::PushRadiusTests` (5).
+  - Two CB-3 tests are re-expressed against the push radius: one placed its
+    bodies inside the collider but outside the new radius, and one computed
+    the penetration cap against the full radius.
+  - `tests/playing/test_bridge_crowd.py` (integration tier): a pack of 12 on
+    seed 35 crosses at ≥ 90 %, with none stuck, and the shipped value is the
+    benched one.
+  - The pinned run digests moved (seeds 7 and 123: the crowd packs tighter)
+    and are re-pinned with `python -m tools.verification.run_digest --write`.
+  - `tests/playing`, `entities`, `combat`, `flows`, `spawn`: **1542 passed,
+    0 skipped**.
+
 ## ENT-016 — Tasks
 
 - [x] ENT-016.1 — This block
 - [x] ENT-016.2 — `CROWD_PUSH_RADIUS_FRAC` in the bump pass
 - [x] ENT-016.3 — The bridge-crowd bench and its table
-- [ ] ENT-016.4 — The value; tests; results
+- [x] ENT-016.4 — The value; tests; results
 
 ---
 

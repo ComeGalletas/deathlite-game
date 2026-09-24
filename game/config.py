@@ -1045,9 +1045,11 @@ HIT_KNOCK_GAIN: float = 2.5      # weapon weight -> hit impulse base
 # are closer than this fraction of their summed radii, so a pack can compress
 # and file across a one-tile bridge deck instead of shoving itself back off
 # the mouth. The hero and the boss still bump at their full colliders. Set
-# from `tools/benchmarks/bridge_crowd.py` -- see the ENT-016 table in
-# journals/enemy_ai_journal.md.
-CROWD_PUSH_RADIUS_FRAC: float = 1.0
+# from `tools/benchmarks/bridge_crowd.py` (24-body packs, six bridges, three
+# seeds, 40 s): half the pack across in 11.1 s at 1.0, 9.7 s at 0.75, 9.0 s at
+# 0.6; 136 / 135 / 132 of 144 across. 0.75 takes most of the speed-up and
+# none of the loss -- see the ENT-016 table in journals/enemy_ai_journal.md.
+CROWD_PUSH_RADIUS_FRAC: float = 0.75
 # Six-weapon system P4 (design §10): every "recently hit" / "marked" synergy
 # shares this window, and every synergy card states it.
 SYNERGY_WINDOW_S: float = 1.5

@@ -55,7 +55,7 @@ class BumpResolverTests(unittest.TestCase):
 
     def test_light_body_flies_and_the_heavy_one_barely_moves(self):
         bug = Body(0, 0, 7, 3)
-        tank = Body(24, 0, 24, 14)                 # deep overlap
+        tank = Body(12, 0, 24, 14)                 # deep overlap, inside the push radius
         _resolve(_ps([bug, tank]))
         self.assertGreater(bug._knock.length(), tank._knock.length())
         # roughly the inverse weight ratio (14/3 ~= 4.7)
@@ -91,8 +91,8 @@ class BumpResolverTests(unittest.TestCase):
         self.assertEqual(boss._knock, pygame.Vector2())
 
     def test_penetration_is_clamped_so_a_tunnelling_body_cannot_spike(self):
-        rr = 14 + 14
-        deep = _ps([Body(0, 0, 14, 7), Body(rr * 0.05, 0, 14, 7)])   # ~95% overlap
+        rr = (14 + 14) * config.CROWD_PUSH_RADIUS_FRAC      # two enemies: the push radius
+        deep =_ps([Body(0, 0, 14, 7), Body(rr * 0.05, 0, 14, 7)])   # ~95% overlap
         capped = _ps([Body(0, 0, 14, 7), Body(rr * (1.0 - _PEN_CAP_FRAC), 0, 14, 7)])
         _resolve(deep)
         _resolve(capped)

@@ -78,6 +78,7 @@ INTEGRATION = (
     "tests/render/test_render_cull.py",
     "tests/flows/test_run_determinism.py",
     "tests/devtools/test_element_building.py",
+    "tests/playing/test_bridge_crowd.py",
 )
 
 
