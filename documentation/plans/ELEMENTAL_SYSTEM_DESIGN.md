@@ -606,13 +606,10 @@ a cascade decay in value.
 | R49 | Directional variants in practice *(closes open 6)* | **None today, and none needed.** The `triggered_by` machinery stays available — making order matter later is a data edit with no code change. |
 | R50 | `globalReactionAuraCooldown` value *(closes open 13)* | **1.0 s**, as shipped. Edit it at `data/weapons/elements.json` → `global.reaction_aura_cooldown`; it is one of the two brakes on the R38 cascade. |
 | R42 | Spread ordering *(v9, CMB-006)* | Inside one contact the aura is spread before the reaction's own payload, so the payload owns its status row's credit and binding rather than the spread element's `onApplied`. |
+| R51 | Particle and damage-number limits under the cascade *(closes open 12, CMB-008)* | **They hold; nothing changes.** Measured 2026-09-23 with `spawn_stress --cascade` (a packed crowd primed so reactions chain, up to five deep): no update cost beyond what the same packed crowd costs with no elements, the reaction backlog always drains, the particle budget is never pressed (≤ 7 of 90 a frame, nothing refused), and no weapon number or reaction label is ever dropped — the damage-number pool's low-priority reservation (`ui/damage_numbers.py`, top 25 % kept for weapon numbers) does its job. `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200 stay. Table: `reaction_damage_rework_journal.md`, CMB-008.3. |
 
 ### Still open
 
-*Settled since v8: 1 (locked node keeps spreading, §4.3), 2 and 3 (Superconduct and ThunderWind reach, §5.5), 7 (IceWind stacks freeze, §5.5), 11 (damage formula, R39), and — reconciled against the shipped code on 2026-09-22 — 4, 8, 9 and 10, which the implementation had answered without the answer ever being written down. 5, 6, 13 and 14 were closed by the owner on 2026-09-22. The numbering of the rest is unchanged so older references still resolve.*
-
-| # | Question | Proposal |
-|---|---|---|
-| 12 | Existing particle system limits | **Open, to measure and test** (owner, 2026-09-22). `MAX_PARTICLES` 1200 and `MAX_DAMAGE_NUMBERS` 200 in `game/config.py`. The M9 pass measured the element system at ~30x a real build's load without trouble, but that was before the R38 cascade, which is load the original audit never saw: more reactions per frame, each with its own flash, label and stream of numbers. Measure a dense cascade before closing this. Tracked as **CMB-008** (proposed). |
+*None.* Settled since v8: 1 (locked node keeps spreading, §4.3), 2 and 3 (Superconduct and ThunderWind reach, §5.5), 7 (IceWind stacks freeze, §5.5), 11 (damage formula, R39), and — reconciled against the shipped code on 2026-09-22 — 4, 8, 9 and 10, which the implementation had answered without the answer ever being written down. 5, 6, 13 and 14 were closed by the owner on 2026-09-22, and 12 by measurement on 2026-09-23 (R51, CMB-008). The numbers are kept so older references still resolve.
 
 

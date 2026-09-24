@@ -361,7 +361,7 @@ are `interval: 0`, every attack. That does not change the answer, but the
 Ember Ring being rate-limited matters: it is a re-hitting orbiter, which is
 exactly the case the cadence exists for.
 
-*(DOC-003: #12 is tracked as **CMB-008**, proposed.)*
+*(DOC-003: #12 is tracked as **CMB-008** — closed 2026-09-23 by measurement, design §13 R51.)*
 
 #12 is worth keeping open for a reason the original audit could not have had:
 `MAX_PARTICLES` is 1200 and `MAX_DAMAGE_NUMBERS` 200, and the M9 pass measured
@@ -433,7 +433,7 @@ make the report fuller but are not a prerequisite.
 - ~~CMB-008.2 — Measure a cascade-heavy build on the DPS bench for realistic load~~ dropped: the bench measures one dummy with nothing beside it, so no aura can spread and nothing can cascade. The realistic-cadence case is scenario C below — the three infused weapons at their own rate, no pumped hits.
 - [x] CMB-008.3 — Record the table against M9 (elemental journal, M9 *What it costs*)
 - ~~CMB-008.4 — Only if D1 fails: an elemental damage-number allowance, limits in data, with a test that a weapon's number survives a full pool~~ dropped: D1 holds (see the table), and the allowance it describes already exists (`_LOW_PRIORITY_FULL`, the corrected reading above).
-- [ ] CMB-008.5 — Close design §13 question 12 with the result; index to done
+- [x] CMB-008.5 — Close design §13 question 12 with the result; index to done
 
 ## CMB-008 — Results
 
@@ -499,3 +499,11 @@ What it says, against D1:
   pumped hits a frame; at realistic cadence, three. The aura lock and the
   per-frame budget are enough of a brake — no depth cap is called for
   (R47 stands).
+
+### CMB-008.5 — Closed
+
+Design §13 question 12 is closed as **R51**: the limits hold and
+`MAX_PARTICLES` 1200 / `MAX_DAMAGE_NUMBERS` 200 stay. "Still open" in §13
+now reads *None*. No game code changed in CMB-008 — only the stress
+harness — so no test tier covers it; the harness itself was exercised by
+the seven runs above.
