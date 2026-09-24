@@ -257,6 +257,33 @@ TST-004.6. One subtask each, in the review's order.
   Renamed `test_slash_true_or_no_fx_swings_the_default_soul_slash`, with a
   docstring saying so.
 
+### TST-004.8 — the summon render tests (WA5)
+
+WA5 (`assets_journal.md`, the wolf animation plan) lists
+`tests/rendering/test_summons.py` — now `tests/render/` — covering the
+registry, `classify`, the wolf's sprite against its fallback, `bite_*` for
+~0.25 s after a bite and the run direction following `vel.x`. The DOC-003
+note says the wolf's *behaviour* tests landed in `tests/combat/test_summons.py`
+and the `.gitignore` half is done; the render tests were not written.
+
+What the code does now: `game/states/playing/visual/summons/` registers
+`disc`, `totem` and `wolf` through `@summon_style`, and `draw_summon` falls
+back to the default for an unknown kind. `wolf.py` blits the `spirit_wolf`
+frame the summon's `Animator` holds, and draws the colour disc with a white
+core when there is no animator or the rig does not resolve. The bite hold is
+`entities/summon.py:_BITE_ANIM_S = 0.32` (the plan's "~0.25 s" was tuned to
+the 5-frame strip at 16 fps). The bite is spawned with `style="melee"`,
+which `projectiles.classify` honours and whose family draws nothing.
+
+`tests/render/test_summons.py` (unit tier, real assets, no world): 14 tests
+across `RegistryTests`, `BiteClassifyTests`, `WolfDrawTests` (sprite drawn,
+scales with zoom, disc fallback without rig and without animator) and
+`WolfAnimTests` (`bite_right` held for the hold then `run_right`, `bite_left`
+for a foe to the west, `run_*` following `vel.x`, the last facing kept when
+it stops, `idle` with nothing in reach). The README half of WA5 ("Assets
+note if warranted") is a call for the owner and is left open in the source
+note.
+
 ## TST-004 — Plan
 
 One task per source note, in the order given; each is read first, its
@@ -290,11 +317,11 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.6 — §6: retitle the modules that open with a plan phase → `13daf4f`
   - [x] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts → `631043e`
   - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler → `d618e61`
-  - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`
+  - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig` → `535dd0b`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
 - [ ] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`
-- [ ] TST-004.8 — Summon render tests (WA5)
+- [x] TST-004.8 — Summon render tests (WA5)
 - [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session
 
 ## TST-004 — Results
