@@ -69,6 +69,8 @@ now holds everywhere. One task per test module, then the results.
 
 ## TST-002 — Follow-up candidates (not in scope)
 
+*(DOC-005, 2026-09-24: the tileset skips are gone (TST-003). The rest are still in `tests/` and still **pending**. `tests/world/test_elevation.py:136` can never fire (`HEIGHTMAP_COAST_KEEP` is 2) and can simply be removed; the others are seed- or environment-dependent (SDL through ctypes, numpy, the mixer))*
+
 Other conditional `skipTest` calls found by `grep -rn skipTest tests`. The four
 the owner named come first; the rest turned up in the same sweep.
 

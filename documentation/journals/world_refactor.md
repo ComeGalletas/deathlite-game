@@ -385,6 +385,8 @@ lists which `store` fields it reads and appends to.
 
 ## Follow-ups (not blocking)
 
+*(DOC-005, 2026-09-24: all three **done**: `_slot_for` and `_STAIR_WIDE_*` are gone; the store is `BakedTerrain` (`world/terrain/baked.py`); the bake left `_build_tiles` for `world/terrain/bake.py::bake`)*
+
 - Drop the unused `_slot_for` (superseded by `mask_slot`) and the retired
   `_STAIR_WIDE_OVERLAP_TILES` / `_STAIR_WIDE_ROOM_TILES` constants.
 - A real `TerrainStore` dataclass so the painters and `TerrainRenderer` take a
