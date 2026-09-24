@@ -1,8 +1,9 @@
 # Test debt — journal
 
 **ID:** TST-004 · **System:** tests · **Type:** refactor ·
-**Status:** in progress · **Branch:** claude/tst-004-test-debt (remote
-session, owner 2026-09-24)
+**Status:** in progress (TST-004.1–.8 done; TST-004.9 with the owner's local
+session) · **Branch:** claude/tst-004-test-debt (remote session, owner
+2026-09-24)
 
 ---
 
@@ -447,12 +448,51 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py` → `6bfae37`
   - [x] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py` → `f1d62e4`
   - [x] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py` → `d32ce72`
-  - [x] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
+  - [x] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py` → `149868d`
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py` → `72ce8a1`
 - [x] TST-004.8 — Summon render tests (WA5) → `a719226`
-- [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session
+- [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session (kept by the
+  owner's local session; not this branch's work)
+- [x] TST-004.10 — Run the default suite and record the results (discovered: the
+  closing run needed its own commit)
 
 ## TST-004 — Results
 
-Pending.
+**Default suite** (`python -m pytest -q`, sweep excluded, headless dummy
+drivers), before the last commit: **3,394 passed, 0 failed, 0 skipped**,
+8 deselected (sweep), 1,047 subtests passed, 14 min 36 s. At the start of
+the session, on `main` (`896bd92`): 3,307 passed, 0 skipped, 8 deselected,
+14 min 49 s. The skip count was already 0 on the pinned seeds; what changed
+is that none of the 18 sites *can* skip any more. The sweep tier was not
+run (not asked).
+
+Per task, the covering modules were run before each commit (counts in the
+Confirmed reading above). New test modules: `tests/world/grids/` (six
+modules, `unit` tier), `tests/render/test_summons.py`,
+`tests/systems/test_debug_overlay.py`, `tests/systems/test_mixer_backend.py`,
+`tests/screens/test_character_select.py` (split, not new tests).
+
+Coverage (TST-004.7, fixed subset): the five modules 64.6 % → 91.5 %
+together; `debug_overlay` and `validate` 100 %, `mixer_backend` 98.2 %,
+`village_tidy` 96.6 %, `world/gen/graph.py` 61.0 %.
+
+No game code was changed; no `data/` value was touched; `INDEX.md` was not
+edited. No test exposed a bug in the game.
+
+**Left for the owner:**
+
+- **TST-004.D3** — numpy is now required to run the suite (the recolour
+  tool's `--check` needs `pygame.surfarray`); the repo has no requirements
+  file to record that in.
+- **TST-004.D6** — `world/gen/graph.py`'s `_adjacency`, `_rooted_tree`,
+  `_grow_subtree` are called from nowhere; deleting them is a game-code
+  change this requirement did not make.
+- **TST-004.4** — the `world` tier is 2 min 56 s, not R4's 90 s: its time is
+  world builds and statistical checks (`BuffBuildingCountTests` 33 s), which
+  would have to move to `sweep` to meet it.
+- **TST-004.6.6** — `test_buffs.py` and the bee-size tests keep their
+  literals as owner decisions; say so if either is tuning.
+- **TST-004.8** — WA5's README note is still the owner's call.
+- **TST-004.9** — the Bonepicker/Gaffjaw screenshot stays with the local
+  session.
