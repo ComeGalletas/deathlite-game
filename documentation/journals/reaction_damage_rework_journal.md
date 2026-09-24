@@ -394,10 +394,15 @@ each with its own flash, label and stream of numbers.
 - **Particles degrade gracefully.** Elements draw from their own per-frame
   and per-element allowance (`visual/elements/budget.py`); when it runs out
   auras keep their rings and stop shedding, and `refused` is counted.
-- **Damage numbers do not.** The pool of 200 drops whatever asks next when
-  full, which can be a weapon's own number (`combat/elements/world.py:31`
-  says so, and is why elemental numbers stay 0.9 s). Nothing rations
-  elemental numbers against weapon numbers. This is the likely weak point.
+- ~~**Damage numbers do not.** … Nothing rations elemental numbers against
+  weapon numbers. This is the likely weak point.~~ **Corrected while
+  building CMB-008.1 (2026-09-23):** they are rationed. `ui/damage_numbers.py`
+  refuses a `low_priority` number once the pool is 75 % full
+  (`_LOW_PRIORITY_FULL`), and `RunWorld.deal` sends every elemental number
+  as low priority, so the top quarter stays for weapon numbers. What the
+  reservation does *not* cover is the reaction **label**
+  (`add_label`, not low priority), which a cascade produces one per
+  reacting body — that became the thing to watch.
 - `tools/benchmarks/spawn_stress.py --elements` (with `--element-rate`)
   already primes every enemy and reports auras, reactions, deferred, held,
   the particle budget and the damage-number peak against its cap. It does
@@ -406,6 +411,12 @@ each with its own flash, label and stream of numbers.
   16.7 ms with `--render`); the deferred backlog drains rather than grows;
   no weapon damage number dropped. All three reported, each against the M9
   figures.
+  *Revised on the measurement (2026-09-23):* headless, `--render` draws
+  through SDL's dummy driver in software ("no fast renderer available"),
+  and draw alone is 18 ms at p50 with **no elements at all** — so
+  "update + draw under 16.7 ms" cannot be judged here. The frame criterion
+  becomes the *update* time and the draw time **against a no-element
+  control of the same crowd**, which is what M9 compared too.
 
 ## CMB-008 — Plan
 
@@ -418,7 +429,7 @@ make the report fuller but are not a prerequisite.
 
 ## CMB-008 — Tasks
 
-- [ ] CMB-008.1 — `spawn_stress --cascade`: a dense crowd primed with two elements so reactions chain; report frame p50/p99, reactions run/deferred per frame and the backlog trend, particles refused, damage-number peak and drops
+- [x] CMB-008.1 — `spawn_stress --cascade`: a dense crowd primed with two elements so reactions chain; report frame p50/p99, reactions run/deferred per frame and the backlog trend, particles refused, damage-number peak and drops
 - [ ] CMB-008.2 — Measure a cascade-heavy build on the DPS bench for realistic load
 - [ ] CMB-008.3 — Record the table against M9 (elemental journal, M9 *What it costs*)
 - [ ] CMB-008.4 — Only if D1 fails: an elemental damage-number allowance, limits in data, with a test that a weapon's number survives a full pool
@@ -426,4 +437,25 @@ make the report fuller but are not a prerequisite.
 
 ## CMB-008 — Results
 
-*(filled in as the tasks land)*
+**Branch:** `claude/cmb-008-cascade-limits`, cut from
+`claude/cmb-009-elemental-extras` so the measurement has CMB-009's
+counters and reaction log (owner, 2026-09-23: continue with CMB-008).
+
+### CMB-008.1 — The staged cascade
+
+`tools/benchmarks/spawn_stress.py` gained three things, none of which
+change the game:
+
+- `--cascade`: after the warm-up, the live crowd is packed into a 220 px
+  disc round the hero and primed with the four elements in turn, so
+  neighbours hold different auras and any aura a reaction spreads sets off
+  the next reaction. Staged *after* the 60 warm-up frames: the first try
+  staged it before, the burst spent itself in the warm-up (74 reactions,
+  the number pool at 200/200) and the measured window saw only the
+  aftermath — 9 reactions, none cascading.
+- `Instruments`: per-frame reactions and backlog, the particles the element
+  budget refused, the damage-number pool's size; a large `ReactionLog` on
+  the resolver for the depth histogram; and the pool's `add` /
+  `add_label` wrapped to count what each priority asked for and what was
+  refused.
+- `--pack`: the same packed crowd with no elements at all — the control.
