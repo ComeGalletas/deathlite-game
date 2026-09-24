@@ -131,6 +131,52 @@ hits are prose). One subtask per module, the mixer pair together.
 - After 3.10, `grep -rn "skipTest|skipIf|skipUnless|pytest.skip" tests`
   finds only the two prose mentions.
 
+### TST-004.4 — worldgen R4
+
+R4 (`worldgen_modularity_todo.md`) asks for three things: audit the per-cell
+sweeps for which need a *generated* world and which need only *a* grid,
+convert the second kind to hand-built grids in the `unit` tier, and keep the
+generated sweeps for what only they can prove.
+
+What the tree does now: `tests/world/` is 343 tests, 2 min 56 s
+(`--durations=40`, this session). The cost has moved since R4 was written —
+the shared world cache (R1) removed the per-test rebuilds, and none of the
+per-cell rule sweeps is in the slowest forty any more. The slow tests are
+world builds and statistical checks (`test_repair.py::BuffBuildingCountTests`
+33 s, `test_elevation.py::ScatterTests::test_both_nav_classes_can_use_every_flight`
+11 s, the fresh-build digest pins 10 s), which are the generated-world kind
+R4 says to keep. So this is R4 as a tiering and clarity change, not a speed
+one. Every `tests/world/` module is `world` by path prefix, which also put
+the hand-built rule tests that already existed in the slow tier.
+
+The audit, for the modules with per-cell or hand-built rule checks:
+
+| test | needs | outcome |
+|---|---|---|
+| `test_elevation` `CanCrossTests.test_a_diagonal_cannot_cut_the_corner_of_a_drop` | a grid (composition identity of `can_step`) | moved: `grids/test_steps.py` |
+| `test_elevation` `CanCrossTests.test_the_endpoint_rule_is_load_bearing` | a grid (the corner beside a lateral head) | moved, now names the corner |
+| `test_elevation` `CanCrossTests.test_a_level_change_needs_a_flight` | invariant over islands | kept; hand-built twin added |
+| `test_elevation` `CanCrossTests.test_no_diagonal_ever_changes_level_between_two_terraces` | invariant over islands | kept; hand-built twin added |
+| `test_elevation` `CanCrossTests.test_matches_walk_links_within_every_room` | mirror over every real cell (R3) | kept; hand-built twin added |
+| `test_elevation` `FootStoneRuleTests` | already hand-built | moved: `grids/test_foot_stone.py` |
+| `test_north_flights` `SiteRuleTests`, `LinkRuleTests` | already hand-built | moved: `grids/test_north_flight_rules.py` |
+| `test_elevation` `ColliderTests`, `NavTests`, `ScatterTests`, `LateralCrossingEdgeTests`, `FootStoneTests` | a `GameMap`, the nav build or the generator's own placements | kept |
+| `test_inset`, `test_pathfinding`, `test_repair` | the baked field, the nav grids, the repair pass over real layouts | kept (see below) |
+
+- **TST-004.D4 — `tests/world/grids/`, tiered `unit` by an explicit list.**
+  A new package beside the world tests holds the hand-built cases, with
+  `scenes.py` drawing three one-room height maps in ASCII (a wall flight, a
+  lateral crossing on a plateau flank, a north rim) and building the real
+  `LevelIndex` over them. `tests/conftest.py` gains a `UNIT` tuple checked
+  before `WORLD`, so the `tests/world/` prefix does not claim it.
+- The moved endpoint check was seen red: with `diagonal_blocked` stubbed to
+  `False` the corner test and the no-level-change test fail on the lateral
+  scene's `(3, 1) -> (2, 2)`.
+- Left for a later batch (recorded, not done): `test_inset.py` and
+  `test_pathfinding.py` sweep baked fields and nav grids whose build needs a
+  `GameMap`; a hand-built `GameMap` from a `scenes` layout is the next step
+  if the owner wants the push-down carried further.
+
 ## TST-004 — Plan
 
 One task per source note, in the order given; each is read first, its
@@ -153,8 +199,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed) → `7c1922a`
   - [x] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer) → `c616403`
   - [x] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy) → `af7dc2a`
-  - [x] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes)
-- [ ] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
+  - [x] TST-004.3.10 — `tests/display/test_native.py` (SDL through ctypes) → `d0e14a2`
+- [x] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
 - [ ] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,

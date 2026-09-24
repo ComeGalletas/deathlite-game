@@ -23,6 +23,13 @@ SWEEP = (
     "test_the_average_island_carries_two_to_three",
 )
 
+# Hand-built grids under a `world` prefix: rules checked on drawings small
+# enough to read, nothing generated (worldgen R4). Listed before `WORLD` so
+# the `tests/world/` prefix does not claim them.
+UNIT = (
+    "tests/world/grids/",
+)
+
 # Modules that read generated worlds (through tests/worlds.py or directly).
 WORLD = (
     "tests/world/",
@@ -86,6 +93,8 @@ def pytest_collection_modifyitems(config, items):
         path = item.nodeid.replace("\\", "/")
         if any(path.startswith(p) for p in SWEEP):
             item.add_marker(pytest.mark.sweep)
+        elif any(path.startswith(p) for p in UNIT):
+            item.add_marker(pytest.mark.unit)
         elif any(path.startswith(p) for p in WORLD):
             item.add_marker(pytest.mark.world)
         elif any(path.startswith(p) for p in INTEGRATION):

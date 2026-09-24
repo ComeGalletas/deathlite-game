@@ -137,6 +137,8 @@ phase 1 could have broken. Most of its neighbours do not.
 **Verified by.** Suite green with the same assertions, tier `world` under its
 90 s target.
 
+*(TST-004, 2026-09-24: done for the rule sweeps — audit in `test_debt_journal.md` (TST-004.4). The two `can_step` sweeps that needed only a grid moved to hand-built scenes in `tests/world/grids/` (tier `unit` via `conftest.UNIT`), with hand-built twins of the three invariants that stay on real islands; `FootStoneRuleTests` and the north-flight site/link rules moved there too. The tier's time is now world builds and statistical checks, not per-cell sweeps: `tests/world` runs 2 min 56 s, so the 90 s target is not met and would need those moved to `sweep`, which is the owner's call. `test_inset` / `test_pathfinding` push-down, which needs a hand-built `GameMap`, is left open.)*
+
 *Hands: two to three days · Agent: several hours, incremental, one suite per
 batch*
 
