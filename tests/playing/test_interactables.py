@@ -120,7 +120,8 @@ class EffectTests(unittest.TestCase):
         self.assertFalse(it.used)
         self.assertGreater(p._notice_t, 0.0)
         self.assertIn("needs", p._notice_text)
-        self.assertIn("2 more", p._notice_text)             # sword at 0 of 2
+        need = game.content.offering["forge_requires_levels"]   # tuned in offering.json
+        self.assertIn(f"{need} more", p._notice_text)       # sword at 0 of the requirement
         game._render()                                      # the notice draws (owner bug: `_hud`)
         pygame.quit()
 

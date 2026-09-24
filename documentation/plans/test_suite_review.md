@@ -322,7 +322,8 @@ Concentrated in `tests/playing/test_interactables.py` (6), `tests/entities/ai/te
 - [x] `tests/render/test_weapon_rigs.py:137`
       `test_legacy_true_and_no_fx_keep_the_old_rig` — `soul_slash` is the current
       default for a cone weapon with no visuals entry, not a legacy path. Rename.
-- [ ] ~38 assertions across 20 modules pin exact balance numbers from the data
+*(TST-004, 2026-09-24: done — ~95 found in 24 modules; the tuning ones read `data/` now and assert the relation they stood for, the contracts (owner decisions, design rules, counts a test is named for) stay literal; TST-004.6 in `test_debt_journal.md`.)*
+- [x] ~38 assertions across 20 modules pin exact balance numbers from the data
       JSONs (`aegis.stats["max_hp"] == 160`, `H["damage"] == 25`). Audit them:
       where the number is a contract, keep it; where it is tuning, assert the
       invariant (ordering, ratio, range) so a balance pass does not report a bug.

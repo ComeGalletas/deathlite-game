@@ -441,13 +441,13 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts → `631043e`
   - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler → `d618e61`
   - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig` → `535dd0b`
-- [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
+- [x] TST-004.6 — The balance-number audit in `test_suite_review.md`
   - [x] TST-004.6.1 — heroes: `test_characters.py` → `a193fa8`
   - [x] TST-004.6.2 — incoming damage: `test_incoming_damage.py` → `df97159`
   - [x] TST-004.6.3 — the Hammer and the Forgings: `test_hammer_swing.py`, `test_forge.py` → `6bfae37`
   - [x] TST-004.6.4 — weapons and blessings in `tests/combat`: `test_six_blessings.py`, `test_weapon_fire.py`, `test_summons.py` → `f1d62e4`
-  - [x] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py`
-  - [ ] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
+  - [x] TST-004.6.5 — progression: `test_blessings.py`, `test_meta.py`, `test_forge_offers.py`, `test_potions.py`, `test_chests.py`, `test_regen.py` → `d32ce72`
+  - [x] TST-004.6.6 — the rest: `test_buffs.py`, `test_gnome_split.py`, `test_interactables.py`, `test_dps_bench.py`
 - [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py` → `72ce8a1`
 - [x] TST-004.8 — Summon render tests (WA5) → `a719226`
