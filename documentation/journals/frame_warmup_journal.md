@@ -1,7 +1,8 @@
 # Frame warm-up — journal
 
 **ID:** RND-005 · **System:** rendering (+ SYS) · **Type:** feature ·
-**Status:** proposed (next) · **Branch:** —
+**Status:** in progress · **Branch:** claude/sys-008-run-determinism (the
+owner's choice, 2026-09-24: stay on the current branch)
 
 ---
 
@@ -38,6 +39,32 @@
   pins the renderer clock to a warmed phase today; with every frame warm it
   can take any phase.
 
+### What a world holds, measured (2026-09-24)
+
+Every surface the renderer passes through `_z_surf`, by kind, after the
+loading screen's warm ring, at zoom 1.5 (`config.effective_zoom()`):
+
+| kind | seed 35: unique · warmed · cold MB | seed 7 | seed 123 |
+|---|---|---|---|
+| water buffer | 1 · 1 · 0 | 1 · 1 · 0 | 1 · 1 · 0 |
+| foam frames | 16 · 9 · 2.3 | 16 · 3 · 4.3 | 16 · 3 · 4.3 |
+| **terrace bands** | 19 · 3 · **407.5** | 18 · 2 · **404.1** | 15 · 3 · **278.8** |
+| bridge surfaces and shadows | 26 · 10 · 4.9 | 30 · 12 · 7.6 | 22 · 8 · 5.7 |
+| decor frames (room and void scatter) | 210 · 56 · 6.7 | 229 · 53 · 7.1 | 228 · 51 · 7.5 |
+| obstacle skin frames | 98 · 29 · 21.0 | 96 · 29 · 23.0 | 100 · 32 · 19.7 |
+| tree shadows | 1 · 1 · 0 | 1 · 1 · 0 | 1 · 1 · 0 |
+
+The ring leaves 95–105 MB in the cache. Warming **every surface but the
+bands** is ~240 surfaces and ~35 MB, and takes **14 ms** in total on seed
+35. A cold band takes **2–11 ms** to scale (six measured, 1728×576 to
+3072×1792 source px) — a one-off hitch the first time a terrace comes on
+screen.
+
+- **RND-005.D1 — The bands are not warmed; the owner decides.** "All
+  possible" at ~35 MB and 14 ms is the non-band set. The bands would add
+  280–410 MB of scaled surfaces per world to save a 2–11 ms hitch once per
+  band — measured, put to the owner, not assumed.
+
 ## RND-005 — Plan
 
 A generator of warm steps over every animation the baked world holds —
@@ -49,7 +76,10 @@ asserts the first draw at any phase adds no cache entry.
 
 ## RND-005 — Tasks
 
-*(numbered when taken up)*
+- [x] RND-005.1 — Measure what a world holds and what the ring leaves cold (above)
+- [ ] RND-005.2 — `world/terrain/warm.py`: every non-band scaled surface, warmed as one loading step
+- [ ] RND-005.3 — Tests: every non-band source is cached after loading, and a first draw at any clock phase adds nothing
+- [ ] RND-005.4 — Results; D1 to the owner
 
 ## RND-005 — Results
 
