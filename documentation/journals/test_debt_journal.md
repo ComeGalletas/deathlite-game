@@ -74,6 +74,12 @@ hits are prose). One subtask per module, the mixer pair together.
   ground 20 px either side. Both find a spot on every pinned seed (run with
   `DEATHLITE_TEST_SEED` = 35, 7, 1234). The aggro search now also tries rings
   at five and eight tiles, and both end in an assertion.
+- **3.4** `test_enemy_nav.py` already pins seed 1234 in `_playing`. The
+  steering test skipped if none of three offsets from the player landed on
+  the field; it now also tries 36 ring probes (160/240/320 px, every 30°)
+  and fails if none does. The pocket test skipped if the small-class field
+  held no unreached walkable cell beside a reached one; seed 1234 has one,
+  so the skip is an assertion naming the seed.
 
 ## TST-004 — Plan
 
@@ -90,8 +96,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [ ] TST-004.3 — Remove the conditional skips
   - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip → `874f86f`
   - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed) → `d76bed9`
-  - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed)
-  - [ ] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed)
+  - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed) → `d92dfef`
+  - [x] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed)
   - [ ] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
   - [ ] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
   - [ ] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
