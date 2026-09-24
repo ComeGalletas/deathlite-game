@@ -68,6 +68,12 @@ hits are prose). One subtask per module, the mixer pair together.
   blocking tree *with* a clear approach; a module helper `_open_sea(gm)`
   tries the corner, then 252 probes along the four edges, and fails if none
   is sea. A generator change moves the probe instead of retiring the test.
+- **3.3** `test_npcs.py` boots `W.pinned(2)` (seed 1234). The aggro test
+  skipped when none of twelve points three tiles past the lancer's aggro was
+  clear of every lancer; the hero test skipped when no villager had open
+  ground 20 px either side. Both find a spot on every pinned seed (run with
+  `DEATHLITE_TEST_SEED` = 35, 7, 1234). The aggro search now also tries rings
+  at five and eight tiles, and both end in an assertion.
 
 ## TST-004 — Plan
 
@@ -83,8 +89,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [x] TST-004.2 — Digest tests through `world_digests` → `f1e620f`
 - [ ] TST-004.3 — Remove the conditional skips
   - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip → `874f86f`
-  - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed)
-  - [ ] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed)
+  - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed) → `d76bed9`
+  - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed)
   - [ ] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed)
   - [ ] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
   - [ ] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
