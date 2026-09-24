@@ -1041,7 +1041,7 @@ SYNERGY_WINDOW_S: float = 1.5
 SLAM_INDICATOR_ALPHA: tuple[int, int] = (45, 170)
 
 # --- Debug key bindings (see spec section 9) ---------------------------
-# Raw SDL2 keycodes (== pygame.K_F1 .. pygame.K_F7). Hardcoded rather than read
+# Raw SDL2 keycodes (== pygame.K_F1 .. pygame.K_F9). Hardcoded rather than read
 # from `pygame` because this module is imported before `pygame.init()` and, in
 # the pygbag/browser build, `pygame.K_*` and the `pygame.constants` submodule
 # are not available that early. These SDLK values are fixed by SDL and never
@@ -1055,11 +1055,17 @@ DEBUG_KEYS = {
     "toggle_invuln": 1073741887,        # K_F6
     "toggle_collision_vis": 1073741888,  # K_F7
     "toggle_spawn_vis": 1073741889,      # K_F8
+    "reload_elements": 1073741890,       # K_F9 -- CMB-009.3, dev runs only
 }
 
 # Start with the debug overlay hidden; F1 toggles it. Debug tools are never
 # required for normal play.
 DEBUG_OVERLAY_DEFAULT: bool = False
+
+# CMB-009.4: how many reactions the dev reaction log keeps (a ring buffer,
+# newest first on screen), and how many of them the overlay lists.
+REACTION_LOG_CAPACITY: int = 64
+REACTION_LOG_LINES: int = 14
 
 
 # --- Controls (CB-5 manual aim) ------------------------------------------

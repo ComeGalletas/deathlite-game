@@ -30,7 +30,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | CMB-006 | Reaction damage rework | CMB | feature | done (balance confirmed in play) | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-007 | Elemental design doc brought to the shipped behaviour (open questions closed bar one) | CMB, DOC | process | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-008 | Particle and damage-number limits under a dense reaction cascade (design §13 q.12) | CMB, RND | feature | proposed | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | — | 2026-09-22 |
-| CMB-009 | Elemental extras: building glow, §9.8 counters, §10.3 dev tools | CMB, RND, SYS | feature | proposed | [elemental_system_journal.md](elemental_system_journal.md) | — | 2026-09-22 |
+| CMB-009 | Elemental extras: building glow, §9.8 counters, §10.3 dev tools | CMB, RND, SYS | feature | done | [elemental_system_journal.md](elemental_system_journal.md) | claude/cmb-009-elemental-extras | 2026-09-22 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |
 | ENT-003 | Chaser collider | ENT | bug | legacy | [chaser_collider_journal.md](chaser_collider_journal.md) | — | 2026-09-15 |
@@ -57,7 +57,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | WLD-009 | Buff buildings | WLD, PRG | feature | legacy | [buff_buildings_journal.md](buff_buildings_journal.md) | — | 2026-09-20 |
 | WLD-010 | Special island facilities | WLD | feature | parked | [special_facilities_journal.md](special_facilities_journal.md) | — | 2026-09-20 |
 | WLD-011 | Bridge clearance for large bodies | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
-| WLD-012 | Keep props a wide body's radius clear of bridge mouths | WLD, ENT | bug | proposed | [bridge_clearance_journal.md](bridge_clearance_journal.md) | — | 2026-09-22 |
+| WLD-012 | Keep props a wide body's radius clear of bridge mouths | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/wld-012-bridge-deck-clearance | 2026-09-22 |
 | RND-001 | Asset integration | RND | feature | legacy | [assets_journal.md](assets_journal.md) | — | 2026-08-27 |
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |

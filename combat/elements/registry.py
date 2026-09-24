@@ -145,6 +145,22 @@ class ElementRegistry:
         self._cache.clear()
         self._reaction_cache.clear()
 
+    def adopt(self, fresh: "ElementRegistry") -> None:
+        """Dev hot-reload (CMB-009.3): take `fresh`'s *data* -- the global
+        block, the element and reaction bases and the reaction table -- and
+        keep everything that belongs to the run: the element objects and the
+        modifier layers the run's buffs and blessings wrote. The baked
+        caches are dropped, so the next hit bakes against the new data.
+
+        `fresh` is a registry built from the new files, so a file that
+        cannot bake fails there, before anything here has changed."""
+        self.global_cfg = fresh.global_cfg
+        self._base = fresh._base
+        self._reaction_base = fresh._reaction_base
+        self._table = fresh._table
+        self._cache.clear()
+        self._reaction_cache.clear()
+
 
 _REGISTRIES: dict[int, ElementRegistry] = {}
 

@@ -49,9 +49,9 @@ from ui.menu_nav import MenuNav
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
-              "aim_line", "auras", "all_rooms", "freeze", "difficulty",
+              "aim_line", "auras", "reaction_log", "all_rooms", "freeze", "difficulty",
               "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
-              "force_aura", "infuse", "game_over", "victory",
+              "force_aura", "infuse", "element_building", "game_over", "victory",
               "reset", "exit", "close")
 
 _LABELS = {
@@ -62,6 +62,7 @@ _LABELS = {
     "spawn_points": "Spawn points",
     "aim_line":     "Aim line",
     "auras":        "Aura inspector",
+    "reaction_log": "Reaction log",
     "all_rooms":    "Activate all rooms",
     "freeze":       "Freeze spawns",
     "difficulty":   "Difficulty",
@@ -73,6 +74,7 @@ _LABELS = {
     "remove_weapon": "Remove weapon...",
     "force_aura":   "Force aura...",
     "infuse":       "Infuse weapons...",
+    "element_building": "Spawn elemental building...",
     "game_over":    "Game over screen",
     "victory":      "Victory screen",
     "reset":        "Reset run",
@@ -82,7 +84,8 @@ _LABELS = {
 _HEADINGS = {"root": "DEV MENU", "enemies": "SPAWN ENEMY",
              "blessings": "GRANT BLESSING", "items": "GRANT ITEM",
              "forges": "FORGE WEAPON", "weapons": "REMOVE WEAPON",
-             "elements": "FORCE AURA", "infuse": "INFUSE WEAPON"}
+             "elements": "FORCE AURA", "infuse": "INFUSE WEAPON",
+             "buildings": "ELEMENTAL BUILDING"}
 _NAV = {"root": "Up/Down move   ENTER select   ESC / ` close",
         "enemies": "Up/Down   ENTER spawn   ESC back",
         "blessings": "Up/Down   ENTER grant   ESC back",
@@ -90,7 +93,8 @@ _NAV = {"root": "Up/Down move   ENTER select   ESC / ` close",
         "forges": "Up/Down   ENTER forge   ESC back",
         "weapons": "Up/Down   ENTER remove   ESC back",
         "elements": "Up/Down   ENTER apply to the nearest enemy   ESC back",
-        "infuse": "Up/Down   ENTER cycle the element   ESC back"}
+        "infuse": "Up/Down   ENTER cycle the element   ESC back",
+        "buildings": "Up/Down   ENTER seat one beside the hero   ESC back"}
 # The four elements, for the "Force aura" page: applying one drives the
 # real resolver, so what the inspector then shows is live state.
 _ELEMENT_ROWS = tuple(ELEMENTS)
@@ -154,6 +158,7 @@ class DevMenuState(State):
                 "blessings": self._blessing_ids, "items": self._item_rows,
                 "forges": self._forge_ids,
                 "elements": _ELEMENT_ROWS,
+                "buildings": _ELEMENT_ROWS,
                 "infuse": self._infuse_rows()}[self.page]
 
     def _weapon_rows(self) -> list[tuple]:
@@ -231,6 +236,8 @@ class DevMenuState(State):
             self._force_aura(_ELEMENT_ROWS[self.sel])
         elif self.page == "infuse":
             self._cycle_infusion(self._infuse_rows()[self.sel])
+        elif self.page == "buildings":
+            self._spawn_building(_ELEMENT_ROWS[self.sel])
 
     def _activate(self, rid: str) -> None:
         p = self._playing
@@ -262,6 +269,9 @@ class DevMenuState(State):
         elif rid == "auras":
             p._dev_show_auras = not p._dev_show_auras
             self._status = f"Aura inspector {'ON' if p._dev_show_auras else 'off'}"
+        elif rid == "reaction_log":
+            p._dev_show_reaction_log = not p._dev_show_reaction_log
+            self._status = f"Reaction log {'ON' if p._dev_show_reaction_log else 'off'}"
         elif rid == "all_rooms":
             m = p.spawn.master
             m.all_active = not m.all_active
@@ -291,6 +301,8 @@ class DevMenuState(State):
             self._goto("elements")
         elif rid == "infuse":
             self._goto("infuse")
+        elif rid == "element_building":
+            self._goto("buildings")
         elif rid in ("game_over", "victory"):
             self._show_end_screen(rid == "victory")
         elif rid == "reset":
@@ -384,6 +396,18 @@ class DevMenuState(State):
             now=p.stats["time"])
         name = getattr(target, "name", element.key)
         self._status = f"{element.key.title()} on {name}: {outcome.name.lower()}"
+
+    def _spawn_building(self, element) -> None:
+        """CMB-009.5: seat a buff building carrying `element` beside the
+        hero, through the world's own compound and skin code, so using it
+        runs the ordinary buff and infusion flow. The kind takes the buff
+        kinds in turn, so each can be tried."""
+        p = self._playing
+        if p is None:
+            return
+        from game.states.playing.devtools.element_building import (
+            spawn_elemental_building)
+        _ok, self._status = spawn_elemental_building(p, element)
 
     def _show_end_screen(self, victory: bool) -> None:
         """Open the real results screen over the frozen dev run, as a preview.
@@ -659,6 +683,8 @@ class DevMenuState(State):
             return f"{head}: {f['name']}" + ("   (forged)" if carried else "")
         if self.page == "elements":
             return self._element_label(rid)
+        if self.page == "buildings":
+            return rid.key.title()
         if self.page == "infuse":
             return self._infusion_label(rid)
         if self.page == "weapons":
@@ -685,6 +711,8 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_show_aim else "   [  ]"
         elif rid == "auras" and p is not None:
             label += "   [ON]" if p._dev_show_auras else "   [  ]"
+        elif rid == "reaction_log" and p is not None:
+            label += "   [ON]" if p._dev_show_reaction_log else "   [  ]"
         elif rid == "all_rooms" and p is not None:
             label += "   [ON]" if p.spawn.master.all_active else "   [  ]"
         elif rid == "freeze" and p is not None:

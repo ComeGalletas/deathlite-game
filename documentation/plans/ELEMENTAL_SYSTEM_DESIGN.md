@@ -465,7 +465,7 @@ a cascade decay in value.
 ### Tasks
 - [x] **8.1 `ElementVisualProfile` per element:** colors, tint, particle preset (existing particle system), sprite/animation refs, default intensity.
 - [-] **8.2 `ElementVisualComponent`** attachable to any actor: `element`, `anchorOffset`, `scale`, `intensity`. Intensity can be driven by Slow stacks. The same component is used for enemies, buildings, and weapons. *(DOC-003: superseded — no generic component; enemies and weapons draw their element directly (`visual/elements/`, `rendering.py`). The building gap is the new box below)*
-- [ ] **Elemental buff buildings show their rolled element.** `Interactable.element` is set (M7) but nothing draws it, so the player learns the element only on use. *(DOC-003: found missing; planned as CMB-009, `plans/elemental_extras_plan.md` §1)*
+- [x] **Elemental buff buildings show their rolled element.** `Interactable.element` is set (M7) but nothing draws it, so the player learns the element only on use. *(DOC-003: found missing; done as CMB-009.1, a faint glow in the element's tint under the building)*
 - [x] **8.3 Aura vs status visuals.** The aura indicator (reactable marker) and status visuals (burning, slowed, frozen) are distinct layers. The aura must be readable because it's the only in-game indicator. A **locked** aura slot (Frostburn) should also be visually recognizable. **[PROPOSAL]**
 - [x] **8.4 Wind area visual:** one tornado ring effect (~1 s, scaled to `area.radius`). The Wind reactions reuse it, tinted/particled with the other element's profile (FireWind, IceWind, ThunderWind).
 - [x] **8.5 Reaction visuals:** each reaction uses a dedicated effect or a generated blend of both profiles. Start with blends and add bespoke effects later.
@@ -498,7 +498,7 @@ a cascade decay in value.
 - [x] **9.5 Tick only what ticks:** only enemies with ticking statuses are iterated.
 - [x] **9.6 Timestamp-based timers** for auras, statuses, locks, and areas.
 - [x] **9.7 Low-rate area checks** (e.g., 10 Hz) for Wind areas. Cap simultaneous areas (`maxActiveWindAreas`).
-- [ ] **9.8 Profiling counters:** active auras, reactions/frame, jump nodes/frame, active Wind areas, particle count. Visible in dev mode. *(DOC-003: auras, reactions/frame, held reactions, particles and element fx are in the F1 metrics (`devtools/dev_flags.py`); jump nodes/frame and active Wind areas are still missing; planned as CMB-009, `plans/elemental_extras_plan.md` §2)*
+- [x] **9.8 Profiling counters:** active auras, reactions/frame, jump nodes/frame, active Wind areas, particle count. Visible in dev mode. *(DOC-003: auras, reactions/frame, held reactions, particles and element fx are in the F1 metrics (`devtools/dev_flags.py`); jump nodes/frame and active Wind areas are still missing; jump nodes and Wind areas added by CMB-009.2)*
 - [x] **9.9 Hit-rate control.** Survivor-style weapons produce many hits per second (multiple projectiles, piercing, persistent damage areas). Without a limit, every tick of a damage area would reapply or react, cascade Thunder jumps constantly, and spawn a Wind area on every contact.
   - Handled by two confirmed mechanisms, both cheap: the weapon `elementInterval` (§6.3), which is one counter per weapon decided at attack spawn, and the global reaction aura cooldown (§3), which is one timestamp comparison per enemy. No per-enemy-per-weapon cooldown tables are needed.
   - Aura *refreshes* on the same element are not rate-limited, but they are just a timestamp write.
@@ -512,7 +512,7 @@ a cascade decay in value.
 
 - [x] **10.1 Aura inspector:** toggle a label/icon above every enemy showing aura element, remaining time, lock state, and active statuses with stacks.
 - [x] **10.2 Weapon element editor:** set, change, or remove the element of any equipped weapon, and edit its `elementInterval`.
-- [ ] **10.3 Extra tools [PROPOSAL]:** *(DOC-003: force aura built (dev menu); hot-reload, reaction log and spawn-building-with-element not built; planned as CMB-009, `plans/elemental_extras_plan.md` §3)*
+- [x] **10.3 Extra tools [PROPOSAL]:** *(DOC-003: force aura built (dev menu); hot-reload (F9), the reaction log and the building spawner done as CMB-009.3–5)*
   - Force-apply an aura to the enemy under the cursor.
   - Spawn a buff building with a chosen element, or a Monastery.
   - Reaction log (pair, target, damage, targets reached vs caps).
