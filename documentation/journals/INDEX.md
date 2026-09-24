@@ -80,7 +80,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-005 · BLD-003 · DOC-007
 | UI-010 | Key icons (keycaps) | UI, RND | feature | legacy | [key_icons_journal.md](key_icons_journal.md) | — | 2026-09-19 |
 | UI-011 | Enemy health bar | UI, ENT | feature | legacy | [enemy_health_bar_journal.md](enemy_health_bar_journal.md) | — | 2026-09-22 |
 | UI-012 | Chests opened shown on the run summary | UI, PRG | feature | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
-| UI-013 | Run summary weapons table: the level never overlaps the damage | UI | bug | proposed | [game_over_journal.md](game_over_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| UI-013 | Run summary weapons table: the level never overlaps the damage | UI | bug | done | [game_over_journal.md](game_over_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |

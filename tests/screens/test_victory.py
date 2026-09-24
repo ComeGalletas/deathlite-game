@@ -323,24 +323,96 @@ class ColumnWidthTests(unittest.TestCase):
                          run_summary.column_widths(1420, [0, 0, 0]))
 
     def test_the_weapons_minimum_applies_at_three_columns_as_well(self):
-        """Not a four-column-only rule.
-
-        The three-column equal share is 480 px, which leaves 424 px of content
-        for a weapon row that can want 430 -- so the game-over screen could
-        already print a long weapon name through a seven-figure damage. The
-        minimum widens that column rather than leaving the overlap latent.
-        """
+        """Not a four-column-only rule: the three-column equal share is
+        narrower than the widest weapon row, so the game-over screen widens
+        its weapons column too rather than leaving the overlap latent."""
+        _display()
+        floor = run_summary.weapons_min_width(run_summary.RunSummaryPanel({})._row)
         space = 1600 - 2 * 60 - 2 * 20
-        self.assertLess(space // 3, 498, "the premise of this test has moved")
-        self.assertEqual(run_summary.column_widths(space, [0, 0, 498])[2], 498)
+        self.assertLess(space // 3, floor, "the premise of this test has moved")
+        # At least: the last column also absorbs the split's rounding.
+        self.assertGreaterEqual(run_summary.column_widths(space, [0, 0, floor])[2], floor)
 
     def test_the_shipped_victory_set_clears_the_weapons_minimum(self):
-        mins = [m for _d, m in
-                (run_summary._COLUMNS[c] for c in run_summary.VICTORY_COLUMNS)]
+        _display()
+        mins = run_summary.column_minimums(run_summary.VICTORY_COLUMNS,
+                                           run_summary.RunSummaryPanel({})._row)
         space = 1600 - 2 * 60 - (len(mins) - 1) * 20
         widths = run_summary.column_widths(space, mins)
         for want, got in zip(mins, widths, strict=True):
             self.assertGreaterEqual(got, want)
+
+
+class _TextFont:
+    """A font and a surface that remember which text was blitted where."""
+
+    def __init__(self, font):
+        self._font, self.texts = font, {}
+
+    def render(self, text, *args):
+        img = self._font.render(text, *args)
+        self.texts[id(img)] = (text, img)
+        return img
+
+    def size(self, text):
+        return self._font.size(text)
+
+
+class _BlitLog(pygame.Surface):
+    def __init__(self, fonts, *args):
+        super().__init__(*args)
+        self.fonts, self.drawn = fonts, []
+
+    def blit(self, img, dest, *args, **kwargs):
+        rect = super().blit(img, dest, *args, **kwargs)
+        for f in self.fonts:
+            hit = f.texts.get(id(img))
+            if hit is not None and hit[1] is img:
+                self.drawn.append((hit[0], rect))
+        return rect
+
+
+class WeaponsTableTests(_Base):
+    """UI-013: a weapon's name and level never reach its damage figure.
+
+    The worst case, not a sample: every name a held weapon can carry (each
+    `weapons.json` entry and each forge override), at a two-digit level,
+    against a 7- and an 8-figure damage, on the three- and four-column
+    screens."""
+
+    def _rows(self, columns, name, damage):
+        panel = run_summary.RunSummaryPanel({
+            **LEDGER_STATS, "damage_dealt": damage * 2,
+            "weapon_rows": [{"name": name, "level": 31, "damage": damage,
+                             "share": 0.5, "dps": 999.9}]})
+        panel._row = _TextFont(panel._row)
+        surf = _BlitLog([panel._row], (1600, 900))
+        panel.draw(surf, None, end_screen.PANEL_TOP, end_screen.PANEL_BOTTOM,
+                   columns=columns)
+        return surf.drawn
+
+    def test_no_name_or_level_reaches_the_damage(self):
+        from game.content import get_content
+        c = get_content()
+        names = sorted({v["name"] for table in (c.weapons, c.forges)
+                        for v in table.values() if isinstance(v, dict) and "name" in v})
+        self.assertIn("Meteor Hammer", names)
+        for columns in (run_summary.COLUMNS, run_summary.VICTORY_COLUMNS):
+            for damage in (1_212_400.0, 12_124_000.0):
+                for name in names:
+                    with self.subTest(columns=len(columns), damage=damage, name=name):
+                        drawn = self._rows(columns, name, damage)
+                        at = [t for t, _r in drawn].index("Lv 31")
+                        (text, name_r), (_lv, lv_r), (_d, dmg_r) = drawn[at - 1:at + 2]
+                        self.assertTrue(name.startswith(text.rstrip("…").rstrip(".")),
+                                        (name, text))
+                        self.assertLess(name_r.right, lv_r.left, f"{text!r} into its level")
+                        self.assertLess(lv_r.right, dmg_r.left, "the level into the damage")
+
+    def test_the_widest_name_shows_in_full_at_a_seven_figure_damage(self):
+        """The measured floor is there so a forge name is not cut short."""
+        drawn = self._rows(run_summary.VICTORY_COLUMNS, "Meteor Hammer", 1_212_400.0)
+        self.assertIn("Meteor Hammer", [t for t, _r in drawn])
 
 
 class HeroColumnTests(_Base):
