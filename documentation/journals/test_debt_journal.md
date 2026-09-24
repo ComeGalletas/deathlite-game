@@ -257,6 +257,50 @@ TST-004.6. One subtask each, in the review's order.
   Renamed `test_slash_true_or_no_fx_swings_the_default_soul_slash`, with a
   docstring saying so.
 
+### TST-004.7 — coverage of the five modules
+
+Paths: `world/gen/graph.py`, `world/gen/validate.py`,
+`world/gen/village_tidy.py`, `systems/mixer_backend.py`,
+`systems/debug_overlay.py`. Measured with `.coveragerc` over one fixed
+subset, before and after, because the whole suite under coverage runs past an
+hour here (world generation under the tracer): `tests/world/test_layout.py`,
+`test_village_tidy.py`, `test_village.py`, `tests/systems/test_audio.py`,
+`test_sound_effects.py`, `tests/playing/test_enemy_nav.py` — plus, after, the
+new modules.
+
+| module | stmts | before | after | still missed |
+|---|---:|---:|---:|---|
+| `systems/debug_overlay.py` | 36 | 47.2 % | **100.0 %** | — |
+| `systems/mixer_backend.py` | 113 | 65.5 % | **98.2 %** | 120–121 (`shutdown`'s `pygame.error` guard) |
+| `world/gen/validate.py` | 60 | 70.0 % | **100.0 %** | — |
+| `world/gen/village_tidy.py` | 149 | 68.5 % | **96.6 %** | 84, 103, 144, 168, 236 (re-entry guards and loop `continue`s) |
+| `world/gen/graph.py` | 77 | 59.7 % | **61.0 %** | 13–19, 26–37, 45–54, 138 |
+| **total** | 435 | 64.6 % | **91.5 %** | |
+
+New tests, all `unit` tier: `tests/systems/test_debug_overlay.py` (5),
+`tests/systems/test_mixer_backend.py` (20: the resample / interleave helpers,
+each backend's bring-up and failure, `make_mixer_backend`'s pick and
+fallback), `tests/world/grids/test_validate.py` (16: a hand-built
+two-island world, sound, then every promise broken one at a time),
+`tests/world/grids/test_island_graph.py` (8: distances, the village pick and
+its empty-band fallback, kinds, topography by weight) and
+`tests/world/grids/test_village_tidy_rules.py` (17: the pass's branches on
+a stand-in site).
+
+- **`graph.py` — for the owner (TST-004.D6).** Its gap is dead code:
+  `_adjacency`, `_rooted_tree` and `_grow_subtree` (lines 12–54) are called
+  from nowhere in the repo — the raised-region growth they served went with
+  the retired generator — and line 138 is the special-island loop body,
+  unreachable while `SPECIAL_KINDS` is empty (parked on purpose). Testing
+  dead helpers would only pin them; deleting them is a game-code change this
+  requirement does not make. With the three helpers gone the module would
+  measure 98 %.
+- The after run had one failure:
+  `test_enemy_nav.py::NavRebuildStaggerTests::test_update_nav_advances_a_fill_within_the_budget`
+  (9.1 ms against an 8 ms budget). It is a wall-clock budget and the tracer
+  slows it; it passes in the plain run (TST-004.3.4, 21 passed) and in the
+  final suite. Not a defect — recorded, not re-raised.
+
 ### TST-004.8 — the summon render tests (WA5)
 
 WA5 (`assets_journal.md`, the wolf animation plan) lists
@@ -319,9 +363,9 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler → `d618e61`
   - [x] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig` → `535dd0b`
 - [ ] TST-004.6 — The balance-number audit in `test_suite_review.md`
-- [ ] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
+- [x] TST-004.7 — Coverage for `world/gen/graph.py`, `world/gen/validate.py`,
   `village_tidy.py`, `mixer_backend.py`, `debug_overlay.py`
-- [x] TST-004.8 — Summon render tests (WA5)
+- [x] TST-004.8 — Summon render tests (WA5) → `a719226`
 - [ ] TST-004.9 — Bonepicker/Gaffjaw in-game screenshot — local session
 
 ## TST-004 — Results

@@ -211,6 +211,8 @@ were behaviour-preserving rather than merely test-passing.
 
 ## 4. Coverage gaps worth closing
 
+*(TST-004, 2026-09-24: the three open lines done — `village_tidy` 68.5 → 96.6 %, `validate` 70.0 → 100 %, `mixer_backend` 65.5 → 98.2 %, `debug_overlay` 47.2 → 100 %; `world/gen/graph.py` 59.7 → 61.0 %, the rest of its gap being three helpers nothing calls (owner decision, TST-004.D6). Subset-measured; `test_debt_journal.md` TST-004.7.)*
+
 At 91.3 % the gaps are narrow and specific. In priority order:
 
 - [x] **`game/states/game_over_state.py` — was 0 % (35 stmts).** The death
@@ -223,13 +225,13 @@ At 91.3 % the gaps are narrow and specific. In priority order:
 - [x] **`game/states/meta_state.py` — 22.5 % (86 missed).** Meta-progression
       screen. The same fake-game approach should reach most of it. *(DOC-005: 89.0 % in the 2026-09-22 coverage run — the Sanctuary mouse tests and the screen tests reach it)*
 - [x] **`game/states/victory_state.py` — 31.4 %.** Win path. *(DOC-003: `tests/screens/test_victory.py` (42 tests) landed 2026-09-12; coverage not re-measured)*
-- [ ] **`world/gen/village_tidy.py` — 67.8 %** and **`game/states/playing/slam_fx.py`
+- [x] **`world/gen/village_tidy.py` — 67.8 %** and **`game/states/playing/slam_fx.py`
       — 70.8 %.** Both new in the current working tree; worth topping up before
       the rework lands rather than after. *(DOC-005, 2026-09-22 run: `slam_fx` is at 98.5 % — done; `village_tidy` rose to 79.9 % and is the half still open)*
-- [ ] **`world/gen/graph.py` — 61 %**, **`world/gen/validate.py` — 75 %**,
+- [x] **`world/gen/graph.py` — 61 %**, **`world/gen/validate.py` — 75 %**,
       **`world/gen/height/graph.py` — 80.8 %.** Generation-stage validation is
       exactly the code a pinned-digest suite cannot check. *(DOC-005, 2026-09-22 run: `world/gen/graph.py` 59.7 %, `validate.py` 75.0 % — no better; still open)*
-- [ ] **`systems/mixer_backend.py` — 45.5 %** and **`systems/debug_overlay.py` —
+- [x] **`systems/mixer_backend.py` — 45.5 %** and **`systems/debug_overlay.py` —
       52.8 %.** Lower value; the mixer is partly environment-gated by design. *(DOC-005, 2026-09-22 run: `mixer_backend` 65.5 %, `debug_overlay` 52.8 %; still open, still lower value)*
 
 ### Exclude the tooling from the number — DONE
