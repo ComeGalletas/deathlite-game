@@ -1,6 +1,6 @@
-"""Six-weapon system P2 (design §21): the blessing catalog, applying levels,
+"""The blessing catalog, applying levels,
 gating on owned weapons, the weapon grants (the weapon alone since CR3)
-blessing, and the offering weights."""
+blessing, and the offering weights (design §21)."""
 import random
 import unittest
 

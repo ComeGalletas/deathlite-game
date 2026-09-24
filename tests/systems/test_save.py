@@ -1,4 +1,4 @@
-"""Milestone 7: save/load round-trip + corruption tolerance
+"""Save/load round-trip + corruption tolerance
 (spec 4.7 / 8: "Save/load")."""
 import json
 import logging

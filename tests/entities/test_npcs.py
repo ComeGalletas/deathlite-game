@@ -1,4 +1,4 @@
-"""HI-3: the villagers (`entities/npc.py`, `game/states/playing/core/npcs.py`).
+"""The villagers (`entities/npc.py`, `game/states/playing/core/npcs.py`).
 
 Driven through a real headless run so the NPCs are built from the same
 `Village` records and step against the same map the game uses. One run per

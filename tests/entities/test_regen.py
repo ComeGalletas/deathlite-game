@@ -1,4 +1,4 @@
-"""CB-7: the hero's HP regeneration stat and the Mending blessing.
+"""The hero's HP regeneration stat and the Mending blessing.
 
 Every hero drips `stats["hp_regen"]` HP once per `config.HP_REGEN_INTERVAL`
 seconds. The cadence is a fixed global; only the amount is a stat, and the

@@ -1,4 +1,4 @@
-"""CB-3: `combat.knockback.knock_split` -- the shared weight-driven impulse
+"""`combat.knockback.knock_split` -- the shared weight-driven impulse
 split used by both unit bumps and weapon hits.
 """
 import math

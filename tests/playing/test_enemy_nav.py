@@ -1,4 +1,4 @@
-"""M3/M6 -- the dual-resolution `NavField` coordinator, its PlayingState wiring,
+"""The dual-resolution `NavField` coordinator, its PlayingState wiring,
 the staggered per-grid rebuild, and the debug-overlay counter.
 """
 import os

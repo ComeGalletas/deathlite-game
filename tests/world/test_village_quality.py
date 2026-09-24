@@ -1,4 +1,4 @@
-"""HI-4: what the human island and its village come out as, over a sweep.
+"""What the human island and its village come out as, over a sweep.
 
 The rest of the village tests read three or four pinned seeds and assert that
 *every* village satisfies each rule. That is the right shape for a rule the

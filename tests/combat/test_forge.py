@@ -1,4 +1,4 @@
-"""Six-weapon system P3: Forging (design §7, §8, §13, §18). The twelve
+"""Forging (design §7, §8, §13, §18). The twelve
 Forgings as data, the merge onto a weapon, exclusivity and eligibility, and
 every Forge behaviour that needs code: twin cones, the Earthshaker
 shockwave, the Meteor Hammer crater (a hero-owned hazard), cluster

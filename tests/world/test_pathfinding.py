@@ -1,4 +1,4 @@
-"""M1 -- the static navigation grid (`world/pathfinding.NavGrid`).
+"""The static navigation grid (`world/pathfinding.NavGrid`).
 
 Covers: the walkable mask matches the map geometry exactly; clearance is 0 on
 blocked / obstacle cells and grows into open floor; `passable(r)` never

@@ -1,4 +1,4 @@
-"""Six-weapon system P1: the stun status (design §3.2, the Hammer). A stunned
+"""The stun status (design §3.2, the Hammer). A stunned
 enemy neither moves, nor advances its behaviour, nor bites; the boss is
 immune; the Hammer rolls it on every cone hit."""
 import os

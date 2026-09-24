@@ -1,4 +1,4 @@
-"""Start-screen milestone M1: the title screen is a navigable option list.
+"""The title screen is a navigable option list.
 The hero select it leads to is `test_character_select.py`.
 
 ENTER on the default selection still starts a run (the smoke / integration tests

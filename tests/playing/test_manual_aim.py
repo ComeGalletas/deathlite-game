@@ -1,4 +1,4 @@
-"""CB-5 manual aim: the input side (group B).
+"""Manual aim, the input side (group B).
 
 Pure tests for `game.states.playing.core.aim.read_aim` -- the priority ladder
 (click > held aim key > nothing), the layout swap, the tap flag, the cursor-on-

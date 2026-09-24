@@ -1,8 +1,8 @@
-"""Change request 1 (weapon_system_journal.md): the Hammer swings before it
+"""The Hammer swings before it
 lands. A swing time gates the blow, the direction locks at the start, the
 blow is a circle 40 px ahead with radius 52, Haste shortens the swing and
 cooldown reductions the cooldown, the forged Hammers swing too, the
-indicator darkens over the swing and the impact sheet plays at the blow."""
+indicator darkens over the swing and the impact sheet plays at the blow (change request 1, weapon_system_journal.md)."""
 import os
 import unittest
 

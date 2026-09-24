@@ -1,6 +1,6 @@
-"""Six-weapon system P5 (design §20): the main-weapon choice. Unlocked per
+"""The main-weapon choice. Unlocked per
 hero by the first boss kill, remembered in the save, picked on the hero
-select, and used by the run; defaults hold until then."""
+select, and used by the run; defaults hold until then (design §20)."""
 import os
 import tempfile
 import unittest

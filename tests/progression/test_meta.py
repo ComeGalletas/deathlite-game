@@ -1,4 +1,4 @@
-"""Milestone 7: meta-progression purchase rules and run-start application
+"""Meta-progression purchase rules and run-start application
 (spec 4.6)."""
 import unittest
 

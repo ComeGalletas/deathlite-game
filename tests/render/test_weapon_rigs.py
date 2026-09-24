@@ -1,7 +1,7 @@
-"""Change request 2 (weapon_system_journal.md): the weapon effect sheets
+"""The weapon effect sheets
 moved into per-weapon folders; every rig must resolve on disk; the Sword
 swings two slashes from Combat-Sheet.png, the first flipped vertically, and
-alternates them by the attack's ordinal."""
+alternates them by the attack's ordinal (change request 2, weapon_system_journal.md)."""
 import os
 import unittest
 from types import SimpleNamespace

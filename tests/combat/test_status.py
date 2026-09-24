@@ -1,4 +1,4 @@
-"""Milestone 6 & 9: status-effect framework (spec 5.7 / 8: "Status effects")."""
+"""Status-effect framework (spec 5.7 / 8: "Status effects")."""
 import unittest
 
 from combat.status import REGISTRY, StatusState

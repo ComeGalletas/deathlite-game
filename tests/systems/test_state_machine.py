@@ -1,4 +1,4 @@
-"""Milestone 1: state stack semantics -- push/pop/change and the
+"""State stack semantics -- push/pop/change and the
 update_below / draw_below propagation rules."""
 import unittest
 

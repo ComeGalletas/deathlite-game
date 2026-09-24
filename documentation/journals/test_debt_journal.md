@@ -228,6 +228,17 @@ TST-004.6. One subtask each, in the review's order.
   real-`Enemy` half under its own section header with its helpers (`make`,
   `fs`, `ctx`) unchanged; no name collides with the fake half's `_enemy` /
   `_ctx`. Neither module is a boss test. 11 passed.
+- **5.6** 56 module docstrings opened with the plan phase that wrote them
+  (`Milestone 2:`, `Six-weapon system P3:`, `CB-5 group A:`, `R2 --`,
+  `LD-9 D10:` …). Each now opens with its subject; the tag is dropped, and a
+  parenthetical it carried that points somewhere useful — a design section
+  (`design §20`) or a journal (`change request 1, weapon_system_journal.md`)
+  — moves to the end of the first paragraph. Spec and design references
+  already inside the sentence stay. 55 retitled by one script; the 56th,
+  `tests/entities/ai/test_boss.py`, is left alone because the parallel boss
+  refactor owns that file. The three chest modules that cite `(CB-9)` after
+  their subject already read the way §6 asks. Collection unchanged (3,314
+  tests + 8 sweep).
 
 ## TST-004 — Plan
 
@@ -258,8 +269,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py` → `22c7a6b`
   - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py` → `6c627e9`
   - [x] TST-004.5.4 — §6: regroup the six weapon modules by subject → `df68421`
-  - [x] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`
-  - [ ] TST-004.5.6 — §6: retitle the modules that open with a plan phase
+  - [x] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm` → `dbd372a`
+  - [x] TST-004.5.6 — §6: retitle the modules that open with a plan phase
   - [ ] TST-004.5.7 — §7: `test_one_multishot_upgrade_does_not_crash_any_weapon` asserts
   - [ ] TST-004.5.8 — §7: `test_clear_removes_everything` observes the handler
   - [ ] TST-004.5.9 — §7: rename `test_legacy_true_and_no_fx_keep_the_old_rig`

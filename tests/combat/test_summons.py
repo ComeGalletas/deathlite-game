@@ -1,4 +1,4 @@
-"""Milestone 9: summon weapons (spec 5.8) -- maintained count, lifetime,
+"""Summon weapons (spec 5.8) -- maintained count, lifetime,
 damage via ordinary friendly projectiles."""
 import unittest
 

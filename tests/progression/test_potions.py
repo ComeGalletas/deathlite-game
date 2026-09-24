@@ -1,4 +1,4 @@
-"""CB-8: health potion drops from enemies.
+"""Health potion drops from enemies.
 
 The drop chance rises with the enemy's *base* HP and caps at 25 %; the enemy's
 rarity band then picks the potion, with two hard exclusions -- a common enemy

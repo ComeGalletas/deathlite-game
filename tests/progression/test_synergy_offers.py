@@ -1,4 +1,4 @@
-"""Six-weapon system P4: synergy cards are offered only when both weapons
+"""Synergy cards are offered only when both weapons
 of the pair are owned (design §5.4, §10), and apply as effects on the
 benefiting weapon."""
 import random

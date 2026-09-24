@@ -1,4 +1,4 @@
-"""Milestone 10: special-location interactables (spec 5.5).
+"""Special-location interactables (spec 5.5).
 
 Driven through a real headless PlayingState so the effects hit the same code the
 game runs (drops, heals, blessing grants).

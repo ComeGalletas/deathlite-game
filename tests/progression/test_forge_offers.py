@@ -1,4 +1,4 @@
-"""Six-weapon system P3: Forge cards in the offering (design §7, §12, §13):
+"""Forge cards in the offering (design §7, §12, §13):
 only for a weapon with enough blessing levels, at Forge rarity, gone once
 the weapon is forged; post-Forge blessings appear only after that Forge."""
 import random

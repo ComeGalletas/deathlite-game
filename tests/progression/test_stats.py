@@ -1,4 +1,4 @@
-"""Milestone 6: layered stat modifiers (spec 8: "Stat modifiers")."""
+"""Layered stat modifiers (spec 8: "Stat modifiers")."""
 import unittest
 
 from progression.stats import FLAT, MULT, PCT, Modifier, StatSet

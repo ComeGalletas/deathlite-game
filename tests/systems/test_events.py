@@ -1,4 +1,4 @@
-"""Milestone 1: event bus dispatch, unsubscribe, and handler-error isolation."""
+"""Event bus dispatch, unsubscribe, and handler-error isolation."""
 import logging
 import unittest
 

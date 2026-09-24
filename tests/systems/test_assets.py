@@ -1,4 +1,4 @@
-"""Asset-integration Phase A: sprite metadata + the Assets loader/cache.
+"""Sprite metadata + the Assets loader/cache.
 
 No gameplay is affected by this phase; these tests just prove the loader slices
 sheets correctly and degrades gracefully."""

@@ -1,4 +1,4 @@
-"""CB-1: incoming contact / hazard damage lands as timed "bites", so flat armor
+"""Incoming contact / hazard damage lands as timed "bites", so flat armor
 subtracts a meaningful chunk per hit instead of nullifying a per-frame sliver
 (journals/BUG_JOURNAL.md #1).
 

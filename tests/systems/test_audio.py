@@ -1,4 +1,4 @@
-"""Milestone 5: procedural audio manager -- builds without assets, degrades to
+"""Procedural audio manager -- builds without assets, degrades to
 a no-op when the mixer is unavailable, and never raises from play()."""
 import os
 import unittest

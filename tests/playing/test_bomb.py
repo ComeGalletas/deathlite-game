@@ -1,4 +1,4 @@
-"""Six-weapon system P1: the Bomb (design §3.6). A fused, inert throw that
+"""The Bomb (design §3.6). A fused, inert throw that
 lands on its target, sits, and detonates into a blast that scores through
 the normal hit resolver."""
 import os
