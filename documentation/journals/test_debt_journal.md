@@ -84,6 +84,13 @@ hits are prose). One subtask per module, the mixer pair together.
   had no `fountain`. Since HI-1 the fountain is the village's sanctuary heal
   (`locations.py:52` builds one per village) and every world has a village
   (the forge test beside it already asserts that), so it is an assertion.
+- **3.6** `test_ghost.py::test_a_kind_the_data_does_not_list_never_ghosts`
+  hunted seed 7 for a skinned sign whose art no ghosting kind overlapped,
+  and skipped without one. It is now built by hand on the module's own
+  `_lone_tree` synthetic map (generalised to any obstacle kind and ghost
+  list): one sign, the shipped `ghost.kinds` from `data/`, a body behind its
+  foot → 0 ghost blits. Checked red: the same map with `sign` added to the
+  kinds ghosts once.
 
 ## TST-004 — Plan
 
@@ -102,8 +109,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed) → `d76bed9`
   - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed) → `d92dfef`
   - [x] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed) → `0ce324e`
-  - [x] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
-  - [ ] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
+  - [x] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed) → `87086ac`
+  - [x] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
   - [ ] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
   - [ ] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)
   - [ ] TST-004.3.9 — `tests/render/test_element_colours.py` (numpy)

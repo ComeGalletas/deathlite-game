@@ -46,13 +46,14 @@ class GhostPassTests(unittest.TestCase):
         self.r.record_character(frame, dest, character_y)
         return self.r.ghost_pass(self.surface, self.cam)
 
-    def _lone_tree(self):
-        """A synthetic map with one skinned tree: art 80 x 120 world px,
-        anchored so the trunk foot is at the obstacle (100, 100)."""
+    def _lone_tree(self, kind="tree", ghost_kinds=("tree",)):
+        """A synthetic map with one skinned obstacle (a tree by default): art
+        80 x 120 world px, anchored so the trunk foot is at the obstacle
+        (100, 100)."""
         from entities.obstacle import Obstacle
         from world.map import GameMap
         gm = GameMap.__new__(GameMap)
-        gm.__dict__["_obstacles"] = [Obstacle("tree", 100, 100)]
+        gm.__dict__["_obstacles"] = [Obstacle(kind, 100, 100)]
         gm._render_zoom = 1.0
         gm._blit_cache = {}
         gm.__dict__["terrain"] = None
@@ -63,7 +64,7 @@ class GhostPassTests(unittest.TestCase):
         gm.terrain = type("T", (), {})()
         gm.terrain.tree_shadows = {}
         gm.terrain.art_rects = {0: (60.0, -10.0, 80.0, 120.0)}
-        gm.terrain.ghost = {"alpha": 110, "kinds": ["tree"]}
+        gm.terrain.ghost = {"alpha": 110, "kinds": list(ghost_kinds)}
         return gm, r
 
     def test_a_body_behind_a_tree_is_ghosted_only_under_its_crown(self):
@@ -104,28 +105,22 @@ class GhostPassTests(unittest.TestCase):
         self.assertLess(inside.r, 200)
 
     def test_a_kind_the_data_does_not_list_never_ghosts(self):
+        """A skinned sign alone on a hand-built map, with the shipped ghost
+        kinds: a body behind it is not ghosted, where the same body behind a
+        tree is (`test_a_body_behind_a_tree_is_ghosted_only_under_its_crown`).
+        Hand-built rather than hunted on a seed: on a real world a tree or a
+        house standing behind the sign would ghost on its own account, and a
+        seed with no sign standing clear would have nothing to say."""
         kinds = get_content().terrain["obstacle_decor"]["ghost"]["kinds"]
         self.assertNotIn("sign", kinds)
-        # A sign whose art no *listed* kind's art overlaps: the probe frame is
-        # placed over the sign, and a tree or a house standing behind it would
-        # ghost on its own account and say nothing about the sign.
-        gm = self.gm
-        pick = None
-        for i, o in enumerate(gm.obstacles):
-            if o.kind != "sign" or i not in gm._art_rects:
-                continue
-            mine = pygame.Rect(*(round(v) for v in gm._art_rects[i]))
-            if not any(gm.obstacles[j].kind in kinds
-                       and mine.colliderect(pygame.Rect(*(round(v) for v in r)))
-                       for j, r in gm._art_rects.items() if j != i):
-                pick = (i, o, gm._art_rects[i])
-                break
-        if pick is None:
-            self.skipTest("no skinned sign standing clear on this seed")
-        i, o, (ax, ay, aw, ah) = pick
-        self.cam.pos = pygame.Vector2(ax - 40, ay - 40)
-        dest = (40 + aw // 2 - 10, 40 + ah - 30)
-        self.assertEqual(self._run(_character_frame(20, 40), dest, o.pos.y - 5.0), 0)
+        self.assertIn("tree", kinds)
+        _gm, r = self._lone_tree(kind="sign", ghost_kinds=kinds)
+        cam = SimpleNamespace(pos=pygame.Vector2(0, 0), zoom=1.0)
+        surface = pygame.Surface((256, 256))
+        r.begin_frame()
+        r.record_character(_character_frame(40, 60), (80, 80), 90.0)   # behind the foot
+        self.assertEqual(r.ghost_pass(surface, cam), 0)
+        self.assertEqual(surface.get_at((100, 90)), (0, 0, 0, 255))
 
     def test_alpha_zero_turns_the_pass_off(self):
         i, o, (ax, ay, aw, ah) = _tree(self.gm)
