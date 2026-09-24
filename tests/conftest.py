@@ -77,6 +77,7 @@ INTEGRATION = (
     "tests/render/test_hostile_glow.py",
     "tests/screens/test_level_up.py",
     "tests/screens/test_menu.py",
+    "tests/screens/test_character_select.py",
     "tests/screens/test_mouse.py",
     "tests/screens/test_options.py",
     "tests/screens/test_pause.py",

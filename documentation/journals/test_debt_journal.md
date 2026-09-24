@@ -195,6 +195,15 @@ TST-004.6. One subtask each, in the review's order.
   point, `alive = True`) and `fakes.FakeProj` sit beside `FakeEnemy`; the
   five modules import them and their local copies are gone. `tests/combat`
   + `test_manual_aim.py`: 624 passed.
+- **5.3** `tests/screens/test_menu.py` was 1,076 lines, fifteen classes, nine
+  of them the hero select. Split by subject: `test_menu.py` keeps the six
+  title-screen classes (39 tests, 396 lines), the new
+  `test_character_select.py` takes the nine (47 tests), and the four helpers
+  both use (`_menu`, `_key`, `_mouse`, `_bright_pixels`) moved to
+  `tests/screens/drive.py`, imported under their old names so no test body
+  changed. The new module is listed in `conftest.INTEGRATION` beside
+  `test_menu.py` (it boots a `Game`). Before 86 tests, after 39 + 47; the two
+  modules and `test_dev_mode.py` together: 173 passed.
 
 ## TST-004 — Plan
 
@@ -222,8 +231,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
 - [x] TST-004.4 — Worldgen R4: push sweep assertions down to hand-built grids → `a292643`
 - [ ] TST-004.5 — The §6 organisation and §7 nits in `test_suite_review.md`
   - [x] TST-004.5.1 — §6: `test_dev_mode._settle` → `tests.boot.settle` → `7ed17ce`
-  - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py`
-  - [ ] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py`
+  - [x] TST-004.5.2 — §6: one `FakeTarget` / `FakeProj` in `tests/combat/fakes.py` → `22c7a6b`
+  - [x] TST-004.5.3 — §6: split `test_character_select.py` out of `test_menu.py`
   - [ ] TST-004.5.4 — §6: regroup the six weapon modules by subject
   - [ ] TST-004.5.5 — §6: merge `test_fsm_enemies` into `test_ai_behaviors_fsm`
   - [ ] TST-004.5.6 — §6: retitle the modules that open with a plan phase
