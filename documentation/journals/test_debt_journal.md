@@ -80,6 +80,10 @@ hits are prose). One subtask per module, the mixer pair together.
   and fails if none does. The pocket test skipped if the small-class field
   held no unreached walkable cell beside a reached one; seed 1234 has one,
   so the skip is an assertion naming the seed.
+- **3.5** `test_interactables.py` skipped the fountain test when the layout
+  had no `fountain`. Since HI-1 the fountain is the village's sanctuary heal
+  (`locations.py:52` builds one per village) and every world has a village
+  (the forge test beside it already asserts that), so it is an assertion.
 
 ## TST-004 — Plan
 
@@ -97,8 +101,8 @@ last commit, and its counts go in Results with 0 skipped as the target.
   - [x] TST-004.3.1 — `tests/world/test_elevation.py`: the dead void-band skip → `874f86f`
   - [x] TST-004.3.2 — `tests/entities/ai/test_flying.py` (3, seed) → `d76bed9`
   - [x] TST-004.3.3 — `tests/entities/test_npcs.py` (2, seed) → `d92dfef`
-  - [x] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed)
-  - [ ] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
+  - [x] TST-004.3.4 — `tests/playing/test_enemy_nav.py` (2, seed) → `0ce324e`
+  - [x] TST-004.3.5 — `tests/playing/test_interactables.py` (1, seed)
   - [ ] TST-004.3.6 — `tests/render/test_ghost.py` (1, seed)
   - [ ] TST-004.3.7 — `tests/render/test_hostile_glow.py` (1, seed)
   - [ ] TST-004.3.8 — `tests/systems/test_audio.py`, `test_sound_effects.py` (4, mixer)

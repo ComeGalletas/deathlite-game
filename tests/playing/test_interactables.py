@@ -104,8 +104,9 @@ class EffectTests(unittest.TestCase):
     def test_fountain_heals_to_full(self):
         _, p = fresh_playing()
         it = self._get(p, "fountain")
-        if it is None:
-            self.skipTest("no fountain in this layout")
+        # The sanctuary heal is a village's (HI-1), and every world has a
+        # village -- the forge tests below rest on the same fact.
+        self.assertIsNotNone(it, "every world has a village, so a sanctuary heal")
         p.player.hp = 1
         p._use_fountain(it)
         self.assertEqual(p.player.hp, p.player.max_hp)
