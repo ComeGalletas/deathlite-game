@@ -80,6 +80,16 @@ class MeleeRosterTests(unittest.TestCase):
                 beat = cfg["attack_telegraph"] + cfg["attack_active"]
                 self.assertAlmostEqual(beat, strip["frames"] / strip["fps"], places=2)
 
+    def test_the_husk_attack_animation_covers_its_swing(self):
+        """ENT-014: the skull's strip plays through within one frame of its
+        swing -- never cut back to `walk`, never held still for long."""
+        cfg = self.enemies["skull"]
+        strip = _sprites()[cfg["sprite"]]["anims"]["attack"]
+        beat = cfg["attack_telegraph"] + cfg["attack_active"]
+        length = strip["frames"] / strip["fps"]
+        self.assertLessEqual(length, beat)
+        self.assertLess(beat - length, 1 / strip["fps"])
+
     def test_every_melee_enemy_has_the_art_to_show_it(self):
         rigs = _sprites()
         for eid in MELEE:
