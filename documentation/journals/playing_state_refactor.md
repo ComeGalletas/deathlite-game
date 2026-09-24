@@ -331,6 +331,6 @@ This block follows the DOC-001 layout; the entries above predate it.
 - [x] SYS-009.1 — This block
 - [x] SYS-009.2 — `MELEE_REACT_SCALE` to `game/config.py`
 - [x] SYS-009.3 — `TimedVisual` for `_death_fx` and `_explosions`; their tests
-- [ ] SYS-009.4 — `rig_frame` / `blit_rig` for the four sprite paths
+- [x] SYS-009.4 — `rig_frame` / `blit_rig` for the four sprite paths
 - [ ] SYS-009.5 — Results; the follow-up notes; index to done
 - [x] SYS-009.6 — Found by the SYS-009.4 A/B run: `scene.actor_items` still read a poof as a list (`run.death_fx`, the alias the first search missed); fixed, with a test that draws a whole frame with a live poof
