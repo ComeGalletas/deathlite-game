@@ -241,6 +241,26 @@ def _check_building_elements(data: dict[str, Any]) -> None:
     if chance > 0.0 and sum(
             float(w) for k, w in weights.items() if not k.startswith("_")) <= 0.0:
         raise ContentError("buildings.json: elements.weights sum to zero")
+    _check_building_glow(block.get("glow"))
+
+
+def _check_building_glow(glow) -> None:
+    """`elements.glow` (CMB-009.1): the disc under an elemental building.
+    Required with the `elements` block -- the renderer reads it with no
+    defaults of its own."""
+    if not isinstance(glow, dict):
+        raise ContentError("buildings.json: elements.glow must be an object")
+    for field in ("scale", "alpha_min", "alpha_max", "period", "steps"):
+        if field not in glow:
+            raise ContentError(f"buildings.json: elements.glow has no {field!r}")
+    lo, hi = int(glow["alpha_min"]), int(glow["alpha_max"])
+    if not 0 <= lo <= hi <= 255:
+        raise ContentError(
+            "buildings.json: elements.glow needs 0 <= alpha_min <= alpha_max <= 255")
+    if float(glow["scale"]) <= 0.0:
+        raise ContentError("buildings.json: elements.glow.scale must be positive")
+    if int(glow["steps"]) < 1:
+        raise ContentError("buildings.json: elements.glow.steps must be at least 1")
 
 
 def _check_elements(data: dict[str, Any]) -> dict[str, Any]:
