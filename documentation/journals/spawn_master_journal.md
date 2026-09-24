@@ -706,6 +706,11 @@ the run's zoom, the centre at three foam phases, one position per loading
 step ("warming the view N of 9"). `TerrainRenderer._z_surf` fills
 `GameMap._blit_cache` as it draws, and the map is handed to the run with
 that cache, so the run's first frames find every scaled surface ready.
+*(RND-005, 2026-09-24: a last step, "warming the animations", now scales
+every foam, bridge, decor, obstacle and shadow frame the world holds — not
+only the phases the ring drew — so a first frame at any phase scales
+nothing; the terrace bands stay on first sight. See
+`frame_warmup_journal.md`.)*
 
 ### Measured
 

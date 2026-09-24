@@ -77,10 +77,24 @@ asserts the first draw at any phase adds no cache entry.
 ## RND-005 — Tasks
 
 - [x] RND-005.1 — Measure what a world holds and what the ring leaves cold (above)
-- [ ] RND-005.2 — `world/terrain/warm.py`: every non-band scaled surface, warmed as one loading step
+- [x] RND-005.2 — `world/terrain/warm.py`: every non-band scaled surface, warmed as one loading step
 - [ ] RND-005.3 — Tests: every non-band source is cached after loading, and a first draw at any clock phase adds nothing
 - [ ] RND-005.4 — Results; D1 to the owner
 
 ## RND-005 — Results
 
-*(filled in as the tasks land)*
+### RND-005.2 — The warm step
+
+- `world/terrain/warm.py`: `scaled_sources(gm)` lists every surface the
+  renderer scales except the bands — the water buffer, the foam frames,
+  bridges and their shadows, every frame of the room and void decor, every
+  frame of every obstacle skin, the tree shadows — once each by id;
+  `warm(gm)` passes each through `_z_surf` at the current render zoom.
+- `LoadingState._warm_steps` ends with it as one more step, "warming the
+  animations", after the ring — so the zoom is already the run's.
+- After loading (seeds 35 and 7): foam 16/16, bridges 26/26 and 30/30, decor
+  210/210 and 229/229, obstacle frames 98/98 and 96/96 cached; the cache
+  goes from ~105 MB to 140 MB (seed 35) and 126 MB (seed 7); the only cold
+  surfaces left are the bands (D1). Load time unchanged within noise
+  (2.7 s and 2.5 s against 3.0 s and 2.3 s before).
+- `spawn_master_journal.md`'s warm-up paragraph gains a pointer to it.

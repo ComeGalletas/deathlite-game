@@ -137,6 +137,13 @@ class LoadingState(State):
                 yield f"warming the view {i + 1} of {len(self._WARM_RING)}"
         finally:
             r.clock = saved_clock
+        # RND-005: every frame of every animation, not only the phases the
+        # ring happened to draw -- the terrace bands excepted, see
+        # `world/terrain/warm.py`. After the ring, so the render zoom is the
+        # run's and the frames land in the cache the run reads.
+        from world.terrain import warm
+        warm.warm(gm)
+        yield "warming the animations"
 
     def update(self, dt: float) -> None:
         if self._anim is not None:
