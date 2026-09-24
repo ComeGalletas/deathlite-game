@@ -770,7 +770,7 @@ This block follows the DOC-001 layout; the entries above predate it.
 ## ENT-015 — Tasks
 
 - [x] ENT-015.1 — This block
-- [ ] ENT-015.2 — The pattern registry and the four patterns
+- [x] ENT-015.2 — The pattern registry and the four patterns
 - [ ] ENT-015.3 — `boss_patterns` behaviour; `Boss` on it; `bosses.json`
 - [ ] ENT-015.4 — Parity A/B against the old `Boss`; tests
 - [ ] ENT-015.5 — Results; index
