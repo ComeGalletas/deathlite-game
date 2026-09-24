@@ -176,7 +176,7 @@
     "frame": [64, 64],
     "content": [0, 0, 64, 64],
     "anchor": [32, 32],
-    "scale": [52, 52],
+    "scale": [76, 76],
     "anims": {
       "loop": {
         "file": "enemies/hex_shaman/hex_shaman_cast_charge.png",

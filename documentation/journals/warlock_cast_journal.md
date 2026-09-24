@@ -74,7 +74,7 @@
 
 - [x] ENT-013.1 — Open this journal; index row
 - [x] ENT-013.2 — Archive the source frames, the cut script and its strip, the rig
-- [ ] ENT-013.3 — The wind-up draw at `cast_at`, data in `enemies.json`
+- [x] ENT-013.3 — The wind-up draw at `cast_at`, data in `enemies.json`
 - [ ] ENT-013.4 — Tests and a screenshot
 - [ ] ENT-013.5 — Results; `sprite_functionality.md`'s open note; index to done
 
