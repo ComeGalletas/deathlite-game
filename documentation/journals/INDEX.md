@@ -62,7 +62,7 @@ PRG-004 · AUD-004 · SYS-009 · TST-004 · BLD-003 · DOC-006
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
 | RND-004 | Native-resolution rendering | RND | feature | legacy | [native_resolution_journal.md](native_resolution_journal.md) | — | 2026-09-16 |
-| RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | done (D1 open) | [frame_warmup_journal.md](frame_warmup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
+| RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | done | [frame_warmup_journal.md](frame_warmup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |

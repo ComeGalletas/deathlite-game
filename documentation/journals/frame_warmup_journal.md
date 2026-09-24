@@ -1,7 +1,7 @@
 # Frame warm-up — journal
 
 **ID:** RND-005 · **System:** rendering (+ SYS) · **Type:** feature ·
-**Status:** done (D1 open to the owner) · **Branch:** claude/sys-008-run-determinism (the
+**Status:** done · **Branch:** claude/sys-008-run-determinism (the
 owner's choice, 2026-09-24: stay on the current branch)
 
 ---
@@ -60,7 +60,7 @@ bands** is ~240 surfaces and ~35 MB, and takes **14 ms** in total on seed
 3072×1792 source px) — a one-off hitch the first time a terrace comes on
 screen.
 
-- **RND-005.D1 — The bands are not warmed; the owner decides.** "All
+- **RND-005.D1 — The bands are not warmed (owner, 2026-09-24: leave them unwarmed).** "All
   possible" at ~35 MB and 14 ms is the non-band set. The bands would add
   280–410 MB of scaled surfaces per world to save a 2–11 ms hitch once per
   band — measured, put to the owner, not assumed.
@@ -121,6 +121,6 @@ asserts the first draw at any phase adds no cache entry.
 A run's first frame now scales nothing at any animation phase: every foam,
 bridge, decor, obstacle and shadow frame is warm before the run starts, for
 ~35 MB and ~14 ms of loading. No screenshot: nothing on screen changes, only
-when the scaling happens. **Left to the owner (D1):** whether the terrace
-bands should be warmed too — 280–410 MB more a world, against a 2–11 ms
-hitch the first time each band comes on screen.
+when the scaling happens. **D1, answered by the owner (2026-09-24):** the
+terrace bands stay unwarmed — each is scaled the first time it comes on
+screen (2–11 ms, once), rather than spending 280–410 MB more a world.
