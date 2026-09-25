@@ -15,6 +15,8 @@ from combat.elements import config as element_schema
 from combat.elements.ids import ELEMENTS as ELEMENT_IDS
 from combat.elements.ids import REACTIONS as REACTION_IDS
 from combat.elements.schema import ElementDataError
+from game.locale import DEFAULT as DEFAULT_LANGUAGE
+from game.locale import LANGUAGES, placeholders, renderable
 from progression.blessings.catalog import RARITIES as BLESSING_RARITIES
 from spawn.tables import SpawnTables, TableError
 
@@ -450,6 +452,81 @@ def _merge_buildings(terrain: dict[str, Any], ui_sprites: dict[str, Any],
         terrain.setdefault("rigs", {}).setdefault(rig, meta)
 
 
+def _flatten(node: dict[str, Any], lang: str, prefix: str = "",
+             out: dict[str, str] | None = None) -> dict[str, str]:
+    """Nested locale groups -> dotted keys. `_`-prefixed keys are
+    documentation. A leaf a font cannot draw (`locale.renderable`) is
+    reported and dropped, so the lookup falls back to English for it."""
+    out = {} if out is None else out
+    for key, value in node.items():
+        if key.startswith("_"):
+            continue
+        dotted = f"{prefix}{key}"
+        if "." in key or not key:
+            # `{"a.b": ..}` would collide with `{"a": {"b": ..}}` once flat.
+            log.warning("locale/%s.json: key %r must be a plain name "
+                        "(nest a group instead of writing a dot), skipped",
+                        lang, dotted)
+            continue
+        if isinstance(value, dict):
+            _flatten(value, lang, f"{dotted}.", out)
+        elif renderable(value):
+            out[dotted] = value
+        else:
+            log.warning("locale/%s.json: %s is not drawable text (blank, "
+                        "NUL, a lone surrogate or not a string), skipped",
+                        lang, dotted)
+    return out
+
+
+def _check_locale(files: dict[str, dict[str, Any]]) -> dict[str, dict[str, str]]:
+    """Validate the UI text files (UI-014.2) and flatten them to
+    `{lang: {dotted.key: template}}`.
+
+    Fail-soft, like invalid spawn data: a bad entry is logged and dropped and
+    the game shows English for it; it never refuses to boot. English is the
+    reference. Another language's key is dropped when English lacks it, when
+    its template is malformed, or when its `{placeholders}` differ from
+    English's (a translation that names a field the code does not pass would
+    raise at draw time). Keys English has and a language lacks are counted in
+    one warning; `tests/locale/` holds the files to full parity."""
+    tables: dict[str, dict[str, str]] = {}
+    dropped: dict[str, set[str]] = {}
+    for lang, raw in files.items():
+        flat = _flatten(raw, lang)
+        dropped[lang] = set()
+        for key, template in list(flat.items()):
+            try:
+                placeholders(template)
+            except ValueError as exc:
+                log.warning("locale/%s.json: %s is malformed (%s), skipped",
+                            lang, key, exc)
+                del flat[key]
+                dropped[lang].add(key)
+        tables[lang] = flat
+    ref = tables[DEFAULT_LANGUAGE]
+    for lang, flat in tables.items():
+        if lang == DEFAULT_LANGUAGE:
+            continue
+        for key, template in list(flat.items()):
+            if key not in ref:
+                reason = ("was dropped from" if key in dropped[DEFAULT_LANGUAGE]
+                          else "is not in")
+                log.warning("locale/%s.json: %s %s %s.json, skipped",
+                            lang, key, reason, DEFAULT_LANGUAGE)
+                del flat[key]
+            elif placeholders(template) != placeholders(ref[key]):
+                log.warning("locale/%s.json: %s uses %s, %s.json uses %s; "
+                            "skipped", lang, key, sorted(placeholders(template)),
+                            DEFAULT_LANGUAGE, sorted(placeholders(ref[key])))
+                del flat[key]
+        missing = len(ref.keys() - flat.keys())
+        if missing:
+            log.warning("locale/%s.json: %d key(s) untranslated, shown in %s",
+                        lang, missing, DEFAULT_LANGUAGE)
+    return tables
+
+
 class Content:
     """Immutable-ish container for all loaded definitions."""
 
@@ -500,6 +577,10 @@ class Content:
         self.buildings: dict = _check_buildings(_load("world/buildings.json"))
         self.ui_sprites: dict[str, dict] = _load("ui/ui_sprites.json")
         _merge_buildings(self.terrain, self.ui_sprites, self.buildings)
+        # UI text per language (UI-014), read through `game.locale`. Data
+        # text is translated in place instead (`<field>_es` beside `<field>`).
+        self.locale: dict[str, dict[str, str]] = _check_locale(
+            {lang: _load(f"locale/{lang}.json") for lang in LANGUAGES})
         # Village NPC tuning (HI-3): speeds, idle bands, leashes, counts.
         self.npcs: dict = _load("village/npcs.json")
         # The spawn schedule (spawn master S2). Checked here, against the
