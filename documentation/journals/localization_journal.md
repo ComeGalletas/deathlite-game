@@ -174,6 +174,19 @@ tools.
   - The tests make sure nothing is missing, so the fallback exists only to
     protect a player from a hole in the data.
 
+- **UI-014.D12 — templates take plain `{name}` fields only** (found by
+  the UI-014.2 critic).
+  - `{0}`, `{}`, `{n:.1f}`, `{n!r}` and `{a.b}` are rejected at load.
+    Numbers reach a template already formatted by `num()`, which is what
+    adds the decimal comma, so a format spec has no job to do. A spec or a
+    conversion is also exactly where a translation could keep English's
+    field names and still crash at draw time.
+  - Keys are plain names; a dot in a key is rejected, because `{"a.b": ..}`
+    would collide with `{"a": {"b": ..}}` once flattened.
+  - This applies to `data/locale/` only. Blessing descriptions keep their
+    positional `{0}` / `{1}`, filled by `catalog.describe`; UI-014.4 checks
+    those separately.
+
 ## UI-014 — Plan
 
 ### Files
@@ -263,7 +276,7 @@ Options.
 ## UI-014 — Tasks
 
 - [x] UI-014.1 — This journal and the index row.
-- [ ] UI-014.2 — The locale core:
+- [x] UI-014.2 — The locale core:
   - `game/locale.py` and the loading and checks in `content.py`;
   - an empty `data/locale/en.json` and `es.json`;
   - the parity and runtime tests.
@@ -306,4 +319,66 @@ Options.
 
 ## UI-014 — Results
 
-_Not started._
+### UI-014.2 — the locale core
+
+- **`game/locale.py`:**
+  - `LANGUAGES = ("en", "es")`, `set_language`, `language`;
+  - `t`, `plural`, `text`, `num`, `placeholders`, `load`.
+  - `t` never raises: an unfillable template falls back to English, then to
+    the key, logged once per key.
+  - `text` reads the English field first, so an entry that has only
+    `name_es` fails in both languages, not first in English.
+  - `num` uses a one-character `format.decimal`, and `.` otherwise.
+  - `renderable(s)` defines drawable text: a str with a visible character,
+    no NUL and no lone surrogate. Both the loader and `text` use it.
+  - `t` and `plural` take `key` and `n` positional-only, so `{key}` and
+    `{n}` work as template fields.
+- **`game/content.py`:** `_flatten` and `_check_locale`. The loader is
+  fail-soft: it logs and drops malformed templates, non-drawable leaves,
+  dotted or empty keys, keys English lacks, placeholder mismatches, and any
+  field that is not a plain `{name}` (UI-014.D12). It counts untranslated
+  keys in one warning. `Content.locale` holds the flat tables.
+- **`data/locale/en.json`, `es.json`:** only `format.decimal` (`.` / `,`)
+  so far. The screens fill them in from UI-014.7 on. Both builds already ship
+  the whole `data/` folder (`dist/desktop/DeathliteGame.spec:88`), so no
+  packaging change was needed.
+- **Tests:** `tests/locale/` (unit tier), 50 tests and 27 subtests.
+  - `test_runtime.py`: language switching, fallback, log-once, escaped
+    braces, plurals, data fields, drawable text, numbers.
+  - `test_locale_files.py`: the shipped files load with no warning, have
+    full key parity and matching placeholders, plurals in pairs, no Spanish
+    entry copied from English, and every entry draws with Fredoka and
+    NunitoSans. Also the loader's fail-soft cases.
+- **Cold critic loop:** five rounds, each judged by a fresh critic with no
+  memory of the others. The count of bug and should-fix findings went
+  5 → 2 → 2 → 1 → 0, and round five was a PASS. Each fix has a test.
+  - **Round 1:**
+    - a `{n:d}` spec or a `!x` conversion passed the name check and crashed
+      in Spanish;
+    - positional `{0}` and `{}` could never be filled;
+    - `{{`/`}}` rendered differently with and without fields;
+    - a missing `format.decimal` printed the key into every number;
+    - a dotted key silently collided with a nested one.
+  - **Round 2:**
+    - a non-string `_es` value (`5`, a list) reached `font.render`;
+    - `TypeError` escaped `t()`.
+  - **Round 3:**
+    - a `{key}` field clashed with `t()`'s own `key` argument;
+    - NUL and lone surrogates passed and made `Font.render` raise.
+  - **Round 4:** strings made only of zero-width characters, a BOM or a soft
+    hyphen passed; pygame raises "Text has zero width" on them.
+  - **Round 5:** PASS. Every Unicode codepoint that `renderable` accepts,
+    alone and after "A", draws with both shipped fonts with no failure. Two
+    of its nits were taken: the draw test uses the shipped fonts, and an empty
+    `_es` ("not translated yet") no longer logs.
+  - **Left as they are:**
+    - an empty `{n:}` spec, which formats like `{n}`;
+    - nan/inf in `num`, which never reach the UI;
+    - caller misuse, such as a negative `places` or an unhashable key;
+    - a non-text English field, which UI-014.4's data-coverage test checks.
+- **Also run** (216 passed with `tests/locale`): `tests/systems/test_save.py`,
+  `tests/systems/test_fonts.py`,
+  `tests/progression/test_blessings.py`,
+  `tests/combat/test_elements_config.py`,
+  `tests/spawn/test_data_integrity.py`, `tests/systems/test_assets.py`,
+  `tests/flows/test_smoke.py` and `tests/flows/test_loading.py`: all pass.

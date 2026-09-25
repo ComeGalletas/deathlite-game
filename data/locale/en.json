@@ -1,0 +1,7 @@
+{
+  "_doc": "UI text in English, the reference language (UI-014). Grouped by screen and read as dotted keys: t(\"format.decimal\"). Every other language file must have the same keys with the same {placeholders}; tests/locale/ checks this. Data text (names, descriptions) is not here: it sits in each entity's JSON as <field>, with <field>_<lang> beside it.",
+  "format": {
+    "_doc": "Number style, read by game.locale.num().",
+    "decimal": "."
+  }
+}
