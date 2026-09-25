@@ -15,7 +15,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-014 · RND-008 · UI-014 ·
+**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-014 · RND-008 · UI-015 ·
 PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 
 ## Requirements
@@ -84,6 +84,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 | UI-011 | Enemy health bar | UI, ENT | feature | legacy | [enemy_health_bar_journal.md](enemy_health_bar_journal.md) | — | 2026-09-22 |
 | UI-012 | Chests opened shown on the run summary | UI, PRG | feature | done | [combat_balance_journal.md](combat_balance_journal.md) | claude/ent-014-ui-012-small-fixes | 2026-09-24 |
 | UI-013 | Run summary weapons table: the level never overlaps the damage | UI | bug | done | [game_over_journal.md](game_over_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| UI-014 | Spanish localization: locale files, `_es` data fields, a Language option | UI, SYS, PRG | feature | in progress | [localization_journal.md](localization_journal.md) | claude/ui-014-localization | 2026-09-25 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
