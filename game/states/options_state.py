@@ -15,8 +15,10 @@ Start-screen milestone M2. Reached from the menu's "Options" entry. Up / Down
 (also W / S) move the cursor; Left / Right adjust the master volume, cycle
 the key layout (CB-5: WASD move / arrows aim, or the swap), toggle the
 Tutorials (the run's opening keycap hints -- journal key_icons_journal.md,
-pass 5), switch the display mode or step the resolution; ENTER toggles mute
-or the tutorials, cycles the layout or the mode, steps the resolution, or
+pass 5), step the Language (UI-014.3: English / Español, each shown by its
+own name, applied on the next frame), switch the display mode or step the
+resolution; ENTER toggles mute or the tutorials, cycles the layout, the
+language or the mode, steps the resolution, or
 opens the selected screen; ESC (or the
 "Back" row) returns to the menu. Every change is persisted immediately, the
 same as the `M` mute key.
@@ -52,7 +54,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import MUSIC_INHERIT, State
 from ui import scale
 from ui.menu_nav import MenuNav
@@ -60,7 +62,7 @@ from ui.mouse import BUTTON_LEFT
 
 _LABELS = {"master": "Master volume", "music": "Music volume",
            "sfx": "Sound effects", "mute": "Mute", "key_layout": "Key layout",
-           "tutorials": "Tutorials",
+           "tutorials": "Tutorials", "language": "Language",
            "display": "Display mode", "resolution": "Resolution",
            "sanctuary": "Sanctuary", "back": "Back"}
 
@@ -71,7 +73,9 @@ _SLIDER_ROWS = ("master", "music", "sfx")
 # right of it; the mouse band spans from just left of the `>` marker to past
 # the percentage, and is exactly `_ROW_STEP` tall so bands touch but never
 # overlap.
-_ROW_TOP, _ROW_STEP = 180, 68        # ten rows from here still clear the hint (pass 5)
+# Eleven rows since the Language row (UI-014.3): the last lands at 810, a
+# half-row clear of the hint line at 860.
+_ROW_TOP, _ROW_STEP = 170, 64
 _LABEL_DX, _VALUE_DX = -250, 250
 _BAR_W, _BAR_H, _PCT_DX = 220, 22, 236
 _BAND_DX, _BAND_W = -40, 590         # from the label column
@@ -97,9 +101,9 @@ class OptionsState(State):
         if self.in_run:
             self.music = MUSIC_INHERIT   # keep the run's track playing
         self._rows = ("master", "music", "sfx", "mute", "key_layout", "tutorials",
-                      "display", "resolution", "back") if self.in_run else (
-            "master", "music", "sfx", "mute", "key_layout", "tutorials", "display",
-            "resolution", "sanctuary", "back")
+                      "language", "display", "resolution", "back") if self.in_run else (
+            "master", "music", "sfx", "mute", "key_layout", "tutorials", "language",
+            "display", "resolution", "sanctuary", "back")
         self.sel = 0
         self._nav = MenuNav()        # the cursor keys and the mouse (ui/menu_nav.py)
         self._mouse = self._nav.mouse   # rows registered in draw(); see ui/mouse.py
@@ -239,6 +243,9 @@ class OptionsState(State):
         if rid == "tutorials":
             self.game.set_tutorials(not self.game.tutorials)
             return
+        if rid == "language":
+            self.game.cycle_language(direction)
+            return
         if rid == "display":
             self._toggle_display_mode()
             return
@@ -267,6 +274,8 @@ class OptionsState(State):
             self.game.cycle_key_layout()
         elif rid == "tutorials":
             self.game.set_tutorials(not self.game.tutorials)
+        elif rid == "language":
+            self.game.cycle_language(+1)
         elif rid == "display":
             self._toggle_display_mode()
         elif rid == "resolution":
@@ -350,6 +359,11 @@ class OptionsState(State):
                 # The run's opening keycap hints (journal: key_icons_journal.md,
                 # pass 5). Every run while On; Off hides them.
                 val = self._row.render("On" if self.game.tutorials else "Off", True, colour)
+                surface.blit(val, val.get_rect(midleft=(vx, y)))
+            elif rid == "language":
+                # Each language by its own name (UI-014.3), so a player who
+                # cannot read the current one still recognises theirs.
+                val = self._row.render(locale.name_of(self.game.language), True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
             elif rid == "display":
                 val = self._row.render(self.game.display.mode_label(), True, colour)

@@ -280,7 +280,7 @@ Options.
   - `game/locale.py` and the loading and checks in `content.py`;
   - an empty `data/locale/en.json` and `es.json`;
   - the parity and runtime tests.
-- [ ] UI-014.3 — The language setting:
+- [x] UI-014.3 — The language setting:
   - `settings["language"]`, the Options row and boot;
   - switching takes effect immediately;
   - the save tests.
@@ -382,3 +382,65 @@ Options.
   `tests/combat/test_elements_config.py`,
   `tests/spawn/test_data_integrity.py`, `tests/systems/test_assets.py`,
   `tests/flows/test_smoke.py` and `tests/flows/test_loading.py`: all pass.
+
+### UI-014.3 — the language setting
+
+- **Save (`game/save.py`):** `settings["language"]` defaults to `"en"`. On
+  load, any value not in `locale.LANGUAGES` (`"fr"`, `"ES"`, `None`, `3`, a
+  list) becomes `"en"`. A save written before UI-014 loads in English and
+  keeps its other settings.
+  - The list of languages is imported from `game.locale` rather than copied
+    into the save module, as the key layouts are (`no-stale-duplicated-
+    references`). `game.locale` imports nothing from the game at load time,
+    so `import game.save` still pulls in neither pygame nor the content layer.
+- **Game (`game/game.py`):** the language is set from the save at boot,
+  before the state machine exists.
+  - `set_language(code)` and `cycle_language(direction)` switch it and
+    persist at once, as the key layout does.
+  - The change shows on the next frame, because every screen draws its text
+    each frame; nothing restarts.
+  - With `SAVE_ENABLED` off (the web build), a new session starts in English
+    (UI-014.D8).
+- **Options (`game/states/options_state.py`):** a Language row directly
+  after Tutorials, on the menu screen and on the in-run (pause) screen.
+  - ENTER and a click step forward; Left and Right step either way, with wrap.
+  - The value is each language's own name ("English", "Español"), read by
+    `locale.name_of` from that language's file (`language.name`), so a player
+    who cannot read the current language still finds theirs.
+  - Eleven rows no longer fit the old step, so `_ROW_TOP, _ROW_STEP` went
+    from 180, 68 to 170, 64. The last row sits at 810, clear of the hint at
+    860.
+  - The row labels stay English until UI-014.7.
+- **Test isolation (found by the critic):** the language is process-global,
+  and two tests (`tests/flows/test_lod.py`, `tests/flows/test_window.py`)
+  booted `Game()` from the repo's own `save.json`. After a developer picked
+  Español while playing, every later test in that process would have run in
+  Spanish.
+  - Both tests now use a temp save.
+  - `tests/locale/test_isolation.py` fails on any `Game()` a test builds
+    without a `save_path`, which covers the plain unittest runner too.
+  - An autouse fixture in `tests/conftest.py` sets English before and after
+    every test.
+- **Tests:**
+  - `test_save.py`: the default and round trip, and junk values.
+  - `test_options.py` `LanguageRowTests` (8): the default at boot, the row's
+    place on both screens, ENTER / Left / Right / click, persistence, set at
+    boot from the save, the unsaved build starting in English, and each name
+    drawn in its own language.
+  - `test_runtime.py` `NameTests`.
+  - `test_isolation.py`.
+  - Two `test_options.py` tests changed with the layout: the skip walk now
+    starts from Language, and the hint check counts eleven rows.
+- **Runs:**
+  - `tests/screens`, `tests/systems`, `tests/display`, `tests/flows` and
+    `tests/locale`: 993 passed.
+  - After the critic fixes, the touched modules: 166 passed.
+  - `unittest discover -s tests/locale`: OK.
+  - **Full default suite: 3503 passed, 0 failed, 0 skipped** (11 sweep
+    deselected, 19 min 2 s). The conftest fixture now wraps every test.
+- **Critic:** one cold pass, verdict PASS with one should-fix (the leak
+  above) and two nits (the in-run row position was not asserted; a test
+  class did not restore the tables). All three are fixed.
+- **Screenshot:** the Options screen with Español selected. The row labels
+  are still English, as planned.
+

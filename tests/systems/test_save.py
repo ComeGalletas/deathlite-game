@@ -60,6 +60,27 @@ class SaveLoadTests(unittest.TestCase):
         save(d, self.path)
         self.assertEqual(load(self.path).settings["key_layout"], "arrows_move")
 
+    def test_default_language_and_round_trip(self):
+        # UI-014.3: the UI language lives in settings and survives a save.
+        self.assertEqual(SaveData().settings["language"], "en")
+        d = SaveData()
+        d.settings["language"] = "es"
+        save(d, self.path)
+        self.assertEqual(load(self.path).settings["language"], "es")
+
+    def test_unknown_language_falls_back_to_default(self):
+        for junk in ("fr", "ES", "", None, 3, ["es"], {"es": 1}):
+            self.path.write_text(json.dumps({"settings": {"language": junk}}),
+                                 encoding="utf-8")
+            self.assertEqual(load(self.path).settings["language"], "en", junk)
+        # A save written before UI-014 has no language key: English, and the
+        # other settings are kept.
+        self.path.write_text(json.dumps({"settings": {"muted": True}}),
+                             encoding="utf-8")
+        back = load(self.path)
+        self.assertTrue(back.settings["muted"])
+        self.assertEqual(back.settings["language"], "en")
+
     def test_unknown_key_layout_falls_back_to_default(self):
         for junk in ("dvorak", 7, None):
             self.path.write_text(json.dumps({"settings": {"key_layout": junk}}),

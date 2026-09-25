@@ -217,14 +217,31 @@ class NumberTests(LocaleCase):
         self.assertEqual(locale.num(12), "12")
 
 
+class NameTests(LocaleCase):
+    def test_each_language_is_named_in_itself_whatever_is_active(self):
+        locale.load({"en": {"language.name": "English"},
+                     "es": {"language.name": "Español"}})
+        for active in locale.LANGUAGES:
+            locale.set_language(active)
+            self.assertEqual(locale.name_of("en"), "English")
+            self.assertEqual(locale.name_of("es"), "Español")
+
+    def test_a_missing_name_shows_the_code(self):
+        locale.load({"en": {}, "es": {"language.name": "   "}})
+        self.assertEqual(locale.name_of("es"), "es")
+        self.assertEqual(locale.name_of("xx"), "xx")
+
+
 class RealTablesTests(unittest.TestCase):
     """`load(None)` goes back to the tables the content loader built."""
 
     def tearDown(self):
         locale.set_language(locale.DEFAULT)
+        locale.load(None)
 
     def test_reads_the_shipped_files(self):
         locale.load(None)
+        self.assertEqual(locale.name_of("es"), "Español")
         locale.set_language("es")
         self.assertEqual(locale.num(1.5), "1,5")
         locale.set_language("en")

@@ -15,7 +15,7 @@ import time
 
 import pygame
 
-from game import config, save as save_mod
+from game import config, locale, save as save_mod
 from game.assets import get_assets
 from game.content import get_content
 from game.display import DisplayWindow
@@ -83,6 +83,10 @@ class Game:
         self.set_master_volume(self.save.settings.get(
             "master_volume", config.MASTER_VOLUME_DEFAULT), persist=False)
 
+        # The UI language (UI-014), before any state draws text. The save
+        # already replaced an unknown code with the default.
+        locale.set_language(self.save.settings.get("language", locale.DEFAULT))
+
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
 
@@ -131,6 +135,27 @@ class Game:
     def set_tutorials(self, on: bool) -> None:
         self.save.settings["tutorials"] = bool(on)
         self.persist()
+
+    # --- language (UI-014) ---------------------------------------------
+    @property
+    def language(self) -> str:
+        """The UI language in use, a `locale.LANGUAGES` code."""
+        return locale.language()
+
+    def set_language(self, code: str) -> None:
+        """Switch the UI language and persist at once, like the key layout.
+        Every screen draws its text each frame, so the change shows on the
+        next frame; nothing needs a restart."""
+        self.save.settings["language"] = locale.set_language(code)
+        self.persist()
+
+    def cycle_language(self, direction: int = 1) -> str:
+        """Step to the next (or previous) language in `locale.LANGUAGES`,
+        the Options "Language" row. Returns the new code."""
+        names = locale.LANGUAGES
+        nxt = names[(names.index(self.language) + direction) % len(names)]
+        self.set_language(nxt)
+        return nxt
 
     def cycle_key_layout(self) -> str:
         """Advance to the next layout (the pause / options toggle). Returns

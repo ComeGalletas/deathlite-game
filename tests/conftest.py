@@ -107,3 +107,16 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
         else:
             item.add_marker(pytest.mark.unit)
+
+
+@pytest.fixture(autouse=True)
+def _english_ui():
+    """Every test starts and ends in English (UI-014.3). The UI language is
+    process-global in `game.locale`, and `Game()` sets it from the save it
+    loads -- a test that boots a `Game` without a temp `save_path` reads the
+    developer's own `save.json`, which may say Spanish. A test that wants
+    another language sets it itself; this puts English back after it."""
+    from game import locale
+    locale.set_language(locale.DEFAULT)
+    yield
+    locale.set_language(locale.DEFAULT)

@@ -13,7 +13,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-from game import config, save as save_mod
+from game import config, locale, save as save_mod
 from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.meta_state import MetaState
@@ -104,11 +104,11 @@ class WindowRowTests(unittest.TestCase):
     def test_without_a_scaled_window_both_rows_are_skipped(self):
         game, opt = _options()
         self.assertFalse(game.display.available)
-        opt.sel = opt._rows.index("tutorials")
+        opt.sel = opt._rows.index("language")
         _key(game, pygame.K_DOWN)
         self.assertEqual(opt._row_id(), "sanctuary")
         _key(game, pygame.K_UP)
-        self.assertEqual(opt._row_id(), "tutorials")
+        self.assertEqual(opt._row_id(), "language")
         opt.draw(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))   # draws "Unavailable"
 
     def test_display_mode_row_switches_and_persists(self):
@@ -366,6 +366,101 @@ class KeyLayoutRowTests(unittest.TestCase):
         game, opt = _options()
         opt.draw(game.screen)            # must not raise; the label is looked up
         self.assertIn(game.key_layout, config.KEY_LAYOUT_LABELS)
+
+
+class LanguageRowTests(unittest.TestCase):
+    """UI-014.3: the Language row steps English / Español, applies on the
+    next frame and persists at once; the saved language is set at boot."""
+
+    def tearDown(self):
+        locale.set_language(locale.DEFAULT)    # never leak Spanish into a later test
+
+    def test_english_is_the_default_at_boot(self):
+        game, _ = _options()
+        self.assertEqual(game.language, "en")
+        self.assertEqual(locale.language(), "en")
+
+    def test_the_row_sits_after_tutorials_on_both_screens(self):
+        game, opt = _options()
+        self.assertEqual(opt._rows.index("language"), opt._rows.index("tutorials") + 1)
+        run = OptionsState(game)
+        game.state_machine.change(run, in_run=True)
+        self.assertEqual(run._rows.index("language"),
+                         run._rows.index("tutorials") + 1)
+
+    def test_enter_cycles_applies_and_persists(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("language")
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(game.language, "es")
+        self.assertEqual(locale.language(), "es")          # live, no restart
+        self.assertEqual(locale.num(1.5), "1,5")
+        self.assertEqual(save_mod.load(game.save_path).settings["language"], "es")
+        _key(game, pygame.K_RETURN)
+        self.assertEqual(game.language, "en")
+        self.assertEqual(save_mod.load(game.save_path).settings["language"], "en")
+
+    def test_left_right_cycle_on_the_row_only(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("language")
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.language, "es")
+        _key(game, pygame.K_LEFT)
+        self.assertEqual(game.language, "en")
+        _key(game, pygame.K_LEFT)                          # wraps either way
+        self.assertEqual(game.language, "es")
+        opt.sel = opt._rows.index("mute")
+        _key(game, pygame.K_RIGHT)
+        self.assertEqual(game.language, "es")
+
+    def test_a_click_cycles_the_language(self):
+        game, opt = _options()
+        opt.draw(game.screen)
+        _click(game, opt._mouse.hits.rect_of(opt._rows.index("language")).center)
+        self.assertEqual(game.language, "es")
+
+    def test_the_language_is_set_at_boot_from_the_save(self):
+        game, opt = _options()
+        opt.sel = opt._rows.index("language")
+        _key(game, pygame.K_RETURN)
+        locale.set_language("en")               # as a fresh process would start
+        fresh = Game(save_path=game.save_path)
+        self.assertEqual(fresh.language, "es")
+        self.assertEqual(locale.language(), "es")
+
+    def test_an_unsaved_build_starts_in_english(self):
+        # The web build runs with SAVE_ENABLED off: the choice lasts the
+        # session only, and a new session starts in English (UI-014.D8).
+        game, opt = _options()
+        opt.sel = opt._rows.index("language")
+        _key(game, pygame.K_RETURN)
+        old = config.SAVE_ENABLED
+        config.SAVE_ENABLED = False
+        try:
+            self.assertEqual(Game(save_path=game.save_path).language, "en")
+        finally:
+            config.SAVE_ENABLED = old
+
+    def test_the_row_shows_each_language_by_its_own_name(self):
+        game, opt = _options()
+        drawn = []
+
+        class Recording:                       # Font.render is read-only
+            def __init__(self, font):
+                self.font = font
+
+            def render(self, text, *a, **k):
+                drawn.append(text)
+                return self.font.render(text, *a, **k)
+
+        opt._row = Recording(opt._row)
+        opt.draw(game.screen)
+        self.assertIn("English", drawn)
+        game.set_language("es")
+        drawn.clear()
+        opt.draw(game.screen)
+        self.assertIn("Español", drawn)
+        self.assertNotIn("Spanish", drawn)
 
 
 class OptionsMouseTests(unittest.TestCase):
@@ -666,14 +761,14 @@ class MasterVolumeTests(unittest.TestCase):
         _key(game, pygame.K_LEFT)
         self.assertEqual(played, ["xp", "xp"])
 
-    def test_all_ten_rows_are_drawn_above_the_hint(self):
-        """Ten rows (the Tutorials row came in pass 5 of the key icons) is
-        two more than the layout was built for; the last must still clear
-        the hint line at the bottom of the box."""
+    def test_all_eleven_rows_are_drawn_above_the_hint(self):
+        """Eleven rows (Tutorials came in pass 5 of the key icons, Language
+        in UI-014.3) is three more than the layout was built for; the last
+        must still clear the hint line at the bottom of the box."""
         from game.states.options_state import _ROW_STEP, _ROW_TOP
         from ui import scale
         game, opt = _options()
-        self.assertEqual(len(opt._rows), 10)
+        self.assertEqual(len(opt._rows), 11)
         last = scale.px(_ROW_TOP + (len(opt._rows) - 1) * _ROW_STEP)
         hint_top = game.screen.get_height() - scale.px(40) - scale.px(_ROW_STEP) // 2
         self.assertLess(last, hint_top)
