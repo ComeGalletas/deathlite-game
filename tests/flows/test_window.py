@@ -3,6 +3,7 @@ falls back to a plain one when the driver refuses -- which the headless
 dummy driver the suite runs under does, so what is pinned here is the
 fallback and the report, not the sync itself."""
 import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -47,7 +48,7 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(surf.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
 
     def test_the_game_records_what_it_got(self):
-        g = Game()
+        g = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
         self.assertIsInstance(g.vsync, bool)
         # The dummy driver refuses the scaled window, so the manager is
         # dormant and the window is the plain fixed one.

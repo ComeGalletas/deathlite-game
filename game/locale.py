@@ -107,6 +107,14 @@ def language() -> str:
     return _language
 
 
+def name_of(code: str) -> str:
+    """A language's own name ("English", "Español"), read from its own file
+    whatever language is active, so a player who cannot read the current one
+    still finds theirs. The code itself when the file has no name."""
+    name = _table(code).get("language.name")
+    return name if renderable(name) else str(code)
+
+
 def _report(key: str, message: str, *args: Any) -> None:
     if key not in _reported:
         _reported.add(key)

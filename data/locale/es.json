@@ -1,5 +1,8 @@
 {
   "_doc": "UI text in Spanish (UI-014). Same keys and same {placeholders} as en.json; a key missing here is shown in English.",
+  "language": {
+    "name": "Español"
+  },
   "format": {
     "_doc": "Decimal comma (UI-014.D7).",
     "decimal": ","
