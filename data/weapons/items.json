@@ -4,6 +4,8 @@
       {
         "id": "sigil",
         "name": "Battle Sigil",
+        "name_es": "Sello de batalla",
+        "gender_es": "m",
         "stat": "damage_multiplier",
         "op": "flat",
         "min": 0.05,
@@ -12,6 +14,8 @@
       {
         "id": "focus",
         "name": "Focusing Lens",
+        "name_es": "Lente de enfoque",
+        "gender_es": "f",
         "stat": "attack_speed_multiplier",
         "op": "flat",
         "min": 0.05,
@@ -22,6 +26,8 @@
       {
         "id": "plate",
         "name": "Iron Plating",
+        "name_es": "Coraza de hierro",
+        "gender_es": "f",
         "stat": "armor",
         "op": "flat",
         "min": 2,
@@ -30,6 +36,8 @@
       {
         "id": "weave",
         "name": "Warded Weave",
+        "name_es": "Cota de malla",
+        "gender_es": "f",
         "stat": "max_hp",
         "op": "flat",
         "min": 14,
@@ -40,6 +48,8 @@
       {
         "id": "band",
         "name": "Traveller Band",
+        "name_es": "Pulsera de viaje",
+        "gender_es": "f",
         "stat": "move_speed",
         "op": "mult",
         "min": 0.04,
@@ -48,6 +58,8 @@
       {
         "id": "charm",
         "name": "Magpie Charm",
+        "name_es": "Amuleto de urraca",
+        "gender_es": "m",
         "stat": "pickup_radius",
         "op": "flat",
         "min": 15,
@@ -58,6 +70,7 @@
   "affixes": {
     "vitality": {
       "name": "of Vitality",
+      "name_es": "de vitalidad",
       "slots": [
         "armor",
         "accessory"
@@ -75,6 +88,7 @@
     },
     "haste": {
       "name": "of Haste",
+      "name_es": "de celeridad",
       "slots": [
         "weapon",
         "accessory"
@@ -92,6 +106,7 @@
     },
     "power": {
       "name": "of Power",
+      "name_es": "de poder",
       "slots": [
         "weapon"
       ],
@@ -108,6 +123,7 @@
     },
     "swiftness": {
       "name": "of Swiftness",
+      "name_es": "de presteza",
       "slots": [
         "accessory",
         "armor"
@@ -125,6 +141,7 @@
     },
     "warding": {
       "name": "of Warding",
+      "name_es": "de protección",
       "slots": [
         "armor"
       ],
@@ -141,6 +158,7 @@
     },
     "precision": {
       "name": "of Precision",
+      "name_es": "de precisión",
       "slots": [
         "weapon",
         "accessory"
@@ -158,6 +176,7 @@
     },
     "cruelty": {
       "name": "of Cruelty",
+      "name_es": "de crueldad",
       "slots": [
         "weapon"
       ],
@@ -174,6 +193,7 @@
     },
     "greed": {
       "name": "of Greed",
+      "name_es": "de codicia",
       "slots": [
         "accessory"
       ],
@@ -190,6 +210,7 @@
     },
     "fortune": {
       "name": "of Fortune",
+      "name_es": "de fortuna",
       "slots": [
         "accessory"
       ],
@@ -206,6 +227,7 @@
     },
     "expanse": {
       "name": "of Expanse",
+      "name_es": "de amplitud",
       "slots": [
         "weapon",
         "armor"
@@ -223,6 +245,7 @@
     },
     "velocity": {
       "name": "of Velocity",
+      "name_es": "de velocidad",
       "slots": [
         "weapon"
       ],
@@ -239,6 +262,7 @@
     },
     "scholarship": {
       "name": "of Scholarship",
+      "name_es": "de erudición",
       "slots": [
         "accessory",
         "armor"
@@ -256,6 +280,7 @@
     },
     "the_maw": {
       "name": "of the Maw",
+      "name_es": "de las fauces",
       "slots": [
         "weapon"
       ],
@@ -271,6 +296,7 @@
     },
     "the_hunt": {
       "name": "of the Hunt",
+      "name_es": "de la caza",
       "slots": [
         "weapon",
         "accessory"
@@ -293,21 +319,49 @@
     "epic": "Ascendant",
     "legendary": "Mythic"
   },
+  "prefixes_es": {
+    "common": {
+      "m": "sencillo",
+      "f": "sencilla"
+    },
+    "uncommon": {
+      "m": "refinado",
+      "f": "refinada"
+    },
+    "rare": {
+      "m": "rúnico",
+      "f": "rúnica"
+    },
+    "epic": {
+      "m": "excelso",
+      "f": "excelsa"
+    },
+    "legendary": {
+      "m": "mítico",
+      "f": "mítica"
+    }
+  },
   "unique_effects": {
     "weapon": {
       "id": "overflow",
       "name": "Overflow",
-      "desc": "+1 projectile to your first weapon."
+      "name_es": "Desbordamiento",
+      "desc": "+1 projectile to your first weapon.",
+      "desc_es": "+1 proyectil en tu primera arma."
     },
     "armor": {
       "id": "aegis_ward",
       "name": "Aegis Ward",
-      "desc": "Start each run with a one-hit shield."
+      "name_es": "Amparo de Aegis",
+      "desc": "Start each run with a one-hit shield.",
+      "desc_es": "Empiezas cada partida con un escudo que absorbe un golpe."
     },
     "accessory": {
       "id": "hoarder",
       "name": "Hoarder",
-      "desc": "+25% Salvage from a run."
+      "name_es": "Acaparador",
+      "desc": "+25% Salvage from a run.",
+      "desc_es": "+25 % de chatarra por partida."
     }
   }
 }

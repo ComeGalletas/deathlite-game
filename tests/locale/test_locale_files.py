@@ -134,15 +134,17 @@ class LoaderTests(unittest.TestCase):
                             for m in logs.output), logs.output)
 
     def test_every_shipped_text_can_be_drawn(self):
-        import pygame
-        from game.fonts import body, heading
-        pygame.font.init()
-        fonts = (body(16, scaled=False), heading(16, scaled=False))
+        # Rendering alone proves little (a missing glyph draws as a box, no
+        # error), so every character is checked for a real glyph as well.
+        from tests.locale.test_data_text import has_glyph, shipped_faces
+        faces = shipped_faces()
         for lang, table in get_content().locale.items():
             for key, template in table.items():
                 with self.subTest(lang=lang, key=key):
-                    for font in fonts:
-                        font.render(template, True, (0, 0, 0))
+                    for name, face in faces:
+                        face.render(template, True, (0, 0, 0))
+                        self.assertEqual(
+                            [c for c in template if not has_glyph(face, c)], [], name)
 
     def test_a_malformed_template_is_dropped(self):
         with self.assertLogs("game.content", "WARNING"):

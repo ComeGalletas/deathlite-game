@@ -10,17 +10,28 @@ vertical clamp here; a caller that needs one caps the list it gets back.
 """
 from __future__ import annotations
 
+import re
+
 import pygame
 
 from game import config
 
 
+# Where a line may break: any whitespace `str.split()` breaks at, except the
+# no-break spaces (U+00A0, figure U+2007, narrow U+202F). Spanish text puts
+# one between a number and its unit ("+25 %", UI-014.D7) precisely so the
+# two stay on one line.
+_BREAK = re.compile(r"[^\S   ]+")
+
+
 def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
-    """Lines of `text` no wider than `max_width` px in `font`."""
+    """Lines of `text` no wider than `max_width` px in `font`. A no-break
+    space (U+00A0) keeps the words either side of it on one line."""
     lines: list[str] = []
     cur = ""
-    for word in text.split():
-        candidate = f"{cur} {word}".strip()
+    for word in (w for w in _BREAK.split(text) if w):
+        # Not `.strip()`: that would eat a no-break space at a word's edge.
+        candidate = f"{cur} {word}" if cur else word
         if cur and font.size(candidate)[0] > max_width:
             lines.append(cur)
             cur = word

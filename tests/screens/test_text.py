@@ -34,6 +34,36 @@ class WrapTests(unittest.TestCase):
         narrow = "iiiiiiiiii " * 6
         self.assertGreater(len(wrap(self.font, wide, 300)), len(wrap(self.font, narrow, 300)))
 
+    def test_a_no_break_space_keeps_a_number_with_its_unit(self):
+        # UI-014: Spanish writes "+25 %" with U+00A0 so the % never lands
+        # alone on the next line. str.split() broke there, and rebuilt the
+        # no-break space as a plain one.
+        text = "+25 % de chatarra por partida."
+        width = self.font.size("+25")[0] + 5          # room for "+25" only
+        lines = wrap(self.font, text, width)
+        self.assertEqual(lines[0], "+25 %")
+        self.assertEqual(" ".join(lines), text)
+
+    def test_ordinary_whitespace_at_the_edges_is_dropped(self):
+        self.assertEqual(wrap(self.font, " a b\t", 10_000), ["a b"])
+        self.assertEqual(wrap(self.font, "a b \n", 1), ["a", "b"])
+        self.assertEqual(wrap(self.font, " \t\n", 10_000), [])
+
+    def test_a_no_break_space_at_a_word_edge_is_kept(self):
+        # `.strip()` on the joined line used to eat it.
+        self.assertEqual(wrap(self.font, " a b ", 1), [" a", "b "])
+        self.assertEqual(wrap(self.font, " a b ", 10_000), [" a b "])
+
+    def test_every_other_space_str_split_breaks_at_still_breaks(self):
+        self.assertEqual(wrap(self.font, "a \t b\n\nc   d", 10_000), ["a b c d"])
+        no_break = {" ", " ", " "}
+        for cp in range(0x110000):
+            ch = chr(cp)
+            if ch.isspace():
+                words = wrap(self.font, f"a{ch}b", 1)
+                self.assertEqual(words, [f"a{ch}b"] if ch in no_break else ["a", "b"],
+                                 hex(cp))
+
     def test_an_overlong_word_gets_its_own_line(self):
         lines = wrap(self.font, "a Supercalifragilisticexpialidocious b", 60)
         self.assertEqual(lines, ["a", "Supercalifragilisticexpialidocious", "b"])
