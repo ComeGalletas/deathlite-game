@@ -1,7 +1,9 @@
 {
   "sword": {
     "name": "Sword",
+    "name_es": "Espada",
     "description": "A wide sweeping arc. Reliable when enemies close in.",
+    "description_es": "Un amplio tajo en arco. Fiable cuando los enemigos se te echan encima.",
     "class": "melee",
     "damage": 15,
     "cooldown": 1.2,
@@ -26,7 +28,9 @@
   },
   "hammer": {
     "name": "Hammer",
+    "name_es": "Martillo",
     "description": "A slow, crushing blow: it winds up, then lands ahead of you. Strong knockback, may stun.",
+    "description_es": "Un golpe lento y demoledor: se carga y cae delante de ti. Gran empuje, puede aturdir.",
     "class": "melee",
     "damage": 27,
     "cooldown": 1.5,
@@ -55,7 +59,9 @@
   },
   "daggers": {
     "name": "Daggers",
+    "name_es": "Dagas",
     "description": "Quick, precise stabs. Melts a single target.",
+    "description_es": "Puñaladas rápidas y precisas. Destrozan a un único objetivo.",
     "class": "melee",
     "damage": 9,
     "cooldown": 0.4,
@@ -79,7 +85,9 @@
   },
   "bow": {
     "name": "Bow",
+    "name_es": "Arco",
     "description": "A long, piercing arrow. Punishes enemies in a line.",
+    "description_es": "Una flecha larga y perforante. Castiga a los enemigos alineados.",
     "class": "ranged",
     "damage": 10,
     "cooldown": 1.2,
@@ -105,7 +113,9 @@
   },
   "magic_rod": {
     "name": "Magic Rod",
+    "name_es": "Vara mágica",
     "description": "A bolt that seeks the nearest foe. Steady pressure, no aiming needed.",
+    "description_es": "Un proyectil que busca al enemigo más cercano. Presión constante, sin necesidad de apuntar.",
     "class": "ranged",
     "damage": 10,
     "cooldown": 1.0,
@@ -134,7 +144,9 @@
   },
   "bomb": {
     "name": "Bomb",
+    "name_es": "Bomba",
     "description": "A thrown explosive. Lands, sits, then erases a cluster.",
+    "description_es": "Un explosivo arrojadizo. Cae, espera y luego arrasa un grupo entero.",
     "class": "ranged",
     "damage": 23,
     "cooldown": 2.2,
@@ -165,7 +177,9 @@
   },
   "ember_ring": {
     "name": "Ember Ring",
+    "name_es": "Anillo de brasas",
     "description": "Embers orbit you, scorching anything they touch.",
+    "description_es": "Las brasas orbitan a tu alrededor y abrasan todo lo que tocan.",
     "class": "summon",
     "damage": 6,
     "cooldown": 0.45,
@@ -193,7 +207,9 @@
   },
   "grave_totem": {
     "name": "Grave Totem",
+    "name_es": "Tótem sepulcral",
     "description": "Plants a totem that fires spectral bolts at nearby foes.",
+    "description_es": "Planta un tótem que dispara proyectiles espectrales a los enemigos cercanos.",
     "class": "summon",
     "damage": 7,
     "cooldown": 6.0,
@@ -224,7 +240,9 @@
   },
   "spirit_wolf": {
     "name": "Spirit Wolf",
+    "name_es": "Lobo espiritual",
     "description": "Looses a spirit wolf that hunts and mauls the nearest foe.",
+    "description_es": "Suelta un lobo espiritual que caza y despedaza al enemigo más cercano.",
     "class": "summon",
     "damage": 12,
     "cooldown": 7.0,

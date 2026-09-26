@@ -119,9 +119,15 @@ tools.
   - "Runed Iron Plating of Vitality" cannot become Spanish word by word. The
     adjective follows the noun and agrees with its gender: "Placas de hierro
     rúnicas de Vitalidad".
-- **Fonts:** `Font.metrics` confirms that both Fredoka and NunitoSans have
-  á é í ó ú ñ ü (upper and lower case), ¿ ¡ and °. `mono()` is the system
-  Consolas, used by the developer tools only.
+- **Fonts:** both Fredoka and NunitoSans have á é í ó ú ñ ü (upper and
+  lower case), ¿ ¡ « » and U+00A0. `mono()` is the system Consolas, used by
+  the developer tools only.
+  - **Correction (UI-014.4.1):** this was first "confirmed" with
+    `Font.metrics`, which reports every character present, CJK and
+    private-use included, so that check proved nothing.
+  - The real check compares each character's render with the missing-glyph
+    box (`tests/locale/test_data_text.py` `has_glyph`). It sees 中 as missing
+    and every Spanish letter as present.
 - **Text inside images:**
   - `assets/ui/end_banners/game_over.png` and `you_won.png`;
   - the logo `text_title.png`, a brand name that stays as it is.
@@ -146,6 +152,11 @@ tools.
   Spanish abbreviations:
   - `+0,3 s`, `x2,2`, `+25 %`, `Nv. 4`, `12 s`;
   - dates and the timer (`mm:ss`) are unchanged.
+  - The space between a number and its unit is a **no-break space**
+    (U+00A0), so the unit can never wrap onto a line of its own (added in
+    UI-014.4.1). `ui.text.wrap` keeps U+00A0 inside a word, and the data test
+    `style_problems` flags a decimal point, a unit touching its number, or
+    any breaking space before `%` / `s`.
 
   All numbers go through one formatter in the locale module, so the style is
   set in one place.
@@ -186,6 +197,33 @@ tools.
   - This applies to `data/locale/` only. Blessing descriptions keep their
     positional `{0}` / `{1}`, filled by `catalog.describe`; UI-014.4 checks
     those separately.
+- **UI-014.D13 — the glossary.** One Spanish term per game word, so the data,
+  the UI and later tasks agree:
+
+  | English | Spanish |
+  |---|---|
+  | run | partida |
+  | Salvage (meta currency) | chatarra |
+  | blessing | bendición |
+  | forge / forged | forja / forjado |
+  | HP | PV |
+  | XP | EXP |
+  | enemy, foe | enemigo |
+  | knockback | empuje |
+  | elite | élite |
+  | hero | héroe |
+  | the player ("you") | tú (informal) |
+
+  Weapon names: Espada, Martillo, Dagas (plural: verbs agree, as in
+  "Destrozan"), Arco, Vara mágica, Bomba, Anillo de brasas, Tótem sepulcral,
+  Lobo espiritual.
+- **UI-014.D14 — data is translated with a tool, not by hand.**
+  `tools/localization/add_translations.py` places `<field>_es` keys from a
+  flat `{"slash/path/field_es": value}` mapping. It edits the text in place,
+  because several `data/` files are hand-formatted. It refuses anything that
+  is not a translation of text, runs a strict self-check, and writes
+  atomically. The mappings are working files; the data file is the only
+  record of a translation.
 
 ## UI-014 — Plan
 
@@ -286,7 +324,7 @@ Options.
   - the save tests.
 - [ ] UI-014.4 — Spanish data: a `_es` next to every player-facing field in
   the 9 files, with the data-coverage and number-match tests.
-  - [ ] UI-014.4.1 — `weapons.json` and `items.json` (the requested part), with
+  - [x] UI-014.4.1 — `weapons.json` and `items.json` (the requested part), with
     `gender_es` and `prefixes_es`.
   - [ ] UI-014.4.2 — `forges.json`, `blessings.json`.
   - [ ] UI-014.4.3 — `characters.json`, `meta_upgrades.json`,
@@ -443,4 +481,90 @@ Options.
   class did not restore the tables). All three are fixed.
 - **Screenshot:** the Options screen with Español selected. The row labels
   are still English, as planned.
+
+### UI-014.4.1 — Spanish for weapons and items
+
+- **Data:**
+  - `data/weapons/weapons.json`: `name_es` and `description_es` on all 9
+    weapons.
+  - `data/weapons/items.json`:
+    - `name_es` and `gender_es` on the 6 bases;
+    - `name_es` on the 15 affixes ("de vitalidad", "de la caza");
+    - `prefixes_es`, with each rarity in both genders (sencillo, refinado,
+      rúnico, excelso, mítico);
+    - `name_es` and `desc_es` on the 3 legendary effects.
+
+  Nothing reads these fields yet: UI-014.5 and UI-014.6 do. So the game is
+  unchanged in both languages until then.
+- **Item names read correctly in every combination.** Each base's gender
+  ties the rarity adjective to the item, not to the noun inside its name:
+  "Sello de batalla rúnico", "Coraza de hierro rúnica de vitalidad",
+  "Pulsera de viaje mítica de la caza". The critics built and read every
+  base × rarity × allowed affix.
+- **The tool:** `tools/localization/add_translations.py` (UI-014.D14).
+  - The first version re-dumped the whole file. The round-trip test showed
+    that only 3 of the 9 text-bearing files are in `json.dump` form, so it
+    now edits the text:
+    - a member alone on its line gets a new line at the same indent;
+    - a member that shares a line gets the new pair inline.
+  - A strict parse of the result, with no duplicate keys, must equal the
+    document `apply()` builds from the original.
+  - It refuses:
+    - a suffix that is not a translated language;
+    - a sibling or value that is not text (a number, list, flag, null, or an
+      object of numbers such as `values`);
+    - a path given twice.
+  - It encodes the output before touching the target and writes through a
+    temp file with an atomic replace. It keeps CRLF or LF as found.
+- **`ui/text.py` `wrap`:** it no longer breaks at a no-break space (U+00A0,
+  U+2007, U+202F). Everywhere else it breaks exactly where `str.split()` did,
+  proved for every whitespace codepoint. It keeps a no-break space at a
+  word's edge.
+- **Tests:**
+  - `tests/locale/test_data_text.py`:
+    - the registry of `TRANSLATED` and `PENDING` files, where a new
+      text-bearing file fails until it is placed;
+    - a drawable `_es` for every field;
+    - the same signed, percent and decimal numbers;
+    - the same placeholders, with their format spec;
+    - Spanish that differs from English;
+    - a real glyph for every character, `prefixes_es` included;
+    - the D7 number style;
+    - no orphan `_es` key;
+    - the item grammar;
+    - each helper tested on its own data.
+  - `tests/locale/test_add_translations.py`: placement, the layouts, errors,
+    the self-check, file handling, and every real data file translated at
+    once changing by insertion only.
+  - `tests/screens/test_text.py`: the no-break space, the edges, and the full
+    whitespace sweep.
+  - `tests/locale/test_locale_files.py` now checks glyphs the same way.
+  - Red checks, run by hand: a blank translation and a changed number each
+    failed the coverage tests; the file was restored afterwards.
+- **Full default suite: 3558 passed, 0 failed, 0 skipped** (11 sweep
+  deselected, 17 min 47 s).
+- **Cold critic loop:** nine rounds, each judged by a fresh critic. From
+  round 7 the critics used mutation testing, up to 94 mutants. Round 9 was a
+  PASS.
+  - **Spanish fixed along the way:**
+    - "Brazalete del viajero ascendente" read as "the rising traveller's
+      bracelet", so the base became "Pulsera de viaje" (f).
+    - ascendente → excelso/a, and fino/a ("thin") → refinado/a.
+    - "Malla protectora … de protección" repeated its root, so the base
+      became "Cota de malla".
+    - The daggers' verb was made plural ("Destrozan").
+    - retroceso → empuje, borra → arrasa, and the ward family was unified.
+  - **Tool bugs found and fixed:**
+    - a space before a comma produced `,,`;
+    - `sword/projectile_count` was overwritten as if it were a translation;
+    - a lone surrogate truncated the target to 0 bytes;
+    - a key duplicated by an edit passed the self-check.
+  - **Test gaps closed:**
+    - `Font.metrics` saw no missing glyph (see the Fonts correction above);
+    - the sign was not compared;
+    - the style check had a false positive on words starting with "s", and
+      missed "+25%" and runs of mixed spaces;
+    - `--check` could have written the file unnoticed.
+  - **Left as nits:** keys containing "/", an inline object value starting at
+    column 0, numbers written as words, and only `%` and `s` known as units.
 
