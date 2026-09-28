@@ -14,7 +14,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-from game import config
+from game import config, locale
 from game.states.character_select_state import CharacterSelectState
 from game.states.menu_state import MenuState
 from tests.screens.drive import (bright_pixels as _bright_pixels, key as _key,
@@ -91,8 +91,16 @@ class CharacterSelectInstructionsTests(unittest.TestCase):
         real = cs._instr
         recorder = _RecordingFont(real)
         cs._instr = recorder
-        instr = {"rows": [("Jump", "SPACE"), ("Crouch", "CTRL")],
-                 "notes": ["first note", "second note"]}
+        # The config holds ids; the words come from the locale (UI-014.7).
+        # A row's keys are its literal, or `instructions.keys.<row>` if None.
+        from game import locale
+        instr = {"rows": [("jump", "SPACE"), ("crouch", None)],
+                 "notes": ["first", "second"]}
+        words = {"instructions.jump": "Jump", "instructions.crouch": "Crouch",
+                 "instructions.keys.crouch": "Hold CTRL",
+                 "instructions.note.first": "first note",
+                 "instructions.note.second": "second note"}
+        locale.load({"en": words})
         try:
             self._with_instructions(
                 instr,
@@ -100,12 +108,12 @@ class CharacterSelectInstructionsTests(unittest.TestCase):
                                               config.SCREEN_WIDTH // 2, 700))
         finally:
             cs._instr = real
+            locale.load(None)
 
         drawn = recorder.drawn
-        self.assertEqual(drawn[:len(instr["notes"])], instr["notes"])
-        for label, combo in instr["rows"]:
-            self.assertIn(label, drawn[-1])
-            self.assertIn(combo, drawn[-1])
+        self.assertEqual(drawn[:2], ["first note", "second note"])
+        for part in ("Jump  SPACE", "Crouch  Hold CTRL"):
+            self.assertIn(part, drawn[-1])
 
     def test_each_extra_note_pushes_the_block_down_one_line(self):
         """The growth rule, asserted as a difference -- so moving the whole
@@ -528,7 +536,7 @@ class DifficultyRibbonTests(unittest.TestCase):
             self.assertEqual(call.kwargs["colour"], config.DIFFICULTY_RIBBON[cs.difficulty])
             self.assertIsNone(call.args[3])                       # the pair is blitted by the state
             a, b = cs._layout["diff_runs"]
-            want_b = cs._diff_type.size(config.DIFFICULTY_LABELS[cs.difficulty])[0]
+            want_b = cs._diff_type.size(locale.t(f"difficulty.{cs.difficulty}"))[0]
             self.assertEqual(b.width, want_b)                     # the type run follows the difficulty
             _key(game, pygame.K_DOWN)
 

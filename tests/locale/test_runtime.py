@@ -126,6 +126,21 @@ class LookupTests(LocaleCase):
         with self.assertLogs("game.locale", "WARNING"):
             locale.t("gone")
 
+    def test_english_reads_english_and_puts_the_language_back(self):
+        locale.set_language("es")
+        self.assertEqual(locale.english("menu.start"), "Start")
+        self.assertEqual(locale.language(), "es")               # not left in English
+        self.assertEqual(locale.t("menu.start"), "Empezar")
+        with self.assertLogs("game.locale", "WARNING"):
+            locale.english("chest.gold", nope=1)                # even on a bad fill
+        self.assertEqual(locale.language(), "es")
+
+    def test_has_looks_in_the_current_language_and_english(self):
+        locale.set_language("es")
+        self.assertTrue(locale.has("menu.start"))
+        self.assertTrue(locale.has("only.english"))            # English only still counts
+        self.assertFalse(locale.has("difficulty.nightmare"))
+
     def test_plural_picks_one_or_other(self):
         self.assertEqual(locale.plural("forge.needs", 1), "needs 1 more blessing")
         self.assertEqual(locale.plural("forge.needs", 2), "needs 2 more blessings")

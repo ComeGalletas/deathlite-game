@@ -365,7 +365,8 @@ class KeyLayoutRowTests(unittest.TestCase):
     def test_row_draws_the_layout_label(self):
         game, opt = _options()
         opt.draw(game.screen)            # must not raise; the label is looked up
-        self.assertIn(game.key_layout, config.KEY_LAYOUT_LABELS)
+        self.assertNotEqual(locale.t(f"key_layout.{game.key_layout}"),
+                            f"key_layout.{game.key_layout}")   # a real label, not the key
 
 
 class LanguageRowTests(unittest.TestCase):
@@ -452,6 +453,9 @@ class LanguageRowTests(unittest.TestCase):
             def render(self, text, *a, **k):
                 drawn.append(text)
                 return self.font.render(text, *a, **k)
+
+            def __getattr__(self, name):          # size() etc. from the font
+                return getattr(self.font, name)
 
         opt._row = Recording(opt._row)
         opt.draw(game.screen)

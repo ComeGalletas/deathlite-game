@@ -352,7 +352,7 @@ Options.
   - `base_id` on `Item`, and recovery for old saves;
   - names built from the locale template;
   - the item tests.
-- [ ] UI-014.7 — UI strings to keys, part one: the menus, the hero select, the
+- [x] UI-014.7 — UI strings to keys, part one: the menus, the hero select, the
   Options screen, the pause screen, the level-up screen, the loading screen and
   the rankings, plus the `config.py` label maps.
 - [ ] UI-014.8 — UI strings to keys, part two, the run:
@@ -846,3 +846,98 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     docstring and an import move. The accepted equivalent nits are listed in
     the round-2 report. A whole old-save item dict (no `base_id` key) now has
     its own summary test.
+
+### UI-014.7 — the menu screens' own text
+
+- **What moved to `data/locale/`:**
+  - screens: the main menu (with its save line), the hero select (with the
+    instructions block), Options, pause (with the Controls block), the
+    level-up screen, loading and the rankings;
+  - labels: the display-mode and resolution labels;
+  - word tables: difficulty, key layout, rarity, blessing category and
+    weapon class.
+
+  97 keys in each language.
+- **`config.py` no longer holds English:**
+  - `DIFFICULTY_LABELS` and `KEY_LAYOUT_LABELS` are gone. A difficulty's
+    name is `difficulty.<id>`.
+  - `MENU_INSTRUCTIONS` holds row and note ids and the literal key names
+    (WASD, TAB).
+  - One source for each word (`no-stale-duplicated-references`).
+- **The developer tools stay English (D6)** through `locale.english(key)`.
+  `locale.has(key)` lets a screen show an id when there is no name for it
+  (an unknown difficulty).
+- **Word order:** the level-up card's category line was the tags joined word
+  by word ("Melee Weapon Grant"). It is now one phrase per card kind, with
+  its word order in the locale ("Arma cuerpo a cuerpo", "Poder del héroe",
+  "Espada · Cobertura"). English equals the old formula for all 106 real
+  offers (critic check) and for every kind × category × weapon the data
+  allows (test).
+- **Fit (`ui.text.fit_font`):** a label steps down in size, to at most 70 %,
+  when its translation does not fit its slot. It is used only then, so
+  English keeps its sizes. Screenshots found three overflows:
+  - "Volumen de la música" into the slider;
+  - the pause key-layout value into its label;
+  - "Nueva arma: Tótem sepulcral" across the card.
+
+  The Options mouse band was widened to cover the longest value.
+- **Everything is read when drawn**, so a switch in Options shows on the
+  next frame, the Options screen itself included. This covers the menu
+  labels (a property), the level-up hint and the loading label.
+- **Spanish choices:**
+  - Nv. for Lv;
+  - "Teclas" for the key-layout row, so the Controls block heading can keep
+    "Controles";
+  - "En ventana", "Sí" / "No";
+  - U+00A0 before "s" and "%".
+
+  "Normal" is the same word in both languages, and is listed as such.
+- **Tests:** `tests/screens/test_spanish_menus.py`.
+  - English byte-identity of the built strings.
+  - Every screen drawn in Spanish, with each string checked where it is
+    drawn.
+  - The live switch from Options.
+  - `fit_font` and each fitted slot.
+  - The display labels.
+  - The dev menu's English difficulty (in `test_spanish_run`).
+  - Eight existing tests moved from the removed config maps to the locale.
+- **Screenshots:** the menu, hero select, Options, pause, rankings and a
+  level-up offer, in Spanish.
+- **Open for the owner:** the TAB screen has three names across screens
+  (Stat screen, Build, Run status), in English as well as Spanish.
+  Unifying them is a wording decision, left as it is.
+- **Tests run:**
+  - Full default suite on the final production code: 3641 passed,
+    0 failed, 0 skipped (20 min 17 s).
+  - After the last test-only edits, the affected suites (`tests/screens`,
+    `tests/locale`, the Spanish run, the controls, dev-mode and display
+    tests): 893 passed.
+  - An earlier full run had two transient failures in
+    `tests/screens/test_level_up.py`. Both tests read the panel's source
+    text, and the file was mid-edit during that run. Both pass on the final
+    code.
+- **Cold critic loop:** four rounds.
+  - Round 1: a stale test assertion, font sizes written twice, and draw
+    paths without a Spanish check. Also fixed: the cached level-up hint and
+    loading label, the unknown-difficulty fallback (`locale.has`), the
+    mouse band, "Teclas" and "En ventana".
+  - Round 2: no production bugs, but nine surviving mutants, all gaps in
+    the tests:
+    - the pause title;
+    - the pause key-layout value;
+    - five Controls rows;
+    - the On / Off order;
+    - the band width;
+    - the unknown difficulty;
+    - `locale.english` restoring the language;
+    - the fit cache's scale key;
+    - the rankings subtitle.
+
+    Plus two tests hard-coding the font sizes. All are now pinned.
+  - Round 3: every mutant killed except `_LABEL_GAP = 0`, since the tests
+    read the room from the same constant. It is now measured on the drawn
+    gap against a literal 16 px.
+  - Round 4: PASS. Across 54 hunk reverts and the fine mutants, the only
+    survivors are equivalent: the dead config maps, `26` in place of its
+    constant, "fit always", and the card-shape length guards. No state
+    leaks from the new tests.

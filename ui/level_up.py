@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import scale, widgets
 from ui.mouse import HitMap
-from ui.text import shadowed, wrap
+from ui.text import fit_font, shadowed, wrap
 
 # The cards grew 15 px downwards (owner, 2026-09-04) so the description's
 # last line and the tag line sit inside the art's flat centre, not on its
@@ -37,6 +37,7 @@ _DESC_TOP = 92              # top of the band, and where a full-height block sta
 _DESC_LINE_H = 24
 _TAG_UP = 39                # the category line's midbottom, up from the card's
 _DESC_GAP = 8               # breathing room between the block and the category line
+_NAME_PX = 24               # the card title's design font size
 
 # The level-up width, and the narrower one the Forge uses so its weapon rail
 # has somewhere to live. Three 260-wide cards and two 40 px gaps come to 860,
@@ -46,10 +47,33 @@ CARD_W = 340
 CARD_W_NARROW = 260
 
 
+def category_line(up) -> str:
+    """The card's category line, a phrase per card kind in the current
+    language (UI-014.7): "Sword Power", "Hero Power", "Melee Weapon Grant",
+    "Sword Forge" / "Espada · Poder", "Poder del héroe", "Arma cuerpo a
+    cuerpo", "Forja · Espada". Word order is the locale's, which is why the
+    tags are not translated one by one. Tags of any other shape are joined,
+    each capitalised, as before."""
+    tags = tuple(up.tags)
+    kind = getattr(up, "kind", None)
+    if kind in ("stat", "weapon") and len(tags) == 2:
+        who, category = tags
+        name = locale.t(f"category.{category}")
+        if who == "hero":
+            return locale.t("level_up.line.hero", category=name)
+        return locale.t("level_up.line.weapon", weapon=who, category=name)
+    if kind == "grant" and len(tags) == 3:
+        return locale.t("level_up.line.grant",
+                        weapon_class=locale.t(f"weapon_class.{tags[0]}"))
+    if kind == "forge" and len(tags) == 2:
+        return locale.t("level_up.line.forge", weapon=tags[0])
+    return " ".join(t[:1].upper() + t[1:] for t in tags)
+
+
 class LevelUpPanel:
     def __init__(self) -> None:
         self._title = fonts.heading(40)
-        self._name = fonts.heading(24)
+        self._name = fonts.heading(_NAME_PX)
         self._desc = fonts.body(18)
         self._hint = fonts.body(16)
         self.hits = HitMap()          # card index -> rect, rebuilt every draw
@@ -75,7 +99,7 @@ class LevelUpPanel:
         if dim:
             self.draw_dim(surface)
 
-        title = self._title.render(title or "Level Up  -  choose one", True,
+        title = self._title.render(title or locale.t("level_up.title"), True,
                                    config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(w // 2, scale.px(110))))
 
@@ -101,14 +125,19 @@ class LevelUpPanel:
             key_badge = self._name.render(f"#{i + 1}", True, config.COLOR_ON_BUTTON_DIM)
             surface.blit(key_badge, (x + scale.px(39), y + scale.px(10) + dy))    # 25 px in from the corner (owner)
 
-            name = shadowed(self._name, up.title, config.COLOR_ACCENT)   # gold with a dark drop shadow
+            # A title wider than the card steps down in size (UI-014.7:
+            # "Nueva arma: Tótem sepulcral"); the English ones all fit.
+            room = card_w - 2 * scale.px(_CARD_TEXT_INSET)
+            title_font = (self._name if self._name.size(up.title)[0] <= room
+                          else fit_font(fonts.heading, _NAME_PX, up.title, room))
+            name = shadowed(title_font, up.title, config.COLOR_ACCENT)   # gold with a dark drop shadow
             surface.blit(name, name.get_rect(midtop=(rect.centerx, y + scale.px(46) + dy)))
 
             # P2: the rarity, top-right, in its colour (the level is in the
             # title's roman numeral).
             rarity = getattr(up, "rarity", "")
             if rarity:
-                r = self._hint.render(rarity.upper(), True,
+                r = self._hint.render(locale.t(f"rarity.{rarity}").upper(), True,
                                       config.RARITY_COLOURS.get(rarity, config.COLOR_ON_BUTTON_DIM))
                 surface.blit(r, r.get_rect(topright=(x + card_w - scale.px(24), y + scale.px(14) + dy)))
 
@@ -125,14 +154,13 @@ class LevelUpPanel:
                     midtop=(rect.centerx, top + j * line_h + dy)))
 
             if up.tags:
-                # The category line: each word capitalised, 25 px up from
-                # the bottom bevel (owner, 2026-09-10).
-                words = " ".join(t[:1].upper() + t[1:] for t in up.tags)
-                tag = self._hint.render(words, True, config.COLOR_ON_BUTTON_DIM)
+                # The category line, 25 px up from the bottom bevel (owner,
+                # 2026-09-10).
+                tag = self._hint.render(category_line(up), True, config.COLOR_ON_BUTTON_DIM)
                 surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - scale.px(39) + dy)))
 
         hint = self._hint.render(
-            hint or "1/2/3 or Left/Right + Enter to pick    -    or click a card",
+            hint or locale.t("level_up.hint_cards"),
             True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(w // 2, y + card_h + scale.px(60))))
 

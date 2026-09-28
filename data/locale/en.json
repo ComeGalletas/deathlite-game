@@ -12,5 +12,138 @@
   "format": {
     "_doc": "Number style, read by game.locale.num().",
     "decimal": "."
+  },
+  "menu": {
+    "start": "Start new game",
+    "dev_start": "Start new developer mode game",
+    "rankings": "Rankings",
+    "options": "Options",
+    "exit": "Exit",
+    "summary": "Salvage {salvage}    Best: {time}s / Lv {level} / {kills} kills    Items found {items}"
+  },
+  "hero_select": {
+    "title": "Choose your hero",
+    "trait": "Trait - {name}",
+    "starts_with": "Starts with: {weapon}",
+    "main_weapon": "Main weapon:",
+    "difficulty": "Difficulty:",
+    "begin": "Begin",
+    "hint": "Left / Right hero    -    Up / Down or click difficulty",
+    "hint_weapon": "    -    Q / E main weapon",
+    "hint_end": "    -    ENTER / Begin    -    ESC back",
+    "back": "<  Back"
+  },
+  "instructions": {
+    "move": "Move",
+    "aim": "Aim",
+    "auto_attack": "Auto attack toggle",
+    "stat_screen": "Stat screen",
+    "pause": "Pause",
+    "mute": "Mute",
+    "keys": {
+      "aim": "Arrows / Click"
+    },
+    "note": {
+      "fire": "Weapons fire on their own; hold a direction or click to aim them.",
+      "goal": "Survive, level up, beat the boss."
+    }
+  },
+  "difficulty": {
+    "normal": "Normal",
+    "fast": "Fast",
+    "super_fast": "Super Fast"
+  },
+  "key_layout": {
+    "wasd_move": "WASD move / Arrows aim",
+    "arrows_move": "Arrows move / WASD aim"
+  },
+  "options": {
+    "title": "Options",
+    "master": "Master volume",
+    "music": "Music volume",
+    "sfx": "Sound effects",
+    "mute": "Mute",
+    "key_layout": "Key layout",
+    "tutorials": "Tutorials",
+    "language": "Language",
+    "display": "Display mode",
+    "resolution": "Resolution",
+    "sanctuary": "Sanctuary",
+    "back": "Back",
+    "on": "On",
+    "off": "Off",
+    "percent": "{n}%",
+    "hint": "Up / Down select    -    Left / Right adjust    -    ENTER toggle / open    -    ESC back"
+  },
+  "display": {
+    "windowed": "Windowed",
+    "borderless": "Borderless",
+    "unavailable": "Unavailable",
+    "custom": "Custom {w}x{h}"
+  },
+  "pause": {
+    "title": "Paused",
+    "resume": "Resume",
+    "status": "Run status",
+    "options": "Options",
+    "key_layout": "Key layout",
+    "quit": "Quit to menu",
+    "hint": "Up / Down select    -    ENTER pick    -    ESC / P resume"
+  },
+  "controls": {
+    "title": "Controls",
+    "move": "Move",
+    "aim": "Aim (hold)",
+    "attack": "Attack",
+    "interact": "Interact",
+    "auto_attack": "Auto attack",
+    "build": "Build",
+    "pause": "Pause"
+  },
+  "level_up": {
+    "title": "Level Up  -  choose one",
+    "hint_cards": "1/2/3 or Left/Right + Enter to pick    -    or click a card",
+    "hint_leave": "1/2/3 or Left/Right + Enter to pick    -    ESC to leave",
+    "hint_rows": "Up/Down pick the row    -    1/2/3 or Left/Right + Enter to choose    -    ESC to leave",
+    "new": "New: {name}",
+    "line": {
+      "weapon": "{weapon} {category}",
+      "hero": "Hero {category}",
+      "grant": "{weapon_class} Weapon Grant",
+      "forge": "{weapon} Forge"
+    }
+  },
+  "rarity": {
+    "common": "Common",
+    "uncommon": "Uncommon",
+    "rare": "Rare",
+    "epic": "Epic",
+    "legendary": "Legendary",
+    "forge": "Forge"
+  },
+  "category": {
+    "power": "Power",
+    "coverage": "Coverage",
+    "behavior": "Behavior",
+    "synergy": "Synergy"
+  },
+  "weapon_class": {
+    "melee": "Melee",
+    "ranged": "Ranged",
+    "summon": "Summon"
+  },
+  "loading": {
+    "label": "Loading..."
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Best run per difficulty  -  never compared across difficulties",
+    "time": "Survived",
+    "level": "Level",
+    "kills": "Kills",
+    "damage": "Damage",
+    "seconds": "{n} s",
+    "empty": "no runs yet",
+    "hint": "ENTER / ESC  -  back to menu"
   }
 }

@@ -57,7 +57,7 @@ class ShippedFilesTests(unittest.TestCase):
     def test_spanish_is_not_a_copy_of_english(self):
         # A key whose Spanish is byte-identical to English is almost always
         # an untranslated paste. Exceptions must be listed here on purpose.
-        same_on_purpose = set()
+        same_on_purpose = {"difficulty.normal"}          # "Normal" in both
         tables = get_content().locale
         copied = sorted(k for k, v in tables["es"].items()
                         if v == tables["en"][k] and k not in same_on_purpose

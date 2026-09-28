@@ -40,7 +40,7 @@ import random
 import pygame
 
 from combat.elements.ids import ELEMENTS, ElementId
-from game import config, fonts
+from game import config, fonts, locale
 from game.content import get_content
 from game.state import State
 from ui import scale
@@ -292,7 +292,7 @@ class DevMenuState(State):
             order = config.DIFFICULTY_ORDER
             nxt = order[(order.index(p.difficulty) + 1) % len(order)]
             p._set_difficulty(nxt)
-            self._status = f"Difficulty -> {config.DIFFICULTY_LABELS[nxt]}"
+            self._status = f"Difficulty -> {locale.english(f'difficulty.{nxt}')}"
         elif rid == "dummy":
             self._toggle_dummy()
         elif rid == "spawn":
@@ -726,7 +726,7 @@ class DevMenuState(State):
         elif rid == "freeze" and p is not None:
             label += "   [ON]" if p.spawn.master.frozen else "   [  ]"
         elif rid == "difficulty" and p is not None:
-            label += f"   [{config.DIFFICULTY_LABELS[p.difficulty]}]"
+            label += f"   [{locale.english(f'difficulty.{p.difficulty}')}]"
         elif rid == "dummy" and p is not None:
             label += "   [ON]" if p.dps.armed else "   [  ]"
         return label

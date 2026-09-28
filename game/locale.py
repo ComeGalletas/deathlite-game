@@ -145,6 +145,23 @@ def t(key: str, /, **fields: Any) -> str:
     return str(key)
 
 
+def has(key: str) -> bool:
+    """Whether any shipped language has `key`; for a caller that shows an
+    id when there is no name for it, rather than the key."""
+    return key in _table(_language) or key in _table(DEFAULT)
+
+
+def english(key: str, /, **fields: Any) -> str:
+    """`t` in English whatever language is active: for the developer tools,
+    which stay English (UI-014.D6), and logs."""
+    global _language
+    saved, _language = _language, DEFAULT
+    try:
+        return t(key, **fields)
+    finally:
+        _language = saved
+
+
 def plural(key: str, n: int, /, **fields: Any) -> str:
     """`key.one` when `n` is 1, else `key.other`, with `n` passed to the
     template. English and Spanish share this rule; a language that needs more

@@ -17,7 +17,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-from game import config
+from game import config, locale
 from ui import end_screen
 from ui.end_screen import Button, EndScreen
 
@@ -125,7 +125,7 @@ class SubtitleTests(unittest.TestCase):
     def test_it_reads_hero_difficulty_and_seed_from_the_stats(self):
         sub = end_screen.run_subtitle(STATS)
         self.assertIn("Aegis", sub)
-        self.assertIn(config.DIFFICULTY_LABELS["fast"], sub)
+        self.assertIn(locale.t("difficulty.fast"), sub)
         self.assertIn("seed 35", sub)
 
     def test_an_empty_run_still_yields_a_line(self):

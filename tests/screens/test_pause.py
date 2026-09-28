@@ -11,7 +11,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-from game import config, save as save_mod
+from game import config, locale, save as save_mod
 from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.paused_state import PausedState
@@ -327,7 +327,7 @@ class PauseButtonArtTests(unittest.TestCase):
         self.pause.draw(screen)
         from game.states.paused_state import _ROWS
         want = self.pause._font.render(
-            config.KEY_LAYOUT_LABELS[self.game.key_layout], True, config.COLOR_TEXT).get_size()
+            locale.t(f"key_layout.{self.game.key_layout}"), True, config.COLOR_TEXT).get_size()
         row = self.pause._mouse.hits.rect_of(_ROWS.index("key_layout"))
         hits = [r for size, r in screen.blits if size == want and row.contains(r)]
         self.assertTrue(hits, "layout value not drawn on its row")
@@ -407,15 +407,16 @@ class PauseTextTests(unittest.TestCase):
 
         screen = _Spy(self.game.screen.get_size())
         self.pause.draw(screen)
-        from game.states.paused_state import _LABELS, _ROWS
+        from game.states.paused_state import _ROWS
         for i, rid in enumerate(_ROWS):
-            want = self.pause._font.render(_LABELS[rid], True, config.COLOR_ON_BUTTON).get_size()
+            want = self.pause._font.render(locale.t(f"pause.{rid}"), True,
+                                           config.COLOR_ON_BUTTON).get_size()
             row = self._row(i)
             hits = [r for size, r in screen.blits if size == want and row.contains(r)]
             self.assertTrue(hits, f"label for {rid} not found on its row")
             self.assertEqual(hits[0].centery, row.centery + widgets.LABEL_DY)
         want = self.pause._font.render(
-            config.KEY_LAYOUT_LABELS[self.game.key_layout], True, config.COLOR_ON_BUTTON_DIM).get_size()
+            locale.t(f"key_layout.{self.game.key_layout}"), True, config.COLOR_ON_BUTTON_DIM).get_size()
         row = self._row(_ROWS.index("key_layout"))
         vals = [r for size, r in screen.blits if size == want and row.contains(r)
                 and r.centerx > row.centerx]

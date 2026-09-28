@@ -42,6 +42,32 @@ def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
     return lines
 
 
+_FIT_CACHE: dict[tuple, pygame.font.Font] = {}
+
+
+def fit_font(role, px: int, text: str, max_width: int, *,
+             min_ratio: float = 0.7, **kwargs) -> pygame.font.Font:
+    """The largest `role(size)` font, from design size `px` down to
+    `px * min_ratio`, in which `text` is no wider than `max_width` native px;
+    the smallest when none fits. `role` is a `game.fonts` role (`body`,
+    `heading`); `kwargs` pass through to it.
+
+    For a label whose slot is fixed and whose text is not: a translation
+    longer than the English it was laid out for (UI-014.7) steps down in
+    size rather than running into its neighbour. Fonts are cached by role,
+    native size and options, so a label drawn every frame builds none."""
+    floor = max(1, int(round(px * min_ratio)))
+    font = None
+    for size in range(int(px), floor - 1, -1):
+        key = (role, config.RENDER_SCALE, size, tuple(sorted(kwargs.items())))
+        font = _FIT_CACHE.get(key)
+        if font is None:
+            font = _FIT_CACHE[key] = role(size, **kwargs)
+        if font.size(text)[0] <= max_width:
+            return font
+    return font
+
+
 def ellipsize(font: pygame.font.Font, text: str, max_width: int) -> str:
     """`text` trimmed with a trailing `...` until it renders inside
     `max_width`, measured in the font that will draw it.

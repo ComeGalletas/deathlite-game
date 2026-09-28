@@ -74,8 +74,9 @@ class OverviewPane:
         # The trait's name from the hero's data, not its id ("bulwark").
         trait = trait_name(cdef, getattr(p, "trait", ""))
         y = c.kv(surface, f.row, area, y, "Hero", f"{hero}" + (f"  ({trait})" if trait else ""))
+        diff_key = f"difficulty.{ps.difficulty}"
         y = c.kv(surface, f.row, area, y, "Difficulty",
-                 config.DIFFICULTY_LABELS.get(ps.difficulty, str(ps.difficulty)))
+                 locale.t(diff_key) if locale.has(diff_key) else str(ps.difficulty))
         y = c.kv(surface, f.row, area, y, "Survived", fmt_time(s.get("time", 0.0)))
         y = c.kv(surface, f.row, area, y, "HP", f"{int(p.hp)} / {int(p.max_hp)}")
         # Level, with the XP bar in the gap under its row.

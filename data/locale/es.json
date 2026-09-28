@@ -11,5 +11,138 @@
   "format": {
     "_doc": "Decimal comma (UI-014.D7).",
     "decimal": ","
+  },
+  "menu": {
+    "start": "Nueva partida",
+    "dev_start": "Nueva partida en modo desarrollador",
+    "rankings": "Clasificación",
+    "options": "Opciones",
+    "exit": "Salir",
+    "summary": "Chatarra {salvage}    Mejor: {time} s / Nv. {level} / {kills} bajas    Objetos hallados {items}"
+  },
+  "hero_select": {
+    "title": "Elige a tu héroe",
+    "trait": "Rasgo - {name}",
+    "starts_with": "Empieza con: {weapon}",
+    "main_weapon": "Arma principal:",
+    "difficulty": "Dificultad:",
+    "begin": "Comenzar",
+    "hint": "Izquierda / Derecha: héroe    -    Arriba / Abajo o clic: dificultad",
+    "hint_weapon": "    -    Q / E: arma principal",
+    "hint_end": "    -    ENTER / Comenzar    -    ESC: volver",
+    "back": "<  Volver"
+  },
+  "instructions": {
+    "move": "Mover",
+    "aim": "Apuntar",
+    "auto_attack": "Ataque automático",
+    "stat_screen": "Estadísticas",
+    "pause": "Pausa",
+    "mute": "Silenciar",
+    "keys": {
+      "aim": "Flechas / Clic"
+    },
+    "note": {
+      "fire": "Las armas disparan solas; mantén una dirección o haz clic para apuntarlas.",
+      "goal": "Sobrevive, sube de nivel, vence al jefe."
+    }
+  },
+  "difficulty": {
+    "normal": "Normal",
+    "fast": "Rápido",
+    "super_fast": "Superrápido"
+  },
+  "key_layout": {
+    "wasd_move": "WASD: mover / Flechas: apuntar",
+    "arrows_move": "Flechas: mover / WASD: apuntar"
+  },
+  "options": {
+    "title": "Opciones",
+    "master": "Volumen general",
+    "music": "Volumen de la música",
+    "sfx": "Efectos de sonido",
+    "mute": "Silenciar",
+    "key_layout": "Teclas",
+    "tutorials": "Tutoriales",
+    "language": "Idioma",
+    "display": "Modo de pantalla",
+    "resolution": "Resolución",
+    "sanctuary": "Santuario",
+    "back": "Volver",
+    "on": "Sí",
+    "off": "No",
+    "percent": "{n} %",
+    "hint": "Arriba / Abajo: elegir    -    Izquierda / Derecha: ajustar    -    ENTER: cambiar / abrir    -    ESC: volver"
+  },
+  "display": {
+    "windowed": "En ventana",
+    "borderless": "Sin bordes",
+    "unavailable": "No disponible",
+    "custom": "Personalizada {w}x{h}"
+  },
+  "pause": {
+    "title": "Pausa",
+    "resume": "Continuar",
+    "status": "Estado de la partida",
+    "options": "Opciones",
+    "key_layout": "Teclas",
+    "quit": "Salir al menú",
+    "hint": "Arriba / Abajo: elegir    -    ENTER: aceptar    -    ESC / P: continuar"
+  },
+  "controls": {
+    "title": "Controles",
+    "move": "Mover",
+    "aim": "Apuntar (mantener)",
+    "attack": "Atacar",
+    "interact": "Interactuar",
+    "auto_attack": "Ataque automático",
+    "build": "Equipo",
+    "pause": "Pausa"
+  },
+  "level_up": {
+    "title": "Subes de nivel  -  elige una",
+    "hint_cards": "1/2/3 o Izquierda/Derecha + Enter para elegir    -    o haz clic en una carta",
+    "hint_leave": "1/2/3 o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
+    "hint_rows": "Arriba/Abajo: elegir fila    -    1/2/3 o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
+    "new": "Nueva arma: {name}",
+    "line": {
+      "weapon": "{weapon} · {category}",
+      "hero": "{category} del héroe",
+      "grant": "Arma {weapon_class}",
+      "forge": "Forja · {weapon}"
+    }
+  },
+  "rarity": {
+    "common": "Común",
+    "uncommon": "Poco común",
+    "rare": "Raro",
+    "epic": "Épico",
+    "legendary": "Legendario",
+    "forge": "Forja"
+  },
+  "category": {
+    "power": "Poder",
+    "coverage": "Cobertura",
+    "behavior": "Comportamiento",
+    "synergy": "Sinergia"
+  },
+  "weapon_class": {
+    "melee": "cuerpo a cuerpo",
+    "ranged": "a distancia",
+    "summon": "de invocación"
+  },
+  "loading": {
+    "label": "Cargando..."
+  },
+  "rankings": {
+    "title": "Clasificación",
+    "subtitle": "Mejor partida por dificultad  -  nunca se comparan entre dificultades",
+    "time": "Tiempo",
+    "level": "Nivel",
+    "kills": "Bajas",
+    "damage": "Daño",
+    "seconds": "{n} s",
+    "empty": "aún no hay partidas",
+    "hint": "ENTER / ESC  -  volver al menú"
   }
 }

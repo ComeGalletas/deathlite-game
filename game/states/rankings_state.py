@@ -11,17 +11,18 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import State
 from ui import scale
 from ui.menu_nav import MenuNav
 
-# (stat key in save.records, row label, formatter)
+# (stat key in save.records, row label key, formatter). The labels are in
+# `data/locale/` (UI-014.7), read when drawn.
 _ROWS = (
-    ("time", "Survived", lambda v: f"{v:.0f} s"),
-    ("level", "Level", lambda v: f"{int(v)}"),
-    ("kills", "Kills", lambda v: f"{int(v)}"),
-    ("damage_dealt", "Damage", lambda v: f"{v:.0f}"),
+    ("time", "rankings.time", lambda v: locale.t("rankings.seconds", n=f"{v:.0f}")),
+    ("level", "rankings.level", lambda v: f"{int(v)}"),
+    ("kills", "rankings.kills", lambda v: f"{int(v)}"),
+    ("damage_dealt", "rankings.damage", lambda v: f"{v:.0f}"),
 )
 
 
@@ -50,10 +51,9 @@ class RankingsState(State):
         cx = w // 2
 
         S = scale.px
-        title = self._title.render("Rankings", True, config.COLOR_ACCENT)
+        title = self._title.render(locale.t("rankings.title"), True, config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(cx, S(84))))
-        sub = self._hint.render("Best run per difficulty  -  never compared across difficulties",
-                                True, config.COLOR_TEXT_DIM)
+        sub = self._hint.render(locale.t("rankings.subtitle"), True, config.COLOR_TEXT_DIM)
         surface.blit(sub, sub.get_rect(center=(cx, S(120))))
 
         order = config.DIFFICULTY_ORDER
@@ -64,20 +64,20 @@ class RankingsState(State):
             bucket = self.records.get(diff, {})
             colx = x0 + c * col_w + col_w // 2
 
-            head = self._head.render(config.DIFFICULTY_LABELS[diff], True,
+            head = self._head.render(locale.t(f"difficulty.{diff}"), True,
                                      config.COLOR_TEXT)
             surface.blit(head, head.get_rect(midtop=(colx, y_head)))
             pygame.draw.line(surface, config.COLOR_WORLD_BORDER,
                              (colx - S(120), y_head + S(34)), (colx + S(120), y_head + S(34)))
 
             if not bucket:
-                none = self._row.render("no runs yet", True, config.COLOR_TEXT_DIM)
+                none = self._row.render(locale.t("rankings.empty"), True, config.COLOR_TEXT_DIM)
                 surface.blit(none, none.get_rect(midtop=(colx, y_rows + step)))
                 continue
 
             for r, (key, label, fmt) in enumerate(_ROWS):
                 y = y_rows + r * step
-                lab = self._row.render(label, True, config.COLOR_TEXT_DIM)
+                lab = self._row.render(locale.t(label), True, config.COLOR_TEXT_DIM)
                 surface.blit(lab, lab.get_rect(midright=(colx - S(12), y)))
                 val_s = fmt(bucket[key]) if key in bucket else "-"
                 val = self._row.render(val_s, True, config.COLOR_TEXT)
@@ -86,7 +86,7 @@ class RankingsState(State):
         hits = self._mouse.hits
         hits.clear()
         lit = self._mouse.hover == 0
-        hint = self._hint.render("ENTER / ESC  -  back to menu", True,
+        hint = self._hint.render(locale.t("rankings.hint"), True,
                                  config.COLOR_TEXT if lit else config.COLOR_TEXT_DIM)
         rect = hint.get_rect(center=(cx, surface.get_height() - S(40)))
         surface.blit(hint, rect)

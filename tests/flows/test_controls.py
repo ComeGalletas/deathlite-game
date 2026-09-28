@@ -50,7 +50,9 @@ class KeyLayoutConfigTests(unittest.TestCase):
 
     def test_default_layout_exists_and_is_labelled(self):
         self.assertIn(config.DEFAULT_KEY_LAYOUT, config.KEY_LAYOUTS)
-        self.assertEqual(set(config.KEY_LAYOUT_LABELS), set(config.KEY_LAYOUTS))
+        from game import locale
+        for name in config.KEY_LAYOUTS:           # every layout has a label (UI-014.7)
+            self.assertNotEqual(locale.t(f"key_layout.{name}"), f"key_layout.{name}")
         self.assertTrue(config.AUTO_ATTACK_DEFAULT)
         self.assertGreater(config.MANUAL_AIM_ASSIST_DEG, 0.0)
 

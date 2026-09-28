@@ -115,7 +115,7 @@ def grant_offers(player, content, rng: random.Random) -> list[Upgrade]:
         # CR4 (owner, 2026-09-10): the category line reads "<Class> Weapon
         # Grant" -- the class, not the weapon's name (the title has that).
         out.append(Upgrade(
-            id=f"grant:{wid}", title=f"New: {name}", description=desc,
+            id=f"grant:{wid}", title=locale.t("level_up.new", name=name), description=desc,
             weight=weight, apply=_apply, max_stacks=1,
             tags=(d["class"], "weapon", "grant"), kind="grant",
             rarity="common", level=1, weapon=wid))

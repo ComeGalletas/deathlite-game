@@ -178,6 +178,13 @@ class SpanishRunTests(unittest.TestCase):
                 s.draw(surface)
         return seen
 
+    def test_the_tab_overview_names_the_difficulty(self):
+        self.assertIn("Normal", self.tab_text())
+        with mock.patch.object(self.ps.run, "difficulty", "nightmare"):
+            seen = self.tab_text()
+        self.assertIn("nightmare", seen)                  # the id, not a key
+        self.assertNotIn("difficulty.nightmare", seen)
+
     def test_the_tab_overview_names_the_hero_and_trait(self):
         self.assertIn("Aegis  (Baluarte)", self.tab_text())
 
@@ -337,6 +344,21 @@ class SpanishRunTests(unittest.TestCase):
             s.draw(pygame.Surface((1600, 900)))
         return seen
 
+    def test_the_dev_menu_names_difficulties_in_english(self):
+        # UI-014.D6 at the two difficulty sites: the row label and the
+        # status line after stepping it.
+        from types import SimpleNamespace
+        from game.states.dev_menu_state import DevMenuState
+        saved = self.ps.difficulty
+        stub = SimpleNamespace(_playing=self.ps, _status="", page="main")
+        try:
+            self.ps._set_difficulty("fast")
+            self.assertTrue(DevMenuState._row_label(stub, "difficulty").endswith("[Fast]"))
+            DevMenuState._activate(stub, "difficulty")                   # -> super_fast
+            self.assertEqual(stub._status, "Difficulty -> Super Fast")
+        finally:
+            self.ps._set_difficulty(saved)
+
     def test_a_unique_effect_reads_in_spanish(self):
         from ui.run_status.overview import _unique_text
         self.assertEqual(_unique_text("overflow", self.C),
@@ -375,7 +397,7 @@ class SpanishRunTests(unittest.TestCase):
         aegis = self.C.character("aegis")
         self.assertIn(aegis["identity_es"], seen)
         self.assertIn(aegis["trait_desc_es"], seen)
-        self.assertIn("Trait - Baluarte", seen)
+        self.assertIn("Rasgo - Baluarte", seen)             # UI-014.7 translates the label
         self.assertIn("Kestrel", seen)                      # a name that stays
 
     def test_the_sanctuary_draws_spanish_upgrades(self):

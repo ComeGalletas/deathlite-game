@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import widgets
 from ui import scale
 from ui.menu_nav import MenuNav
@@ -69,7 +69,8 @@ def run_subtitle(stats: dict, *, lead: tuple[str, ...] = ()) -> str:
     parts.append(str(stats.get("character", "-")))
     diff = stats.get("difficulty")
     if diff:
-        parts.append(config.DIFFICULTY_LABELS.get(diff, str(diff)))
+        key = f"difficulty.{diff}"
+        parts.append(locale.t(key) if locale.has(key) else str(diff))
     if stats.get("seed") is not None:
         parts.append(f"seed {stats['seed']}")
     return "   -   ".join(parts)

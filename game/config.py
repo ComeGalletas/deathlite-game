@@ -577,22 +577,22 @@ UI_CURSOR_IMAGE: str = "ui/pointers/arrow.png"
 UI_CURSOR_SCALE: float = 1.0
 
 # Game instructions, surfaced on the character-select screen (they lived on the
-# start menu until the hero-preview rework). A (label, keys) grid plus free
+# start menu until the hero-preview rework). A (row, keys) grid plus free
 # notes; the select screen renders them at ~85% of its body font, between the
-# difficulty line and the nav hint.
+# difficulty line and the nav hint. The words are in `data/locale/` (UI-014.7):
+# a row's label is `instructions.<row>`; its keys are the literal here, or,
+# when None (a phrase: "Arrows / Click"), `instructions.keys.<row>`; a note
+# is `instructions.note.<note>`.
 MENU_INSTRUCTIONS: dict = {
     "rows": [
-        ("Move", "WASD"),
-        ("Aim", "Arrows / Click"),
-        ("Auto attack toggle", "Q"),
-        ("Stat screen", "TAB"),
-        ("Pause", "ESC"),
-        ("Mute", "M"),
+        ("move", "WASD"),
+        ("aim", None),
+        ("auto_attack", "Q"),
+        ("stat_screen", "TAB"),
+        ("pause", "ESC"),
+        ("mute", "M"),
     ],
-    "notes": [
-        "Weapons fire on their own; hold a direction or click to aim them.",
-        "Survive, level up, beat the boss.",
-    ],
+    "notes": ["fire", "goal"],
 }
 
 # --- In-run HUD bars -----------------------------------------------------
@@ -877,8 +877,7 @@ DIFFICULTIES: dict[str, dict[str, float]] = {
 }
 DIFFICULTY_ORDER: tuple[str, ...] = ("normal", "fast", "super_fast")
 DIFFICULTY_DEFAULT: str = "normal"
-DIFFICULTY_LABELS: dict[str, str] = {
-    "normal": "Normal", "fast": "Fast", "super_fast": "Super Fast"}
+# A difficulty's name is `difficulty.<id>` in `data/locale/` (UI-014.7).
 # The ribbon the hero select draws the difficulty on: one of the pack's
 # `ribbon_<colour>` sheets per difficulty, so the colour reads the danger.
 DIFFICULTY_RIBBON: dict[str, str] = {
@@ -1119,10 +1118,7 @@ KEY_LAYOUTS: dict[str, dict[str, dict[str, tuple[int, ...]]]] = {
     "arrows_move": {"move": _KEYS_ARROWS, "aim": _KEYS_WASD},
 }
 DEFAULT_KEY_LAYOUT: str = "wasd_move"
-KEY_LAYOUT_LABELS = {
-    "wasd_move":   "WASD move / Arrows aim",
-    "arrows_move": "Arrows move / WASD aim",
-}
+# A layout's label is `key_layout.<name>` in `data/locale/` (UI-014.7).
 
 
 # --- Browser (pygbag) profile ---------------------------------------------

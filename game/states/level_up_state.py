@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pygame
 
+from game import locale
 from game.state import State
 from ui import scale
 from progression.upgrades import apply_choice
@@ -55,7 +56,7 @@ class LevelUpState(State):
         # The keys line under the cards. It names what the screen
         # actually does, so a caller that is not the Forge (the
         # Monastery, M7) says so rather than offering to forge.
-        self.hint = hint or self._default_hint()
+        self._hint_arg = hint             # a caller's own hint, else the default at draw
         self.rail = ForgeRail() if self.weapon_rows else None
         self._rail_mouse = MouseNav(self.rail.hits) if self.rail else None
         self.weapon_sel = next((i for i, r in enumerate(self.weapon_rows) if r[1]), 0)
@@ -63,11 +64,16 @@ class LevelUpState(State):
 
     def _default_hint(self) -> str | None:
         if self.weapon_rows:
-            return ("Up/Down pick the row    -    1/2/3 or Left/Right + Enter "
-                    "to choose    -    ESC to leave")
+            return locale.t("level_up.hint_rows")
         if self.cancelable:
-            return "1/2/3 or Left/Right + Enter to pick    -    ESC to leave"
+            return locale.t("level_up.hint_leave")
         return None
+
+    @property
+    def hint(self) -> str | None:
+        """The caller's hint, else the default, read when drawn so it is in
+        the language in use (UI-014.7)."""
+        return self._hint_arg or self._default_hint()
 
     @property
     def card_width(self) -> int:

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import keycap, scale
 
 CAP = keycap.CAP_PX     # design px
@@ -33,13 +33,13 @@ def rows(game) -> list[tuple[list[str], str]]:
     move = [keycap.label_for(layout["move"][d][0]) for d in _DIRECTIONS]
     aim = [keycap.label_for(layout["aim"][d][0]) for d in _DIRECTIONS]
     return [
-        (move, "Move"),
-        (aim, "Aim (hold)"),
-        ([CLICK], "Attack"),
-        ([keycap.label_for(config.KEY_INTERACT)], "Interact"),
-        ([keycap.label_for(config.KEY_TOGGLE_AUTO_ATTACK)], "Auto attack"),
-        ([keycap.label_for(pygame.K_TAB)], "Build"),
-        ([keycap.label_for(pygame.K_ESCAPE)], "Pause"),
+        (move, locale.t("controls.move")),
+        (aim, locale.t("controls.aim")),
+        ([CLICK], locale.t("controls.attack")),
+        ([keycap.label_for(config.KEY_INTERACT)], locale.t("controls.interact")),
+        ([keycap.label_for(config.KEY_TOGGLE_AUTO_ATTACK)], locale.t("controls.auto_attack")),
+        ([keycap.label_for(pygame.K_TAB)], locale.t("controls.build")),
+        ([keycap.label_for(pygame.K_ESCAPE)], locale.t("controls.pause")),
     ]
 
 
@@ -57,7 +57,7 @@ def draw(surface: pygame.Surface, assets, topleft, game, *,
     font = font or fonts.body(20)
     heading_font = heading_font or fonts.heading(26)
     x0, y0 = int(topleft[0]), int(topleft[1])
-    head = heading_font.render("Controls", True, config.COLOR_ACCENT)
+    head = heading_font.render(locale.t("controls.title"), True, config.COLOR_ACCENT)
     surface.blit(head, (x0, y0))
     y = y0 + head.get_height() + scale.px(HEADING_GAP - 26)
     widest = max(cluster_width(labels) for labels, _ in rows(game))
