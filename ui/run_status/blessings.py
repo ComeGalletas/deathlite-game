@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, locale
 from progression.blessings.catalog import roman
 from ui.run_status import common as c
 from ui.text import wrap
@@ -69,7 +69,8 @@ class BlessingsPane:
             self.scroll = self.sel - visible + 1
         self.scroll = max(0, min(self.scroll, max(0, len(rows) - visible)))
 
-        names = {wid: d.get("name", wid) for wid, d in ps.content.weapons.items()}
+        names = {wid: locale.text(d, "name") if "name" in d else wid
+                 for wid, d in ps.content.weapons.items()}
         for i in range(self.scroll, min(len(rows), self.scroll + visible)):
             bid, lvl, bdef = rows[i]
             r = pygame.Rect(lst.left, y - list_row // 2 + c.S(2), lst.width, list_row)
@@ -77,7 +78,7 @@ class BlessingsPane:
             if i == self.sel:
                 pygame.draw.rect(surface, (40, 36, 60), r, border_radius=c.S(6))
                 pygame.draw.rect(surface, config.COLOR_ACCENT, r, width=1, border_radius=c.S(6))
-            name = bdef.name if bdef else bid.replace("_", " ").title()
+            name = bdef.display_name if bdef else bid.replace("_", " ").title()
             colour = c.RARITY_ON_DARK.get(bdef.rarity if bdef else "common", config.COLOR_TEXT)
             t = f.row.render(f"{name} {roman(lvl)}", True, colour)
             surface.blit(t, t.get_rect(midleft=(lst.left + c.S(10), y)))
@@ -101,7 +102,7 @@ class BlessingsPane:
         if bdef is None:
             c.line(surface, f.title, area, y, bid, step=34)
             return
-        y = c.line(surface, f.title, area, y, f"{bdef.name} {roman(lvl)}",
+        y = c.line(surface, f.title, area, y, bdef.title(lvl),
                    colour=c.RARITY_ON_DARK.get(bdef.rarity, config.COLOR_TEXT), step=34)
         owner = names.get(bdef.weapon, bdef.weapon) if bdef.weapon else "Hero"
         y = c.line(surface, f.small, area, y,

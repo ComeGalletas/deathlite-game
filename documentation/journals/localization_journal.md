@@ -344,7 +344,7 @@ Options.
   - [x] UI-014.4.2 — `forges.json`, `blessings.json`.
   - [x] UI-014.4.3 — `characters.json`, `meta_upgrades.json`,
     `enemies.json`, `bosses.json`, `buildings.json`.
-- [ ] UI-014.5 — Data text read through `locale.text` in:
+- [x] UI-014.5 — Data text read through `locale.text` in:
   - `catalog.py`, `offer.py` and the level-up cards;
   - hero select, the sanctuary and the buff banner;
   - the boss warning, the run summary and the TAB screen.
@@ -696,4 +696,95 @@ Spanish sibling, and `PENDING` in `tests/locale/test_data_text.py` is empty.
     collided with "Caparazón"; Aegis's trait switched person.
   - Round 2: PASS. Three taste points taken ("Premia no moverse",
     "Cascarón", "de cada partida").
+
+### UI-014.5 — the game reads its data text through `locale.text`
+
+This is the first task where Spanish shows in the game. Every player-facing
+read of a data text field goes through `game.locale.text`. Screen chrome
+("Level Up - choose one", "Trait -", "Starts with:", stat labels) is
+UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
+
+- **The rule, since the language can change mid-run** (Options from the
+  pause menu).
+  - Text held for the process or the run is resolved when shown, never
+    copied once.
+  - `Weapon.name`, `Enemy.name` and `Boss.name` are properties over the
+    definition they already keep. A forged weapon's merged definition
+    carries the forge's translations.
+  - `BlessingDef` and `ForgeDef` keep their data entry (`texts`). The
+    player reads `display_name`, `describe`, `title` and the `display_*`
+    properties. The English `name` / `identity` / `description` stay as
+    identities: dev-menu order and logs.
+  - The ledger keeps each killed type's definition and resolves its name
+    when the list is read, not at the first kill.
+  - The boss warning reads the live boss's name.
+- **Built once, on purpose:**
+  - The level-up, Forge and Monastery cards, at roll time. Those overlays
+    cannot reach the pause menu, so a card never outlives a switch (the
+    critics checked the state machine).
+  - The end-of-run summary, when the run ends. The end screens cannot
+    change the language.
+  - Transient notices and the 7-second buff banner.
+- **Surfaces wired:**
+  - the level-up, Forge and grant cards (title, text, the weapon tag);
+  - hero select (name, identity, trait, weapon);
+  - the Sanctuary upgrades;
+  - the TAB overview (hero, trait, unique item effects), build pane (card
+    name, forge line, Forging header and text, synergies) and blessings
+    pane (list row, owner, detail);
+  - the buff banner, the boss warning, the HUD boss bar;
+  - the run summary (character, trait, weapons, blessings, boss, kill and
+    proc rows).
+- **Fixes along the way:**
+  - The TAB overview and the run summary showed the trait's id
+    (`double_shot`, "Double_Shot"). They now show the data's `trait_name`,
+    in English too.
+  - The run summary's weapons column is measured over every language's
+    name (`widest_weapon_name`), forge overrides included, so a switch
+    never clips it.
+- **Developer tools stay English (D6):** the dev menu reads English names
+  through `_english_name`, at each of its six call sites.
+- **Missing fields:**
+  - Where the old code fell back to an id (a weapon, enemy, boss or trait
+    without a name), it still does, and each fallback has a test.
+  - Where it raised on hero select, the Sanctuary and the offer cards
+    (`c["name"]`, `d["desc"]`), it still raises.
+  - The TAB overview used to raise on a hero without a name. It now falls
+    back to the hero's id, which is more lenient.
+- **Tests:**
+  - `tests/locale/test_data_readers.py`:
+    - each reader in Spanish, and following a switch made after the object
+      exists;
+    - the offers;
+    - the dev-menu helper;
+    - the fallbacks;
+    - a sweep that fails on any new raw read of a data text field
+      (`d["name"]`, `.get` / `.pop` / `.setdefault`), with a counted,
+      reasoned allowlist and its blind spots documented.
+  - `tests/playing/test_spanish_run.py` (integration tier): one run built
+    up in English, switched to Spanish, then checked on every surface above.
+    Text is captured at the font or the draw helper, and every assertion
+    uses text that differs between the languages.
+- **Screenshots:** hero select, a level-up offer and the TAB build pane in
+  Spanish.
+- **Full default suite: 3603 passed, 0 failed, 0 skipped** (11 sweep
+  deselected, 20 min 20 s). The round-5 nits, test-only edits, landed while
+  it ran; `tests/locale` and `tests/playing/test_spanish_run.py` passed
+  after them (144).
+- **Cold critic loop:** five rounds. From round 3 the critics used mutation
+  testing over every production hunk.
+  - Round 1: the sweep let a repeated read through; several surfaces were
+    working but unguarded.
+  - Round 2: the width test passed against the English-only code.
+  - Round 3: a boss or hero without `name` / `trait_name` crashed the
+    summary (a third instance, in the ledger, was found by the new test);
+    the blessings list row was unguarded.
+  - Round 4: the six dev-menu call sites, a `.title()` revert and the forge
+    card description survived their reverts.
+  - Round 5: PASS. All 74 production change groups were reverted one at a
+    time, and each revert is caught by a test. Its nits were taken:
+    - a test for each of the four untested id fallbacks;
+    - the shared-content test restores key order (`mock.patch.dict`);
+    - the sweep docstring names `BUFF_FIELDS`;
+    - this section's wording on missing fields.
 

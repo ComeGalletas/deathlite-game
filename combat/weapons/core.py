@@ -44,7 +44,7 @@ import pygame
 from combat import targeting
 from combat.damage import outgoing_damage
 from combat.elements.ids import ElementId
-from game import config
+from game import config, locale
 
 # --- weapon taxonomy (the only fixed weapon data that stays in code) ---------
 # Every `data/weapons/weapons.json` entry names one `category` and one `special_effect`
@@ -223,7 +223,12 @@ class Weapon:
     # --- derived stats -------------------------------------------
     @property
     def name(self) -> str:
-        return self.definition.get("name", self.weapon_id)
+        """The name in the current language, read on every call so a
+        language switch mid-run shows at once (UI-014.5). A forged weapon's
+        merged definition carries the forge's own translations."""
+        if "name" not in self.definition:
+            return self.weapon_id
+        return locale.text(self.definition, "name")
 
     @property
     def tags(self) -> tuple[str, ...]:

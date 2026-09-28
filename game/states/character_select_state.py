@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.content import get_content
 from game.state import State
 from systems.animation import Animator
@@ -269,17 +269,17 @@ class CharacterSelectState(State):
 
             # Text on the light card: the name and the trait line are titles
             # (title face, black); the rest is body text in the dark grey.
-            name = shadowed(self._name, c["name"], config.COLOR_ACCENT)   # gold with a dark drop shadow
+            name = shadowed(self._name, locale.text(c, "name"), config.COLOR_ACCENT)   # gold with a dark drop shadow
             surface.blit(name, name.get_rect(midtop=(rect.centerx, y + S(16) + dy)))
 
-            trait_line = f"Trait - {c['trait_name']}"
+            trait_line = f"Trait - {locale.text(c, 'trait_name')}"
             text_w = card_w - 2 * S(_CARD_TEXT_INSET)      # pixel-measured wrap
             unlocked = self.weapon_unlocked(cid)
             weapon_line = (f"<  {self._weapon_name(self._main_weapon[cid])}  >" if unlocked
                            else f"Starts with: {self._weapon_name(c['starting_weapon'])}")
-            rows = wrap(self._body, c["identity"], text_w) + [
+            rows = wrap(self._body, locale.text(c, "identity"), text_w) + [
                 "", trait_line,
-            ] + wrap(self._body, c["trait_desc"], text_w) + [
+            ] + wrap(self._body, locale.text(c, "trait_desc"), text_w) + [
                 "", "Main weapon:" if unlocked else weapon_line,
             ] + ([weapon_line] if unlocked else [])
             for j, line in enumerate(rows):
@@ -429,5 +429,6 @@ class CharacterSelectState(State):
         return y
 
     def _weapon_name(self, wid: str) -> str:
-        return self.content.weapons.get(wid, {}).get("name", wid)
+        d = self.content.weapons.get(wid)
+        return locale.text(d, "name") if d and "name" in d else wid
 

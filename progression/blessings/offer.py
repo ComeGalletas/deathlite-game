@@ -21,6 +21,7 @@ import random
 
 from combat.weapons import Weapon
 from combat.weapons.forge import apply_forge, forge_eligible, get_forges
+from game import locale
 from progression.blessings.apply import apply_blessing, level_of
 from progression.blessings.catalog import (BlessingDef, Catalog, OfferingRules,
                                            get_catalog, get_rules, roman)
@@ -57,7 +58,7 @@ def blessing_weight(bdef: BlessingDef, level: int, catalog: Catalog,
 
 
 def _blessing_offer(bdef: BlessingDef, level: int, weight: float, content) -> Upgrade:
-    tags = (content.weapons[bdef.weapon]["name"],) if bdef.weapon else ("hero",)
+    tags = (locale.text(content.weapons[bdef.weapon], "name"),) if bdef.weapon else ("hero",)
     return Upgrade(
         id=bdef.id, title=bdef.title(level), description=bdef.describe(level),
         weight=weight, apply=lambda p, _b=bdef: apply_blessing(p, _b),
@@ -106,8 +107,8 @@ def grant_offers(player, content, rng: random.Random) -> list[Upgrade]:
         weight = float(rules.kind_weights["grant"])
         if is_summon:
             weight *= rules.summon_factor
-        name = d["name"]
-        desc = d.get("description", "")
+        name = locale.text(d, "name")
+        desc = locale.text(d, "description") if "description" in d else ""
         def _apply(p, _wid=wid, _d=d):
             p.weapons.append(Weapon(_wid, _d))
 
@@ -133,11 +134,11 @@ def forge_offers_for(player, content, weapon: Weapon, *, weighted: bool = True) 
             # The card's own name, unprefixed (owner, 2026-09-12): the screen
             # title and the FORGE rarity tag already say it is a Forging, so
             # "Forge: Whirlwind" said it three times.
-            id=f"forge:{fdef.id}", title=fdef.name,
-            description=f"{fdef.description} ({fdef.identity}.)",
+            id=f"forge:{fdef.id}", title=fdef.display_name,
+            description=f"{fdef.display_description} ({fdef.display_identity}.)",
             weight=weight if weighted else 1.0,
             apply=lambda p, _w=weapon, _f=fdef: apply_forge(_w, _f),
-            max_stacks=1, tags=(content.weapons[weapon.weapon_id]["name"], "forge"),
+            max_stacks=1, tags=(weapon.name, "forge"),
             kind="forge", rarity="forge", level=1, weapon=weapon.weapon_id))
     return out
 

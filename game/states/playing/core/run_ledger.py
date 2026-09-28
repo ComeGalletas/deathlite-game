@@ -28,6 +28,7 @@ Three things it keeps, and why:
 from __future__ import annotations
 
 from combat.elements.tracking import ElementTracking
+from game import locale
 
 # The two damage-source labels the ledger and the training dummy's meter
 # share. They live here, on the core side, so the ledger and the NPCs never
@@ -51,6 +52,10 @@ class RunLedger:
         self.held_since: dict[str, float] = {}
         self.kills: dict[str, int] = {}
         self.kill_names: dict[str, str] = {}
+        # The killed type's data entry, so its name is read in the language
+        # in use when the list is shown, not the one at the first kill
+        # (UI-014.5). `kill_names` is the fallback for an entry-less enemy.
+        self.kill_defs: dict[str, dict] = {}
         # The elemental books (`combat.elements.tracking`): the same damage
         # again, split by the *effect* that dealt it as well as the weapon it
         # belongs to. Kept here rather than beside the ledger so both come off
@@ -88,6 +93,9 @@ class RunLedger:
         key = getattr(enemy, "enemy_id", None) or getattr(enemy, "boss_id", None) or "?"
         self.kills[key] = self.kills.get(key, 0) + 1
         self.kill_names.setdefault(key, str(getattr(enemy, "name", key)))
+        cfg = getattr(enemy, "cfg", None)
+        if isinstance(cfg, dict) and "name" in cfg:
+            self.kill_defs.setdefault(key, cfg)
 
     # --- readout --------------------------------------------------
     @property
@@ -142,5 +150,12 @@ class RunLedger:
 
     def kill_rows(self) -> list[tuple[str, int]]:
         """`[(display name, count)]`, biggest first."""
-        return [(self.kill_names.get(k, k), n)
+        return [(self.kill_name(k), n)
                 for k, n in sorted(self.kills.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    def kill_name(self, key: str) -> str:
+        """A killed type's name in the current language."""
+        cfg = self.kill_defs.get(key)
+        if cfg is not None and "name" in cfg:
+            return locale.text(cfg, "name")
+        return self.kill_names.get(key, key)

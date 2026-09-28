@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, locale
+from game.states.playing.core.run_end import trait_name
 from ui.run_status import common as c
 from ui.run_summary import fmt_time
 
@@ -42,7 +43,9 @@ def _unique_text(effect_id: str, content) -> str:
     table = getattr(content, "items", {}).get("unique_effects", {}) if content else {}
     for entry in table.values():
         if entry.get("id") == effect_id:
-            return f"{entry.get('name', effect_id)}: {entry.get('desc', '')}".rstrip(": ")
+            name = locale.text(entry, "name") if "name" in entry else effect_id
+            desc = locale.text(entry, "desc") if "desc" in entry else ""
+            return f"{name}: {desc}".rstrip(": ")
     return effect_id.replace("_", " ").title()
 
 
@@ -65,8 +68,10 @@ class OverviewPane:
     def _draw_run(self, surface, area, ps) -> None:
         f, s, p = self.f, ps.stats, ps.player
         y = area.top + c.S(c.ROW_STEP) // 2
-        hero = ps.content.character(ps.character_id)["name"]
-        trait = getattr(p, "trait", "")
+        cdef = ps.content.character(ps.character_id)
+        hero = locale.text(cdef, "name") if "name" in cdef else ps.character_id
+        # The trait's name from the hero's data, not its id ("bulwark").
+        trait = trait_name(cdef, getattr(p, "trait", ""))
         y = c.kv(surface, f.row, area, y, "Hero", f"{hero}" + (f"  ({trait})" if trait else ""))
         y = c.kv(surface, f.row, area, y, "Difficulty",
                  config.DIFFICULTY_LABELS.get(ps.difficulty, str(ps.difficulty)))

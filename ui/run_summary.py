@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import text as uitext
 from ui import widgets
 from ui import scale
@@ -319,9 +319,9 @@ class RunSummaryPanel:
             y = self._line(surface, area, y, "Main weapon unlocked",
                            colour=config.COLOR_ACCENT, font=self._small)
         y = self._kv(surface, area, y, "Hero", s.get("character", "-"))
-        trait = s.get("trait")
+        trait = s.get("trait_name") or str(s.get("trait") or "").title()
         if trait:
-            y = self._kv(surface, area, y, "Trait", str(trait).title())
+            y = self._kv(surface, area, y, "Trait", trait)
 
         stats = dict(s.get("hero_stats", {}))
         if stats:
@@ -478,13 +478,26 @@ def weapons_min_width(font: pygame.font.Font) -> int:
     "Meteor Hammer  Lv 9" ran its level into the damage. A new weapon or
     forge now widens the column by itself.
     """
-    from game.content import get_content
-    c = get_content()
-    names = [v["name"] for table in (c.weapons, c.forges)
-             for v in table.values() if isinstance(v, dict) and "name" in v]
-    return (max(font.size(n)[0] for n in names) + S(_CELL_GAP)
+    return (widest_weapon_name(font) + S(_CELL_GAP)
             + _widest(font, _WIDEST_LEVEL) + S(_CELL_GAP)
             + _widest(font, _WIDEST_DAMAGE) + S(_DAMAGE_X) + S(_COLUMN_PAD))
+
+
+def widest_weapon_name(font) -> int:
+    """The widest name a weapons row can show, in any language (UI-014.5):
+    every weapon and every forge, English and each translation, so a
+    language switch never clips the column."""
+    from game.content import get_content
+    c = get_content()
+    keys = ("name", *(f"name_{lang}" for lang in locale.LANGUAGES if lang != locale.DEFAULT))
+    # A forged weapon shows its forge's `overrides` name; measured too, so
+    # the two can never drift apart unnoticed.
+    entries = [v for table in (c.weapons, c.forges) for v in table.values()
+               if isinstance(v, dict)]
+    entries += [v["overrides"] for v in c.forges.values()
+                if isinstance(v, dict) and isinstance(v.get("overrides"), dict)]
+    names = [v[k] for v in entries for k in keys if isinstance(v.get(k), str)]
+    return max(font.size(n)[0] for n in names)
 
 
 # (drawer, minimum width). Only the weapons table has a floor, and it is

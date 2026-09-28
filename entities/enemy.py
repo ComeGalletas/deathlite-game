@@ -15,7 +15,7 @@ from combat.status import StatusState
 from entities.ai import Blackboard, build_behavior
 from entities.ai.components.aggro import provoke
 from entities.ai.machine import ATTACK_SLOT
-from game import config
+from game import config, locale
 from game.assets import get_assets
 from systems.animation import Animator
 
@@ -23,10 +23,17 @@ _MACHINE = "__machine__"
 
 
 class Enemy:
+    @property
+    def name(self) -> str:
+        """The name in the current language, read on every call: the HUD
+        and the kill lists follow a mid-run language switch (UI-014.5)."""
+        if "name" not in self.cfg:
+            return self.enemy_id
+        return locale.text(self.cfg, "name")
+
     def __init__(self, enemy_id: str, definition: dict, x: float, y: float) -> None:
         self.enemy_id = enemy_id
         self.cfg = definition
-        self.name = definition.get("name", enemy_id)
         self.max_hp = float(definition["hp"])
         self.hp = self.max_hp
         self.speed = float(definition["speed"])

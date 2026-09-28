@@ -70,6 +70,7 @@ INTEGRATION = (
     "tests/playing/test_bomb.py",
     "tests/playing/test_chest_open.py",
     "tests/playing/test_potion_drops.py",
+    "tests/playing/test_spanish_run.py",
     "tests/screens/test_hero_select_preview.py",
     "tests/playing/test_manual_aim.py",
     "tests/combat/test_weapon_specials.py",

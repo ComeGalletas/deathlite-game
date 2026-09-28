@@ -24,7 +24,7 @@ from entities.ai.components import SeekTarget
 from entities.ai.machine import ATTACK_SLOT
 from entities.ai.registry import build_behavior
 from entities.ai.steering import Steering
-from game import config
+from game import config, locale
 from game.assets import get_assets
 from systems.animation import Animator
 
@@ -36,10 +36,17 @@ class Boss:
     stun_immune = True      # P1: the Hammer's stun never lands on a boss
     killed_by = ""          # P2: set by the resolver on the killing hit
 
+    @property
+    def name(self) -> str:
+        """The name in the current language, read on every call: the HUD
+        and the kill lists follow a mid-run language switch (UI-014.5)."""
+        if "name" not in self.cfg:
+            return self.boss_id
+        return locale.text(self.cfg, "name")
+
     def __init__(self, boss_id: str, definition: dict, x: float, y: float) -> None:
         self.boss_id = boss_id
         self.cfg = definition
-        self.name = definition.get("name", boss_id)
         self.max_hp = float(definition["hp"])
         self.hp = self.max_hp
         # The run's `RunLedger` (set by the spawner), as on `Enemy`.

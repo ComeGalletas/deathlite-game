@@ -28,8 +28,7 @@ import pygame
 from combat.weapons.core import TIME_MODE
 from combat.weapons.forge import blessing_levels, forge_changes, get_forges
 from game.states.playing.visual import elements as element_fx
-from game import config
-from progression.blessings.catalog import roman
+from game import config, locale
 from progression.blessings.offer import get_rules
 from ui.run_status import common as c
 from ui.text import wrap
@@ -114,7 +113,7 @@ def gate_text(weapon, need: int, forges) -> str:
     if weapon.is_summon:
         return "cannot be forged"
     if weapon.forge:
-        return f"forged  -  {forges.get(weapon.forge).identity}"
+        return f"forged  -  {forges.get(weapon.forge).display_identity}"
     levels = blessing_levels(weapon)
     if levels >= need:
         return f"ready for the Forge ({need})"
@@ -131,7 +130,7 @@ def synergy_rows(player, catalog, weapon_names) -> list[tuple[str, str]]:
         names = [weapon_names.get(bdef.weapon, bdef.weapon or "Hero")]
         names += [weapon_names.get(w, w) for w in bdef.requires_weapons]
         pair = " + ".join(n for n in names if n)
-        rows.append((f"{pair}  -  {bdef.name} {roman(lvl)}", bdef.describe(lvl)))
+        rows.append((f"{pair}  -  {bdef.title(lvl)}", bdef.describe(lvl)))
     return rows
 
 
@@ -156,7 +155,8 @@ class BuildPane:
         self.sel = max(0, min(self.sel, max(0, len(weapons) - 1)))
         need = get_rules(ps.content).forge_requires_levels
         forges = get_forges(ps.content)
-        names = {wid: d.get("name", wid) for wid, d in ps.content.weapons.items()}
+        names = {wid: locale.text(d, "name") if "name" in d else wid
+                 for wid, d in ps.content.weapons.items()}
 
         # Cards across the top; the detail strip takes the rest.
         card_h = min(c.S(380), int(area.height * 0.56))
@@ -233,7 +233,8 @@ class BuildPane:
                    colour=config.COLOR_TEXT_DIM)
             return
         fdef = forges.get(w.forge)
-        y = c.subheader(surface, f.sub, area, area.top, f"Forging: {fdef.name}  -  {fdef.identity}")
+        y = c.subheader(surface, f.sub, area, area.top,
+                        f"Forging: {fdef.display_name}  -  {fdef.display_identity}")
         # The numbers first -- they are what the player came for -- then the
         # description in whatever room is left.
         for key, before, after in forge_changes(content, w):
@@ -245,7 +246,7 @@ class BuildPane:
                      colour=config.COLOR_ACCENT)
             y -= c.S(c.ROW_STEP) - c.S(22)
         y += c.S(6)
-        for text_line in wrap(f.small, fdef.description, area.width):
+        for text_line in wrap(f.small, fdef.display_description, area.width):
             if y > area.bottom - c.S(8):
                 return
             y = c.line(surface, f.small, area, y, text_line, colour=config.COLOR_TEXT_DIM, step=20)

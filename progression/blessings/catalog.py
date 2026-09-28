@@ -9,6 +9,9 @@ rarity, category, effect type, display or weapon id raises at load.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Mapping
+
+from game import locale
 
 KINDS = ("stat", "weapon")
 RARITIES = ("common", "uncommon", "rare", "forge")
@@ -92,17 +95,31 @@ class BlessingDef:
     requires_weapons: tuple[str, ...] = ()
     requires_forge: str | None = None
     tags: tuple[str, ...] = ()
+    # The data entry, for its translations (UI-014.5). `name` and
+    # `description` stay English: `name` is an identity (dev-menu order,
+    # logs); what the player reads comes through `display_name`,
+    # `describe` and `title`, resolved on every call so a language switch
+    # mid-run shows at once. Empty for a def built by hand in a test.
+    texts: Mapping[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     @property
     def max_level(self) -> int:
         return len(self.effects[0].levels)
 
+    @property
+    def display_name(self) -> str:
+        """The name in the current language."""
+        return locale.text(self.texts, "name") if self.texts else self.name
+
     def describe(self, level: int) -> str:
+        """The card text in the current language, values filled in."""
+        template = (locale.text(self.texts, "description") if self.texts
+                    else self.description)
         values = [format_value(e.value_at(level), e.display) for e in self.effects]
-        return self.description.format(*values)
+        return template.format(*values)
 
     def title(self, level: int) -> str:
-        return f"{self.name} {roman(level)}"
+        return f"{self.display_name} {roman(level)}"
 
 
 class Catalog:
@@ -176,7 +193,7 @@ def _parse(bid: str, d: dict, weapons: dict, forges: dict) -> BlessingDef:
         id=bid, name=need("name"), kind=kind, category=category, rarity=rarity,
         description=need("description"), effects=effects, weapon=weapon,
         requires_weapons=tuple(req.get("weapons", ())),
-        requires_forge=req.get("forge"), tags=tuple(d.get("tags", ())))
+        requires_forge=req.get("forge"), tags=tuple(d.get("tags", ())), texts=d)
 
 
 def _parse_effect(bid: str, e: dict) -> Effect:

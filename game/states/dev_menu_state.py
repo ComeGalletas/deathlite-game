@@ -46,6 +46,14 @@ from game.state import State
 from ui import scale
 from ui.menu_nav import MenuNav
 
+
+def _english_name(obj, default: str = "?") -> str:
+    """A weapon's or a creature's data name in English. The developer tools
+    stay English (UI-014.D6), while `.name` follows the player's language."""
+    d = getattr(obj, "definition", None) or getattr(obj, "cfg", None) or {}
+    return (d.get("name") or getattr(obj, "weapon_id", None)
+            or getattr(obj, "enemy_id", None) or getattr(obj, "boss_id", None) or default)
+
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
 _ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
@@ -361,7 +369,7 @@ class DevMenuState(State):
             pace = f"1 attack in {w.element_interval + 1}"
         else:
             pace = "every attack"
-        return f"{w.name.ljust(14)} {held.ljust(8)} ({pace})"
+        return f"{_english_name(w).ljust(14)} {held.ljust(8)} ({pace})"
 
     def _cycle_infusion(self, row) -> None:
         """Step a weapon through none -> fire -> ice -> thunder -> wind ->
@@ -377,7 +385,7 @@ class DevMenuState(State):
         if w.infused:
             p.run.unlocked_elements.add(w.element)
         held = w.element.key if w.infused else "nothing"
-        self._status = f"{w.name} carries {held}"
+        self._status = f"{_english_name(w)} carries {held}"
 
     def _force_aura(self, element) -> None:
         """Apply one element to the nearest enemy through the real resolver,
@@ -394,7 +402,7 @@ class DevMenuState(State):
         outcome = p.run.elements.apply(
             target, element, weapon_id="dev", hit_damage=10.0,
             now=p.stats["time"])
-        name = getattr(target, "name", element.key)
+        name = _english_name(target, element.key)
         self._status = f"{element.key.title()} on {name}: {outcome.name.lower()}"
 
     def _spawn_building(self, element) -> None:
@@ -546,7 +554,7 @@ class DevMenuState(State):
             owned = [w]
         target = next((w for w in owned if w.forge is None), None)
         if target is None:
-            self._status = f"{base_name} already forged into {owned[0].name}"
+            self._status = f"{base_name} already forged into {_english_name(owned[0])}"
             return
         apply_forge(target, fdef)
         self._status = f"{base_name} -> {fdef.name}"
@@ -562,7 +570,7 @@ class DevMenuState(State):
         for w in targets:
             self._retire_weapon(w)
         self._status = (f"removed {len(targets)} weapons" if row == _ROW_ALL
-                        else f"removed {targets[0].name}")
+                        else f"removed {_english_name(targets[0])}")
         self.sel = min(self.sel, len(self._weapon_rows()) - 1)
 
     def _retire_weapon(self, w) -> None:
@@ -693,7 +701,7 @@ class DevMenuState(State):
             if rid == _ROW_ALL:
                 return f"All weapons   ({len(p.player.weapons)})"
             w = p.player.weapons[rid[1]]
-            forged = f"   [{w.name}]" if w.forge else ""
+            forged = f"   [{_english_name(w)}]" if w.forge else ""
             base = p.content.weapon(w.weapon_id).get("name", w.weapon_id)
             return f"{base}   Lv{w.level}{forged}"
         label = _LABELS[rid]

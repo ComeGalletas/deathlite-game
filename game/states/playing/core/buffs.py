@@ -23,7 +23,7 @@ import math
 
 import pygame
 
-from game import config
+from game import config, locale
 from game.events import Events
 from progression.stats import FLAT, Modifier
 from systems.collision import circles_overlap
@@ -117,7 +117,8 @@ class BuffSystem:
         self.tint = [float(self.feedback.get("tint_seconds", 0.9)), palette]
         self.hero_fx.append([spec.get("fx_rig", ""), 0.0,
                              float(spec.get("fx_scale", 1.0))])
-        self.banners.add(str(spec.get("name", kind.title())), palette[0])
+        name = locale.text(spec, "name") if "name" in spec else kind.title()
+        self.banners.add(str(name), palette[0])
 
     def _apply(self, kind: str, spec: dict) -> None:
         ps = self.ps

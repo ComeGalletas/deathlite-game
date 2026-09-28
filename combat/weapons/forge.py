@@ -17,8 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from combat.weapons.core import CATEGORIES, CLASSES, SPECIAL_EFFECTS, Weapon
-from game.locale import DEFAULT as DEFAULT_LANGUAGE
-from game.locale import LANGUAGES
+from game import locale
 
 # The text keys a Forging may override. Each also takes its translations
 # (`name_es`, UI-014), derived from the shipped languages so a new language
@@ -29,7 +28,7 @@ TEXT_OVERRIDES = ("name", "description")
 # translation key -> the English key it translates (`name_es` -> `name`),
 # built rather than parsed back out, so a language code may hold "_".
 _TRANSLATES = {f"{key}_{lang}": key for key in TEXT_OVERRIDES
-               for lang in LANGUAGES if lang != DEFAULT_LANGUAGE}
+               for lang in locale.LANGUAGES if lang != locale.DEFAULT}
 TEXT_TRANSLATIONS = frozenset(_TRANSLATES)
 TEXT_OVERRIDE_KEYS = frozenset(TEXT_OVERRIDES) | TEXT_TRANSLATIONS
 # Definition keys a Forging may override. Anything else is bad data.
@@ -62,6 +61,25 @@ class ForgeDef:
     description: str
     overrides: dict = field(default_factory=dict)
     effects: dict = field(default_factory=dict)
+    # The data entry, for its translations (UI-014.5). `name`, `identity`
+    # and `description` stay English (identities: dev-menu order, logs);
+    # the player reads the `display_*` properties, resolved on every call.
+    texts: dict = field(default_factory=dict, compare=False, repr=False)
+
+    def _text(self, key: str, english: str) -> str:
+        return locale.text(self.texts, key) if self.texts else english
+
+    @property
+    def display_name(self) -> str:
+        return self._text("name", self.name)
+
+    @property
+    def display_identity(self) -> str:
+        return self._text("identity", self.identity)
+
+    @property
+    def display_description(self) -> str:
+        return self._text("description", self.description)
 
 
 class Forges:
@@ -107,7 +125,8 @@ def _parse(fid: str, d: dict, weapons: dict) -> ForgeDef:
     bad = set(fx) - EFFECT_KEYS
     if bad:
         raise ValueError(f"forge {fid!r}: unknown effects {sorted(bad)}")
-    return ForgeDef(fid, d["name"], d["weapon"], d["identity"], d["description"], ov, fx)
+    return ForgeDef(fid, d["name"], d["weapon"], d["identity"], d["description"], ov, fx,
+                    texts=d)
 
 
 # --- per-content cache -------------------------------------------------

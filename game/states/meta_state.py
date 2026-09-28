@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import State
 from ui import scale
 from ui.menu_nav import MenuNav
@@ -132,8 +132,8 @@ class MetaState(State):
             colour = config.COLOR_ACCENT if (active and i == self.sel[0]) else (
                 config.COLOR_TEXT if afford else config.COLOR_TEXT_DIM)
             surface.blit(self._f.render(
-                f"{d['name']:<14} {lvl}/{mx}   {cost:>4}", True, colour), (x, y))
-            surface.blit(self._small.render(d["desc"], True, config.COLOR_TEXT_DIM),
+                f"{locale.text(d, 'name'):<14} {lvl}/{mx}   {cost:>4}", True, colour), (x, y))
+            surface.blit(self._small.render(locale.text(d, "desc"), True, config.COLOR_TEXT_DIM),
                          (x + S(16), y + S(20)))
             # The row and its description line, one band each, touching.
             self._mouse.hits.add(pygame.Rect(x - S(8), y - S(4), S(440), S(46)), (0, i))
