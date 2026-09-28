@@ -249,14 +249,16 @@ ALLOWED_RAW_READS = Counter({
     ("combat/weapons/forge.py", "d['description']"): 1,
     # A log line names the boss in English.
     ("entities/ai/behaviors/boss.py", "cfg.get('name', '?')"): 1,
-    # Item names are built and saved in English; UI-014.6 rebuilds them
-    # from their parts when shown. (`to_dict` / `from_dict` read `d['name']`
-    # for the item and for each affix.)
+    # An item's English name is its identity: built at generation and
+    # saved (`to_dict` / `from_dict` read `d['name']` for the item and each
+    # affix). The player reads `item_name`, built from the parts in the
+    # current language (UI-014.6).
     ("progression/items.py", "d['name']"): 2,
     ("progression/items.py", "base['name']"): 1,
     ("progression/items.py", "a['name']"): 1,
-    ("game/states/meta_state.py", "match['name']"): 1,
-    ("ui/run_summary.py", "item.get('name', '?')"): 1,
+    # The summary's fallback for a dict that is not a whole item (a
+    # summary written before items carried their parts).
+    ("ui/run_summary.py", "d.get('name', '?')"): 1,
     # Keys of the run summary's own dict (already resolved), not data.
     ("game/states/playing/core/run_end.py", "summary['trait_name']"): 1,
     ("ui/run_summary.py", "s.get('trait_name')"): 1,

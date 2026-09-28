@@ -17,7 +17,7 @@ from game import config, fonts, locale
 from game.state import State
 from ui import scale
 from ui.menu_nav import MenuNav
-from progression.items import Item
+from progression.items import Item, item_label, item_name
 from progression.meta import buy
 
 _RARITY_COLOR = {
@@ -152,7 +152,7 @@ class MetaState(State):
             if eid:
                 match = next((it for it in self.save.stash if it["item_id"] == eid), None)
                 if match:
-                    name = match["name"]
+                    name = item_name(Item.from_dict(match), self.game.content)
             surface.blit(self._small.render(f"{slot:<10} {name}", True,
                                             (150, 200, 255)), (x, y))
             y += S(20)
@@ -168,6 +168,7 @@ class MetaState(State):
             base = _RARITY_COLOR.get(it.rarity, config.COLOR_TEXT)
             colour = config.COLOR_ACCENT if (active and i == self.sel[1]) else base
             tag = " *" if equipped else ""
-            surface.blit(self._f.render(f"{it.short()}{tag}", True, colour), (x, y))
+            surface.blit(self._f.render(f"{item_label(it, self.game.content)}{tag}",
+                                        True, colour), (x, y))
             self._mouse.hits.add(pygame.Rect(x - S(8), y, S(520), S(24)), (1, i))
             y += S(24)

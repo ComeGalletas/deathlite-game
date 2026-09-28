@@ -3,6 +3,11 @@
   "language": {
     "name": "Español"
   },
+  "item": {
+    "_doc": "The rarity adjective follows the base and agrees with its gender_es (UI-014.D9): Coraza de hierro rúnica de vitalidad.",
+    "name": "{base} {prefix}",
+    "name_affix": "{base} {prefix} {affix}"
+  },
   "format": {
     "_doc": "Decimal comma (UI-014.D7).",
     "decimal": ","

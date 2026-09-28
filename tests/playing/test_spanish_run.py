@@ -286,6 +286,57 @@ class SpanishRunTests(unittest.TestCase):
         self.assertTrue(stub._status.endswith("already forged into Greatsword"),
                         stub._status)
 
+    def test_items_are_named_in_spanish_on_every_screen(self):
+        # UI-014.6: the Sanctuary's stash list and equipped line, and the
+        # TAB overview's equipped items, name each item from its parts.
+        from game.states.meta_state import MetaState
+        from progression.items import generate_item
+        it = generate_item(self.C, seed=33, item_level=3)     # Traveller Band
+        spanish = "Pulsera de viaje refinada de vitalidad"
+        save = self.game.save
+        with mock.patch.object(save, "stash", [it.to_dict()]), \
+                mock.patch.dict(save.equipped, {it.slot: it.item_id}):
+            meta = MetaState(self.game)
+            meta.enter()
+            seen = []
+            meta._f = _Recorder(meta._f, seen)
+            meta._small = _Recorder(meta._small, seen)
+            meta.draw(pygame.Surface((1600, 900)))
+        self.assertIn(f"[U] {spanish} *", seen)                # " *": equipped
+        self.assertIn(f"{it.slot:<10} {spanish}", seen)         # the equipped line
+        with mock.patch.object(self.ps.player, "equipment", [it]):
+            self.assertIn(f"[U] {spanish}", self.tab_text_labels())
+
+    def test_the_summary_equipment_rows_are_whole_items(self):
+        # The victory / game-over "Equipped" list builds each name from the
+        # row's parts, so the run's end must hand it whole items; a row of
+        # name / rarity / slot / level only would show the stored English.
+        from progression.items import generate_item
+        from ui.run_summary import _item_name
+        it = generate_item(self.C, seed=33, item_level=3)
+        with mock.patch.object(self.ps.player, "equipment", [it]):
+            rows = self.ps._snapshot_summary(True)["equipment"]
+        self.assertEqual(rows, [it.to_dict()])
+        self.assertEqual(_item_name(rows[0])[0],
+                         "[U] Pulsera de viaje refinada de vitalidad")
+
+    def tab_text_labels(self):
+        """The overview's kv labels (the item rows put the name there)."""
+        from game.states.run_status_state import RunStatusState
+        from ui.run_status import common
+        seen = []
+        real_kv = common.kv
+
+        def kv(surface, font, area, y, label, value, **k):
+            seen.append(str(label))
+            return real_kv(surface, font, area, y, label, value, **k)
+
+        s = RunStatusState(self.game)
+        s.enter(playing=self.ps)
+        with mock.patch.object(common, "kv", kv):
+            s.draw(pygame.Surface((1600, 900)))
+        return seen
+
     def test_a_unique_effect_reads_in_spanish(self):
         from ui.run_status.overview import _unique_text
         self.assertEqual(_unique_text("overflow", self.C),

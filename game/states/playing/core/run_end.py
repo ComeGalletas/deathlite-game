@@ -132,9 +132,9 @@ class RunEnd:
         # The trait's own name for the screens; `trait` stays the id.
         summary["trait_name"] = trait_name(cdef, summary["trait"])
         summary["hero_stats"] = dict(getattr(player, "stats", None) or {})
-        summary["equipment"] = [
-            {"name": it.name, "rarity": it.rarity, "slot": it.slot, "level": it.level}
-            for it in getattr(player, "equipment", ())]
+        # Whole items (UI-014.6): the summary builds each name from its parts
+        # in the language in use, as it does for the dropped items.
+        summary["equipment"] = [it.to_dict() for it in getattr(player, "equipment", ())]
         return summary
 
     def hand_off(self, summary: dict, victory: bool) -> None:

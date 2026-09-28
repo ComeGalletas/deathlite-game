@@ -348,7 +348,7 @@ Options.
   - `catalog.py`, `offer.py` and the level-up cards;
   - hero select, the sanctuary and the buff banner;
   - the boss warning, the run summary and the TAB screen.
-- [ ] UI-014.6 — Item names built when shown (UI-014.D9):
+- [x] UI-014.6 — Item names built when shown (UI-014.D9):
   - `base_id` on `Item`, and recovery for old saves;
   - names built from the locale template;
   - the item tests.
@@ -788,3 +788,61 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     - the sweep docstring names `BUFF_FIELDS`;
     - this section's wording on missing fields.
 
+
+### UI-014.6 — item names built when shown (UI-014.D9)
+
+- **The model (`progression/items.py`):**
+  - An `Item` saves `base_id`.
+  - `Item.name` stays the English identity: built at generation by
+    `stored_name`, saved in the stash, and used by logs and the dev menu.
+  - The player reads `item_name(item, content)`: base, rarity word and first
+    affix in the current language, joined by the locale's `item.name` /
+    `item.name_affix` templates.
+    - English is "{prefix} {base} {affix}".
+    - Spanish is "{base} {prefix} {affix}", with the adjective from
+      `prefixes_es[rarity][gender_es]`: "Pulsera de viaje refinada de
+      vitalidad", "Amuleto de urraca refinado de presteza".
+  - `item_label` puts the rarity tag in front. The tag letters are
+    UI-014.9.
+- **Old saves:**
+  - An item without `base_id` finds its base by slot and base stat. A test
+    holds the base stats unique per slot, so this is exact.
+  - Its stored English name is left as it is and is not shown.
+  - The critic walked an old `save.json` end to end: it loads, shows in
+    Spanish and equips; the stash re-saves byte-identical. Nothing localized reaches
+    the file.
+- **Screens:**
+  - the Sanctuary's stash list and equipped line;
+  - the TAB overview's equipped items;
+  - the run summary's dropped and equipped items.
+
+  The summary's `equipment` rows became whole item dicts. `dropped_items`
+  is what `Game._on_run_ended` saves, so the summary resolves names when
+  drawn and adds nothing to it.
+- **English is unchanged:** `item_name` equals the stored name for every
+  slot × base × rarity × possible first affix (150 combinations), for a new
+  item and for an old save. This is enumerated, not sampled.
+- **The summary's fallback** covers only a dict that is not a whole item. An
+  error inside `item_name` raises, as it does on the other screens, rather
+  than hiding behind English (critic, round 1).
+- **Tests:** `tests/progression/test_item_names.py`, plus the item screens
+  in `tests/playing/test_spanish_run.py`.
+- **Tests run:**
+  - Full default suite: 3614 passed, 0 failed, 0 skipped (19 min 54 s).
+    It started before the round-1 fixes.
+  - After those fixes, the suites they reach (`tests/progression`,
+    `tests/screens`, `tests/playing`, `tests/locale`, the save and dev-mode
+    tests): 1296 passed.
+- **Cold critic loop:**
+  - Round 1: the English-equality test sampled 120 of the 150 combinations,
+    and the summary's fallback swallowed real `item_name` errors. Both fixed,
+    and `stored_name` was extracted so the test compares two code paths.
+  - Round 2: a complete mutation pass, with 43 fine mutants and every hunk
+    reverted. The only meaningful survivor was the run-end `equipment` rows,
+    which had no test; now pinned. The Sanctuary equipped-line format is
+    pinned too.
+  - Round 3: PASS. Every production hunk's revert is caught, apart from four
+    with no observable effect: the two journal hunks, the `short()`
+    docstring and an import move. The accepted equivalent nits are listed in
+    the round-2 report. A whole old-save item dict (no `base_id` key) now has
+    its own summary test.

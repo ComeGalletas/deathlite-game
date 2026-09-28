@@ -4,6 +4,11 @@
     "_doc": "The language's own name, shown on the Options row whatever language is active (locale.name_of).",
     "name": "English"
   },
+  "item": {
+    "_doc": "An item's name from its parts (progression.items.item_name): {prefix} is the rarity word, {base} the base, {affix} the first affix's name. English builds exactly the name stored at generation.",
+    "name": "{prefix} {base}",
+    "name_affix": "{prefix} {base} {affix}"
+  },
   "format": {
     "_doc": "Number style, read by game.locale.num().",
     "decimal": "."

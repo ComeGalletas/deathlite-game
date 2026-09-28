@@ -34,6 +34,8 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts, locale
+from game.content import get_content
+from progression.items import Item, item_name
 from ui import text as uitext
 from ui import widgets
 from ui import scale
@@ -105,13 +107,29 @@ def fmt_dps(v: float) -> str:
     return f"{v:.1f}"
 
 
+# The keys `Item.from_dict` needs; a dict without them is a row from before
+# items carried their parts, shown by its stored name.
+_ITEM_KEYS = ("item_id", "slot", "name", "rarity", "level",
+              "base_stat", "base_op", "base_value")
+
+
+def _localized_item_name(d: dict) -> str:
+    """An item dict's name in the current language (UI-014.6), built from
+    its parts. Only the "is this a whole item" check falls back: an error
+    inside `item_name` (bad data, a code bug) is raised, as it is on the
+    TAB screen and in the Sanctuary, never hidden behind English."""
+    if not all(k in d for k in _ITEM_KEYS):
+        return str(d.get("name", "?"))
+    return item_name(Item.from_dict(d), get_content())
+
+
 def _item_name(item) -> tuple[str, str]:
     """(display, rarity) for an item dict, or a bare string from an older
     summary."""
     if isinstance(item, dict):
         rarity = str(item.get("rarity", ""))
         tag = f"[{rarity[:1].upper()}] " if rarity else ""
-        return tag + str(item.get("name", "?")), rarity
+        return tag + _localized_item_name(item), rarity
     return str(item), ""
 
 
@@ -487,7 +505,6 @@ def widest_weapon_name(font) -> int:
     """The widest name a weapons row can show, in any language (UI-014.5):
     every weapon and every forge, English and each translation, so a
     language switch never clips the column."""
-    from game.content import get_content
     c = get_content()
     keys = ("name", *(f"name_{lang}" for lang in locale.LANGUAGES if lang != locale.DEFAULT))
     # A forged weapon shows its forge's `overrides` name; measured too, so

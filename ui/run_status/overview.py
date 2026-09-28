@@ -18,6 +18,7 @@ import pygame
 
 from game import config, locale
 from game.states.playing.core.run_end import trait_name
+from progression.items import item_label
 from ui.run_status import common as c
 from ui.run_summary import fmt_time
 
@@ -99,7 +100,7 @@ class OverviewPane:
         for item in items[:MAX_ITEMS]:
             if y > area.bottom - c.S(c.ROW_STEP):
                 break
-            name = f"[{item.rarity[:1].upper()}] {item.name}"
+            name = item_label(item, ps.content)
             y = c.kv(surface, f.row, area, y, name, f"{item.slot}  Lv {item.level}",
                      label_colour=c.RARITY_ON_DARK.get(item.rarity, config.COLOR_TEXT))
             for text in item_lines(item, ps.content):
