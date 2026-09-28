@@ -148,6 +148,60 @@ class ApplyTests(unittest.TestCase):
         wolf.level = 9
         self.assertFalse(forge_eligible(wolf, 2), "summons are never forged")
 
+    def test_a_forged_weapon_carries_the_forge_name_in_spanish(self):
+        # UI-014.4.2: the overrides carry `name_es`, so a forged Sword reads
+        # as the forge in Spanish, not as "Espada".
+        from game import locale
+        try:
+            locale.set_language("es")
+            for f in F.by_id.values():
+                w = weapon(f.weapon, f.id)
+                self.assertEqual(locale.text(w.definition, "name"),
+                                 f.overrides["name_es"], f.id)
+                self.assertNotEqual(locale.text(w.definition, "name"),
+                                    C.weapon(f.weapon)["name_es"], f.id)
+        finally:
+            locale.set_language(locale.DEFAULT)
+
+    def test_overriding_a_text_field_drops_the_base_translation(self):
+        # A forge that renames without a translation must fall back to its
+        # own English name, never keep the base weapon's Spanish one.
+        from game import locale
+        bare = Forges({"x": {"name": "Cleaver", "weapon": "sword", "identity": "i",
+                             "description": "d", "overrides": {"name": "Cleaver"},
+                             "effects": {}}}, C.weapons)
+        w = weapon("sword")
+        apply_forge(w, bare.get("x"))
+        self.assertNotIn("name_es", w.definition)
+        try:
+            locale.set_language("es")
+            self.assertEqual(locale.text(w.definition, "name"), "Cleaver")
+            # A field the forge leaves alone keeps its translation.
+            self.assertEqual(locale.text(w.definition, "description"),
+                             C.weapon("sword")["description_es"])
+        finally:
+            locale.set_language(locale.DEFAULT)
+
+    def test_translated_text_keys_are_overridable(self):
+        for key in ("name_es", "description_es"):
+            self.assertIn(key, OVERRIDABLE)
+        self.assertNotIn("damage_es", OVERRIDABLE)
+        self.assertNotIn("name_en", OVERRIDABLE)
+
+    def test_the_forged_spanish_name_is_the_offered_one(self):
+        # The offer will show the forge's own `name_es` (UI-014.5); the
+        # forged weapon shows its overrides' `name_es`. They must not drift.
+        for fid, raw in C.forges.items():
+            self.assertEqual(raw["overrides"]["name_es"], raw["name_es"], fid)
+
+    def test_a_translation_needs_its_english_override(self):
+        base = {"name": "X", "weapon": "sword", "identity": "i", "description": "d",
+                "effects": {}}
+        with self.assertRaises(ValueError):
+            Forges({"x": {**base, "overrides": {"name_es": "Equis"}}}, C.weapons)
+        Forges({"x": {**base, "overrides": {"name": "X", "name_es": "Equis"}}},
+               C.weapons)                                   # both: fine
+
     def test_blessing_bonuses_survive_the_forge(self):
         w = weapon("sword")
         w.bonus["damage"] += 9

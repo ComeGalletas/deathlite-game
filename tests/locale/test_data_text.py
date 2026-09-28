@@ -26,10 +26,10 @@ TEXT_FIELDS = ("name", "description", "desc", "identity", "trait_name",
 TRANSLATED = (
     "weapons/weapons.json",        # UI-014.4.1
     "weapons/items.json",          # UI-014.4.1
+    "weapons/forges.json",         # UI-014.4.2
+    "weapons/blessings.json",      # UI-014.4.2
 )
 PENDING = {
-    "weapons/forges.json": "UI-014.4.2",
-    "weapons/blessings.json": "UI-014.4.2",
     "heroes/characters.json": "UI-014.4.3",
     "heroes/meta_upgrades.json": "UI-014.4.3",
     "enemies/enemies.json": "UI-014.4.3",

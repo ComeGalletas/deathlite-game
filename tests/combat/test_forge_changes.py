@@ -9,7 +9,8 @@ the data every Forging is validated from.
 import unittest
 
 from combat.weapons import Weapon
-from combat.weapons.forge import apply_forge, forge_changes, get_forges
+from combat.weapons.forge import (TEXT_OVERRIDE_KEYS, apply_forge, forge_changes,
+                                  get_forges)
 from game.content import get_content
 
 
@@ -40,13 +41,23 @@ class ForgeChangesTests(unittest.TestCase):
                 changes = forge_changes(self.content, w)
                 keys = [k for k, _b, _a in changes]
                 for k, v in fdef.overrides.items():
-                    if k in ("name", "description"):
+                    if k in TEXT_OVERRIDE_KEYS:
                         self.assertNotIn(k, keys)
                         continue
                     self.assertIn(k, keys)
                     before, after = next((b, a) for kk, b, a in changes if kk == k)
                     self.assertEqual(before, base.get(k))
                     self.assertEqual(after, v)
+
+    def test_no_text_or_translation_is_reported_as_a_change(self):
+        # Found by the UI-014.4.2 critic: `name_es` came back as a change,
+        # and the TAB screen drew "name es  Espada -> Torbellino" for every
+        # forged weapon, in English too.
+        for fid in self.forges.by_id:
+            w, _ = self._forged(fid)
+            keys = {k for k, _b, _a in forge_changes(self.content, w)}
+            self.assertEqual(keys & TEXT_OVERRIDE_KEYS, set(), fid)
+            self.assertFalse([k for k in keys if k.endswith("_es")], fid)
 
     def test_added_effects_come_back_with_no_before(self):
         for fid in self.forges.by_id:
@@ -66,7 +77,7 @@ class ForgeChangesTests(unittest.TestCase):
         changes = {k: (b, a) for k, b, a in forge_changes(self.content, w)}
         base = self.content.weapon(fdef.weapon)
         for key, after in fdef.overrides.items():
-            if key in ("name", "description"):
+            if key in TEXT_OVERRIDE_KEYS:
                 continue
             before = changes[key][0]
             self.assertEqual(before, base.get(key))

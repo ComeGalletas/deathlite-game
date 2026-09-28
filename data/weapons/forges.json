@@ -1,74 +1,86 @@
 {
   "whirlwind": {
-    "name": "Whirlwind", "weapon": "sword", "identity": "Defensive AoE",
+    "name": "Whirlwind", "name_es": "Torbellino", "weapon": "sword", "identity": "Defensive AoE", "identity_es": "Área defensiva",
     "description": "The Sword spins without pause: a fast, full-circle sweep for far less per hit. Strong when surrounded, weak on a single target.",
-    "overrides": { "name": "Whirlwind", "cooldown": 0.8, "projectile_lifetime": 0.2, "cone_half_angle": 180, "damage": 6, "weight": 12, "area": 70 },
+    "description_es": "La Espada gira sin pausa: un barrido rápido en círculo completo que hace mucho menos daño por golpe. Fuerte cuando te rodean, débil contra un solo objetivo.",
+    "overrides": { "name": "Whirlwind", "name_es": "Torbellino", "cooldown": 0.8, "projectile_lifetime": 0.2, "cone_half_angle": 180, "damage": 6, "weight": 12, "area": 70 },
     "effects": {}
   },
   "greatsword": {
-    "name": "Greatsword", "weapon": "sword", "identity": "Crowd breaker",
+    "name": "Greatsword", "name_es": "Mandoble", "weapon": "sword", "identity": "Crowd breaker", "identity_es": "Rompehordas",
     "description": "A slow, enormous blade: huge damage, a wide arc and a shove that scatters a crowd. Every swing has to count.",
-    "overrides": { "name": "Greatsword", "cooldown": 1.8, "damage": 42, "area": 112, "cone_half_angle": 75, "weight": 75 },
+    "description_es": "Una hoja lenta y gigantesca: daño enorme, un arco amplio y un empuje que dispersa a la multitud. Cada tajo tiene que contar.",
+    "overrides": { "name": "Greatsword", "name_es": "Mandoble", "cooldown": 1.8, "damage": 42, "area": 112, "cone_half_angle": 75, "weight": 75 },
     "effects": {}
   },
   "earthshaker": {
-    "name": "Earthshaker", "weapon": "hammer", "identity": "Area control",
+    "name": "Earthshaker", "name_es": "Sismo", "weapon": "hammer", "identity": "Area control", "identity_es": "Control de área",
     "description": "Every blow sends a shockwave rolling out past the impact at half damage. Slower swings.",
-    "overrides": { "name": "Earthshaker", "cooldown": 1.95 },
+    "description_es": "Cada golpe lanza una onda de choque que avanza más allá del impacto con la mitad del daño. Golpes más lentos.",
+    "overrides": { "name": "Earthshaker", "name_es": "Sismo", "cooldown": 1.95 },
     "effects": { "shockwave_radius": 90, "shockwave_damage_mult": 0.5 }
   },
   "meteor_hammer": {
-    "name": "Meteor Hammer", "weapon": "hammer", "identity": "Area denial",
+    "name": "Meteor Hammer", "name_es": "Martillo meteoro", "weapon": "hammer", "identity": "Area denial", "identity_es": "Negación de área",
     "description": "Each impact leaves a burning crater that keeps hurting whatever stands in it. The blow itself lands lighter.",
-    "overrides": { "name": "Meteor Hammer", "damage": 23 },
+    "description_es": "Cada impacto deja un cráter ardiente que sigue dañando a lo que se quede dentro. El golpe en sí pega más flojo.",
+    "overrides": { "name": "Meteor Hammer", "name_es": "Martillo meteoro", "damage": 23 },
     "effects": { "hazard_radius": 64, "hazard_dps_mult": 0.35, "hazard_duration": 2.5 }
   },
   "twin_daggers": {
-    "name": "Twin Daggers", "weapon": "daggers", "identity": "Sustained DPS, wider",
+    "name": "Twin Daggers", "name_es": "Dagas gemelas", "weapon": "daggers", "identity": "Sustained DPS, wider", "identity_es": "Daño sostenido, más amplio",
     "description": "Two blades strike at once, fanned apart. Each hits for less, the pair covers more.",
-    "overrides": { "name": "Twin Daggers", "damage": 4, "cone_half_angle": 32, "area": 44 },
+    "description_es": "Dos hojas golpean a la vez, abiertas en abanico. Cada una hace menos daño; juntas cubren más.",
+    "overrides": { "name": "Twin Daggers", "name_es": "Dagas gemelas", "damage": 4, "cone_half_angle": 32, "area": 44 },
     "effects": { "twin_offset_deg": 22 }
   },
   "fan_of_blades": {
-    "name": "Fan of Blades", "weapon": "daggers", "identity": "Crowd-clearing assassin",
+    "name": "Fan of Blades", "name_es": "Abanico de hojas", "weapon": "daggers", "identity": "Crowd-clearing assassin", "identity_es": "Barrehordas",
     "description": "The daggers are thrown in a spread of four. Groups suffer; precision is gone.",
-    "overrides": { "name": "Fan of Blades", "special_effect": null, "category": "projectile", "projectile_count": 4, "spread_deg": 13, "projectile_speed": 540, "projectile_lifetime": 0.42, "reach": 240, "damage": 5, "pierce": 0, "cooldown": 0.5, "tags": ["melee", "projectile"] },
+    "description_es": "Las dagas se lanzan en un abanico de cuatro. Los grupos sufren; la precisión desaparece.",
+    "overrides": { "name": "Fan of Blades", "name_es": "Abanico de hojas", "special_effect": null, "category": "projectile", "projectile_count": 4, "spread_deg": 13, "projectile_speed": 540, "projectile_lifetime": 0.42, "reach": 240, "damage": 5, "pierce": 0, "cooldown": 0.5, "tags": ["melee", "projectile"] },
     "effects": {}
   },
   "multishot": {
-    "name": "Multishot", "weapon": "bow", "identity": "Coverage",
+    "name": "Multishot", "name_es": "Disparo múltiple", "weapon": "bow", "identity": "Coverage", "identity_es": "Cobertura",
     "description": "Three arrows in a spread, each lighter and piercing less. Many targets over one.",
-    "overrides": { "name": "Multishot", "projectile_count": 3, "spread_deg": 14, "damage": 8, "pierce": 1 },
+    "description_es": "Tres flechas en abanico, cada una más ligera y menos perforante. Muchos objetivos antes que uno solo.",
+    "overrides": { "name": "Multishot", "name_es": "Disparo múltiple", "projectile_count": 3, "spread_deg": 14, "damage": 8, "pierce": 1 },
     "effects": {}
   },
   "ballista": {
-    "name": "Ballista", "weapon": "bow", "identity": "Elite and boss killer",
+    "name": "Ballista", "name_es": "Balista", "weapon": "bow", "identity": "Elite and boss killer", "identity_es": "Cazador de élites y jefes",
     "description": "One slow, enormous bolt: very high damage, huge penetration, very long range. Fires seldom.",
-    "overrides": { "name": "Ballista", "damage": 50, "cooldown": 2.4, "pierce": 8, "projectile_speed": 760, "projectile_lifetime": 1.6, "reach": 640, "area": 7, "weight": 30 },
+    "description_es": "Un único virote lento y enorme: daño muy alto, penetración enorme, alcance muy largo. Dispara con poca frecuencia.",
+    "overrides": { "name": "Ballista", "name_es": "Balista", "damage": 50, "cooldown": 2.4, "pierce": 8, "projectile_speed": 760, "projectile_lifetime": 1.6, "reach": 640, "area": 7, "weight": 30 },
     "effects": {}
   },
   "arcane_storm": {
-    "name": "Arcane Storm", "weapon": "magic_rod", "identity": "Battlefield coverage",
+    "name": "Arcane Storm", "name_es": "Tormenta arcana", "weapon": "magic_rod", "identity": "Battlefield coverage", "identity_es": "Cobertura del campo de batalla",
     "description": "The Rod no longer fires: four arcane motes circle you and burn whatever they touch.",
-    "overrides": { "name": "Arcane Storm", "special_effect": "orbit", "category": "orbit", "projectile_count": 4, "orbit_radius": 120, "orbit_speed": 2.6, "rehit_interval": 0.5, "damage": 5, "projectile_lifetime": 999, "reach": 160, "targeting_mode": "none", "cooldown": 0.45 },
+    "description_es": "La Vara deja de disparar: cuatro orbes arcanos giran a tu alrededor y queman todo lo que tocan.",
+    "overrides": { "name": "Arcane Storm", "name_es": "Tormenta arcana", "special_effect": "orbit", "category": "orbit", "projectile_count": 4, "orbit_radius": 120, "orbit_speed": 2.6, "rehit_interval": 0.5, "damage": 5, "projectile_lifetime": 999, "reach": 160, "targeting_mode": "none", "cooldown": 0.45 },
     "effects": {}
   },
   "arcane_lance": {
-    "name": "Arcane Lance", "weapon": "magic_rod", "identity": "Single-target destruction",
+    "name": "Arcane Lance", "name_es": "Lanza arcana", "weapon": "magic_rod", "identity": "Single-target destruction", "identity_es": "Destrucción de un solo objetivo",
     "description": "A focused lance of power: high damage, long reach, pierces a line. Casts slowly.",
-    "overrides": { "name": "Arcane Lance", "damage": 34, "cooldown": 1.6, "pierce": 6, "projectile_speed": 900, "area": 9, "reach": 460, "projectile_lifetime": 1.0 },
+    "description_es": "Una lanza de poder concentrado: daño alto, largo alcance, atraviesa una línea. Se lanza despacio.",
+    "overrides": { "name": "Arcane Lance", "name_es": "Lanza arcana", "damage": 34, "cooldown": 1.6, "pierce": 6, "projectile_speed": 900, "area": 9, "reach": 460, "projectile_lifetime": 1.0 },
     "effects": {}
   },
   "cluster_bomb": {
-    "name": "Cluster Bomb", "weapon": "bomb", "identity": "Chain-reaction AoE",
+    "name": "Cluster Bomb", "name_es": "Bomba de racimo", "weapon": "bomb", "identity": "Chain-reaction AoE", "identity_es": "Área en cadena",
     "description": "The blast scatters three bomblets that go off a moment later. The first blast is lighter.",
-    "overrides": { "name": "Cluster Bomb", "damage": 20 },
+    "description_es": "La explosión esparce tres minibombas que estallan un momento después. La primera explosión es más débil.",
+    "overrides": { "name": "Cluster Bomb", "name_es": "Bomba de racimo", "damage": 20 },
     "effects": { "cluster_count": 3, "cluster_damage_mult": 0.4, "cluster_radius_mult": 0.6, "cluster_fuse": 0.55, "cluster_speed": 180 }
   },
   "minefield": {
-    "name": "Minefield", "weapon": "bomb", "identity": "Battlefield control",
+    "name": "Minefield", "name_es": "Campo de minas", "weapon": "bomb", "identity": "Battlefield control", "identity_es": "Control del campo de batalla",
     "description": "Bombs become mines: thrown, armed, and waiting until an enemy steps on them. Thrown faster, a little lighter.",
-    "overrides": { "name": "Minefield", "cooldown": 1.3, "damage": 21, "blast_radius": 62 },
+    "description_es": "Las bombas se convierten en minas: lanzadas, armadas y esperando a que un enemigo las pise. Se lanzan más rápido y pegan algo menos.",
+    "overrides": { "name": "Minefield", "name_es": "Campo de minas", "cooldown": 1.3, "damage": 21, "blast_radius": 62 },
     "effects": { "mine": 1, "mine_arm_delay": 0.6, "mine_lifetime": 25 }
   }
 }

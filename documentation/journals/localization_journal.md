@@ -224,6 +224,21 @@ tools.
   is not a translation of text, runs a strict self-check, and writes
   atomically. The mappings are working files; the data file is the only
   record of a translation.
+- **UI-014.D15: a share or a length never reads as a bonus.** This was
+  found by the UI-014.4.2 critics while filling the blessing cards. It fixes
+  the English cards too.
+  - A threshold (Executioner "below 35% health"), a fraction of a hit
+    (Lacerate, Scorch, Split Arrow, Powder Keg) and a slow's potency
+    (Chilling Bolts, a raw fraction the totem applies with no base) use the
+    unsigned `chance` display, not `pct`.
+  - A fixed duration (the 2 s bleed and burn, the 1.5 s slow) uses a new
+    unsigned `duration` display in `format_value`, not `seconds`. Before,
+    these read "below +35% health" and "for +2s".
+  - The data display changed; no value and no combat path did.
+  - `documentation/designs/weapon_blessing_forge_tables.md` had its 9
+    generated rows re-synced by script, aligned with the generator's
+    output. Regenerating the file would drop its
+    hand-written sections.
 
 ## UI-014 — Plan
 
@@ -326,7 +341,7 @@ Options.
   the 9 files, with the data-coverage and number-match tests.
   - [x] UI-014.4.1 — `weapons.json` and `items.json` (the requested part), with
     `gender_es` and `prefixes_es`.
-  - [ ] UI-014.4.2 — `forges.json`, `blessings.json`.
+  - [x] UI-014.4.2 — `forges.json`, `blessings.json`.
   - [ ] UI-014.4.3 — `characters.json`, `meta_upgrades.json`,
     `enemies.json`, `bosses.json`, `buildings.json`.
 - [ ] UI-014.5 — Data text read through `locale.text` in:
@@ -567,4 +582,72 @@ Options.
     - `--check` could have written the file unnoticed.
   - **Left as nits:** keys containing "/", an inline object value starting at
     column 0, numbers written as words, and only `%` and `s` known as units.
+
+### UI-014.4.2 — Spanish for forges and blessings
+
+- **Data:**
+  - `data/weapons/forges.json`: `name_es`, `identity_es` and
+    `description_es` on all 12 forges, and `overrides.name_es`, so a forged
+    weapon carries its Spanish name.
+  - `data/weapons/blessings.json`: `name_es` and `description_es` on all 88
+    blessings.
+  - Every filled card was read at level I and max in Spanish.
+  - Counts use "{0} al número de …", so "+1" reads correctly: "+1 al número
+    de lobos que corren contigo", not "+1 lobos más".
+- **Forge code (`combat/weapons/forge.py`):**
+  - `TEXT_OVERRIDES`, `TEXT_TRANSLATIONS` and `TEXT_OVERRIDE_KEYS` are the
+    one list of forge text keys. The translated keys are built from
+    `locale.LANGUAGES`. The parser, `apply_forge`, `forge_changes` and
+    `tools/gen_weapon_tables.py` all read it.
+  - `OVERRIDABLE` accepts `name_es` and `description_es`.
+  - A translated override without its English field is refused at load.
+  - `apply_forge` drops the base's translation of any text field the forge
+    overrides. A forge with no translation then reads its own English name,
+    never the base's "Espada".
+- **Bug found by the critic and fixed:** `forge_changes` kept its own copy of
+  the text keys, so the TAB screen would have drawn "name es  Espada ->
+  Torbellino" for every forged weapon, in English too. Its test hard-coded
+  the same copy and would have locked the bug in. Both now read
+  `TEXT_OVERRIDE_KEYS`, and a regression test checks that no `_es` key comes
+  back.
+- **Card displays:** UI-014.D15 above.
+- **For UI-014.5:** `ForgeDef` keeps only the English `name`, `identity`
+  and `description`. The forge offer (`offer.py:137`), the TAB screen
+  (`ui/run_status/build.py:117,236`) and the dev menu read them. UI-014.5
+  has to carry the `_es` fields on `ForgeDef` or read through `locale.text`
+  on the raw entry.
+- **Tests:**
+  - `tests/locale/test_data_text.py` now holds forges and blessings in
+    `TRANSLATED`: 536 subtests in that module, covering drawable text,
+    numbers, placeholders, glyphs and number style.
+  - `tests/combat/test_forge.py`:
+    - the Spanish forged name;
+    - dropped inherited translations;
+    - overridable keys;
+    - offered name equals forged name;
+    - a translation without its English field is refused.
+  - `tests/combat/test_forge_changes.py`: no text key is reported as a
+    change.
+  - `tests/progression/test_blessings.py`: the `duration` display, and the
+    six English cards that used to show a "+" where none belongs.
+- **Checked by script:** `tools/gen_weapon_tables.py` output is identical
+  with and without the `_es` keys.
+- **Full default suite: 3565 passed, 0 failed, 0 skipped** (11 sweep
+  deselected, 16 min 42 s). The run started before the last two data edits,
+  the Chilling Bolts display and two Spanish strings. The tests that read
+  them were rerun after: `tests/progression`, `tests/locale` and the forge
+  tests, 317 passed.
+- **Cold critic loop:** five rounds.
+  - Round 1: the `forge_changes` bug; plural counts at "+1"; three broken
+    sentences.
+  - Round 2: Scorch "hasta 5 veces" (meaning), and the stale doc row.
+  - Round 3: signed shares and lengths (D15); Split Arrow, Gold Rush and
+    "Brazo escudo"; "vida" changed to "PV" per the glossary.
+  - Round 4: the Chilling Bolts slow is a share too (added to D15), and four
+    journal inaccuracies.
+  - Round 5: PASS on the data, code, tests and doc tables. Every changed
+    display was checked against the combat code that reads its key, and
+    all 176 generated table rows appear verbatim in the design doc. Its
+    only finding was this journal's round count. One taste fix was taken:
+    Siege Bolt and Impale say "atraviesa {1} enemigos más".
 

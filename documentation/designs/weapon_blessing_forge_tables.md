@@ -109,7 +109,7 @@ Base: class melee, category melee, damage 27, cooldown 1.5s, area 35, weight 75,
 | Staggering Strike | behavior | uncommon | stun chance + | +8% | +16% | +24% | +32% | +40% | stun chance 35% → 43% / 51% / 59% / 67% / 75% |  |
 |  |  |  | stun duration + | +0.1s | +0.2s | +0.3s | +0.4s | +0.5s | stun duration 0.8 → 0.9 / 1 / 1.1 / 1.2 / 1.3 |  |
 | Executioner | behavior | rare | bonus dmg vs low HP | +25% | +45% | +65% | +85% | +110% |  |  |
-|  |  |  | low-HP threshold | +35% | +35% | +35% | +35% | +35% |  |  |
+|  |  |  | low-HP threshold | 35% | 35% | 35% | 35% | 35% |  |  |
 
 #### Forgings
 
@@ -142,8 +142,8 @@ Base: class melee, category melee, damage 9, cooldown 0.4s, area 42, cone ±17°
 | Weak Point | behavior | rare | bonus dmg vs wounded | +15% | +30% | +45% | +60% | +80% |  |  |
 | Flurry | behavior | rare | attack speed per stack | +4% | +6% | +8% | +10% | +12% |  |  |
 |  |  |  | max stacks | 5 | 5 | 5 | 5 | 5 |  |  |
-| Lacerate | behavior | uncommon | bleed per tick (of the hit) | +3% | +5% | +8% | +10% | +13% |  |  |
-|  |  |  | bleed duration | +2s | +2s | +2s | +2s | +2s |  |  |
+| Lacerate | behavior | uncommon | bleed per tick (of the hit) | 3% | 5% | 8% | 10% | 13% |  |  |
+|  |  |  | bleed duration | 2s | 2s | 2s | 2s | 2s |  |  |
 | Blood in the Water | synergy | rare | bonus dmg after Sword hit (1.5 s) | +25% | +40% | +55% | +75% | +100% |  | needs Sword |
 | Marked Prey | synergy | rare | bonus dmg vs Rod-marked | +30% | +45% | +60% | +80% | +100% |  | needs Magic Rod |
 
@@ -178,7 +178,7 @@ Base: class ranged, category projectile, damage 10, cooldown 1.2s, area 5, reach
 | Heavy Draw | behavior | rare | damage + | +3 | +5 | +8 | +10 | +13 | damage 10 → 13 / 15 / 18 / 20 / 23 |  |
 |  |  |  | cooldown × | ×1.15 | ×1.15 | ×1.15 | ×1.15 | ×1.15 | cooldown 1.2s → 1.38s / 1.38s / 1.38s / 1.38s / 1.38s |  |
 | Split Arrow | behavior | rare | arrows spawned on hit | +1 | +1 | +2 | +2 | +3 |  |  |
-|  |  |  | split arrow damage | +50% | +60% | +60% | +70% | +70% |  |  |
+|  |  |  | split arrow damage | 50% | 60% | 60% | 70% | 70% |  |  |
 | Hunter's Mark | behavior | rare | bonus dmg per stack | +6% | +9% | +12% | +15% | +20% |  |  |
 |  |  |  | max stacks | 5 | 5 | 5 | 5 | 5 |  |  |
 | Linebreaker | synergy | rare | bonus dmg after Hammer hit (1.5 s) | +25% | +40% | +55% | +75% | +100% |  | needs Hammer |
@@ -250,7 +250,7 @@ Base: class ranged, category projectile, damage 23, cooldown 2.2s, area 8, reach
 | Demolitionist | behavior | rare | bonus dmg vs stunned / shoved | +20% | +40% | +60% | +80% | +100% |  |  |
 | Sticky Bomb | behavior | rare | stuck blast bonus dmg | +10% | +20% | +30% | +40% | +50% |  |  |
 |  |  |  | sticks to the first enemy touched | 1 | 1 | 1 | 1 | 1 |  |  |
-| Powder Keg | behavior | rare | burst on kill (of the blast) | +20% | +30% | +40% | +50% | +60% |  |  |
+| Powder Keg | behavior | rare | burst on kill (of the blast) | 20% | 30% | 40% | 50% | 60% |  |  |
 | Demolition | synergy | rare | bonus dmg after Hammer hit (1.5 s) | +25% | +40% | +55% | +75% | +100% |  | needs Hammer |
 
 #### Forgings
@@ -282,8 +282,8 @@ Base: class summon, category orbit, damage 6, cooldown 0.45s, count 3, area 8, r
 |  |  |  | rehit interval × | 13% | 24% | 34% | 43% | 50% | rehit interval 0.4s → 0.35s / 0.3s / 0.26s / 0.23s / 0.2s |  |
 | More Embers | coverage | uncommon | count + | +1 | +2 | +3 | +4 | +5 | count 3 → 4 / 5 / 6 / 7 / 8 |  |
 | Wide Orbit | coverage | common | area + | +1 | +2 | +3 | +4 | +5 | area 8 → 9 / 10 / 11 / 12 / 13 |  |
-| Scorch | behavior | uncommon | burn per tick (of the hit) | +4% | +8% | +11% | +15% | +19% |  |  |
-|  |  |  | burn duration | +2s | +2s | +2s | +2s | +2s |  |  |
+| Scorch | behavior | uncommon | burn per tick (of the hit) | 4% | 8% | 11% | 15% | 19% |  |  |
+|  |  |  | burn duration | 2s | 2s | 2s | 2s | 2s |  |  |
 | Far Orbit | behavior | uncommon | orbit radius + | +12 | +24 | +36 | +48 | +60 | orbit radius 96 → 108 / 120 / 132 / 144 / 156 |  |
 |  |  |  | reach + | +16 | +32 | +48 | +64 | +80 | reach 140 → 156 / 172 / 188 / 204 / 220 |  |
 
@@ -304,8 +304,8 @@ Base: class summon, category summon, damage 7, cooldown 6.0s, area 5, pierce 0, 
 | Quick Plant | power | common | cooldown × | 13% | 24% | 34% | 43% | 50% | cooldown 6s → 5.22s / 4.56s / 3.96s / 3.42s / 3s |  |
 | Twin Totems | coverage | uncommon | count + | +1 | +1 | +2 | +2 | +3 | count 1 → 2 / 2 / 3 / 3 / 4 |  |
 | Long Watch | coverage | common | summon lifetime + | +2s | +4s | +6s | +8s | +10s | summon lifetime 8 → 10 / 12 / 14 / 16 / 18 |  |
-| Chilling Bolts | behavior | uncommon | slow | +15% | +20% | +25% | +30% | +35% |  |  |
-|  |  |  | slow duration | +1.5s | +1.5s | +1.5s | +1.5s | +1.5s |  |  |
+| Chilling Bolts | behavior | uncommon | slow | 15% | 20% | 25% | 30% | 35% |  |  |
+|  |  |  | slow duration | 1.5s | 1.5s | 1.5s | 1.5s | 1.5s |  |  |
 
 No Forgings: summons cannot be forged.
 

@@ -17,7 +17,7 @@ EFFECT_TYPES = ("stat", "weapon_bonus", "weapon_effect")
 STAT_OPS = ("flat", "pct", "mult")
 BONUS_MODES = ("add", "mult")
 DISPLAYS = ("flat", "pct", "pct_gain", "pct_drop", "chance", "seconds",
-            "mult", "raw", "degrees", "hidden")
+            "duration", "mult", "raw", "degrees", "hidden")
 ROMAN = ("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X")
 
 
@@ -41,6 +41,10 @@ def format_value(value: float, display: str) -> str:
         return f"{value * 100:.0f}%"
     if display == "seconds":
         return f"+{value:g}s"
+    if display == "duration":
+        # A length of time, not an increase of one: "burns for 2s", where
+        # `seconds` would read "for +2s" (UI-014.D15).
+        return f"{value:g}s"
     if display == "mult":
         return f"x{value:g}"
     if display == "degrees":

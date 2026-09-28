@@ -114,6 +114,26 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(format_value(2.2, "mult"), "x2.2")
         self.assertEqual(format_value(1.15, "pct_gain"), "+15%")
         self.assertEqual(format_value(1.75, "pct_gain"), "+75%")
+        self.assertEqual(format_value(2.0, "duration"), "2s")    # a length, no "+"
+        self.assertEqual(format_value(0.35, "chance"), "35%")
+
+    def test_a_share_or_a_length_never_reads_as_a_bonus(self):
+        # UI-014.D15: a threshold, a fraction of a hit and a fixed duration
+        # are not increases, so their cards carry no "+" ("below +35%
+        # health", "for +2s" before).
+        cards = {
+            "hammer_executioner": "+25% Hammer damage against enemies below 35% health.",
+            "daggers_lacerate": "Dagger hits open a wound that bleeds for 3% of the "
+                                "hit every 0.4 s for 2s, up to 6 wounds.",
+            "ember_ring_scorch": "Embers set what they touch burning for 4% of the hit "
+                                 "every 0.5 s for 2s, up to 5 times over.",
+            "grave_totem_chilling_bolts": "Totem bolts slow their target by 15% for 1.5s.",
+            "bow_split_arrow": "An arrow that hits splits into +1 more at 50% damage.",
+            "bomb_powder_keg": "An enemy killed by a blast bursts for 20% of that "
+                               "blast's damage.",
+        }
+        for bid, text in cards.items():
+            self.assertEqual(CAT.get(bid).describe(1), text, bid)
 
     def test_bad_data_raises(self):
         bad = {"x": {"name": "X", "kind": "weapon", "weapon": "axe", "category": "power",
