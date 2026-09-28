@@ -38,6 +38,7 @@
   "buffs": {
     "magnet": {
       "name": "Magnet",
+      "name_es": "Imán",
       "duration": 10.0,
       "palette": [
         [
@@ -74,6 +75,7 @@
     },
     "turbo": {
       "name": "Turbo",
+      "name_es": "Turbo",
       "duration": 10.0,
       "palette": [
         [
@@ -111,6 +113,7 @@
     },
     "haste": {
       "name": "Haste",
+      "name_es": "Celeridad",
       "duration": 10.0,
       "palette": [
         [
@@ -148,6 +151,7 @@
     },
     "pinball": {
       "name": "Pinball",
+      "name_es": "Pinball",
       "duration": 10.0,
       "palette": [
         [
@@ -191,6 +195,7 @@
     },
     "vampire": {
       "name": "Vampire",
+      "name_es": "Vampiro",
       "duration": 10.0,
       "palette": [
         [

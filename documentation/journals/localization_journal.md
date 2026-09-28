@@ -337,12 +337,12 @@ Options.
   - `settings["language"]`, the Options row and boot;
   - switching takes effect immediately;
   - the save tests.
-- [ ] UI-014.4 — Spanish data: a `_es` next to every player-facing field in
+- [x] UI-014.4 — Spanish data: a `_es` next to every player-facing field in
   the 9 files, with the data-coverage and number-match tests.
   - [x] UI-014.4.1 — `weapons.json` and `items.json` (the requested part), with
     `gender_es` and `prefixes_es`.
   - [x] UI-014.4.2 — `forges.json`, `blessings.json`.
-  - [ ] UI-014.4.3 — `characters.json`, `meta_upgrades.json`,
+  - [x] UI-014.4.3 — `characters.json`, `meta_upgrades.json`,
     `enemies.json`, `bosses.json`, `buildings.json`.
 - [ ] UI-014.5 — Data text read through `locale.text` in:
   - `catalog.py`, `offer.py` and the level-up cards;
@@ -650,4 +650,50 @@ Options.
     all 176 generated table rows appear verbatim in the design doc. Its
     only finding was this journal's round count. One taste fix was taken:
     Siege Bolt and Impale say "atraviesa {1} enemigos más".
+
+### UI-014.4.3 — Spanish for heroes, meta upgrades, enemies, bosses, buffs
+
+This task closes UI-014.4: every player-facing field in `data/` now has a
+Spanish sibling, and `PENDING` in `tests/locale/test_data_text.py` is empty.
+
+- **`heroes/characters.json`:**
+  - `name_es` (unchanged, UI-014.D5), `identity_es`, `trait_name_es` and
+    `trait_desc_es` for Aegis, Kestrel and Nihil.
+  - The English never states a hero's gender, so the identity lines avoid
+    gendered adjectives: "Velocidad y fragilidad", "Magia y fragilidad",
+    "Premia no moverse".
+  - Trait names match the blessings where the English does: Nihil's "Quick
+    Cast" is "Lanzamiento rápido" in both places.
+- **`heroes/meta_upgrades.json`:** the 6 Sanctuary upgrades. Constitución,
+  Presteza, Fortuna, Erudito, Ferocidad and Chatarrero, with PV, EXP and
+  chatarra as in the glossary.
+- **`enemies/enemies.json`, `bosses.json`:** 19 enemy names and 2 bosses.
+  - Names read as creatures and none repeat another's meaning: Cascarón,
+    Escurridiza, Caparazón, Aguijón, Hondero, Hinchado, Zarpa recia,
+    Devastador, Gnomo martillero, Giralanzas, Apicultor, Rencor, Pavesa,
+    Cornasangre, Parpadeo, Roehuesos, Fauces de garfio, Invocamaldiciones,
+    Muñeco de entrenamiento.
+  - The bosses are El Hambre Primigenia and La Lanza Colmilluda. Both read
+    well in the boss warning, which is not wired yet (UI-014.8).
+- **`world/buildings.json`:** the 5 buff names. Imán and Celeridad match the
+  blessings of the same English name; Turbo and Pinball stay.
+- **Tests (`tests/locale/test_data_text.py`):**
+  - all nine files are in `TRANSLATED`, and `PENDING` is empty;
+  - `SAME_ON_PURPOSE` lists the five fields that stay identical on purpose
+    (the three hero names, Turbo and Pinball), each by exact path, with a
+    test that fails when an entry goes stale;
+  - the copy check ignores case and edge spaces ("turbo " counts as a
+    copy).
+- **Loaders:** none of the five files' loaders rejects unknown keys. The
+  loaders' suites pass (`tests/entities`, `tests/progression`,
+  `tests/playing/test_buffs.py`, `tests/spawn/test_data_integrity.py`,
+  hero select).
+- **Full default suite: 3566 passed, 0 failed, 0 skipped** (11 sweep
+  deselected, 15 min 50 s). The three taste edits from round 2 landed while
+  it ran; `tests/locale` passed after them (106).
+- **Cold critic loop:** two rounds.
+  - Round 1: Nihil's line made the magic fragile, not the hero; "Cáscara"
+    collided with "Caparazón"; Aegis's trait switched person.
+  - Round 2: PASS. Three taste points taken ("Premia no moverse",
+    "Cascarón", "de cada partida").
 

@@ -28,14 +28,26 @@ TRANSLATED = (
     "weapons/items.json",          # UI-014.4.1
     "weapons/forges.json",         # UI-014.4.2
     "weapons/blessings.json",      # UI-014.4.2
+    "heroes/characters.json",      # UI-014.4.3
+    "heroes/meta_upgrades.json",   # UI-014.4.3
+    "enemies/enemies.json",        # UI-014.4.3
+    "enemies/bosses.json",         # UI-014.4.3
+    "world/buildings.json",        # UI-014.4.3
 )
-PENDING = {
-    "heroes/characters.json": "UI-014.4.3",
-    "heroes/meta_upgrades.json": "UI-014.4.3",
-    "enemies/enemies.json": "UI-014.4.3",
-    "enemies/bosses.json": "UI-014.4.3",
-    "world/buildings.json": "UI-014.4.3",
-}
+# Every data file is translated (UI-014.4.3). A new text-bearing file fails
+# the registry test until it is translated or listed here with its task.
+PENDING: dict[str, str] = {}
+
+# Fields whose Spanish is the English on purpose, so the "not a copy" check
+# does not flag them: hero names are proper names (UI-014.D5); Turbo and
+# Pinball are the words Spanish games use.
+SAME_ON_PURPOSE = frozenset({
+    "heroes/characters.json/aegis/name",
+    "heroes/characters.json/kestrel/name",
+    "heroes/characters.json/nihil/name",
+    "world/buildings.json/buffs/turbo/name",
+    "world/buildings.json/buffs/pinball/name",
+})
 
 # `_es` keys that are data about the Spanish text rather than a translation
 # of an English key: an item base's grammatical gender (UI-014.D9).
@@ -196,11 +208,21 @@ class TranslatedFileTests(unittest.TestCase):
         self.assertEqual(bad, [])
 
     def test_spanish_is_not_a_copy_of_english(self):
-        # Proper names that stay the same in Spanish go here, on purpose.
-        same_on_purpose = set()
+        # A field identical on purpose is listed in SAME_ON_PURPOSE.
+        # Case and edge spaces do not make a translation: "turbo " is a copy.
         copied = [p for p, en, es in self.pairs()
-                  if es == en and p not in same_on_purpose]
+                  if isinstance(es, str) and p not in SAME_ON_PURPOSE
+                  and es.strip().casefold() == en.strip().casefold()]
         self.assertEqual(copied, [])
+
+    def test_the_same_on_purpose_list_is_not_stale(self):
+        # Every listed field exists and really is identical; a translation
+        # that later changes must leave the list.
+        pairs = {p: (en, es) for p, en, es in self.pairs()}
+        for path in SAME_ON_PURPOSE:
+            self.assertIn(path, pairs)
+            en, es = pairs[path]
+            self.assertEqual(en, es, path)
 
     def test_every_character_has_a_real_glyph_in_the_shipped_fonts(self):
         # pygame draws a missing glyph as a placeholder box without raising,
