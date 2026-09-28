@@ -21,10 +21,11 @@ from game import config, locale
 from ui import end_screen
 from ui.end_screen import Button, EndScreen
 
+# `label` is a locale key (UI-014.8); these are the real screens' three.
 BUTTONS = (
-    Button("first", "First", "ENTER"),
-    Button("middle", "Middle", "M", pygame.K_m),
-    Button("last", "Last", "ESC", pygame.K_ESCAPE, variant="danger"),
+    Button("first", "end.new_run", "ENTER"),
+    Button("middle", "end.sanctuary", "M", pygame.K_m),
+    Button("last", "end.menu", "ESC", pygame.K_ESCAPE, variant="danger"),
 )
 STATS = {"character": "Aegis", "difficulty": "fast", "seed": 35,
          "time": 305.5, "level": 12, "kills": 240}
@@ -182,8 +183,8 @@ class KeyTests(unittest.TestCase):
     def test_a_direct_key_wins_over_the_cursor_letters(self):
         """A button bound to A or D fires instead of moving the selection --
         the reason direct keys are checked first."""
-        buttons = (Button("first", "First", "ENTER"),
-                   Button("away", "Away", "A", pygame.K_a))
+        buttons = (Button("first", "end.new_run", "ENTER"),
+                   Button("away", "end.menu", "A", pygame.K_a))
         s = _screen(buttons)
         self.assertEqual(s.handle_event(_key(pygame.K_a)), "away")
         self.assertEqual(s.sel, 0)

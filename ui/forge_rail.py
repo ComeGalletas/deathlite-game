@@ -20,17 +20,18 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import scale
 from ui.mouse import HitMap
+from ui.text import ellipsize, fit_font
 
 
 ROW_H = 62
 ROW_GAP = 8
 WIDTH = 250
-# The Forge's own heading. The Monastery reuses the rail for elements
-# and passes its own (M7).
-DEFAULT_HEADING = "REFORGE WHICH WEAPON"
+# The Forge's own heading, a locale key read when drawn (UI-014.8). The
+# Monastery reuses the rail for elements and passes its own (M7).
+DEFAULT_HEADING = "forge.rail.heading"
 _PAD_X = 14
 
 # The lit row reads as a card does: the pack's gold panel for the selected
@@ -38,6 +39,7 @@ _PAD_X = 14
 # cannot be chosen -- an unselectable thing should not look like a button.
 _TITLE_DY = 8
 _SUB_DY = 32
+_NAME_PX, _NOTE_PX, _HEAD_PX = 20, 15, 16
 
 
 class ForgeRail:
@@ -47,9 +49,9 @@ class ForgeRail:
     all the rail asks of a row is a `.name`."""
 
     def __init__(self) -> None:
-        self._name = fonts.heading(20)
-        self._note = fonts.body(15)
-        self._head = fonts.body(16)
+        self._name = fonts.heading(_NAME_PX)
+        self._note = fonts.body(_NOTE_PX)
+        self._head = fonts.body(_HEAD_PX)
         self.hits = HitMap()        # row index -> rect, rebuilt every draw
 
     def height(self, rows) -> int:
@@ -60,13 +62,21 @@ class ForgeRail:
              heading: str = DEFAULT_HEADING) -> None:
         """`right` is the rail's right edge -- the caller puts it just left of
         the cards, so the two read as one screen on any resolution rather than
-        the rail drifting into the corner on a wide one."""
+        the rail drifting into the corner on a wide one. `heading` is a
+        locale key. A name, note or heading longer than the rail (a
+        translation, a long list of carriers) steps its font down to fit, and
+        is trimmed with `...` if even the smallest step is too wide."""
         from ui import widgets
 
         self.hits.clear()
         width, row_h, row_gap = scale.px(WIDTH), scale.px(ROW_H), scale.px(ROW_GAP)
         left = right - width
-        head = self._head.render(heading, True, config.COLOR_TEXT_DIM)
+        room = width - 2 * scale.px(_PAD_X)       # a row's text, inside the panel
+        # The heading sits above the rail, not in a panel, so it may use the
+        # rail's whole width: every English heading fits that at full size.
+        heading = locale.t(heading)
+        head = self._render(self._head, fonts.body, _HEAD_PX, heading, width,
+                            config.COLOR_TEXT_DIM)
         surface.blit(head, head.get_rect(midbottom=(left + width // 2, top - scale.px(10))))
 
         for i, (item, eligible, note) in enumerate(rows):
@@ -91,10 +101,23 @@ class ForgeRail:
                 name_col = config.COLOR_TEXT_DIM
                 note_col = config.COLOR_TEXT_DIM
 
-            name = self._name.render(item.name, True, name_col)
+            name = self._render(self._name, fonts.heading, _NAME_PX, item.name, room,
+                                name_col)
             surface.blit(name, (left + scale.px(_PAD_X), y + scale.px(_TITLE_DY)))
-            sub = self._note.render(note, True, note_col)
+            sub = self._render(self._note, fonts.body, _NOTE_PX, note, room, note_col)
             surface.blit(sub, (left + scale.px(_PAD_X), y + scale.px(_SUB_DY)))
+
+
+    @staticmethod
+    def _fit(font, role, px: int, text: str, room: int):
+        """`font` when `text` fits `room`, else the fitted size."""
+        return font if font.size(text)[0] <= room else fit_font(role, px, text, room)
+
+    def _render(self, font, role, px: int, text: str, room: int, colour) -> pygame.Surface:
+        """`text` drawn no wider than `room`: in `font`, a smaller step of
+        its role, or -- five carriers in one note -- the smallest, trimmed."""
+        font = self._fit(font, role, px, text, room)
+        return font.render(ellipsize(font, text, room), True, colour)
 
 
 def rows_for(weapons, need: int, blessing_levels, forged_name=None):
@@ -102,6 +125,8 @@ def rows_for(weapons, need: int, blessing_levels, forged_name=None):
 
     `blessing_levels` and `forged_name` are passed in rather than imported so
     this module stays pure presentation and the test can drive it with fakes.
+    The notes are composed here, in the current language: the rail is built
+    when the Forge opens and nothing can switch the language while it is up.
     """
     out = []
     for w in weapons:
@@ -109,13 +134,12 @@ def rows_for(weapons, need: int, blessing_levels, forged_name=None):
             continue
         if getattr(w, "forge", None) is not None:
             name = forged_name(w) if forged_name else str(w.forge)
-            out.append((w, False, f"already forged into {name}"))
+            out.append((w, False, locale.t("forge.rail.forged", name=name)))
             continue
         have = blessing_levels(w)
         if have >= need:
-            out.append((w, True, f"{have} / {need} blessings"))
+            out.append((w, True, locale.t("forge.rail.ready", have=have, need=need)))
         else:
-            short = need - have
-            plural = "" if short == 1 else "s"
-            out.append((w, False, f"{have} / {need} - needs {short} more blessing{plural}"))
+            out.append((w, False, locale.plural("forge.rail.short", need - have,
+                                                have=have, need=need)))
     return out

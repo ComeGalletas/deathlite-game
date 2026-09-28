@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, locale
 from ui import keycap
 
 STAGES = ("move", "attack")
@@ -89,12 +89,14 @@ class RunHints:
 
     def clusters(self, stage: str | None = None) -> list[tuple[str, list[list[str]]]]:
         """`[(word, rows of cap labels), ...]` for `stage` (the current one
-        by default): what the hint shows, left to right."""
+        by default): what the hint shows, left to right. The words are
+        read in the current language on every call (UI-014.8)."""
         stage = self.stage if stage is None else stage
         if stage == "move":
-            return [("Move", self._cluster(self._keys("move")))]
+            return [(locale.t("hints.move"), self._cluster(self._keys("move")))]
         if stage == "attack":
-            return [("Attack", [[keycap.MOUSE]]), ("Aim", self._cluster(self._keys("aim")))]
+            return [(locale.t("hints.attack"), [[keycap.MOUSE]]),
+                    (locale.t("hints.aim"), self._cluster(self._keys("aim")))]
         return []
 
     def keycodes_for(self, label: str) -> tuple[int, ...]:

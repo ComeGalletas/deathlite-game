@@ -16,7 +16,7 @@ import math
 
 import pygame
 
-from game import config
+from game import config, locale
 from ui import scale
 from entities.pickup import XP_TIER_COLORS
 from game.states.playing.devtools import overlays
@@ -202,7 +202,7 @@ class WorldRenderer:
                 boss = getattr(run, "boss", None)
                 name = boss.name if boss is not None else run._boss_name
                 text = ps._banner_font.render(
-                    f"{name} APPROACHES", True, (255, 90, 90))
+                    locale.t("boss.approaches", boss=name), True, (255, 90, 90))
                 surface.blit(text, text.get_rect(center=(w // 2, scale.px(120))))
 
         # P3: a transient notice (the Forge's answer, a chest's payout),

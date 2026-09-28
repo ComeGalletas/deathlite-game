@@ -203,6 +203,13 @@ def num(value: float, places: int | None = None, sign: bool = False) -> str:
         body = body[1:]                      # -0.0 and -0.04 at 1 place -> 0
     if sign and not body.startswith("-"):
         body = "+" + body
+    return decimals(body)
+
+
+def decimals(body: str) -> str:
+    """`body`, an already formatted number, with its `.` swapped for the
+    language's `format.decimal` (one character; `.` when no table has one).
+    For a number whose English text is not `num`'s, such as a `.2g`."""
     decimal = next((d for d in (_table(_language).get("format.decimal"),
                                 _table(DEFAULT).get("format.decimal"))
                     if isinstance(d, str) and len(d) == 1), ".")

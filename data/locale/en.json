@@ -145,5 +145,120 @@
     "seconds": "{n} s",
     "empty": "no runs yet",
     "hint": "ENTER / ESC  -  back to menu"
+  },
+  "hints": {
+    "move": "Move",
+    "attack": "Attack",
+    "aim": "Aim"
+  },
+  "keys": {
+    "space": "SPACE",
+    "shift": "SHIFT",
+    "backspace": "BKSP",
+    "click": "CLICK"
+  },
+  "chest": {
+    "notice": "{rarity} chest: {contents}.",
+    "gold": "{n} gold",
+    "potion": "a {rarity} potion",
+    "rarity": {
+      "common": "Common",
+      "uncommon": "Uncommon",
+      "rare": "Rare",
+      "epic": "Epic"
+    }
+  },
+  "potion": {
+    "rarity": {
+      "common": "common",
+      "uncommon": "uncommon",
+      "rare": "rare"
+    }
+  },
+  "list": {
+    "pair": "{a} and {b}",
+    "pair_i": "{a} and {b}",
+    "separator": ", "
+  },
+  "forge": {
+    "title": "The Forge  -  choose a weapon to reforge",
+    "hint": "Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter to forge    -    ESC to leave",
+    "reforged": "The {weapon} is reforged: {forge}.",
+    "all_forged": "Every weapon is already forged.",
+    "needs": {
+      "one": "The Forge needs a weapon with {need} blessings: the {weapon} needs {n} more.",
+      "other": "The Forge needs a weapon with {need} blessings: the {weapon} needs {n} more."
+    },
+    "rail": {
+      "heading": "REFORGE WHICH WEAPON",
+      "forged": "already forged into {name}",
+      "ready": "{have} / {need} blessings",
+      "short": {
+        "one": "{have} / {need} - needs {n} more blessing",
+        "other": "{have} / {need} - needs {n} more blessings"
+      }
+    }
+  },
+  "element": {
+    "fire": "Fire",
+    "ice": "Ice",
+    "thunder": "Thunder",
+    "wind": "Wind"
+  },
+  "infusion": {
+    "monastery_title": "The Monastery  -  choose an element, then a weapon",
+    "rail": {
+      "heading": "INFUSE WITH WHICH ELEMENT",
+      "on": "on {weapons}",
+      "none": "not carried"
+    },
+    "refresh": "Already carries {element}. Refreshes it ({pace}).",
+    "replace": "Replaces {old} with {element} ({pace}).",
+    "carry": "Carries {element} {pace}.",
+    "pace": {
+      "time": "every {s}s",
+      "count": "on 1 attack in {n}",
+      "every": "on every attack"
+    },
+    "no_weapon": "No weapon to infuse.",
+    "hint_rail": "Up/Down pick the element    -    1/2/3 or Left/Right + Enter to infuse    -    ESC to leave",
+    "hint": "1/2/3 or Left/Right + Enter to infuse    -    ESC to leave",
+    "title": "Choose an element, then a weapon",
+    "buff_title": "{element} - choose a weapon to infuse",
+    "done": "The {weapon} carries {element}."
+  },
+  "effect": {
+    "fire_hit": "Fire",
+    "burn": "Burn",
+    "wind_hit": "Wind",
+    "wind_area": "Wind area",
+    "thunder_chain": "Thunder chain",
+    "frozen_contact": "Frozen contact",
+    "frostburn": "Frostburn",
+    "overload": "Overload",
+    "overload_wave": "Overload shockwave",
+    "superconduct": "Superconduct",
+    "firewind": "FireWind",
+    "icewind": "IceWind",
+    "thunderwind": "ThunderWind",
+    "thunder_strike": "Thunder strike"
+  },
+  "boss": {
+    "approaches": "{boss} APPROACHES"
+  },
+  "banner": {
+    "loss": "GAME OVER",
+    "win": "YOU WON!"
+  },
+  "end": {
+    "game_over": "Game Over",
+    "victory": "Victory",
+    "new_run": "New run",
+    "sanctuary": "Sanctuary",
+    "menu": "Main menu",
+    "seed": "seed {n}",
+    "button_hint": "{key} {label}",
+    "hint_separator": "   -   ",
+    "select": "Left / Right select"
   }
 }

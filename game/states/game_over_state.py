@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import pygame
 
+from game import locale
 from game.state import State
 from ui import end_screen
 from ui.end_screen import Button
@@ -24,9 +25,9 @@ from ui.end_screen import Button
 BACKDROP = (22, 10, 12)
 TITLE_COLOUR = (230, 90, 90)
 BUTTONS = (
-    Button("new_run", "New run", "ENTER"),
-    Button("sanctuary", "Sanctuary", "S", pygame.K_s),
-    Button("menu", "Main menu", "ESC", pygame.K_ESCAPE, variant="danger"),
+    Button("new_run", "end.new_run", "ENTER"),
+    Button("sanctuary", "end.sanctuary", "S", pygame.K_s),
+    Button("menu", "end.menu", "ESC", pygame.K_ESCAPE, variant="danger"),
 )
 
 
@@ -44,7 +45,7 @@ class GameOverState(State):
         # the stack below, so the way out of the screen is back into it.
         self.preview = bool(preview)
         self._screen = end_screen.EndScreen(
-            self.stats, title="Game Over", title_colour=TITLE_COLOUR,
+            self.stats, title=locale.t("end.game_over"), title_colour=TITLE_COLOUR,
             backdrop=BACKDROP, buttons=BUTTONS,
             subtitle=end_screen.run_subtitle(self.stats))
 

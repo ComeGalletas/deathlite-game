@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import pygame
 
+from game import locale
 from game.state import State
 from ui import end_screen
 from ui.end_screen import Button
@@ -33,9 +34,9 @@ from ui.run_summary import VICTORY_COLUMNS
 BACKDROP = (38, 28, 14)
 TITLE_COLOUR = (255, 214, 112)
 BUTTONS = (
-    Button("new_run", "New run", "ENTER"),
-    Button("sanctuary", "Sanctuary", "S", pygame.K_s),
-    Button("menu", "Main menu", "ESC", pygame.K_ESCAPE),
+    Button("new_run", "end.new_run", "ENTER"),
+    Button("sanctuary", "end.sanctuary", "S", pygame.K_s),
+    Button("menu", "end.menu", "ESC", pygame.K_ESCAPE),
 )
 
 
@@ -50,7 +51,7 @@ class VictoryState(State):
         # screen and `dev_mode_journal.md` (assumption P).
         self.preview = bool(preview)
         self._screen = end_screen.EndScreen(
-            self.stats, title="Victory", title_colour=TITLE_COLOUR,
+            self.stats, title=locale.t("end.victory"), title_colour=TITLE_COLOUR,
             backdrop=BACKDROP, buttons=BUTTONS,
             columns=VICTORY_COLUMNS,
             subtitle=end_screen.run_subtitle(

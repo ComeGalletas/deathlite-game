@@ -144,5 +144,120 @@
     "seconds": "{n} s",
     "empty": "aún no hay partidas",
     "hint": "ENTER / ESC  -  volver al menú"
+  },
+  "hints": {
+    "move": "Mover",
+    "attack": "Atacar",
+    "aim": "Apuntar"
+  },
+  "keys": {
+    "space": "ESPACIO",
+    "shift": "MAYÚS",
+    "backspace": "BORRAR",
+    "click": "CLIC"
+  },
+  "chest": {
+    "notice": "Cofre {rarity}: {contents}.",
+    "gold": "{n} de oro",
+    "potion": "una poción {rarity}",
+    "rarity": {
+      "common": "común",
+      "uncommon": "poco común",
+      "rare": "raro",
+      "epic": "épico"
+    }
+  },
+  "potion": {
+    "rarity": {
+      "common": "común",
+      "uncommon": "poco común",
+      "rare": "rara"
+    }
+  },
+  "list": {
+    "pair": "{a} y {b}",
+    "pair_i": "{a} e {b}",
+    "separator": ", "
+  },
+  "forge": {
+    "title": "La Forja  -  elige un arma para reforjar",
+    "hint": "Arriba/Abajo: elegir arma    -    1/2/3 o Izquierda/Derecha + Enter para forjar    -    ESC para salir",
+    "reforged": "Reforja de {weapon}: {forge}.",
+    "all_forged": "Todas las armas ya están forjadas.",
+    "needs": {
+      "one": "La Forja necesita un arma con {need} bendiciones. {weapon}: falta {n}.",
+      "other": "La Forja necesita un arma con {need} bendiciones. {weapon}: faltan {n}."
+    },
+    "rail": {
+      "heading": "¿QUÉ ARMA REFORJAR?",
+      "forged": "ya tiene forja: {name}",
+      "ready": "{have} / {need} bendiciones",
+      "short": {
+        "one": "{have} / {need} - falta {n} bendición",
+        "other": "{have} / {need} - faltan {n} bendiciones"
+      }
+    }
+  },
+  "element": {
+    "fire": "Fuego",
+    "ice": "Hielo",
+    "thunder": "Trueno",
+    "wind": "Viento"
+  },
+  "infusion": {
+    "monastery_title": "El Monasterio  -  elige un elemento y luego un arma",
+    "rail": {
+      "heading": "¿CON QUÉ ELEMENTO INFUNDIR?",
+      "on": "en {weapons}",
+      "none": "sin portar"
+    },
+    "refresh": "Ya porta {element}. Lo renueva ({pace}).",
+    "replace": "Cambia {old} por {element} ({pace}).",
+    "carry": "Porta {element} {pace}.",
+    "pace": {
+      "time": "cada {s} s",
+      "count": "en 1 de cada {n} ataques",
+      "every": "en cada ataque"
+    },
+    "no_weapon": "No hay armas que infundir.",
+    "hint_rail": "Arriba/Abajo: elegir elemento    -    1/2/3 o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
+    "hint": "1/2/3 o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
+    "title": "Elige un elemento y luego un arma",
+    "buff_title": "{element} - elige un arma para infundir",
+    "done": "Infusión de {element} en {weapon}."
+  },
+  "effect": {
+    "fire_hit": "Fuego",
+    "burn": "Quemadura",
+    "wind_hit": "Viento",
+    "wind_area": "Área de viento",
+    "thunder_chain": "Cadena de trueno",
+    "frozen_contact": "Contacto helado",
+    "frostburn": "Quemadura gélida",
+    "overload": "Sobretensión",
+    "overload_wave": "Onda de sobretensión",
+    "superconduct": "Superconducción",
+    "firewind": "Viento ígneo",
+    "icewind": "Viento helado",
+    "thunderwind": "Viento tormentoso",
+    "thunder_strike": "Rayo"
+  },
+  "boss": {
+    "approaches": "{boss} SE ACERCA"
+  },
+  "banner": {
+    "loss": "FIN DE LA PARTIDA",
+    "win": "¡VICTORIA!"
+  },
+  "end": {
+    "game_over": "Fin de la partida",
+    "victory": "Victoria",
+    "new_run": "Nueva partida",
+    "sanctuary": "Santuario",
+    "menu": "Menú principal",
+    "seed": "semilla {n}",
+    "button_hint": "{key}: {label}",
+    "hint_separator": "   -   ",
+    "select": "Izquierda / Derecha: elegir"
   }
 }

@@ -104,7 +104,8 @@ class BuffSystem:
             from game.states.playing.core import infusion
             infusion.offer(
                 ps, element=element,
-                title=f"{element.key.title()} - choose a weapon to infuse")
+                title=locale.t("infusion.buff_title",
+                               element=infusion.element_name(element)))
 
     def start(self, kind: str) -> None:
         """Grant `kind` for its full duration. A buff already running is

@@ -65,10 +65,11 @@ class _Recorder:
     """Stands in for a font: records what is rendered, renders it."""
 
     def __init__(self, font, seen):
-        self.font, self.seen = font, seen
+        self.font, self.seen, self.calls = font, seen, []
 
     def render(self, text, *a, **k):
         self.seen.append(str(text))
+        self.calls.append((text, *a))
         return self.font.render(text, *a, **k)
 
     def __getattr__(self, name):
@@ -139,12 +140,20 @@ class SpanishRunTests(unittest.TestCase):
             # A warning time on the banner's visible phase of its blink.
             run.boss, run.boss_name, run.boss_warning_t = self.boss, "The First Hunger", 1.0
             self.ps.draw(pygame.Surface((1600, 900)))
-            self.assertTrue(any(t.startswith("El Hambre Primigenia") for t in seen), seen)
+            self.assertIn("El Hambre Primigenia SE ACERCA", seen)
             # With no live boss, the name the spawn event carried is shown.
             seen.clear()
             run.boss = None
             self.ps.draw(pygame.Surface((1600, 900)))
-            self.assertTrue(any(t.startswith("The First Hunger") for t in seen), seen)
+            self.assertIn("The First Hunger SE ACERCA", seen)
+            # English is the line it always was (UI-014.8).
+            seen.clear()
+            locale.set_language("en")
+            run.boss = self.boss
+            self.ps.draw(pygame.Surface((1600, 900)))
+            self.assertIn("The First Hunger APPROACHES", seen)
+            self.assertIn(("The First Hunger APPROACHES", True, (255, 90, 90)),
+                          self.ps._banner_font.calls)
         finally:
             run.boss, run.boss_warning_t = None, 0.0
             self.ps._banner_font = self.ps._banner_font.font

@@ -17,7 +17,7 @@ import pygame
 from game import config, fonts, locale
 from ui import scale, widgets
 from ui.mouse import HitMap
-from ui.text import fit_font, shadowed, wrap
+from ui.text import cached_font, fit_font, shadowed, wrap
 
 # The cards grew 15 px downwards (owner, 2026-09-04) so the description's
 # last line and the tag line sit inside the art's flat centre, not on its
@@ -35,6 +35,8 @@ _CARD_TEXT_INSET = 19       # description wraps to the card width minus this eac
 # four-line cards (`bow_crossfire`) are laid out exactly as before.
 _DESC_TOP = 92              # top of the band, and where a full-height block starts
 _DESC_LINE_H = 24
+_DESC_PX = 18                # the description's design font size
+_DESC_MIN_PX = 13           # the smallest a long description steps down to (72 %)
 _TAG_UP = 39                # the category line's midbottom, up from the card's
 _DESC_GAP = 8               # breathing room between the block and the category line
 _NAME_PX = 24               # the card title's design font size
@@ -74,9 +76,29 @@ class LevelUpPanel:
     def __init__(self) -> None:
         self._title = fonts.heading(40)
         self._name = fonts.heading(_NAME_PX)
-        self._desc = fonts.body(18)
+        self._desc = fonts.body(_DESC_PX)
         self._hint = fonts.body(16)
         self.hits = HitMap()          # card index -> rect, rebuilt every draw
+
+    def desc_block(self, text: str, width: int, band_h: int):
+        """`(font, lines, line height)` for a card description in a band
+        `band_h` native px tall. The panel's own 18 px font when the wrapped
+        lines fit, which every English card does; otherwise a step smaller at
+        a time, the line height shrinking with it, down to `_DESC_MIN_PX` (UI-014.8:
+        a Spanish Forge card on the narrow cards ran into its category
+        line)."""
+        lines = wrap(self._desc, text, width)
+        line_h = scale.px(_DESC_LINE_H)
+        if len(lines) * line_h <= band_h:
+            return self._desc, lines, line_h
+        font = self._desc
+        for size in range(_DESC_PX - 1, _DESC_MIN_PX - 1, -1):
+            font = cached_font(fonts.body, size)
+            lines = wrap(font, text, width)
+            line_h = scale.px(_DESC_LINE_H * size / _DESC_PX)
+            if len(lines) * line_h <= band_h:
+                break
+        return font, lines, line_h
 
     @staticmethod
     def draw_dim(surface: pygame.Surface) -> None:
@@ -141,15 +163,15 @@ class LevelUpPanel:
                                       config.RARITY_COLOURS.get(rarity, config.COLOR_ON_BUTTON_DIM))
                 surface.blit(r, r.get_rect(topright=(x + card_w - scale.px(24), y + scale.px(14) + dy)))
 
-            lines = wrap(self._desc, up.description, card_w - 2 * scale.px(_CARD_TEXT_INSET))
-            line_h = scale.px(_DESC_LINE_H)
             band_top = y + scale.px(_DESC_TOP)
             band_bottom = (y + card_h - scale.px(_TAG_UP)
                            - self._hint.get_height() - scale.px(_DESC_GAP))
+            desc, lines, line_h = self.desc_block(up.description, room,
+                                                  band_bottom - band_top)
             slack = band_bottom - band_top - len(lines) * line_h
             top = band_top + max(0, slack // 2)      # never above the band's top
             for j, line in enumerate(lines):
-                d = self._desc.render(line, True, config.COLOR_ON_BUTTON_DIM)
+                d = desc.render(line, True, config.COLOR_ON_BUTTON_DIM)
                 surface.blit(d, d.get_rect(
                     midtop=(rect.centerx, top + j * line_h + dy)))
 

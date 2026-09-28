@@ -239,6 +239,30 @@ tools.
     generated rows re-synced by script, aligned with the generator's
     output. Regenerating the file would drop its
     hand-written sections.
+- **UI-014.D16 — key legends stay, key words translate** (UI-014.8).
+  - A keycap shows what the key prints: `ENTER`, `ESC`, `TAB`, `CTRL`,
+    `ALT`, the arrows and the letters are the same in every language. The
+    Spanish hint lines from UI-014.7 already say "ENTER" and "ESC", so a cap
+    and the line beside it never disagree.
+  - The words a player reads are translated: `SPACE` "ESPACIO", `SHIFT`
+    "MAYÚS", `BKSP` "BORRAR", and `CLICK` "CLIC" (drawn only when the cursor
+    art is missing).
+  - A word too wide for its cap steps its font down (`keycap.WORD_ROOM`,
+    75 % of the cap) instead of spilling over the bevel. English too: no key
+    the game shows is that long, but "CAPS LOCK" or "PAGE DOWN" would now
+    step down where it used to spill.
+- **UI-014.D17 — when run text is read** (UI-014.8).
+  - A notice (a chest's payout, the Forge's answer, an infusion) is composed
+    when it is raised. It is gone in a few seconds, like a floating damage
+    word, so a switch shows from the next one.
+  - A Forge or Monastery overlay composes its rows, title and keys when it
+    opens. It is modal and the pause menu cannot open over it, so nothing can
+    change the language while it is up. The rail's heading is a key read
+    when drawn, as the level-up hint already was.
+  - English notices keep the weapon's name in lower case in mid-sentence
+    ("The sword carries wind."), exactly as before. Spanish is phrased so the
+    lower-case name needs no article or agreement: "Infusión de viento en
+    espada.", "Reforja de espada: Mandoble.".
 
 ## UI-014 — Plan
 
@@ -355,7 +379,7 @@ Options.
 - [x] UI-014.7 — UI strings to keys, part one: the menus, the hero select, the
   Options screen, the pause screen, the level-up screen, the loading screen and
   the rankings, plus the `config.py` label maps.
-- [ ] UI-014.8 — UI strings to keys, part two, the run:
+- [x] UI-014.8 — UI strings to keys, part two, the run:
   - hints and keycaps;
   - chest notices, forge, infusion and buffs;
   - reaction labels and the boss warning;
@@ -941,3 +965,90 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     survivors are equivalent: the dead config maps, `26` in place of its
     constant, "fit always", and the card-shape length guards. No state
     leaks from the new tests.
+
+### UI-014.8 — the run's own text
+
+- **Locale keys (76, `data/locale/en.json` and `es.json`):**
+  - `hints.*` (Move / Attack / Aim), `keys.*` (the key words, UI-014.D16);
+  - `chest.*` with separate `chest.rarity.*` and `potion.rarity.*` tables, because
+    Spanish agrees the rarity with its noun ("cofre raro", "poción rara");
+    `list.pair` and `list.separator` join the payout;
+  - `forge.*` (title, keys, the reforged and requirements notices, the rail's
+    heading and notes, `forge.needs` and `forge.rail.short` as plurals);
+  - `element.*`, `infusion.*` (titles, hints, rail, card text, pace, notices);
+  - `effect.<id>` for the 14 damage labels ("Sobretensión" for Overload, since
+    "Sobrecarga" is the Overcharge blessing);
+  - `boss.approaches`, `banner.loss` / `banner.win`, `end.*`.
+- **English is byte-identical** everywhere it was reachable. The tests keep the old
+  f-strings as the reference: every rarity, plural, element held or replaced, pace
+  mode and window (the `.2g` text, `1e+02` included, through the new
+  `locale.decimals`), unknown ids.
+- **Code:**
+  - `ui/keycap.py`: `_NAMES` (legends) and `_WORDS` (locale keys); a word too wide
+    for a wide cap steps down (`WORD_ROOM`, 75 %), never a caller's own font.
+  - `ui/forge_rail.py`: the heading is a key read when drawn; names, notes and the
+    heading step down to fit, and are trimmed with `...` at the smallest step (five
+    carriers in one note overflow even then, in English too).
+  - `game/states/playing/core/infusion.py`: `element_name`; notes, card text and
+    notices from the locale. `locations.py`: `_base_name` names the reforged weapon
+    from its base definition. `chests.py`: `_rarity_word`.
+  - `combat/elements/tracking.py`: the label table is gone; `label` reads
+    `effect.<id>`.
+  - `game/states/end_banner_state.py` (UI-014.D10): in a language with no rig of its
+    own (`end_banner_loss_es`), the words are drawn in the heading face with a drop
+    shadow for the English rig's play, which keeps the clock.
+  - `ui/end_screen.py`: `Button.label` is a key, `Button.text` reads it.
+- **Two fixes found on the way:**
+  - The `fit_font` cache from UI-014.7 kept `Font` objects across
+    `pygame.quit()` / `init()`, which `game/fonts.py` warns is an access violation.
+    The keycaps made it reachable and `test_pause` crashed. `ui/text.py` now drops
+    the cache from a `pygame.register_quit` hook, re-armed each cycle, and
+    `cached_font` is the one place fonts are cached.
+  - The Spanish Forge cards ran their description into the category line. A card
+    description now steps down, a size at a time, to `_DESC_MIN_PX` (13 px) with the
+    line height, until it fits the band (`LevelUpPanel.desc_block`). Across all 452
+    blessing and forge descriptions, in both languages and both card widths, every
+    one fits. At render scale 1 two English cards step down too, Whirlwind and
+    Minefield on the narrow Forge card; at the smallest windows (scale 0.65-0.75)
+    Greatsword does as well. Each had been drawing over its category line.
+- **Tests:**
+  - `tests/screens/test_spanish_run_text.py` (unit tier): keycaps, the fit cache, chest
+    text, the rail, card descriptions, infusion text, effect labels, the end screens,
+    the end banner.
+  - `tests/playing/test_spanish_run_notices.py` (integration tier, one pinned run):
+    hints, a chest's payout, the Forge (overlay, notices, requirements), the
+    Monastery, the infusion notice, a buff building's title.
+  - `test_spanish_run.py`: the boss warning's exact line in both languages.
+  - `test_level_up.py`: the overflow test now steps down and fits; the clamp test
+    uses a text too long even at the floor. `test_end_screen.py` fixtures use real
+    keys. `test_controls_block.py` expects the drawn word.
+- **Spanish details the critics caught:** "e" for "y" before an /i/ sound that
+  is not a diphthong ("… una poción común e Imán II.", but "y Hielo"), chosen by
+  `chests._I_SOUND` through `list.pair_i`; the no-break space in "cada 1,2 s";
+  "ya tiene forja" (the rail names mostly masculine weapons); one hint style
+  across the level-up overlay family ("Enter para forjar", "ESC para salir").
+- **Screenshots** (Spanish): the hints, a chest notice, the Forge, the Monastery,
+  the boss warning, the end banner, Game Over and Victory.
+- **Tests run:**
+  - Full default suite after the round 2 fixes: 3699 passed, 0 failed (17 min).
+  - The touched suites after the round 4 fixes: 1860 passed, 0 failed.
+  - The final full suite: 3717 passed, 0 failed, 0 skipped (16 min 36 s).
+- **Cold critic loop:** eight rounds, each a fresh critic with a mutation sweep
+  over every changed production and locale line.
+  - Round 1: the rail and keycap fitting untested; the pace not byte-identical
+    for large windows; the chest test changing the shared run; a mixed Spanish
+    hint style; an unreachable banner guard.
+  - Round 2: the card draw never checked to use the stepped font; the banner
+    shadow scaled twice; the floor, the quit-hook guard, the cache's scale key
+    and the rail's font roles unpinned; "ya forjada".
+  - Round 3: the step sizes only checked against themselves; the loop and
+    early-return boundaries; which English cards step.
+  - Round 4: 44 survivors in rewritten lines (rail sizes and room, card width,
+    antialias, the English banner, the Victory keys, the boss colour, the
+    Spanish tables); the plain space in the pace.
+  - Round 5: "y" before an /i/ sound; a duplicated width; the font cache
+    untested.
+  - Rounds 6 and 7: the y/e rule's boundaries (a later "i", each diphthong
+    vowel, u and ú); the rail's room to the pixel; the keycap's 75 % room.
+  - Round 8: PASS. The only survivors are equivalent (dead initialisations,
+    loop starts that cannot fit, regex spellings of the same language).

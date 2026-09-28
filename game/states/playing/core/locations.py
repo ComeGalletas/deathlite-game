@@ -17,6 +17,7 @@ from __future__ import annotations
 import pygame
 
 from entities.interactable import Interactable
+from game import locale
 from game.states.playing.core import elemental, infusion
 from progression.blessings import roll_offering
 from world.gen.tuning import SPECIAL_KINDS
@@ -141,7 +142,7 @@ class SpecialLocations:
         run = getattr(self, "run", ps)
         run.particles.burst(it.pos, it.colour, count=18, speed=150, life=0.5)
         infusion.offer(
-            ps, title="The Monastery  -  choose an element, then a weapon",
+            ps, title=locale.t("infusion.monastery_title"),
             on_done=lambda u: self._infused(it, u))
 
     def _infused(self, it: Interactable, upgrade) -> None:
@@ -182,11 +183,20 @@ class SpecialLocations:
             # Names both halves, as it did before the picker: which weapon was
             # reforged is no longer obvious now that the player chose it from a
             # list of several.
-            on_done=lambda u: ps.notice(
-                f"The {str(u.weapon).replace('_', ' ')} is reforged: {u.title}."),
-            title="The Forge  -  choose a weapon to reforge", cancelable=True,
-            hint=("Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter "
-                  "to forge    -    ESC to leave"))
+            on_done=lambda u: ps.notice(locale.t(
+                "forge.reforged", weapon=self._base_name(u.weapon), forge=u.title)),
+            title=locale.t("forge.title"), cancelable=True,
+            hint=locale.t("forge.hint"))
+
+    def _base_name(self, weapon_id) -> str:
+        """The reforged weapon's own name, lower-case for the middle of the
+        notice: its base definition's, since the weapon now carries the
+        forge's. The id, spaced, when the definition has no name."""
+        run = getattr(self, "run", self.ps)
+        entry = run.content.weapons.get(str(weapon_id)) or {}
+        if "name" not in entry:
+            return str(weapon_id).replace("_", " ")
+        return locale.text(entry, "name").lower()
 
     def forge_requirements(self, need: int) -> str:
         """The message for a Forge with nothing to work on."""
@@ -195,11 +205,10 @@ class SpecialLocations:
         run = getattr(self, "run", ps)
         unforged = [w for w in run.player.weapons if w.forge is None and not w.is_summon]
         if not unforged:
-            return "Every weapon is already forged."
+            return locale.t("forge.all_forged")
         w = min(unforged, key=lambda w: need - blessing_levels(w))
         missing = need - blessing_levels(w)
-        return (f"The Forge needs a weapon with {need} blessings: "
-                f"the {w.name} needs {missing} more.")
+        return locale.plural("forge.needs", missing, need=need, weapon=w.name)
 
     def use_merchant(self, it: Interactable) -> None:
         ps = self.ps
