@@ -33,6 +33,12 @@ from pathlib import Path
 COLUMNS = ("t", "frame_ms", "update_ms", "draw_ms", "present_ms", "state",
            "live", "in_view", "particles", "numbers", "run_time")
 ENV = "DEATHLITE_TRACE"
+# The frame budget: one 60 Hz vsync period. The game caps itself at
+# `config.FPS` (62, 16.13 ms) but presents on vsync, so on a 60 Hz display a
+# frame has 16.7 ms (RND-008.D3). pygame 2.5 cannot read the refresh rate,
+# so this is the owner's display, fixed. The one copy: the stress harness
+# and the trace report both read it from here.
+BUDGET_MS = 1000.0 / 60.0
 FLUSH_EVERY = 600          # frames between writes: ten seconds at 60 fps
 
 

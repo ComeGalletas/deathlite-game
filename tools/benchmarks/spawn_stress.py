@@ -53,11 +53,10 @@ from collections import Counter
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-# The frame budget: one 60 Hz vsync period. The game caps itself at
-# `config.FPS` (62, 16.13 ms) but presents on vsync, so on a 60 Hz display a
-# frame has 16.7 ms. pygame 2.5 cannot read the refresh rate, so this is the
-# owner's display, fixed (RND-008.D3). The cap's figure is printed beside it.
-BUDGET_MS = 1000.0 / 60.0
+# The frame budget, one 60 Hz vsync period (RND-008.D3), kept in one place
+# with the frame trace that reports against it too (SYS-010). The cap's
+# figure is printed beside it.
+from systems.frame_trace import BUDGET_MS  # noqa: E402
 
 # Where `bump_times` parks the hero: far outside every broad-phase query, so
 # the pass measured is enemy against enemy only.

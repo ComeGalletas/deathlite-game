@@ -62,6 +62,6 @@ owner, 2026-09-29)
 
 - [x] SYS-010.1: This journal; the index row
 - [x] SYS-010.2: The recorder and its wiring (`--trace`, `DEATHLITE_TRACE`, `traces/` beside the save)
-- [ ] SYS-010.3: The report
+- [x] SYS-010.3: The report (`tools/benchmarks/trace_report.py`); `BUDGET_MS` moved to `systems/frame_trace.py`, the one copy
 - [ ] SYS-010.4: Tests, the recorder's measured cost, the how-to
 - [ ] SYS-010.5: Results; index to done
