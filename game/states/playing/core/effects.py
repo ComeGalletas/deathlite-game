@@ -2,7 +2,8 @@
 visuals, and the shared one-shot death poof.
 
 `TransientFx` owns the spawn / per-frame update / cull logic for these, and
-the LD-9 D10 elevation rule for shots (`stamp_fire_level` / `block_on_terrain`). The
+applies the elevation rule for shots (`stamp_floor` / `block_on_terrain` /
+`bounce`; the rule itself is `core/shot_terrain.py`, CMB-010). The
 containers themselves stay on `PlayingState` (`_explosions`, `_death_fx`,
 `hazards`, and the `projectiles` / `hostiles` pools) because `WorldRenderer` and
 the tests read them directly; this class only mutates them.
@@ -33,7 +34,12 @@ from game import config
 
 _HERO_HAZARD_COLOUR = (255, 150, 60)   # P3: the Meteor Hammer's crater
 _TICK_LIFE = 0.03                       # P3: a hero hazard's bite lives one frame
+# CMB-010: the longest piece of a frame a bouncing shot moves before its
+# walls are judged (`TransientFx.roll`). Pixels, so a throw bounces the same
+# way at any frame rate.
+_SUBSTEP_PX = 4.0
 from world.elevation import NONE as _NO_LEVEL
+from game.states.playing.core import shot_terrain
 
 
 class TransientFx:
@@ -80,9 +86,8 @@ class TransientFx:
             return None
         self.resolve_visual(kw)
         proj.reset(**kw)
-        # LD-9 D10: stamp the floor it leaves from, at the muzzle. See
-        # `block_on_terrain`.
-        self.stamp_fire_level(proj)
+        # Stamp the floor it leaves from, at the muzzle (`shot_terrain`).
+        self.stamp_floor(proj)
         slash_fx.spawn_from_cone(self.ps, proj)     # a sequence weapon's swing visual
         self.run.game.audio.play_shoot()
         return proj
@@ -127,8 +132,10 @@ class TransientFx:
     def fire_hostile(self, *, pos, vel, damage, radius, style: str = "",
                      fx: dict | None = None, pierce: int = 0,
                      lifetime: float = 6.0, stop_after: float = 0.0,
-                     blast_radius: float = 0.0, inert: bool = False) -> None:
-        """One enemy shot.
+                     blast_radius: float = 0.0, inert: bool = False,
+                     bounces: int = 0):
+        """One enemy shot, returned (None when the pool is full). `bounces`
+        makes it a bouncing shot (CMB-010); no enemy's data asks for one today.
 
         `style` / `fx` / `pierce` were added in R1 of
         `journals/enemy_roster_expansion_journal.md`. Until then this method
@@ -142,55 +149,49 @@ class TransientFx:
         """
         proj = self.run.hostiles.acquire()
         if proj is None:
-            return
+            return None
         proj.reset(pos=pos, vel=vel, damage=damage, radius=radius,
                    lifetime=lifetime, color=(255, 110, 90), hostile=True,
                    style=style, fx=fx, pierce=int(pierce),
                    stop_after=stop_after, blast_radius=blast_radius,
-                   inert=inert)
-        self.stamp_fire_level(proj)
+                   inert=inert, bounces=int(bounces))
+        self.stamp_floor(proj)
+        return proj
 
-    def stamp_fire_level(self, proj) -> None:
-        """Record the elevation a shot leaves from, for `block_on_terrain`.
-
-        Sampled at the muzzle rather than on the projectile's first update: a
-        fast shot has already travelled several pixels by then, which at a
-        terrace rim is enough to sample the tile beyond the edge and give the
-        shot the wrong floor to be judged against."""
+    def stamp_floor(self, proj) -> None:
+        """Record the floor a shot leaves from (`shot_terrain.muzzle_floor`).
+        Called by the spawners right after `reset`, at the muzzle."""
         levels = getattr(self.run.game_map, "_levels", None)
         if levels is not None:
-            proj.fire_level = levels.top_at_point(proj.pos.x, proj.pos.y)
+            proj.floor = shot_terrain.muzzle_floor(levels, proj.pos)
 
-    def block_on_terrain(self, proj) -> None:
-        """LD-9 D10: a shot dies against terrain that stands above the floor it
-        was fired from.
+    def block_on_terrain(self, proj, before=None) -> None:
+        """A plain shot against the terrain's elevation (CMB-010): walk its
+        move from `before` and stop it at the first wall -- terrain above its
+        floor that no staircase led it onto. A legal climb raises its floor.
+        See `shot_terrain` for the whole rule.
 
-        The rule, as set with the rest of the phase: a projectile travels over
-        its own floor and over anything lower, so shooting *down* off a terrace
-        works. Shooting *up* does not -- it hits the cliffside. Together with
-        elevation-blind aggro that makes high ground asymmetrically strong,
-        which is deliberate: a ranged enemy above can fire down while the
-        player's answer hits the wall. It is the first balance lever to reach
-        for if plateaus feel unfair.
-
-        `top_at_point` is what makes this land on the *face* rather than on the
-        rim above it. A cliff face has no walkable level, so a test against
-        `level_at_point` would let the shot through the wall and only kill it
-        on the plateau beyond -- reading as if it had passed through the rock.
-        The void reports `NONE` and blocks nothing, so a shot still crosses open
-        sea between islands.
+        `before=None` judges the current point alone, which is all a caller
+        with no previous position can ask. A blocked shot is placed against
+        the wall it met, on the ground it was legally on, so its burst (and a
+        bomb's blast and bomblets) lands at the face rather than on the
+        plateau a fast shot had already reached, or inside the rock.
 
         Orbiters are exempt for the same reason they skip the obstacle test:
         they are anchored to the player and are not travelling anywhere.
+        `floor == NONE` (a flat world, a shot fired over the sea) and
+        `no_block` switch the rule off.
         """
-        if (not proj.active or proj.fire_level == _NO_LEVEL or proj.orbit_speed
+        if (not proj.active or proj.floor == _NO_LEVEL or proj.orbit_speed
                 or proj.no_block):
             return
         levels = getattr(self.run.game_map, "_levels", None)
         if levels is None:
             return
-        here = levels.top_at_point(proj.pos.x, proj.pos.y)
-        if here != _NO_LEVEL and here > proj.fire_level:
+        start = proj.pos if before is None else before
+        proj.floor, wall = shot_terrain.travel(levels, proj.floor, start, proj.pos)
+        if wall is not None:
+            proj.pos.update(wall)
             self.run.particles.burst(proj.pos, proj.color, count=3, speed=70,
                                     life=0.2, radius=2)
             proj.active = False
@@ -205,41 +206,75 @@ class TransientFx:
                                life=0.2, radius=2)
             proj.active = False
 
-    def _terrain_stops(self, proj, pos) -> bool:
-        """Would a bouncing shot at `pos` be stopped by the terrain: a
-        terrace above the floor it was fired from (the D10 rule), or ground
-        it cannot roll on at all -- a cliff face, the shoreline, the sea?"""
-        gm = self.run.game_map
-        levels = getattr(gm, "_levels", None)
-        if levels is not None and proj.fire_level != _NO_LEVEL:
-            here = levels.top_at_point(pos.x, pos.y)
-            if here != _NO_LEVEL and here > proj.fire_level:
-                return True
-        return not gm.is_walkable(pos, proj.radius)
+    def roll(self, proj, before) -> None:
+        """A bouncing shot's frame, in sub-steps of at most `_SUBSTEP_PX`.
+
+        `Projectile.update` has already moved it the whole frame; this walks
+        that move again a few pixels at a time, `bounce` judging each piece.
+        A ball therefore meets a wall where it touches it, not from wherever
+        the frame began, and the same throw bounces the same way at 20 fps as
+        at 144 (CMB-010.D11). Stepping the frame whole put a blocked ball back
+        at the frame's start: at a low frame rate that was far enough from a
+        wall for two walls to hold it, spending a bounce every frame."""
+        move = proj.pos - before
+        length = move.length()
+        n = max(1, math.ceil(length / _SUBSTEP_PX))
+        if n == 1:
+            self.bounce(proj, before)
+            return
+        piece = length / n
+        proj.pos.update(before)
+        for _ in range(n):
+            if not proj.active or proj.vel.length_squared() < 1e-12:
+                break
+            start = pygame.Vector2(proj.pos)
+            proj.pos += proj.vel.normalize() * piece
+            self.bounce(proj, start)
 
     def bounce(self, proj, before) -> None:
-        """A pinball (buff buildings) reflects off what an ordinary shot dies
-        against: an obstacle, about the normal from the obstacle's centre;
-        terrain, about the axis it crossed (probed one axis at a time, both
-        at a corner). Each bounce costs one of `bounces_left`; the last one
-        spends the ball."""
+        """A bouncing shot (`bounces_left > 0`: the pinball buff, or any spawn
+        that passed `bounces=N`) reflects off what an ordinary shot dies
+        against, and off every wall a walking body could not cross
+        (`shot_terrain.body_blocks`, CMB-010): an obstacle, about the normal
+        from the obstacle's centre; terrain, about the axis it crossed (probed
+        one axis at a time, both at a corner). So it climbs and descends only
+        by the stairs. Each bounce costs one of `bounces_left`; the last one
+        spends the ball. Orbiters and `no_block` shots are exempt, as they are
+        from the plain blocks. One call judges one move; `roll` feeds it a
+        frame in sub-steps."""
         ps = self.ps
         run = getattr(self, "run", ps)
-        if not proj.active:
-            return
-        hit = run.game_map.blocking_obstacle_hit(proj.pos, proj.radius)
+        if not proj.active or proj.no_block or proj.orbit_speed:
+            return                  # exempt from every wall, as a plain shot is
+        gm = run.game_map
+        incoming = pygame.Vector2(proj.vel)
+        step = (proj.pos - before).length()
+        # On the ground or in flight (`Projectile.landed`). A ball whose
+        # centre starts on floor is on the ground; one fired from over the
+        # sea, a lake or a cliff face is in flight until its whole body is
+        # over ground. Once on the ground it stays there: the body rule only
+        # ever moves it where its centre stays on floor.
+        if proj.landed is None:
+            proj.landed = not gm.is_open_water(before.x, before.y)
+        elif not proj.landed and shot_terrain.on_ground(gm, before, proj.radius):
+            proj.landed = True
+        grounded = proj.landed
+        hit = gm.blocking_obstacle_hit(proj.pos, proj.radius)
         if hit is not None:
             n = proj.pos - hit.pos
             if n.length_squared() < 1e-6:
                 n = -proj.vel
             n = n.normalize()
             proj.vel -= 2.0 * proj.vel.dot(n) * n
-            proj.pos.update(hit.pos + n * (hit.radius + proj.radius + 1.0))
-        elif self._terrain_stops(proj, proj.pos):
+            seat = hit.pos + n * (hit.radius + proj.radius + 1.0)
+            if self._walled(gm, proj, seat, before, grounded):
+                seat = self._toward(gm, proj, before, seat, grounded)
+            proj.pos.update(seat)
+        elif self._walled(gm, proj, proj.pos, before, grounded):
             along_x = pygame.Vector2(proj.pos.x, before.y)
             along_y = pygame.Vector2(before.x, proj.pos.y)
-            flip_x = self._terrain_stops(proj, along_x)
-            flip_y = self._terrain_stops(proj, along_y)
+            flip_x = self._walled(gm, proj, along_x, before, grounded)
+            flip_y = self._walled(gm, proj, along_y, before, grounded)
             if not flip_x and not flip_y:
                 flip_x = flip_y = True                    # a corner: straight back
             if flip_x:
@@ -248,11 +283,54 @@ class TransientFx:
                 proj.vel.y = -proj.vel.y
             proj.pos.update(before)
         else:
+            levels = getattr(gm, "_levels", None)
+            if levels is not None and (
+                    grounded or shot_terrain.on_ground(gm, proj.pos, proj.radius)):
+                proj.floor = shot_terrain.ground_floor(levels, proj.pos, proj.floor)
             return
+        # A reflection whose very next step is walled too -- a rock and a
+        # cliff closer than a step, or the inside of a corner -- would reflect
+        # off each in turn from one spot until the bounces ran out. The way it
+        # came in was clear a step ago, so it goes straight back instead.
+        if step > 0.0:
+            nxt = proj.pos + proj.vel.normalize() * step
+            if (gm.blocking_obstacle_hit(nxt, proj.radius) is not None
+                    or self._walled(gm, proj, nxt, proj.pos, grounded)):
+                proj.vel.update(-incoming)
         proj.bounces_left -= 1
         run.particles.burst(proj.pos, proj.color, count=4, speed=90, life=0.25, radius=2)
         if proj.bounces_left <= 0:
             proj.active = False
+
+    @staticmethod
+    def _walled(gm, proj, pos, before, grounded: bool) -> bool:
+        """Is `pos` behind a wall for a bouncing shot coming from `before`?
+        On the ground, the body rule. In flight, the edge of the world -- the
+        bound a flyer has (`GameMap.is_walkable(flying=True)`) -- and, along
+        the whole move, ground of any level but its own floor
+        (`shot_terrain.lands_off_floor`)."""
+        if grounded:
+            return shot_terrain.body_blocks(gm, pos, proj.radius, before)
+        return (not gm.is_walkable(pos, flying=True)
+                or shot_terrain.lands_off_floor(gm, before, pos, proj.floor))
+
+    @classmethod
+    def _toward(cls, gm, proj, before, seat, grounded: bool):
+        """A legal point from `before` toward `seat`, found by bisection. A
+        ball reflected off a rock is seated just outside it, but that seat
+        can be across a drop, or on ground of another level for a ball in
+        flight; this keeps as much of the way out as the bisection finds legal
+        (not necessarily the farthest: the walls need not be monotone along
+        the line), and at worst `before` itself."""
+        lo, hi = 0.0, 1.0
+        d = seat - before
+        for _ in range(8):
+            mid = (lo + hi) * 0.5
+            if cls._walled(gm, proj, before + d * mid, before, grounded):
+                hi = mid
+            else:
+                lo = mid
+        return before + d * lo
 
     def update_projectiles(self, dt: float) -> None:
         """Advance both projectile pools, block them on obstacles, and drop
@@ -265,21 +343,26 @@ class TransientFx:
             p.update(dt)
             self.ride_stuck(p)
             if p.bounces_left > 0:
-                self.bounce(p, before)
+                self.roll(p, before)
             else:
+                # Terrain first: a move that crosses a face and ends in a rock
+                # beyond it stops against the face, not on the plateau.
+                self.block_on_terrain(p, before)
                 self.block_on_obstacle(p)
-                self.block_on_terrain(p)
             self._shed_trail(p, (p.pos - before).length())
             if p.blast_radius > 0.0 and not p.active and not p.detonated:
                 self.detonate(p)        # fuse ran out, or the bomb was blocked
         run.projectiles.sweep()
         for p in run.hostiles:
+            before = pygame.Vector2(p.pos)
             p.update(dt)
             if not ps._in_world_margin(p.pos, 60):
                 p.active = False
+            elif p.bounces_left > 0:
+                self.roll(p, before)        # bouncing is any shot's property
             else:
+                self.block_on_terrain(p, before)
                 self.block_on_obstacle(p)
-                self.block_on_terrain(p)
             # An enemy bomb blows up where it stopped. The hero's bombs go
             # through `detonate`, which spawns the blast into the *player's*
             # projectile pool and would hurt enemies; a hostile one is an
@@ -311,7 +394,7 @@ class TransientFx:
             source_tags=tuple(bomb.source_tags) + ("blast",), is_crit=bomb.is_crit,
             style="blast", color=(255, 190, 110), no_block=True)
         if blast is not None:
-            blast.fire_level = bomb.fire_level
+            blast.floor = bomb.floor
             # The blast *is* the bomb's hit, so it carries the attack's
             # element (§6.3: every hit an attack produces shares it).
             blast.element = bomb.element
@@ -432,7 +515,7 @@ class TransientFx:
         base = run.rng.random() * math.tau
         for i in range(n):
             a = base + math.tau * i / n
-            ps._spawn_projectile(
+            bomblet = ps._spawn_projectile(
                 pos=pos, vel=pygame.Vector2(math.cos(a), math.sin(a)) * speed,
                 damage=bomb.damage * float(fx.get("cluster_damage_mult", 0.4)),
                 radius=max(3.0, bomb.radius * 0.7), lifetime=fuse, pierce=0,
@@ -443,6 +526,10 @@ class TransientFx:
                 blast_lifetime=bomb.blast_lifetime,
                 element=bomb.element, infusion=bomb.infusion,
                 fx={"scale": scale} if scale else {})
+            if bomblet is not None:
+                # Thrown from the floor the bomb was on, not from the face a
+                # blocked bomb stopped on (whose height is the terrace above).
+                bomblet.floor = bomb.floor
 
     # --- ground hazards (spec 5.6) --------------------------
     def spawn_hazard(self, pos, radius, dps, duration, tick_interval=None,

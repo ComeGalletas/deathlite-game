@@ -201,7 +201,7 @@ class CombatResolver:
                 source_tags=tuple(proj.source_tags) + ("split",), is_crit=proj.is_crit)
             if child is not None:
                 child.hit_ids.add(id(enemy))
-                child.fire_level = proj.fire_level
+                child.floor = proj.floor
                 child.element = proj.element      # same attack, same flag
 
     def apply_on_hit_effects(self, proj: Projectile, enemy) -> None:

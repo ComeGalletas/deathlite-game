@@ -3166,6 +3166,8 @@ Settled first, from the brief:
 * **Projectiles respect elevation upward only.** A shot crosses its own floor
   and higher ground freely; one entering a *lower* tile than it was fired from
   dies at that boundary.
+  *(Superseded twice: D10 below inverted it, and CMB-010 lets a shot climb
+  through a staircase; see `projectile_elevation_journal.md`.)*
 * **Enemies get an aggro range and a pursuit timer.** Once aggroed they take
   the whole route however long -- no path-cost cap -- but the timer ends it.
   The timer refreshes while the player is in range and counts down from the
@@ -3596,6 +3598,13 @@ diagonal.
 Suite **754** green.
 
 ### D10 — projectiles respect elevation — ✅ DONE
+
+> **CMB-010 (2026-09-29):** the upward half of this rule changed. A plain shot
+> now climbs to higher ground through a staircase (its floor rises by any step
+> `can_step` allows and never drops), and a bouncing shot moves like a walking
+> body. `fire_level` / `stamp_fire_level` are now `floor` / `stamp_floor`, and
+> the rule lives in `game/states/playing/core/shot_terrain.py`. See
+> [projectile_elevation_journal.md](projectile_elevation_journal.md).
 
 **The rule as written here was inverted, and the brief is what settled it.** The
 paragraph below used to read "travels onto higher ground; dies on entering a

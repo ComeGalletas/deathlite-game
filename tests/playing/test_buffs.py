@@ -342,6 +342,25 @@ class PinballTests(_BuffCase):
         p.fx.bounce(q, before)
         self.assertFalse(q.active)
 
+    def test_an_enemy_shot_can_bounce_too(self):
+        """Bouncing is any projectile's property (CMB-010.D3): an enemy shot
+        fired with `bounces` goes through the same branch of the frame
+        update as the hero's pinball, and reflects off a rock instead of
+        dying on it."""
+        p = self.p
+        rock = next(o for o in p.game_map.obstacles if o.blocks_projectiles)
+        q = p.fx.fire_hostile(
+            pos=pygame.Vector2(rock.pos.x - rock.radius - 12, rock.pos.y),
+            vel=pygame.Vector2(600, 0), damage=1.0, radius=4.0, bounces=3)
+        try:
+            p.fx.update_projectiles(1 / 60)
+            self.assertTrue(q.active, "the hostile shot died on the rock")
+            self.assertEqual(q.bounces_left, 2)
+            self.assertLess(q.vel.x, 0)
+        finally:
+            q.active = False
+            p.hostiles.sweep()
+
     def test_an_ordinary_shot_still_dies_on_an_obstacle(self):
         p = self.p
         rock = next(o for o in p.game_map.obstacles if o.blocks_projectiles)

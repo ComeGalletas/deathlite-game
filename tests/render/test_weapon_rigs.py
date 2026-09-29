@@ -168,7 +168,7 @@ class SwingSequenceTests(unittest.TestCase):
 
     def _cone(self, fx):
         return SimpleNamespace(fx=fx, cone_half_angle=1.0, cone_dir=pygame.Vector2(0, 1),
-                               pos=pygame.Vector2(100, 50), radius=32, fire_level=-1)
+                               pos=pygame.Vector2(100, 50), radius=32, floor=-1)
 
     def test_a_sword_cone_queues_one_sequence_entry(self):
         ps, slash_fx = self._ps()

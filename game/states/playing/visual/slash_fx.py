@@ -58,7 +58,7 @@ def spawn_from_cone(ps, proj) -> None:
     ps._slashes.append({
         "rigs": rigs, "durs": durs, "t": 0.0,
         "pos": pygame.Vector2(proj.pos), "dir": pygame.Vector2(proj.cone_dir),
-        "radius": float(proj.radius), "fx": fx, "level": proj.fire_level,
+        "radius": float(proj.radius), "fx": fx, "level": proj.floor,
     })
 
 

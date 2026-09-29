@@ -213,7 +213,7 @@ class ProjectileTrailTests(unittest.TestCase):
         run in is built from a **random** run seed. Left on, the rule kills the
         shot the moment it crosses onto higher ground, so on the seeds where the
         hero happens to start below a terrace the puff count collapses -- 0 or 1
-        against the 4-6 the spacing predicts. `fire_level = NONE` is the
+        against the 4-6 the spacing predicts. `floor = NONE` is the
         documented way to opt a projectile out; the rule has its own coverage in
         `tests/playing/test_projectile_elevation.py`.
 
@@ -227,7 +227,7 @@ class ProjectileTrailTests(unittest.TestCase):
         base.update(kw)
         pr = p._spawn_projectile(**base)
         if pr is not None:
-            pr.fire_level = NO_LEVEL
+            pr.floor = NO_LEVEL
         return pr
 
     def test_trail_projectile_sheds_puffs_plain_one_does_not(self):

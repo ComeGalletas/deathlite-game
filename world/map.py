@@ -233,46 +233,13 @@ class GameMap:
                 cur = nxt
         return cur == b or can_step(ix, cur, b)
 
-    def is_walkable(self, pos: pygame.Vector2, radius: float = 0.0,
-                    frm: pygame.Vector2 | None = None, flying: bool = False) -> bool:
-        """`frm` opts into the elevation rule: the move from there to here must
-        be one the terrain allows. Callers that are only asking "is this spot
-        free" -- the AI's `is_walkable` probe, spawn placement -- leave it None
-        and get the pure floor test, unchanged.
-
-        The rule is applied to the body's **centre only**. The radius probes
-        below stay a plain floor test, as they always were: a terrace is a few
-        tiles wide, so demanding that every probe sit on the centre's level
-        would stop a large enemy standing anywhere near a rim, and overhanging
-        a drop is exactly what those probes already tolerate against a wall.
-
-        The **terrace margin** is applied to the centre as well, and for the
-        same reason it is a fixed number of pixels rather than a body radius:
-        it exists so that two floors read as separate, not so that bodies are
-        physically excluded. Scaling it by radius would forbid the boss, at 46
-        px, from most of a 64 px terrace.
-
-        A body already inside the margin -- spawned there before the rule
-        existed, knocked back into it, or standing where a crossing's exemption
-        ends -- may still move, as long as it does not go *deeper*. "Cannot
-        enter, may leave" is what stops the rule wedging anything; refusing
-        outright would freeze a body the moment anything put it there."""
-        # A flyer (`flying` tag: The First Hunger and its brood) is over the
-        # world, not on it: no terrace margin, no elevation rule, no obstacle,
-        # no radius probe, and no floor -- it passes above a boulder, across a
-        # cliff, over a lake and out over the sea between islands in one line.
-        # The only wall is the edge of the world; a flyer hunts the player, so
-        # one out over the water is one on its way back.
-        if flying:
-            return 0.0 <= pos.x <= self.width and 0.0 <= pos.y <= self.height
+    def on_floor(self, pos: pygame.Vector2, radius: float = 0.0,
+                 frm: pygame.Vector2 | None = None) -> bool:
+        """The floor half of `is_walkable`: the centre on floor, and a body of
+        `radius` not overhanging anything that is not floor (water, a lake, a
+        cliff face) -- no terrace margin, no elevation rule, no obstacle. A bouncing projectile asks this to know whether it
+        has ground under it at all (CMB-010)."""
         if not self._point_ok(pos.x, pos.y):
-            return False
-        if self._body_inset > 0.0 and not self.inset_ok(pos.x, pos.y):
-            if frm is None:
-                return False
-            if self.inset_at(pos.x, pos.y) < self.inset_at(frm.x, frm.y):
-                return False
-        if frm is not None and not self.path_ok(frm, pos):
             return False
         if radius > 0 and not (
                 self._point_ok(pos.x + radius, pos.y)
@@ -300,14 +267,81 @@ class GameMap:
             # whose floor is irregular, and demanding a full radius of it the
             # moment the body leaves the planks would stand it up on the deck
             # and refuse to let it ashore.
-            if not (self.on_bridge(pos.x, pos.y)
-                    or (frm is not None and self.on_bridge(frm.x, frm.y))):
+            return (self.on_bridge(pos.x, pos.y)
+                    or (frm is not None and self.on_bridge(frm.x, frm.y)))
+        return True
+
+    def is_walkable(self, pos: pygame.Vector2, radius: float = 0.0,
+                    frm: pygame.Vector2 | None = None, flying: bool = False,
+                    path: bool = True, obstacles: bool = True) -> bool:
+        """`frm` opts into the elevation rule: the move from there to here must
+        be one the terrain allows. Callers that are only asking "is this spot
+        free" -- the AI's `is_walkable` probe, spawn placement -- leave it None
+        and get the pure floor test, unchanged.
+
+        `path=False` keeps everything `frm` means for the terrace margin but
+        skips `path_ok`, for a caller that judges the move's steps itself: a
+        bouncing projectile walks them exactly, tile by tile
+        (`game/states/playing/core/shot_terrain.py`, CMB-010), where `path_ok`
+        samples every half tile. `obstacles=False` leaves the obstacle test
+        out, for the same caller: a projectile passes the props that do not
+        block projectiles, and meets the ones that do on its own terms.
+
+        The rule is applied to the body's **centre only**. The radius probes
+        below stay a plain floor test, as they always were: a terrace is a few
+        tiles wide, so demanding that every probe sit on the centre's level
+        would stop a large enemy standing anywhere near a rim, and overhanging
+        a drop is exactly what those probes already tolerate against a wall.
+        They and the centre's floor test are `on_floor`.
+
+        The **terrace margin** is applied to the centre as well, and for the
+        same reason it is a fixed number of pixels rather than a body radius:
+        it exists so that two floors read as separate, not so that bodies are
+        physically excluded. Scaling it by radius would forbid the boss, at 46
+        px, from most of a 64 px terrace.
+
+        A body already inside the margin -- spawned there before the rule
+        existed, knocked back into it, or standing where a crossing's exemption
+        ends -- may still move, as long as it does not go *deeper*. "Cannot
+        enter, may leave" is what stops the rule wedging anything; refusing
+        outright would freeze a body the moment anything put it there."""
+        # A flyer (`flying` tag: The First Hunger and its brood) is over the
+        # world, not on it: no terrace margin, no elevation rule, no obstacle,
+        # no radius probe, and no floor -- it passes above a boulder, across a
+        # cliff, over a lake and out over the sea between islands in one line.
+        # The only wall is the edge of the world; a flyer hunts the player, so
+        # one out over the water is one on its way back.
+        if flying:
+            return 0.0 <= pos.x <= self.width and 0.0 <= pos.y <= self.height
+        if not self.on_floor(pos, radius, frm):
+            return False
+        if self._body_inset > 0.0 and not self.inset_ok(pos.x, pos.y):
+            if frm is None:
                 return False
+            if self.inset_at(pos.x, pos.y) < self.inset_at(frm.x, frm.y):
+                return False
+        if frm is not None and path and not self.path_ok(frm, pos):
+            return False
+        if not obstacles:
+            return True
         for o in self._obstacle_index.near(pos.x, pos.y, radius):
             rr = o.radius + radius
             if (pos.x - o.pos.x) ** 2 + (pos.y - o.pos.y) ** 2 < rr * rr:
                 return False
         return True
+
+    def props_hit(self, pos: pygame.Vector2, radius: float) -> list:
+        """Every obstacle overlapping the circle that does *not* block
+        projectiles -- a bush, a scarecrow: what a plain shot flies through
+        and a bouncing one still bounces off (CMB-010.D12)."""
+        out = []
+        for o in self._obstacle_index.near(pos.x, pos.y, radius):
+            if o.blocks_projectiles:
+                continue
+            rr = o.radius + radius
+            if (pos.x - o.pos.x) ** 2 + (pos.y - o.pos.y) ** 2 < rr * rr:
+                out.append(o)
+        return out
 
     def blocking_obstacle_hit(self, pos: pygame.Vector2, radius: float):
         """First projectile-blocking obstacle overlapping the circle, or None."""
