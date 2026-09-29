@@ -278,7 +278,7 @@ tier is **9 to 10 times faster**.
 
 ## TST-007 — Requirement (owner, 2026-09-29)
 
-**ID:** TST-007 · **System:** tests · **Type:** bug · **Status:** in progress ·
+**ID:** TST-007 · **System:** tests · **Type:** bug · **Status:** done ·
 **Branch:** ComeGalletas/tst-007-ultrawide-font-init-83009add (stacked on
 TST-006's branch; the session worktree `.claude/worktrees/busy-shtern-6bb78d`)
 
@@ -330,8 +330,37 @@ TST-006's branch; the session worktree `.claude/worktrees/busy-shtern-6bb78d`)
 
 ## TST-007 — Todo
 
-- [ ] TST-007.1 — Move the level-up margin test into its own pure class
+- [x] TST-007.1 — Move the level-up margin test into its own pure class
   with its own setup (D1).
-- [ ] TST-007.2 — Verify and close: runs, tier audit, index.
+- [x] TST-007.2 — Verify and close: runs, tier audit, index.
 
 ## TST-007 — Log
+
+### 2026-09-29 — TST-007.1: the test gets its own class
+
+- Before (`9cf0139`, run alone):
+  `python -m pytest -p no:cacheprovider "tests/screens/test_ultrawide.py::PanelsStayInTheBoxTests::test_a_level_up_draw_without_the_dim_leaves_the_margins_alone"`
+  → 1 failed, `pygame.error: font not initialized` from `pygame.sysfont`
+  under `LevelUpPanel.draw`.
+- After, the same test under its new node
+  `tests/screens/test_ultrawide.py::LevelUpPanelMarginTests::test_a_level_up_draw_without_the_dim_leaves_the_margins_alone`:
+  1 passed alone (0.5 s); `python -m unittest
+  tests.screens.test_ultrawide.LevelUpPanelMarginTests` OK.
+
+### 2026-09-29 — TST-007.2: verified, closed
+
+- Whole module: 12 passed (the one warning, "no fast renderer available",
+  is the dummy video driver in `game/display/window.py`, there before).
+- Tiers: `-m unit` on the module selects `LongBackgroundStripTests` and
+  `LevelUpPanelMarginTests` (2 passed); `-m integration` selects the other
+  ten, `PanelsStayInTheBoxTests` now holding only the pause test.
+- `python -m tools.verification.tier_audit`: 3480 tests read; 0
+  under-tiered. `--over` listed three tests of this module before and lists
+  two now (the D2 pair); the moved test is no longer over-tiered.
+- `tests/devtools/test_tier_audit.py`: 30 passed, `SuiteTests` included.
+- **Only the isolated run proves the fix.** With `setUpClass` deleted from
+  the new class, the module's `unit` slice still passed: it runs
+  `LongBackgroundStripTests` first, and the cut script it checks calls
+  `pygame.init()` (`tools/asset_pipeline/cut_menu_background_long.py`).
+  So any run with an earlier test in the process can hide this bug again;
+  running the class or test alone is the check.
