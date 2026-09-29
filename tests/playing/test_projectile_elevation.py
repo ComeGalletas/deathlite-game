@@ -803,6 +803,9 @@ class _PocketMap:
     def is_open_water(self, x, y):
         return False
 
+    def props_hit(self, pos, radius):
+        return []
+
     def on_floor(self, pos, radius=0.0, frm=None):
         return pos.x - radius >= 0
 
@@ -1177,23 +1180,53 @@ class FrameLoopTests(_Terrain):
                     checked += 1
         self.assertGreater(checked, 5)
 
-    def test_a_ball_ignores_props_that_do_not_block_shots(self):
-        """A plain shot flies through a bush or a scarecrow; so does a
-        bouncing one. A ball that came down on one used to find every move
-        refused by the body's obstacle test and spend all its bounces there
-        (78 of 114 landings on a prop)."""
-        from game.states.playing.core import shot_terrain
+    def _props(self):
         props = [o for o in self.gm.obstacles if not o.blocks_projectiles]
         self.assertGreater(len(props), 10)
+        return props
+
+    def test_a_ball_bounces_off_a_bush_a_plain_shot_flies_through(self):
+        """Owner, CMB-010.D12: the pinball keeps bouncing off props that do
+        not block projectiles. Rolled into one from outside, it is walled."""
+        from game.states.playing.core import shot_terrain
         checked = 0
-        for o in props:
+        for o in self._props():
             for k in range(8):
                 frm = o.pos + pygame.Vector2(o.radius + 12, 0).rotate(45 * k)
-                if not self.gm.is_walkable(frm, 10.0, obstacles=False):
+                if not self.gm.is_walkable(frm, 10.0):
                     continue
                 to = frm + (o.pos - frm).normalize() * 4
-                self.assertFalse(shot_terrain.body_blocks(self.gm, to, 10.0, frm),
-                                 f"a prop at {tuple(o.pos)} walled the ball")
+                self.assertTrue(shot_terrain.body_blocks(self.gm, to, 10.0, frm),
+                                f"rolled into the prop at {tuple(o.pos)}")
+                checked += 1
+        self.assertGreater(checked, 20)
+
+    def test_a_ball_inside_a_prop_may_leave_it(self):
+        """A ball can be put inside a bush -- come down on one from flight,
+        or fired from over one -- and a body's obstacle test refused every
+        move out, spending all its bounces there (78 of 114 landings on a
+        prop). It rolls on through the prop it is in, either way: holding it
+        to "not deeper" pinned a ball that came ashore onto a sign with the
+        sea behind it (50 of 89 landings on a prop)."""
+        from game.states.playing.core import shot_terrain
+        checked = 0
+        for o in self._props():
+            for k in range(8):
+                out = pygame.Vector2(1, 0).rotate(45 * k)
+                inside = o.pos + out * (o.radius * 0.5)
+                if not self.gm.is_walkable(inside, 10.0, obstacles=False):
+                    continue
+                away, deeper = inside + out * 4, inside - out * 4
+                if not self.gm.is_walkable(away, 10.0, frm=inside, obstacles=False):
+                    continue
+                if any(q is not o for q in self.gm.props_hit(away, 10.0)):
+                    continue                    # out of this prop into the next one
+                self.assertFalse(shot_terrain.body_blocks(self.gm, away, 10.0, inside),
+                                 f"held inside the prop at {tuple(o.pos)}")
+                if (self.gm.is_walkable(deeper, 10.0, frm=inside, obstacles=False)
+                        and not any(q is not o for q in self.gm.props_hit(deeper, 10.0))):
+                    self.assertFalse(shot_terrain.body_blocks(self.gm, deeper, 10.0, inside),
+                                     f"held from crossing the prop at {tuple(o.pos)}")
                 checked += 1
         self.assertGreater(checked, 20)
 

@@ -19,6 +19,9 @@
 - **Constraint:** Confirm the reading before building (done, below). Enemy
   shots follow the same rule. No weapon gains bouncing, and no `bounces`
   field is added to the weapon data (owner, 2026-09-29: "no").
+- **and then:** keep the pinball bouncing off bushes (owner, 2026-09-29,
+  after D11 had made bouncing shots pass the props that do not block
+  projectiles). See D12.
 
 ## CMB-010 — Confirmed reading
 
@@ -46,13 +49,15 @@ ground, stairs included.
   frm=before, path=False, obstacles=False)` -- the floor test, the terrace
   margin, the radius probes -- with the move's steps walked exactly through
   `can_step` (D4) rather than by `path_ok`'s half-tile samples
-  (`shot_terrain.body_blocks`). Two differences from a body, both because it
-  is a projectile: it passes the props that do not block projectiles (a
-  bush, a scarecrow), as a plain shot does, and meets the ones that do in
-  `bounce`'s own obstacle test; and a ball already overhanging the water
-  (centre on floor, radius over the edge) may roll on its centre until it is
-  clear of it -- "cannot enter, may leave", as the collider treats the
-  terrace margin. Anything a body could not cross
+  (`shot_terrain.body_blocks`). Props that do not block projectiles (a bush,
+  a scarecrow) are walls to it, as to a body, although a plain shot flies
+  through them (D12); the props that do are `bounce`'s own obstacle test.
+  Two leniencies a body does not need, because a ball can be *put* where a
+  body never stands, both "cannot enter, may leave" as the collider treats
+  the terrace margin: a ball already inside a prop rolls on through it (only
+  entering one from outside is a wall), and a ball already overhanging the
+  water (centre on floor, radius over the edge) may roll on its centre until
+  it is clear. Anything a body could not cross
   is a wall to it, up **or down**: a cliff, a plateau flank or back edge with
   no stone in it, a shoreline, the sea. So a pinball fired on a terrace stays
   on it unless it rolls down the stairs, and one fired below climbs only by the
@@ -219,7 +224,7 @@ ground, stairs included.
   491 of 491 overhang throws roll on; 1,008 straight-wall reflections
   mirrored (the 17 others ran past the stretch checked); grounded fuzz
   (2,553 throws, 630,000 frames) 0 illegal steps, 0 off the floor, 0 leaving
-  the ground. Flight launches (5,400): 3 flagged "landed on another level"
+  the ground. (Passing non-blocking props was reverted by the owner in D12.) Flight launches (5,400): 3 flagged "landed on another level"
   are balls that came down on their own floor and, in the same frame,
   stepped onto a staircase's head (`standing_level` reads a flight's low
   end). A bounce costs about 24 us against HEAD's 14 us.
@@ -232,6 +237,19 @@ ground, stairs included.
   Also residual, with no shooter today: of the few spots where a ball's
   body overhangs the water, 3 to 6 in 200 to 250 per world squeeze it
   between a rock and the waterline, where it spends its bounces.
+- **CMB-010.D12: The pinball keeps bouncing off bushes** (owner, 2026-09-29).
+  D11 had let bouncing shots pass the props that do not block projectiles;
+  the owner kept them as walls, which is what HEAD did. `GameMap.props_hit`
+  names them and `shot_terrain.body_blocks` walls a ball that would enter
+  one from outside. A ball already inside one (come down on it from flight)
+  rolls on through it: the first version held it to "not deeper", and a ball
+  that came ashore onto a sign with the sea behind it had no legal move (50
+  of 89 landings on a prop spent every bounce). After the fix: 89 of 89 get
+  out; grounded fuzz (2,562 throws, 631,000 frames) 0 illegal steps, 0 off
+  the floor, 0 leaving the ground; true pins near rocks 20 in 9,000 throws
+  against HEAD's 27. Regression tests:
+  `test_a_ball_bounces_off_a_bush_a_plain_shot_flies_through`,
+  `test_a_ball_inside_a_prop_may_leave_it`.
 - The obstacles a body cannot walk through but a shot flies over (bushes) still
   reflect a bouncing shot through `is_walkable`, as they did before CMB-010.
 
@@ -265,6 +283,7 @@ ground, stairs included.
 
 - [x] CMB-010.1 — Open this journal and the index row
 - [x] CMB-010.2 — `shot_terrain.py` (the plain climb rule and the bouncing body rule) wired through `TransientFx`: `fire_level` renamed `floor`, each frame's move walked, the hostile pool's bounce branch, split and blast inherit the floor; new tests on a pinned world, existing tests follow the rename. *(Planned as two tasks; the new tests exercise the module through `TransientFx`, so the rule and its wiring are one commit.)*
+- [x] CMB-010.4 — Keep the pinball bouncing off bushes, with a ball inside a prop free to roll out of it (D12)
 - [x] CMB-010.3 — Docs: D10 pointers in `level_design_journal.md`, `world/README.md`, the stale `stamp_fire_level` names in `enemy_ai_journal.md` and `boss_free_roam_todo.md`, memory; results and close
 
 ## CMB-010 — Results
@@ -290,6 +309,13 @@ ground, stairs included.
 - **Cost.** A plain shot's terrain check about 2 us against HEAD's 0.7 us
   (about 1 ms a frame for 500 live shots); a bounce about 24 us against
   14 us, from the sub-steps.
-- **Behaviour change beyond the brief, flagged.** A bouncing shot no longer
-  bounces off props that do not block projectiles (bushes, scarecrows); a
-  plain shot never did (D2).
+- **Bushes.** D11 made bouncing shots pass the props that do not block
+  projectiles; the owner kept the pinball bouncing off them (D12), which
+  is what HEAD did.
+- **Open concerns.** (1) A pinball can spend every bounce in a tight corner
+  between a rock and a wall: 20 in 9,000 throws near rocks, HEAD 27 on the
+  same throws; pre-existing, not introduced here. (2) Latent: a ball whose
+  body overhangs the water beside a rock can be squeezed there (3 to 6 in
+  200 to 250 such spots per world); no shooter stands there today. (3) Cost:
+  a plain shot's terrain check about 2 us against 0.7 us, a bounce about
+  24 us against 14 us.

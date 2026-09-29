@@ -330,6 +330,19 @@ class GameMap:
                 return False
         return True
 
+    def props_hit(self, pos: pygame.Vector2, radius: float) -> list:
+        """Every obstacle overlapping the circle that does *not* block
+        projectiles -- a bush, a scarecrow: what a plain shot flies through
+        and a bouncing one still bounces off (CMB-010.D12)."""
+        out = []
+        for o in self._obstacle_index.near(pos.x, pos.y, radius):
+            if o.blocks_projectiles:
+                continue
+            rr = o.radius + radius
+            if (pos.x - o.pos.x) ** 2 + (pos.y - o.pos.y) ** 2 < rr * rr:
+                out.append(o)
+        return out
+
     def blocking_obstacle_hit(self, pos: pygame.Vector2, radius: float):
         """First projectile-blocking obstacle overlapping the circle, or None."""
         for o in self._obstacle_index.near(pos.x, pos.y, radius):

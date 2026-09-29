@@ -24,10 +24,10 @@ leaves from the flight's low end.
 **A bouncing shot moves like a walking body.** `body_blocks` is the
 collider's own test -- `GameMap.is_walkable` with `frm`: the floor, the
 terrace margin, the radius probes -- with the steps walked exactly (below)
-instead of by `path_ok`'s half-tile samples, and without the props that do
-not block projectiles. Anything a body could not cross is a wall to it
-whatever the height, up *or* down -- so a pinball fired on a terrace stays on
-it unless it rolls down the stairs. Its floor follows the
+instead of by `path_ok`'s half-tile samples. Anything a body could not cross
+is a wall to it whatever the height, up *or* down -- so a pinball fired on a
+terrace stays on it unless it rolls down the stairs -- and so is a bush, which
+a plain shot flies through. Its floor follows the
 ground it rolls on (`ground_floor`), which is only read by what it spawns.
 A ball whose centre starts off the floor (fired from over the sea, a lake or
 a cliff face) has no ground to roll on yet. It flies until its whole body is
@@ -222,16 +222,28 @@ def body_blocks(game_map, pos, radius: float, frm) -> bool:
     collider's test for a body of the shot's radius -- off the floor, into
     the terrace margin -- with the steps walked exactly.
 
-    Two differences from a body, both because this is a projectile. It
-    passes the props that do not block projectiles (a bush, a scarecrow), as
-    a plain shot does; the ones that do are `bounce`'s own obstacle test. And
-    a ball already overhanging the water (a shooter smaller than its shot, at
-    a shoreline or a bridge mouth) may keep rolling on its centre until it is
-    clear of the edge again -- "cannot enter, may leave", as the collider
-    treats the terrace margin -- instead of finding every way refused."""
+    Props that do not block projectiles (a bush, a scarecrow) are walls to
+    it, as they are to a body -- the pinball bounces off a bush although a
+    plain shot flies through it (owner, CMB-010.D12); the props that block
+    projectiles are `bounce`'s own obstacle test, which reflects about the
+    rock's centre.
+
+    Two leniencies a body does not need, because a ball can be *put* where a
+    body never stands -- come down from flight, or fired by a shooter smaller
+    than its shot -- and "cannot enter, may leave", as the collider treats
+    the terrace margin, is what stops either pinning it:
+
+    - a ball already overlapping a prop rolls on through it and out: only
+      entering one from outside is a wall. Holding it to "not deeper" pinned
+      a ball that came ashore onto a sign with the sea behind it;
+    - a ball already overhanging the water (centre on floor, radius over the
+      edge) may keep rolling on its centre until it is clear of it."""
     probe = radius if game_map.on_floor(frm, radius) else 0.0
     if not game_map.is_walkable(pos, probe, frm=frm, path=False, obstacles=False):
         return True
+    for prop in game_map.props_hit(pos, radius):
+        if (frm - prop.pos).length() >= prop.radius + radius:
+            return True                     # into a prop from outside it
     levels = getattr(game_map, "_levels", None)
     return levels is not None and not steps_clear(levels, frm, pos)
 
