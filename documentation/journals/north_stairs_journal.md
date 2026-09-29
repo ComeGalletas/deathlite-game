@@ -308,3 +308,99 @@ lower half on the rim's upper half, on the plateau band. The rock flight
 is unchanged. The test reads plain grass on the rim's lower quarter, the
 channel's lip on the rim's upper quarter and on the landing's lower
 quarter, and no stone. Digests re-pinned; screenshot delivered.
+
+---
+
+## WLD-014 — Requirement (owner, 2026-09-29)
+
+- **Objective:** Make a north flight a door in the frontier between two
+  floors: the stairs (or the grass channel) show only on the lower floor's
+  landing tile, and in gameplay the flight cell stops walling off the
+  plateau ground beside it.
+- **Details:** From a screenshot of a rock north flight straddling the
+  seam (NS-6), side edges and all. Two changes, the first the main one:
+  1. *Visual.* Cut the staircase at the seam and keep only the half that
+     lies on the lower floor's tile (in the screenshot, the top half). The
+     grass channel gets the same cut. The rim cell becomes open, lip-free
+     plateau grass for both tags.
+  2. *Gameplay.* Remove the perpendicular walls `| x |` on the flight
+     cell's east and west edges, so the only walls left are the frontier
+     between the two floors. The staircase tile is then purely visual and
+     shows a door between the floors.
+- **Constraint:** A two-level north flight follows the same rule (its
+  landing half fills the whole landing tile). South and east/west flights
+  and lateral crossings are untouched.
+
+## WLD-014 — Confirmed reading
+
+- Today (`world/terrain/grid_paint.py::paint_seams`) a rock flight keeps
+  its autotiled rim tile and lays the flipped stone cut in half at the
+  seam: the foot half on the landing's lower half (low band), the top half
+  on the rim's upper half (plateau band). A grass flight first repaints the
+  rim as plain interior grass, then lays the channel halves the same way.
+- Today (`world/gen/height/graph.py::_north_flight_links`, mirrored by
+  `world/rules/steps.py::_flight_opens`) the flight cell links only north
+  to the landing at `level - drop` and south to its own terrace at `level`.
+  Its east and west neighbours are plateau ground at `level` (the site rule
+  in `flights.py::_nstair_site` requires both), and `can_cross` refuses
+  those two edges. Those are the `| x |` walls.
+- After: the landing half alone is painted, on the low band; the rim cell
+  is plain interior grass on the plateau band for both tags; the flight
+  links north, south, east and west. The cell stays `VSTAIR` with
+  `dir == "n"`, so the keep-outs, tile meta and the level-change rule keep
+  reading it as a flight. `diagonal_blocked` still refuses a ground-to-
+  ground diagonal across the drop, so changing floors still means standing
+  on the flight.
+
+**WLD-014.D1 — the door opens on both tags (owner, 2026-09-29).** The rim
+lip breaks at the flight whether it is rock or grass. For rock this is new:
+NS-6/NS-7 kept its autotiled rim tile under the stone.
+
+**WLD-014.D2 — two-level flights follow the same rule (owner,
+2026-09-29).** NS-5 measured every north flight on six seeds as a one-level
+drop, so this is a guarantee for a case the generator does not produce
+today, not a visible change. The landing half of the 64x128 sprite is a
+full tile.
+
+**WLD-014.D3 — the provisional cut becomes dead code (to be measured in
+WLD-014.3).** `flights._cut` rolls a north cut back when a flank no longer
+reaches the terrace south of the flight, because a flight linked only at
+its ends could sever a thin strip of terrace. With east/west links the
+flanks reach each other *through* the flight, so the rollback can no longer
+fire. The guard and its test
+(`test_a_cut_that_would_sever_its_own_flank_is_rolled_back`) are replaced
+by a test that such a strip now survives the cut. This moves generation
+(sites that were rolled back now stand), so the world digests are re-pinned
+and the count of north flights is recorded before and after over the
+pinned seeds (35, 7, 42) and the NS-4 six (35, 7, 1234, 42, 3, 99).
+
+## WLD-014 — Plan
+
+Painter first (the main change), then the link rule on both sides of the
+mirror, then the generator consequence, then pins and the screenshot.
+`tests/world` (which carries the render-side north-flight tests) before
+each commit; digests re-pinned with
+`python -m tools.verification.world_digest --write` in the commit that
+moves them. Measurable outcome: on every north flight of the pinned seeds,
+the rim tile carries no stair or channel pixels, the landing tile does,
+and a body steps east and west off the flight cell onto the plateau.
+
+## WLD-014 — Tasks
+
+- [ ] WLD-014.1 — Painter: draw only the landing half of the stone flight
+  and of the grass channel, on the low band; paint the rim cell as plain
+  interior grass for both tags (D1, D2). `sheets.vstair_seam` /
+  `channel_halves` keep only what is used. Painter test rewritten: rim
+  tile is plain interior grass with no lip and no stair, landing tile
+  carries the half, both tags required per seed; south flights still
+  pixel-identical. Bake and draw digests re-pinned.
+- [ ] WLD-014.2 — Gameplay: `_north_flight_links` and `_flight_opens` add
+  east and west to ground at `level`. Hand-built grid tests for the four
+  edges, the unchanged diagonal refusal across the drop, and the
+  runtime-mirrors-generator test over the shared worlds.
+- [ ] WLD-014.3 — Generator consequence (D3): measure the north-flight
+  count before and after, retire the dead rollback in `_cut` and replace
+  its test, re-pin the world digests, record the rates here.
+- [ ] WLD-014.4 — Screenshot of a rock and a grass north flight on the
+  seed 35 island used for NS-6/NS-7, before and after; journal results and
+  close WLD-014 in `INDEX.md`.

@@ -15,7 +15,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-014 · RND-008 · UI-014 ·
+**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-015 · RND-008 · UI-014 ·
 PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 
 ## Requirements
@@ -64,6 +64,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | WLD-011 | Bridge clearance for large bodies | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | WLD-012 | Keep props a wide body's radius clear of bridge mouths | WLD, ENT | bug | done | [bridge_clearance_journal.md](bridge_clearance_journal.md) | claude/wld-012-bridge-deck-clearance | 2026-09-22 |
 | WLD-013 | Remove the retired generator's unused island-graph helpers | WLD | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
+| WLD-014 | North flight as a door: landing half only, open rim, no east/west walls | WLD, RND | feature | in progress | [north_stairs_journal.md](north_stairs_journal.md) | ComeGalletas/wld-014-north-flight-door-16f28d09 | 2026-09-29 |
 | RND-001 | Asset integration | RND | feature | legacy | [assets_journal.md](assets_journal.md) | — | 2026-08-27 |
 | RND-002 | Cluster Bomb bomblet FX | RND, CMB | feature | legacy | [bomblet_fx_journal.md](bomblet_fx_journal.md) | — | 2026-09-12 |
 | RND-003 | Dynamic window scaling | RND, UI | feature | legacy | [window_scaling_journal.md](window_scaling_journal.md) | — | 2026-09-15 |
