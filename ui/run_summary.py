@@ -44,9 +44,13 @@ from ui import scale
 
 ROW_STEP = 28          # design px, scaled at the point of use with `S`
 _ROW_PX = 22           # the row font's design size
+_SMALL_PX = 17         # the notes: the record marker, the "+n more" lines
 _RIBBON_PX = 22        # a column's ribbon title
+_RIBBON_PAD = 4        # a title's least margin inside the ribbon's raised front
+_RIBBON_REACH = 8      # how far a widened ribbon may run past its column, each side
 _SUB_PX = 20           # a section heading
 _LABEL_GAP = 12        # the least room between a row's label (or marker) and its value
+_ALONE_RATIO = 0.8     # a value steps alone beside a whole label down to this, then both step
 _COUNT = re.compile(r"\s*\(\d+\)$")   # a heading's "  (14)", kept whole by a trim
 RIBBON_H = 48
 TITLE_DY = -5
@@ -169,7 +173,7 @@ class RunSummaryPanel:
         self._ribbon = fonts.heading(_RIBBON_PX)
         self._sub = fonts.heading(_SUB_PX)
         self._row = fonts.body(_ROW_PX)
-        self._small = fonts.body(17)
+        self._small = fonts.body(_SMALL_PX)
 
     # --- the three columns ----------------------------------------
     def draw(self, surface: pygame.Surface, assets, top: int, bottom: int,
@@ -183,6 +187,9 @@ class RunSummaryPanel:
         """
         picked = [_COLUMNS[name] for name in columns]
         margin, gap = S(margin), S(gap)
+        # Never past the surface: the end screens place the panel for 900
+        # rows, and the web profile's 720 would cut the last lines (UI-014.11).
+        bottom = min(bottom, surface.get_height() - margin // 4)
         space = surface.get_width() - 2 * margin - (len(picked) - 1) * gap
         widths = column_widths(space, column_minimums(columns, self._row))
         x = margin
@@ -197,72 +204,149 @@ class RunSummaryPanel:
         panel.fill(_PANEL_FILL)
         surface.blit(panel, rect.topleft)
         pygame.draw.rect(surface, _RULE, rect, width=1, border_radius=S(8))
-        ribbon = pygame.Rect(rect.left + S(16), rect.top - S(RIBBON_H) // 2 + S(8),
-                             rect.width - S(32), S(RIBBON_H))
+        ribbon = _ribbon_rect(assets, rect, title, colour, self._ribbon)
         widgets.draw_ribbon(surface, assets, ribbon, None, colour=colour)
-        # A title wider than its ribbon (the web profile's four columns,
-        # "Enemigos abatidos") steps down rather than running off the art.
-        font = (self._ribbon if self._ribbon.size(title)[0] <= ribbon.width
-                else uitext.fit_font(fonts.heading, _RIBBON_PX, title, ribbon.width))
-        text = font.render(title, True, config.COLOR_ON_BUTTON)
+        # The title sits on the ribbon's raised front, clear of the forked
+        # tails (UI-014.11); wider than that, it steps down to 60 % -- the
+        # ribbon is one short line with nothing beside it -- and at the last
+        # trims.
+        room = _title_room(assets, ribbon, colour)
+        font = (self._ribbon if self._ribbon.size(title)[0] <= room
+                else uitext.fit_font(fonts.heading, _RIBBON_PX, title, room, min_ratio=0.6))
+        text = font.render(uitext.ellipsize(font, title, room), True, config.COLOR_ON_BUTTON)
         surface.blit(text, text.get_rect(center=(ribbon.centerx, ribbon.centery + S(TITLE_DY))))
-        return pygame.Rect(rect.left + S(28), ribbon.bottom + S(18),
-                           rect.width - S(56), rect.bottom - ribbon.bottom - S(30))
+        # The side inset is 28 px, or a tenth of a narrower column: the web
+        # profile's four Victory columns are ~150 px, and 56 px of padding
+        # left a Spanish enemy name no room (UI-014.11).
+        inset = min(S(28), rect.width // 10)
+        return pygame.Rect(rect.left + inset, ribbon.bottom + S(18),
+                           rect.width - 2 * inset, rect.bottom - ribbon.bottom - S(30))
 
     # --- primitives -----------------------------------------------
     def _kv(self, surface, area, y, label, value, *, colour=None, flag: str = "") -> int:
-        """A label / value row. `flag` is a small accent note set after the
-        label -- the "best" marker. It goes on the *label* side because the
-        value is right-aligned to the column edge and has nothing to spare."""
-        font, text = self._row, str(value)
+        """A label / value row; one line, or two (`_kv_fit`). `flag` is a
+        small accent note set after the label -- the "best" marker. It goes
+        on the *label* side because the value is right-aligned to the column
+        edge and has nothing to spare."""
+        label, text = str(label), str(value)
+        lines, lab_font, val_font, _ = self._kv_fit(area, label, text, flag)
+        if lines > 1:
+            return self._kv_two_lines(surface, area, y, label, text, colour, flag)
         note = self._small.render(locale.t(flag), True, config.COLOR_ACCENT) if flag else None
-        extra = S(_LABEL_GAP) + (note.get_width() + S(8) if note else 0)
-        # The value is the data. When it and the label cannot both fit (a
-        # translated list, "fuego, viento"), the value steps its font down
-        # (UI-014.9) -- when that leaves the label whole. Otherwise the label
-        # gives way, as it always did, and the value keeps its size unless it
-        # would cross the column's edge or the record marker: then, in order,
-        # it steps to fit beside the marker, drops the marker and steps to
-        # the column, and at the last trims. Nothing leaves the column and
-        # nothing is drawn over anything (the web profile's four Victory
-        # columns are about 120 px).
-        val_font = font
-        value_room = area.width - font.size(str(label))[0] - extra
-        if font.size(text)[0] > value_room:
-            stepped = uitext.fit_font(fonts.body, _ROW_PX, text, value_room)
-            if stepped.size(text)[0] <= value_room:
-                val_font = stepped
+        if not text.strip() or not label.strip():
+            # One part alone (an empty value, a nameless row): it takes the
+            # row, beside its marker, stepped and at the last trimmed.
+            one = label if label.strip() else text
+            if one is text or (note is not None and uitext.fit_font(
+                    fonts.body, _ROW_PX, one, 0).size(one)[0] + note.get_width() + S(8)
+                    > area.width):
+                note = None                  # the label before its marker; no label, no marker
+            room = area.width - (note.get_width() + S(8) if note else 0)
+            f = uitext.fit_font(fonts.body, _ROW_PX, one, room)
+            shown = uitext.ellipsize(f, one, room)
+            if not one.strip() or f.size(shown)[0] > room:
+                return y + S(ROW_STEP)
+            t = f.render(shown, True, config.COLOR_TEXT_DIM if one is label
+                         else colour or config.COLOR_TEXT)
+            if one is label:
+                surface.blit(t, t.get_rect(midleft=(area.left, y)))
+                if note is not None:
+                    surface.blit(note, note.get_rect(midleft=(area.left + t.get_width() + S(8), y)))
             else:
-                room_v = area.width - (extra if note else 0)
-                if font.size(text)[0] > room_v:
-                    val_font = uitext.fit_font(fonts.body, _ROW_PX, text, room_v)
-                    if val_font.size(text)[0] > room_v and note is not None:
-                        note, extra = None, S(_LABEL_GAP)
-                        val_font = uitext.fit_font(fonts.body, _ROW_PX, text, area.width)
-                    text = uitext.ellipsize(val_font, text, area.width)
-        val = val_font.render(text, True, colour or config.COLOR_TEXT)
-        room = area.width - val.get_width() - extra
-        shown = uitext.ellipsize(font, str(label), room)
-        if font.size(shown)[0] > room:
-            shown = ""                     # not even "..." fits: it would push the marker on
-        lab = font.render(shown, True, config.COLOR_TEXT_DIM)
+                surface.blit(t, t.get_rect(midright=(area.right, y)))
+            return y + S(ROW_STEP)
+        lab = lab_font.render(label, True, config.COLOR_TEXT_DIM)
         surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
         if note is not None:
             surface.blit(note, note.get_rect(midleft=(area.left + lab.get_width() + S(8), y)))
+        val = val_font.render(text, True, colour or config.COLOR_TEXT)
         surface.blit(val, val.get_rect(midright=(area.right, y)))
         return y + S(ROW_STEP)
 
-    def _line(self, surface, area, y, text, *, colour=None, font=None) -> int:
-        """One full-width line, trimmed to the column.
+    def _kv_fit(self, area, label: str, value: str, flag: str = ""):
+        """`(lines, label font, value font, marker width)` for a `_kv` row
+        (measured, not drawn: `_kv_lines` asks it for a line budget).
+
+        The value is the data and the label says what it is, so on one line
+        neither is trimmed. In order: both at the row size; the value alone
+        stepped down beside the whole label (UI-014.9, "fuego, viento"),
+        while it keeps `_ALONE_RATIO` of the row size; both at the largest
+        size they share ("Bajas récord 3877 (129/min)" at 1600, UI-014.11 --
+        one size, not a 15 px label beside a 22 px value). When neither
+        fits, the row takes two lines
+        (`_kv_two_lines`): at the web profile's 120 px Victory columns a
+        label used to shrink to "N..." or vanish."""
+        font = self._row
+        note = self._small.size(locale.t(flag))[0] + S(8) if flag else 0
+        extra = S(_LABEL_GAP) + note
+        if not value.strip() or not label.strip():
+            return 1, font, font, note           # one part: `_kv` fits it to the row
+        value_room = area.width - font.size(label)[0] - extra
+        if font.size(value)[0] <= value_room:
+            return 1, font, font, note
+        stepped = uitext.fit_font(fonts.body, _ROW_PX, value, value_room)
+        alone = stepped.size(value)[0] <= value_room
+        if alone and _px_of(stepped, value) >= _ROW_PX * _ALONE_RATIO:
+            return 1, font, stepped, note
+        # A value that fits alone at any step fits beside the label at the
+        # shared floor too (both floors are 70 %), so this is the last one-line
+        # case.
+        shared = _shared_step(label, value, area.width - extra)
+        if shared is not None:
+            return 1, shared, shared, note
+        return 1 + len(_value_lines(value, area.width)[1]), None, None, note
+
+    def _kv_lines(self, area, label, value, flag: str = "") -> int:
+        """How many lines `_kv` takes for this row."""
+        return self._kv_fit(area, str(label), str(value), flag)[0]
+
+    def _kv_two_lines(self, surface, area, y, label, value, colour, flag) -> int:
+        """A row whose label and value cannot share a line: the label and
+        its marker take this line, the value the next, right-aligned as ever
+        (UI-014.11) -- "Elementos" over "fuego, hielo, trueno, viento" at
+        1600. Each part steps down and, wider than the whole column even
+        then, trims; the marker gives way before the label does."""
+        note = self._small.render(locale.t(flag), True, config.COLOR_ACCENT) if flag else None
+        note_w = note.get_width() + S(8) if note else 0
+        smallest = uitext.fit_font(fonts.body, _ROW_PX, label, 0)
+        if note is not None and smallest.size(label)[0] + note_w > area.width:
+            note, note_w = None, 0            # the label before its marker
+        room = area.width - note_w
+        font = uitext.fit_font(fonts.body, _ROW_PX, label, room)
+        lab = font.render(uitext.ellipsize(font, label, room), True, config.COLOR_TEXT_DIM)
+        surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
+        if note is not None:
+            surface.blit(note, note.get_rect(midleft=(area.left + lab.get_width() + S(8), y)))
+        font, lines = _value_lines(value, area.width)
+        for line in lines:
+            y += S(ROW_STEP)
+            val = font.render(line, True, colour or config.COLOR_TEXT)
+            surface.blit(val, val.get_rect(midright=(area.right, y)))
+        return y + S(ROW_STEP)
+
+    def _line(self, surface, area, y, text, *, colour=None, font=None, step=True,
+              wrap=False) -> int:
+        """One full-width line, stepped down (UI-014.11) and then trimmed to
+        the column; with `wrap`, wrapped onto more lines instead of trimmed.
 
         Item names are rolled from affixes and run long -- "Ascendant Warded
         Weave of Scholarship" is 452 px against a 251 px column -- so without
-        the trim they draw straight over the column beside them."""
+        the trim they draw straight over the column beside them. They pass
+        `step=False`: a name is trimmed at the row size, as it always was;
+        the other lines ("+12 estadísticas más") keep their words."""
         font = font or self._row
-        t = font.render(uitext.ellipsize(font, str(text), area.width),
-                        True, colour or config.COLOR_TEXT)
-        surface.blit(t, t.get_rect(midleft=(area.left, y)))
-        return y + S(ROW_STEP)
+        text = str(text)
+        if step and font.size(text)[0] > area.width:
+            px = _SMALL_PX if font is self._small else _ROW_PX
+            font = uitext.fit_font(fonts.body, px, text, area.width)
+        lines = (uitext.wrap(font, text, area.width)
+                 if wrap and font.size(text)[0] > area.width else [text])
+        for line in lines:
+            t = font.render(uitext.ellipsize(font, line, area.width),
+                            True, colour or config.COLOR_TEXT)
+            surface.blit(t, t.get_rect(midleft=(area.left, y)))
+            y += S(ROW_STEP)
+        return y
 
     def _subheader(self, surface, area, y, text) -> int:
         """A section heading, stepped down and then trimmed to the column:
@@ -286,10 +370,12 @@ class RunSummaryPanel:
         return y + S(6)
 
     def _more(self, surface, area, y, n, what) -> int:
-        """The "+n more" line; `what` picks its `summary.more.<what>` text."""
-        if n <= 0:
+        """The "+n more" line; `what` picks its `summary.more.<what>` forms
+        ("+1 more type", "+2 more types"). Not drawn when its line would
+        fall below the column (a column with room for nothing at all)."""
+        if n <= 0 or y > area.bottom:
             return y
-        return self._line(surface, area, y, locale.t(f"summary.more.{what}", n=n),
+        return self._line(surface, area, y, locale.plural(f"summary.more.{what}", n),
                           colour=config.COLOR_TEXT_DIM, font=self._small)
 
     # --- column 1: the run --------------------------------------
@@ -359,7 +445,7 @@ class RunSummaryPanel:
         for item in items[:shown]:
             name, rarity = _item_name(item)
             y = self._line(surface, area, y, name,
-                           colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT))
+                           colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT), step=False)
         self._more(surface, area, y, len(items) - shown, "items")
 
     # --- optional column: the hero the run was played with -------
@@ -383,7 +469,7 @@ class RunSummaryPanel:
             # Victory only, and only the first time with this hero: the clear
             # is what unlocks the main-weapon choice (design section 20).
             y = self._line(surface, area, y, locale.t("summary.main_weapon"),
-                           colour=config.COLOR_ACCENT, font=self._small)
+                           colour=config.COLOR_ACCENT, font=self._small, wrap=True)
         y = self._kv(surface, area, y, locale.t("summary.hero"), s.get("character", "-"))
         trait = s.get("trait_name") or str(s.get("trait") or "").title()
         if trait:
@@ -402,11 +488,13 @@ class RunSummaryPanel:
             # let the stats fill the column and pushed both off the bottom.
             items = list(s.get("equipment", ()))
             reserve = S(ROW_STEP) * (2 + min(len(items), MAX_ITEMS))
-            fit = max(1, (area.bottom - reserve - y) // S(ROW_STEP))
-            shown = len(rows) if len(rows) <= fit else max(1, fit - 1)
-            for stat, label in rows[:shown]:
-                y = self._kv(surface, area, y, label,
-                             rs_common.fmt_stat(stat, float(stats[stat])))
+            fit = max(0, (area.bottom - reserve - y) // S(ROW_STEP))
+            # A row can take two lines (`_kv_fit`), so the budget is in lines.
+            values = [rs_common.fmt_stat(stat, float(stats[stat])) for stat, _l in rows]
+            lines = [self._kv_lines(area, label, v) for (_s, label), v in zip(rows, values)]
+            shown = _rows_that_fit(lines, fit)
+            for (stat, label), v in zip(rows[:shown], values):
+                y = self._kv(surface, area, y, label, v)
             y = self._more(surface, area, y, len(rows) - shown, "stats")
 
         items = list(s.get("equipment", ()))
@@ -414,11 +502,16 @@ class RunSummaryPanel:
         if not items:
             self._line(surface, area, y, locale.t("summary.none"), colour=config.COLOR_TEXT_DIM)
             return
-        for item in items[:MAX_ITEMS]:
+        # As many as the column still holds, as the Run column's items do.
+        step = S(ROW_STEP)
+        room = max(0, (area.bottom - step // 2 - y) // step + 1)
+        capped = items[:MAX_ITEMS]
+        shown = _rows_that_fit([1] * len(capped), room, more=len(items) > len(capped))
+        for item in items[:shown]:
             name, rarity = _item_name(item)
             y = self._line(surface, area, y, name,
-                           colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT))
-        self._more(surface, area, y, len(items) - MAX_ITEMS, "items")
+                           colour=_RARITY_ON_DARK.get(rarity, config.COLOR_TEXT), step=False)
+        self._more(surface, area, y, len(items) - shown, "items")
 
     # --- column 2: kills and blessings ---------------------------
     def _draw_kills(self, surface, assets, rect) -> None:
@@ -430,11 +523,22 @@ class RunSummaryPanel:
             y = self._line(surface, area, y, locale.t("summary.nothing_slain"),
                            colour=config.COLOR_TEXT_DIM)
         else:
-            for name, n in rows[:MAX_KILL_ROWS]:
+            # As many rows as the column holds above the rule and the total,
+            # counted in lines: a row can take two (`_kv_fit`), and fourteen
+            # Spanish names at the web profile ran the total off the bottom
+            # (UI-014.11).
+            step = S(ROW_STEP)
+            total = sum(n for _n, n in rows)
+            total_lines = self._kv_lines(area, locale.t("summary.total"), total)
+            fit = (area.bottom - step // 2 - S(6) - y) // step + 1 - total_lines
+            capped = rows[:MAX_KILL_ROWS]
+            lines = [self._kv_lines(area, name, n) for name, n in capped]
+            shown = _rows_that_fit(lines, fit, more=len(rows) > len(capped))
+            for name, n in rows[:shown]:
                 y = self._kv(surface, area, y, name, n)
-            y = self._more(surface, area, y, len(rows) - MAX_KILL_ROWS, "types")
+            y = self._more(surface, area, y, len(rows) - shown, "types")
             y = self._rule(surface, area, y)
-            self._kv(surface, area, y, locale.t("summary.total"), sum(n for _n, n in rows),
+            self._kv(surface, area, y, locale.t("summary.total"), total,
                      colour=config.COLOR_ACCENT)
 
     def _draw_blessings(self, surface, area, y) -> None:
@@ -450,12 +554,15 @@ class RunSummaryPanel:
             self._line(surface, area, y, locale.t("summary.blessings_none"),
                        colour=config.COLOR_TEXT_DIM)
             return
-        # Rows whose centre stays inside the column; the last one is given
-        # to the "+n more" line when the list does not fit.
-        fit = max(1, (area.bottom - y) // S(ROW_STEP) + 1)
-        shown = len(blessings) if len(blessings) <= fit else max(1, fit - 1)
-        for name, lvl in blessings[:shown]:
-            y = self._kv(surface, area, y, name, locale.t("summary.level_value", n=lvl))
+        # Lines whose centre stays inside the column, a two-line row counted
+        # as two; the last one is given to the "+n more" line when the list
+        # does not fit.
+        fit = max(0, (area.bottom - y) // S(ROW_STEP) + 1)
+        levels = [locale.t("summary.level_value", n=lvl) for _n, lvl in blessings]
+        shown = _rows_that_fit([self._kv_lines(area, name, lv)
+                                for (name, _l), lv in zip(blessings, levels)], fit)
+        for (name, _l), lv in zip(blessings[:shown], levels):
+            y = self._kv(surface, area, y, name, lv)
         self._more(surface, area, y, len(blessings) - shown, "blessings")
 
     # --- column 3: weapons -----------------------------------------
@@ -552,6 +659,85 @@ def weapons_min_width(font: pygame.font.Font) -> int:
     return (widest_weapon_name(font) + S(_CELL_GAP)
             + _widest(font, _widest_level()) + S(_CELL_GAP)
             + _widest(font, _WIDEST_DAMAGE) + _damage_offset(font, [1.0]) + S(_COLUMN_PAD))
+
+
+def _shared_step(label: str, value: str, room: int):
+    """The largest row font, down to `fit_font`'s floor, in which `label`
+    and `value` together fit `room` (the row's width less the gap and the
+    record marker); None when even the floor does not."""
+    return next((f for f in _row_steps()
+                 if f.size(label)[0] + f.size(value)[0] <= room), None)
+
+
+def _px_of(font, text: str) -> int:
+    """The row step `font` is, found by what it measures `text` at: the
+    largest step whose width for `text` is `font`'s."""
+    w = font.size(text)[0]
+    return next((_ROW_PX - i for i, f in enumerate(_row_steps()) if f.size(text)[0] <= w),
+                _ROW_PX)
+
+
+def _rows_that_fit(lines: list[int], fit: int, *, more: bool = False) -> int:
+    """How many rows, `lines[i]` lines tall each, to draw in `fit` lines.
+    All of them when they fit; else as many as leave one line for the
+    "+n more" line, which may be none (UI-014.11: a first row of two lines
+    in two lines of room used to be drawn anyway, over what follows).
+    `more` reserves that line even when the rows fit (a list already cut)."""
+    if not more and sum(lines) <= fit:
+        return len(lines)
+    shown, used = 0, 0
+    while shown < len(lines) and used + lines[shown] <= fit - 1:
+        used += lines[shown]
+        shown += 1
+    return shown
+
+
+def _title_room(assets, ribbon: pygame.Rect, colour: str) -> int:
+    """Native px a title has on `ribbon`: its raised front, less a margin."""
+    return widgets.ribbon_face(assets, ribbon, colour).width - S(2 * _RIBBON_PAD)
+
+
+def _ribbon_rect(assets, rect: pygame.Rect, title: str, colour: str, full_font) -> pygame.Rect:
+    """A column's ribbon: 16 px in from each side of the column; when its
+    front is too narrow for `title` even at 60 % (the web profile's four
+    Victory columns, "Enemigos abatidos" and "Enemies slain" alike), wider,
+    as far as `_RIBBON_REACH` past each side of the column -- into the gap
+    between columns, never to the next ribbon."""
+    top = rect.top - S(RIBBON_H) // 2 + S(8)
+    width = rect.width - S(32)
+    ribbon = pygame.Rect(rect.left + S(16), top, width, S(RIBBON_H))
+    if full_font.size(title)[0] <= _title_room(assets, ribbon, colour):
+        return ribbon
+    smallest = uitext.cached_font(fonts.heading, max(1, int(round(_RIBBON_PX * 0.6))))
+    need = smallest.size(title)[0]
+    widest = rect.width + 2 * S(_RIBBON_REACH)
+    while width < widest:
+        ribbon = pygame.Rect(0, top, width, S(RIBBON_H))
+        ribbon.centerx = rect.centerx
+        if _title_room(assets, ribbon, colour) >= need:
+            return ribbon
+        width = min(widest, width + S(4))
+    ribbon = pygame.Rect(0, top, widest, S(RIBBON_H))
+    ribbon.centerx = rect.centerx
+    return ribbon
+
+
+def _value_lines(value: str, width: int):
+    """`(font, lines)` for a value on lines of its own: one line, stepped
+    down to fit `width`; wider than that even at the smallest step (the
+    four elements in Spanish at the web profile), wrapped there, each line
+    trimmed only if one word alone is wider."""
+    font = uitext.fit_font(fonts.body, _ROW_PX, value, width)
+    if font.size(value)[0] <= width:
+        return font, [value]
+    return font, [uitext.ellipsize(font, line, width)
+                  for line in uitext.wrap(font, value, width)]
+
+
+def _row_steps():
+    """The row font at each `fit_font` step, largest first."""
+    floor = max(1, int(round(_ROW_PX * 0.7)))
+    return [uitext.cached_font(fonts.body, px) for px in range(_ROW_PX, floor - 1, -1)]
 
 
 def _share_text(share: float) -> str:

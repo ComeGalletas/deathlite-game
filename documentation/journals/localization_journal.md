@@ -320,6 +320,32 @@ tools.
     losing its level to the trim. The empty-synergy line is "ninguna aún  -
     una sinergia une dos armas", which fits there.
 
+- **UI-014.D20 — the web profile's 900-row screens are not this task's**
+  (UI-014.11). At the 1280x720 web profile (`config.apply_web_profile`,
+  render scale 1) the title menu, the hero select, Options and the end
+  screens are laid out for 900 rows: their lower buttons, hints and the
+  menu's summary land below or onto each other past y 620-780, in English
+  as much as in Spanish. That is the web build's layout, not the
+  translation's, and it goes to a task of its own (started 2026-09-29 in a
+  separate session, "Fit the 900-row screens to the 720 web canvas"; its
+  ID is assigned there). The fit test lists these screens in `WEB_UNFIT`
+  with the row their 900-row part starts at: below it a problem is exempt
+  while Spanish has no more of them than English; above it every screen is
+  held to the full rule. An entry whose screen fits fails the test, so the
+  list goes when that task lands.
+- **UI-014.D21 — a summary label is never trimmed** (UI-014.11; replaces
+  the trimming half of D19). A label / value row takes, in order: both at
+  the row size; the value alone stepped beside the whole label while it
+  keeps 80 % of the row size; both at the largest size they share; the
+  value alone stepped further; and when nothing fits, two lines -- the
+  label and its record marker over the value, the value wrapping if it is
+  wider than the column. The marker gives way before the label. Columns
+  budget in lines (kills, hero stats, equipment), so a two-line row can
+  never push the column past its bottom. In English at 1600 two rows of a
+  wordy run change: "Elements" beside four elements is drawn (it was left
+  out), and a kill record's "Kills best 3880 (129/min)" takes one shared
+  size (the value had stepped to 70 % beside a 22 px label).
+
 ## UI-014 — Plan
 
 ### Files
@@ -481,8 +507,21 @@ Options.
   - tests: `format_value` and every site in both languages, English pinned
     to the old strings (and the English layout gate of UI-014.9), Spanish
     checked for the D7 style; the full suite; a cold critic loop.
-- [ ] UI-014.11 — The "no stray English" AST test and the fit test, and fixes
-  for everything they flag.
+- [x] UI-014.11 — The "no stray English" AST test and the fit test, and fixes
+  for everything they flag. Plan (2026-09-29): (1) `tests/locale/test_no_stray_english.py`
+  parses every module under `ui/`, `game/states/` (not the developer tools,
+  D6), `progression/` and `game/display/`, and fails on any string literal
+  with words that is not a docstring, a log or error message, a locale key,
+  an identifier, or an entry of its allowlist -- each allowlist entry carries
+  its reason (a key legend of D16, a class name, a step name nothing draws)
+  and must still exist, so the list cannot go stale; (2)
+  `tests/screens/test_fit.py` draws every screen in both languages at
+  1600x900 and at the web profile's 1280x720 -- the menus, Options, the
+  rankings, the Sanctuary, the run's HUD with its hints and notices, pause,
+  a level-up offer, the Forge and the Monastery, the TAB panes, the end
+  banner, Game Over and Victory -- and fails when a text leaves the screen,
+  sits on another text, or Spanish trims more than English does there;
+  (3) fixes for everything they flag.
 - [ ] UI-014.12 — The full suite, the Spanish screenshots, the results, and
   the index row set to done.
 
@@ -1273,3 +1312,86 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
   - Round 3: PASS. The one survivor (`+ [1.0]` to `+ [0.0]`) is equivalent:
     the extra width is the no-break space's, the same whatever number it
     follows (measured for 0-100 at 17 scales).
+
+### UI-014.11 — no stray English, and every screen fits
+
+- **`tests/locale/test_no_stray_english.py`:** parses every module under
+  `ui/`, `game/states/`, `progression/` and `game/display/` (the developer
+  tools left out, D6) and fails on a string literal with words that is not
+  a docstring, a log call on a logger, an error, a locale key passed to
+  `locale.*`, an id (no spaces, no "..."), an upper-snake constant, a type
+  annotation, a `getattr` / library / registry name, or an `ALLOWED` entry
+  with its reason (key legends of D16, roman numerals, loading steps
+  nothing draws, the developer overlays). An `ALLOWED` entry nothing
+  matches fails. What it cannot tell: a lone lowercase word ("paused")
+  reads as an id. Nothing player-facing was left in English.
+- **The fit harness** (`tests/screens/fit_harness.py`): every drawn text
+  followed from its font through the panels, copies and scales it is
+  composed on to where its ink lands; a text cut by a panel, off the
+  screen, on another text (the same string only within a shadow's offset),
+  over the edge of a button, card or ribbon, or on a button that carries
+  its own label, is a problem; a text rendered and never placed is lost.
+- **The scenes** (`tests/screens/fit_scenes.py`), 37 of them, drawn in both
+  languages at 1600x900 and 1280x720: the menu over a played save, the hero
+  select (and with every hero's main weapon unlocked), Options (and with a
+  desktop's display rows), the rankings, the Sanctuary (upgrades, stash,
+  every slot equipped), loading, pause, the TAB panes (a full and an empty
+  run), Game Over, Victory and the end banners with their art, the HUD
+  (the hints' two stages, a notice and the boss warning, the boss bar, a
+  buff's name), a level-up offer (the wordiest of 200 rolls), the Forge
+  (two weapons), the Monastery and a buff building's picker. The in-run
+  data is the wordiest a run shows, measured in Spanish: four weapons, the
+  longest blessing names and every other blessing, every enemy kind, every
+  element.
+- **`tests/screens/test_fit.py`:** at 1600 nothing is a problem in either
+  language; at 1280 the same, but for the rows `WEB_UNFIT` exempts (D20);
+  Spanish trims no more than English (generated item names aside); no text
+  is lost; each screen draws in the language asked for.
+  `tests/screens/test_fit_rules.py` pins what the scenes cannot reach: a
+  label never trimmed at any column width, the shared size, the line
+  budgets at every column height, the ribbon titles on the art's raised
+  front, the Controls words, the cards and rail between the margins, the
+  hero cards clear of their bevel.
+- **Fixed**, all found by the fit test or its critics:
+  - the run summary (D21): labels kept whole, two-line rows, line budgets
+    for the kills, stats and equipment, the panel held above the surface's
+    bottom, a narrower column inset in a narrow column, ribbon titles on
+    the ribbon's raised front (measured from the art), the ribbon widened
+    up to 8 px past a narrow column, "+1 more type" / "+1 tipo más";
+  - the pause screen's Controls block: a word steps down, then takes two
+    lines, never past the edge ("Ataque automático" at 1280);
+  - the Forge, Monastery and buff-building pickers: the cards narrow and
+    shift so the cards and rail stay between the margins (four cards ran
+    off the screen at 1600 and at 1280); the keys hint names the cards'
+    own keys ("1/2/3/4");
+  - the hero cards: an unlocked hero's two main-weapon rows ran off
+    Aegis's card in Spanish; the rows lose their gaps, then step down;
+  - "+1 more synergy" and the other "+n more" lines have their singular.
+- **Found and handed on:** the web profile's 900-row screens (D20); at
+  the web profile the summary's rows change size row to row (D21's shared
+  step and two-line rows), which that task can revisit with the layout.
+- **Found, not fixed** (older art spacing, the same in both languages, out
+  of this task): text on a 9-slice's inner border -- the Forge and
+  Monastery rail's sub-lines ("sin portar", "not carried"), some card
+  descriptions ("Porta fuego en 1 de cada 3", "Carries fire on 1 attack in
+  3.") and a hero card's widest line. The harness checks a frame's outer
+  rect, so it does not see the border.
+- **Tests run:** full suite 3865 passed, 4747 subtests (20 min); the fit, rules, stray-English, English layout and Spanish suites on every round.
+- **Cold critic loop:** five rounds.
+  - Round 1: the kills column ran off 720 in Spanish; the ribbon fix did
+    not match the art; the end screens were checked without their art; the
+    boss bar was never drawn; lost text and same-text overlaps passed; the
+    web exemption compared counts; seven surviving mutations.
+  - Round 2: text past a card's art edge was invisible (the unlocked hero
+    card); the web exemption still loose; the scenes not the wordiest; a
+    15 px label beside a 22 px value; five surviving mutations.
+  - Round 3: the buff building's four-card picker ran off both edges at
+    1280; the menu's summary never drawn with a played save; the web
+    exemption not recorded as a decision; seven surviving mutations.
+  - Round 4: the 80 % rule and the web below-row comparison not pinned;
+    the notice scene not the run's longest notice.
+  - Round 5: PASS. Its notes tied off before the commit: the crossing
+    check pinned inside `problems`, a dead branch removed, two docstrings
+    that claimed more than their tests check. Two survivors left are
+    equivalent (a fallback both destination forms reach alike, and the
+    branch it confirmed dead).

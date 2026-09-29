@@ -1097,7 +1097,8 @@ class ItemLineTests(unittest.TestCase):
 
 
 class SummaryRowTests(unittest.TestCase):
-    """`_kv`'s geometry: a value steps down before its label trims."""
+    """`_kv`'s geometry: a value steps down, then both step, then the
+    row takes two lines; a label is never trimmed (UI-014.11)."""
 
     def setUp(self):
         _display()
@@ -1116,9 +1117,15 @@ class SummaryRowTests(unittest.TestCase):
             font = real(role, px, text, room, **k)
             stepped.append((text, font, room))
             return placed.font(font)
+        real_cached = run_summary.uitext.cached_font
+
+        def cached(role, px, **k):
+            return placed.font(real_cached(role, px, **k))
         area = pygame.Rect(0, 0, width, 400)
-        with mock.patch.object(run_summary.uitext, "fit_font", fit):
-            self.panel._kv(placed.Surface((width, 400)), area, 20, label, value, flag=flag)
+        with mock.patch.object(run_summary.uitext, "fit_font", fit), \
+                mock.patch.object(run_summary.uitext, "cached_font", cached):
+            self.last_y = self.panel._kv(placed.Surface((width, 400)), area, 20, label, value,
+                                         flag=flag)
         self.panel._row = self.panel._row.font
         self.panel._small = self.panel._small.font
         return placed.where, stepped
@@ -1145,37 +1152,49 @@ class SummaryRowTests(unittest.TestCase):
         self.assertIn(label, where)                                  # whole
         self.assertLessEqual(where[label][0].right + self.S(12), where[value][0].left)
 
-    def test_a_trimmed_label_stops_short_of_its_marker(self):
+    def test_a_label_too_long_for_the_row_takes_its_own_line(self):
+        """UI-014.11: a label is never trimmed. Its marker stays beside it,
+        the value goes to the next line, right-aligned as ever."""
         label, value, width = "A very long label indeed", "845   (83/min)", 226
-        where, stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
-        trimmed = [t for t in where if t.endswith("...")]
-        self.assertEqual(len(trimmed), 1)
-        self.assertLessEqual(where[trimmed[0]][0].right + self.S(8), where["best"][0].left)
-        self.assertLessEqual(where["best"][0].right + self.S(12), where[value][0].left)
+        where, _stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
+        self.assertFalse([t for t in where if t.endswith("...")])
+        self.assertIn(label, where)
+        (lab,), (best,), (val,) = where[label], where["best"], where[value]
+        self.assertLessEqual(lab.right, best.left)
+        self.assertLessEqual(best.right, width)
+        self.assertGreater(val.top, lab.bottom)
+        self.assertEqual(val.right, width)
+        self.assertEqual(self.last_y, 20 + 2 * self.S(run_summary.ROW_STEP))
 
-    def test_a_step_that_cannot_save_the_label_is_not_taken(self):
-        """Even the smallest step leaves no room for "Elements": the value
-        keeps its size, as it always did, and the label gives way."""
-        value = "fire, ice, thunder, wind"                # fits the column alone
-        where, stepped = self.row("Elements", value, 226)
-        self.assertEqual(len(stepped), 1)                 # tried, and declined
-        self.assertEqual(where[value][0].width, self.panel._row.size(value)[0])
+    def test_the_label_and_the_value_both_step_before_two_lines(self):
+        """"Bajas récord 3877 (129/min)", the Victory Run column at 1600: the
+        value alone cannot step far enough to leave "Bajas" whole at the row
+        size, but both stepped share the line (UI-014.11)."""
+        label, value, width = "Bajas", "3877   (129/min)", 228
+        locale.set_language("es")
+        self.addCleanup(locale.set_language, locale.DEFAULT)
+        where, _stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
+        self.assertEqual(set(where), {label, "récord", value})
+        (lab,), (best,), (val,) = where[label], where["récord"], where[value]
+        self.assertLess(abs(lab.centery - val.centery), self.S(6))    # one line
+        self.assertLessEqual(best.right + self.S(12), val.left)
+        self.assertEqual(self.last_y, 20 + self.S(run_summary.ROW_STEP))
 
-    def test_a_value_wider_than_the_column_steps_to_fit_it(self):
-        """All four elements in Spanish: no step saves "Elementos", but the
-        value alone is wider than the column; it steps to the column's
-        width rather than running off its left edge."""
+    def test_four_elements_go_under_their_label(self):
+        """No step leaves "Elementos" whole beside the four Spanish elements:
+        the value takes the next line, stepped to the column. English's four
+        share their line, both stepped."""
         value, width = "fuego, hielo, trueno, viento", 226
         self.assertGreater(self.panel._row.size(value)[0], width)
-        where, stepped = self.row("Elementos", value, width)
-        self.assertEqual([room for _t, _f, room in stepped][-1], width)
-        self.assertGreaterEqual(where[value][0].left, 0)
-        self.assertLessEqual(where[value][0].width, width)
-        # English, the same four: it fits the column, and keeps its size.
-        value = "fire, ice, thunder, wind"
-        self.assertLessEqual(self.panel._row.size(value)[0], width)
-        where, _stepped = self.row("Elements", value, width)
-        self.assertEqual(where[value][0].width, self.panel._row.size(value)[0])
+        where, _stepped = self.row("Elementos", value, width)
+        (lab,), (val,) = where["Elementos"], where[value]
+        self.assertGreater(val.top, lab.bottom)
+        self.assertGreaterEqual(val.left, 0)
+        self.assertLessEqual(val.right, width)
+        where, _stepped = self.row("Elements", "fire, ice, thunder, wind", width)
+        (lab,), (val,) = where["Elements"], where["fire, ice, thunder, wind"]
+        self.assertLess(abs(lab.centery - val.centery), self.S(6))
+        self.assertLessEqual(lab.right + self.S(12), val.left)
 
     def test_a_value_that_exactly_fits_is_not_stepped(self):
         label, value = "Elements", "fire, wind"
@@ -1192,62 +1211,53 @@ class SummaryRowTests(unittest.TestCase):
         self.assertEqual(where[value][0].width, target.size(value)[0])
         self.assertIn(label, where)
 
-    def body_size(self, value, room):
-        """The largest step (22 down to 15) whose `value` fits `room`."""
-        return next((k for k in range(22, 14, -1) if fonts.body(k).size(value)[0] <= room), None)
-
-    def test_a_marker_row_steps_to_fit_beside_its_marker(self):
+    def test_a_marker_row_with_no_room_for_its_label_takes_two_lines(self):
+        """Room for the marker and the value at 17 px, none for "Enemigos"
+        beside them: the marker stays with its label, the value goes to the
+        next line at the size that fits the column."""
         label, value = "Enemigos", "99999   (1666/min)"
         marker = self.panel._small.size("best")[0]
         extra = self.S(12) + marker + self.S(8)
         width = extra + fonts.body(17).size(value)[0]
-        where, stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
-        self.assertEqual(self.body_size(value, width - extra), 17)
-        self.assertIn("best", where)                                  # kept
-        self.assertEqual(where[value][0].width, fonts.body(17).size(value)[0])
-        self.assertLessEqual(where["best"][0].right + self.S(12), where[value][0].left)
+        where, _stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
+        self.assertIn("best", where)
+        self.assertIn(label, where)
+        fitted = run_summary.uitext.fit_font(fonts.body, 22, value, width)
+        self.assertEqual(where[value][0].width, fitted.size(value)[0])
+        self.assertGreater(where[value][0].top, where["best"][0].bottom)
 
-    def test_a_marker_that_leaves_no_room_is_dropped(self):
-        """Even the smallest step does not fit beside the marker: the marker
-        goes, the value fits the whole row at its full size, and the label
-        keeps what room is left (just "...")."""
+    def test_a_marker_that_leaves_no_room_goes_before_the_label(self):
+        """So narrow that even the smallest label and the marker do not share
+        a line: the marker gives way, the label keeps its words, the value
+        its size on the line below."""
         label, value = "Enemigos", "999"
-        width = self.panel._row.size(value)[0] + self.S(12) + self.panel._row.size("...")[0] + 1
-        marker = self.S(12) + self.panel._small.size("best")[0] + self.S(8)
-        self.assertGreater(fonts.body(15).size(value)[0], width - marker)   # the premise
-        where, stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
-        self.assertNotIn("best", where)                               # dropped
-        self.assertEqual(where[value][0].width, self.panel._row.size(value)[0])   # whole, full size
-        self.assertIn("...", where)                                   # the label's room, used
-
-    def test_after_the_marker_drops_the_label_keeps_exactly_its_gap(self):
-        """With the marker gone the label stops exactly `_LABEL_GAP` short of
-        the value: at the width that leaves "I..." that gap, "I..." is drawn;
-        one pixel less, only "..." is."""
-        label, value = "Impuestos", "999"
-        row = self.panel._row
-        gap = self.S(run_summary._LABEL_GAP)
-        self.assertEqual(run_summary._LABEL_GAP, 12)
-        width = row.size(value)[0] + row.size("I...")[0] + gap
-        marker = gap + self.panel._small.size("best")[0] + self.S(8)
-        self.assertGreater(fonts.body(15).size(value)[0], width - 1 - marker)   # the drop branch
+        smallest = run_summary.uitext.fit_font(fonts.body, 22, label, 0)
+        width = smallest.size(label)[0] + 2
         where, _stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
         self.assertNotIn("best", where)
-        self.assertIn("I...", where)
-        self.assertEqual(where[value][0].left - where["I..."][0].right, gap)
-        where, _stepped = self.row(label, value, width - 1, flag=run_summary.BEST_FLAG)
-        self.assertNotIn("I...", where)
-        self.assertIn("...", where)
+        self.assertIn(label, where)
+        self.assertGreater(where[value][0].top, where[label][0].bottom)
 
-    def test_a_value_wider_than_the_row_even_at_the_smallest_step_is_trimmed(self):
+    def test_a_two_line_value_sits_one_row_below_at_the_right_edge(self):
+        label, value = "Impuestos", "999"
+        width = self.panel._row.size(label)[0] + 4
+        where, _stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
+        self.assertEqual(where[value][0].right, width)
+        self.assertEqual(self.last_y, 20 + 2 * self.S(run_summary.ROW_STEP))
+
+    def test_a_word_wider_than_the_column_is_trimmed_on_its_own_line(self):
+        """60 px: the value wraps under its label, "99999" whole; "(1666/min)"
+        is wider than the column even at the smallest step, so it alone
+        trims. Nothing leaves the column."""
         label, value, width = "Enemigos", "99999   (1666/min)", 60
         self.assertGreater(fonts.body(15).size(value)[0], width)      # the premise
-        where, stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
-        self.assertNotIn("best", where)
-        trimmed = [t for t in where if t.startswith("9") and t.endswith("...")]
-        self.assertEqual(len(trimmed), 1)
-        self.assertLessEqual(where[trimmed[0]][0].width, width)
-        self.assertGreaterEqual(where[trimmed[0]][0].left, 0)
+        where, _stepped = self.row(label, value, width, flag=run_summary.BEST_FLAG)
+        self.assertIn("99999", where)
+        self.assertTrue([t for t in where if t.startswith("(") and t.endswith("...")])
+        for rects in where.values():
+            for r in rects:
+                self.assertGreaterEqual(r.left, 0)
+                self.assertLessEqual(r.right, width)
 
     def test_the_marker_counts_against_the_room(self):
         label, value, width = "Kills", "845   (83/min)", 226
@@ -1257,19 +1267,6 @@ class SummaryRowTests(unittest.TestCase):
                          - self.S(12) - marker_w - self.S(8))
         self.assertIn("Kills", where)
         self.assertLessEqual(where["best"][0].right, where[value][0].left)
-
-    def test_a_value_too_wide_even_stepped_trims_the_label(self):
-        label, value = "Elements", "fire, ice, thunder, wind"
-        where, stepped = self.row(label, value, 226)
-        self.assertEqual(len(stepped), 1)
-        # No step saves the whole label, so the value keeps its size.
-        self.assertEqual(where[value][0].width, self.panel._row.size(value)[0])
-        self.assertNotIn(label, where)                               # trimmed, not overlapped
-        trimmed = [t for t in where if t.endswith("...")]
-        self.assertLessEqual(len(trimmed), 1)
-        for t in trimmed:
-            self.assertTrue(label.startswith(t[:-3]))
-            self.assertLessEqual(where[t][0].right + self.S(12), where[value][0].left)
 
 
 class SummaryPairTests(unittest.TestCase):

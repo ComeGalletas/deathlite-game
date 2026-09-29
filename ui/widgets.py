@@ -115,3 +115,31 @@ def draw_ribbon(surface: pygame.Surface, assets, rect: pygame.Rect, label: str |
     text_rect = text.get_rect(center=rect.center)
     surface.blit(text, text_rect)
     return text_rect
+
+
+_FACES: dict[tuple, tuple[int, int]] = {}
+
+
+def ribbon_face(assets, rect: pygame.Rect, colour: str = "blue") -> pygame.Rect:
+    """The ribbon's raised front at `rect`: where a title can sit. The forked
+    tails either side are lower and fold back, so a title over them runs
+    off the band (UI-014.11). Measured from the art as sliced to this size
+    -- the columns whose top edge is the band's highest, within 2 px --
+    and cached; the whole rect without art, inset by the flat border."""
+    rect = pygame.Rect(rect)
+    art = (panels.slice(assets, ribbon_sheet(colour), rect.size)
+           if assets is not None else None)
+    if art is None:
+        inset = scale.px(6)
+        return pygame.Rect(rect.left + inset, rect.top, max(0, rect.width - 2 * inset), rect.height)
+    key = (id(assets), colour, rect.size)
+    if key not in _FACES:
+        w, h = art.get_size()
+        tops = []
+        for x in range(w):
+            tops.append(next((y for y in range(h) if art.get_at((x, y))[3] > 128), h))
+        high = min(tops)
+        face = [x for x, t in enumerate(tops) if t <= high + 2]
+        _FACES[key] = (face[0], face[-1] + 1) if face else (0, w)
+    left, right = _FACES[key]
+    return pygame.Rect(rect.left + left, rect.top, right - left, rect.height)

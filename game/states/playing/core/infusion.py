@@ -139,7 +139,7 @@ def offer(ps, *, element=None, title=None, on_done=None) -> None:
         choices=() if element is None else weapon_cards(player, element),
         weapon_rows=rows, offers_for=offers_for,
         rail_heading=RAIL_HEADING,
-        hint=locale.t("infusion.hint_rail" if element is None else "infusion.hint"),
+        hint_key="infusion.hint_rail" if element is None else "infusion.hint",
         title=title or locale.t("infusion.title"),
         cancelable=True,
         on_done=on_done or (lambda u: _noticed(ps, u)))

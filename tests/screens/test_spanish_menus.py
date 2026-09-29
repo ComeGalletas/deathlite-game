@@ -202,7 +202,7 @@ class SpanishScreenTests(unittest.TestCase):
         self.assertIn("Subes de nivel  -  elige una", seen)
         self.assertIn("COMÚN", seen)
         self.assertIn("Arma de invocación", seen)
-        self.assertIn("1/2/3 o Izquierda/Derecha + Enter para elegir    -    "
+        self.assertIn("1 o Izquierda/Derecha + Enter para elegir    -    "     # one card
                       "o haz clic en una carta", seen)
         # The long Spanish title is drawn smaller, inside the card.
         from ui import scale
@@ -215,13 +215,15 @@ class SpanishScreenTests(unittest.TestCase):
     def test_level_up_state_default_hints(self):
         from game.states.level_up_state import LevelUpState
         rows = SimpleNamespace(weapon_rows=[1], cancelable=True, _hint_arg=None,
+                               _hint_key=None, choices=[1, 2, 3],
                                _default_hint=lambda: LevelUpState._default_hint(rows))
         self.assertEqual(LevelUpState.hint.fget(rows).split("    -    ")[0],
                          "Arriba/Abajo: elegir fila")
         leave = SimpleNamespace(weapon_rows=[], cancelable=True, _hint_arg=None,
+                                _hint_key=None, choices=[1, 2, 3],
                                 _default_hint=lambda: LevelUpState._default_hint(leave))
         self.assertTrue(LevelUpState.hint.fget(leave).endswith("ESC para salir"))
-        own = SimpleNamespace(_hint_arg="custom", _default_hint=lambda: "x")
+        own = SimpleNamespace(_hint_arg="custom", _hint_key=None, _default_hint=lambda: "x")
         self.assertEqual(LevelUpState.hint.fget(own), "custom")
 
     def test_the_loading_label_follows_the_language(self):
@@ -285,11 +287,14 @@ class SpanishScreenTests(unittest.TestCase):
         title, rows, controls, fitted = [], [], [], []
         pause._title_font = _Recorder(pause._title_font, title)
         pause._font = _Recorder(pause._font, rows)
-        pause._controls_font = _Recorder(pause._controls_font, controls)
         pause._controls_head = _Recorder(pause._controls_head, controls)
+        from ui import controls_block
         real_fit = paused_state.fit_font
+        real_cached = controls_block.uitext.cached_font
         with mock.patch.object(paused_state, "fit_font",
-                               lambda *a, **k: _Recorder(real_fit(*a, **k), fitted)):
+                               lambda *a, **k: _Recorder(real_fit(*a, **k), fitted)), \
+                mock.patch.object(controls_block.uitext, "cached_font",
+                                  lambda *a, **k: _Recorder(real_cached(*a, **k), controls)):
             pause.draw(self.game.screen)
         self.assertEqual(title, ["Pausa"])
         for want in ("Continuar", "Estado de la partida", "Opciones", "Teclas",

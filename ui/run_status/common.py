@@ -220,10 +220,11 @@ def rule(surface, area, y) -> int:
 
 
 def more(surface, font, area, y, n: int, key: str) -> int:
-    """The "+n more" line; `key` is its locale template, filled with `n`."""
+    """The "+n more" line; `key` names its `.one` / `.other` forms ("+1 more
+    synergy", "+2 more synergies")."""
     if n <= 0:
         return y
-    return line(surface, font, area, y, locale.t(key, n=n), colour=config.COLOR_TEXT_DIM)
+    return line(surface, font, area, y, locale.plural(key, n), colour=config.COLOR_TEXT_DIM)
 
 
 def fits(area, y, rows: int, step: int = ROW_STEP) -> int:

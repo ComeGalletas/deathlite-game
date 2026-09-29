@@ -102,9 +102,9 @@
   },
   "level_up": {
     "title": "Level Up  -  choose one",
-    "hint_cards": "1/2/3 or Left/Right + Enter to pick    -    or click a card",
-    "hint_leave": "1/2/3 or Left/Right + Enter to pick    -    ESC to leave",
-    "hint_rows": "Up/Down pick the row    -    1/2/3 or Left/Right + Enter to choose    -    ESC to leave",
+    "hint_cards": "{keys} or Left/Right + Enter to pick    -    or click a card",
+    "hint_leave": "{keys} or Left/Right + Enter to pick    -    ESC to leave",
+    "hint_rows": "Up/Down pick the row    -    {keys} or Left/Right + Enter to choose    -    ESC to leave",
     "new": "New: {name}",
     "line": {
       "weapon": "{weapon} {category}",
@@ -182,7 +182,7 @@
   },
   "forge": {
     "title": "The Forge  -  choose a weapon to reforge",
-    "hint": "Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter to forge    -    ESC to leave",
+    "hint": "Up/Down pick the weapon    -    {keys} or Left/Right + Enter to forge    -    ESC to leave",
     "reforged": "The {weapon} is reforged: {forge}.",
     "all_forged": "Every weapon is already forged.",
     "needs": {
@@ -221,8 +221,8 @@
       "every": "on every attack"
     },
     "no_weapon": "No weapon to infuse.",
-    "hint_rail": "Up/Down pick the element    -    1/2/3 or Left/Right + Enter to infuse    -    ESC to leave",
-    "hint": "1/2/3 or Left/Right + Enter to infuse    -    ESC to leave",
+    "hint_rail": "Up/Down pick the element    -    {keys} or Left/Right + Enter to infuse    -    ESC to leave",
+    "hint": "{keys} or Left/Right + Enter to infuse    -    ESC to leave",
     "title": "Choose an element, then a weapon",
     "buff_title": "{element} - choose a weapon to infuse",
     "done": "The {weapon} carries {element}."
@@ -387,11 +387,26 @@
     "blessings_none": "none",
     "items": "Items acquired  ({n})",
     "more": {
-      "items": "+{n} more items",
-      "stats": "+{n} more stats",
-      "types": "+{n} more types",
-      "blessings": "+{n} more blessings",
-      "sources": "+{n} more sources"
+      "items": {
+        "one": "+{n} more item",
+        "other": "+{n} more items"
+      },
+      "stats": {
+        "one": "+{n} more stat",
+        "other": "+{n} more stats"
+      },
+      "types": {
+        "one": "+{n} more type",
+        "other": "+{n} more types"
+      },
+      "blessings": {
+        "one": "+{n} more blessing",
+        "other": "+{n} more blessings"
+      },
+      "sources": {
+        "one": "+{n} more source",
+        "other": "+{n} more sources"
+      }
     },
     "main_weapon": "Main weapon unlocked",
     "hero": "Hero",
@@ -456,7 +471,10 @@
     "forging": "Forging: {name}  -  {identity}",
     "synergies": "Synergies  ({n})",
     "synergies_none": "none yet  -  a synergy blessing links two weapons",
-    "more_synergies": "+{n} more synergies",
+    "more_synergies": {
+      "one": "+{n} more synergy",
+      "other": "+{n} more synergies"
+    },
     "blessings": "Blessings  ({n})",
     "none_yet": "none yet",
     "blessings_help": "Blessings come from level-ups and the village.",

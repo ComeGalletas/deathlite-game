@@ -43,10 +43,18 @@ _NAME_PX = 24               # the card title's design font size
 
 # The level-up width, and the narrower one the Forge uses so its weapon rail
 # has somewhere to live. Three 260-wide cards and two 40 px gaps come to 860,
-# which leaves 370 px a side at 1600 and 210 at the 1280 web profile -- enough
-# for the rail on both, where the 340 width leaves only 90 on web.
+# which leaves 370 px a side at 1600: room for the rail (250 + 30). Where the
+# cards leave less -- four of them (the Monastery, four weapons), or the 1280
+# web profile -- `LevelUpState.card_layout` narrows and shifts them.
 CARD_W = 340
 CARD_W_NARROW = 260
+CARD_GAP = 40               # between two cards
+
+
+def number_keys(n: int) -> str:
+    """The number keys `n` cards answer to, for a hint's `{keys}`: "1/2/3",
+    "1/2/3/4" (`ui/menu_nav.py` reads 1 to 9)."""
+    return "/".join(str(i + 1) for i in range(max(1, n)))
 
 
 def category_line(up) -> str:
@@ -112,11 +120,13 @@ class LevelUpPanel:
 
     def draw(self, surface: pygame.Surface, choices, selected: int, *,
              assets=None, pressed=None, title=None, hint=None,
-             card_w: int = CARD_W, dim: bool = True) -> None:
+             card_w: float = CARD_W, dim: bool = True, x_shift: int = 0) -> None:
         """`card_w` narrows the cards so something else can share the screen --
         the Forge's weapon rail (`ui/forge_rail.py`) sits in the margin the
-        narrower cards free up. The default is the level-up width and that path
-        is unchanged, which `tests/screens/test_level_up.py` pins."""
+        narrower cards free up -- and `x_shift` (native px) moves them right
+        of centre when that margin is still too small. The defaults are the
+        level-up layout and that path is unchanged, which
+        `tests/screens/test_level_up.py` pins."""
         w, h = surface.get_size()
         if dim:
             self.draw_dim(surface)
@@ -128,9 +138,9 @@ class LevelUpPanel:
         n = len(choices)
         card_w = scale.px(card_w)               # design widths in; native px from here on
         card_h = scale.px(_CARD_H)
-        gap = scale.px(40)
+        gap = scale.px(CARD_GAP)
         total = n * card_w + (n - 1) * gap
-        x0 = (w - total) // 2
+        x0 = (w - total) // 2 + x_shift
         y = h // 2 - scale.px(_CARD_TOP_H) // 2   # the top edge stays where the 200-tall card had it
 
         self.hits.clear()
@@ -182,7 +192,7 @@ class LevelUpPanel:
                 surface.blit(tag, tag.get_rect(midbottom=(rect.centerx, y + card_h - scale.px(39) + dy)))
 
         hint = self._hint.render(
-            hint or locale.t("level_up.hint_cards"),
+            hint or locale.t("level_up.hint_cards", keys=number_keys(n)),
             True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(w // 2, y + card_h + scale.px(60))))
 

@@ -145,14 +145,14 @@ class RunNoticeTests(unittest.TestCase):
         en, es = self.in_both(open_forge)
         self.assertEqual(en, (
             "The Forge  -  choose a weapon to reforge",
-            "Up/Down pick the weapon    -    1/2/3 or Left/Right + Enter to forge"
+            "Up/Down pick the weapon    -    1/2 or Left/Right + Enter to forge"
             "    -    ESC to leave",
             [f"{self.need} / {self.need} blessings"],
             "REFORGE WHICH WEAPON",
             "The sword is reforged: Forged."))
         self.assertEqual(es, (
             "La Forja  -  elige un arma para reforjar",
-            "Arriba/Abajo: elegir arma    -    1/2/3 o Izquierda/Derecha + Enter para forjar"
+            "Arriba/Abajo: elegir arma    -    1/2 o Izquierda/Derecha + Enter para forjar"
             "    -    ESC para salir",
             [f"{self.need} / {self.need} bendiciones"],
             "¿QUÉ ARMA REFORJAR?",
@@ -176,14 +176,14 @@ class RunNoticeTests(unittest.TestCase):
         self.assertFalse(it.used)
         self.assertEqual(en[:5], (
             "The Monastery  -  choose an element, then a weapon",
-            "Up/Down pick the element    -    1/2/3 or Left/Right + Enter to infuse"
+            "Up/Down pick the element    -    1 or Left/Right + Enter to infuse"
             "    -    ESC to leave",
             ["Fire", "Ice", "Thunder", "Wind"], ["not carried"] * 4,
             "INFUSE WITH WHICH ELEMENT"))
         self.assertTrue(en[5].startswith("Carries fire "), en[5])
         self.assertEqual(es[:5], (
             "El Monasterio  -  elige un elemento y luego un arma",
-            "Arriba/Abajo: elegir elemento    -    1/2/3 o Izquierda/Derecha + Enter "
+            "Arriba/Abajo: elegir elemento    -    1 o Izquierda/Derecha + Enter "
             "para infundir    -    ESC para salir",
             ["Fuego", "Hielo", "Trueno", "Viento"], ["sin portar"] * 4,
             "¿CON QUÉ ELEMENTO INFUNDIR?"))
@@ -217,9 +217,9 @@ class RunNoticeTests(unittest.TestCase):
         finally:
             self.p.buffs.update(600.0)                     # every buff runs out
         self.assertEqual(en, ("Ice - choose a weapon to infuse",
-                              "1/2/3 or Left/Right + Enter to infuse    -    ESC to leave"))
+                              "1 or Left/Right + Enter to infuse    -    ESC to leave"))
         self.assertEqual(es, ("Hielo - elige un arma para infundir",
-                              "1/2/3 o Izquierda/Derecha + Enter para infundir    -    ESC para salir"))
+                              "1 o Izquierda/Derecha + Enter para infundir    -    ESC para salir"))
 
     def test_the_picker_titles_itself_when_no_title_is_given(self):
         def open_picker():

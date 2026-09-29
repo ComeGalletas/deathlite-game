@@ -101,9 +101,9 @@
   },
   "level_up": {
     "title": "Subes de nivel  -  elige una",
-    "hint_cards": "1/2/3 o Izquierda/Derecha + Enter para elegir    -    o haz clic en una carta",
-    "hint_leave": "1/2/3 o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
-    "hint_rows": "Arriba/Abajo: elegir fila    -    1/2/3 o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
+    "hint_cards": "{keys} o Izquierda/Derecha + Enter para elegir    -    o haz clic en una carta",
+    "hint_leave": "{keys} o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
+    "hint_rows": "Arriba/Abajo: elegir fila    -    {keys} o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
     "new": "Nueva arma: {name}",
     "line": {
       "weapon": "{weapon} · {category}",
@@ -181,7 +181,7 @@
   },
   "forge": {
     "title": "La Forja  -  elige un arma para reforjar",
-    "hint": "Arriba/Abajo: elegir arma    -    1/2/3 o Izquierda/Derecha + Enter para forjar    -    ESC para salir",
+    "hint": "Arriba/Abajo: elegir arma    -    {keys} o Izquierda/Derecha + Enter para forjar    -    ESC para salir",
     "reforged": "Reforja de {weapon}: {forge}.",
     "all_forged": "Todas las armas ya están forjadas.",
     "needs": {
@@ -220,8 +220,8 @@
       "every": "en cada ataque"
     },
     "no_weapon": "No hay armas que infundir.",
-    "hint_rail": "Arriba/Abajo: elegir elemento    -    1/2/3 o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
-    "hint": "1/2/3 o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
+    "hint_rail": "Arriba/Abajo: elegir elemento    -    {keys} o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
+    "hint": "{keys} o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
     "title": "Elige un elemento y luego un arma",
     "buff_title": "{element} - elige un arma para infundir",
     "done": "Infusión de {element} en {weapon}."
@@ -386,11 +386,26 @@
     "blessings_none": "ninguna",
     "items": "Objetos obtenidos  ({n})",
     "more": {
-      "items": "+{n} objetos más",
-      "stats": "+{n} estadísticas más",
-      "types": "+{n} tipos más",
-      "blessings": "+{n} bendiciones más",
-      "sources": "+{n} fuentes más"
+      "items": {
+        "one": "+{n} objeto más",
+        "other": "+{n} objetos más"
+      },
+      "stats": {
+        "one": "+{n} estadística más",
+        "other": "+{n} estadísticas más"
+      },
+      "types": {
+        "one": "+{n} tipo más",
+        "other": "+{n} tipos más"
+      },
+      "blessings": {
+        "one": "+{n} bendición más",
+        "other": "+{n} bendiciones más"
+      },
+      "sources": {
+        "one": "+{n} fuente más",
+        "other": "+{n} fuentes más"
+      }
     },
     "main_weapon": "Arma principal liberada",
     "hero": "Héroe",
@@ -455,7 +470,10 @@
     "forging": "Forja: {name}  -  {identity}",
     "synergies": "Sinergias  ({n})",
     "synergies_none": "ninguna aún  -  una sinergia une dos armas",
-    "more_synergies": "+{n} sinergias más",
+    "more_synergies": {
+      "one": "+{n} sinergia más",
+      "other": "+{n} sinergias más"
+    },
     "blessings": "Bendiciones  ({n})",
     "none_yet": "ninguna aún",
     "blessings_help": "Las bendiciones llegan al subir de nivel y en la aldea.",

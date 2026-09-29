@@ -25,7 +25,7 @@ from systems.animation import Animator
 from ui import widgets
 from ui import scale as ui_scale     # `scale` is a rig field here
 from ui.menu_nav import MenuNav
-from ui.text import shadowed, wrap
+from ui.text import cached_font, shadowed, wrap
 
 # The preview cycles these; idle / walk are held for a beat, attack plays once.
 _PREVIEW_PHASES = ("idle", "walk", "attack")
@@ -41,6 +41,13 @@ _PREVIEW_ZOOM = 3.0
 # Card body text wraps to the card width minus this inset each side, measured
 # in the body font (`ui.text.wrap`), so it always clears the 9-slice frame.
 _CARD_TEXT_INSET = 19       # 16 for the 9-slice frame + 3 px of breathing room
+# The card's text rows: the first row's top below the card's, the room kept
+# above its bottom bevel, and the row step at the body size.
+_CARD_ROWS_TOP = 66
+_CARD_ROWS_BOTTOM = 22
+_CARD_ROW_STEP = 24
+_CARD_BODY_PX = 20
+_CARD_TRAIT_PX = 20
 # The Begin button under the difficulty line, and the gaps around it. Drawn
 # from the `wide` button sheets at the pack's native 64 px (the caps and
 # bevel are authored for that height); 256 wide = four tiles.
@@ -69,9 +76,9 @@ class CharacterSelectState(State):
         self.diff_index = config.DIFFICULTY_ORDER.index(config.DIFFICULTY_DEFAULT)
         self._title = fonts.heading(44)
         self._name = fonts.heading(30)          # hero names, "Difficulty:", Begin (title face)
-        self._trait = fonts.heading(20)         # the trait line, title face
+        self._trait = fonts.heading(_CARD_TRAIT_PX)   # the trait line, title face
         self._diff_type = fonts.body(26)        # the difficulty *type*, body face
-        self._body = fonts.body(20)
+        self._body = fonts.body(_CARD_BODY_PX)
         self._instr = fonts.body(17)   # ~85% of the body font
         self._hint = fonts.body(16)
         # The hero cards run left to right; Up / Down come back as the cross
@@ -170,6 +177,39 @@ class CharacterSelectState(State):
             self._step_weapon(-1)
         elif kind == "click" and key == "weapon_next":
             self._step_weapon(+1)
+
+    def _card_rows(self, c, trait_line, weapon_line, unlocked, text_w, room):
+        """`(body font, trait font, row step, rows)` for a hero card whose
+        rows get `room` native px. As always when they fit; else without the
+        blank separators; else the body and trait text a size smaller at a
+        time, re-wrapped, with their step (to 70 %; at the floor the rows are
+        what they are). An unlocked hero's two main-weapon rows in Spanish
+        ("Arma principal:" / "< Espada >") ran off Aegis's card
+        (UI-014.11)."""
+        S = ui_scale.px
+
+        def rows_in(font, gaps):
+            gap = [""] if gaps else []
+            return (wrap(font, locale.text(c, "identity"), text_w) + gap + [trait_line]
+                    + wrap(font, locale.text(c, "trait_desc"), text_w) + gap
+                    + [locale.t("hero_select.main_weapon") if unlocked else weapon_line]
+                    + ([weapon_line] if unlocked else []))
+        step = S(_CARD_ROW_STEP)
+        rows = rows_in(self._body, True)
+        if len(rows) * step <= room:
+            return self._body, self._trait, step, rows
+        rows = rows_in(self._body, False)
+        if len(rows) * step <= room:
+            return self._body, self._trait, step, rows
+        floor = max(1, int(round(_CARD_BODY_PX * 0.7)))
+        for px in range(_CARD_BODY_PX - 1, floor - 1, -1):
+            font = cached_font(fonts.body, px)
+            trait = cached_font(fonts.heading, round(_CARD_TRAIT_PX * px / _CARD_BODY_PX))
+            step = S(_CARD_ROW_STEP * px / _CARD_BODY_PX)
+            rows = rows_in(font, False)
+            if len(rows) * step <= room:
+                break
+        return font, trait, step, rows
 
     def _card_state(self, i: int) -> str:
         """Armed (first click landed) or held down -> `pressed`; the selected
@@ -278,17 +318,14 @@ class CharacterSelectState(State):
             weapon_line = (f"<  {self._weapon_name(self._main_weapon[cid])}  >" if unlocked
                            else locale.t("hero_select.starts_with",
                                          weapon=self._weapon_name(c["starting_weapon"])))
-            rows = wrap(self._body, locale.text(c, "identity"), text_w) + [
-                "", trait_line,
-            ] + wrap(self._body, locale.text(c, "trait_desc"), text_w) + [
-                "", locale.t("hero_select.main_weapon") if unlocked else weapon_line,
-            ] + ([weapon_line] if unlocked else [])
+            body, trait, step, rows = self._card_rows(c, trait_line, weapon_line, unlocked, text_w,
+                                               card_h - S(_CARD_ROWS_TOP + _CARD_ROWS_BOTTOM))
             for j, line in enumerate(rows):
                 if line == trait_line:
-                    surf = shadowed(self._trait, line, config.COLOR_ACCENT)
+                    surf = shadowed(trait, line, config.COLOR_ACCENT)
                 else:
-                    surf = self._body.render(line, True, config.COLOR_ON_BUTTON_DIM)
-                r = surf.get_rect(midtop=(rect.centerx, y + S(66 + j * 24) + dy))
+                    surf = body.render(line, True, config.COLOR_ON_BUTTON_DIM)
+                r = surf.get_rect(midtop=(rect.centerx, y + S(_CARD_ROWS_TOP) + j * step + dy))
                 surface.blit(surf, r)
                 if unlocked and line == weapon_line and i == self.index:
                     # The arrows are click targets (P5): each takes its half

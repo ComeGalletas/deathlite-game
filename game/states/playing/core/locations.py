@@ -186,7 +186,7 @@ class SpecialLocations:
             on_done=lambda u: ps.notice(locale.t(
                 "forge.reforged", weapon=self._base_name(u.weapon), forge=u.title)),
             title=locale.t("forge.title"), cancelable=True,
-            hint=locale.t("forge.hint"))
+            hint_key="forge.hint")
 
     def _base_name(self, weapon_id) -> str:
         """The reforged weapon's own name, lower-case for the middle of the

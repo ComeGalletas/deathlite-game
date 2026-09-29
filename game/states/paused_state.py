@@ -76,7 +76,6 @@ class PausedState(State):
         self._title_font = fonts.heading(48)
         self._font = fonts.body(_FONT_PX)
         self._hint = fonts.body(16)
-        self._controls_font = fonts.body(20)
         self._controls_head = fonts.heading(26)
         # The Controls block's keycap labels, drawn every paused frame
         # (RND-008.3): built once per scale, not once per cap per frame.
@@ -165,8 +164,7 @@ class PausedState(State):
 
         controls_block.draw(surface, self.game.assets,
                             (cx + scale.px(_CONTROLS_X), scale.px(_CONTROLS_Y)), self.game,
-                            font=self._controls_font, heading_font=self._controls_head,
-                            cache=self._text_cache)
+                            heading_font=self._controls_head, cache=self._text_cache)
 
         hint = self._hint.render(locale.t("pause.hint"), True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(

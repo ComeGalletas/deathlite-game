@@ -19,9 +19,12 @@ from ui import scale
 from progression.upgrades import apply_choice
 from ui import forge_rail
 from ui.forge_rail import ForgeRail
-from ui.level_up import CARD_W, CARD_W_NARROW, LevelUpPanel
+from ui.level_up import CARD_GAP, CARD_W, CARD_W_NARROW, LevelUpPanel, number_keys
 from ui.menu_nav import MenuNav
 from ui.mouse import MouseNav
+
+_RAIL_GAP = 30          # design px between the rail and the first card
+_EDGE = 20              # the least margin the rail keeps from the surface's edge
 
 
 class LevelUpState(State):
@@ -30,7 +33,7 @@ class LevelUpState(State):
 
     def enter(self, *, player, choices=(), on_done=None, title=None,
               cancelable=False, weapon_rows=None, offers_for=None,
-              rail_heading=None, hint=None, **kwargs) -> None:
+              rail_heading=None, hint=None, hint_key=None, **kwargs) -> None:
         self.player = player
         self.on_done = on_done
         # P3: the Forge reuses this overlay with its own title, and lets the
@@ -57,6 +60,9 @@ class LevelUpState(State):
         # actually does, so a caller that is not the Forge (the
         # Monastery, M7) says so rather than offering to forge.
         self._hint_arg = hint             # a caller's own hint, else the default at draw
+        # Or its locale key: filled, when drawn, with the number keys the
+        # cards on screen answer to ("1/2/3/4" for the Monastery's four).
+        self._hint_key = hint_key
         self.rail = ForgeRail() if self.weapon_rows else None
         self._rail_mouse = MouseNav(self.rail.hits) if self.rail else None
         self.weapon_sel = next((i for i, r in enumerate(self.weapon_rows) if r[1]), 0)
@@ -64,20 +70,44 @@ class LevelUpState(State):
 
     def _default_hint(self) -> str | None:
         if self.weapon_rows:
-            return locale.t("level_up.hint_rows")
+            return locale.t("level_up.hint_rows", keys=number_keys(len(self.choices)))
         if self.cancelable:
-            return locale.t("level_up.hint_leave")
+            return locale.t("level_up.hint_leave", keys=number_keys(len(self.choices)))
         return None
 
     @property
     def hint(self) -> str | None:
         """The caller's hint, else the default, read when drawn so it is in
-        the language in use (UI-014.7)."""
+        the language in use (UI-014.7) and names the cards' own number keys
+        (UI-014.11: "1/2/3" over four cards)."""
+        if self._hint_key:
+            return locale.t(self._hint_key, keys=number_keys(len(self.choices)))
         return self._hint_arg or self._default_hint()
 
     @property
     def card_width(self) -> int:
         return CARD_W_NARROW if self.rail is not None else CARD_W
+
+    def card_layout(self, width: int) -> tuple[float, int]:
+        """`(card width in design px, shift right in native px)` on a
+        `width`-wide surface. Without a rail, the level-up layout, the cards
+        narrowed only when they would not fit between the margins (the buff
+        building's four weapons at the 1280 web profile ran off both edges).
+        With one, the narrow cards stay centred while the rail fits left of
+        them; when it would not (four cards, or three at the 1280 web
+        profile, where it ran off the left edge), the cards narrow until rail
+        and cards fit between the margins, and shift right until the rail
+        clears the left one (UI-014.11)."""
+        S = scale.px
+        n = max(1, len(self.choices))
+        gap, margin = S(CARD_GAP), S(_EDGE)
+        rail = S(forge_rail.WIDTH) + S(_RAIL_GAP) if self.rail is not None else 0
+        fit = (width - 2 * margin - rail - (n - 1) * gap) // n
+        card_w = float(self.card_width)
+        if S(card_w) > fit:
+            card_w = float(fit // scale.factor())
+        total = n * S(card_w) + (n - 1) * gap
+        return card_w, max(0, margin + rail - (width - total) // 2)
 
     def _offers(self) -> list:
         """The cards for the selected weapon (Forge only)."""
@@ -149,9 +179,10 @@ class LevelUpState(State):
 
     def draw(self, surface: pygame.Surface) -> None:
         hint = self.hint
+        card_w, shift = self.card_layout(surface.get_width())
         self.panel.draw(surface, self.choices, self.selected,
                         assets=self.game.assets, pressed=self._mouse.pressed_on,
-                        title=self.title, hint=hint, card_w=self.card_width,
+                        title=self.title, hint=hint, card_w=card_w, x_shift=shift,
                         dim=False)
         if self.rail is None:
             return
@@ -159,7 +190,10 @@ class LevelUpState(State):
         # stays beside them at 1600 and at the 1280 web profile instead of
         # drifting into the corner on the wider one.
         first = self.panel.hits.rect_of(0)
-        right = (first.left - scale.px(30)) if first is not None else surface.get_width() // 4
+        # No cards (a weapon with no Forgings left): a quarter in, or as far
+        # in as the rail needs to clear the edge.
+        right = (first.left - scale.px(_RAIL_GAP)) if first is not None \
+            else max(surface.get_width() // 4, scale.px(_EDGE + forge_rail.WIDTH))
         top = first.top if first is not None else scale.px(300)
         self.rail.draw(surface, self.weapon_rows, self.weapon_sel,
                        assets=self.game.assets, right=right, top=top,
