@@ -143,6 +143,8 @@ INTEGRATION = (
     "tests/render/test_elemental_draw_cost.py::TerraceSortTests",
     # RND-008.5: seed 35's fight as it plays; the random crowds stay unit.
     "tests/playing/test_bump_exact.py::HarnessFightTests",
+    # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
+    "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
 )
 
 

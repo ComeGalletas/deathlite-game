@@ -111,7 +111,33 @@ Inside the movement probe (`walk_parts.py`, same crowd):
 ## ENT-018: Tasks
 
 - [x] ENT-018.1: This journal; the index row
-- [ ] ENT-018.2: Separation drops far candidates on floats first, bit for bit the same
+- [x] ENT-018.2: Separation drops far candidates on floats first, bit for bit the same
 - [ ] ENT-018.3: The floor index for the collider's lookups, bit for bit the same
 - [ ] ENT-018.4: Re-measure by part; decide on what is left
 - [ ] ENT-018.5: Results, fingerprint, suites
+
+## ENT-018: Results
+
+### ENT-018.2: the crowding push
+
+- `entities/ai/components/crowd.py` `Separation.tick` drops a neighbour
+  candidate beyond the push radius, or closer than `1e-6` squared, on two
+  float products before any vector. `_MARGIN_OUT` and `_NEAR` keep the
+  drop a billionth inside the vector test's own limits. The neighbours
+  that push go through the original code in the original order.
+- `tests/entities/test_enemy_update_exact.py`, with the old tick copied
+  verbatim as the oracle, compares every push handed to the steering
+  accumulator with `==`:
+  - 600 random crowds, each with the actor in its own list, dead bodies,
+    coincident points, points at the radius and a hair past the minimum;
+  - two neighbours placed on purpose within a billionth of each limit;
+  - every enemy of seed 35's packed fight over 40 frames, with the real
+    neighbour query (`integration`).
+- Mutations (`scratchpad/mutate_e2.py`), all five caught:
+  - either margin on the wrong side;
+  - a drop that cuts neighbours that push;
+  - the neighbours taken in another order;
+  - a dead neighbour pushing.
+- `tests/entities`: 356 passed. The tier audit passes.
+- Its timing is taken with ENT-018.3's, in ENT-018.4.
+
