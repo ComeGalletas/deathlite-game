@@ -278,16 +278,23 @@ Each task names the number it has to move. "Before" is the rerun above.
   done, and a pointer from the untracked report to this journal. Whether
   the root `GAMEPLAY_PERFORMANCE_FINDINGS.md` is deleted is the owner's
   call.
+  - *Changed on the way:*
+    - The index moves to done in RND-008.8, because D7 put the full test
+      after this.
+    - The pointer is not written: the report sits untracked in the
+      shared checkout, where no session writes (`CLAUDE.md`,
+      "Branching"). The journal holds it verbatim, and deleting it is
+      left to the owner.
 
 ## RND-008: Tasks
 
 - [x] RND-008.1: This journal, with the reviewed findings and the report; the index row
 - [x] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
 - [x] RND-008.3: No font built during a run's draw (hints, keycaps, interact key, and the pause menu's Controls block); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
-- [x] RND-008.4: Elemental draw: bodies and motes sorted onto their terraces once a frame; the burn flame scaled once; plain damage-number glyphs kept. The status-mark shape cache was dropped (it changes edge pixels). **Outcome missed: the gap fell about 20 %, the target was 50 %** (owner to decide, see Results)
+- [x] RND-008.4: Elemental draw: bodies and motes sorted onto their terraces once a frame; the burn flame scaled once; plain damage-number glyphs kept. The status-mark shape cache was dropped (it changes edge pixels). **Outcome missed: the gap fell about 20 %, the target was 50 %**; accepted by the owner (D7), with the full test in RND-008.8
 - [x] RND-008.5: Update re-measured by part (60 / 100 / 150 packed, hero jittered and still, plain and infused); the bump decision; the bump pass about halved, bit for bit the same; `--jitter` on the harness
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
-- [ ] RND-008.7: Results, before and after; index to done
+- [x] RND-008.7: Results, before and after, in one place; the follow-ups found on the way (the index moves to done in RND-008.8)
 - [ ] RND-008.8: The full test at the end (D7). The whole suite, `sweep` included, on the final branch, and the harness workloads (plain, infused, hints on and off, bump) against the RND-008.1 base in one sitting, with RND-008.4's accepted −20 % re-checked in the elemental fight. Loading time is compared too.
 
 ## RND-008: Results
@@ -719,6 +726,8 @@ Each task names the number it has to move. "Before" is the rerun above.
   | aura motes | 0.16 / 0.16 ms | 0.05 / 0.05 ms |
   | damage numbers | 0.37 / 0.37 ms | 0.35 / 0.35 ms |
   | whole draw | 11.02 / 11.07 ms | 10.40 / 10.53 ms |
+  | whole draw, plain pack | 8.44 / 8.24 ms | 8.49 / 8.13 ms |
+  | terrain ground bands, plain pack (untouched) | 3.42 ms | 3.37 ms |
   | `draw_under`, plain pack (after includes the sort) | 0.41 / 0.41 ms | 0.13 / 0.12 ms |
 
   - **Outcome missed.** By the whole-draw means, the infused-minus-plain
@@ -899,15 +908,80 @@ Each task names the number it has to move. "Before" is the rerun above.
 
   - Bump halves at 144 (the plan's measure) and in every update run. The
     update is 0.7 to 2.2 ms faster.
+  - The update's other parts in the after runs: the enemies' own update
+    2.37 / 2.64 ms at 113 / 112 and 3.77 / 3.77 ms at 168 / 167;
+    navigation 1.37 / 0.92 ms at 113 / 112 (jittered / still) and
+    1.82 / 0.78 ms at 168 / 167.
   - An earlier sitting under heavier load, with the first version of the
     change, gave the same shape: bump at 144 5.31 / 5.25 → 2.41 / 2.40 ms,
     and update at 112 still 6.31 → 4.35 ms.
   - The machine's load differed between the sittings, so each table is
     read only against itself.
-- **What is left in the update.** The enemies' own update (2.4 to 3.9 ms at
+- **What is left in the update.** The enemies' own update (2.4 to 3.8 ms at
   110 to 170) is now the largest item, then bump and navigation. The
   first findings report put the per-enemy cost in the movement probe.
   That is the next lever, and it is not in this plan (see RND-008.7).
+
+### RND-008.7: the results in one place, and what is left
+
+Each task measured its own before and after, back to back against the
+commit before it, on the machine as it was that hour. The load varied
+between sittings, so each row is read only against itself. RND-008.8
+measures the whole branch against the RND-008.1 base in one sitting.
+
+| Task | What moved | Before | After | Target | Met |
+|---|---|---|---|---|---|
+| RND-008.2 | the harness measures play: hints dismissed, director frozen, one budget | the report's 131 live, draw 27.07 ms (hints on) | 95 → 113 live (summons only), draw 10.22 ms (hints off) | the report's numbers reproduce under the old flags | yes (131 live, 27.07 against 27.21 ms) |
+| RND-008.3 | draw p50 with the opening hints up, 100 packed, 2560 × 1080 | 13.86 / 18.48 ms over hints off | 0.02 / 0.06 ms over the run beside it | within 1 ms of hints off | **yes** |
+| RND-008.3 | fonts built per warm frame (Move, fade, Attack, interact, pause) | 5 / 5 / 6 / 1 / 13 | 0 / 0 / 0 / 0 / 0 | 0 | **yes** |
+| RND-008.4 | elemental `draw_under`, infused fight (plain in brackets) | 1.95 ms (0.41) | 1.44 ms (0.13) | the infused-minus-plain gap halved | **no: about −20 %**, accepted (D7) |
+| RND-008.5 | bump p50, 144 packed | 2.75 / 2.70 ms | 1.38 / 1.38 ms | lower, bit for bit the same | **yes**, and bit for bit |
+| RND-008.5 | update p50, 112 to 168 packed | 5.33 to 9.63 ms | 4.51 to 7.66 ms | recorded with the bump decision | 0.7 to 2.2 ms faster |
+
+Nothing changed a pixel or the game. RND-008.3 and .4 were
+fingerprinted against the code before them (570 cap and hint comparisons,
+and 150 frames of a primed fight). RND-008.5 compared every knockback,
+frozen exchange and death with the old pass, bit for bit, and the
+150-frame fingerprint matched there too.
+
+**The frame after RND-008,** by the numbers taken above. Harness, 100
+packed, 2560 × 1080, hints dismissed:
+- **Draw:** 8.1 to 8.5 ms in RND-008.4's quiet sitting (10.22 ms under
+  RND-008.2's load). The terrain's ground bands take 3.4 ms of it. The
+  elemental fight adds 1.9 to 2.4 ms, which is art that has to be drawn.
+- **Update:** about 4.5 ms with the hero still, 5.2 ms jittered. The
+  enemies' own update is about 2.5 ms of it, bump about 1 ms, and
+  navigation 0.9 to 1.4 ms.
+- **Combined:** at 100 packed that is inside the 16.67 ms budget. At 150
+  to 170 packed the update alone is 6.7 to 7.7 ms, and a crowded
+  infused fight is at or over budget.
+- RND-008.8 measures this directly instead of adding it up.
+
+**What is left.** Found on the way, outside RND-008's plan. Each would be
+its own requirement:
+1. **The enemies' own update** is now the largest item in the update:
+   2.4 to 3.8 ms at 110 to 170 packed. The first report put the
+   per-enemy cost in the movement probe.
+2. **The terrain's ground bands** take 3.4 ms of an 8 to 10 ms draw. Resolution
+   is not a lever (D4); the cost has to be found in how the bands are
+   drawn.
+3. **Navigation with a moving hero** costs 0.6 to 2 ms more than with a
+   still one: the flow field is re-aimed as the hero moves.
+4. **The elemental art** (aura sprites 0.5 ms, status marks 0.45, Wind
+   areas 0.28, damage numbers 0.35 in a primed fight). Any further saving
+   draws less, so it changes the picture; the owner's call (D7).
+5. **The weapon loop** (D6): not re-measured; every measured cost was
+   larger.
+6. **A frame is not a function of the run alone.** The terrain animates
+   on the wall clock (`world/terrain/render.py` `seconds`, unless handed a
+   `clock`). Two processes then draw the same frame differently, which a
+   pixel test across processes has to pin (RND-008.4's fingerprint did).
+7. **The in-game debug overlay's render time includes the vsync wait**
+   (`game/game.py` `_step` times `display.flip()`), so it is not
+   comparable with the harness's draw figure.
+- Also found, and handed off during RND-008.3: run-booting tests sitting in
+  the `unit` tier. The owner ran it as TST-006, now merged. Its tier audit
+  shaped the harness's flag tests (RND-008.5).
 
 ## RND-008: Method
 
