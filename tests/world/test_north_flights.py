@@ -28,7 +28,7 @@ from tests import worlds as W
 from world.gen.height.graph import walk_links
 from world.layout import GROUND, VSTAIR
 from world.nav.field import NavField, _INF
-from world.rules.steps import can_cross
+from world.rules.steps import can_cross, can_step
 
 SEEDS = (35, 7)
 
@@ -95,6 +95,37 @@ class GeneratedTests(unittest.TestCase):
                 self.assertTrue(can_cross(ix, (a[0], a[1] - 1), a))
                 self.assertTrue(can_cross(ix, (a[0], a[1] + 1), a))
 
+    def test_a_body_walks_through_the_door_sideways(self):
+        """WLD-014: a north flight has no walls at its flanks. On every one,
+        a body walks from each flank onto the flight and back, and from the
+        flank down through the flight to the landing -- while the frontier
+        beside the door stays shut: no step from a flank straight to the
+        low ground north of it, nor diagonally to the landing."""
+        for seed in SEEDS:
+            gm = W.game_map(seed)
+            ix = gm._levels
+            for room, pos, _cell in _north_flights(gm.layout):
+                at = _abs_tiles(room)
+                a = at(pos)
+                where = f"seed {seed} at {pos}"
+                landing = (a[0], a[1] - 1)
+                for dc in (-1, 1):
+                    flank = (a[0] + dc, a[1])
+                    north = (flank[0], flank[1] - 1)
+                    self.assertTrue(can_cross(ix, flank, a), where)
+                    self.assertTrue(can_cross(ix, a, flank), where)
+                    self.assertTrue(gm.path_ok(_centre(ix, flank), _centre(ix, a)),
+                                    where)
+                    self.assertTrue(gm.path_ok(_centre(ix, a), _centre(ix, flank)),
+                                    where)
+                    self.assertTrue(gm.is_walkable(_centre(ix, a), 16.0,
+                                                   frm=_centre(ix, flank)),
+                                    f"{where}: a small body is refused the door "
+                                    f"from its {'west' if dc < 0 else 'east'} flank")
+                    self.assertFalse(can_step(ix, flank, north), where)
+                    self.assertFalse(can_step(ix, flank, landing), where)
+                    self.assertFalse(can_step(ix, landing, flank), where)
+
     def test_both_nav_classes_can_climb_one(self):
         """From the low landing, the field reaches the terrace tile south of
         the flight, and back the other way.
@@ -121,8 +152,11 @@ class GeneratedTests(unittest.TestCase):
                 checked = 0
                 for room, (c, r), _cell in _north_flights(layout):
                     at = _abs_tiles(room)
+                    # up and down, and in from either flank (WLD-014)
                     for frm, to in (((c, r - 1), (c, r + 1)),
-                                    ((c, r + 1), (c, r - 1))):
+                                    ((c, r + 1), (c, r - 1)),
+                                    ((c - 1, r), (c, r - 1)),
+                                    ((c + 1, r), (c, r - 1))):
                         ff.rebuild(_centre(ix, at(frm)), min_clearance=clearance)
                         self.assertTrue(
                             any(ff.cost_at(p) < _INF
@@ -133,109 +167,187 @@ class GeneratedTests(unittest.TestCase):
                 self.assertGreater(checked, 5)
 
 
+def _band_px(surfs, level, wx, wy):
+    """The baked pixel of `level`'s band at world `(wx, wy)`, or `None` when
+    no band of that level covers the point."""
+    for rect, surf, lvl in surfs:
+        if lvl == level and rect.collidepoint(wx, wy):
+            return tuple(surf.get_at((wx - rect.x, wy - rect.y)))
+    return None
+
+
+def _band_tile(surfs, level, wx, wy, px):
+    """`level`'s band cut to the `px` tile whose top-left is world
+    `(wx, wy)`, as RGBA bytes, or `None` when no band covers the whole tile."""
+    tile = pygame.Rect(wx, wy, px, px)
+    for rect, surf, lvl in surfs:
+        if lvl == level and rect.contains(tile):
+            sub = surf.subsurface(tile.move(-rect.x, -rect.y))
+            return pygame.image.tobytes(sub, "RGBA")
+    return None
+
+
+def _expected_landing(sheets, sheet, tag, drop):
+    """What a north flight's landing should show, cut here from the source
+    art rather than asked of the painter's own helpers: the flipped stone's
+    north half for "rock"; for "grass" the channel's low end, its foot
+    piece -- the upper half of it for one level, the whole tile for two."""
+    if tag == "rock":
+        spr = sheets.vstair_sprite(drop, north=True)
+        w, h = spr.get_size()
+        return spr.subsurface(pygame.Rect(0, 0, w, h // 2)).copy()
+    piece = sheets.ramp_slots.get("n") or sheets.ramp_slots.get("s")
+    tile = sheets.cell(sheet, piece[-1])
+    if drop > 1:
+        return tile
+    w, h = tile.get_size()
+    return tile.subsurface(pygame.Rect(0, 0, w, h // 2)).copy()
+
+
 class PainterTests(unittest.TestCase):
-    def test_the_stairs_sit_on_the_seam_and_cast_no_shadow(self):
-        """No shadow blob on the low ground north of a north flight; the
-        stairs centred on the seam, half on each tile, each half on its own
-        floor's band, grass and rock alike. Where the sprite is opaque the
-        baked pixel *is* the sprite's pixel: the foot half on the landing's
-        lower half, the top half on the rim's upper half. Outside the
-        sprite the rim is plateau ground and the landing is low ground,
-        both opaque."""
+    """WLD-014: a north flight is a door in the frontier between two floors.
+    Its rim cell is plain plateau grass, lip-free, whatever the tag, and the
+    connection -- the channel for "grass", the flipped stone for "rock" --
+    shows only as its landing half, on the landing's lower half, on the low
+    floor's band. Nothing of it lies on the rim."""
+
+    def _landing_matches(self, surfs, level, x0, y0, half, tol):
+        """Every pixel the landing half paints opaque is the baked pixel of
+        `level`'s band at the landing's lower half. `tol` covers the
+        smoothscaled stone, which is a hair short of opaque everywhere, so
+        the baked pixel is a blend; the channel tile is exact."""
+        w, h = half.get_size()
+        checked = 0
+        for yy in range(h):
+            for xx in range(w):
+                want = half.get_at((xx, yy))
+                if want.a < 240:
+                    continue
+                got = _band_px(surfs, level, x0 + xx, y0 - h + yy)
+                if got is None or any(abs(a - b) > tol
+                                      for a, b in zip(got[:3], tuple(want)[:3])):
+                    return False
+                checked += 1
+        self.assertGreater(checked, w * h // 4, "the half is mostly clear")
+        return True
+
+    def test_the_door_shows_on_the_landing_only_and_casts_no_shadow(self):
         from world.terrain.grid_paint import _shadow_casts
         W.display()
         px = config.TILE_PX
-
-        def baked(gm, level, wx, wy):
-            hit = [(rect, surf) for rect, surf, lvl in gm._grid_surfs
-                   if lvl == level and rect.collidepoint(wx, wy)]
-            self.assertTrue(hit, f"no band {level} at {(wx, wy)}")
-            rect, surf = hit[0]
-            return tuple(surf.get_at((wx - rect.x, wy - rect.y)))
-
-        def opaque_point(half):
-            """The most opaque pixel down the half's middle column. The
-            smoothscaled art is a hair short of opaque everywhere, so the
-            baked pixel is a blend and is compared with a small tolerance."""
-            x = half.get_width() // 2
-            y = max(range(half.get_height()), key=lambda yy: half.get_at((x, yy)).a)
-            self.assertGreaterEqual(half.get_at((x, y)).a, 240)
-            return x, y
-
-        def close(got, want):
-            return all(abs(a - b) <= 8 for a, b in zip(got[:3], want[:3]))
-
         for seed in SEEDS:
             gm = W.baked(seed)
-            foot, top = gm._sheets.vstair_seam(1)
-            self.assertEqual(foot.get_size(), (px, px // 2))
-            self.assertEqual(top.get_size(), (px, px // 2))
-            tx, ty = opaque_point(top)
-            fx, fy = opaque_point(foot)
-            seen = 0
-            styles = set()
-            sheets = gm._sheets
-            piece = sheets.ramp_slots.get("n") or sheets.ramp_slots.get("s")
+            sheets, surfs = gm._sheets, gm._grid_surfs
+            styles, seen = set(), 0
             for room, (c, r), cell in _north_flights(gm.layout):
+                where = f"seed {seed} room {room.id} at {(c, r)} ({cell.tag})"
                 self.assertEqual(_shadow_casts(room.grid, c, r, cell, 0, 0, px),
-                                 [])
+                                 [], where)
                 low = cell.level - cell.drop
                 x0 = room.rect.x + c * px
                 y0 = room.rect.y + r * px
-                sx = px // 2
-                # NS-7: one thing or the other, never both.
-                channel = sheets.cell(sheets.sheet_for(cell.level, room.kind, room),
-                                      piece[-1])
-                if cell.tag == "rock":
-                    # the rim's upper half carries the top half of the sprite
-                    self.assertTrue(close(baked(gm, cell.level, x0 + tx, y0 + ty),
-                                          tuple(top.get_at((tx, ty)))),
-                                    f"seed {seed}: no top step on the rim at {(c, r)}")
-                    # the landing's lower half carries the foot half
-                    self.assertTrue(close(baked(gm, low, x0 + fx, y0 - px // 2 + fy),
-                                          tuple(foot.get_at((fx, fy)))),
-                                    f"seed {seed}: no foot on the landing at {(c, r)}")
-                    # and below the stone the rim is plain plateau ground,
-                    # not the channel: no side lip where the channel has one
-                    self.assertNotEqual(baked(gm, cell.level, x0 + 2, y0 + 3 * px // 4),
-                                        tuple(channel.get_at((2, 3 * px // 4))),
-                                        f"seed {seed}: channel under the stone at {(c, r)}")
-                    self.assertEqual(baked(gm, cell.level, x0 + sx, y0 + 3 * px // 4)[3],
-                                     255)
-                else:
-                    # a grass flight: plain plateau grass on the rim cell's
-                    # lower half, and the channel straddling the seam --
-                    # its lower half on the rim's upper half (plateau band),
-                    # its upper half on the landing's lower half (low band)
-                    plain = sheets.cell(sheets.sheet_for(cell.level, room.kind, room),
-                                        sheets.interior)
-                    self.assertEqual(baked(gm, cell.level, x0 + sx, y0 + 3 * px // 4),
-                                     tuple(plain.get_at((sx, 3 * px // 4))),
-                                     f"seed {seed}: rim under the channel is not plain "
-                                     f"grass at {(c, r)}")
-                    # the lip: the first opaque pixel in from the tile's
-                    # left edge on that row (the margin outside it is clear)
-                    def lip(row):
-                        return next(xx for xx in range(px // 2)
-                                    if channel.get_at((xx, row)).a == 255)
-                    lx = lip(px // 2 + px // 4)
-                    self.assertEqual(baked(gm, cell.level, x0 + lx, y0 + px // 4),
-                                     tuple(channel.get_at((lx, px // 2 + px // 4))),
-                                     f"seed {seed}: no channel lip on the rim at {(c, r)}")
-                    lx = lip(px // 4)
-                    self.assertEqual(baked(gm, low, x0 + lx, y0 - px // 4),
-                                     tuple(channel.get_at((lx, px // 4))),
-                                     f"seed {seed}: no channel lip on the landing at {(c, r)}")
-                    self.assertEqual(baked(gm, cell.level, x0 + tx, y0 + ty),
-                                     tuple(channel.get_at((tx, px // 2 + ty))),
-                                     f"seed {seed}: stone on a grass flight at {(c, r)}")
-                # and the landing beyond the sprite is opaque ground
-                self.assertEqual(baked(gm, low, x0 + sx, y0 - px + px // 4)[3],
-                                 255)
+                sheet = sheets.sheet_for(cell.level, room.kind, room)
+                # The rim tile is the plain interior tile, byte for byte: no
+                # lip across the door and no stair or channel on it.
+                plain = pygame.image.tobytes(sheets.cell(sheet, sheets.interior),
+                                             "RGBA")
+                self.assertEqual(_band_tile(surfs, cell.level, x0, y0, px), plain,
+                                 f"{where}: the rim is not open plateau grass")
+                # The landing's lower half carries the landing half.
+                half = _expected_landing(sheets, sheet, cell.tag, cell.drop)
+                tol = 8 if cell.tag == "rock" else 0
+                self.assertEqual(half.get_size(), (px, px // 2))
+                self.assertTrue(self._landing_matches(surfs, low, x0, y0, half, tol),
+                                f"{where}: the landing half is not on the landing")
+                # ...and on the low band only: the plateau's band is clear
+                # over the landing.
+                over = _band_px(surfs, cell.level, x0 + px // 2, y0 - px // 4)
+                self.assertTrue(over is None or over[3] == 0,
+                                f"{where}: the plateau band paints the landing")
+                # The landing's upper half, beyond the door, is opaque ground.
+                self.assertEqual(_band_px(surfs, low, x0 + px // 2,
+                                          y0 - px + px // 4)[3], 255, where)
                 styles.add(cell.tag)
                 seen += 1
             self.assertGreater(seen, 5)
             self.assertEqual(styles, {"grass", "rock"}, f"seed {seed}")
+
+    def test_the_flanking_rim_keeps_its_lip(self):
+        """The lip breaks at the door and nowhere else: the rim cells either
+        side of a north flight are still the autotiled north-lip tile, not
+        the plain interior tile the door is."""
+        W.display()
+        px = config.TILE_PX
+        for seed in SEEDS:
+            gm = W.baked(seed)
+            sheets, surfs = gm._sheets, gm._grid_surfs
+            for room, (c, r), cell in _north_flights(gm.layout):
+                sheet = sheets.sheet_for(cell.level, room.kind, room)
+                plain = pygame.image.tobytes(sheets.cell(sheet, sheets.interior),
+                                             "RGBA")
+                for dc in (-1, 1):
+                    # ground by the site rule, so never a second door
+                    self.assertEqual(room.grid[(c + dc, r)].kind, GROUND)
+                    got = _band_tile(surfs, cell.level,
+                                     room.rect.x + (c + dc) * px,
+                                     room.rect.y + r * px, px)
+                    self.assertNotEqual(got, plain,
+                                        f"seed {seed} at {(c + dc, r)}: the "
+                                        f"flank lost its lip")
+
+    def test_a_two_level_door_fills_the_whole_landing(self):
+        """D2, on a real two-level geometry. The generator places no
+        two-level north flight today (NS-5 measured every one as a
+        one-level drop), so the island is built by hand: level-0 ground,
+        then a level-2 terrace with its wall, the door on its back rim.
+        For both tags the rim is plain grass and the landing -- ground at
+        level 0 -- shows a whole tile of the connection, on its own band
+        and in the composited frame, which is the same picture the
+        unbanded painter makes."""
+        from types import SimpleNamespace
+        from world.gen.height.graph import check_grid
+        from world.layout import CLIFF, Cell
+        from world.terrain.grid_paint import paint_room_grid, paint_room_levels
+        W.display()
+        px = config.TILE_PX
+        sheets = W.baked(SEEDS[0])._sheets
+        for tag in ("rock", "grass"):
+            g = {}
+            for c in range(7):
+                for r in range(3):
+                    g[(c, r)] = Cell(GROUND, level=0)
+                for r in range(3, 7):
+                    g[(c, r)] = Cell(GROUND, level=2)
+                g[(c, 7)] = Cell(CLIFF, level=2, drop=2, row=0)
+                g[(c, 8)] = Cell(CLIFF, level=2, drop=2, row=1)
+            g[(3, 3)] = Cell(VSTAIR, level=2, drop=2, row=0, tag=tag, dir="n")
+            self.assertEqual(check_grid(g), [], tag)
+            rect = pygame.Rect(0, 0, 7 * px, 9 * px)
+            room = SimpleNamespace(id=0, rect=rect, grid=g, kind="",
+                                   topography=None)
+            bands = paint_room_levels(None, sheets, None, room)
+            frame = pygame.Surface(rect.size, pygame.SRCALPHA)
+            for brect, surf, _lvl in sorted(bands, key=lambda t: t[2]):
+                frame.blit(surf, brect.topleft)
+            flat_rect, flat = paint_room_grid(None, sheets, None, room)
+            flat_frame = pygame.Surface(rect.size, pygame.SRCALPHA)
+            flat_frame.blit(flat, flat_rect.topleft)
+            self.assertEqual(pygame.image.tobytes(frame, "RGBA"),
+                             pygame.image.tobytes(flat_frame, "RGBA"), tag)
+
+            sheet = sheets.sheet_for(2, "", room)
+            x0, y0 = 3 * px, 3 * px
+            self.assertEqual(_band_tile(bands, 2, x0, y0, px),
+                             pygame.image.tobytes(sheets.cell(sheet, sheets.interior),
+                                                  "RGBA"), f"{tag}: rim")
+            half = _expected_landing(sheets, sheet, tag, 2)
+            self.assertEqual(half.get_size(), (px, px), tag)
+            tol = 8 if tag == "rock" else 0
+            self.assertTrue(self._landing_matches(bands, 0, x0, y0, half, tol),
+                            f"{tag}: not a whole tile on the landing's band")
+            self.assertTrue(self._landing_matches([(rect, frame, 0)], 0, x0, y0,
+                                                  half, tol),
+                            f"{tag}: hidden in the composited frame")
 
     def test_south_flights_are_still_painted_as_flights(self):
         """The regression the north branch caused once: every wall-cut

@@ -187,37 +187,45 @@ class TileSheets:
             self._cell_cache[key] = img
         return self._cell_cache[key]
 
-    def channel_halves(self, sheet: str, idx: int):
-        """A grass channel tile cut at its middle into `(upper, lower)`,
-        each `px` wide and half a tile tall, for a grass north flight that
-        straddles the seam the way the stone flight does: the upper half
-        lies on the landing's lower half, the lower half on the rim's upper
-        half. The tile is symmetric top to bottom, so no flip. Cached."""
-        key = ("channel-halves", sheet, idx)
+    def channel_landing(self, sheet: str, piece, drop: int = 1):
+        """The part of the grass channel a grass north flight shows, laid on
+        its landing so that it ends at the seam. A north flight is a door in
+        the frontier between two floors, so it is drawn on the lower floor
+        only and nothing of it covers the rim (WLD-014).
+
+        `piece` is the `ramp` slot pair `(head, foot)`. The channel for a
+        `drop`-level descent is `drop` tiles tall, and the landing is its
+        low end, so it wears the foot piece, as the low end of a wall-cut
+        flight does: for a one-level drop the upper half of it, half a tile
+        tall; for two levels the whole tile. The piece is symmetric in shape
+        (a lip down each side, open at both ends) though not pixel for
+        pixel, and it is laid unflipped. Cached."""
+        idx = piece[-1]
+        key = ("channel-landing", sheet, idx, drop > 1)
         if key not in self._cell_cache:
             tile = self.cell(sheet, idx)
-            w, h = tile.get_size()
-            half = h // 2
-            self._cell_cache[key] = (
-                tile.subsurface(pygame.Rect(0, 0, w, half)).copy(),
-                tile.subsurface(pygame.Rect(0, half, w, h - half)).copy())
+            if drop > 1:
+                self._cell_cache[key] = tile
+            else:
+                w, h = tile.get_size()
+                self._cell_cache[key] = tile.subsurface(
+                    pygame.Rect(0, 0, w, h // 2)).copy()
         return self._cell_cache[key]
 
-    def vstair_seam(self, drop: int = 1):
-        """The north flight as it is painted: the flipped sprite cut at its
-        middle into `(foot_half, top_half)`, each `px` wide and half a
-        sprite tall. The foot half lies on the landing's lower half and the
-        top half on the rim's upper half, so the stairs sit centred on the
-        seam between the two floors. `None` when the art is missing."""
-        key = ("vstair-seam", drop)
+    def vstair_landing(self, drop: int = 1):
+        """The part of the stone flight a rock north flight shows: the
+        flipped sprite's north half, its foot end, `px` wide and half a
+        sprite tall, laid on the landing so that it ends at the seam. The
+        half that used to lie over the rim is not drawn (WLD-014): the
+        flight is a door onto the lower floor. For the 64x128 two-level
+        sprite that half is a whole tile. `None` when the art is missing."""
+        key = ("vstair-landing", drop)
         if key not in self._cell_cache:
             spr = self.vstair_sprite(drop, north=True)
             if spr is None:
                 return None
             w, h = spr.get_size()
-            half = h // 2
-            self._cell_cache[key] = (
-                spr.subsurface(pygame.Rect(0, 0, w, half)).copy(),
-                spr.subsurface(pygame.Rect(0, half, w, h - half)).copy())
+            self._cell_cache[key] = spr.subsurface(
+                pygame.Rect(0, 0, w, h // 2)).copy()
         return self._cell_cache[key]
 

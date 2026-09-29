@@ -91,8 +91,11 @@ def _flight_keepouts(rooms) -> list:
 
     The tiles are taken straight from `heightmap.walk_links` rather than
     re-derived: it already knows that a straight flight opens north at its head
-    and south at its foot, and that an east/west flight also reaches sideways
-    because the wall jogs a row across it.
+    and south at its foot, that an east/west flight also reaches sideways
+    because the wall jogs a row across it, and that a north flight is a door
+    joined at both flanks as well as at its landing and its terrace
+    (WLD-014) -- so its two flank tiles are kept clear too, and a tree cannot
+    shut the door's side entrance.
     """
     px = config.TILE_PX
     out = []

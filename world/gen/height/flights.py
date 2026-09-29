@@ -273,33 +273,25 @@ def _cut_lateral_stairs(grid, rng, spacing: int = None) -> None:
                 cut += 1
 
 
-def _cut(grid, c, r, kind, tag, d, dir="s") -> bool:
+def _cut(grid, c, r, kind, tag, d, dir="s") -> None:
     """Hand the cells of one flight over to it. A wall-cut straight flight
     spans its `d` cells of stone, an east/west one a row more (the jog), and
     a north flight is the single rim cell it was found at.
 
-    A north cut is **provisional**, like a lateral one: the rim cell was
-    terrace ground, and a flight links only at its two ends, so where the
-    rim is the only thing joining a strip of terrace to the rest -- a thin
-    band of level 1 pinched between the low ground and a higher cap, say --
-    taking the cell severs that strip. The prune would then delete it, and
-    the flight would be left with no flank on that side. The cut is kept
-    only if both flanks still reach the terrace south of the flight by some
-    other way; returns whether it stood."""
+    A north cut always stands. It used to be provisional: a flight linked
+    only at its two ends, so a rim cell that was the only join between a
+    strip of terrace and the rest severed the strip when it was taken, and
+    the cut was rolled back. A north flight is a door now (WLD-014) and
+    joins the terrace at both flanks as well, so the strip stays joined
+    through it and there is nothing left to roll back."""
     if kind == VSTAIR and dir == "n":
-        was = grid[(c, r)]
-        grid[(c, r)] = Cell(VSTAIR, level=was.level, drop=d, row=0,
+        grid[(c, r)] = Cell(VSTAIR, level=grid[(c, r)].level, drop=d, row=0,
                             tag=tag, dir="n")
-        keep = reachable(grid, (c, r + 1))
-        if (c - 1, r) in keep and (c + 1, r) in keep:
-            return True
-        grid[(c, r)] = was
-        return False
+        return
     span = d if kind == VSTAIR else d + 1
     for k in range(span):
         grid[(c, r + k)] = Cell(kind, level=grid[(c, r)].level,
                                 drop=d, row=k, tag=tag)
-    return True
 
 
 def _cut_flights(grid, rng, per_region: int, region: int = None,
@@ -429,9 +421,7 @@ def _cut_north_flights(grid, rng, per_region: int = 1, region: int = None,
             # An earlier cut in this pass may have spent this site's landing.
             if _nstair_site(grid, c, r) != d:
                 continue
-            if not _cut(grid, c, r, VSTAIR, rng.choice(("grass", "rock")), d,
-                        "n"):
-                continue
+            _cut(grid, c, r, VSTAIR, rng.choice(("grass", "rock")), d, "n")
             taken.append((c, r))
             cut += 1
 
@@ -446,13 +436,7 @@ def _cut_north_flights(grid, rng, per_region: int = 1, region: int = None,
                 and owner.get((c, r)) != owner.get((c, r - 1))]
         if not cuts:
             return
-        # One draw picks where to start; a cut that would sever its own
-        # flank is rolled back, so carry on round the list from there rather
-        # than spend a whole iteration on nothing.
-        start = rng.randrange(len(cuts))
-        tag = rng.choice(("grass", "rock"))
-        for c, r, d in cuts[start:] + cuts[:start]:
-            if _cut(grid, c, r, VSTAIR, tag, d, "n"):
-                break
-        else:
-            return
+        # One draw picks the site and one its tag; a north cut always
+        # stands, so the first pick is the join.
+        c, r, d = cuts[rng.randrange(len(cuts))]
+        _cut(grid, c, r, VSTAIR, rng.choice(("grass", "rock")), d, "n")

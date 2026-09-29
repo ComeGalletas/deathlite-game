@@ -10,12 +10,12 @@ Layering inside the returned surface, per cell:
     ground    the biome sheet for its level, autotiled by its open sides
     cliff     the stone face, `row` down the stack, run-capped left/right
     vstair    the grass channel, plus the stone sprite on top when "rock";
-              a north flight (`dir == "n"`) is either, when "grass", plain
-              plateau grass on its rim cell with the channel piece
-              (`slots.ramp.n`) centred on the seam between it and the
-              landing north of it, or, when "rock", plateau ground with the
-              stone sprite flipped to ascend toward the camera, centred on
-              that seam -- never both
+              a north flight (`dir == "n"`) is a door in the frontier
+              between two floors: its rim cell is plain, lip-free plateau
+              grass, and on the landing north of it lies the landing half
+              of either the channel piece (`slots.ramp.n`), when "grass",
+              or the stone sprite flipped to ascend toward the camera, when
+              "rock" -- never both, and nothing of either on the rim
     ewstair   the biome `slots.ramp` wedge for its descent direction
 
 A side counts as **open** (and so gets a grass fringe / shoreline edge) only
@@ -80,7 +80,9 @@ def _floor_sides(grid, col, row, level) -> str:
     break in it, so the tile alongside one keeps the plain bottom-line rim it
     would have had if the wall ran on unbroken instead of turning a corner into
     the gap. The head of a grass vertical pathway is the one place even the
-    south rim goes; see `_open_channel`."""
+    south rim goes; see `_open_channel`. A north flight lies *north* of the
+    terrace cell behind it, and that side does not fringe either: the floor
+    runs straight on into the door."""
     out = []
     for side, dx, dy in _SIDES:
         nb = grid.get((col + dx, row + dy))
@@ -403,7 +405,7 @@ class _RoomPaint:
     blitted, or in what order. One implementation rather than two is what keeps
     the banded and unbanded pictures from drifting apart. The passes run in
     the order `_paint_room` calls them -- `sort_cells`, `paint_floors`,
-    `paint_stone`, `paint_tall`, `paint_seams`, `trim` -- and that order is
+    `paint_stone`, `paint_tall`, `paint_doors`, `trim` -- and that order is
     the picture: each pass's comment says what it relies on the one before
     having done.
     """
@@ -421,7 +423,7 @@ class _RoomPaint:
         self.ramp_slots = sheets.ramp_slots
         self.slots = sheets.slots
         self.walls: list = []            # (col, row, cell, x, y) -- stone to come
-        self.seams: list = []            # (cell, x, y) -- north flights, `paint_seams`
+        self.doors: list = []            # (cell, x, y) -- north flights, `paint_doors`
         self.floors: dict = {}           # level -> the ground tiles painted at it
         self.shadows: dict = {}          # level -> the casters standing at it
         self.tall: list = []             # (x, y, sprite, surface) -- taller than a cell
@@ -489,11 +491,11 @@ class _RoomPaint:
                 continue
             if c.kind == VSTAIR and c.dir == "n":
                 # The rim cell of a plateau's back is painted as the plateau
-                # ground it is -- autotiled, lip and all -- and the stairs go
-                # on afterwards, centred on the seam; see `paint_seams`.
+                # ground it is, with the floors below it laid first, and
+                # then opened into a door; see `paint_doors`.
                 self.floors.setdefault(c.level, []).append((col, row, c.level, x, y,
                                                             False))
-                self.seams.append((c, x, y))
+                self.doors.append((c, x, y))
                 continue
 
             self.walls.append((col, row, c, x, y))
@@ -631,38 +633,38 @@ class _RoomPaint:
             if spr is not None:
                 target.blit(spr, (x, y))
 
-    # A north flight is one thing or the other (owner, 2026-09-20,
-    # north_stairs_journal NS-7), and either way it straddles the seam
-    # between the landing and the rim, half on each tile, each half on its
-    # own floor's band -- the landing's half on the low band, where a body
-    # on the landing draws over it; the rim's half on the plateau's band,
-    # so the connection cuts through the edge rather than vanishing under
-    # it. A **grass** flight first turns its rim cell into plain plateau
-    # grass (the sheet's interior tile, no lips), then lays the grass
-    # channel piece (`ramp.n`, the south channel by default: a strip with a
-    # lip down each side and open ends) centred on the seam, so the upper
-    # floor's grass runs half a tile past the rim line onto the lower
-    # floor. A **rock** flight keeps its autotiled rim tile and carries the
-    # stone flight centred on the seam the same way. Never both.
-    def paint_seams(self) -> None:
+    # A north flight is a door in the frontier between two floors (owner,
+    # 2026-09-29, WLD-014), drawn in two steps:
+    #
+    # 1. The rim cell becomes the plateau sheet's plain interior tile, no
+    #    lips, on the plateau's band, for both tags. The rim's lip breaks
+    #    there: the flanking rim cells keep theirs, so it runs up to the
+    #    door on each side and stops, and the plateau's grass runs straight
+    #    on to the seam.
+    # 2. The landing half of the connection is laid on the landing's lower
+    #    half, on the low band, where a body on the landing draws over it.
+    #    It ends at the seam; nothing of it covers the rim. A **grass**
+    #    flight lays the low end of the channel (`ramp.n`, the south
+    #    channel by default: a strip with a lip down each side), a **rock**
+    #    flight the foot half of the flipped stone flight. For a two-level
+    #    drop both are a whole tile, the way the connection is two tiles
+    #    tall. One thing or the other (NS-7), never both.
+    #
+    # This replaced NS-6/NS-7, which centred the connection on the seam,
+    # half on each tile, and kept the autotiled rim under the stone.
+    def paint_doors(self) -> None:
         room, sheets, cell = self.room, self.sheets, self.cell
-        for c, x, y in self.seams:
-            low_band = self.band(max(0, c.level - c.drop))
-            if c.tag != "rock":
-                sheet = self.sheet_for(c.level, room.kind, room)
-                self.band(c.level).blit(cell(sheet, self.interior), (x, y))
+        for c, x, y in self.doors:
+            sheet = self.sheet_for(c.level, room.kind, room)
+            self.band(c.level).blit(cell(sheet, self.interior), (x, y))
+            if c.tag == "rock":
+                half = sheets.vstair_landing(c.drop)
+            else:
                 piece = self.ramp_slots.get("n") or self.ramp_slots.get("s")
-                if piece:
-                    upper, lower = sheets.channel_halves(sheet, piece[-1])
-                    low_band.blit(upper, (x, y - upper.get_height()))
-                    self.band(c.level).blit(lower, (x, y))
-                continue
-            halves = sheets.vstair_seam(c.drop)
-            if halves is None:
-                continue
-            foot, top = halves
-            low_band.blit(foot, (x, y - foot.get_height()))
-            self.band(c.level).blit(top, (x, y))
+                half = sheets.channel_landing(sheet, piece, c.drop) if piece else None
+            if half is not None:
+                self.band(max(0, c.level - c.drop)).blit(
+                    half, (x, y - half.get_height()))
 
     # Trim each band to what it actually holds. A terrace occupies a fraction
     # of the island's bounding box, and an untrimmed band would cost the whole
@@ -698,7 +700,7 @@ def _paint_room(store, sheets, layout, room, banded: bool):
     job.paint_floors()
     job.paint_stone()
     job.paint_tall()
-    job.paint_seams()
+    job.paint_doors()
     return job.trim()
 
 

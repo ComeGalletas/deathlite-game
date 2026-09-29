@@ -14,7 +14,7 @@ import unittest
 
 from world.gen.height.flights import (_nstair_site, _cut, _cut_flights,
                                       _cut_north_flights)
-from world.gen.height.graph import walk_links, check_grid, to_ascii
+from world.gen.height.graph import walk_links, check_grid, reachable, to_ascii
 from world.layout import Cell, GROUND, CLIFF, VSTAIR, EWSTAIR
 
 
@@ -125,23 +125,25 @@ class SiteRuleTests(unittest.TestCase):
         _cut_north_flights(b, random.Random(7))
         self.assertEqual(a, b)
 
-    def test_a_cut_that_would_sever_its_own_flank_is_rolled_back(self):
+    def test_a_rim_cell_that_is_the_only_join_keeps_its_strip_joined(self):
         """A rim cell may be the only thing joining a strip of terrace to the
-        rest -- level 1 pinched between the low ground and a higher cap. A
-        flight links only at its ends, so taking that cell strands the strip
-        (and the prune would then delete the flight's own flank). The cut
-        stands only if both flanks still reach the terrace another way."""
+        rest -- level 1 pinched between the low ground and a higher cap.
+        While a flight linked only at its ends, taking that cell stranded
+        the strip, and the cut was rolled back (NS-4). A north flight is a
+        door now (WLD-014): it joins the strip through its west flank, so the
+        cut stands and the strip stays on the terrace."""
         g = _plateau()
         # a level-2 cap under the west half of the rim: cells (0..3, 4)
         for c in range(4):
             g[(c, 4)] = Cell(GROUND, level=2)
         self.assertEqual(_nstair_site(g, 4, 3), 1, "the site itself is fine")
-        before = dict(g)
-        self.assertFalse(_cut(g, 4, 3, VSTAIR, "rock", 1, "n"))
-        self.assertEqual(g, before, "a rolled-back cut leaves no trace")
-        # further east the strip is joined on both sides: the cut stands
-        self.assertTrue(_cut(g, 5, 3, VSTAIR, "rock", 1, "n"))
-        self.assertEqual(g[(5, 3)].dir, "n")
+        # the strip's only way to the rest of its terrace is (4, 3)
+        self.assertTrue(all(g[(c, 4)].level == 2 for c in range(4)))
+        _cut(g, 4, 3, VSTAIR, "rock", 1, "n")
+        self.assertEqual(g[(4, 3)].dir, "n")
+        joined = reachable(g, (4, 4))
+        for c in range(4):
+            self.assertIn((c, 3), joined, f"the strip lost ({c}, 3)")
 
     def test_the_north_pass_joins_a_stranded_terrace_from_its_back(self):
         """With no regional quota at all, the join loop alone still reaches
@@ -157,12 +159,44 @@ class LinkRuleTests(unittest.TestCase):
     def test_down_is_north_and_up_is_south(self):
         g = _plateau()
         _cut(g, 3, 3, VSTAIR, "rock", 1, "n")
-        self.assertEqual(set(walk_links(g, (3, 3))), {(3, 2), (3, 4)})
+        self.assertIn((3, 2), walk_links(g, (3, 3)))
+        self.assertIn((3, 4), walk_links(g, (3, 3)))
         self.assertIn((3, 3), walk_links(g, (3, 2)))
         self.assertIn((3, 3), walk_links(g, (3, 4)))
-        # the flanks are the same terrace but a flight links only at its ends
+
+    def test_the_door_has_no_walls_at_its_flanks(self):
+        """WLD-014: the plateau ground either side of a north flight is its
+        own terrace, and the flight joins it both ways. The four edges are
+        the whole of what it links."""
+        g = _plateau()
+        _cut(g, 3, 3, VSTAIR, "rock", 1, "n")
+        self.assertEqual(set(walk_links(g, (3, 3))),
+                         {(3, 2), (3, 4), (2, 3), (4, 3)})
+        self.assertIn((3, 3), walk_links(g, (2, 3)))
+        self.assertIn((3, 3), walk_links(g, (4, 3)))
+
+    def test_the_frontier_stays_shut_beside_the_door(self):
+        """The only walls left are the frontier between the floors: a flank
+        does not reach the low ground north of it, and the landing does not
+        reach the flanks. Changing floors still means crossing the flight."""
+        g = _plateau()
+        _cut(g, 3, 3, VSTAIR, "rock", 1, "n")
+        for flank in ((2, 3), (4, 3)):
+            links = walk_links(g, flank)
+            self.assertNotIn((flank[0], 2), links, f"{flank} reaches the low ground")
+        self.assertEqual({p for p in walk_links(g, (3, 2)) if g[p].level == 1},
+                         {(3, 3)}, "the landing reaches the terrace only "
+                                   "through the flight")
+
+    def test_a_flank_at_another_level_does_not_link(self):
+        """The site rule keeps both flanks at the flight's level, but the
+        link rule states its own condition rather than trusting that: ground
+        at the low level beside the flight is the frontier, not a door."""
+        g = _plateau()
+        _cut(g, 3, 3, VSTAIR, "rock", 1, "n")
+        g[(2, 3)] = Cell(GROUND, level=0)
+        self.assertNotIn((2, 3), walk_links(g, (3, 3)))
         self.assertNotIn((3, 3), walk_links(g, (2, 3)))
-        self.assertNotIn((3, 3), walk_links(g, (4, 3)))
 
     def test_check_grid_names_a_flight_leading_nowhere(self):
         g = _plateau()
