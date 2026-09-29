@@ -16,7 +16,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-014 · RND-008 · UI-014 ·
-PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
+PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-008
 
 ## Requirements
 
@@ -112,6 +112,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-006 · BLD-003 · DOC-007
 | DOC-004 | Journals for the five proposed requirements (CMB-008, CMB-009, SYS-008, WLD-012, TST-003) | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-004-proposal-journals | 2026-09-23 |
 | DOC-005 | Second documentation review: the narrative open sections, and the owner's answers | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
 | DOC-006 | Third review: the owner's answers on the DOC-005 leftovers, the order of work | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| DOC-007 | Name no person in `CLAUDE.md`: "owner" replaces the template author's name and handle | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | ComeGalletas/doc-007-owner-neutral-610d3887 | 2026-09-28 |
 
 ## Plans and designs
 
