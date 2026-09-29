@@ -290,5 +290,36 @@ class ConftestTierTests(unittest.TestCase):
                          "integration")
 
 
+class SuiteTests(unittest.TestCase):
+    """The real suite: nothing in `unit` needs more."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.results = list(A.tests(A.Index(A.ROOT), conftest.tier))
+
+    def test_nothing_in_unit_boots_or_generates(self):
+        bad = A.grouped([t for t in A.under(self.results) if t.tier == "unit"],
+                        self.results)
+        lines = [f"{prefix}: in `{given}`, needs `{needs}` via {' -> '.join(chain)}"
+                 for (given, needs), prefixes in sorted(bad.items())
+                 for prefix, chain in sorted(prefixes.items())]
+        self.assertEqual(lines, [], "\nregister these in tests/conftest.py:\n"
+                         + "\n".join(lines))
+
+    def test_the_run_hints_and_key_marker_modules_are_integration(self):
+        for path in ("tests/playing/test_run_hints.py",
+                     "tests/playing/test_key_marker.py"):
+            mine = [t for t in self.results if t.nodeid.startswith(path)]
+            self.assertTrue(mine, path)
+            self.assertEqual({(t.tier, t.need.tier) for t in mine},
+                             {("integration", "integration")}, path)
+
+    def test_this_module_is_unit(self):
+        mine = [t for t in self.results
+                if t.nodeid.startswith("tests/devtools/test_tier_audit.py")]
+        self.assertTrue(mine)
+        self.assertEqual({(t.tier, t.need.tier) for t in mine}, {("unit", "unit")})
+
+
 if __name__ == "__main__":
     unittest.main()

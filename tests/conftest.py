@@ -52,6 +52,8 @@ WORLD = (
     "tests/render/test_depth_sort.py",
     "tests/render/test_hazard_sprite.py",
     "tests/playing/test_projectile_elevation.py",
+    # TST-006.2: reads the shared worlds; the module's boats boot a run.
+    "tests/entities/test_fish_huts.py::PlacementTests",
 )
 
 # Modules that boot a real `Game` and drive its states -- the menu into a run,
@@ -91,6 +93,30 @@ INTEGRATION = (
     "tests/flows/test_run_determinism.py",
     "tests/devtools/test_element_building.py",
     "tests/playing/test_bridge_crowd.py",
+    # TST-006.2: booted a Game inside `unit`. Whole modules where every class
+    # boots; class by class where the rest of the module is pure, and a class
+    # that mixes goes whole (TST-006.D1). `tools/verification/tier_audit.py`
+    # names the call that boots each one.
+    "tests/playing/test_run_hints.py",
+    "tests/playing/test_key_marker.py",
+    "tests/playing/test_buffs.py",
+    "tests/flows/test_display_change_in_run.py",
+    "tests/screens/test_ui_scale.py",
+    "tests/combat/test_forge.py::ArcaneStormOnTheDummyTests",
+    "tests/combat/test_forge.py::ForgeWeaponPickerTests",
+    "tests/devtools/test_dps_bench.py::BuildTests",
+    "tests/devtools/test_dps_bench.py::DamageScaleTests",
+    "tests/devtools/test_dps_bench.py::BlessingDamageScaleTests",
+    "tests/devtools/test_dps_bench.py::MeasurementTests",
+    "tests/devtools/test_dps_meter.py::BenchArenaTests",
+    "tests/entities/ai/test_ranged_windup.py::FiringTests",
+    "tests/entities/test_fish_huts.py::BoatTests",
+    "tests/render/test_element_layers.py::DrawOrderTests",
+    "tests/render/test_enemy_hp_bar.py::BossExclusionTests",
+    "tests/render/test_spawn_fx.py::RunTests",
+    "tests/screens/test_ultrawide.py::DimCoversTheMarginsTests",
+    "tests/screens/test_ultrawide.py::ScreenBackdropTests",
+    "tests/screens/test_ultrawide.py::PanelsStayInTheBoxTests",
 )
 
 

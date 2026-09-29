@@ -151,7 +151,7 @@
 
 - [x] TST-006.1 — `tier()` in conftest; `tier_audit.py`, `tier_trace.py`;
   the reader's tests.
-- [ ] TST-006.2 — Register the `unit` findings (the request's own scope);
+- [x] TST-006.2 — Register the `unit` findings (the request's own scope);
   pin `test_run_hints.py` / `test_key_marker.py` as `integration`.
 - [ ] TST-006.3 — Split the five `world` modules that boot a Game (D2);
   the suite-wide "nothing under-tiered" test.
@@ -178,3 +178,18 @@
 - `tests/devtools/test_tier_audit.py`: 17 tests on small source trees,
   0.16 s. The grep false positives listed above are among the cases pinned
   as `unit` (`_Game(` fakes, a menu's own `.enter(...)`).
+
+### 2026-09-29 — TST-006.2: the `unit` findings registered
+
+- `INTEGRATION` gains five whole modules and fifteen classes;
+  `WORLD` gains `test_fish_huts.py::PlacementTests`. 132 tests leave `unit`:
+  70 in the five whole modules, 62 in the sixteen classes, of which 9 are
+  the pure tests that ride up with a mixed class (TST-006.D1). pytest
+  agrees: 2250 selected before, 2138 after = 2250 - 132 + this task's 20
+  audit tests.
+- They pass where they now live: `-m "world or integration"` over the
+  fourteen touched modules, 132 passed, 101 deselected (the pure classes,
+  still in `unit`), 150 s.
+- `SuiteTests` pins it: nothing in `unit` is under-tiered, and
+  `test_run_hints.py` / `test_key_marker.py` are `integration` by need and
+  by registration.
