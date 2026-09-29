@@ -204,8 +204,10 @@ Built once by `GameMap` from the layout. Per absolute tile it holds `level`
 here, walkable or not — what a projectile has to die against). Flight cells
 keep their `Cell` beside the arrays. `world/rules/steps.py` (`can_step`,
 `can_cross`, `diagonal_blocked`) mirrors `walk_links` against it so the
-collider and the flow field ask the same question without allocating;
-`tests/world/test_elevation.py` checks the two agree on every cell.
+collider, the flow field and projectiles ask the same question without
+allocating; `tests/world/test_elevation.py` checks the two agree on every cell.
+A projectile's climb through a staircase (CMB-010) is that same `can_step`,
+asked by `game/states/playing/core/shot_terrain.py`.
 
 ---
 

@@ -104,7 +104,8 @@ Conventions, as everywhere:
       terrain: the top band, or the band of the nearest floor). Fix in
       `_actor_items` if a flyer vanishes or sinks under a terrace edge.
 - [x] Combat: the contact bite (`combat.py`) and the hostile barrage
-      (`fire_hostile` -> `stamp_fire_level` -> `block_on_terrain`). A boss
+      (`fire_hostile` -> `stamp_fire_level` -> `block_on_terrain`;
+      `stamp_floor` since CMB-010). A boss
       firing from over the sea samples `top_at_point` where there is no
       floor; make sure its bullets are not killed on the first tile they
       cross, and that contact across a level difference (the verticality

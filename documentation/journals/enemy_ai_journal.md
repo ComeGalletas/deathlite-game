@@ -605,7 +605,8 @@ body by `level_at`, which answers 0 over a cliff wall (no floor there), so
 a bat over the face of a terrace would have been painted under its rim.
 `TerrainRenderer.top_level_at` (the elevation of whatever stands under the
 point, walls included) is the band for a `flying` body now. Combat needed
-nothing: the contact bite is elevation-blind; `stamp_fire_level` over the
+nothing: the contact bite is elevation-blind; `stamp_fire_level` (`stamp_floor`
+since CMB-010) over the
 sea records `NONE`, which `block_on_terrain` exempts, so the barrage from
 offshore lands, and the hero's answer from the beach crosses the void as
 LD-9 D10 already allowed. The hero's targeting has no elevation filter.
