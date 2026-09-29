@@ -162,6 +162,18 @@ class PanelsStayInTheBoxTests(unittest.TestCase):
             self.assertGreaterEqual(r.left, 0)
             self.assertLessEqual(r.right, config.UI_WIDTH)
 
+
+class LevelUpPanelMarginTests(unittest.TestCase):
+    """The level-up panel on its own, no `Game`: it needs only a display and
+    the font module, so it sets them up itself and runs in `unit` (TST-007;
+    it used to pass only after the pause test above had booted a Game)."""
+
+    @classmethod
+    def setUpClass(cls):
+        pygame.display.init()
+        pygame.display.set_mode((64, 64))
+        pygame.font.init()
+
     def test_a_level_up_draw_without_the_dim_leaves_the_margins_alone(self):
         s = _bright()
         panel = LevelUpPanel()
