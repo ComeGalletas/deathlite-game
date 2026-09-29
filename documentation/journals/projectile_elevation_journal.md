@@ -270,7 +270,8 @@ ground, stairs included.
 ## CMB-010 — Results
 
 - **Tests.** Full suite **3476 passed**, 11 deselected (the opt-in `sweep`
-  tier), 1221 subtests. `tests/playing/test_projectile_elevation.py` holds
+  tier), 1221 subtests; after rebasing onto main (WLD-014's step-rule
+  change, ENT-018, RND-008) **3580 passed**, 11 deselected, 3134 subtests. `tests/playing/test_projectile_elevation.py` holds
   44 tests,
   about 9 s; every regression test added after a critic round was shown to
   fail with the old behaviour patched back in.
