@@ -9,7 +9,9 @@ in the event pump, on a fresh save and not on a saved one -- heap layout).
 """
 import os
 import sys
+import time
 import unittest
+from unittest import mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -121,6 +123,104 @@ class SystemCursorTests(unittest.TestCase):
 
     def test_an_unreadable_bitmap_falls_back_to_the_stock_arrow(self):
         self.assertIsNone(native._ink_fraction_of(None, 0))
+
+
+def _sleep_median_ms(n: int = 15) -> float:
+    """The median wall time of `pygame.time.wait(1)`: `SDL_Delay`, the very
+    sleep `Clock.tick` makes. About 1.5 ms while the 1 ms timer request is
+    honored, about 15.3 ms while Windows sets it aside."""
+    samples = []
+    for _ in range(n):
+        t = time.perf_counter()
+        pygame.time.wait(1)
+        samples.append((time.perf_counter() - t) * 1000.0)
+    samples.sort()
+    return samples[n // 2]
+
+
+class TimerResolutionTests(unittest.TestCase):
+    """`honor_timer_resolution` (SYS-011): Windows 11 may set aside the 1 ms
+    timer SDL asks for while a process is hidden and silent, and the frame
+    cap then holds every frame at ~31 ms. The fix turns the process's
+    `IGNORE_TIMER_RESOLUTION` power-throttling policy off."""
+
+    @classmethod
+    def setUpClass(cls):
+        pygame.display.init()           # SDL starts, and asks for its 1 ms timer
+        pygame.time.wait(1)             # the timer subsystem, as `Clock.tick` starts it
+
+    def setUp(self):
+        # Every test leaves the process's policy as it found it.
+        saved = native._throttling() or (0, 0)
+        self.addCleanup(native._set_throttling, *saved)
+
+    def test_the_policy_reads_back_as_always_honored(self):
+        honored = native.honor_timer_resolution()
+        if sys.platform != "win32":
+            self.assertFalse(honored)
+            self.assertIsNone(native._throttling())
+            return
+        self.assertTrue(honored)
+        self.assertEqual(native._throttling(), (native._IGNORE_TIMER_RESOLUTION, 0))
+
+    def test_the_fix_lifts_the_stretch_windows_applies(self):
+        """The regression pin. Windows applying the rule on its own and the
+        process switching `IGNORE_TIMER_RESOLUTION` on are one policy, so the
+        stretch is forced here rather than waited for (SYS-011.D3): with it
+        on, the tick's sleep rounds to the coarse timer; the fix brings it
+        back to 1 ms in the same process. Off Windows there is no such
+        policy, and forcing it is refused."""
+        forced = native._set_throttling(native._IGNORE_TIMER_RESOLUTION,
+                                        native._IGNORE_TIMER_RESOLUTION)
+        if sys.platform != "win32":
+            self.assertFalse(forced)
+            self.assertFalse(native.honor_timer_resolution())
+            return
+        self.assertTrue(forced)
+        self.assertGreater(_sleep_median_ms(), 10.0,
+                           "the forced policy no longer stretches the sleep")
+        self.assertTrue(native.honor_timer_resolution())
+        self.assertLess(_sleep_median_ms(), 5.0,
+                        "honoring the request did not bring the 1 ms sleep back")
+
+    def test_off_windows_it_touches_no_win32_api(self):
+        def no_kernel32():
+            raise AssertionError("reached for kernel32 off Windows")
+
+        with mock.patch.object(native.sys, "platform", "emscripten"), \
+                mock.patch.object(native, "_kernel32", no_kernel32):
+            self.assertFalse(native.honor_timer_resolution())
+            self.assertFalse(native._set_throttling(0, 0))
+            self.assertIsNone(native._throttling())
+
+    def test_a_windows_without_the_api_answers_false_and_says_why(self):
+        """Windows 7 has no `SetProcessInformation` (AttributeError); a
+        failed load is OSError. Neither reaches the caller."""
+        for exc in (AttributeError("SetProcessInformation"), OSError("kernel32")):
+            def broken(exc=exc):
+                raise exc
+
+            with self.subTest(exc=type(exc).__name__), \
+                    mock.patch.object(native.sys, "platform", "win32"), \
+                    mock.patch.object(native, "_kernel32", broken), \
+                    self.assertLogs(native.log, "INFO") as logged:
+                self.assertFalse(native.honor_timer_resolution())
+                self.assertIsNone(native._throttling())
+            self.assertIn("unavailable", logged.output[0])
+
+    def test_a_refused_policy_answers_false_and_says_why(self):
+        """Before Windows 11 the timer-resolution bit is not a known policy
+        and `SetProcessInformation` answers 0."""
+        from types import SimpleNamespace
+        refusing = SimpleNamespace(GetCurrentProcess=lambda: -1,
+                                   SetProcessInformation=lambda *a: 0,
+                                   GetProcessInformation=lambda *a: 0)
+        with mock.patch.object(native.sys, "platform", "win32"), \
+                mock.patch.object(native, "_kernel32", lambda: refusing), \
+                self.assertLogs(native.log, "INFO") as logged:
+            self.assertFalse(native.honor_timer_resolution())
+            self.assertIsNone(native._throttling())
+        self.assertIn("refused", logged.output[0])
 
 
 if __name__ == "__main__":
