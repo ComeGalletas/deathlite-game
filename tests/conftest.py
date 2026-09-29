@@ -137,6 +137,8 @@ INTEGRATION = (
     "tests/devtools/test_spawn_stress.py::HarnessDefaultsTests",
     "tests/devtools/test_spawn_stress.py::LiveDirectorTests",
     "tests/devtools/test_spawn_stress.py::CommandLineTests",
+    # RND-008.3: a whole run's draw, three booted runs.
+    "tests/playing/test_frame_fonts.py",
 )
 
 

@@ -270,7 +270,7 @@ Each task names the number it has to move. "Before" is the rerun above.
 
 - [x] RND-008.1: This journal, with the reviewed findings and the report; the index row
 - [x] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
-- [ ] RND-008.3: No font built during a run's draw (hints, keycaps, interact key); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
+- [x] RND-008.3: No font built during a run's draw (hints, keycaps, interact key, and the pause menu's Controls block); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
 - [ ] RND-008.4: Elemental draw: bodies bucketed by band once a frame; cached status-mark shapes; cached plain damage-number glyphs
 - [ ] RND-008.5: Update re-measured with a stationary hero and frozen master; the bump decision, and the cheap wins if taken
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
@@ -409,6 +409,173 @@ Each task names the number it has to move. "Before" is the rerun above.
   the report (4.56 ms at 150). The load makes them an upper bound, not a
   baseline. RND-008.5 takes its before and after back to back in one
   sitting, which is the only comparison this machine supports.
+
+### RND-008.3: no font built while a run draws
+
+- **What changed:**
+  - `ui/text_cache.py` (new): `TextCache`. It keeps fonts by role, design
+    size, weight and `config.RENDER_SCALE`, and the surfaces rendered from
+    them (plain, and `ui.text.shadowed`) by text and colour, bounded at
+    256. The object that draws holds it (D2). The role's function is
+    looked up on `game/fonts.py` at build time, so a patched face is used.
+    `game/fonts.py` is unchanged and still keeps nothing.
+  - `PlayingState.text_cache`: made with the HUD, and replaced in
+    `on_display_changed`, so a re-opened display gets fonts at its scale.
+  - `ui/keycap.py`:
+    - `draw_keycap(..., cache=None)`. The label comes from the cache when
+      one is given.
+    - The font is built only when there is text to render. An arrow or the
+      mouse glyph used to build a font it never used, which was four of
+      the Attack hint's six per frame.
+    - What a cap writes (`_words`), where it goes (`_face`) and how it is
+      rendered (`_text`) are now shared by `draw_keycap` and a new
+      `footprint`, which returns everything the cap paints. That is the
+      frame, grown to take in a written label that runs past it.
+  - `game/states/playing/visual/hints.py`:
+    - The words and the caps' labels come from the run's cache.
+    - A fading stage draws into a buffer covering the block's footprint
+      (`extent`), not a new full-screen alpha surface each frame (about
+      11 MB at 2560 x 1080).
+    - `draw` returns that footprint.
+  - `key_marker.py` passes the run's cache for the interact cap.
+  - **Also the pause menu.** Its Controls block (`ui/controls_block.py`)
+    drew 13 keycaps every paused frame, and each built a font (8 of them
+    to render a label). `PausedState` now holds a `TextCache`, made in
+    `_build_fonts` (on enter and on a display change), and
+    `controls_block.draw` takes `cache=`. It is outside the run's draw,
+    but it is the same fix, and the menu is open during play.
+- **Fonts built per warm frame** (`scratchpad/font_sweep.py` and
+  `pause_sweep.py`, seed 1234, the pause count run in both trees):
+
+  | Scene | Before | After |
+  |---|---|---|
+  | Move hint | 5 | 0 |
+  | Move hint fading | 5 | 0 |
+  | Attack hint | 6 | 0 |
+  | No hints | 0 | 0 |
+  | Interact cap | 1 | 0 |
+  | Pause menu, hints dismissed or up | 13 | 0 |
+
+  The pause menu's count is the same with the Move hint up, so the
+  frozen run under it is not redrawn while paused.
+- **The cold critic caught a clip.**
+  - The first version sized the fade buffer from the caps' frames and
+    said everything a cap paints lies inside its frame. That is false for
+    the mouse cap without the cursor art: it writes `CLICK` (49 px at
+    18 px bold) on a 32 px square cap.
+  - The fading Attack hint then lost the word's left edge. The critic
+    measured 42 to 115 changed pixels at render scales 0.75 to 1.5, on
+    the documented degrade path.
+  - My identity check had not covered that path, so its "no pixel
+    changes" was not supported as first written.
+  - Fixed with `keycap.footprint`, and pinned by the tests below. The
+    critic's other points were fixed too:
+    - the false `extent` docstring;
+    - a fade test that could not see the clip;
+    - a misleading comment;
+    - the font roles bound at import time.
+  - A second finding came from the suite, not the critic: the refactor
+    looked the cursor glyph up twice per mouse cap, which
+    `test_controls_block` pins to once. The lookup now happens once.
+- **Pixels do not change.** This was checked against the real `HEAD`
+  modules, loaded side by side (`scratchpad/identity.py`), in 570
+  comparisons with none differing:
+  - 534 at render scale 1.0 and 1.2: caps in every label kind, colour,
+    state and two sizes, with art and without, each through a cold and a
+    warm cache; the Move hint, with a key held, and the Attack hint; and
+    the fade at five points.
+  - 36 on the critic's path: no cursor glyph, with and without keycap art,
+    at scales 1.0, 1.2 and 1.5, with the Attack hint steady and fading at
+    three points, plus the lone mouse cap.
+  - Two negative controls (alpha one step apart, a key held on one side
+    only) were both flagged, so the comparison sees a real difference.
+  - In the suite, the uncached path is the oracle: a cached cap against an
+    uncached one, and the block-sized fade against the whole-screen fade
+    drawn the old way.
+- **Tests:**
+  - `tests/screens/test_text_cache.py` (14 tests, `unit`) pins:
+    - a font is built once per role, size and weight, and again at another
+      render scale;
+    - an unknown role is refused;
+    - rendered and shadowed text is kept and equals a fresh render, and
+      the shadow follows the scale;
+    - the store is bounded;
+    - a cached cap is pixel-identical to an uncached one, cold and warm, in
+      every label kind, colour, state and size, with and without art;
+    - a warm cache builds nothing;
+    - arrows and the mouse build no font even uncached;
+    - a given font still wins;
+    - everything `draw_keycap` paints lies inside `footprint`, over every
+      label kind, colour, state, size, art and glyph case at scales 1.0
+      and 1.5 (448 subtests);
+    - the mouse word really is wider than its square cap.
+  - `tests/playing/test_frame_fonts.py` (11 tests, `integration`, seed
+    1234) pins:
+    - a whole `PlayingState.draw` builds no font in a warm frame with the
+      Move hint, a held key, a fading stage, the Attack hint, the interact
+      cap, and all at once;
+    - the control: with the cache replaced, the same frame builds fonts;
+    - a warm paused frame builds none;
+    - a display re-opened at 1.2 gets a new cache whose first frame builds
+      the fonts at 22 px (18 × 1.2), nothing at the old size, and whose
+      second frame builds none;
+    - the fade is pixel-identical to the whole-screen one, and everything
+      painted lies inside the rect `draw` returns. This covers both stages
+      at scales 1.0 and 1.5, with the art as shipped, without the cursor
+      glyph and without keycap art;
+    - the mouse cap without its glyph really does paint past its frame.
+  - **Mutation check** (`scratchpad/mutate3.py`): each pre-fix behaviour
+    was put back in turn, and all ten were caught:
+
+    | Behaviour put back | Tests failed |
+    |---|---|
+    | the hint word built from a new font every frame | 6 |
+    | the hint caps drawn without the cache | 5 |
+    | the fade block measured from the cap frames only (the critic's clip) | 62 |
+    | the interact cap drawn without the cache | 2 |
+    | the fade buffer drawn without the block offset | 36 |
+    | the cache kept across a display re-open | 1 |
+    | the font built before the label is known | 10 |
+    | the font key without the render scale | 2 |
+    | the text key without the render scale | 1 |
+    | the pause menu's caps drawn without the cache | 1 |
+
+  - **Suites:**
+    - After the critic's fixes, `tests/playing`, `tests/render`,
+      `tests/screens` and `tests/devtools` gave 1,422 passed and 1 failed
+      (1,074 subtests) in 9 min 49 s. The failure was the double glyph
+      lookup above.
+    - After fixing that, the tests of every keycap caller passed, 112
+      (612 subtests): `test_controls_block`, `test_keycap`,
+      `test_text_cache`, `test_frame_fonts`, `test_run_hints`,
+      `test_key_marker` and `test_pause`. The identity check and the
+      mutation check were re-run on the final code.
+- **Measured** on the Windows renderer, 2560 × 1080, 100 packed, seed 35,
+  240 frames, on the final code. Before (`HEAD`, from `git archive`) and
+  after (this tree) were run in two alternating rounds in one sitting. The
+  CPU load swung between 9 and 59 % from other programs, so each round
+  is read pairwise:
+
+  | Round | Before, hints on | Before, hints off | After, hints on | After, hints off |
+  |---|---|---|---|---|
+  | 1 | 22.49 ms | 8.63 ms | 8.65 ms | 10.66 ms |
+  | 2 | 29.58 ms | 11.10 ms | 11.16 ms | 9.51 ms |
+
+  - The two hints-off runs in a round do the same work, yet differ by
+    2.03 and 1.59 ms. That is this sitting's noise.
+  - With the hints on, the new code lands 0.02 and 0.06 ms from the
+    hints-off run beside it, and within the noise of the other. Before,
+    the hints cost 13.86 and 18.48 ms of draw p50.
+  - An earlier sitting at 65 to 91 % load, on the code before the
+    critic's fixes, gave the same shape: hints on 0.22 and 0.57 ms above
+    hints off, where before they cost 23.27 and 19.97 ms.
+  - Target (within 1 ms of hints off): **met**, within the resolution this
+    machine gives.
+- **Found and handed off:** `tests/playing/test_run_hints.py` and
+  `test_key_marker.py` boot a `Game` and a seeded run but are not
+  registered in `tests/conftest.py`, so they run in the every-save `unit`
+  tier. That is outside RND-008. It was raised as a separate task, which
+  the owner started in its own session.
 
 ## RND-008: Method
 
