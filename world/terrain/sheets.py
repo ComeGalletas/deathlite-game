@@ -187,19 +187,29 @@ class TileSheets:
             self._cell_cache[key] = img
         return self._cell_cache[key]
 
-    def channel_landing(self, sheet: str, idx: int):
-        """The part of a grass channel tile a grass north flight shows: the
-        tile's upper half, `px` wide and half a tile tall, laid on the
-        landing's lower half. A north flight is a door in the frontier
-        between two floors, so it is drawn on the lower floor only and
-        nothing of it covers the rim (WLD-014). The tile is symmetric top
-        to bottom, so no flip. Cached."""
-        key = ("channel-landing", sheet, idx)
+    def channel_landing(self, sheet: str, piece, drop: int = 1):
+        """The part of the grass channel a grass north flight shows, laid on
+        its landing so that it ends at the seam. A north flight is a door in
+        the frontier between two floors, so it is drawn on the lower floor
+        only and nothing of it covers the rim (WLD-014).
+
+        `piece` is the `ramp` slot pair `(head, foot)`. The channel for a
+        `drop`-level descent is `drop` tiles tall, and the landing is its
+        low end, so it wears the foot piece, as the low end of a wall-cut
+        flight does: for a one-level drop the upper half of it, half a tile
+        tall; for two levels the whole tile. The piece is symmetric in shape
+        (a lip down each side, open at both ends) though not pixel for
+        pixel, and it is laid unflipped. Cached."""
+        idx = piece[-1]
+        key = ("channel-landing", sheet, idx, drop > 1)
         if key not in self._cell_cache:
             tile = self.cell(sheet, idx)
-            w, h = tile.get_size()
-            self._cell_cache[key] = tile.subsurface(
-                pygame.Rect(0, 0, w, h // 2)).copy()
+            if drop > 1:
+                self._cell_cache[key] = tile
+            else:
+                w, h = tile.get_size()
+                self._cell_cache[key] = tile.subsurface(
+                    pygame.Rect(0, 0, w, h // 2)).copy()
         return self._cell_cache[key]
 
     def vstair_landing(self, drop: int = 1):

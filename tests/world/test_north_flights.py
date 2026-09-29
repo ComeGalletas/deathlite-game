@@ -187,6 +187,23 @@ def _band_tile(surfs, level, wx, wy, px):
     return None
 
 
+def _expected_landing(sheets, sheet, tag, drop):
+    """What a north flight's landing should show, cut here from the source
+    art rather than asked of the painter's own helpers: the flipped stone's
+    north half for "rock"; for "grass" the channel's low end, its foot
+    piece -- the upper half of it for one level, the whole tile for two."""
+    if tag == "rock":
+        spr = sheets.vstair_sprite(drop, north=True)
+        w, h = spr.get_size()
+        return spr.subsurface(pygame.Rect(0, 0, w, h // 2)).copy()
+    piece = sheets.ramp_slots.get("n") or sheets.ramp_slots.get("s")
+    tile = sheets.cell(sheet, piece[-1])
+    if drop > 1:
+        return tile
+    w, h = tile.get_size()
+    return tile.subsurface(pygame.Rect(0, 0, w, h // 2)).copy()
+
+
 class PainterTests(unittest.TestCase):
     """WLD-014: a north flight is a door in the frontier between two floors.
     Its rim cell is plain plateau grass, lip-free, whatever the tag, and the
@@ -221,7 +238,6 @@ class PainterTests(unittest.TestCase):
         for seed in SEEDS:
             gm = W.baked(seed)
             sheets, surfs = gm._sheets, gm._grid_surfs
-            piece = sheets.ramp_slots.get("n") or sheets.ramp_slots.get("s")
             styles, seen = set(), 0
             for room, (c, r), cell in _north_flights(gm.layout):
                 where = f"seed {seed} room {room.id} at {(c, r)} ({cell.tag})"
@@ -238,10 +254,8 @@ class PainterTests(unittest.TestCase):
                 self.assertEqual(_band_tile(surfs, cell.level, x0, y0, px), plain,
                                  f"{where}: the rim is not open plateau grass")
                 # The landing's lower half carries the landing half.
-                if cell.tag == "rock":
-                    half, tol = sheets.vstair_landing(cell.drop), 8
-                else:
-                    half, tol = sheets.channel_landing(sheet, piece[-1]), 0
+                half = _expected_landing(sheets, sheet, cell.tag, cell.drop)
+                tol = 8 if cell.tag == "rock" else 0
                 self.assertEqual(half.get_size(), (px, px // 2))
                 self.assertTrue(self._landing_matches(surfs, low, x0, y0, half, tol),
                                 f"{where}: the landing half is not on the landing")
@@ -272,9 +286,8 @@ class PainterTests(unittest.TestCase):
                 plain = pygame.image.tobytes(sheets.cell(sheet, sheets.interior),
                                              "RGBA")
                 for dc in (-1, 1):
-                    nb = room.grid[(c + dc, r)]
-                    if nb.kind == VSTAIR:
-                        continue                # two doors side by side
+                    # ground by the site rule, so never a second door
+                    self.assertEqual(room.grid[(c + dc, r)].kind, GROUND)
                     got = _band_tile(surfs, cell.level,
                                      room.rect.x + (c + dc) * px,
                                      room.rect.y + r * px, px)
@@ -283,37 +296,58 @@ class PainterTests(unittest.TestCase):
                                         f"flank lost its lip")
 
     def test_a_two_level_door_fills_the_whole_landing(self):
-        """D2. The generator places no two-level north flight today (NS-5
-        measured every one as a one-level drop), so one is made here by
-        deepening a shipped flight and repainting its island: the landing
-        half of the 64x128 stone is a whole tile, and the rim is still
-        plain grass."""
-        import copy
-        from world.terrain.grid_paint import paint_room_levels
+        """D2, on a real two-level geometry. The generator places no
+        two-level north flight today (NS-5 measured every one as a
+        one-level drop), so the island is built by hand: level-0 ground,
+        then a level-2 terrace with its wall, the door on its back rim.
+        For both tags the rim is plain grass and the landing -- ground at
+        level 0 -- shows a whole tile of the connection, on its own band
+        and in the composited frame, which is the same picture the
+        unbanded painter makes."""
+        from types import SimpleNamespace
+        from world.gen.height.graph import check_grid
+        from world.layout import CLIFF, Cell
+        from world.terrain.grid_paint import paint_room_grid, paint_room_levels
         W.display()
         px = config.TILE_PX
-        gm = W.baked(SEEDS[0])
-        sheets = gm._sheets
-        half = sheets.vstair_landing(2)
-        self.assertEqual(half.get_size(), (px, px))
-        full = sheets.vstair_sprite(2, north=True)
-        for y in (0, px // 2, px - 1):
-            self.assertEqual(tuple(half.get_at((px // 2, y))),
-                             tuple(full.get_at((px // 2, y))))
-        room, pos, cell = next(f for f in _north_flights(gm.layout)
-                               if f[2].tag == "rock")
-        deep = copy.copy(room)
-        deep.grid = dict(room.grid)
-        deep.grid[pos] = cell._replace(drop=2)
-        surfs = paint_room_levels(None, sheets, gm.layout, deep)
-        x0 = room.rect.x + pos[0] * px
-        y0 = room.rect.y + pos[1] * px
-        sheet = sheets.sheet_for(cell.level, room.kind, room)
-        self.assertEqual(_band_tile(surfs, cell.level, x0, y0, px),
-                         pygame.image.tobytes(sheets.cell(sheet, sheets.interior),
-                                              "RGBA"))
-        low = max(0, cell.level - 2)
-        self.assertTrue(self._landing_matches(surfs, low, x0, y0, half, 8))
+        sheets = W.baked(SEEDS[0])._sheets
+        for tag in ("rock", "grass"):
+            g = {}
+            for c in range(7):
+                for r in range(3):
+                    g[(c, r)] = Cell(GROUND, level=0)
+                for r in range(3, 7):
+                    g[(c, r)] = Cell(GROUND, level=2)
+                g[(c, 7)] = Cell(CLIFF, level=2, drop=2, row=0)
+                g[(c, 8)] = Cell(CLIFF, level=2, drop=2, row=1)
+            g[(3, 3)] = Cell(VSTAIR, level=2, drop=2, row=0, tag=tag, dir="n")
+            self.assertEqual(check_grid(g), [], tag)
+            rect = pygame.Rect(0, 0, 7 * px, 9 * px)
+            room = SimpleNamespace(id=0, rect=rect, grid=g, kind="",
+                                   topography=None)
+            bands = paint_room_levels(None, sheets, None, room)
+            frame = pygame.Surface(rect.size, pygame.SRCALPHA)
+            for brect, surf, _lvl in sorted(bands, key=lambda t: t[2]):
+                frame.blit(surf, brect.topleft)
+            flat_rect, flat = paint_room_grid(None, sheets, None, room)
+            flat_frame = pygame.Surface(rect.size, pygame.SRCALPHA)
+            flat_frame.blit(flat, flat_rect.topleft)
+            self.assertEqual(pygame.image.tobytes(frame, "RGBA"),
+                             pygame.image.tobytes(flat_frame, "RGBA"), tag)
+
+            sheet = sheets.sheet_for(2, "", room)
+            x0, y0 = 3 * px, 3 * px
+            self.assertEqual(_band_tile(bands, 2, x0, y0, px),
+                             pygame.image.tobytes(sheets.cell(sheet, sheets.interior),
+                                                  "RGBA"), f"{tag}: rim")
+            half = _expected_landing(sheets, sheet, tag, 2)
+            self.assertEqual(half.get_size(), (px, px), tag)
+            tol = 8 if tag == "rock" else 0
+            self.assertTrue(self._landing_matches(bands, 0, x0, y0, half, tol),
+                            f"{tag}: not a whole tile on the landing's band")
+            self.assertTrue(self._landing_matches([(rect, frame, 0)], 0, x0, y0,
+                                                  half, tol),
+                            f"{tag}: hidden in the composited frame")
 
     def test_south_flights_are_still_painted_as_flights(self):
         """The regression the north branch caused once: every wall-cut

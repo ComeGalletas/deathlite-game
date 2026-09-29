@@ -374,7 +374,8 @@ instead of surf, keyed **directly** by the open sides: `"" → 15`, `"n" → 6`,
 - `slots.ramp` — `"w": [36, 45]`, `"e": [39, 48]` are the east/west wedge
   (top tile, bottom tile) by descent side; `"s"` / `"n"` → `[17, 17]` is the
   grass channel piece a straight flight lays. `TileSheets.channel_landing`
-  is its upper half, the part a grass north flight shows on its landing.
+  is the part a grass north flight shows on its landing: the upper half of
+  the foot piece for a one-level drop, the whole foot piece for two.
 - `vstair` — a separate sheet of stone flights (`vstairs.png`, one column,
   with `sheets` per drop). `TileSheets.vstair_sprite(drop, north)` is the
   stone drawn on a `"rock"` flight; `vstair_landing` is the north half of
@@ -404,14 +405,18 @@ standing on this cell, a terrace butting against it — because the floor runs
 on underneath and ground is painted below everything. A flight at this level
 is rim to the south only; the head of a grass channel is the one place even
 the south rim goes (`_open_channel`), so the channel reads as continuous from
-the terrace down through the wall.
+the terrace down through the wall. A north flight lies *north* of the
+terrace cell behind it, and that cell runs straight on into it with no rim;
+the rim cells beside it keep their north lip and do not fringe toward it.
 
 Per cell, `grid_paint` then paints: nothing for a lake (the water buffer
 shows through); the biome sheet's ground tile for ground; the stone face for
 a cliff; the grass channel plus, when `"rock"`, the stone sprite for a
 straight flight; the ramp wedge for an east/west one. Sprites taller than a
-cell (a drop-2 stone flight) go on last so the cell they hang into does not
-paint over them.
+cell (a drop-2 stone flight) go on after that so the cell they hang into
+does not paint over them, and the north-flight doors (`paint_doors`) last of
+all: the rim cell opened to plain grass, then the landing half of the
+connection on the low floor's band.
 
 ---
 

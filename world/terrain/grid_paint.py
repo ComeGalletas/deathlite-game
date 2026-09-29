@@ -80,7 +80,9 @@ def _floor_sides(grid, col, row, level) -> str:
     break in it, so the tile alongside one keeps the plain bottom-line rim it
     would have had if the wall ran on unbroken instead of turning a corner into
     the gap. The head of a grass vertical pathway is the one place even the
-    south rim goes; see `_open_channel`."""
+    south rim goes; see `_open_channel`. A north flight lies *north* of the
+    terrace cell behind it, and that side does not fringe either: the floor
+    runs straight on into the door."""
     out = []
     for side, dx, dy in _SIDES:
         nb = grid.get((col + dx, row + dy))
@@ -642,10 +644,11 @@ class _RoomPaint:
     # 2. The landing half of the connection is laid on the landing's lower
     #    half, on the low band, where a body on the landing draws over it.
     #    It ends at the seam; nothing of it covers the rim. A **grass**
-    #    flight lays the upper half of the channel piece (`ramp.n`, the
-    #    south channel by default: a strip with a lip down each side), a
-    #    **rock** flight the foot half of the flipped stone flight. One
-    #    thing or the other (NS-7), never both.
+    #    flight lays the low end of the channel (`ramp.n`, the south
+    #    channel by default: a strip with a lip down each side), a **rock**
+    #    flight the foot half of the flipped stone flight. For a two-level
+    #    drop both are a whole tile, the way the connection is two tiles
+    #    tall. One thing or the other (NS-7), never both.
     #
     # This replaced NS-6/NS-7, which centred the connection on the seam,
     # half on each tile, and kept the autotiled rim under the stone.
@@ -658,7 +661,7 @@ class _RoomPaint:
                 half = sheets.vstair_landing(c.drop)
             else:
                 piece = self.ramp_slots.get("n") or self.ramp_slots.get("s")
-                half = sheets.channel_landing(sheet, piece[-1]) if piece else None
+                half = sheets.channel_landing(sheet, piece, c.drop) if piece else None
             if half is not None:
                 self.band(max(0, c.level - c.drop)).blit(
                     half, (x, y - half.get_height()))

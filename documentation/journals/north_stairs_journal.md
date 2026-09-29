@@ -359,8 +359,10 @@ NS-6/NS-7 kept its autotiled rim tile under the stone.
 **WLD-014.D2 — two-level flights follow the same rule (owner,
 2026-09-29).** NS-5 measured every north flight on six seeds as a one-level
 drop, so this is a guarantee for a case the generator does not produce
-today, not a visible change. The landing half of the 64x128 sprite is a
-full tile.
+today, not a visible change. The landing half is a full tile for both
+tags: the top 64 px of the 64x128 stone, or the channel's whole foot piece
+(the channel of a two-level drop is two tiles tall). *Amended by the
+WLD-014.4 critic pass: the first build gave the grass case half a tile.*
 
 **WLD-014.D3 — the provisional cut becomes dead code (to be measured in
 WLD-014.3).** `flights._cut` rolls a north cut back when a flank no longer
@@ -403,7 +405,7 @@ and a body steps east and west off the flight cell onto the plateau.
   its test, re-pin the world digests, record the rates here. Landed in
   the WLD-014.2 commit: the link change is what moves generation and
   invalidates the rollback test, and that commit has to be green.
-- [ ] WLD-014.4 — Screenshot of a rock and a grass north flight on the
+- [x] WLD-014.4 — Screenshot of a rock and a grass north flight on the
   seed 35 island used for NS-6/NS-7, before and after; journal results and
   close WLD-014 in `INDEX.md`.
 
@@ -437,6 +439,12 @@ and a body steps east and west off the flight cell onto the plateau.
   - `test_a_two_level_door_fills_the_whole_landing`: a shipped rock flight
     deepened to drop 2 and its island repainted with
     `paint_room_levels`.
+- *Amended by the WLD-014.4 critic pass:* the grass helper is now
+  `channel_landing(sheet, piece, drop)`, the foot piece's upper half for
+  one level and the whole foot piece for two, so D2 holds for both tags;
+  the drop-1 test takes its expectation from the source art; and the
+  two-level test builds a real two-level island for both tags. See
+  WLD-014.4 findings 1-3 and C.
 - **Mutation check.** Four mutants of `paint_doors`, each restoring one
   piece of the old painting, were all caught by the painter tests: the rock
   rim keeping its lip, the half also drawn over the rim, the half on the
@@ -454,8 +462,12 @@ and a body steps east and west off the flight cell onto the plateau.
 - `world/gen/height/graph.py::_north_flight_links` and its runtime mirror
   `world/rules/steps.py::_flight_opens` join the flight to plateau ground
   at its own level east and west, as well as the landing north and the
-  terrace south. Nothing else in nav, the collider, the flow field or the
-  inset field needed to change: they all read these two.
+  terrace south. Nothing else in nav, the collider or the flow field
+  needed to change: they all read these two. The inset field does not read
+  them -- `inset._flight_tiles` exempts every tile within `FLIGHT_SLACK` (1)
+  of any flight -- and that exemption already covered both flanks.
+  *Corrected by the WLD-014.4 critic pass; the first note said the inset
+  field read the link rule.*
 - **What stays shut.** A flank does not reach the low ground north of it
   (ground at two levels never joins), and a flank and the landing are
   never one move apart (`diagonal_blocked` refuses a ground-to-ground
@@ -517,4 +529,104 @@ the totals move by 0.3%.
   seeds 7 and 123 moved, as the world under them did. That pin is a manual
   A/B tool; `tests/flows/test_run_determinism.py` compares processes with
   each other, not with it.
+
+### WLD-014.4 — Evidence, critic pass, close (2026-09-29)
+
+**Screenshots delivered** (seed 35, room 0; the rock flight at (20, 6) and
+the grass flight at (11, 8), the pair NS-6/NS-7 were judged on), painted
+from `main` and from this branch:
+
+- *Painting*: before, the stone and the channel straddle the seam; after,
+  only their landing half shows, on the landing, and the rim is open grass.
+- *Collider walk*: a radius-16 body driven 2 px a step through
+  `GameMap.is_walkable(new, 16, frm=prev)` from the west flank's centre,
+  east onto the flight, then north onto the landing; a second body goes
+  straight north from the flank.
+
+| flight | before: sideways into the door | after | straight north from the flank |
+|---|---|---|---|
+| rock (20, 6) | refused at the tile edge, 30 px | through to the landing, 128 px | refused at the frontier, both |
+| grass (11, 8) | refused at the tile edge, 30 px | through to the landing, 128 px | refused at the frontier, both |
+
+**Cold critic pass** (one sub-agent, requirement + diff + evidence only,
+no builder reasoning; it ran `tests/world` and the rest of the suite,
+scanned 414 north flights over 24 seeds, and ran its own mutants).
+Verdict: **FAIL**, with the core change confirmed correct -- the mirror
+exact, every diagonal across the frontier refused on all 414 flights, the
+rollback truly dead, the stream unchanged, every grid valid, the journal's
+counts reproduced exactly. Its findings and what was done:
+
+1. *should-fix, verified*: a two-level **grass** door showed half a tile
+   on its landing; only the rock case met D2. **Fixed**:
+   `TileSheets.channel_landing(sheet, piece, drop)` returns the whole foot
+   piece for a two-level drop.
+2. *should-fix*: the D2 test deepened a shipped flight without lowering
+   its landing, so it did not model a real two-level island. **Fixed**:
+   the test builds one by hand (level 0, a level-2 terrace and its wall,
+   the door), `check_grid` clean, for **both** tags, and checks the whole
+   landing tile on the landing's band *and* in the composited frame, and
+   that the banded and unbanded painters draw the same picture.
+3. *nit, verified by mutation*: the drop-1 painter test took its expected
+   pixels from the helper under test, so a helper cutting the wrong half
+   passed. **Fixed**: `_expected_landing` cuts the expectation from the
+   source art (`vstair_sprite`, the ramp piece).
+4. *nit*: `scatter._flight_keepouts` docstring did not mention the door's
+   flanks. **Fixed.**
+5. *nit*: README and `_floor_sides` said nothing of the north flight's
+   fringe rule, and the README paint order left out the doors. **Fixed.**
+6. *nit*: the WLD-014.2 note said the inset field reads the link rule.
+   **Corrected** above.
+7. *process*: WLD-014.4 open and the index in progress. Closed with this
+   entry; `INDEX.md` lists WLD-014 as done.
+
+Two suspicions, not reachable today, no fix: a flank lowered by a later
+stage would leave an open-looking door walled on that side, and two doors
+side by side would be two open cells with a wall between them. The site
+rule forbids both (flanks must be ground at the flight's level), and
+`test_every_one_sits_on_a_back_rim` holds it on the pinned seeds; the
+flank-lip test now asserts the flank is ground instead of skipping a
+second door.
+
+**Second cold critic pass** (a fresh sub-agent on the fix diff alone):
+all seven findings **CLOSED**, each reproduced -- a hand-built two-level
+grass door shows 64 of 64 channel rows on its landing with the fix and 0
+with the old helper; six runtime mutants of the two helpers all caught.
+Verdict FAIL on three new nits, all fixed:
+
+- A. `world/README.md` still called `channel_landing` "its upper half".
+  Now says: upper half of the foot piece for one level, the whole foot
+  piece for two.
+- B. `channel_landing` justified "no flip" by the tile being symmetric top
+  to bottom. It is symmetric in shape only (2392 of 4096 pixels differ
+  under a vertical flip on most sheets); the docstring now says so, and
+  the drop-1 test pins the unflipped half.
+- C. The two-level branch laid the *head* piece (`piece[0]`) on the
+  landing, against the wall-cut rule it cited, where the low end wears the
+  foot piece (`piece[-1]`). Invisible today (`ramp.n` and `ramp.s` are both
+  `[17, 17]`), wrong the day `ramp.n` gets a distinct pair. Now the foot
+  piece at both depths.
+
+It also noted, as pre-existing and out of scope, that the landing half
+wears the **plateau's** sheet on the lower floor (71 of 71 north flights
+on the four digest seeds, where the two sheets differ). That is the NS-7
+decision -- "the upper floor's grass runs past the rim line onto the lower
+floor" -- carried into the door; raised with the owner rather than
+changed.
+
+**Mutation check of the fixes**: the critic's findings as mutants, all now
+caught -- grass drop-2 back to half a tile (D2 test), rock landing cut
+from the sprite's bottom half (both painter tests; the critic's m1, which
+the drop-1 test used to miss), grass landing cut from the lower half
+(drop-1 test).
+
+A third fresh critic confirmed A, B and C closed (eight in-process
+mutants, including a distinct `ramp.n` pair in both orders, all caught)
+and flagged two record items: `INDEX.md` still said "in progress", and
+the WLD-014.1 note above still described the old grass helper. Both fixed
+in the closing commit; they are text, checked by grep, not re-judged.
+
+**WLD-014: done.** Runs: `tests/world` 394 passed after the fixes; the
+full default suite (3475 passed) ran at WLD-014.2, and the later fixes
+touch only the grass landing helper, docs and tests, with no digest
+moving.
 
