@@ -22,6 +22,7 @@ import io
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -203,6 +204,37 @@ class FlagPlumbingTests(unittest.TestCase):
             with self.subTest(flag=flag), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
                     S.main(["--bump", flag])
+
+    def test_jitter_reaches_the_frames(self):
+        # RND-008.5: `--jitter 0` holds the hero still, so the flow field is
+        # not re-aimed every frame.
+        # Both the warm-up and the timed frames get it: the warm-up returns,
+        # the timed call is recorded and stops the run.
+        seen = []
+
+        def fake_run(ps, frames, jitter=None, **kw):
+            seen.append((frames, jitter))
+            if len(seen) > 1:
+                raise _Stop
+            return [], [], []
+
+        fake_ps = SimpleNamespace(enemies=[])
+        for flags, want in (([], 24.0), (["--jitter", "0"], 0.0), (["--jitter", "8"], 8.0)):
+            seen.clear()
+            with self.subTest(flags=flags), \
+                    mock.patch.object(S, "build", return_value=(None, fake_ps)), \
+                    mock.patch.object(S, "display_line", return_value=""), \
+                    mock.patch.object(S, "run", fake_run), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(_Stop):
+                    S.main(["--frames", "7", *flags])
+                self.assertEqual(seen, [(60, want), (7, want)])
+
+    def test_a_negative_or_nan_jitter_is_refused(self):
+        for bad in ("-1", "nan"):
+            with self.subTest(jitter=bad), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    S.main(["--jitter", bad])
 
     def test_no_frames_is_refused(self):
         with contextlib.redirect_stderr(io.StringIO()):

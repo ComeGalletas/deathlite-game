@@ -529,6 +529,10 @@ def main(argv=None) -> int:
     ap.add_argument("--live-director", action="store_true",
                     help="let the director add companies while the frames "
                          "are timed (the behaviour before RND-008)")
+    ap.add_argument("--jitter", type=float, default=24.0,
+                    help="how far the hero is moved about each frame, px "
+                         "(0: it stands still, so the flow field is not "
+                         "re-aimed every frame; RND-008.5)")
     ap.add_argument("--bump", action="store_true",
                     help="time BumpResolver.resolve alone, --frames times, "
                          "with nothing moving and the hero out of reach; "
@@ -538,6 +542,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.frames < 1:
         ap.error("--frames must be at least 1")
+    if not args.jitter >= 0:                    # also refuses nan
+        ap.error("--jitter must be a number of px, 0 or more")
     if args.bump:
         clash = [flag for flag, on in (
             ("--render", args.render), ("--profile", args.profile),
@@ -557,7 +563,7 @@ def main(argv=None) -> int:
         infuse(ps, args.seed)
         if args.element_rate > 0:
             pump = element_pump(ps, args.element_rate, args.seed)
-    run(ps, 60, render=args.render, pump=pump)       # warm the caches
+    run(ps, 60, jitter=args.jitter, render=args.render, pump=pump)   # warm the caches
     if args.pack and not args.cascade:
         cascade_setup(ps, prime=False)
     if args.cascade:
@@ -578,7 +584,7 @@ def main(argv=None) -> int:
         import pstats
         prof = cProfile.Profile()
         prof.enable()
-        times, draws, in_view = run(ps, args.frames, render=args.render,
+        times, draws, in_view = run(ps, args.frames, jitter=args.jitter, render=args.render,
                                     pump=pump, instruments=instruments)
         prof.disable()
         print(report(times, ps))
@@ -589,7 +595,7 @@ def main(argv=None) -> int:
             print(instruments.report())
         pstats.Stats(prof).sort_stats("cumulative").print_stats(28)
     else:
-        times, draws, in_view = run(ps, args.frames, render=args.render,
+        times, draws, in_view = run(ps, args.frames, jitter=args.jitter, render=args.render,
                                     pump=pump, instruments=instruments)
         print(f"seed {args.seed} lod {lod}  " + report(times, ps))
         print(arrivals_line(ps, before))

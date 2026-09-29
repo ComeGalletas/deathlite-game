@@ -285,7 +285,7 @@ Each task names the number it has to move. "Before" is the rerun above.
 - [x] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
 - [x] RND-008.3: No font built during a run's draw (hints, keycaps, interact key, and the pause menu's Controls block); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
 - [x] RND-008.4: Elemental draw: bodies and motes sorted onto their terraces once a frame; the burn flame scaled once; plain damage-number glyphs kept. The status-mark shape cache was dropped (it changes edge pixels). **Outcome missed: the gap fell about 20 %, the target was 50 %** (owner to decide, see Results)
-- [ ] RND-008.5: Update re-measured with a stationary hero and frozen master; the bump decision, and the cheap wins if taken
+- [x] RND-008.5: Update re-measured by part (60 / 100 / 150 packed, hero jittered and still, plain and infused); the bump decision; the bump pass about halved, bit for bit the same; `--jitter` on the harness
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
 - [ ] RND-008.7: Results, before and after; index to done
 - [ ] RND-008.8: The full test at the end (D7). The whole suite, `sweep` included, on the final branch, and the harness workloads (plain, infused, hints on and off, bump) against the RND-008.1 base in one sitting, with RND-008.4's accepted −20 % re-checked in the elemental fight. Loading time is compared too.
@@ -744,6 +744,152 @@ Each task names the number it has to move. "Before" is the rerun above.
   - The larger costs in the frame lie elsewhere: the terrain's ground
     bands take 3.4 ms of a 10.5 ms draw, and update takes 8 to 10 ms at
     100 packed. That is RND-008.5's ground.
+
+### RND-008.5: the update, and the bump pass
+
+- **Measured by part** (`scratchpad/update_sections.py`, light
+  `perf_counter` wrappers, 240 frames, master frozen, dummy driver). The
+  harness gained `--jitter PX` (0: the hero stands still) so the hero's
+  movement can be taken out.
+
+  | Crowd, run | Update mean | Enemies | Bump | Navigation |
+  |---|---|---|---|---|
+  | 67, plain, jittered | 5.22 ms | 1.95 | 1.10 | 1.81 |
+  | 66, plain, still | 4.84 ms | 2.02 | 1.24 | 1.22 |
+  | 113, plain, jittered | 9.00 ms | 3.67 | 2.86 | 1.94 |
+  | 112, plain, still | 8.52 ms | 3.81 | 3.04 | 1.16 |
+  | 168, plain, jittered | 21.15 ms | 8.18 | 8.72 | 3.30 |
+  | 167, plain, still | 15.06 ms | 6.47 | 6.60 | 1.26 |
+  | 65, infused, jittered | 4.85 ms | 1.71 | 0.87 | 1.82 |
+  | 61, infused, still | 4.47 ms | 1.91 | 0.96 | 1.15 |
+  | 100, infused, jittered | 10.16 ms | 4.65 | 3.12 | 1.50 |
+  | 112, infused, still | 6.91 ms | 3.06 | 2.14 | 1.15 |
+  | 160, infused, jittered | 13.60 ms | 5.65 | 5.24 | 1.91 |
+  | 166, infused, still | 13.49 ms | 5.66 | 5.74 | 1.21 |
+
+  - The crowd is the count at the end of timing: summons still arrive
+    through a frozen master.
+  - Everything else in the update (combat, weapons, particles, numbers,
+    spawning, buffs, hazards) was under 0.3 ms together in every run.
+  - **Jitter costs navigation 0.6 to 2 ms**, as the first report said: a
+    hero moved every frame re-aims the flow field every frame.
+  - **The decision (plan item):** bump grows fastest with the crowd. It is
+    the largest single item at about 165 and second to the enemies' own
+    update below that, so the plan's condition for the cheap wins held.
+- **What changed** (`game/states/playing/core/physics.py`):
+  - `resolve` drops a pair that does not touch on two float products,
+    before any tuple, set or `Vector2`. `_bump` did nothing with such a
+    pair (no shove, no frozen contact), so skipping it changes nothing.
+  - The pairs that touch go through the same code, in the same order and
+    the same way round. This matters because `apply_knockback` sums floats
+    into `_knock`, and a float sum depends on its order.
+  - The drop keeps a margin of a billionth inside `_bump`'s own limits
+    (`_MARGIN_OUT`, `_COINCIDENT`), so the two can never disagree about a
+    pair that matters.
+  - The broad-phase pad is now the largest living collider, never more
+    than the old 72 px (`_pad`):
+    - A smaller search covers a sub-block of the same grid cells, in the
+      same order, and still reaches every body that can touch.
+    - The cap keeps a body bigger than 72 px found exactly as before.
+    - With 96 px cells and colliders of 9 to 26 px (bosses 40 and 46), it
+      saves the troll's 5 × 5-cell searches. The early drop is most of the
+      gain.
+- **Bit for bit the same.** The oracle is the old pass, copied verbatim
+  into `tests/playing/test_bump_exact.py`. Every `_knock` is compared with
+  `==`, as is every frozen-contact exchange and death, in order:
+  - 400 random crowds: radii from 9 to 26, weights from 0.5 to 4, a few
+    dead bodies, a 46 px boss, a collider bigger than the old pad, bodies
+    stacked exactly on each other, and pairs exactly touching;
+  - 240 more crowds where frozen contact kills `a` or `b` on every second
+    or third exchange: the one state that changes inside a pass;
+  - the pad's edge cases, built on purpose:
+    - a giant across a cell edge from a small body (an uncapped pad meets
+      it from the other side);
+    - a troll against the giant (a pad well short misses it);
+    - two r 48.25 bodies on the one-cell to two-cell boundary (a pad even
+      one px short never meets them);
+  - a pair just past `_bump`'s coincident limit;
+  - seed 35's harness fight, packed and primed round the hero with the
+    boss in it, compared on each of 40 frames as it plays.
+  - The dev check (`scratchpad/frames5.sh`, 150 frames of the primed fight
+    fingerprinted in `HEAD` and this tree) was equal on every frame for
+    pixels, the run's RNG, the global RNG, and the particle, number and
+    aura counts.
+- **Tests:**
+  - `tests/playing/test_bump_exact.py`: 6 tests, 683 subtests. The fight
+    class boots a run (`integration`); the crowds boot nothing (`unit`,
+    about 1 s). A mismatch reports its first differing knock, exchange or
+    death: printing the full diff of hundreds of failing subtests had
+    taken minutes.
+  - `tests/playing/test_bump.py` (19) unchanged and green.
+  - Suites on the final code: `tests/playing` + `tests/devtools` +
+    `tests/flows` (which holds the run-determinism checks) 545 passed
+    (756 subtests) in 9 min 13 s.
+  - `tests/devtools/test_spawn_stress.py`: `--jitter` reaches the warm-up
+    and the timed frames, and a negative or `nan` jitter is refused.
+  - **Mutation check** (`scratchpad/mutate5.py`): all eleven caught, each
+    in 2 to 6 s:
+
+    | Behaviour broken | Tests failed |
+    |---|---|
+    | the pad no longer capped at 72 px | 1 |
+    | the pad halved | 2 |
+    | the pad one px short (the cell-count boundary) | 1 |
+    | pairs no longer deduplicated | 586 |
+    | a pair shoved the other way round | 597 |
+    | the candidates taken in another order | 468 |
+    | the early drop cutting pairs that touch | 513 |
+    | the coincident margin on the wrong side | 1 |
+    | a dead body met as the second of a pair | 432 |
+    | `--jitter` dropped from the warm-up | 3 |
+    | `--jitter` dropped from the timed frames | 3 |
+
+- **The cold critic** returned FAIL on the tests, not on the physics. Its
+  own probe of 4,000 random worlds found no input where the new pass
+  differs: 12,000 comparisons, 1,335,462 exchanges, with kills,
+  coordinates down to −100,000, bodies on cell edges, radii of 0 and
+  1e-300, and giants of 73 to 150 px. Its findings, all fixed:
+  - the `--jitter` test stopped at the warm-up and never reached the timed
+    frames;
+  - nothing killed a body in the middle of a pass;
+  - the pad's cell-count boundary was not pinned (a pad one px short
+    passed);
+  - the coincident margin was not pinned;
+  - the new pass read the size and position of dead bodies, which the old
+    one never did. The alive check is back ahead of the distance, and the
+    pad counts only the living;
+  - `--jitter nan` passed the guard.
+- **Measured.** `HEAD` (the RND-008.4 commit) and this tree, back to back,
+  final code.
+
+  Bump alone (`--pack --bump`, 400 passes, two rounds):
+
+  | Crowd | Before p50 | After p50 |
+  |---|---|---|
+  | 58 | 0.78 / 0.43 ms | 0.26 / 0.34 ms |
+  | 95 | 1.95 / 1.08 ms | 0.64 / 0.66 ms |
+  | 144 | 2.75 / 2.70 ms | 1.38 / 1.38 ms |
+
+  The whole update (`update_sections.py`, plain pack):
+
+  | Crowd, hero | Before p50 | After p50 | Bump before → after |
+  |---|---|---|---|
+  | 113, jittered | 5.88 ms | 5.21 ms | 1.90 → 1.03 ms |
+  | 112, still | 5.33 ms | 4.51 ms | 2.00 → 1.17 ms |
+  | 168, jittered | 9.63 ms | 7.66 ms | 3.89 → 1.90 ms |
+  | 167, still | 8.90 ms | 6.66 ms | 3.90 → 1.89 ms |
+
+  - Bump halves at 144 (the plan's measure) and in every update run. The
+    update is 0.7 to 2.2 ms faster.
+  - An earlier sitting under heavier load, with the first version of the
+    change, gave the same shape: bump at 144 5.31 / 5.25 → 2.41 / 2.40 ms,
+    and update at 112 still 6.31 → 4.35 ms.
+  - The machine's load differed between the sittings, so each table is
+    read only against itself.
+- **What is left in the update.** The enemies' own update (2.4 to 3.9 ms at
+  110 to 170) is now the largest item, then bump and navigation. The
+  first findings report put the per-enemy cost in the movement probe.
+  That is the next lever, and it is not in this plan (see RND-008.7).
 
 ## RND-008: Method
 

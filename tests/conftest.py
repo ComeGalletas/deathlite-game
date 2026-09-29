@@ -141,6 +141,8 @@ INTEGRATION = (
     "tests/playing/test_frame_fonts.py",
     # RND-008.4: the harness's packed, primed fight; the cache checks stay unit.
     "tests/render/test_elemental_draw_cost.py::TerraceSortTests",
+    # RND-008.5: seed 35's fight as it plays; the random crowds stay unit.
+    "tests/playing/test_bump_exact.py::HarnessFightTests",
 )
 
 
