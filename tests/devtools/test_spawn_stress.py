@@ -22,7 +22,6 @@ import io
 import os
 import tempfile
 import unittest
-from types import SimpleNamespace
 from unittest import mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -165,24 +164,16 @@ class LiveDirectorTests(unittest.TestCase):
         self.assertEqual(self.ps.hints.stage, "move")
 
 
-class _Stop(Exception):
-    pass
-
-
 class FlagPlumbingTests(unittest.TestCase):
-    """Each flag reaches `build` on its own; nothing is booted."""
+    """Each flag reaches `build` on its own, and the refusals refuse.
+
+    Through `parse` and `build_options`, the two pure halves of `main`:
+    nothing here reaches a `Game`, so the class stays `unit` by what it
+    calls, which `tools/verification/tier_audit.py` reads (TST-006). The
+    wiring that needs a real run is in `CommandLineTests`."""
 
     def _build_kwargs(self, *flags):
-        seen = {}
-
-        def fake_build(*_a, **kw):
-            seen.update(kw)
-            raise _Stop
-
-        with mock.patch.object(S, "build", fake_build):
-            with self.assertRaises(_Stop):
-                S.main(["--frames", "1", *flags])
-        return seen
+        return S.build_options(S.parse(["--frames", "1", *flags]))
 
     def test_no_flags_mean_hints_off_and_the_director_frozen(self):
         kw = self._build_kwargs()
@@ -199,50 +190,34 @@ class FlagPlumbingTests(unittest.TestCase):
         self.assertFalse(kw["hints"])
         self.assertTrue(kw["live_director"])
 
+    def test_jitter_is_read(self):
+        # RND-008.5: `--jitter 0` holds the hero still, so the flow field is
+        # not re-aimed every frame.
+        for flags, want in (([], 24.0), (["--jitter", "0"], 0.0), (["--jitter", "8"], 8.0)):
+            with self.subTest(flags=flags):
+                self.assertEqual(S.parse(flags).jitter, want)
+
     def test_bump_refuses_the_flags_it_would_ignore_or_distort(self):
         for flag in ("--render", "--profile", "--elements", "--cascade"):
             with self.subTest(flag=flag), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
-                    S.main(["--bump", flag])
-
-    def test_jitter_reaches_the_frames(self):
-        # RND-008.5: `--jitter 0` holds the hero still, so the flow field is
-        # not re-aimed every frame.
-        # Both the warm-up and the timed frames get it: the warm-up returns,
-        # the timed call is recorded and stops the run.
-        seen = []
-
-        def fake_run(ps, frames, jitter=None, **kw):
-            seen.append((frames, jitter))
-            if len(seen) > 1:
-                raise _Stop
-            return [], [], []
-
-        fake_ps = SimpleNamespace(enemies=[])
-        for flags, want in (([], 24.0), (["--jitter", "0"], 0.0), (["--jitter", "8"], 8.0)):
-            seen.clear()
-            with self.subTest(flags=flags), \
-                    mock.patch.object(S, "build", return_value=(None, fake_ps)), \
-                    mock.patch.object(S, "display_line", return_value=""), \
-                    mock.patch.object(S, "run", fake_run), \
-                    contextlib.redirect_stdout(io.StringIO()):
-                with self.assertRaises(_Stop):
-                    S.main(["--frames", "7", *flags])
-                self.assertEqual(seen, [(60, want), (7, want)])
+                    S.parse(["--bump", flag])
 
     def test_a_negative_or_nan_jitter_is_refused(self):
         for bad in ("-1", "nan"):
             with self.subTest(jitter=bad), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
-                    S.main(["--jitter", bad])
+                    S.parse(["--jitter", bad])
 
     def test_no_frames_is_refused(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
-                S.main(["--frames", "0"])
+                S.parse(["--frames", "0"])
 
 
 class CommandLineTests(unittest.TestCase):
+    """`main` end to end, on a small booted run."""
+
     def test_a_bump_run_prints_its_display_and_passes(self):
         out = io.StringIO()
         with mock.patch.object(S, "build", wraps=S.build) as spy:
@@ -255,6 +230,15 @@ class CommandLineTests(unittest.TestCase):
         self.assertIn("hints off", text)
         self.assertIn("director frozen", text)
         self.assertIn("bump 3 passes", text)
+
+    def test_jitter_reaches_the_warm_up_and_the_timed_frames(self):
+        with mock.patch.object(S, "run", wraps=S.run) as spy, \
+                contextlib.redirect_stdout(io.StringIO()):
+            code = S.main(["--seed", str(SEED), "--live", "10", "--dormant", "0",
+                           "--frames", "3", "--jitter", "0"])
+        self.assertEqual(code, 0)
+        self.assertEqual([(c.args[1], c.kwargs.get("jitter")) for c in spy.call_args_list],
+                         [(60, 0.0), (3, 0.0)])
 
 
 class BudgetTests(unittest.TestCase):

@@ -825,6 +825,24 @@ Each task names the number it has to move. "Before" is the rerun above.
   - Suites on the final code: `tests/playing` + `tests/devtools` +
     `tests/flows` (which holds the run-determinism checks) 545 passed
     (756 subtests) in 9 min 13 s.
+- **Rebased onto TST-006 and TST-007** (merged to `main` meanwhile).
+  - Two conflicts, both from additions on both sides: the index's next
+    free IDs (RND-009 and TST-008 kept) and `tests/conftest.py`'s
+    integration list (both lists kept).
+  - TST-006's tier audit (`tools/verification/tier_audit.py`) then
+    flagged `FlagPlumbingTests` as needing `integration`. It reads the
+    calls statically, and cannot see that the tests replaced `build` with
+    a mock.
+  - Rather than list fast, pure tests as `integration`, the harness's
+    `main` was split: `parse(argv)` (the flags and their refusals) and
+    `build_options(args)` (what reaches `build`) are pure, and the flag
+    tests use them.
+  - The check that `--jitter` reaches the warm-up and the timed frames,
+    which needs a real run, moved to the booted `CommandLineTests`.
+  - The swapped-flags mutation and both jitter mutations are still caught.
+  - **Whole default suite on the rebased branch:** 3,533 passed (2,534
+    subtests), 0 failed, in 19 min 49 s. The 11 `sweep` tests are
+    deselected, as always; they run in RND-008.8.
   - `tests/devtools/test_spawn_stress.py`: `--jitter` reaches the warm-up
     and the timed frames, and a negative or `nan` jitter is refused.
   - **Mutation check** (`scratchpad/mutate5.py`): all eleven caught, each

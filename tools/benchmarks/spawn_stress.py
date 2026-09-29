@@ -494,7 +494,10 @@ def bump_times(ps, frames: int) -> list:
     return times
 
 
-def main(argv=None) -> int:
+def parse(argv=None) -> argparse.Namespace:
+    """The command line, checked: a combination the harness would ignore or
+    measure wrongly is refused here (argparse exits with status 2). Kept
+    apart from `main` so the flags can be checked without booting a run."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--seed", type=int, default=35)
     ap.add_argument("--live", type=int, default=100)
@@ -551,10 +554,20 @@ def main(argv=None) -> int:
             ("--cascade", args.cascade)) if on]
         if clash:
             ap.error(f"--bump times the bump pass alone; drop {', '.join(clash)}")
+    return args
+
+
+def build_options(args: argparse.Namespace) -> dict:
+    """The keywords `main` hands `build`, from the parsed flags."""
+    return {"hints": args.hints, "live_director": args.live_director}
+
+
+def main(argv=None) -> int:
+    args = parse(argv)
     from game import config
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod,
-                     hints=args.hints, live_director=args.live_director)
+                     **build_options(args))
     print(display_line(ps))
     elements = args.elements or args.element_rate > 0 or args.cascade
     pump = None
