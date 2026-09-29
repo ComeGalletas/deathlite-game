@@ -1,7 +1,8 @@
 # Gameplay frame time: journal
 
 **ID:** RND-008 · **System:** rendering (+ SYS, ENT, CMB) · **Type:**
-performance · **Status:** proposed, waiting on the owner's confirmation ·
+performance · **Status:** in progress (plan confirmed by the owner,
+2026-09-28) ·
 **Branch:** ComeGalletas/rnd-008-frame-time-9ec11fc6 (its own worktree, cut
 from `origin/main` at `5176c0c`, owner 2026-09-28)
 
@@ -25,8 +26,10 @@ from `origin/main` at `5176c0c`, owner 2026-09-28)
   - Gameplay does not change. Pixel output does not change, except where a
     task says so and the owner agrees.
   - The window-scaling rules hold: the camera zoom and the covered world
-    area stay as they are at every size. The render-scale knob is measured,
-    and it is not moved without the owner's decision.
+    area stay as they are at every size.
+  - **The render stays at native resolution** (owner, 2026-09-28).
+    Lowering the resolution or `config.RENDER_MAX_HEIGHT` is not
+    considered at all as a way to meet the budget (RND-008.D4).
   - No timing assertion goes into the suite, because it would be flaky.
     Timings live in this journal. The tests pin behaviour that timing
     depends on, such as "no font is built after the first frame".
@@ -129,7 +132,9 @@ the same as the report. How each number was taken is under "Method".
    A 720-line render has 44 % of the pixels and saves 3.0 ms with the
    hints on and 3.7 ms with them off. Even with the hints off, 100 packed
    at 720 lines is still over budget: update + draw p50 16.97 ms, and 154
-   of 240 frames over.
+   of 240 frames over. These numbers stay as the record of the review
+   only. The owner ruled resolution out as a lever (RND-008.D4), so
+   nothing is planned on them.
 3. **The aura-ring cache targets a path the shipped game barely uses.**
    All four elements have an authored aura rig (`aura_rig` in
    `data/weapons/element_visuals.json`, lines 148, 163, 178 and 193). So
@@ -173,7 +178,7 @@ the totals, so these are shares, not budgets:
 - `damage_numbers.draw`: 0.216 s. Plain numbers re-render their text every
   frame. Outlined ones are cached.
 
-## RND-008: Decisions for the owner
+## RND-008: Decisions (confirmed by the owner, 2026-09-28)
 
 - **RND-008.D1: Type `performance`.** The index has no such type yet.
   `bug` fits the hint fonts but not the bump or elemental work. Proposed:
@@ -188,9 +193,11 @@ the totals, so these are shares, not budgets:
   frozen through timing (`--live-director` to let it run), one budget
   (16.7 ms, the vsync period, reported next to `1000 / FPS`), and the
   render surface and zoom printed with every run.
-- **RND-008.D4: The render-scale default does not move** in this
-  requirement. It is measured (RND-008.6), and any change is a separate
-  decision.
+- **RND-008.D4: The resolution stays native.** Owner, 2026-09-28:
+  changing the render resolution is not considered at all, not as a
+  default, not as a knob to measure. The frame time is found in the code.
+  RND-008.6 (the render-scale comparison) is dropped, and the harness
+  gets no `--max-height` flag.
 - **RND-008.D5: The aura-ring cache is dropped.** The fallback is not the
   shipped path (Confirmed reading, item 3).
 - **RND-008.D6: Weapon-loop work is deferred.** It was not re-run, and
@@ -202,10 +209,9 @@ Each task names the number it has to move. "Before" is the rerun above.
 "After" is taken with the same command and recorded under Results.
 
 - **RND-008.2: Harness.**
-  - `tools/benchmarks/spawn_stress.py`: the D3 flags and output, plus
-    `--max-height` to run the render-scale comparison without a scratch
-    script, and a `--bump` mode that times `BumpResolver.resolve` alone
-    (the report's isolated test, now in the repo).
+  - `tools/benchmarks/spawn_stress.py`: the D3 flags and output, plus a
+    `--bump` mode that times `BumpResolver.resolve` alone (the report's
+    isolated test, now in the repo).
   - Re-baseline hints on and off.
   - Outcome: the report's workloads re-run from one command each, with
     the live count held at what was asked for (no drift with the master
@@ -252,8 +258,8 @@ Each task names the number it has to move. "Before" is the rerun above.
     exactly.
   - Outcome: a decision recorded here with its numbers. Bump p50 at 144
     packed down from 4.10 ms if the change is made.
-- **RND-008.6: Render scale, measured only.** 1080 / 900 / 720 lines
-  after RND-008.3 and .4, recorded for D4. No default change.
+- **RND-008.6: Dropped** (D4). The resolution is not a lever, so there
+  is nothing to measure.
 - **RND-008.7: Results.** The before and after tables, the index moved to
   done, and a pointer from the untracked report to this journal. Whether
   the root `GAMEPLAY_PERFORMANCE_FINDINGS.md` is deleted is the owner's
@@ -262,11 +268,11 @@ Each task names the number it has to move. "Before" is the rerun above.
 ## RND-008: Tasks
 
 - [x] RND-008.1: This journal, with the reviewed findings and the report; the index row
-- [ ] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--max-height`, `--bump`; re-baseline
+- [ ] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
 - [ ] RND-008.3: No font built during a run's draw (hints, keycaps, interact key); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
 - [ ] RND-008.4: Elemental draw: bodies bucketed by band once a frame; cached status-mark shapes; cached plain damage-number glyphs
 - [ ] RND-008.5: Update re-measured with a stationary hero and frozen master; the bump decision, and the cheap wins if taken
-- [ ] RND-008.6: Render-scale comparison after .3 and .4 (measurement only)
+- [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
 - [ ] RND-008.7: Results, before and after; index to done
 
 ## RND-008: Method
@@ -284,7 +290,8 @@ frames. Windows runs set `SDL_VIDEODRIVER=windows` and opened the saved
   display opened, called `ps.hints.dismiss()` where the table says "off",
   and wrapped `ps.draw` or `ps.bump.resolve` in `time.perf_counter` or
   cProfile. RND-008.2 moves what they did into the harness's own flags, so
-  every number here can be re-taken from the repo.
+  every number here can be re-taken from the repo, except the
+  render-height runs, which D4 retires.
 
 ---
 
