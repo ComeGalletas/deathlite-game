@@ -1,7 +1,7 @@
 # Test tiers — journal
 
 **ID:** TST-006 · **System:** tests · **Type:** bug ·
-**Status:** in progress · **Branch:** ComeGalletas/tst-006-tier-booting-tests-bb480b0c
+**Status:** done · **Branch:** ComeGalletas/tst-006-tier-booting-tests-bb480b0c
 (the session worktree `.claude/worktrees/sad-williams-838fee`, cut from
 `origin/main` at `5176c0c`)
 
@@ -135,6 +135,15 @@
   the tests run, and is the cross-check for what reading source cannot
   see; it fails nothing.
 
+- **D5 — a child process is read, not trusted.** The critic showed
+  `test_run_determinism.py` could leave `INTEGRATION` unnoticed: it boots
+  four runs in child interpreters, where neither the reader nor the trace
+  looks. The reader now follows `subprocess` calls into the child's
+  program (`-c` code, `-m` module, script path), and a child it cannot
+  resolve counts as `integration`. The three cut-script checks
+  (`--check` runs of `tools/asset_pipeline/`) read as `unit`, which is
+  what they are.
+
 ## TST-006 — Plan
 
 - `tests/conftest.py`: `tier(nodeid)` shared by the hook and the audit;
@@ -155,7 +164,10 @@
   pin `test_run_hints.py` / `test_key_marker.py` as `integration`.
 - [x] TST-006.3 — Split the five `world` modules that boot a Game (D2);
   the suite-wide "nothing under-tiered" test.
-- [ ] TST-006.4 — `pytest.ini` note; before/after measurements; close.
+- [x] TST-006.4 — The cold critic pass's findings fixed in the reader
+  (cycles, `--over` grouping, child processes, module-level test
+  functions); its remaining blind spots written into the docstring.
+- [x] TST-006.5 — `pytest.ini` note; before/after measurements; close.
 
 ## TST-006 — Log
 
@@ -209,3 +221,55 @@
   primitive above their tier (132 s).
 - `SuiteTests.test_no_test_is_under_tiered` now covers every tier; the
   audit reads 0 under-tiered.
+
+### 2026-09-29 — TST-006.4: the critic pass
+
+A cold adversarial reviewer (deliverable only, no build context) ran for
+22 minutes and returned FAIL. It confirmed that the tiering is correct:
+0 under-tiered, 0 false positives (the 184 `integration` and 150 `world`
+tests the reader calls pure touch no primitive under the trace), every
+`::Class` entry exists, nothing is shadowed, and removing entries one at a
+time is caught. It FAILed the reader on:
+
+| finding | severity | fix | pinned by |
+|---|---|---|---|
+| `f -> g -> f` cached a partial answer mid-cycle, so the second-read end came out `unit` | bug | a body that met an open key is not cached until the cycle closes | `CycleTests` (fails on the TST-006.1 reader) |
+| `--over` named mixed classes whole (`test_window.py::WindowTests` "needs unit", yet one test builds a `Game`) with an empty `via` | bug | moving down, a class is named only if every test in it is pure; an empty chain prints "reaches nothing" | `GroupingTests.test_moving_down_...` (fails on the old one) |
+| a boot in a child interpreter is invisible: dropping `test_run_determinism.py` from `INTEGRATION` passed `SuiteTests` | gap present in the repo | D5 | `ChildProcessTests`, `SuiteTests.test_the_child_process_run_...` (both fail on the old one); the mutation now fails |
+| module-level `def test_*` functions skipped | gap, none today | read as nodeid `path::name` | `CollectionTests.test_module_level_...` |
+| helper-instance methods, aliases by assignment, `partial`, `getattr`, template-method `setUp`, decorators, `GameMap(**kw)`, a name imported twice | gaps, none today | listed in the module docstring as what the reading cannot see | — |
+| the trace credits a `setUpClass` boot to the first test only | doc | the trace docstring says so, and names child processes | — |
+
+Also here: imports are collected by walking statements only (an import is
+always a statement). The whole read is 1.1 s for 3480 tests; the answers
+for all 3470 existing tests, call chains included, were identical to the
+TST-006.1 version before the critic fixes went in.
+
+The critic also found `test_ultrawide.py::PanelsStayInTheBoxTests::
+test_a_level_up_draw_without_the_dim_leaves_the_margins_alone` fails when
+run alone ("font not initialized"): it leans on an earlier test in its class
+having booted a Game. The file is untouched here and the class keeps its
+order in `integration`, so this branch does not expose it. Raised as its
+own task.
+
+### 2026-09-29 — TST-006.5: measured, documented, closed
+
+`python -m pytest -m unit --durations=15`, same machine, nothing else
+running:
+
+| | tests | wall | slowest test |
+|---|---|---|---|
+| before (`5176c0c`) | 2250 | 181.0 s | 7.9 s, `test_fish_huts.py::PlacementTests` (a world build) |
+| after TST-006.2 | 2138 | 21.2 s | 2.4 s, `test_victory.py::WeaponsTableTests` |
+| after TST-006.3 | 2147 | **18.1 s** | 1.9 s, the same |
+| final (after TST-006.4) | 2157 | **19.4 s** | 2.3 s, the same |
+
+Before, the fifteen slowest were all world builds or booted runs, 3.5 to
+7.9 s each (`test_spawn_fx.py::RunTests` alone had seven of them). After,
+the slowest is `test_victory.py`'s weapons table (1.9 to 2.3 s, pure by both
+the audit and the trace), then the audit's own read of the suite (1.3 s
+setup), then spawn-director and cut-script checks around 1 s. The 18.1 /
+19.4 s spread is run-to-run noise (10 more tests, all under 0.1 s): the
+tier is **9 to 10 times faster**.
+
+- `pytest.ini` and the conftest docstring say how to check the tiers.

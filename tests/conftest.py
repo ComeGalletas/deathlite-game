@@ -3,6 +3,10 @@
 Markers are assigned here, by path, rather than with `@pytest.mark` in the
 modules, so that no test module imports pytest and the plain unittest runner
 stays a first-class way to run everything.
+
+Anything unlisted is `unit`. `tools/verification/tier_audit.py` reads what
+each test calls and `tests/devtools/test_tier_audit.py` fails when one needs
+more than it gets here (TST-006).
 """
 from __future__ import annotations
 
