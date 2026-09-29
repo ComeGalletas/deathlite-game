@@ -130,11 +130,14 @@ class DrawTests(unittest.TestCase):
                 surface = _drawn(s)
                 self.assertGreater(_lit(surface, pygame.Rect(100, 160, 1400, 600)), 30)
 
-    def test_the_web_profile_size_draws_every_pane(self):
-        s = _state(_run(full=True))
-        for i in range(len(PANES)):
-            s.tab = i
-            _drawn(s, (1280, 720))
+    def test_the_web_profile_draws_every_pane(self):
+        from game import config
+        from tests.web_profile import web_profile
+        with web_profile():
+            s = _state(_run(full=True))
+            for i in range(len(PANES)):
+                s.tab = i
+                _drawn(s, (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
 
     def test_no_run_draws_a_placeholder(self):
         game = SimpleNamespace(state_machine=_Machine())

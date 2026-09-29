@@ -66,7 +66,20 @@ Closes UI-014.D20 (`localization_journal.md`).
   inside `apply_web_profile()` (restored after), with the in-run scenes on
   a run booted under it, so the fonts the run keeps are the web profile's.
   The other tests that described themselves as "the 1280 web profile" are
-  moved onto it the same way.
+  moved onto it the same way (`tests/web_profile.py: web_profile()`), with
+  one kind of exception: two tests existed to drive the Build pane's
+  title step-down and the run summary's subheader trim, which only the
+  old 1280-at-1.0 surface was narrow enough to reach. At 0.8 the fonts
+  shrink with the layout and both fit whole. Those two keep the narrow
+  surface, now named as a stress case and no shipped configuration, and a
+  new test pins that the web profile shows the subheader whole in both
+  languages.
+- **UI-016.D5 — the web exemption goes, not just its entries.** With all
+  13 `WEB_UNFIT` screens fitting at 0.8, the exemption (`WEB_UNFIT`,
+  `web_held`, `web_exempt`, `spanish_adds_below` and their self-tests)
+  would be machinery with nothing to exempt. It is removed; both sizes are
+  held to one rule in `test_every_screen_fits_at_both_sizes`. A screen that
+  one day misfits at 1280 fails like one that misfits at 1600.
 
 ## Plan
 
@@ -84,5 +97,5 @@ Closes UI-014.D20 (`localization_journal.md`).
 
 - [x] UI-016.1 — journal, index entry
 - [x] UI-016.2 — web profile at scale 0.8, compensated zoom, window scale, test helper, zoom pin
-- [ ] UI-016.3 — fit harness under the web profile, `WEB_UNFIT` emptied, web-profile tests moved on
+- [x] UI-016.3 — fit harness under the web profile, `WEB_UNFIT` emptied, web-profile tests moved on
 - [ ] UI-016.4 — screenshots, docs, D20 closed

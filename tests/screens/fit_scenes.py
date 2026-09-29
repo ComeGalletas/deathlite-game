@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 from game import config, locale
@@ -25,6 +26,22 @@ from progression.items import generate_item
 from tests.screens import fit_harness
 
 SIZES = ((1600, 900), (1280, 720))
+WEB_SIZE = SIZES[1]
+
+
+@contextmanager
+def profile(size):
+    """The config a scene at `size` is drawn under: the browser build's
+    (`config.apply_web_profile()`, the interface at 0.8) at 1280x720, the
+    desktop's as it stands at 1600x900 (UI-016.D4). A 1280 surface at scale
+    1.0 is no configuration the game runs in."""
+    if tuple(size) != WEB_SIZE:
+        yield
+        return
+    from tests.web_profile import web_profile
+    with web_profile():
+        assert (config.SCREEN_WIDTH, config.SCREEN_HEIGHT) == WEB_SIZE
+        yield
 
 
 def _game():
@@ -222,8 +239,11 @@ def _dress(ps):
 
 
 def booted():
-    """One dressed run on a pinned world, shared by every in-run scene."""
-    if "ps" not in _RUN:
+    """One dressed run on a pinned world, shared by every in-run scene drawn
+    under the same `profile`: the run keeps fonts built at its interface
+    scale, so the web profile's scenes get a run booted under it."""
+    key = config.RENDER_SCALE
+    if key not in _RUN:
         from game.states.menu_state import MenuState
         from tests import worlds as W
         from tests.boot import start_run
@@ -234,8 +254,8 @@ def booted():
             ps = start_run(game, W.pinned(1))
         locale.set_language(was)
         _dress(ps)
-        _RUN["game"], _RUN["ps"] = game, ps
-    return _RUN["game"], _RUN["ps"]
+        _RUN[key] = game, ps
+    return _RUN[key]
 
 
 def summary_stats(victory):
