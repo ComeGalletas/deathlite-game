@@ -20,6 +20,9 @@ from ui.menu_nav import MenuNav
 from progression.items import Item, item_label, item_name
 from progression.meta import buy
 
+_SLOTS = ("weapon", "armor", "accessory")
+_SLOT_GAP = 12                   # design px between the slot label and the item
+
 _RARITY_COLOR = {
     "common": (180, 180, 185), "uncommon": (110, 200, 120),
     "rare": (90, 160, 240), "epic": (190, 120, 240), "legendary": (240, 180, 80),
@@ -101,24 +104,23 @@ class MetaState(State):
         surface.fill(config.COLOR_BG)
         w = surface.get_width()
         S = scale.px
-        title = self._title.render("Sanctuary", True, config.COLOR_ACCENT)
+        title = self._title.render(locale.t("meta.title"), True, config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(midtop=(w // 2, S(28))))
-        salvage = self._h.render(f"Salvage: {self.save.currency}", True, config.COLOR_TEXT)
+        salvage = self._h.render(locale.t("meta.salvage", n=self.save.currency), True,
+                                 config.COLOR_TEXT)
         surface.blit(salvage, salvage.get_rect(midtop=(w // 2, S(78))))
 
         self._mouse.hits.clear()             # the panels re-register their rows
         self._draw_upgrades(surface, x=S(70), active=self.panel == 0)
         self._draw_stash(surface, x=w // 2 + S(30), active=self.panel == 1)
 
-        hint = self._small.render(
-            "TAB switch panel   -   Up/Down select   -   ENTER buy/equip   -   "
-            "U unequip   -   ESC back", True, config.COLOR_TEXT_DIM)
+        hint = self._small.render(locale.t("meta.hint"), True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(midbottom=(w // 2, surface.get_height() - S(18))))
 
     def _draw_upgrades(self, surface, x, active) -> None:
         S = scale.px
         y = S(130)
-        head = self._h.render("Upgrades" + (" <" if active else ""), True,
+        head = self._h.render(locale.t("meta.upgrades") + (" <" if active else ""), True,
                               config.COLOR_TEXT if active else config.COLOR_TEXT_DIM)
         surface.blit(head, (x, y))
         y += S(40)
@@ -127,39 +129,49 @@ class MetaState(State):
             lvl = self.save.meta.get(uid, 0)
             mx = self.catalog.max_level(uid)
             maxed = lvl >= mx
-            cost = "MAX" if maxed else str(self.catalog.cost(uid, lvl))
+            cost = locale.t("meta.max") if maxed else str(self.catalog.cost(uid, lvl))
             afford = (not maxed) and self.save.currency >= self.catalog.cost(uid, lvl)
             colour = config.COLOR_ACCENT if (active and i == self.sel[0]) else (
                 config.COLOR_TEXT if afford else config.COLOR_TEXT_DIM)
-            surface.blit(self._f.render(
-                f"{locale.text(d, 'name'):<14} {lvl}/{mx}   {cost:>4}", True, colour), (x, y))
-            surface.blit(self._small.render(locale.text(d, "desc"), True, config.COLOR_TEXT_DIM),
-                         (x + S(16), y + S(20)))
-            # The row and its description line, one band each, touching.
-            self._mouse.hits.add(pygame.Rect(x - S(8), y - S(4), S(440), S(46)), (0, i))
+            # One string, padded: a name longer than the pad (a
+            # translation) pushes its own level on, never into it.
+            row = self._f.render(f"{locale.text(d, 'name'):<14} {lvl}/{mx}   {cost:>4}",
+                                 True, colour)
+            surface.blit(row, (x, y))
+            desc = self._small.render(locale.text(d, "desc"), True, config.COLOR_TEXT_DIM)
+            surface.blit(desc, (x + S(16), y + S(20)))
+            # The row and its description line, one band each, touching; as
+            # wide as the longer of the two, and never narrower than it was.
+            band = max(S(440), row.get_width() + S(16), S(32) + desc.get_width())
+            self._mouse.hits.add(pygame.Rect(x - S(8), y - S(4), band, S(46)), (0, i))
             y += S(46)
 
     def _draw_stash(self, surface, x, active) -> None:
         S = scale.px
         y = S(130)
-        head = self._h.render("Stash" + (" <" if active else ""), True,
+        head = self._h.render(locale.t("meta.stash") + (" <" if active else ""), True,
                               config.COLOR_TEXT if active else config.COLOR_TEXT_DIM)
         surface.blit(head, (x, y))
         y += S(34)
-        for slot in ("weapon", "armor", "accessory"):
+        # The slot names in a column as wide as the widest of them, the item
+        # names aligned after it (they were space-padded in a proportional
+        # face, so they never lined up).
+        labels = {slot: locale.name("slot", slot) for slot in _SLOTS}
+        item_x = x + max(self._small.size(t)[0] for t in labels.values()) + S(_SLOT_GAP)
+        for slot in _SLOTS:
             eid = self.save.equipped.get(slot)
             name = "-"
             if eid:
                 match = next((it for it in self.save.stash if it["item_id"] == eid), None)
                 if match:
                     name = item_name(Item.from_dict(match), self.game.content)
-            surface.blit(self._small.render(f"{slot:<10} {name}", True,
-                                            (150, 200, 255)), (x, y))
+            surface.blit(self._small.render(labels[slot], True, (150, 200, 255)), (x, y))
+            surface.blit(self._small.render(name, True, (150, 200, 255)), (item_x, y))
             y += S(20)
         y += S(10)
 
         if not self.save.stash:
-            surface.blit(self._f.render("(no items yet - beat elites / the boss)",
+            surface.blit(self._f.render(locale.t("meta.empty"),
                                         True, config.COLOR_TEXT_DIM), (x, y))
             return
         for i, raw in enumerate(self.save.stash[:12]):

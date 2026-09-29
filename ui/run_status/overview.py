@@ -32,7 +32,8 @@ def item_lines(item, content=None) -> list[str]:
     out = [c.fmt_mod(item.base_stat, item.base_op, item.base_value)]
     for a in item.affixes:
         if a.kind == "tag_damage":
-            out.append(f"{a.value * 100:+.0f}% damage vs {a.tag}")
+            out.append(locale.t("status.tag_damage", pct=f"{a.value * 100:+.0f}%",
+                                tag=locale.name("tag", a.tag)))
         else:
             out.append(c.fmt_mod(a.stat, a.op, a.value))
     if item.unique_effect:
@@ -73,36 +74,44 @@ class OverviewPane:
         hero = locale.text(cdef, "name") if "name" in cdef else ps.character_id
         # The trait's name from the hero's data, not its id ("bulwark").
         trait = trait_name(cdef, getattr(p, "trait", ""))
-        y = c.kv(surface, f.row, area, y, "Hero", f"{hero}" + (f"  ({trait})" if trait else ""))
-        diff_key = f"difficulty.{ps.difficulty}"
-        y = c.kv(surface, f.row, area, y, "Difficulty",
-                 locale.t(diff_key) if locale.has(diff_key) else str(ps.difficulty))
-        y = c.kv(surface, f.row, area, y, "Survived", fmt_time(s.get("time", 0.0)))
-        y = c.kv(surface, f.row, area, y, "HP", f"{int(p.hp)} / {int(p.max_hp)}")
+        y = c.kv(surface, f.row, area, y, locale.t("status.hero"),
+                 f"{hero}" + (f"  ({trait})" if trait else ""))
+        y = c.kv(surface, f.row, area, y, locale.t("status.difficulty"),
+                 locale.name("difficulty", ps.difficulty))
+        y = c.kv(surface, f.row, area, y, locale.t("status.survived"),
+                 fmt_time(s.get("time", 0.0)))
+        y = c.kv(surface, f.row, area, y, locale.t("status.hp"),
+                 f"{int(p.hp)} / {int(p.max_hp)}")
         # Level, with the XP bar in the gap under its row.
-        y = c.kv(surface, f.row, area, y, "Level", ps.levels.level)
+        y = c.kv(surface, f.row, area, y, locale.t("status.level"), ps.levels.level)
         frac = max(0.0, min(1.0, float(ps.levels.progress_fraction)))
         bar = pygame.Rect(area.left, y - c.S(c.ROW_STEP) // 2 + c.S(1), area.width, c.S(6))
         pygame.draw.rect(surface, (14, 20, 40), bar)
         pygame.draw.rect(surface, (90, 150, 240), (bar.left, bar.top, int(bar.width * frac), bar.height))
         y += c.S(10)
-        y = c.kv(surface, f.row, area, y, "Kills", s.get("kills", 0))
-        y = c.kv(surface, f.row, area, y, "Gold", s.get("gold", 0), colour=config.COLOR_ACCENT)
-        y = c.kv(surface, f.row, area, y, "Salvage", s.get("currency", 0), colour=config.COLOR_ACCENT)
+        y = c.kv(surface, f.row, area, y, locale.t("status.kills"), s.get("kills", 0))
+        y = c.kv(surface, f.row, area, y, locale.t("status.gold"), s.get("gold", 0),
+                 colour=config.COLOR_ACCENT)
+        y = c.kv(surface, f.row, area, y, locale.t("status.salvage"), s.get("currency", 0),
+                 colour=config.COLOR_ACCENT)
         # CB-8: potions picked up, with the HP they actually restored.
-        y = c.kv(surface, f.row, area, y, "Potions",
-                 f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
+        y = c.kv(surface, f.row, area, y, locale.t("status.potions"),
+                 locale.t("summary.potions_value", n=s.get("potions", 0),
+                          hp=round(s.get("potion_healing", 0.0))))
 
         items = list(getattr(p, "equipment", ()))
-        y = c.subheader(surface, f.sub, area, y, f"Equipped items  ({len(items)})")
+        y = c.subheader(surface, f.sub, area, y, locale.t("status.equipped", n=len(items)))
         if not items:
-            c.line(surface, f.row, area, y, "none", colour=config.COLOR_TEXT_DIM)
+            c.line(surface, f.row, area, y, locale.t("status.none"),
+                   colour=config.COLOR_TEXT_DIM)
             return
         for item in items[:MAX_ITEMS]:
             if y > area.bottom - c.S(c.ROW_STEP):
                 break
             name = item_label(item, ps.content)
-            y = c.kv(surface, f.row, area, y, name, f"{item.slot}  Lv {item.level}",
+            y = c.kv(surface, f.row, area, y, name,
+                     locale.t("status.item_value", slot=locale.name("slot", item.slot),
+                              level=item.level),
                      label_colour=c.RARITY_ON_DARK.get(item.rarity, config.COLOR_TEXT))
             for text in item_lines(item, ps.content):
                 if y > area.bottom - c.S(10):
@@ -115,8 +124,9 @@ class OverviewPane:
     def _draw_stats(self, surface, area, ps) -> None:
         f = self.f
         stats = ps.player.stats
-        y = c.subheader(surface, f.sub, area, area.top + c.S(2), "Hero stats")
-        for stat, label, _kind in c.STAT_ROWS:
+        y = c.subheader(surface, f.sub, area, area.top + c.S(2), locale.t("status.hero_stats"))
+        for stat, _kind in c.STAT_ROWS:
             if y > area.bottom:
                 break
-            y = c.kv(surface, f.row, area, y, label, c.fmt_stat(stat, float(stats.get(stat, 0.0))))
+            y = c.kv(surface, f.row, area, y, c.stat_label(stat),
+                     c.fmt_stat(stat, float(stats.get(stat, 0.0))))

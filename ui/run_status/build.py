@@ -27,36 +27,48 @@ import pygame
 
 from combat.weapons.core import TIME_MODE
 from combat.weapons.forge import blessing_levels, forge_changes, get_forges
+from game.states.playing.core.infusion import element_name
 from game.states.playing.visual import elements as element_fx
-from game import config, locale
+from game import config, fonts, locale
 from progression.blessings.offer import get_rules
 from ui.run_status import common as c
-from ui.text import wrap
+from ui.text import fit_font, wrap
 
-# (definition key, label, bonus key or None, kind) -- shown when the
-# definition has the key. `kind` "s" prints seconds, "n" a number, "deg" degrees.
+# (definition key, bonus key or None, kind) -- shown when the definition has
+# the key, labelled `weapon_stat.<key>` (UI-014.9). `kind` "s" prints
+# seconds, "n" a number, "deg" degrees.
 _NUMBERS = (
-    ("damage", "Damage", "damage", "n"),
-    ("cooldown", "Cooldown", None, "s"),
-    ("projectile_count", "Projectiles", "projectile_count", "n"),
-    ("area", "Area", "area", "n"),
-    ("reach", "Reach", None, "n"),
-    ("pierce", "Pierce", "pierce", "n"),
-    ("blast_radius", "Blast radius", "blast_radius", "n"),
-    ("cone_half_angle", "Cone", "cone_half_angle", "deg"),
-    ("chain_count", "Chains", "chain_count", "n"),
-    ("weight", "Weight", "weight", "n"),
+    ("damage", "damage", "n"),
+    ("cooldown", None, "s"),
+    ("projectile_count", "projectile_count", "n"),
+    ("area", "area", "n"),
+    ("reach", None, "n"),
+    ("pierce", "pierce", "n"),
+    ("blast_radius", "blast_radius", "n"),
+    ("cone_half_angle", "cone_half_angle", "deg"),
+    ("chain_count", "chain_count", "n"),
+    ("weight", "weight", "n"),
 )
+# A Forging's text values are ids; each names its own table. Anything else
+# a change carries is a number (or a list of numbers).
+_VALUE_TABLES = {"category": "weapon_category", "special_effect": "special",
+                 "targeting_mode": "targeting", "tags": "tag"}
 MAX_SYNERGIES = 4
 CARD_STEP = 24            # a card's number rows; tighter than the shared ROW_STEP
 GATE_H = 54               # the two gate rows anchored at a card's bottom
 
 
-def _fmt(v, kind: str) -> str:
+def _fmt(v, kind: str, table: str | None = None) -> str:
+    """A value as the card prints it; `table` names the ids of a text value
+    (`_VALUE_TABLES`)."""
     if isinstance(v, (list, tuple)):
-        return ", ".join(str(x) for x in v)
+        return ", ".join(_fmt(x, kind, table) for x in v)
+    if v is None:                       # a Forging that clears a field (Fan of Blades)
+        return locale.t("status.none")
     if isinstance(v, bool):
-        return "yes" if v else "no"
+        return locale.t("status.yes" if v else "status.no")
+    if table is not None and isinstance(v, str):
+        return locale.name(table, v)
     if kind == "s":
         return f"{float(v):g}s"
     if kind == "deg":
@@ -72,7 +84,7 @@ def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
     is None when no blessing changed it."""
     d, b = weapon.definition, weapon.bonus
     out = []
-    for key, label, bkey, kind in _NUMBERS:
+    for key, bkey, kind in _NUMBERS:
         if key not in d:
             continue
         base = float(d[key])
@@ -89,10 +101,11 @@ def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
                    * float(b.get("blast_radius_mult", 1.0)))
         elif bkey is not None:
             now = base + float(b.get(bkey, 0.0))
-        out.append((label, _fmt(base, kind), _fmt(now, kind) if abs(now - base) > 1e-9 else None))
+        out.append((locale.name("weapon_stat", key), _fmt(base, kind),
+                    _fmt(now, kind) if abs(now - base) > 1e-9 else None))
     crit = float(b.get("crit_chance", 0.0))
     if crit > 0.0:
-        out.append(("Crit chance", f"+{crit * 100:.0f}%", None))
+        out.append((locale.name("stat", "crit_chance"), f"+{crit * 100:.0f}%", None))
     return out
 
 
@@ -100,24 +113,26 @@ def infusion_text(weapon) -> str:
     """`fire  ·  every attack` -- the element and the cadence it lands
     at, which is the half of an infusion the numbers do not show."""
     if weapon.element_mode == TIME_MODE:
-        pace = f"every {weapon.element_window:.2g}s"
+        pace = locale.t("status.pace.time",
+                        s=locale.decimals(f"{weapon.element_window:.2g}"))
     elif weapon.element_interval:
-        pace = f"1 attack in {weapon.element_interval + 1}"
+        pace = locale.t("status.pace.count", n=weapon.element_interval + 1)
     else:
-        pace = "every attack"
-    return f"{weapon.element.key}  ·  {pace}"
+        pace = locale.t("status.pace.every")
+    return f"{element_name(weapon.element).lower()}  ·  {pace}"
 
 
 def gate_text(weapon, need: int, forges) -> str:
     """The Forge line under a card's blessing count."""
     if weapon.is_summon:
-        return "cannot be forged"
+        return locale.t("status.gate.summon")
     if weapon.forge:
-        return f"forged  -  {forges.get(weapon.forge).display_identity}"
+        return locale.t("status.gate.forged",
+                        identity=forges.get(weapon.forge).display_identity)
     levels = blessing_levels(weapon)
     if levels >= need:
-        return f"ready for the Forge ({need})"
-    return f"Forge at {need}  -  has {levels}"
+        return locale.t("status.gate.ready", need=need)
+    return locale.t("status.gate.short", need=need, have=levels)
 
 
 def synergy_rows(player, catalog, weapon_names) -> list[tuple[str, str]]:
@@ -127,7 +142,7 @@ def synergy_rows(player, catalog, weapon_names) -> list[tuple[str, str]]:
         bdef = catalog.by_id.get(bid)
         if bdef is None or bdef.category != "synergy":
             continue
-        names = [weapon_names.get(bdef.weapon, bdef.weapon or "Hero")]
+        names = [weapon_names.get(bdef.weapon, bdef.weapon or locale.t("status.owner_hero"))]
         names += [weapon_names.get(w, w) for w in bdef.requires_weapons]
         pair = " + ".join(n for n in names if n)
         rows.append((f"{pair}  -  {bdef.title(lvl)}", bdef.describe(lvl)))
@@ -164,8 +179,8 @@ class BuildPane:
         gap = c.S(20)
         card_w = (area.width - gap * (n - 1)) // n
         if not weapons:
-            c.line(surface, f.row, area, area.top + c.S(c.ROW_STEP), "no weapons",
-                   colour=config.COLOR_TEXT_DIM)
+            c.line(surface, f.row, area, area.top + c.S(c.ROW_STEP),
+                   locale.t("status.no_weapons"), colour=config.COLOR_TEXT_DIM)
         for i, w in enumerate(weapons):
             card = pygame.Rect(area.left + i * (card_w + gap), area.top, card_w, card_h)
             hits.add(card, ("row", i))
@@ -189,14 +204,22 @@ class BuildPane:
                          card, width=1, border_radius=c.S(8))
         area = pygame.Rect(card.left + c.S(16), card.top, card.width - c.S(32), card.height)
         y = area.top + c.S(22)
-        y = c.line(surface, f.title, area, y, f"{w.name}  Lv {w.level}", step=30)
+        # The name and level, stepped down (not cut) when four cards share
+        # the 1280 px web profile: "Lobo espiritual  Nv. 10" would lose its
+        # level to the trim (UI-014.9).
+        title = locale.t("status.weapon_level", name=w.name, level=w.level)
+        title_font = (f.title if f.title.size(title)[0] <= area.width
+                      else fit_font(fonts.heading, c.TITLE_PX, title, area.width))
+        y = c.line(surface, title_font, area, y, title, step=30)
         # Class, then the category and the special effect where they say
-        # something the class does not ("summon · summon" told the player nothing).
-        parts = [w.weapon_class]
+        # something the class does not ("summon · summon" told the player
+        # nothing). Compared as ids, drawn through their name tables.
+        parts = [locale.name("class", w.weapon_class)]
         if w.category != w.weapon_class:
-            parts.append(w.category)
+            parts.append(locale.name("weapon_category", w.category))
         if w.special and w.special != w.weapon_class:
-            parts.append(str(w.special).replace("_", " "))
+            parts.append(locale.name("special", w.special,
+                                     str(w.special).replace("_", " ")))
         y = c.line(surface, f.small, area, y, "  ·  ".join(parts), colour=config.COLOR_TEXT_DIM, step=24)
         # The infusion, in the weapon's own element colour, with how
         # often it actually lands -- which is the part a player cannot
@@ -216,11 +239,12 @@ class BuildPane:
                      colour=config.COLOR_ACCENT if now is not None else None)
             y -= c.S(c.ROW_STEP) - c.S(CARD_STEP)
         if len(shown) < len(rows):
-            c.line(surface, f.small, area, y, f"+{len(rows) - len(shown)} more",
+            c.line(surface, f.small, area, y, locale.t("status.more", n=len(rows) - len(shown)),
                    colour=config.COLOR_TEXT_DIM)
 
         y = c.rule(surface, area, gate_top + c.S(6))
-        y = c.kv(surface, f.row, area, y, "Blessing levels", blessing_levels(w))
+        y = c.kv(surface, f.row, area, y, locale.t("status.blessing_levels"),
+                 blessing_levels(w))
         c.line(surface, f.small, area, y - c.S(6), gate_text(w, need, forges), step=24,
                colour=config.COLOR_ACCENT if w.forge else config.COLOR_TEXT_DIM)
 
@@ -228,21 +252,25 @@ class BuildPane:
     def _draw_forging(self, surface, area, w, need, forges, content) -> None:
         f = self.f
         if not w.forge:
-            y = c.subheader(surface, f.sub, area, area.top, f"{w.name}  -  not forged")
+            y = c.subheader(surface, f.sub, area, area.top,
+                            locale.t("status.not_forged", weapon=w.name))
             c.line(surface, f.row, area, y, gate_text(w, need, forges).capitalize(),
                    colour=config.COLOR_TEXT_DIM)
             return
         fdef = forges.get(w.forge)
         y = c.subheader(surface, f.sub, area, area.top,
-                        f"Forging: {fdef.display_name}  -  {fdef.display_identity}")
+                        locale.t("status.forging", name=fdef.display_name,
+                                 identity=fdef.display_identity))
         # The numbers first -- they are what the player came for -- then the
         # description in whatever room is left.
         for key, before, after in forge_changes(content, w):
             if y > area.bottom - c.S(8):
                 return
-            value = (f"+ {_fmt(after, 'n')}" if before is None
-                     else f"{_fmt(before, 'n')}  ->  {_fmt(after, 'n')}")
-            y = c.kv(surface, f.small, area, y, key.replace("_", " "), value,
+            table = _VALUE_TABLES.get(key)
+            value = (f"+ {_fmt(after, 'n', table)}" if before is None
+                     else f"{_fmt(before, 'n', table)}  ->  {_fmt(after, 'n', table)}")
+            y = c.kv(surface, f.small, area, y,
+                     locale.name("forge_field", key, key.replace("_", " ")), value,
                      colour=config.COLOR_ACCENT)
             y -= c.S(c.ROW_STEP) - c.S(22)
         y += c.S(6)
@@ -254,9 +282,10 @@ class BuildPane:
     # --- synergies --------------------------------------------------------
     def _draw_synergies(self, surface, area, syn) -> None:
         f = self.f
-        y = c.subheader(surface, f.sub, area, area.top, f"Synergies  ({len(syn)})")
+        y = c.subheader(surface, f.sub, area, area.top,
+                        locale.t("status.synergies", n=len(syn)))
         if not syn:
-            c.line(surface, f.row, area, y, "none yet  -  a synergy blessing links two weapons",
+            c.line(surface, f.row, area, y, locale.t("status.synergies_none"),
                    colour=config.COLOR_TEXT_DIM)
             return
         for head, text in syn[:MAX_SYNERGIES]:
@@ -268,4 +297,4 @@ class BuildPane:
                            indent=18, step=22)
                 y += c.S(6)
             y -= c.S(6)
-        c.more(surface, f.small, area, y, len(syn) - MAX_SYNERGIES, "synergies")
+        c.more(surface, f.small, area, y, len(syn) - MAX_SYNERGIES, "status.more_synergies")

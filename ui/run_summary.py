@@ -31,16 +31,23 @@ share as a percentage, DPS to one decimal, time as `mm:ss` like the HUD.
 """
 from __future__ import annotations
 
+import re
+
 import pygame
 
 from game import config, fonts, locale
 from game.content import get_content
-from progression.items import Item, item_name
+from progression.items import Item, item_name, rarity_tag
 from ui import text as uitext
 from ui import widgets
 from ui import scale
 
 ROW_STEP = 28          # design px, scaled at the point of use with `S`
+_ROW_PX = 22           # the row font's design size
+_RIBBON_PX = 22        # a column's ribbon title
+_SUB_PX = 20           # a section heading
+_LABEL_GAP = 12        # the least room between a row's label (or marker) and its value
+_COUNT = re.compile(r"\s*\(\d+\)$")   # a heading's "  (14)", kept whole by a trim
 RIBBON_H = 48
 TITLE_DY = -5
 
@@ -53,7 +60,7 @@ def S(n: float) -> int:
 # column has room for every type in `data/enemies/enemies.json` plus the boss; the
 # weapon column's budget is four weapon rows (three slots and a summon), the
 # proc rows, the total and the blessings.
-BEST_FLAG = "best"
+BEST_FLAG = "summary.best"     # a locale key: the marker is drawn in the current language
 MAX_ITEMS = 10
 MAX_KILL_ROWS = 13
 MAX_OTHER_ROWS = 2
@@ -70,7 +77,7 @@ _DAMAGE_X = 150
 _SHARE_X = 84
 _CELL_GAP = 12
 _WIDEST_DAMAGE = "#,###,###"
-_WIDEST_LEVEL = "Lv ##"
+_WIDEST_LEVEL = "##"         # a two-digit level, inside `summary.level_value`
 _COLUMN_PAD = 56
 
 
@@ -128,7 +135,7 @@ def _item_name(item) -> tuple[str, str]:
     summary."""
     if isinstance(item, dict):
         rarity = str(item.get("rarity", ""))
-        tag = f"[{rarity[:1].upper()}] " if rarity else ""
+        tag = f"{rarity_tag(rarity)} " if rarity else ""
         return tag + _localized_item_name(item), rarity
     return str(item), ""
 
@@ -159,9 +166,9 @@ def column_widths(space: int, minimums) -> list[int]:
 class RunSummaryPanel:
     def __init__(self, stats: dict) -> None:
         self.stats = stats
-        self._ribbon = fonts.heading(22)
-        self._sub = fonts.heading(20)
-        self._row = fonts.body(22)
+        self._ribbon = fonts.heading(_RIBBON_PX)
+        self._sub = fonts.heading(_SUB_PX)
+        self._row = fonts.body(_ROW_PX)
         self._small = fonts.body(17)
 
     # --- the three columns ----------------------------------------
@@ -193,25 +200,52 @@ class RunSummaryPanel:
         ribbon = pygame.Rect(rect.left + S(16), rect.top - S(RIBBON_H) // 2 + S(8),
                              rect.width - S(32), S(RIBBON_H))
         widgets.draw_ribbon(surface, assets, ribbon, None, colour=colour)
-        text = self._ribbon.render(title, True, config.COLOR_ON_BUTTON)
+        # A title wider than its ribbon (the web profile's four columns,
+        # "Enemigos abatidos") steps down rather than running off the art.
+        font = (self._ribbon if self._ribbon.size(title)[0] <= ribbon.width
+                else uitext.fit_font(fonts.heading, _RIBBON_PX, title, ribbon.width))
+        text = font.render(title, True, config.COLOR_ON_BUTTON)
         surface.blit(text, text.get_rect(center=(ribbon.centerx, ribbon.centery + S(TITLE_DY))))
         return pygame.Rect(rect.left + S(28), ribbon.bottom + S(18),
                            rect.width - S(56), rect.bottom - ribbon.bottom - S(30))
 
     # --- primitives -----------------------------------------------
-    def _kv(self, surface, area, y, label, value, *, colour=None, font=None,
-            flag: str = "") -> int:
+    def _kv(self, surface, area, y, label, value, *, colour=None, flag: str = "") -> int:
         """A label / value row. `flag` is a small accent note set after the
         label -- the "best" marker. It goes on the *label* side because the
         value is right-aligned to the column edge and has nothing to spare."""
-        font = font or self._row
-        val = font.render(str(value), True, colour or config.COLOR_TEXT)
-        note = self._small.render(flag, True, config.COLOR_ACCENT) if flag else None
-        # The value is the data and is never trimmed; the label gives way to
-        # it, and to the marker, rather than drawing over either.
-        room = area.width - val.get_width() - S(12) - (note.get_width() + S(8) if note else 0)
-        lab = font.render(uitext.ellipsize(font, str(label), room),
-                          True, config.COLOR_TEXT_DIM)
+        font, text = self._row, str(value)
+        note = self._small.render(locale.t(flag), True, config.COLOR_ACCENT) if flag else None
+        extra = S(_LABEL_GAP) + (note.get_width() + S(8) if note else 0)
+        # The value is the data. When it and the label cannot both fit (a
+        # translated list, "fuego, viento"), the value steps its font down
+        # (UI-014.9) -- when that leaves the label whole. Otherwise the label
+        # gives way, as it always did, and the value keeps its size unless it
+        # would cross the column's edge or the record marker: then, in order,
+        # it steps to fit beside the marker, drops the marker and steps to
+        # the column, and at the last trims. Nothing leaves the column and
+        # nothing is drawn over anything (the web profile's four Victory
+        # columns are about 120 px).
+        val_font = font
+        value_room = area.width - font.size(str(label))[0] - extra
+        if font.size(text)[0] > value_room:
+            stepped = uitext.fit_font(fonts.body, _ROW_PX, text, value_room)
+            if stepped.size(text)[0] <= value_room:
+                val_font = stepped
+            else:
+                room_v = area.width - (extra if note else 0)
+                if font.size(text)[0] > room_v:
+                    val_font = uitext.fit_font(fonts.body, _ROW_PX, text, room_v)
+                    if val_font.size(text)[0] > room_v and note is not None:
+                        note, extra = None, S(_LABEL_GAP)
+                        val_font = uitext.fit_font(fonts.body, _ROW_PX, text, area.width)
+                    text = uitext.ellipsize(val_font, text, area.width)
+        val = val_font.render(text, True, colour or config.COLOR_TEXT)
+        room = area.width - val.get_width() - extra
+        shown = uitext.ellipsize(font, str(label), room)
+        if font.size(shown)[0] > room:
+            shown = ""                     # not even "..." fits: it would push the marker on
+        lab = font.render(shown, True, config.COLOR_TEXT_DIM)
         surface.blit(lab, lab.get_rect(midleft=(area.left, y)))
         if note is not None:
             surface.blit(note, note.get_rect(midleft=(area.left + lab.get_width() + S(8), y)))
@@ -231,8 +265,18 @@ class RunSummaryPanel:
         return y + S(ROW_STEP)
 
     def _subheader(self, surface, area, y, text) -> int:
+        """A section heading, stepped down and then trimmed to the column:
+        at the web profile's four columns "Objetos obtenidos  (14)" would
+        run into the next one. A trim takes words, never the "(n)" count."""
         y += S(6)
-        t = self._sub.render(text, True, config.COLOR_ACCENT)
+        font = (self._sub if self._sub.size(text)[0] <= area.width
+                else uitext.fit_font(fonts.heading, _SUB_PX, text, area.width))
+        shown = text
+        if font.size(text)[0] > area.width:
+            count = _COUNT.search(text)
+            head, tail = (text[:count.start()], text[count.start():]) if count else (text, "")
+            shown = uitext.ellipsize(font, head, area.width - font.size(tail)[0]) + tail
+        t = font.render(shown, True, config.COLOR_ACCENT)
         surface.blit(t, t.get_rect(midleft=(area.left, y)))
         pygame.draw.line(surface, _RULE, (area.left, y + S(15)), (area.right, y + S(15)))
         return y + S(ROW_STEP + 4)
@@ -242,15 +286,16 @@ class RunSummaryPanel:
         return y + S(6)
 
     def _more(self, surface, area, y, n, what) -> int:
+        """The "+n more" line; `what` picks its `summary.more.<what>` text."""
         if n <= 0:
             return y
-        return self._line(surface, area, y, f"+{n} more {what}",
+        return self._line(surface, area, y, locale.t(f"summary.more.{what}", n=n),
                           colour=config.COLOR_TEXT_DIM, font=self._small)
 
     # --- column 1: the run --------------------------------------
     def _draw_run(self, surface, assets, rect) -> None:
         s = self.stats
-        area = self._column(surface, assets, rect, "Run", "blue")
+        area = self._column(surface, assets, rect, locale.t("summary.run"), "blue")
         t = float(s.get("time", 0.0))
         rate = max(1e-6, t)
         kills = s.get("kills", 0)
@@ -265,17 +310,18 @@ class RunSummaryPanel:
         # A win is not a death with better numbers: "Survived" is the wrong
         # word for the run the hero finished on their feet.
         y = self._kv(surface, area, y,
-                     "Cleared in" if s.get("victory") else "Survived", fmt_time(t),
-                     flag=mark("time"))
-        y = self._kv(surface, area, y, "Level", s.get("level", 1),
+                     locale.t("summary.cleared" if s.get("victory") else "summary.survived"),
+                     fmt_time(t), flag=mark("time"))
+        y = self._kv(surface, area, y, locale.t("summary.level"), s.get("level", 1),
                      flag=mark("level"))
-        y = self._kv(surface, area, y, "Kills",
-                     f"{kills}   ({kills / rate * 60:.0f}/min)", flag=mark("kills"))
+        y = self._kv(surface, area, y, locale.t("summary.kills"),
+                     locale.t("summary.kills_value", kills=kills,
+                              rate=f"{kills / rate * 60:.0f}"), flag=mark("kills"))
         # Gold *earned* over the run, not the balance left after the Merchant
         # (owner, 2026-09-12): pick up 200 and spend 50 and this says 200.
         # `gold` is the fallback for a summary written before the run kept a
         # total -- there it is the best answer available, if an undercount.
-        y = self._kv(surface, area, y, "Gold earned",
+        y = self._kv(surface, area, y, locale.t("summary.gold_earned"),
                      s.get("gold_earned", s.get("gold", 0)),
                      colour=config.COLOR_ACCENT)
         # No "Salvage banked" row: it printed the raw `currency`, while
@@ -283,22 +329,24 @@ class RunSummaryPanel:
         # a player with those upgrades was told they earned less than they did.
         # The owner's call was to drop the line rather than fix the arithmetic.
         # CB-8: potions picked up, with the HP they actually restored.
-        y = self._kv(surface, area, y, "Potions",
-                     f'{s.get("potions", 0)}   ({round(s.get("potion_healing", 0.0))} HP)')
+        y = self._kv(surface, area, y, locale.t("summary.potions"),
+                     locale.t("summary.potions_value", n=s.get("potions", 0),
+                              hp=round(s.get("potion_healing", 0.0))))
         # UI-012: chests opened (CB-9 counts them); they paid out the gold and
         # the potions above. A summary written before the count reads 0.
-        y = self._kv(surface, area, y, "Chests", s.get("chests", 0))
+        y = self._kv(surface, area, y, locale.t("summary.chests"), s.get("chests", 0))
         # The elements this run obtained (design §7.3). Tracked for the
         # summary only -- no gameplay system reads the set. A run with
         # no infusion says so rather than showing a blank.
-        elements = list(s.get("unlocked_elements", ()))
-        y = self._kv(surface, area, y, "Elements",
-                     ", ".join(elements) if elements else "none",
+        elements = [_element_word(e) for e in s.get("unlocked_elements", ())]
+        y = self._kv(surface, area, y, locale.t("summary.elements"),
+                     locale.t("list.separator").join(elements) if elements
+                     else locale.t("summary.none"),
                      colour=config.COLOR_ACCENT if elements else None)
         items = list(s.get("dropped_items", ()))
-        y = self._subheader(surface, area, y, f"Items acquired  ({len(items)})")
+        y = self._subheader(surface, area, y, locale.t("summary.items", n=len(items)))
         if not items:
-            self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
+            self._line(surface, area, y, locale.t("summary.none"), colour=config.COLOR_TEXT_DIM)
             return
         # As many as the column still holds, capped at MAX_ITEMS; when some
         # are left over, one row goes to the "+N more" line instead. UI-012's
@@ -329,22 +377,22 @@ class RunSummaryPanel:
         from ui.run_status import common as rs_common
 
         s = self.stats
-        area = self._column(surface, assets, rect, "Hero", "blue")
+        area = self._column(surface, assets, rect, locale.t("summary.hero_title"), "blue")
         y = area.top + S(ROW_STEP) // 2
         if s.get("first_clear"):
             # Victory only, and only the first time with this hero: the clear
             # is what unlocks the main-weapon choice (design section 20).
-            y = self._line(surface, area, y, "Main weapon unlocked",
+            y = self._line(surface, area, y, locale.t("summary.main_weapon"),
                            colour=config.COLOR_ACCENT, font=self._small)
-        y = self._kv(surface, area, y, "Hero", s.get("character", "-"))
+        y = self._kv(surface, area, y, locale.t("summary.hero"), s.get("character", "-"))
         trait = s.get("trait_name") or str(s.get("trait") or "").title()
         if trait:
-            y = self._kv(surface, area, y, "Trait", trait)
+            y = self._kv(surface, area, y, locale.t("summary.trait"), trait)
 
         stats = dict(s.get("hero_stats", {}))
         if stats:
-            y = self._subheader(surface, area, y, "Stats")
-            rows = [(stat, label) for stat, label, _k in rs_common.STAT_ROWS
+            y = self._subheader(surface, area, y, locale.t("summary.stats"))
+            rows = [(stat, rs_common.stat_label(stat)) for stat, _k in rs_common.STAT_ROWS
                     if stat in stats]
             # Leave room for the equipment block below; the list is cut the
             # way the blessings are rather than running off the column. The
@@ -362,9 +410,9 @@ class RunSummaryPanel:
             y = self._more(surface, area, y, len(rows) - shown, "stats")
 
         items = list(s.get("equipment", ()))
-        y = self._subheader(surface, area, y, f"Equipped  ({len(items)})")
+        y = self._subheader(surface, area, y, locale.t("summary.equipped", n=len(items)))
         if not items:
-            self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
+            self._line(surface, area, y, locale.t("summary.none"), colour=config.COLOR_TEXT_DIM)
             return
         for item in items[:MAX_ITEMS]:
             name, rarity = _item_name(item)
@@ -375,17 +423,18 @@ class RunSummaryPanel:
     # --- column 2: kills and blessings ---------------------------
     def _draw_kills(self, surface, assets, rect) -> None:
         s = self.stats
-        area = self._column(surface, assets, rect, "Enemies slain", "yellow")
+        area = self._column(surface, assets, rect, locale.t("summary.kills_title"), "yellow")
         rows = list(s.get("kill_rows", ()))
         y = area.top + S(ROW_STEP) // 2
         if not rows:
-            y = self._line(surface, area, y, "nothing slain", colour=config.COLOR_TEXT_DIM)
+            y = self._line(surface, area, y, locale.t("summary.nothing_slain"),
+                           colour=config.COLOR_TEXT_DIM)
         else:
             for name, n in rows[:MAX_KILL_ROWS]:
                 y = self._kv(surface, area, y, name, n)
             y = self._more(surface, area, y, len(rows) - MAX_KILL_ROWS, "types")
             y = self._rule(surface, area, y)
-            self._kv(surface, area, y, "Total", sum(n for _n, n in rows),
+            self._kv(surface, area, y, locale.t("summary.total"), sum(n for _n, n in rows),
                      colour=config.COLOR_ACCENT)
 
     def _draw_blessings(self, surface, area, y) -> None:
@@ -393,24 +442,26 @@ class RunSummaryPanel:
         blessings = list(s.get("blessing_rows", ()))
         if not blessings:
             # The older summary shape: ids to levels, no names.
-            blessings = [(str(k).replace("_", " ").title(), v)
+            blessings = [(_blessing_name(k), v)
                          for k, v in dict(s.get("blessings", {})).items()]
-        y = self._subheader(surface, area, y, f"Blessings  ({len(blessings)})")
+        y = self._subheader(surface, area, y, locale.t("summary.blessings", n=len(blessings)))
         if not blessings:
-            self._line(surface, area, y, "none", colour=config.COLOR_TEXT_DIM)
+            # Its own key: the Spanish agrees with "bendiciones" ("ninguna").
+            self._line(surface, area, y, locale.t("summary.blessings_none"),
+                       colour=config.COLOR_TEXT_DIM)
             return
         # Rows whose centre stays inside the column; the last one is given
         # to the "+n more" line when the list does not fit.
         fit = max(1, (area.bottom - y) // S(ROW_STEP) + 1)
         shown = len(blessings) if len(blessings) <= fit else max(1, fit - 1)
         for name, lvl in blessings[:shown]:
-            y = self._kv(surface, area, y, name, f"Lv {lvl}")
+            y = self._kv(surface, area, y, name, locale.t("summary.level_value", n=lvl))
         self._more(surface, area, y, len(blessings) - shown, "blessings")
 
     # --- column 3: weapons -----------------------------------------
     def _draw_damage(self, surface, assets, rect) -> None:
         s = self.stats
-        area = self._column(surface, assets, rect, "Weapons", "red")
+        area = self._column(surface, assets, rect, locale.t("summary.weapons"), "red")
         t = float(s.get("time", 0.0))
         rows = list(s.get("weapon_rows", ()))
         if not rows:
@@ -434,13 +485,13 @@ class RunSummaryPanel:
                     *(self._row.size(fmt_damage(d))[0] for d in damages if d is not None))
         x_lv = x_dmg - dmg_w - S(_CELL_GAP)
         level_room = x_lv - area.left
-        name_room = level_room - _widest(self._row, _WIDEST_LEVEL) - S(_CELL_GAP)
+        name_room = level_room - _widest(self._row, _widest_level()) - S(_CELL_GAP)
         y = area.top + S(ROW_STEP) // 2
-        for label, x in (("Lv", x_lv), ("Damage", x_dmg), ("Share", x_share),
-                         ("DPS", x_dps)):
-            h = self._small.render(label, True, config.COLOR_TEXT_DIM)
+        for key, x in (("level", x_lv), ("damage", x_dmg), ("share", x_share),
+                       ("dps", x_dps)):
+            h = self._small.render(locale.t(f"summary.head.{key}"), True, config.COLOR_TEXT_DIM)
             surface.blit(h, h.get_rect(midright=(x, y)))
-        h = self._small.render("Weapon", True, config.COLOR_TEXT_DIM)
+        h = self._small.render(locale.t("summary.head.weapon"), True, config.COLOR_TEXT_DIM)
         surface.blit(h, h.get_rect(midleft=(area.left, y)))
         y += S(ROW_STEP - 4)
         y = self._rule(surface, area, y)
@@ -448,7 +499,7 @@ class RunSummaryPanel:
         def row(name, level, dmg, share, dps, *, colour=None, flag=""):
             nonlocal y
             colour = colour or config.COLOR_TEXT
-            note = self._small.render(flag, True, config.COLOR_ACCENT) if flag else None
+            note = self._small.render(locale.t(flag), True, config.COLOR_ACCENT) if flag else None
             room = (name_room if level is not None else level_room) \
                 - (note.get_width() + S(8) if note else 0)
             n = self._row.render(uitext.ellipsize(self._row, str(name), room), True, colour)
@@ -457,7 +508,7 @@ class RunSummaryPanel:
                 surface.blit(note,
                              note.get_rect(midleft=(area.left + n.get_width() + S(8), y)))
             if level is not None:
-                lv = self._row.render(f"Lv {level}", True, colour)
+                lv = self._row.render(locale.t("summary.level_value", n=level), True, colour)
                 surface.blit(lv, lv.get_rect(midright=(x_lv, y)))
             cells = ((x_dmg, "-" if dmg is None else fmt_damage(dmg)),
                      (x_share, "-" if share is None else f"{share:.0%}"),
@@ -468,17 +519,18 @@ class RunSummaryPanel:
             y += S(ROW_STEP)
 
         if not rows:
-            y = self._line(surface, area, y, "no weapons", colour=config.COLOR_TEXT_DIM)
+            y = self._line(surface, area, y, locale.t("summary.no_weapons"),
+                           colour=config.COLOR_TEXT_DIM)
         for r in rows:
             row(r["name"], r.get("level"), r.get("damage"), r.get("share"), r.get("dps"))
         if others:
-            y = self._subheader(surface, area, y, "Blessing procs & other")
+            y = self._subheader(surface, area, y, locale.t("summary.procs"))
             for r in others[:MAX_OTHER_ROWS]:
                 row(r["name"], None, r.get("damage"), r.get("share"), r.get("dps"),
                     colour=config.COLOR_TEXT_DIM)
             y = self._more(surface, area, y, len(others) - MAX_OTHER_ROWS, "sources")
         y = self._rule(surface, area, y + S(4))
-        row("Total", None, float(total), 1.0 if total else 0.0,
+        row(locale.t("summary.total"), None, float(total), 1.0 if total else 0.0,
             float(total) / t if t > 0 else 0.0, colour=config.COLOR_ACCENT,
             flag=BEST_FLAG if "damage_dealt" in set(s.get("new_records", ())) else "")
         self._draw_blessings(surface, area, y)
@@ -497,7 +549,7 @@ def weapons_min_width(font: pygame.font.Font) -> int:
     forge now widens the column by itself.
     """
     return (widest_weapon_name(font) + S(_CELL_GAP)
-            + _widest(font, _WIDEST_LEVEL) + S(_CELL_GAP)
+            + _widest(font, _widest_level()) + S(_CELL_GAP)
             + _widest(font, _WIDEST_DAMAGE) + S(_DAMAGE_X) + S(_COLUMN_PAD))
 
 
@@ -515,6 +567,25 @@ def widest_weapon_name(font) -> int:
                 if isinstance(v, dict) and isinstance(v.get("overrides"), dict)]
     names = [v[k] for v in entries for k in keys if isinstance(v.get(k), str)]
     return max(font.size(n)[0] for n in names)
+
+
+def _widest_level() -> str:
+    """The level cell's widest text, `#` for a digit, in the current
+    language ("Lv ##", "Nv. ##")."""
+    return locale.t("summary.level_value", n=_WIDEST_LEVEL)
+
+
+def _element_word(key: str) -> str:
+    """An element id as the Run column lists it: its name, lower case."""
+    return locale.name("element", key, str(key).title()).lower()
+
+
+def _blessing_name(bid) -> str:
+    """A blessing id from an older summary, named through the catalog in
+    the current language; the id, titled, when the catalog lacks it."""
+    from progression.blessings.catalog import get_catalog
+    bdef = get_catalog(get_content()).by_id.get(str(bid))
+    return bdef.display_name if bdef is not None else str(bid).replace("_", " ").title()
 
 
 # (drawer, minimum width). Only the weapons table has a floor, and it is

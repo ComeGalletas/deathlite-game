@@ -151,6 +151,16 @@ def has(key: str) -> bool:
     return key in _table(_language) or key in _table(DEFAULT)
 
 
+def name(table: str, key: Any, fallback: str | None = None) -> str:
+    """An id's entry in a name table (`stat.crit_chance`, `slot.armor`) in
+    the current language. An id the table does not list -- new data -- shows
+    as `fallback`, or the id itself, never as the dotted key."""
+    dotted = f"{table}.{key}"
+    if has(dotted):
+        return t(dotted)
+    return str(key) if fallback is None else fallback
+
+
 def english(key: str, /, **fields: Any) -> str:
     """`t` in English whatever language is active: for the developer tools,
     which stay English (UI-014.D6), and logs."""

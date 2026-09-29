@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import text as uitext
 from ui import widgets
 from ui import scale
@@ -35,42 +35,45 @@ _TAB_SHADE_MULT = (135, 135, 135, 255)
 RARITY_ON_DARK = {"common": config.COLOR_TEXT, "uncommon": (130, 225, 150),
                   "rare": (150, 170, 255), "forge": (255, 185, 90)}
 
-# (stat, label, kind) in display order. `kind` picks the formatter:
+# (stat, kind) in display order; the label is `stat.<id>` in the locale
+# files (UI-014.9), read when drawn. `kind` picks the formatter:
 #   num   -- a plain number (HP, px/s, px)
 #   flat  -- a flat amount shown with its sign
 #   pct   -- a fraction shown as a percentage (chances, +gain fractions)
 #   mult  -- a multiplier shown as x1.25
 #   regen -- HP per tick, printed with the cadence: `1 / 5s` (CB-7)
 STAT_ROWS = (
-    ("max_hp", "Max HP", "num"),
-    ("hp_regen", "HP regen", "regen"),
-    ("move_speed", "Move speed", "num"),
-    ("armor", "Armor", "num"),
-    ("damage_multiplier", "Damage", "mult"),
-    ("melee_damage", "Melee damage", "pctplus"),
-    ("ranged_damage", "Ranged damage", "pctplus"),
-    ("attack_speed_multiplier", "Attack speed", "mult"),
-    ("projectile_speed_multiplier", "Projectile speed", "mult"),
-    ("area_multiplier", "Area", "mult"),
-    ("crit_chance", "Crit chance", "pct"),
-    ("crit_damage", "Crit damage", "pctplus"),
-    ("evasion_chance", "Evasion", "pct"),
-    ("block_chance", "Block chance", "pct"),
-    ("block_strength", "Block strength", "pct"),
-    ("pickup_radius", "Pickup radius", "num"),
-    ("luck", "Luck", "num"),
-    ("xp_gain", "XP gain", "pctplus"),
-    ("gold_gain", "Gold gain", "pctplus"),
+    ("max_hp", "num"),
+    ("hp_regen", "regen"),
+    ("move_speed", "num"),
+    ("armor", "num"),
+    ("damage_multiplier", "mult"),
+    ("melee_damage", "pctplus"),
+    ("ranged_damage", "pctplus"),
+    ("attack_speed_multiplier", "mult"),
+    ("projectile_speed_multiplier", "mult"),
+    ("area_multiplier", "mult"),
+    ("crit_chance", "pct"),
+    ("crit_damage", "pctplus"),
+    ("evasion_chance", "pct"),
+    ("block_chance", "pct"),
+    ("block_strength", "pct"),
+    ("pickup_radius", "num"),
+    ("luck", "num"),
+    ("xp_gain", "pctplus"),
+    ("gold_gain", "pctplus"),
 )
-STAT_LABELS = {stat: label for stat, label, _k in STAT_ROWS}
+_KINDS = dict(STAT_ROWS)
 
 
 def stat_label(stat: str) -> str:
-    return STAT_LABELS.get(stat, stat.replace("_", " ").capitalize())
+    """The stat's name in the current language; a stat the table does not
+    list shows its id, spaced and capitalised."""
+    return locale.name("stat", stat, stat.replace("_", " ").capitalize())
 
 
 def fmt_stat(stat: str, value: float) -> str:
-    kind = next((k for s, _l, k in STAT_ROWS if s == stat), "num")
+    kind = _KINDS.get(stat, "num")
     if kind == "mult":
         return f"x{value:.2f}"
     if kind == "pct":
@@ -91,7 +94,7 @@ def fmt_mod(stat: str, op: str | None, value: float) -> str:
     if op == "mult":
         return f"x{1.0 + value:.2f} {label}"
     # flat: chances and multipliers are fractions even when flat
-    kind = next((k for s, _l, k in STAT_ROWS if s == stat), "num")
+    kind = _KINDS.get(stat, "num")
     if kind in ("pct", "pctplus", "mult"):
         return f"{value * 100:+.0f}% {label}"
     # Item rolls are unrounded floats (+3.917 armor); one decimal is what a
@@ -104,12 +107,15 @@ def _one_decimal(value: float) -> str:
     return text[:-2] if text.endswith(".0") else text
 
 
+TITLE_PX = 28          # a weapon card's title (the Build pane steps it down to fit)
+
+
 class Fonts:
     """The faces the panes share, built once per screen."""
 
     def __init__(self) -> None:
         self.ribbon = fonts.heading(22)
-        self.title = fonts.heading(28)
+        self.title = fonts.heading(TITLE_PX)
         self.sub = fonts.heading(20)
         self.row = fonts.body(20)
         self.small = fonts.body(16)
@@ -209,10 +215,11 @@ def rule(surface, area, y) -> int:
     return y + S(6)
 
 
-def more(surface, font, area, y, n: int, what: str) -> int:
+def more(surface, font, area, y, n: int, key: str) -> int:
+    """The "+n more" line; `key` is its locale template, filled with `n`."""
     if n <= 0:
         return y
-    return line(surface, font, area, y, f"+{n} more {what}", colour=config.COLOR_TEXT_DIM)
+    return line(surface, font, area, y, locale.t(key, n=n), colour=config.COLOR_TEXT_DIM)
 
 
 def fits(area, y, rows: int, step: int = ROW_STEP) -> int:

@@ -263,6 +263,62 @@ tools.
     ("The sword carries wind."), exactly as before. Spanish is phrased so the
     lower-case name needs no article or agreement: "Infusión de viento en
     espada.", "Reforja de espada: Mandoble.".
+- **UI-014.D18 — the name tables** (UI-014.9).
+  - Every id a screen printed as text reads a table: `stat.*`,
+    `weapon_stat.*`, `forge_field.*`, `class.*`, `weapon_category.*`,
+    `special.*`, `tag.*`, `targeting.*`, `slot.*`, through
+    `locale.name(table, id, fallback)`. An id a table does not list (new
+    data) shows as the id, never as the dotted key.
+  - English is the text drawn before: the ids themselves where the screen
+    printed ids ("melee  ·  cone", "cluster damage mult"), the old labels
+    elsewhere. A test holds both.
+  - An item's rarity tag is the initial of its `rarity.*` name, so a Spanish
+    list reads `[P]` for "Poco común" beside cards that say "Poco común"
+    (`progression.items.rarity_tag`). The English log form (`Item.short`)
+    keeps the id's initial (UI-014.D6).
+  - A Forging that clears a field (Fan of Blades removes the Daggers'
+    special effect) printed Python's `+ None` on the Build pane; it prints
+    `+ none` / `+ ninguno`. That one English row changes.
+- **UI-014.D19 — the Spanish summary columns are narrow** (UI-014.9).
+  - The Victory screen's four columns leave a stat label about 165 px beside
+    its value. The Spanish stat names use the compact forms Spanish stat
+    sheets use: "Regen. PV", "Vel. ataque", "Daño c. a c.", "Daño a dist.",
+    "Prob. crítico", "Radio recogida". A test fits each one beside the
+    widest value its kind prints.
+  - The time row is "Tiempo" on a loss and on a win; the screen's title
+    already says which ("Completada en" did not fit beside "récord").
+  - A summary row whose label and value do not both fit now steps its value
+    down, to 70 %, before the label trims -- when that leaves the label
+    whole; otherwise the value keeps its size and the label trims, as
+    before. A value wider than the whole column on its own (the four
+    elements in Spanish) steps to the column's width, so it can never run
+    past the column's edge.
+  - The web profile (1280x720, scale 1) draws the summary's columns about
+    120 px wide, where English already ran text past the columns and over
+    its neighbours. Every row now stays in its column and alone, in both
+    languages, three columns or four: a value that cannot keep its label
+    steps to fit beside the record marker, then drops the marker and fits
+    the column, and at the last trims; a label with no room for even "..."
+    is left out rather than pushing the marker on; a ribbon title or a
+    subheader wider than its space steps down (then trims -- a subheader's
+    words, never its "(n)" count: "Objetos obt...  (14)"). At 1600x900
+    English is unchanged by any of this (pixel comparison). This fixes English too: a run
+    that set a kill record at three digits drew "Ki… best 845 (83/min)" and
+    now draws "Kills best". Every other English row is unchanged, by a
+    pixel comparison against the previous commit.
+  - The Sanctuary's upgrade rows stay the one padded string they were
+    (`f"{name:<14} {lvl}/{mx}   {cost:>4}"`), so English is the old line in
+    any face, the web build's proportional one included; a longer name (a
+    translation) pushes its own level on, never into it. Splitting the row
+    into a name and a level cell drifted a pixel in faces with fractional
+    advances (found by the critic). The equipped-slot lines align their
+    item names after the widest slot name (they were space-padded in a
+    proportional face and never lined up); that is the one Sanctuary change
+    in English.
+  - At the 1280x720 web profile, four weapon cards share the Build pane: a
+    card title ("Lobo espiritual  Nv. 10") steps its font down rather than
+    losing its level to the trim. The empty-synergy line is "ninguna aún  -
+    una sinergia une dos armas", which fits there.
 
 ## UI-014 — Plan
 
@@ -384,9 +440,28 @@ Options.
   - chest notices, forge, infusion and buffs;
   - reaction labels and the boss warning;
   - end banners (UI-014.D10) and end screens.
-- [ ] UI-014.9 — UI strings to keys, part three: the run summary, the TAB
+- [x] UI-014.9 — UI strings to keys, part three: the run summary, the TAB
   screen and the sanctuary. Name tables replace every id shown as text, and
-  the sanctuary's columns are measured in pixels.
+  the sanctuary's columns are measured in pixels. Plan (2026-09-28):
+  - name tables in the locale files for every id these screens print:
+    `stat.*` (the 19 hero stats), `weapon_stat.*` (a card's numbers),
+    `forge_field.*` (the 33 keys a Forging can change), `class.*`,
+    `weapon_category.*`, `special.*`, `tag.*`, `targeting.*`, `slot.*`;
+    English is the text drawn today, so English stays byte-identical;
+  - `ui/run_summary.py` (about 35 strings, the rarity tag, the element list,
+    the older-summary blessing fallback through the catalog);
+  - `game/states/run_status_state.py` and `ui/run_status/` (tabs, hint, the
+    three panes; `STAT_ROWS` loses its English labels, read through
+    `stat_label` when drawn);
+  - `game/states/meta_state.py`: the text, and pixel columns in place of
+    `:<14` / `:<10` padding. The upgrade columns keep today's positions in
+    English (a column is at least 14 characters of the mono face, wider when
+    a translation needs it);
+  - numbers keep their current formatting; UI-014.10 moves them to
+    `locale.num`. Words in number templates ("Lv", "HP") move here;
+  - tests: English byte-identity against the old strings, every screen drawn
+    in Spanish with its text checked where drawn, the name tables complete
+    for the data; screenshots; cold critic loop; full suite.
 - [ ] UI-014.10 — Numbers through `locale.num` (UI-014.D7), with the
   `format_value` tests in both languages.
 - [ ] UI-014.11 — The "no stray English" AST test and the fit test, and fixes
@@ -1052,3 +1127,81 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     vowel, u and ú); the rail's room to the pixel; the keycap's 75 % room.
   - Round 8: PASS. The only survivors are equivalent (dead initialisations,
     loop starts that cannot fit, regex spellings of the same language).
+
+### UI-014.9 — the run summary, the TAB screen and the Sanctuary
+
+- **Locale keys (178):** `summary.*`, `status.*`, `meta.*`, and the name
+  tables of UI-014.D18: `stat.*` (19), `weapon_stat.*` (10), `forge_field.*`
+  (33), `class.*`, `weapon_category.*`, `special.*`, `tag.*`, `targeting.*`,
+  `slot.*`. `locale.name(table, id, fallback)` reads them; an id a table does
+  not list shows as the id.
+- **Code:**
+  - `ui/run_summary.py`: every label, header, "+n more" line and the record
+    marker read the locale; the level cell is measured from
+    `summary.level_value` ("Lv ##", "Nv. ##"); the element list reads
+    `element.*`; an older summary names its blessings through the catalog;
+    `_kv` steps a value down before its label trims (UI-014.D19).
+  - `game/states/run_status_state.py`, `ui/run_status/`: the tabs, the hint
+    and the three panes. `common.STAT_ROWS` is `(stat, kind)`, the label read
+    by `stat_label` when drawn. The Build pane's class, category, special,
+    number labels and Forging fields read their tables, a Forging's text
+    values too (`_VALUE_TABLES`); a card title steps down at the web profile.
+  - `game/states/meta_state.py`: the text; the upgrade rows stay the one
+    padded string; the equipped-slot lines in a pixel column.
+  - `progression/items.py`: `rarity_tag`, the translated rarity's initial,
+    for every item list.
+- **English:** every screen state of the TAB screen and of a current summary,
+  in both layouts, renders byte-identical to UI-014.8 (a hand-run pixel
+  comparison of 40 states against the previous commit). The changes are the
+  deliberate ones of UI-014.D18 and D19, each confined to its rows.
+- **Spanish choices:** "Arsenal" for the Build tab, "Resumen" for Overview;
+  "Tiempo" for the time row; "sin bajas"; "Arma principal liberada"; the
+  compact stat names of D19; "con forja", "sin forja", "puede ir a la
+  Forja"; "Inventario" for the stash; "ninguna" under "Bendiciones (0)"
+  (`summary.blessings_none`), "ninguno" under the other lists.
+- **Tests:**
+  - `tests/screens/test_spanish_status.py` (new, unit tier): the name tables
+    complete for the data and English equal to what was drawn; every
+    Spanish name pinned; the TAB panes, the summary and the Sanctuary drawn
+    in both languages with their text checked where drawn; the Forging rows
+    through their tables, the "+n more" lines, the scroll lines, a
+    tag-damage item line; `_kv`'s geometry; the Sanctuary placement driven
+    through `MetaState`; the fit of the Spanish at the Victory screen and
+    the 1280x720 web profile (every text inside its area and alone, three
+    columns or four, both languages).
+  - `tests/screens/test_english_layout.py` with `english_layout.json` (new):
+    404 English texts with their rects -- TAB panes full and empty, the
+    summary in four, three and empty, the Sanctuary's upgrades -- captured
+    from UI-014.8's code and compared on every run. It holds what the old
+    strings drew, values and layout included; re-pin with `--write`.
+  - Updated: `test_regen.py` (`STAT_ROWS`), `test_data_readers.py`,
+    `test_locale_files.py` (the words that are the same in both languages),
+    `test_spanish_run.py` and `test_item_names.py` (the `[P]` tag, the
+    Spanish Build pane).
+- **Tests run:**
+  - Full default suite after the round-5 fixes: 3788 passed, 0 failed.
+  - Final full suite: 3790 passed, 0 failed, 0 skipped (18 min 41 s).
+  - A hand-run English pixel comparison of 40 screen states against
+    UI-014.8, after each round: the TAB panes and the current summaries are
+    identical; the differences are the D18/D19 rows.
+- **Cold critic loop:** eight rounds, a fresh critic each, with mutation
+  sweeps of about a thousand mutants over every changed line.
+  - Round 1: the Spanish synergy line and card titles overflowing at 1280;
+    the Sanctuary split into cells assuming a mono face; unpinned Spanish
+    tables; untested templates, forge rows, scroll lines, `_kv` geometry.
+  - Round 2: the split rows drifting a pixel in proportional faces (back to
+    one padded string); "ninguno" under "Bendiciones"; `_kv` shrinking a
+    value that freed nothing; weak test inputs.
+  - Round 3: the Spanish four elements running off the Victory column; the
+    Total's record marker, the empty lists and five bonus keys untested.
+  - Round 4: at the 1280 web profile, a ribbon title, subheaders and a
+    record marker overlapping (English overflowed there too).
+  - Round 5: a subheader trim that ate its "(n)" count; the fit test
+    measuring the column, not its area; the marker-drop steps unpinned.
+  - Rounds 6 and 7: the label gap after a dropped marker (now
+    `_LABEL_GAP`, pinned at its exact boundary); values and layout
+    constants unasserted (the English layout gate).
+  - Round 8: PASS. The survivors are equivalent (S() rounding, defaults
+    unchanged from the old code, comments).
+- **Left for UI-014.11:** the Run column trims "Kills" when a kill record,
+  a four-digit count and a long rate all meet; English does too.

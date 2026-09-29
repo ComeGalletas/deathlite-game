@@ -212,6 +212,13 @@ def item_name(item: Item, content) -> str:
     return locale.t("item.name_affix", **fields)
 
 
+def rarity_tag(rarity: str) -> str:
+    """`[C]`: the rarity's initial in the current language ([C]ommon,
+    [P]oco común), from the same `rarity.*` names the cards print, so a tag
+    and the rarity it stands for agree (UI-014.9)."""
+    return f"[{locale.name('rarity', rarity)[:1].upper()}]"
+
+
 def item_label(item: Item, content) -> str:
     """`item_name` behind the rarity tag, as the item lists show it."""
-    return f"[{item.rarity[:1].upper()}] {item_name(item, content)}"
+    return f"{rarity_tag(item.rarity)} {item_name(item, content)}"

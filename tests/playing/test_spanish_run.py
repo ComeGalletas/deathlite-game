@@ -199,9 +199,9 @@ class SpanishRunTests(unittest.TestCase):
 
     def test_the_tab_build_pane_shows_the_forged_weapon(self):
         seen = self.tab_text()
-        self.assertTrue(any(t.startswith("Mandoble  Lv") for t in seen), seen[:30])
-        self.assertIn("forged  -  Rompehordas", seen)
-        self.assertIn("Forging: Mandoble  -  Rompehordas", seen)
+        self.assertTrue(any(t.startswith("Mandoble  Nv.") for t in seen), seen[:30])
+        self.assertIn("con forja  -  Rompehordas", seen)            # UI-014.9
+        self.assertIn("Forja: Mandoble  -  Rompehordas", seen)
         desc = get_forges(self.C).get("greatsword").display_description
         self.assertTrue(any(desc.startswith(t) for t in seen if len(t) > 12), desc)
 
@@ -318,10 +318,12 @@ class SpanishRunTests(unittest.TestCase):
             meta._f = _Recorder(meta._f, seen)
             meta._small = _Recorder(meta._small, seen)
             meta.draw(pygame.Surface((1600, 900)))
-        self.assertIn(f"[U] {spanish} *", seen)                # " *": equipped
-        self.assertIn(f"{it.slot:<10} {spanish}", seen)         # the equipped line
+        # The tag is the Spanish rarity's initial: [P]oco común (UI-014.9).
+        self.assertIn(f"[P] {spanish} *", seen)                # " *": equipped
+        self.assertIn("accesorio", seen)                        # the equipped line:
+        self.assertIn(spanish, seen)                            # slot, then the item
         with mock.patch.object(self.ps.player, "equipment", [it]):
-            self.assertIn(f"[U] {spanish}", self.tab_text_labels())
+            self.assertIn(f"[P] {spanish}", self.tab_text_labels())
 
     def test_the_summary_equipment_rows_are_whole_items(self):
         # The victory / game-over "Equipped" list builds each name from the
@@ -334,7 +336,7 @@ class SpanishRunTests(unittest.TestCase):
             rows = self.ps._snapshot_summary(True)["equipment"]
         self.assertEqual(rows, [it.to_dict()])
         self.assertEqual(_item_name(rows[0])[0],
-                         "[U] Pulsera de viaje refinada de vitalidad")
+                         "[P] Pulsera de viaje refinada de vitalidad")
 
     def tab_text_labels(self):
         """The overview's kv labels (the item rows put the name there)."""

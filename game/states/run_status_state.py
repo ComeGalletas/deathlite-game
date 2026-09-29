@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import State
 from ui import widgets
 from ui.menu_nav import MenuNav
@@ -25,7 +25,7 @@ from ui.run_status import BlessingsPane, BuildPane, OverviewPane
 from ui.run_status import common as c
 
 PANES = ("overview", "build", "blessings")
-LABELS = {"overview": "Overview", "build": "Build", "blessings": "Blessings"}
+# A pane's tab reads `status.tab.<pane>` when drawn (UI-014.9).
 _MARGIN_X, _TOP, _BOTTOM = 60, 96, 56
 
 
@@ -101,18 +101,17 @@ class RunStatusState(State):
         hits = self._mouse.hits
         hits.clear()
         assets = getattr(self.game, "assets", None)
-        c.draw_tabs(surface, assets, panel, [LABELS[p] for p in PANES], self.tab,
+        c.draw_tabs(surface, assets, panel,
+                    [locale.t(f"status.tab.{p}") for p in PANES], self.tab,
                     self._fonts.ribbon, hits)
         area = pygame.Rect(panel.left + c.S(28), panel.top + c.S(c.RIBBON_H) // 2 + c.S(8 + 18),
                            panel.width - c.S(56), 0)
         area.height = panel.bottom - c.S(24) - area.top
         if self.playing is None:
-            t = self._fonts.row.render("no run", True, config.COLOR_TEXT_DIM)
+            t = self._fonts.row.render(locale.t("status.no_run"), True, config.COLOR_TEXT_DIM)
             surface.blit(t, t.get_rect(center=panel.center))
         else:
             self.pane.draw(surface, area, self.playing, hits)
 
-        hint = self._hint.render(
-            "TAB / ESC close   -   Left / Right or 1 2 3 switch pane   -   "
-            "Up / Down or wheel select", True, config.COLOR_TEXT_DIM)
+        hint = self._hint.render(locale.t("status.hint"), True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(w // 2, h - bottom // 2)))

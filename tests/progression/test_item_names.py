@@ -141,25 +141,28 @@ class NameTests(unittest.TestCase):
         self.assertTrue(name.endswith(affix["name"]), name)        # English affix
 
     def test_the_label_puts_the_rarity_tag_before_the_name(self):
-        locale.set_language("es")
         it = generate_item(C, seed=5, item_level=3)
-        self.assertEqual(item_label(it, C), f"[{it.rarity[0].upper()}] {item_name(it, C)}")
+        self.assertEqual(it.rarity, "uncommon")
+        self.assertEqual(item_label(it, C), f"[U] {item_name(it, C)}")
+        # The tag is the rarity's initial in the language shown (UI-014.9).
+        locale.set_language("es")
+        self.assertEqual(item_label(it, C), f"[P] {item_name(it, C)}")
 
     def test_the_summary_builds_names_and_keeps_a_legacy_dict(self):
         from ui.run_summary import _item_name
         locale.set_language("es")
         it = generate_item(C, seed=33, item_level=3)
         self.assertEqual(_item_name(it.to_dict())[0],
-                         "[U] Pulsera de viaje refinada de vitalidad")
+                         "[P] Pulsera de viaje refinada de vitalidad")
         # A summary written before items carried their parts.
         legacy = {"name": "Fine Traveller Band of Vitality", "rarity": "uncommon",
                   "slot": "accessory", "level": 3}
-        self.assertEqual(_item_name(legacy)[0], "[U] Fine Traveller Band of Vitality")
+        self.assertEqual(_item_name(legacy)[0], "[P] Fine Traveller Band of Vitality")
         self.assertEqual(_item_name("Bare string")[0], "Bare string")
         # A whole item saved before `base_id` existed is still built.
         old = it.to_dict()
         del old["base_id"]
-        self.assertEqual(_item_name(old)[0], "[U] Pulsera de viaje refinada de vitalidad")
+        self.assertEqual(_item_name(old)[0], "[P] Pulsera de viaje refinada de vitalidad")
 
     def test_the_summary_does_not_hide_a_naming_error(self):
         # Only the whole-item check falls back; a bug inside `item_name`

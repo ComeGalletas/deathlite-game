@@ -193,7 +193,7 @@ class MendingTests(unittest.TestCase):
 
 class BuildScreenTests(unittest.TestCase):
     def test_the_build_screen_lists_hp_regen_under_max_hp(self):
-        stats = [s for s, _l, _k in rc.STAT_ROWS]
+        stats = [s for s, _k in rc.STAT_ROWS]
         self.assertIn("hp_regen", stats)
         self.assertEqual(stats.index("hp_regen"), stats.index("max_hp") + 1)
 

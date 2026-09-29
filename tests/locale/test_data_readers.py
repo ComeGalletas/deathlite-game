@@ -204,7 +204,7 @@ class ScreenHelperTests(Spanish):
         w = Weapon("sword", dict(C.weapon("sword")))
         apply_forge(w, get_forges(C).get("whirlwind"))
         locale.set_language("es")
-        self.assertEqual(gate_text(w, 2, get_forges(C)), "forged  -  Área defensiva")
+        self.assertEqual(gate_text(w, 2, get_forges(C)), "con forja  -  Área defensiva")
 
     def test_the_hero_select_weapon_name(self):
         from game.states.character_select_state import CharacterSelectState
