@@ -60,9 +60,12 @@ def draw_world(ps, surface) -> None:
     levels = sorted({lvl for lvl, _d, _f in scenery}
                     | {lvl for lvl, _d, _f in actors}
                     | set(r.ground_levels()))
+    # The elemental passes' bodies and motes, sorted onto their terraces
+    # once for the whole frame rather than once per terrace (RND-008.4).
+    elemental = element_fx.bands(ps.run)
     for level in levels:
         r.draw_ground_band(surface, ps.camera, level)
-        draw_flat_effects(ps, surface, level)
+        draw_flat_effects(ps, surface, level, elemental)
         items = [(d, f) for lvl, d, f in scenery if lvl == level]
         items += [(d, f) for lvl, d, f in actors if lvl == level]
         items.sort(key=lambda t: t[0])
@@ -73,13 +76,14 @@ def draw_world(ps, surface) -> None:
     r.ghost_pass(surface, ps.camera)
 
 
-def draw_flat_effects(ps, surface, level: int) -> None:
+def draw_flat_effects(ps, surface, level: int, elemental=None) -> None:
     """Everything that lies flat on one terrace: interactables, hazard
     discs, gems, explosion rings, dust trails and the player's own shots.
 
     Filtered by level rather than drawn once, because they belong under the
     characters standing on their own terrace -- which is where they were
-    before the world was banded.
+    before the world was banded. `elemental` is the frame's
+    `element_fx.bands`, when `draw_world` sorted it once for every terrace.
     """
     ren = ps.renderer
     ren.interactables(surface, level)
@@ -96,7 +100,7 @@ def draw_flat_effects(ps, surface, level: int) -> None:
     ps._draw_player_projectiles(surface, level)   # patchable: the order test hooks it
     # The elemental state of this terrace, last of the flat effects so it
     # sits directly under the sprites standing on the same band (M10 rule 3).
-    element_fx.draw_under(surface, ps.run, level)
+    element_fx.draw_under(surface, ps.run, level, bands=elemental)
 
 
 def actor_items(ps) -> list:

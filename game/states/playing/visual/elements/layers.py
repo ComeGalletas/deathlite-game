@@ -25,6 +25,10 @@ _STATUS_LIFT = 12
 _STATUS_STEP = 9
 _STATUS_ALPHA = 215
 
+# How far past the view (world px) a body's aura and marks are still drawn:
+# a body just off screen can have art reaching into it.
+VIEW_PAD = 140
+
 # Slowed and frozen have no authored art; these are their shapes.
 _SLOW_SHAPE = ((0.0, 0.0), (0.5, 0.55), (1.0, 0.0), (1.0, 0.35),
                (0.5, 0.9), (0.0, 0.35))
@@ -36,22 +40,36 @@ _FREEZE_COLOUR = (215, 240, 255)
 _BURN_COLOUR = (255, 150, 70)
 
 
-def draw_auras(surface, run, visuals, now: float, budget, level=None) -> int:
+def in_band(run, level):
+    """The bodies these passes paint on terrace `level` (all of them when
+    `level` is None), in `_bodies` order: in view, and standing on that
+    terrace. `elements.bands` sorts a whole frame's bodies this way once,
+    rather than once per terrace (RND-008.4)."""
+    from game.states.playing.visual.elements.transient import off_band
+
+    view = run.camera.visible_rect().inflate(VIEW_PAD, VIEW_PAD)
+    return [body for body in _bodies(run)
+            if view.collidepoint(body.pos.x, body.pos.y)
+            and not off_band(run, level, body.pos)]
+
+
+def draw_auras(surface, run, visuals, now: float, budget, level=None,
+               bodies=None) -> int:
     """One pass over the live bodies. Returns how many auras were drawn.
 
     Called once per terrace band, so a body's aura is painted with the
     ground it stands on and ends up *under* the body itself (M10 rule 3).
-    """
-    from game.states.playing.visual.elements.transient import off_band
+    `bodies` is that band's `in_band` list when the caller has sorted the
+    frame already; without it the pass sorts its own.
 
+    The order matters beyond the picture: an aura's shed draws on
+    `run.rng`, so the bodies are visited in `_bodies` order, band by band.
+    """
     cam = run.camera
-    view = cam.visible_rect().inflate(140, 140)
     drawn = 0
-    for body in _bodies(run):
+    for body in in_band(run, level) if bodies is None else bodies:
         state = getattr(body, "elemental", None)
-        if state is None or not view.collidepoint(body.pos.x, body.pos.y):
-            continue
-        if off_band(run, level, body.pos):
+        if state is None:
             continue
         element = state.element(now)
         if element:
@@ -62,16 +80,13 @@ def draw_auras(surface, run, visuals, now: float, budget, level=None) -> int:
     return drawn
 
 
-def draw_statuses(surface, run, visuals, now: float, level=None) -> None:
-    from game.states.playing.visual.elements.transient import off_band
-
+def draw_statuses(surface, run, visuals, now: float, level=None,
+                  bodies=None) -> None:
+    """The status marks of one band's bodies; `bodies` as `draw_auras`."""
     cam = run.camera
-    view = cam.visible_rect().inflate(140, 140)
-    for body in _bodies(run):
+    for body in in_band(run, level) if bodies is None else bodies:
         status = getattr(body, "status", None)
-        if status is None or not view.collidepoint(body.pos.x, body.pos.y):
-            continue
-        if off_band(run, level, body.pos):
+        if status is None:
             continue
         sx, sy = cam.world_to_screen(body.pos)
         # Freeze is not a mark over the head: it is the body encased, so it
@@ -214,12 +229,32 @@ def _burn_mark(surface, visuals, sx, sy, zoom) -> None:
     them at all, and it has to look the same either way."""
     frame = visuals.status_frame("burn")
     if frame is not None:
-        scaled = pygame.transform.smoothscale(
-            frame, (max(4, int(frame.get_width() * 0.34 * zoom)),
-                    max(6, int(frame.get_height() * 0.34 * zoom))))
+        scaled = _scaled(frame, (max(4, int(frame.get_width() * 0.34 * zoom)),
+                                 max(6, int(frame.get_height() * 0.34 * zoom))))
         surface.blit(scaled, scaled.get_rect(midbottom=(int(sx), int(sy))))
         return
     markers.draw(surface, "flame", sx, sy, 6 * zoom, _BURN_COLOUR, _STATUS_ALPHA)
+
+
+# (id(frame), size) -> (frame, scaled). A burning crowd asks for the same
+# few flame frames at one size every frame; `smoothscale` is deterministic,
+# so a kept copy is the same picture (RND-008.4). The source is kept in the
+# entry so its id cannot be recycled under the cache, as `elements.washed`
+# does.
+_SCALED: dict[tuple, tuple] = {}
+_SCALED_CAP = 256
+
+
+def _scaled(frame: pygame.Surface, size: tuple[int, int]) -> pygame.Surface:
+    key = (id(frame), size)
+    hit = _SCALED.get(key)
+    if hit is not None and hit[0] is frame:
+        return hit[1]
+    if len(_SCALED) >= _SCALED_CAP:
+        _SCALED.clear()
+    out = pygame.transform.smoothscale(frame, size)
+    _SCALED[key] = (frame, out)
+    return out
 
 
 def _slow_mark(surface, visuals, sx, sy, zoom) -> None:

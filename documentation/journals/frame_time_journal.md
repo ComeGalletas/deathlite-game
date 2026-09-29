@@ -241,12 +241,15 @@ Each task names the number it has to move. "Before" is the rerun above.
     hand each band its bucket. Today each of the three band passes tests
     every body and particle with `off_band`.
   - Cache the `_shape` status marks per (shape, size, colour, alpha).
+    *Dropped: a cached mark differs by an edge pixel in 31 of 60,000
+    positions (see Results).*
   - Cache plain damage-number glyphs, as the outlined ones already are.
   - Tests: pixel-identical frames for a primed crowd across terrace
     bands, and the same draw order (auras under bodies, reactions on
     top).
   - Outcome: the infused-minus-packed draw gap at 2560 × 1080 halved or
-    better (RND-008.2 baseline: 15.99 − 10.22 = 5.77 ms p50).
+    better (RND-008.2 baseline: 15.99 − 10.22 = 5.77 ms p50). *Missed:
+    about −20 %; see Results.*
 - **RND-008.5: Update, re-measured, then decide on bump.**
   - With the harness fixed: stationary versus jittered hero, frozen
     master, 60 / 100 / 150 packed. Take a cProfile of `ps.update`.
@@ -271,7 +274,7 @@ Each task names the number it has to move. "Before" is the rerun above.
 - [x] RND-008.1: This journal, with the reviewed findings and the report; the index row
 - [x] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
 - [x] RND-008.3: No font built during a run's draw (hints, keycaps, interact key, and the pause menu's Controls block); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
-- [ ] RND-008.4: Elemental draw: bodies bucketed by band once a frame; cached status-mark shapes; cached plain damage-number glyphs
+- [x] RND-008.4: Elemental draw: bodies and motes sorted onto their terraces once a frame; the burn flame scaled once; plain damage-number glyphs kept. The status-mark shape cache was dropped (it changes edge pixels). **Outcome missed: the gap fell about 20 %, the target was 50 %** (owner to decide, see Results)
 - [ ] RND-008.5: Update re-measured with a stationary hero and frozen master; the bump decision, and the cheap wins if taken
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
 - [ ] RND-008.7: Results, before and after; index to done
@@ -576,6 +579,160 @@ Each task names the number it has to move. "Before" is the rerun above.
   registered in `tests/conftest.py`, so they run in the every-save `unit`
   tier. That is outside RND-008. It was raised as a separate task, which
   the owner started in its own session.
+
+### RND-008.4: the elemental draw
+
+- **What changed:**
+  - `elements.bands(run)` sorts the bodies in view and the aura motes onto
+    their terraces once a frame. `scene.draw_world` calls it before the
+    terrace loop and passes it down through `draw_flat_effects` to
+    `draw_under`, which hands each pass its terrace's list.
+    - Before, each terrace's pass filtered the whole field with
+      `transient.off_band`: every body in view twice (the aura and status
+      passes) and every mote once. That was about 820 terrain lookups a
+      frame in the harness's packed, primed fight (164,557 calls over 200
+      profiled frames).
+    - Nothing is kept between frames, so the display re-open's off-screen
+      warm-up draw, which skips `begin_frame`, cannot see a stale sort.
+  - `layers.in_band` is the filter the passes used to run, in one place.
+    `draw_auras` and `draw_statuses` take the band's `bodies`, or filter
+    for themselves when called without them (the tests, `level=None`).
+    `VIEW_PAD` (140) replaces the two copies of the pad.
+  - `ParticleSystem.layer` and `draw(..., only=)`: a terrace draws its own
+    motes instead of testing the whole pool.
+  - `layers._scaled`: the burn flame's `smoothscale` is kept per source
+    surface and size. It is deterministic, so the copy is the same picture.
+    The source is held in the entry, as `washed` does, so a recycled id
+    cannot be served another surface's copy.
+  - `DamageNumbers._plain`: a weapon's plain numbers are rendered once per
+    font, text and colour, like the outlined ones already were. The alpha
+    is set on the shared glyph right before each blit.
+- **The order is gameplay.** `layers._shed` draws on `run.rng` once per
+  aura drawn, so the sort keeps `_bodies` order (boss first, then the
+  enemy list) inside each terrace, and the terraces are painted in the
+  same order.
+  - The one thing that adds a mote during the loop is that shed. It bursts
+    at the body's own position, whose terrace has already drawn its motes,
+    so the mote waits for the next frame on either path. `layers._shed` is
+    the only `under=True` emitter in the code.
+- **Dropped: caching the status marks' shapes.** `_shape` computes its
+  polygon from absolute screen position, then makes it relative. A cached
+  copy built at the origin differed by an edge pixel in 31 of 60,000
+  random positions (`scratchpad/shape_float.py`), so it would break the
+  pixel-identity rubric for about 0.3 ms. Reusing a scratch surface
+  instead of allocating one buys nothing either: allocating is as cheap as
+  clearing (0.27 against 0.25 µs at 24 px, 2.33 against 2.11 µs at 200 px).
+- **Pixels and the game do not change.**
+  - `scratchpad/frame_identity.py` fingerprinted 150 consecutive frames of
+    the harness's primed fight, update and draw, in `HEAD` and in this tree.
+    Each frame recorded its pixels, the run's RNG, the global RNG, and the
+    particle, number and aura counts. All 150 were equal on every field.
+  - The fingerprint needs the terrain renderer's clock pinned
+    (`renderer.clock`). Left on the wall clock, the same tree fingerprinted
+    differently in two processes (8 of 150 frames equal), which a first
+    comparison mistook for a change.
+  - The cold critic repeated the check on its own probe (seeded RNGs,
+    `PYTHONHASHSEED=0`, jittered frames): the chained hash matched.
+- **Tests:** `tests/render/test_elemental_draw_cost.py`, 13 tests. The
+  fight class boots the harness on seed 35 (`integration`); the cache
+  classes boot nothing (`unit`). They pin:
+  - the fixture covers what the sort must get right: bodies on all three
+    terraces, the boss first in its terrace, and a bumblebee hovering
+    where the floor under it is not the top of the terrain (the actor pass
+    bands a flyer by the top, the elemental passes by the floor);
+  - a pass picks exactly what the old per-pass filter picked, written out
+    in the test as the oracle, with a body moved out of view (an
+    off-screen aura draws nothing but would still shed);
+  - each terrace's bodies and motes are exactly what its own pass picks,
+    in the same order;
+  - the auras shed in the same body order, sorted or not;
+  - a frame sorts once (`in_band` called with `None` only), not once per
+    terrace;
+  - a whole frame is the same picture sorted and unsorted, and stable;
+  - the burn mark scales its flame once over two draws, to the same pixels
+    as a fresh scale;
+  - the kept flame is never served for another surface, and its store is
+    bounded;
+  - kept number glyphs draw what fresh renders draw, cold and warm, as the
+    alphas fall, with two numbers sharing a glyph at different alphas;
+  - a glyph is rendered once.
+  - `tests/render/test_element_layers.py`: its trace helper forwards the
+    new `bands` keyword.
+  - **Mutation check** (`scratchpad/mutate4.py`): all seven were caught.
+
+    | Behaviour put back or broken | Tests failed |
+    |---|---|
+    | the passes filter their own terrace again (the sort ignored) | 1 |
+    | the bodies sorted out of order | 6 |
+    | a terrace's motes lost | 3 |
+    | the bodies sorted without the view | 2 |
+    | the burn mark scaling its flame afresh every draw | 1 |
+    | a kept flame served for another surface | 1 |
+    | a shared glyph taking a number's alpha only the first time | 3 |
+
+  - Suites: `tests/render` + `tests/playing` 797 passed (412 subtests)
+    before the critic's fixes, and 798 passed (415 subtests) in 6 min 1 s
+    on the final code. The 150-frame fingerprint was re-run on the final
+    code too: equal to `HEAD` on every frame.
+- **The cold critic** returned FAIL on coverage, not on correctness. It
+  confirmed the identity with `HEAD` on its own probe and found no path
+  where the sort differs from the per-pass filters. Fixed:
+  - the burn cache had no test of its wiring (reverting `_burn_mark` to a
+    per-call `smoothscale` passed every test);
+  - the fixture stood on two terraces, not three, with no boss and no
+    flyer;
+  - this journal still planned the shape cache without saying it was
+    dropped;
+  - the sort ran even in a run with no elemental visuals;
+  - a docstring miscounted the old lookups;
+  - `_plain` used another cache's cap.
+- **Measured.** Windows renderer, 2560 × 1080, 100 packed, seed 35, 240
+  frames, `HEAD` (the RND-008.3 commit) and this tree alternating in one
+  sitting, CPU load 7 to 32 %.
+
+  Harness draw p50:
+
+  | Round | Before, plain | Before, infused | After, plain | After, infused |
+  |---|---|---|---|---|
+  | 1 | 7.84 ms | 11.21 ms | 7.83 ms | 10.47 ms |
+  | 2 | 7.81 ms | 10.86 ms | 7.68 ms | 11.07 ms |
+
+  Per part (`scratchpad/sections.py`, light `perf_counter` wrappers, mean
+  of 240 frames, the same two rounds):
+
+  | Part, infused fight | Before | After |
+  |---|---|---|
+  | `draw_under`, three terraces (after includes the 0.09 ms sort) | 1.95 / 1.94 ms | 1.44 / 1.47 ms |
+  | status marks | 0.74 / 0.75 ms | 0.45 / 0.46 ms |
+  | auras | 0.70 / 0.70 ms | 0.51 / 0.52 ms |
+  | aura motes | 0.16 / 0.16 ms | 0.05 / 0.05 ms |
+  | damage numbers | 0.37 / 0.37 ms | 0.35 / 0.35 ms |
+  | whole draw | 11.02 / 11.07 ms | 10.40 / 10.53 ms |
+  | `draw_under`, plain pack (after includes the sort) | 0.41 / 0.41 ms | 0.13 / 0.12 ms |
+
+  - **Outcome missed.** By the whole-draw means, the infused-minus-plain
+    gap went from 2.58 / 2.83 ms to 1.91 / 2.40 ms, about −20 % against a
+    target of −50 %. The saving is real and stable: about 0.5 ms off the
+    elemental draw and 0.3 ms off the plain one, which the gap metric
+    does not show.
+  - **Why the target was wrong.** The 5.77 ms baseline gap was taken
+    under heavy CPU load. The plan's hot spots came from cProfile, whose
+    per-call overhead inflates exactly the Python-heavy filtering this
+    removed. On a quieter machine the gap is about 2.5 to 3 ms.
+  - Measured by part, what remains of it (infused minus plain) is:
+    - the art that has to be drawn: aura sprites 0.5 ms, status marks and
+      freeze blocks 0.45 ms, Wind areas 0.28 ms, jump arcs 0.2 ms;
+    - the health bars of damaged enemies, 0.4 ms (already cached, so this
+      is their blits);
+    - the damage numbers, 0.35 ms;
+    - the reaction bursts, 0.15 ms.
+  - None of it is filtering any more. No pixel-identical change left in
+    the elemental draw is worth more than about 0.2 ms. The next saving
+    would have to draw less, which changes the picture, and that is the
+    owner's call.
+  - The larger costs in the frame lie elsewhere: the terrain's ground
+    bands take 3.4 ms of a 10.5 ms draw, and update takes 8 to 10 ms at
+    100 packed. That is RND-008.5's ground.
 
 ## RND-008: Method
 

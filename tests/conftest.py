@@ -139,6 +139,8 @@ INTEGRATION = (
     "tests/devtools/test_spawn_stress.py::CommandLineTests",
     # RND-008.3: a whole run's draw, three booted runs.
     "tests/playing/test_frame_fonts.py",
+    # RND-008.4: the harness's packed, primed fight; the cache checks stay unit.
+    "tests/render/test_elemental_draw_cost.py::TerraceSortTests",
 )
 
 
