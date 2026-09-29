@@ -202,6 +202,16 @@ the totals, so these are shares, not budgets:
   shipped path (Confirmed reading, item 3).
 - **RND-008.D6: Weapon-loop work is deferred.** It was not re-run, and
   every measured cost above it is larger.
+- **RND-008.D7: RND-008.4 is accepted at about −20 %** (owner,
+  2026-09-29), short of its −50 % target, with a condition: a full test
+  at the end of RND-008 checks the elemental fight again alongside
+  everything else (RND-008.8).
+  - Asked on accepting it: does RND-008.4 lengthen loading? No. The sort
+    runs inside each frame's draw, and the two caches fill on first use
+    during play. Nothing on the loading path changed.
+  - Measured, loading to the run's first frame, seed 35, three runs each,
+    alternated: RND-008.3 3.84 to 4.04 s, RND-008.4 3.94 to 4.01 s. The
+    first frame took 7.4 to 9.0 ms either way.
 
 ## RND-008: Plan
 
@@ -278,6 +288,7 @@ Each task names the number it has to move. "Before" is the rerun above.
 - [ ] RND-008.5: Update re-measured with a stationary hero and frozen master; the bump decision, and the cheap wins if taken
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
 - [ ] RND-008.7: Results, before and after; index to done
+- [ ] RND-008.8: The full test at the end (D7). The whole suite, `sweep` included, on the final branch, and the harness workloads (plain, infused, hints on and off, bump) against the RND-008.1 base in one sitting, with RND-008.4's accepted −20 % re-checked in the elemental fight. Loading time is compared too.
 
 ## RND-008: Results
 
