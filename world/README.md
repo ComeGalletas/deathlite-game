@@ -373,13 +373,16 @@ instead of surf, keyed **directly** by the open sides: `"" → 15`, `"n" → 6`,
 
 - `slots.ramp` — `"w": [36, 45]`, `"e": [39, 48]` are the east/west wedge
   (top tile, bottom tile) by descent side; `"s"` / `"n"` → `[17, 17]` is the
-  grass channel piece a straight flight lays. `TileSheets.channel_halves`
-  splits it for the north flight, which straddles the seam between the rim
-  and the landing.
+  grass channel piece a straight flight lays. `TileSheets.channel_landing`
+  is its upper half, the part a grass north flight shows on its landing.
 - `vstair` — a separate sheet of stone flights (`vstairs.png`, one column,
   with `sheets` per drop). `TileSheets.vstair_sprite(drop, north)` is the
-  stone drawn on a `"rock"` flight; `vstair_seam` is where it sits on a north
-  flight.
+  stone drawn on a `"rock"` flight; `vstair_landing` is the north half of
+  the flipped sprite, the part a rock north flight shows on its landing.
+- A north flight is a **door** in the frontier between two floors
+  (WLD-014): its rim cell is plain interior grass, so the rim's lip breaks
+  there, and only the landing half of the channel or stone is drawn, on the
+  low floor's band. Nothing of it covers the rim.
 
 ### Bridges (`bridge`)
 

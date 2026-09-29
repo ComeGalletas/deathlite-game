@@ -387,7 +387,7 @@ and a body steps east and west off the flight cell onto the plateau.
 
 ## WLD-014 — Tasks
 
-- [ ] WLD-014.1 — Painter: draw only the landing half of the stone flight
+- [x] WLD-014.1 — Painter: draw only the landing half of the stone flight
   and of the grass channel, on the low band; paint the rim cell as plain
   interior grass for both tags (D1, D2). `sheets.vstair_seam` /
   `channel_halves` keep only what is used. Painter test rewritten: rim
@@ -404,3 +404,46 @@ and a body steps east and west off the flight cell onto the plateau.
 - [ ] WLD-014.4 — Screenshot of a rock and a grass north flight on the
   seed 35 island used for NS-6/NS-7, before and after; journal results and
   close WLD-014 in `INDEX.md`.
+
+### WLD-014.1 — What landed (2026-09-29)
+
+- `world/terrain/sheets.py`: `vstair_seam` and `channel_halves`, which
+  returned both halves, are replaced by `vstair_landing(drop)` (the flipped
+  sprite's north half, the foot end) and `channel_landing(sheet, idx)` (the
+  channel tile's upper half). Each returns only the part that is drawn.
+- `world/terrain/grid_paint.py`: `paint_seams` became `paint_doors`. For
+  both tags it lays the plateau sheet's plain interior tile over the rim
+  cell on the plateau's band, then the landing half on the landing's lower
+  half on the low band. Nothing goes on the rim. `_floor_sides` needed no
+  change: the flanking rim cells already keep their north lip and do not
+  fringe toward the flight, so the lip runs up to the door on each side and
+  stops.
+- A two-level flight takes the same path; its landing half is the top
+  64 px of the 64x128 flipped sprite, a whole tile (D2).
+- `world/README.md` flights section brought to the door.
+- Tests (`tests/world/test_north_flights.py::PainterTests`), replacing the
+  NS-6/NS-7 seam test:
+  - `test_the_door_shows_on_the_landing_only_and_casts_no_shadow`: on every
+    north flight of seeds 35 and 7, the rim tile on the plateau band is the
+    interior tile byte for byte; every opaque pixel of the landing half is
+    the baked pixel on the low band (exact for the channel, within 8 per
+    channel for the smoothscaled stone); the plateau band is clear over
+    the landing; the landing's upper half is opaque ground; no shadow; both
+    tags seen per seed.
+  - `test_the_flanking_rim_keeps_its_lip`: the cells either side of a door
+    are not the interior tile, so the lip breaks at the door only.
+  - `test_a_two_level_door_fills_the_whole_landing`: a shipped rock flight
+    deepened to drop 2 and its island repainted with
+    `paint_room_levels`.
+- **Mutation check.** Four mutants of `paint_doors`, each restoring one
+  piece of the old painting, were all caught by the painter tests: the rock
+  rim keeping its lip, the half also drawn over the rim, the half on the
+  plateau band, the half not drawn.
+- **Digests.** `bake` moved on all four digest seeds and `draw` on three;
+  no layout, obstacle or navigation stage moved. Re-pinned.
+- **Run.** `tests/world` 390 passed; `tests/render/test_terrain.py`,
+  `tests/flows/test_loading.py` and `tests/flows/test_run_determinism.py`
+  (the other readers of the baked terrain) 75 passed.
+- **Screenshot delivered:** seed 35, room 0, the rock flight at (20, 6) and
+  the grass flight at (11, 8), before and after.
+
