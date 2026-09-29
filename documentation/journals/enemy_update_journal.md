@@ -112,7 +112,7 @@ Inside the movement probe (`walk_parts.py`, same crowd):
 
 - [x] ENT-018.1: This journal; the index row
 - [x] ENT-018.2: Separation drops far candidates on floats first, bit for bit the same
-- [ ] ENT-018.3: The floor index for the collider's lookups, bit for bit the same
+- [x] ENT-018.3: The floor index for the collider's lookups, bit for bit the same
 - [ ] ENT-018.4: Re-measure by part; decide on what is left
 - [ ] ENT-018.5: Results, fingerprint, suites
 
@@ -140,4 +140,51 @@ Inside the movement probe (`walk_parts.py`, same crowd):
   - a dead neighbour pushing.
 - `tests/entities`: 356 passed. The tier audit passes.
 - Its timing is taken with ENT-018.3's, in ENT-018.4.
+
+### ENT-018.3: the floor index
+
+- `world/rules/floor.py` `FloorIndex`: per 256 px square of the world, the
+  islands and bridges whose bounds reach it, in `layout` order.
+  `room_of`, `in_corridor`, `point_on_floor` and `inset_at` take an
+  optional `index`, and test only its candidates with the unchanged
+  condition.
+- **The keying follows each test.**
+  - An island's bounds compare as floats, so it is keyed by the floored
+    point.
+  - A bridge goes through `Rect.collidepoint`, which truncates a float
+    toward zero (probed: −0.5 is on a bridge that starts at 0, and −1.0
+    is not; −20.5 is on one that starts at −20; nan and inf are on
+    nothing). So a bridge is keyed by the truncated point.
+  - A point that cannot be keyed is handed the whole list: the old
+    answer.
+- `GameMap._floor_index()` builds it on first use, and rebuilds it if the
+  map is handed another layout. `_point_ok`, `on_bridge`, `_room_of` and
+  `inset_at` pass it.
+  - Only world generation edits islands, cells or bridges (`world/gen/`,
+    checked by search). The run's map is created from the finished layout
+    (`loading_state.py:88`), or generates it in its constructor before
+    assigning `self.layout`. The index can never see a layout still being
+    built.
+  - The navigation grid's build keeps calling the rule without it.
+- **Tests:** `tests/world/test_floor_index.py`, 7 tests (`world` tier). It
+  pins, answer for answer against the unindexed rule (`room_of` by
+  identity):
+  - the four pinned worlds on a 53 px grid, and every island and bridge
+    edge and square boundary at −0.5, −1e-9, 0, +1e-9 and +0.5;
+  - a hand-drawn layout for the keying: a bridge at the origin and one at
+    −520, and an island in negative coordinates, plus nan and inf;
+  - the collider's four lookups against the rule;
+  - every collider lookup carries the index (the saving: without it the
+    answers are the same);
+  - a new layout gets a new index.
+  - It takes about 8 s, 7 of them the four world builds, which other
+    `world` tests share in a full run.
+- **Mutations** (`scratchpad/mutate_e3.py`), all five caught:
+  - an island's last square left out;
+  - a bridge keyed by the floored point;
+  - an unkeyable point raising;
+  - an index kept across a new layout;
+  - the collider asking without its index.
+- **Suites:** `tests/world`, `tests/playing`, `tests/entities` and
+  `tests/flows` gave 1,209 passed (1,852 subtests) in 16 min 54 s.
 
