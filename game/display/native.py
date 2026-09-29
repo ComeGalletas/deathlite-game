@@ -8,9 +8,11 @@ minimum size to the logical size, and in windowed mode turns on SDL's
 and unscaled with the mouse mapped offset-only. Two SDL calls undo that
 (journal "Dynamic window scaling", probes #2 and #3, 2026-09-15). The
 usable desktop bounds and the display DPI are the other two things the
-fit rule wants and pygame cannot say. `system_cursor_ink_height` is the
-one thing here that is not about the window: the size the desktop draws
-its own arrow at, so the in-game arrow can match it.
+fit rule wants and pygame cannot say. Two things here are not about the
+window: `system_cursor_ink_height`, the size the desktop draws its own
+arrow at, so the in-game arrow can match it; and `honor_timer_resolution`,
+which keeps Windows 11 from setting aside the 1 ms timer the frame cap
+sleeps on while the process is hidden and silent (SYS-011).
 
 Every function here returns `False` / `None` on any failure and logs why:
 a missing symbol or an odd driver degrades one capability, never the
@@ -185,6 +187,87 @@ def set_window_size(width: int, height: int, centre: bool = True) -> bool:
     except Exception as exc:
         log.info("SDL_SetWindowSize failed (%s)", exc)
         return False
+
+
+# --- the frame cap's timer (SYS-011) -------------------------------
+# `Clock.tick` sleeps through `SDL_Delay`, which is `Sleep()` on Windows,
+# and SDL asks for a 1 ms timer when it starts. From Windows 11 a process
+# that owns a window but is neither visible nor audible may have that
+# request set aside: every sleep then rounds to the ~15.6 ms default, and
+# `tick(62)` holds each frame at about 31 ms. A headless run with the dummy
+# audio driver qualifies (pygame owns hidden message-only windows), and so
+# does a minimized window with no audio device. One policy switch asks
+# Windows to always honor the request (journal `timer_resolution_journal.md`).
+_PROCESS_POWER_THROTTLING = 4                 # PROCESS_INFORMATION_CLASS
+_THROTTLING_VERSION = 1                       # ..._CURRENT_VERSION
+_IGNORE_TIMER_RESOLUTION = 0x4                # PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION
+
+
+class _PowerThrottling(ctypes.Structure):
+    _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong),
+                ("StateMask", ctypes.c_ulong)]
+
+
+def _kernel32():
+    """kernel32 with its own function prototypes: a private handle, so the
+    argtypes set here never leak into `ctypes.windll` for other callers."""
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.GetCurrentProcess.restype = ctypes.c_void_p
+    for name in ("SetProcessInformation", "GetProcessInformation"):
+        fn = getattr(k32, name)
+        fn.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong]
+        fn.restype = ctypes.c_int
+    return k32
+
+
+def _set_throttling(control: int, state: int) -> bool:
+    """Set this process's power-throttling policy: `control` names the
+    mechanisms the process decides itself, `state` which of those are on;
+    `(0, 0)` hands every one back to Windows. True when Windows took it.
+    Used by `honor_timer_resolution`, and by the tests and the eval to put
+    the automatic case back or force it."""
+    if sys.platform != "win32":
+        return False
+    try:
+        k32 = _kernel32()
+        policy = _PowerThrottling(_THROTTLING_VERSION, control, state)
+        ok = k32.SetProcessInformation(k32.GetCurrentProcess(), _PROCESS_POWER_THROTTLING,
+                                       ctypes.byref(policy), ctypes.sizeof(policy))
+    except (AttributeError, OSError) as exc:     # no such API: Windows 7, an odd build
+        log.info("process power throttling unavailable (%s)", exc)
+        return False
+    if not ok:
+        log.info("process power throttling refused (Windows error %d)",
+                 ctypes.get_last_error())
+        return False
+    return True
+
+
+def _throttling() -> tuple[int, int] | None:
+    """`(control, state)` as this process last set them, None where it
+    cannot be read. Windows' own automatic decisions are not reported here:
+    this reads the process's explicit policy only."""
+    if sys.platform != "win32":
+        return None
+    try:
+        k32 = _kernel32()
+        policy = _PowerThrottling(_THROTTLING_VERSION, 0, 0)
+        if not k32.GetProcessInformation(k32.GetCurrentProcess(), _PROCESS_POWER_THROTTLING,
+                                         ctypes.byref(policy), ctypes.sizeof(policy)):
+            return None
+    except (AttributeError, OSError):
+        return None
+    return policy.ControlMask, policy.StateMask
+
+
+def honor_timer_resolution() -> bool:
+    """Ask Windows to always honor this process's timer resolution request,
+    so the frame cap sleeps at 1 ms granularity even while the window is
+    hidden and nothing is audible. Changes nothing the process asks for,
+    only whether Windows may set it aside. True when Windows took it; False
+    off Windows or on a Windows without the policy (before Windows 11 the
+    request is never set aside, so there is nothing to lose there)."""
+    return _set_throttling(_IGNORE_TIMER_RESOLUTION, 0)
 
 
 # --- the system cursor ---------------------------------------------

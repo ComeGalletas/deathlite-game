@@ -18,7 +18,7 @@ import pygame
 from game import config, save as save_mod
 from game.assets import get_assets
 from game.content import get_content
-from game.display import DisplayWindow
+from game.display import DisplayWindow, native
 from game.events import EventBus, Events
 from game.state import StateMachine
 from progression.meta import MetaCatalog
@@ -34,6 +34,11 @@ log = logging.getLogger(__name__)
 class Game:
     def __init__(self, save_path=None, trace_path=None) -> None:
         DisplayWindow.prepare()             # SDL hints: before init
+        # The frame cap sleeps on the 1 ms timer SDL asks for; Windows 11 may
+        # set that aside while the process is hidden and silent, and every
+        # frame then holds ~31 ms (SYS-011). Process-wide, so any order works.
+        self.timer_honored = native.honor_timer_resolution()
+        log.info("timer resolution request always honored: %s", self.timer_honored)
         pygame.init()
         pygame.display.set_caption(config.TITLE)
         self._set_icon()                    # before the window: SDL reads it there
