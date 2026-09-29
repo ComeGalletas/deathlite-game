@@ -61,14 +61,19 @@ def inset(assets, *, frame: str) -> int | None:
 
 
 def bar(assets, *, frame: str, fill: str, empty: str, width: int,
-        fraction: float, framed: bool = True, scale: int = 1):
+        fraction: float, framed: bool = True, scale: int = 1,
+        resample: float = 1.0):
     """A finished bar Surface, or `None` when the art is missing.
 
     `width` is the bar's outer width in **native** px (the housing's art box
     rebuilt to that length); the result is `scale`d up from there, so a x3 bar
     moves its fill in 3-px screen steps and keeps a clean pixel grid.
+    `resample` then smooth-scales the finished bar by a fraction (below
+    interface scale 1, where rounding the whole scale down would cost too
+    much size: UI-016.D6); 1.0 keeps the grid.
     """
     width, scale = int(width), max(1, int(scale))
+    resample = float(resample)
     fraction = max(0.0, min(1.0, float(fraction)))
     well = _well(assets, frame)
     housing = assets.image(frame)
@@ -78,7 +83,7 @@ def bar(assets, *, frame: str, fill: str, empty: str, width: int,
     wx, wy, ww, wh = well
     track = width - (housing.get_width() - ww)
     filled = round(track * fraction)
-    key = (frame, fill, empty, width, filled, framed, scale)
+    key = (frame, fill, empty, width, filled, framed, scale, resample)
     if key in _cache:
         return _cache[key]
 
@@ -108,6 +113,10 @@ def bar(assets, *, frame: str, fill: str, empty: str, width: int,
     if scale != 1:
         out = pygame.transform.scale(
             out, (out.get_width() * scale, out.get_height() * scale))
+    if resample != 1.0:
+        out = pygame.transform.smoothscale(
+            out, (max(1, round(out.get_width() * resample)),
+                  max(1, round(out.get_height() * resample))))
 
     if len(_cache) >= _CACHE_MAX:
         _cache.clear()

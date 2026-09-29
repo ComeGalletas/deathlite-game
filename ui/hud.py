@@ -27,6 +27,21 @@ from ui import bars, scale
 from ui import text as uitext
 
 
+def bar_scale() -> tuple[int, float]:
+    """`(whole scale, resample)` the HUD's pixel-art bars are drawn at.
+
+    At interface scale 1 and above: the design scale times the interface
+    scale, rounded to a whole number (`ui/scale.int_scale`), so the bars
+    keep a whole-pixel grid (x5 for x4.8 at 1.6, +4%). Below 1 rounding
+    would cost too much (x2 for x2.4 at the web profile's 0.8, -17%), so
+    the bar is built at the design scale and resampled by the interface
+    scale: exactly 80% on web, slightly soft (UI-016.D6)."""
+    k = scale.factor()
+    if k < 1.0:
+        return int(config.HUD_BAR_SCALE), k
+    return scale.int_scale(config.HUD_BAR_SCALE), 1.0
+
+
 class HUD:
     def __init__(self) -> None:
         self._font = fonts.body(18)
@@ -40,26 +55,26 @@ class HUD:
         False when the sheets are missing, so `draw` can fall back."""
         assets = get_assets()
         frac = 0.0 if player.max_hp <= 0 else max(0.0, player.hp / player.max_hp)
-        # Pixel-art bars keep a whole-pixel grid: the art scale is the design
-        # scale times the render scale, rounded (`ui/scale.int_scale`).
-        art_scale = scale.int_scale(config.HUD_BAR_SCALE)
+        # Pixel-art bars keep a whole-pixel grid at scale 1 and above, and
+        # are resampled to size below it (`bar_scale`).
+        art_scale, resample = bar_scale()
         hp = bars.bar(assets, frame=config.HUD_BAR_FRAME,
                       fill=config.HUD_BAR_HP_FILL, empty=config.HUD_BAR_EMPTY,
                       width=config.HUD_BAR_WIDTH, fraction=frac, framed=True,
-                      scale=art_scale)
+                      scale=art_scale, resample=resample)
         if hp is None:
             return False
         xp = None if xp_fraction is None else bars.bar(
             assets, frame=config.HUD_BAR_FRAME, fill=config.HUD_BAR_XP_FILL,
             empty=config.HUD_BAR_EMPTY, width=config.HUD_BAR_WIDTH,
-            fraction=xp_fraction, framed=False, scale=art_scale)
+            fraction=xp_fraction, framed=False, scale=art_scale, resample=resample)
         gem_px = scale.px(config.HUD_GEM_PX)
         gem = bars.medallion(assets, socket=config.HUD_GEM_SOCKET,
                              core=config.HUD_GEM_CORE, size=gem_px)
 
         # The gap rides the scale so the cluster keeps its proportions when
         # HUD_BAR_SCALE changes; the bar stack is centred on the medallion.
-        gap = 2 * art_scale
+        gap = round(2 * art_scale * resample)
         stack_h = hp.get_height() + (gap + xp.get_height() if xp else 0)
         top, left = scale.px(config.HUD_LEFT_TOP), scale.px(16)
         bar_x = left + (gem.get_width() + scale.px(8) if gem else 0)
@@ -120,14 +135,15 @@ class HUD:
     def _draw_boss(self, surface: pygame.Surface, boss) -> bool:
         """The boss bar in the same hex family as the hero's, framed and wide.
         False when the sheets are missing, so `draw` can fall back."""
-        art_scale = scale.int_scale(config.HUD_BAR_SCALE)
+        art_scale, resample = bar_scale()
         # Native width from the screen, so the bar stays half the frame at any
         # resolution and still lands on a whole number of source pixels.
-        width = int(surface.get_width() * config.HUD_BOSS_WIDTH) // art_scale
+        width = int(int(surface.get_width() * config.HUD_BOSS_WIDTH)
+                    // (art_scale * resample))
         bar = bars.bar(get_assets(), frame=config.HUD_BOSS_FRAME,
                        fill=config.HUD_BOSS_FILL, empty=config.HUD_BAR_EMPTY,
                        width=width, fraction=getattr(boss, "hp_fraction", 0.0),
-                       framed=True, scale=art_scale)
+                       framed=True, scale=art_scale, resample=resample)
         if bar is None:
             return False
         x = (surface.get_width() - bar.get_width()) // 2

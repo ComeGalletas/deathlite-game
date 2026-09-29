@@ -174,6 +174,6 @@ Closes UI-014.D20 (`localization_journal.md`).
 
 ### Tasks
 
-- [ ] UI-016.5 — the web HUD bars (and the boss bar) at 80%: `bars.bar`
+- [x] UI-016.5 — the web HUD bars (and the boss bar) at 80%: `bars.bar`
   resample, `ui/hud.py`, tests
 - [ ] UI-017.1 — `UI_CURSOR_SCALE` 0.85, its comment, a pinning test
