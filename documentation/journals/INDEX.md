@@ -16,7 +16,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-010 · ENT-019 · SPN-004 · WLD-014 · RND-010 · UI-014 ·
-PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
+PRG-004 · AUD-004 · SYS-011 · TST-008 · BLD-003 · DOC-008
 
 ## Requirements
 
@@ -102,6 +102,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
 | SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | claude/sys-008-run-determinism | 2026-09-22 |
 | SYS-009 | One sprite-blit core, a `TimedVisual` for transient effects, `MELEE_REACT_SCALE` to config | SYS, RND, ENT | refactor | done | [playing_state_refactor.md](playing_state_refactor.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| SYS-010 | A frame-time trace of real play (`--trace`) and its report | SYS | feature | in progress | [frame_trace_journal.md](frame_trace_journal.md) | ComeGalletas/sys-010-frame-trace-9ec11fc6 | 2026-09-29 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
