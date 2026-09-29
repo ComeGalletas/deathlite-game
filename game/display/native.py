@@ -254,8 +254,11 @@ def _throttling() -> tuple[int, int] | None:
         policy = _PowerThrottling(_THROTTLING_VERSION, 0, 0)
         if not k32.GetProcessInformation(k32.GetCurrentProcess(), _PROCESS_POWER_THROTTLING,
                                          ctypes.byref(policy), ctypes.sizeof(policy)):
+            log.info("process power throttling unreadable (Windows error %d)",
+                     ctypes.get_last_error())
             return None
-    except (AttributeError, OSError):
+    except (AttributeError, OSError) as exc:
+        log.info("process power throttling unavailable (%s)", exc)
         return None
     return policy.ControlMask, policy.StateMask
 

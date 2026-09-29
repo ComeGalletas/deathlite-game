@@ -61,6 +61,8 @@ class WindowTests(unittest.TestCase):
         answer, so a hidden, silent game (every headless run) paces on the
         1 ms timer and not on Windows' ~15.6 ms default."""
         from game.display import native
+        saved = native._throttling() or (0, 0)
+        self.addCleanup(native._set_throttling, *saved)
         native._set_throttling(0, 0)                  # Windows-managed, as a fresh process
         g = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
         self.assertIs(g.timer_honored, sys.platform == "win32")

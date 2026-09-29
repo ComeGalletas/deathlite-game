@@ -180,6 +180,10 @@ class TimerResolutionTests(unittest.TestCase):
         self.assertGreater(_sleep_median_ms(), 10.0,
                            "the forced policy no longer stretches the sleep")
         self.assertTrue(native.honor_timer_resolution())
+        # The policy itself, not only today's sleep: handed back to Windows
+        # (the pre-fix state) the sleep can read 1 ms too, whenever Windows
+        # is not applying its rule to this process at that moment.
+        self.assertEqual(native._throttling(), (native._IGNORE_TIMER_RESOLUTION, 0))
         self.assertLess(_sleep_median_ms(), 5.0,
                         "honoring the request did not bring the 1 ms sleep back")
 
@@ -207,6 +211,7 @@ class TimerResolutionTests(unittest.TestCase):
                 self.assertFalse(native.honor_timer_resolution())
                 self.assertIsNone(native._throttling())
             self.assertIn("unavailable", logged.output[0])
+            self.assertIn("unavailable", logged.output[1])       # the read says why too
 
     def test_a_refused_policy_answers_false_and_says_why(self):
         """Before Windows 11 the timer-resolution bit is not a known policy
@@ -221,6 +226,7 @@ class TimerResolutionTests(unittest.TestCase):
             self.assertFalse(native.honor_timer_resolution())
             self.assertIsNone(native._throttling())
         self.assertIn("refused", logged.output[0])
+        self.assertIn("unreadable", logged.output[1])
 
 
 if __name__ == "__main__":

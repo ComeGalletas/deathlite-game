@@ -15,8 +15,8 @@ driver, so nothing makes it audible), minimized, stepped by its own
 
 * **managed:** the policy handed back to Windows, as before the fix. The
   control: it shows whether Windows applies the rule on this machine today.
-* **honored:** the policy the game sets. The fix: it must pace at the
-  tick's own rate.
+* **honored:** `native.honor_timer_resolution()`, the very call
+  `Game.__init__` makes. The fix: it must pace at the tick's own rate.
 * **managed again:** handed back once more, so the stretch coming back
   shows the policy, and nothing else, is the switch.
 
@@ -32,8 +32,17 @@ setting, where the tick never waits and the present carries the stretch.
     python -m tools.benchmarks.timer_regime --seconds 8 --vsync
 
 A window opens for a moment and minimizes itself. Windows only. Exit
-status 0 when the honored arm paces on the 1 ms timer, 1 when it does not,
-2 off Windows. Results: `documentation/journals/timer_resolution_journal.md`.
+status:
+
+* 0: Windows set the request aside in a control arm, and the fix lifted it;
+* 1: the fix failed (its call answered False, at startup or in the honored
+  arm, or the honored arm did not pace on the 1 ms timer);
+* 2: not Windows;
+* 3: inconclusive. The honored arm paced right, but Windows applied its
+  rule in neither control arm, so nothing showed the fix was needed; run
+  it again.
+
+Results: `documentation/journals/timer_resolution_journal.md`.
 """
 from __future__ import annotations
 
@@ -152,40 +161,48 @@ def main(argv=None) -> int:
     _run_for(game, 0.5)
     pygame.display.iconify()
 
-    arms = [("managed", (0, 0)),
-            ("honored", (native._IGNORE_TIMER_RESOLUTION, 0)),
-            ("managed again", (0, 0))]
+    arms = [("managed", lambda: native._set_throttling(0, 0)),
+            ("honored", native.honor_timer_resolution),
+            ("managed again", lambda: native._set_throttling(0, 0))]
     results = {}
-    for name, policy in arms:
-        native._set_throttling(*policy)
+    for name, set_policy in arms:
+        took = set_policy()
         results[name] = r = measure_arm(game, pygame, clock, args.seconds)
+        r["policy_taken"] = took
         print(f"  {name:14s} SDL_Delay(1) {r['sleep_before']:5.2f} -> {r['sleep_after']:5.2f} ms "
               f"[{r['regime']}]  "
               f"frames {r['frames']:4d}  period p50 {r['period_p50']:5.2f} p90 {r['period_p90']:5.2f}  "
               f"tick wait p50 {r['wait_p50']:5.2f} p90 {r['wait_p90']:5.2f}", flush=True)
     game._close()
 
-    control, passed = judge(results, game.vsync)
+    control, passed, status = judge(results, game.vsync, game.timer_honored)
     honored = results["honored"]
     print(f"control: the rule {control} (whether Windows set the request aside "
           f"for this hidden, silent window; its call, not the game's)")
-    print(f"honored: {'PASS' if passed else 'FAIL'} (SDL_Delay(1) {honored['sleep_before']:.2f} "
+    print(f"honored: {'PASS' if passed else 'FAIL'} (Game's call took: {game.timer_honored}, "
+          f"the arm's: {honored['policy_taken']}; SDL_Delay(1) {honored['sleep_before']:.2f} "
           f"-> {honored['sleep_after']:.2f} ms, frame p50 {honored['period_p50']:.2f} ms)")
-    return 0 if passed else 1
+    if status == 3:
+        print("inconclusive: the fix was not needed this run; run it again")
+    return status
 
 
-def judge(results: dict, vsync: bool) -> tuple[str, bool]:
-    """The control arms' verdict, and whether the fix holds. It holds when
-    the honored arm sleeps on the 1 ms timer at both ends and, with vsync
-    off, the frame keeps the cap's own period. The control only says
-    whether Windows applied its rule this time; it never fails the eval."""
+def judge(results: dict, vsync: bool, honored_at_start: bool) -> tuple[str, bool, int]:
+    """The control arms' verdict, whether the fix holds, and the exit
+    status. The fix holds when the game's own call took at startup, the
+    honored arm's call took, that arm sleeps on the 1 ms timer at both ends,
+    and, with vsync off, its frame keeps the cap's own period. A pass counts
+    (0) only when a control arm showed Windows applying its rule, since a
+    pass with nothing to lift would hold with the fix deleted (3)."""
     coarse = [results[k]["regime"].startswith("coarse") for k in ("managed", "managed again")]
     control = ("REPRODUCED in both" if all(coarse) else
                "reproduced in one" if any(coarse) else "NOT reproduced")
     honored = results["honored"]
-    passed = honored["regime"] == "1 ms timer" and (
-        vsync or honored["period_p50"] < CAP_PERIOD_MAX_MS)
-    return control, passed
+    passed = (honored_at_start and honored["policy_taken"]
+              and honored["regime"] == "1 ms timer"
+              and (vsync or honored["period_p50"] < CAP_PERIOD_MAX_MS))
+    status = 1 if not passed else 0 if any(coarse) else 3
+    return control, passed, status
 
 
 if __name__ == "__main__":

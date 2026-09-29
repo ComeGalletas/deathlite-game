@@ -1,6 +1,7 @@
 """`tools/benchmarks/timer_regime.py` (SYS-011): the eval's own judgment,
 without a window. The eval itself opens a real window and minimizes it, so
 it is run by hand; what is pinned here is how it reads what it measures."""
+import importlib
 import os
 import unittest
 from unittest import mock
@@ -11,9 +12,12 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 from tools.benchmarks import timer_regime as tr
 
 
-def _arm(regime="1 ms timer", period_p50=16.7):
-    return {"regime": regime, "period_p50": period_p50,
+def _arm(regime="1 ms timer", period_p50=16.7, taken=True):
+    return {"regime": regime, "period_p50": period_p50, "policy_taken": taken,
             "sleep_before": 1.5, "sleep_after": 1.5}
+
+
+COARSE = _arm("coarse (~15.6 ms)", 30.7, taken=True)
 
 
 class RegimeTests(unittest.TestCase):
@@ -53,42 +57,53 @@ class RegimeTests(unittest.TestCase):
 
 
 class JudgeTests(unittest.TestCase):
-    def results(self, managed, honored, again):
-        return {"managed": managed, "honored": honored, "managed again": again}
+    def judge(self, managed, honored, again, vsync=False, at_start=True):
+        return tr.judge({"managed": managed, "honored": honored, "managed again": again},
+                        vsync, at_start)
 
     def test_the_fix_passes_on_the_1_ms_timer_at_the_caps_period(self):
-        coarse = _arm("coarse (~15.6 ms)", 30.7)
-        control, passed = tr.judge(self.results(coarse, _arm(), coarse), vsync=False)
+        control, passed, status = self.judge(COARSE, _arm(), COARSE)
         self.assertEqual(control, "REPRODUCED in both")
         self.assertTrue(passed)
+        self.assertEqual(status, 0)
+        control, _, status = self.judge(COARSE, _arm(), _arm())
+        self.assertEqual(control, "reproduced in one")
+        self.assertEqual(status, 0)
 
-    def test_the_control_never_fails_the_eval(self):
-        """Windows not applying its rule this time says nothing about the fix."""
-        control, passed = tr.judge(self.results(_arm(), _arm(), _arm()), vsync=False)
+    def test_a_pass_with_nothing_to_lift_is_inconclusive(self):
+        """Windows not applying its rule in either control arm: the honored
+        arm would pace right with the fix deleted, so it proves nothing."""
+        control, passed, status = self.judge(_arm(), _arm(), _arm())
         self.assertEqual(control, "NOT reproduced")
         self.assertTrue(passed)
-        coarse = _arm("coarse (~15.6 ms)", 30.7)
-        control, _ = tr.judge(self.results(coarse, _arm(), _arm()), vsync=False)
-        self.assertEqual(control, "reproduced in one")
+        self.assertEqual(status, 3)
 
     def test_a_coarse_or_changing_honored_arm_fails(self):
-        coarse = _arm("coarse (~15.6 ms)", 30.7)
-        for honored in (coarse, _arm("changed mid-arm", 16.7),
+        for honored in (COARSE, _arm("changed mid-arm", 16.7),
                         _arm("unclear (a loaded machine?)", 16.7)):
             with self.subTest(regime=honored["regime"]):
-                _, passed = tr.judge(self.results(coarse, honored, coarse), vsync=False)
+                _, passed, status = self.judge(COARSE, honored, COARSE)
                 self.assertFalse(passed)
+                self.assertEqual(status, 1)
+
+    def test_the_shipped_call_must_have_taken(self):
+        """The eval judges the game's own call, at startup and in the
+        honored arm, not only the sleep it measured."""
+        _, passed, status = self.judge(COARSE, _arm(taken=False), COARSE)
+        self.assertEqual((passed, status), (False, 1))
+        _, passed, status = self.judge(COARSE, _arm(), COARSE, at_start=False)
+        self.assertEqual((passed, status), (False, 1))
 
     def test_without_vsync_the_frame_must_keep_the_caps_period(self):
         """The sleep alone is not enough when nothing else paces the frame:
         a 1 ms sleep with 31 ms frames means the cap is not what held it."""
-        _, passed = tr.judge(self.results(_arm(), _arm(period_p50=30.7), _arm()), vsync=False)
+        _, passed, _ = self.judge(COARSE, _arm(period_p50=30.7), COARSE)
         self.assertFalse(passed)
 
     def test_with_vsync_the_present_owns_the_period(self):
         """Minimized under vsync the present takes ~33 ms and the tick never
         waits, so only the sleep decides."""
-        _, passed = tr.judge(self.results(_arm(), _arm(period_p50=33.5), _arm()), vsync=True)
+        _, passed, _ = self.judge(COARSE, _arm(period_p50=33.5), COARSE, vsync=True)
         self.assertTrue(passed)
 
 
@@ -105,9 +120,11 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(clock.get_fps(), 60.0)
 
     def test_importing_it_opens_no_real_window(self):
-        """The drivers are set in `main`, never at import: this test's own
-        process kept the suite's dummy driver."""
-        self.assertEqual(os.environ.get("SDL_VIDEODRIVER"), "dummy")
+        """The drivers are set in `main`, never at import: importing the
+        module leaves this process's drivers as they were."""
+        before = {k: os.environ.get(k) for k in ("SDL_VIDEODRIVER", "SDL_AUDIODRIVER")}
+        importlib.reload(tr)
+        self.assertEqual({k: os.environ.get(k) for k in before}, before)
 
     def test_percentile(self):
         self.assertEqual(tr._pctl([3.0, 1.0, 2.0, 4.0], 0.9), 4.0)
