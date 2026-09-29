@@ -27,6 +27,7 @@ import pygame
 from combat.weapons import Weapon
 from combat.weapons.forge import apply_forge, get_forges
 from entities.player import Player
+from game import config, locale
 from game.content import get_content
 from game.states.run_status_state import PANES, RunStatusState, find_playing
 from progression.blessings import apply_blessing
@@ -163,6 +164,38 @@ class ReadoutTests(unittest.TestCase):
         base, now = rows["Damage"]
         self.assertIsNotNone(now)
         self.assertNotEqual(base, now)
+
+    def test_a_card_number_has_two_decimals_at_most(self):
+        """UI-015: a blessing-scaled cooldown printed "0.8s -> 0.8004s". A
+        card's number keeps two decimals at most and drops trailing zeros;
+        a change too small to show at that precision shows no arrow."""
+        from ui.run_status.common import short as _short
+        cases = {0.8004: "0.8", 0.348: "0.35", 6.09: "6.09", 180.0: "180",
+                 1_000_000.0: "1000000", -0.001: "0", 0.0: "0", 12.5: "12.5"}
+        for value, want in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(_short(value), want)
+        # The hero's stats (Overview, run summary) read by the same rule.
+        from ui.run_status.common import fmt_stat
+        self.assertEqual(fmt_stat("armor", 4.000731), "4")
+        self.assertEqual(fmt_stat("hp_regen", 0.2000004), "0.2 / " + locale.unit(
+            "seconds", _short(config.HP_REGEN_INTERVAL)))
+        # The owner's case: the Whirlwind forging's 0.8 s, a blessing's x1.15
+        # and another's x0.87 -> x1.0005, 0.8004 s.
+        sword = Weapon("sword", dict(self.ps.content.weapon("sword")))
+        apply_forge(sword, get_forges(self.ps.content).get("whirlwind"))
+        base = float(sword.definition["cooldown"])
+        self.assertEqual(base, 0.8)
+        sword.bonus["cooldown_mult"] = 1.15 * 0.87
+        rows = dict((label, (b, n)) for label, b, n in weapon_numbers(sword))
+        self.assertEqual(rows["Cooldown"], (f"{_short(base)}s", None))
+        sword.bonus["cooldown_mult"] = 0.87
+        self.assertEqual(dict((label, (b, n)) for label, b, n in weapon_numbers(sword))
+                         ["Cooldown"], (f"{_short(base)}s", f"{_short(base * 0.87)}s"))
+        locale.set_language("es")
+        self.addCleanup(locale.set_language, locale.DEFAULT)
+        now = dict((label, n) for label, _b, n in weapon_numbers(sword))["Recarga"]
+        self.assertEqual(now, _short(base * 0.87).replace(".", ",") + " s")
 
     def test_the_blast_radius_row_folds_in_the_area_binding(self):
         """2026-09-12: the card's "Blast radius" must match what

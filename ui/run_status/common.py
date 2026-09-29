@@ -72,6 +72,9 @@ def stat_label(stat: str) -> str:
     return locale.name("stat", stat, stat.replace("_", " ").capitalize())
 
 
+DECIMALS = 2          # a pane number's decimals at most (`short`)
+
+
 def fmt_stat(stat: str, value: float) -> str:
     """A hero stat as the panes print it, in the language's number style
     (UI-014.10): "x1.25" / "x1,25", "12%" / "12 %", "1 / 5s" / "1 / 5 s"."""
@@ -84,9 +87,17 @@ def fmt_stat(stat: str, value: float) -> str:
     if kind == "pctplus":
         return locale.unit("percent", f"{value * 100:+.0f}")
     if kind == "regen":
-        return f"{d(f'{value:g}')} / " + locale.unit(
-            "seconds", d(f"{config.HP_REGEN_INTERVAL:g}"))
-    return d(f"{value:g}")
+        return f"{d(short(value))} / " + locale.unit(
+            "seconds", d(short(config.HP_REGEN_INTERVAL)))
+    return d(short(value))
+
+
+def short(value: float) -> str:
+    """A pane's number: at most `DECIMALS` decimals, no trailing zeros --
+    "0.8", "0.35", "180" (UI-015: a blessing-scaled cooldown printed as
+    "0.8004s", and `:g` wrote a million as "1e+06")."""
+    s = f"{value:.{DECIMALS}f}".rstrip("0").rstrip(".")
+    return "0" if s in ("-0", "") else s
 
 
 def fmt_mod(stat: str, op: str | None, value: float) -> str:

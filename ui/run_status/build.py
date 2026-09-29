@@ -69,14 +69,16 @@ def _fmt(v, kind: str, table: str | None = None) -> str:
         return locale.t("status.yes" if v else "status.no")
     if table is not None and isinstance(v, str):
         return locale.name(table, v)
-    if kind == "s":
-        return locale.unit("seconds", locale.decimals(f"{float(v):g}"))
-    if kind == "deg":
-        return locale.unit("degrees", locale.decimals(f"{float(v):g}"))
     try:
-        return locale.decimals(f"{float(v):g}")
+        number = locale.decimals(c.short(float(v)))
     except (TypeError, ValueError):
         return str(v)
+    if kind == "s":
+        return locale.unit("seconds", number)
+    if kind == "deg":
+        return locale.unit("degrees", number)
+    return number
+
 
 
 def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
@@ -101,8 +103,10 @@ def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
                    * float(b.get("blast_radius_mult", 1.0)))
         elif bkey is not None:
             now = base + float(b.get(bkey, 0.0))
-        out.append((locale.name("weapon_stat", key), _fmt(base, kind),
-                    _fmt(now, kind) if abs(now - base) > 1e-9 else None))
+        # A change too small to show at the card's precision shows no arrow:
+        # "0.8s -> 0.8s" says nothing.
+        shown, was = _fmt(now, kind), _fmt(base, kind)
+        out.append((locale.name("weapon_stat", key), was, shown if shown != was else None))
     crit = float(b.get("crit_chance", 0.0))
     if crit > 0.0:
         out.append((locale.name("stat", "crit_chance"),
