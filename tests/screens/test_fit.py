@@ -56,9 +56,6 @@ WEB_UNFIT = {
     "game_over": (780, "the end screen's buttons and hint sit below 720"),
     "victory": (780, "the end screen's buttons and hint sit below 720"),
 }
-# English plays the banner's art, which carries its words; only a language
-# without its own sheet draws them as text.
-ART_IN_ENGLISH = {"end_banner_win", "end_banner_loss"}
 
 _RECORDS = {}
 _TRACKING = H.tracking()
@@ -191,8 +188,6 @@ class FitTests(unittest.TestCase):
             es = {p.text for p in recorded(name, DESIGN, "es")[0]}
             with self.subTest(name):
                 self.assertTrue(es)
-                if name in ART_IN_ENGLISH:
-                    continue
                 self.assertTrue(en)
                 if any(re.search(r"[A-Za-z]{3,}", t) for t in en):
                     self.assertNotEqual(en, es)

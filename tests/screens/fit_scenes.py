@@ -256,12 +256,14 @@ def _end(cls, victory):
 
 
 def end_banner(victory):
-    """The banner over the run's last frame, mid-play. English plays its art;
-    a language without its own sheet draws the words (`banner.win`,
-    `banner.loss`) in the heading face."""
+    """The banner mid-play with its art missing: the one case it draws text,
+    the words in the language in use (`banner.win`, `banner.loss`). With the
+    art it plays the pack's sprite in every language (UI-015.D1)."""
     def draw(surface):
         from game.states.end_banner_state import BANNER, EndBannerState
-        st = EndBannerState(_game())
+        game = _game()
+        game.assets = None
+        st = EndBannerState(game)
         st.enter(victory=victory, on_done=lambda: None)
         for _ in range(600):
             if st.phase == BANNER:

@@ -931,7 +931,7 @@ class _Rec:
         return getattr(self.font, name)
 
 
-# --- the end banner (UI-014.D10) --------------------------------------------------------
+# --- the end banner (UI-014.D10, UI-015.D1) --------------------------------------------------------
 
 class _Assets:
     def __init__(self, own=()):
@@ -970,64 +970,40 @@ class EndBannerTests(unittest.TestCase):
         return st
 
     def words(self, st):
-        from game.states import end_banner_state
-        seen = []
-        real = end_banner_state.shadowed
-
-        def shadowed(font, s, colour, **k):
-            seen.append(s)
-            return real(font, s, colour, **k)
-        with mock.patch.object(end_banner_state, "shadowed", shadowed):
+        """The words `st` draws this frame instead of its art."""
+        from game.states.end_banner_state import EndBannerState
+        with mock.patch.object(EndBannerState, "_words", autospec=True,
+                               side_effect=EndBannerState._words) as spy:
             st.draw(pygame.Surface((1600, 900)))
-        return seen
+        return spy.call_count
 
     def test_english_plays_the_art(self):
         _display()
         assets = _Assets()
         st = self.banner(assets)
-        self.assertEqual(self.words(st), [])
+        self.assertEqual(self.words(st), 0)
         self.assertEqual(assets.frames, ["end_banner_loss"])
 
-    def test_spanish_draws_the_words_on_the_english_clock(self):
+    def test_spanish_plays_the_same_art(self):
+        """The art is the banner in every language (UI-015.D1): Spanish plays
+        the English rig, frame for frame, and draws no words over it."""
         _display()
-        for victory, want in ((False, "FIN DE LA PARTIDA"), (True, "¡VICTORIA!")):
+        for victory, rig in ((False, "end_banner_loss"), (True, "end_banner_win")):
             locale.set_language("es")
             assets = _Assets()
             st = self.banner(assets, victory)
-            self.assertEqual(self.words(st), [want])
-            self.assertEqual(assets.frames, [])                # no English letters
+            self.assertEqual(self.words(st), 0)
+            self.assertEqual(assets.frames, [rig])
             self.assertEqual(st.banner_seconds, 2.0)           # 30 frames at 15 fps
-            st.update(2.1)                                     # the play is over
-            self.assertEqual(self.words(st), [])
 
-    def test_the_words_shadow_is_in_design_px(self):
-        """`shadowed` scales the offset itself: at render scale 2 the drop is
-        8 native px, not 16."""
-        from game import config
-        from game.states import end_banner_state
-        _display()
-        locale.set_language("es")
-        offsets = []
-        real = end_banner_state.shadowed
-
-        def shadowed(font, s, colour, **k):
-            offsets.append(k.get("offset"))
-            return real(font, s, colour, **k)
-        with (mock.patch.object(config, "RENDER_SCALE", 2),
-              mock.patch.object(end_banner_state, "shadowed", shadowed)):
-            st = self.banner(_Assets())
-            surf = st._words(shadow=True)
-            plain = st._font.render("FIN DE LA PARTIDA", True, (0, 0, 0))
-        self.assertEqual(offsets, [(4, 4)])
-        self.assertEqual(surf.get_width() - plain.get_width(), 8)
-
-    def test_a_spanish_rig_is_played_when_the_sheet_has_one(self):
+    def test_a_language_sheet_is_not_played(self):
+        """A `_es` rig in the sheet changes nothing: the English art plays."""
         _display()
         locale.set_language("es")
         assets = _Assets(own={"end_banner_win_es"})
         st = self.banner(assets, victory=True)
-        self.assertEqual(self.words(st), [])
-        self.assertEqual(assets.frames, ["end_banner_win_es"])
+        self.assertEqual(self.words(st), 0)
+        self.assertEqual(assets.frames, ["end_banner_win"])
 
     def test_without_art_the_fallback_words_follow_the_language(self):
         """Pixel for pixel what the banner drew before, in English: the

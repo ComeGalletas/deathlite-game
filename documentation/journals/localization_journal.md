@@ -173,8 +173,9 @@ tools.
   - Spanish gender: each base gets `gender_es` (`m`/`f`) and each prefix
     gets `prefixes_es` `{m, f}`. The locale's `item.name` template sets the
     word order for each language.
-- **UI-014.D10 — the end banners.** `game_over.png` and `you_won.png` are art
-  with English words.
+- **UI-014.D10 — the end banners.** *Superseded by UI-015.D1 (owner,
+  2026-09-29): the art plays in every language; words only without art.*
+  `game_over.png` and `you_won.png` are art with English words.
   - In Spanish, the banner state draws its text fallback ("FIN DE LA PARTIDA",
     "¡VICTORIA!") in the heading font, with the banner's gold and shadow.
   - It does not show the English art.
@@ -1127,7 +1128,8 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     `effect.<id>`.
   - `game/states/end_banner_state.py` (UI-014.D10): in a language with no rig of its
     own (`end_banner_loss_es`), the words are drawn in the heading face with a drop
-    shadow for the English rig's play, which keeps the clock.
+    shadow for the English rig's play, which keeps the clock. (Removed by UI-015.2:
+    the art plays in every language.)
   - `ui/end_screen.py`: `Button.label` is a key, `Button.text` reads it.
 - **Two fixes found on the way:**
   - The `fit_font` cache from UI-014.7 kept `Font` objects across
@@ -1432,3 +1434,64 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
   ("0,8 s -> 0,8004 s"; English "0.8004s"), a precision question for the
   number formatting, not the language.
 - **UI-014 done.**
+
+## UI-015 — Requirement (owner, 2026-09-29)
+
+A follow-up to UI-014, on its branch (owner's choice: it lands with PR #45).
+
+> fix the cooldown float precision in the Build pane and do a small change,
+> dont replace the sprite animatons for "you win" and "game over" to the
+> spanish version, keep those as they are and only replace them if the
+> sprite doesnt exist. This last part consider it carefully, if its too
+> expensive or unnecesary to add, dont do it.
+
+**Objective.** The TAB screen's Build pane prints its numbers without float
+noise, and the end-of-run banner plays its sprite in every language.
+**Details.** A blessing-scaled cooldown printed "0,8 s -> 0,8004 s"
+(English "0.8s -> 0.8004s"). The banner drew the translated words over
+the English rig's clock in Spanish (UI-014.D10); it now plays the art, and
+draws words only when the art is missing.
+**Constraint.** English layout unchanged where no noise was printed; the
+banner's timing unchanged.
+
+## UI-015 — Plan and tasks
+
+- [x] UI-015.1 — The Build pane's numbers: two decimals at most, trailing
+  zeros dropped (`short` in `ui/run_status/common.py`, `DECIMALS`); a
+  change too small to show at that precision draws no arrow. Every card
+  number, the Forging lines, and the hero's stats (`fmt_stat`: the
+  Overview pane and the run summary, which printed `:g` too) go through it.
+- [x] UI-015.2 — The end banner plays its sprite in every language
+  (UI-015.D1): the language branch and the words-over-the-clock mode go;
+  the no-art fallback keeps the language's words (`banner.win`,
+  `banner.loss`). The fit scene draws the banner without art, the one case
+  it has text.
+
+## UI-015 — Decisions
+
+- **UI-015.D1 — the end banner's art is the banner in every language**
+  (owner, 2026-09-29; replaces UI-014.D10). The pack's "YOU WON!" / "GAME
+  OVER" sprites play in Spanish too, as the rest of the pack's art does;
+  a language's own sheet (`end_banner_win_es`) is not looked for. Only
+  with the art missing does the banner draw words, the language's own.
+  Cheap to do: it removes code (the language branch, the words-only mode
+  and its drop shadow) rather than adding any.
+
+## UI-015 — Results
+
+- **UI-015.1:** "0.8004s" reads "0.8s"; "1.2006s" reads "1.2s"; a
+  million, which `:g` wrote as "1e+06", reads "1000000". A blessing that
+  moves a cooldown by less than 0.005 s shows the base alone. The English
+  layout gate is unchanged (none of its numbers carried noise).
+- **UI-015.2:** Spanish plays `end_banner_loss` / `end_banner_win` frame
+  for frame on the same clock; no words are drawn over them.
+- **Tests:** `tests/screens/test_run_status.py`
+  (`test_a_card_number_has_two_decimals_at_most`: `short` over its edge
+  cases, `fmt_stat` on the same rule, the owner's case -- the Whirlwind
+  forging's 0.8 s times a blessing's x1.15 and another's x0.87 -- with no
+  arrow, a real change with one, the Spanish comma and unit); `tests/screens/test_spanish_run_text.py`
+  `EndBannerTests` (Spanish plays the same art, a `_es` sheet is not
+  played, the no-art words follow the language).
+- **Tests run:** the touched suites (run status, Spanish status and run text, end banner, fit, English layout, locale), then the full suite: 3969 passed, 6668 subtests.
+- **Cold critic:** one pass (medium): PASS on the code. Its notes, tied off here: the journal record and D10 marked superseded; the test's comment named the wrong base (the test now runs the owner's own case, the Whirlwind forging's 0.8 s); `fmt_stat` still printed `:g` for the hero's stats, now on the same rule; the banner's docstring overclaimed its timing without assets. Survivors: a redundant `round()` before `.2f` (removed), and the `ValueError` catch on a string number no data reaches.
+
