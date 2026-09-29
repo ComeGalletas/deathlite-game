@@ -291,15 +291,14 @@ class ConftestTierTests(unittest.TestCase):
 
 
 class SuiteTests(unittest.TestCase):
-    """The real suite: nothing in `unit` needs more."""
+    """The real suite: nothing runs below the tier it needs."""
 
     @classmethod
     def setUpClass(cls):
         cls.results = list(A.tests(A.Index(A.ROOT), conftest.tier))
 
-    def test_nothing_in_unit_boots_or_generates(self):
-        bad = A.grouped([t for t in A.under(self.results) if t.tier == "unit"],
-                        self.results)
+    def test_no_test_is_under_tiered(self):
+        bad = A.grouped(A.under(self.results), self.results)
         lines = [f"{prefix}: in `{given}`, needs `{needs}` via {' -> '.join(chain)}"
                  for (given, needs), prefixes in sorted(bad.items())
                  for prefix, chain in sorted(prefixes.items())]

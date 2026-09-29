@@ -37,19 +37,18 @@ UNIT = (
 # Modules that read generated worlds (through tests/worlds.py or directly).
 WORLD = (
     "tests/world/",
-    # Booted or generated worlds that moved out of tests/world/ in the
-    # folder reorganisation and keep their tier.
-    "tests/entities/test_npcs.py",
-    "tests/playing/test_interactables.py",
-    "tests/playing/test_infusion_sources.py",
+    # Generated worlds that moved out of tests/world/ in the folder
+    # reorganisation and keep their tier. The classes of these modules that
+    # boot a Game are in `INTEGRATION` (TST-006.3), and the pure ones fall to
+    # `unit`; `WORLD` is matched first, so it names only its own classes.
     "tests/entities/ai/test_boss_pig_rider.py",
     "tests/world/test_pathfinding.py",
-    "tests/playing/test_enemy_nav.py",
+    "tests/playing/test_enemy_nav.py::NavFieldTests",
     "tests/entities/ai/test_aggro.py",
     "tests/entities/ai/test_flying.py",
     "tests/render/test_terrain.py",
     "tests/render/test_biome.py",
-    "tests/render/test_depth_sort.py",
+    "tests/render/test_depth_sort.py::SceneryDrawablesTests",
     "tests/render/test_hazard_sprite.py",
     "tests/playing/test_projectile_elevation.py",
     # TST-006.2: reads the shared worlds; the module's boats boot a run.
@@ -117,6 +116,18 @@ INTEGRATION = (
     "tests/screens/test_ultrawide.py::DimCoversTheMarginsTests",
     "tests/screens/test_ultrawide.py::ScreenBackdropTests",
     "tests/screens/test_ultrawide.py::PanelsStayInTheBoxTests",
+    # TST-006.3: booted a Game inside `world`, where they had been carried
+    # whole. `PenSpotTests`, `DataTests` and `ConeWeaponVisualTests` build
+    # nothing and are `unit`.
+    "tests/playing/test_interactables.py",
+    "tests/entities/test_npcs.py::VillagerTests",
+    "tests/playing/test_infusion_sources.py::PlacementTests",
+    "tests/playing/test_infusion_sources.py::MonasteryTests",
+    "tests/playing/test_infusion_sources.py::CardTests",
+    "tests/playing/test_infusion_sources.py::BuffBuildingTests",
+    "tests/playing/test_enemy_nav.py::PlayingStateNavWiringTests",
+    "tests/playing/test_enemy_nav.py::NavRebuildStaggerTests",
+    "tests/render/test_depth_sort.py::DepthOrderTests",
 )
 
 

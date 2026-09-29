@@ -153,7 +153,7 @@
   the reader's tests.
 - [x] TST-006.2 — Register the `unit` findings (the request's own scope);
   pin `test_run_hints.py` / `test_key_marker.py` as `integration`.
-- [ ] TST-006.3 — Split the five `world` modules that boot a Game (D2);
+- [x] TST-006.3 — Split the five `world` modules that boot a Game (D2);
   the suite-wide "nothing under-tiered" test.
 - [ ] TST-006.4 — `pytest.ini` note; before/after measurements; close.
 
@@ -193,3 +193,19 @@
 - `SuiteTests` pins it: nothing in `unit` is under-tiered, and
   `test_run_hints.py` / `test_key_marker.py` are `integration` by need and
   by registration.
+
+### 2026-09-29 — TST-006.3: the `world` modules that boot a Game
+
+- `WORLD` no longer lists `test_npcs.py`, `test_interactables.py`,
+  `test_infusion_sources.py` whole; `test_enemy_nav.py` and
+  `test_depth_sort.py` keep only their world classes (`NavFieldTests`,
+  `SceneryDrawablesTests`). `INTEGRATION` gains `test_interactables.py` and
+  eight classes. `PenSpotTests` (4), `DataTests` (3) and
+  `ConeWeaponVisualTests` (2) fall to `unit`: 9 tests, under 0.2 s
+  together.
+- Every test is in exactly one tier: `-m unit` 2147, `world` 515,
+  `integration` 797, `sweep` 11; sum 3470 = everything collected.
+- The five modules under the trace, all tiers: 74 passed, 0 reached a
+  primitive above their tier (132 s).
+- `SuiteTests.test_no_test_is_under_tiered` now covers every tier; the
+  audit reads 0 under-tiered.
