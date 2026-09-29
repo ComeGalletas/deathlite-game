@@ -1,7 +1,7 @@
 # The enemies' own update: journal
 
 **ID:** ENT-018 · **System:** entities (+ WLD) · **Type:** performance ·
-**Status:** in progress · **Branch:** ComeGalletas/ent-018-enemy-update-9ec11fc6
+**Status:** done (2026-09-29; closed at ENT-018.2's exact gain, owner D1) · **Branch:** ComeGalletas/ent-018-enemy-update-9ec11fc6
 (the RND-008 worktree, stacked on the RND-008 branch while #39 waits to
 merge; owner, 2026-09-29)
 
@@ -114,7 +114,7 @@ Inside the movement probe (`walk_parts.py`, same crowd):
 - [x] ENT-018.2: Separation drops far candidates on floats first, bit for bit the same
 - [x] ~~ENT-018.3: The floor index for the collider's lookups~~: built, exact, measured **slower**, reverted (see Results)
 - [x] ENT-018.4: Re-measured by part without wrappers; what is left is spread thin (see Results); the direction is the owner's call
-- [ ] ENT-018.5: Results, fingerprint, suites
+- [x] ~~ENT-018.5: Results, fingerprint, suites~~: folded into the close (D1); ENT-018.2's results and suites are recorded above
 
 ## ENT-018: Results
 
@@ -216,4 +216,22 @@ frame's worth each (`scratchpad/micro_parts.py`, best of 5):
      every other frame, as the off-screen LOD already does. This buys
      most (about 1 ms at 100 packed), but it changes how a crowd moves,
      so it is a gameplay decision.
+
+## ENT-018: Decision and close (owner, 2026-09-29)
+
+- **ENT-018.D1:** of the three directions in ENT-018.4, the owner chose to
+  close ENT-018 at ENT-018.2's exact gain and turn to the terrain's ground
+  bands (the largest single item left in the frame), as a requirement of
+  its own.
+- **What ENT-018 leaves in the game:** `Separation.tick`'s early drop.
+  Bit for bit the same, −24 % on its own part, about 0.15 ms a frame at
+  113 packed.
+- **What it leaves in the record:**
+  - the enemy update measured without wrappers (ENT-018.4);
+  - the floor index built, proven exact, measured slower and reverted
+    (ENT-018.3);
+  - RND-008's follow-up 8 found not to hold.
+- **Still open, if wanted later:** about 0.5 ms of exact small changes in
+  the enemy update (ENT-018.4), and the crowd LOD for a packed on-screen
+  crowd, which would change how crowds move.
 

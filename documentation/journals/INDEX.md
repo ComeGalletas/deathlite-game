@@ -48,7 +48,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | ENT-015 | The boss on the shared AI components | ENT | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
-| ENT-018 | The enemies' own update made cheaper, bit for bit the same (crowding push, floor lookups) | ENT, WLD | performance | in progress | [enemy_update_journal.md](enemy_update_journal.md) | ComeGalletas/ent-018-enemy-update-9ec11fc6 | 2026-09-29 |
+| ENT-018 | The enemies' own update made cheaper, bit for bit the same (crowding push, floor lookups) | ENT, WLD | performance | done | [enemy_update_journal.md](enemy_update_journal.md) | ComeGalletas/ent-018-enemy-update-9ec11fc6 | 2026-09-29 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
