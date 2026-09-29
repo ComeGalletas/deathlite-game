@@ -139,3 +139,41 @@ Closes UI-014.D20 (`localization_journal.md`).
   interface. That is presentation only and was not decided explicitly.
   The HUD's pixel-art bars use `scale.int_scale`, which rounds x3 at 0.8
   to x2, so they are ~67% of their desktop size rather than 80%.
+
+## and then: the cursor and the HUD bars (owner, 2026-09-29)
+
+- **Objective:** make the base cursor 15% smaller, and draw the web HUD
+  bars at 80% of their desktop size.
+- **Details:** raised from the two open points above. The owner picked,
+  from two readings each:
+  - cursor: the *base* size, everywhere, not only on web.
+    `UI_CURSOR_SCALE` 1.0 -> 0.85. On desktop the arrow is 85% of the
+    system cursor's size (`ui/mouse.py: system_match_scale`). Where the
+    platform does not report a size, the fallback is
+    `UI_CURSOR_SCALE x RENDER_SCALE`, which on web is 0.85 x 0.8 = 0.68 of
+    the old base.
+  - HUD bars: on web only, a true 80% of desktop (x2.4, not x2). Desktop
+    stays x3.
+- **Constraint:** the 1600x900 layout and the enemy health bars are
+  untouched (the request named the HUD bars). The HUD's integer grid
+  above scale 1 (x5 at 1.6) stays as it is.
+
+### Decisions
+
+- **UI-016.D6 — below scale 1 the HUD bars are resampled, not rounded.**
+  `scale.int_scale` keeps pixel-art bars on a whole-pixel grid by rounding
+  the art scale. Above 1 that costs little (x4.8 -> x5, +4%), but at 0.8 it
+  costs 17% (x2.4 -> x2). Below scale 1 the bar is built at its design
+  scale (x3) and resampled by the interface scale (`bars.bar(...,
+  resample=)`, smoothscale, cached with the bar). Its size is then exactly
+  80%, with slightly soft pixels, the same trade-off as the text and button
+  art at 0.8. The rule reads the interface scale, not the platform, so a
+  native desktop window under 900 rows gets the same bars.
+- **UI-017.D1 — `UI_CURSOR_SCALE = 0.85`** (owner). This is the one
+  constant both cursor paths read.
+
+### Tasks
+
+- [ ] UI-016.5 — the web HUD bars (and the boss bar) at 80%: `bars.bar`
+  resample, `ui/hud.py`, tests
+- [ ] UI-017.1 — `UI_CURSOR_SCALE` 0.85, its comment, a pinning test

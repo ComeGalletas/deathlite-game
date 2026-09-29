@@ -15,7 +15,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-019 · SPN-004 · WLD-015 · RND-009 · UI-017 ·
+**Next free:** CMB-011 · ENT-019 · SPN-004 · WLD-015 · RND-009 · UI-018 ·
 PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 
 ## Requirements
@@ -91,6 +91,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | UI-014 | Spanish localization: locale files, `_es` data fields, a Language option | UI, SYS, PRG | feature | done | [localization_journal.md](localization_journal.md) | claude/ui-014-localization | 2026-09-25 |
 | UI-015 | Build pane numbers without float noise; the end banner plays its sprite in every language | UI | bug | done | [localization_journal.md](localization_journal.md) | claude/ui-014-localization | 2026-09-29 |
 | UI-016 | Web build: the interface at scale 0.8 so the 900-row screens fit the 720-row canvas | UI, BLD | bug | done | [web_ui_scale_journal.md](web_ui_scale_journal.md) | ComeGalletas/ui-016-web-ui-scale-b5bf589e | 2026-09-29 |
+| UI-017 | The base cursor 15% smaller (`UI_CURSOR_SCALE` 0.85) | UI | feature | in progress | [web_ui_scale_journal.md](web_ui_scale_journal.md) | ComeGalletas/ui-016-web-ui-scale-b5bf589e | 2026-09-29 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
