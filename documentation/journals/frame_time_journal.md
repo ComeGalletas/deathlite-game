@@ -985,7 +985,10 @@ its own requirement:
 8. **The update costs more in the real loop than headless** (found in
    RND-008.8): 8.5 ms at 113 packed with the Windows renderer drawing
    between updates, against 5.2 ms on the dummy driver. The cause was not
-   isolated.
+   isolated. *Not confirmed (ENT-018.4):* timed four
+   ways in one sitting (Windows or dummy driver, drawing between updates or
+   not), the update shows no consistent difference. The gap was the
+   machine's load between the sittings (`enemy_update_journal.md`).
 - Also found, and handed off during RND-008.3: run-booting tests sitting in
   the `unit` tier. The owner ran it as TST-006, now merged. Its tier audit
   shaped the harness's flag tests (RND-008.5).
