@@ -156,21 +156,12 @@ class GameMap:
         px = config.TILE_PX
         return (int((x - room.rect.left) // px), int((y - room.rect.top) // px))
 
-    def _floor_index(self):
-        """The floor rule's per-square index of this map's islands and
-        bridges (ENT-018.3), built on first use, when the layout is final.
-        Rebuilt if the map is handed another layout."""
-        index = getattr(self, "_floor_idx", None)
-        if index is None or index._layout is not self.layout:
-            index = self._floor_idx = floor_rules.FloorIndex(self.layout)
-        return index
-
     def _point_ok(self, x: float, y: float) -> bool:
         """Is the point on floor? `world/rules/floor.py` is the one body of
         this rule; the navigation grid reads the same function."""
         if self.layout is None:
             return self._rects[0].collidepoint(x, y)
-        return floor_rules.point_on_floor(self.layout, x, y, self._floor_index())
+        return floor_rules.point_on_floor(self.layout, x, y)
 
     def is_open_water(self, x: float, y: float) -> bool:
         """Off every island cell and every bridge: where a seahorse boat may
@@ -186,13 +177,13 @@ class GameMap:
         movement on open ground never reaches it."""
         if self.layout is None:
             return False
-        return floor_rules.in_corridor(self.layout, x, y, self._floor_index())
+        return floor_rules.in_corridor(self.layout, x, y)
 
     def _room_of(self, x: float, y: float):
         """The island whose floor the point actually stands on, or `None`."""
         if self.layout is None:
             return None
-        return floor_rules.room_of(self.layout, x, y, self._floor_index())
+        return floor_rules.room_of(self.layout, x, y)
 
     def inset_at(self, x: float, y: float) -> float:
         """How far inside its own terrace `(x, y)` stands, in pixels. `CAP`
@@ -200,7 +191,7 @@ class GameMap:
         carries no level boundary to keep away from."""
         if self.layout is None:
             return float(terrain_inset.CAP)
-        return float(floor_rules.inset_at(self.layout, x, y, self._floor_index()))
+        return float(floor_rules.inset_at(self.layout, x, y))
 
     def inset_ok(self, x: float, y: float) -> bool:
         """Is `(x, y)` far enough inside its own terrace for a body to stand?"""
