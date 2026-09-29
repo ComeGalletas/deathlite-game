@@ -34,7 +34,7 @@ import pygame
 
 from game import config, fonts, locale
 from ui import scale
-from ui.text import cached_font, fit_font
+from ui.text import fit_font
 
 STATES = ("raised", "pressed")
 COLOURS = ("blue", "grey")
@@ -220,12 +220,13 @@ def _text(words: str, ink, wide: bool, size: int, font, cache, rect) -> pygame.S
     if font is not None:
         return font.render(words, True, ink)
     px = int(round((WORD_PX if wide else LABEL_PX) * size / CAP_PX))
+    base = cache.font("body", px, bold=True) if cache is not None else fonts.body(px, bold=True)
     room = int(rect.width * WORD_ROOM)
-    if wide and cached_font(fonts.body, px, bold=True).size(words)[0] > room:
+    if wide and base.size(words)[0] > room:
         return fit_font(fonts.body, px, words, room, bold=True).render(words, True, ink)
     if cache is not None:
         return cache.render("body", px, words, ink, bold=True)
-    return fonts.body(px, bold=True).render(words, True, ink)
+    return base.render(words, True, ink)
 
 
 def draw_keycap(surface: pygame.Surface, assets, face_center, label: str, *,

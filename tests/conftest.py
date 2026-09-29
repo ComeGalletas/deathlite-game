@@ -147,6 +147,17 @@ INTEGRATION = (
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
     "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
+    # UI-014: screens drawn from a booted `Game`; the fit test boots a run.
+    "tests/locale/test_numbers.py::LocaleNumberTests",
+    "tests/screens/test_english_layout.py",
+    "tests/screens/test_fit.py",
+    "tests/screens/test_fit_rules.py::ControlsWordTests",
+    "tests/screens/test_fit_rules.py::HeroCardTests",
+    "tests/screens/test_fit_rules.py::SummaryPanelTests",
+    "tests/screens/test_spanish_menus.py::FitTests",
+    "tests/screens/test_spanish_menus.py::MenuEnglishTests",
+    "tests/screens/test_spanish_menus.py::SpanishScreenTests",
+    "tests/screens/test_spanish_status.py::SanctuaryTests",
 )
 
 

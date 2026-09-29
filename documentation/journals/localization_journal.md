@@ -522,7 +522,7 @@ Options.
   banner, Game Over and Victory -- and fails when a text leaves the screen,
   sits on another text, or Spanish trims more than English does there;
   (3) fixes for everything they flag.
-- [ ] UI-014.12 — The full suite, the Spanish screenshots, the results, and
+- [x] UI-014.12 — The full suite, the Spanish screenshots, the results, and
   the index row set to done.
 
 ## UI-014 — Results
@@ -1395,3 +1395,40 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     that claimed more than their tests check. Two survivors left are
     equivalent (a fallback both destination forms reach alike, and the
     branch it confirmed dead).
+
+### UI-014.12 — the close
+
+- **Rebased on main** (2026-09-29): WLD-014, RND-008 and ENT-018 had landed.
+  Three conflicts, each kept both sides:
+  - the index's "next free" line, re-derived from the rows (ENT-019,
+    WLD-015, RND-009, UI-015, TST-008, DOC-008);
+  - `tests/conftest.py`: main's `tier()` and this task's English-reset
+    fixture;
+  - `ui/keycap.py` and `ui/controls_block.py`: RND-008's text cache and
+    split `draw_keycap` (`_words`, `_text`, `footprint`) with this task's
+    locale word for the mouse cap, the wide cap's word stepping down to
+    `WORD_ROOM` (measured in the text cache's font where there is one, so
+    no font is built per frame),
+    and the Controls words' own fitting.
+- **After the rebase**, the full suite found two things the merge had
+  made, both fixed here: a wide keycap without a text cache built its
+  font twice, once to measure and once to draw (the measured font now
+  draws); and main's tier audit (TST-006) wants every test that boots
+  a `Game` registered as `integration` in `tests/conftest.py` -- ten
+  UI-014 modules and classes are.
+- **Tests run:** full suite after the rebase and its fixes, 3969 passed, 6660 subtests (22 min).
+- **Screenshots** (Spanish, rendered from `tests/screens/fit_scenes.py`,
+  not committed): the menu over a played save, the hero select with the
+  main weapon unlocked, Options with a desktop's display rows, the
+  rankings, the Sanctuary's stash, pause, the HUD's hints and a notice, a
+  level-up, the Forge, the Monastery, the three TAB panes, Game Over,
+  Victory and the end banner at 1600x900; pause, the Monastery, the Build
+  pane and Victory at 1280x720.
+- **Left for the owner:** the decisions this journal took that the owner
+  may overrule (D7's "." thousands mark; the TAB screen's three names
+  across screens); D20's web layout task; the found-not-fixed notes of
+  UI-014.11 (text on a 9-slice's inner border). Seen in the screenshots,
+  not this task's: the Build pane prints a cooldown's float as it is
+  ("0,8 s -> 0,8004 s"; English "0.8004s"), a precision question for the
+  number formatting, not the language.
+- **UI-014 done.**
