@@ -61,7 +61,7 @@ owner, 2026-09-29)
 ## SYS-010: Tasks
 
 - [x] SYS-010.1: This journal; the index row
-- [ ] SYS-010.2: The recorder and its wiring (`--trace`, `DEATHLITE_TRACE`, `traces/` beside the save)
+- [x] SYS-010.2: The recorder and its wiring (`--trace`, `DEATHLITE_TRACE`, `traces/` beside the save)
 - [ ] SYS-010.3: The report
 - [ ] SYS-010.4: Tests, the recorder's measured cost, the how-to
 - [ ] SYS-010.5: Results; index to done

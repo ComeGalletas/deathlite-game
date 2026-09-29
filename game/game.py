@@ -23,7 +23,9 @@ from game.events import EventBus, Events
 from game.state import StateMachine
 from progression.meta import MetaCatalog
 from systems.audio import AudioManager
+from systems import frame_trace
 from systems.debug_overlay import DebugOverlay
+from systems.frame_trace import FrameTrace
 from systems.music import MusicPlayer
 from ui.mouse import install_cursor, system_match_scale
 
@@ -31,7 +33,7 @@ log = logging.getLogger(__name__)
 
 
 class Game:
-    def __init__(self, save_path=None) -> None:
+    def __init__(self, save_path=None, trace_path=None) -> None:
         DisplayWindow.prepare()             # SDL hints: before init
         pygame.init()
         pygame.display.set_caption(config.TITLE)
@@ -85,6 +87,10 @@ class Game:
 
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
+        # SYS-010: the frame-time trace of real play, when `--trace` asked
+        # for one (`systems/frame_trace.py`). None costs one check a frame.
+        self.trace = FrameTrace(trace_path) if trace_path is not None else None
+        self._drawn_at = 0.0
 
         # A finished run banks its rewards into the save file.
         self.events.subscribe(Events.RUN_ENDED, self._on_run_ended)
@@ -236,8 +242,8 @@ class Game:
         """One iteration of the main loop: timing -> input -> update -> render.
         Clears `self.running` when the state stack drains. Identical work for
         both loop drivers so desktop and browser never diverge."""
-        dt = self.clock.tick(config.FPS) / 1000.0
-        dt = min(dt, config.MAX_DT)  # clamp -- see config.MAX_DT
+        frame_ms = self.clock.tick(config.FPS)
+        dt = min(frame_ms / 1000.0, config.MAX_DT)  # clamp -- see config.MAX_DT
 
         self._process_input()
         if self.state_machine.is_empty():
@@ -254,11 +260,16 @@ class Game:
         t2 = time.perf_counter()
 
         self.debug.record_timing((t1 - t0) * 1000.0, (t2 - t1) * 1000.0)
+        if self.trace is not None:
+            self.trace.record(frame_ms, (t1 - t0) * 1000.0, (self._drawn_at - t1) * 1000.0,
+                              (t2 - self._drawn_at) * 1000.0, frame_trace.sample(self))
 
     def _close(self) -> None:
         """A dragged window size is written once, here, not per event."""
         if self.display.dirty:
             self.persist()
+        if self.trace is not None:
+            self.trace.close()
         pygame.quit()
 
     def run(self) -> None:
@@ -317,4 +328,5 @@ class Game:
         self.screen.fill(config.COLOR_BG)
         self.state_machine.draw(self.screen)
         self.debug.draw(self.screen, self.clock)
+        self._drawn_at = time.perf_counter()      # draw ends, present begins (SYS-010)
         pygame.display.flip()

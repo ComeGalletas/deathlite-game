@@ -145,6 +145,8 @@ INTEGRATION = (
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
     "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
+    # SYS-010: a real Game stepped with and without a trace.
+    "tests/devtools/test_frame_trace.py::GameWiringTests",
 )
 
 

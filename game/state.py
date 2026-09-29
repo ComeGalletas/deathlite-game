@@ -132,6 +132,12 @@ class StateMachine:
     def current(self) -> State | None:
         return self._stack[-1] if self._stack else None
 
+    @property
+    def stack(self) -> tuple:
+        """The states, bottom first (read-only; the frame trace reads the
+        run under a pause menu from it)."""
+        return tuple(self._stack)
+
     def push(self, state: State, **enter_kwargs) -> None:
         self._stack.append(state)
         state.enter(**enter_kwargs)
