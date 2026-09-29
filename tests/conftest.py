@@ -94,16 +94,18 @@ INTEGRATION = (
 )
 
 
+def tier(nodeid: str) -> str:
+    """The tier a test gets, by the first tuple one of whose prefixes starts
+    its nodeid; `unit` when none does. `tools/verification/tier_audit.py`
+    reads the same answer to check it against what each test reaches."""
+    path = nodeid.replace("\\", "/")
+    for name, prefixes in (("sweep", SWEEP), ("unit", UNIT), ("world", WORLD),
+                           ("integration", INTEGRATION)):
+        if any(path.startswith(p) for p in prefixes):
+            return name
+    return "unit"
+
+
 def pytest_collection_modifyitems(config, items):
     for item in items:
-        path = item.nodeid.replace("\\", "/")
-        if any(path.startswith(p) for p in SWEEP):
-            item.add_marker(pytest.mark.sweep)
-        elif any(path.startswith(p) for p in UNIT):
-            item.add_marker(pytest.mark.unit)
-        elif any(path.startswith(p) for p in WORLD):
-            item.add_marker(pytest.mark.world)
-        elif any(path.startswith(p) for p in INTEGRATION):
-            item.add_marker(pytest.mark.integration)
-        else:
-            item.add_marker(pytest.mark.unit)
+        item.add_marker(getattr(pytest.mark, tier(item.nodeid)))
