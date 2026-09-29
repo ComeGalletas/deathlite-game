@@ -15,7 +15,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-010 · ENT-018 · SPN-004 · WLD-015 · RND-008 · UI-014 ·
+**Next free:** CMB-011 · ENT-018 · SPN-004 · WLD-015 · RND-008 · UI-014 ·
 PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 
 ## Requirements
@@ -31,6 +31,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | CMB-007 | Elemental design doc brought to the shipped behaviour (open questions closed bar one) | CMB, DOC | process | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | CMB-008 | Particle and damage-number limits under a dense reaction cascade (design §13 q.12) | CMB, RND | feature | done | [reaction_damage_rework_journal.md](reaction_damage_rework_journal.md) | claude/cmb-008-cascade-limits | 2026-09-22 |
 | CMB-009 | Elemental extras: building glow, §9.8 counters, §10.3 dev tools | CMB, RND, SYS | feature | done | [elemental_system_journal.md](elemental_system_journal.md) | claude/cmb-009-elemental-extras | 2026-09-22 |
+| CMB-010 | Projectiles climb stairs; bouncing shots follow walking steps | CMB, WLD | feature | in progress | [projectile_elevation_journal.md](projectile_elevation_journal.md) | claude/projectile-collision-priority-aaaf97 | 2026-09-29 |
 | ENT-001 | Enemy AI architecture | ENT | refactor | legacy | [enemy_ai_journal.md](enemy_ai_journal.md) | — | 2026-08-28 |
 | ENT-002 | Pig rider boss | ENT | feature | legacy | [pig_rider_boss_journal.md](pig_rider_boss_journal.md) | — | 2026-09-12 |
 | ENT-003 | Chaser collider | ENT | bug | legacy | [chaser_collider_journal.md](chaser_collider_journal.md) | — | 2026-09-15 |
