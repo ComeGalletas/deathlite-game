@@ -273,3 +273,94 @@ setup), then spawn-director and cut-script checks around 1 s. The 18.1 /
 tier is **9 to 10 times faster**.
 
 - `pytest.ini` and the conftest docstring say how to check the tiers.
+
+---
+
+## TST-007 — Requirement (owner, 2026-09-29)
+
+**ID:** TST-007 · **System:** tests · **Type:** bug · **Status:** done ·
+**Branch:** ComeGalletas/tst-007-ultrawide-font-init-83009add (stacked on
+TST-006's branch; the session worktree `.claude/worktrees/busy-shtern-6bb78d`)
+
+- **Objective:** `tests/screens/test_ultrawide.py::PanelsStayInTheBoxTests::
+  test_a_level_up_draw_without_the_dim_leaves_the_margins_alone` passes when
+  run on its own, not only after another test has booted a `Game`.
+- **Details:**
+  - Found in TST-006.4 (critic pass): run alone it fails with
+    `pygame.error: font not initialized` from `LevelUpPanel.draw`. In a full
+    run it passes only because `test_the_pause_buttons_are_centred_in_the_box_not_the_surface`
+    sorts first in the class and boots a real `Game`, which initialises
+    pygame's font module.
+  - Give the test the setup it needs, the way the neighbouring pure tests
+    in `tests/screens/` do (`pygame.display.init()`,
+    `pygame.display.set_mode((64, 64))`, `pygame.font.init()` in
+    `setUpClass`), without booting a `Game`.
+  - Check the tier: `python -m tools.verification.tier_audit` reports 0
+    under-tiered; if the test no longer needs a Game, decide whether it
+    belongs in `unit` (its class is registered in `INTEGRATION`).
+- **Constraint:** no `Game` boot added; the test keeps checking the same
+  thing; nothing else in the module changes behaviour.
+
+## TST-007 — Decisions
+
+- **D1 — the test gets its own class, and falls to `unit`.** It builds a
+  `LevelUpPanel` and draws it on a plain surface; it needs a display and
+  the font module, never a `Game`. Left in `PanelsStayInTheBoxTests`, the
+  class would stay whole in `INTEGRATION` (TST-006.D1: a mixed class goes
+  whole to its highest tier), so adding a `setUpClass` there fixes the
+  order dependence but keeps a pure test in the slow tier. Moved to
+  `LevelUpPanelMarginTests`, which no tuple in `tests/conftest.py` names,
+  so it is `unit`; `PanelsStayInTheBoxTests` keeps only the pause test,
+  which boots a `Game` and stays `integration`. No conftest change.
+- **D2 — the module's other pure tests stay where they are.**
+  `DimCoversTheMarginsTests::test_level_up` and
+  `ScreenBackdropTests::test_overlays_declare_no_backdrop_colour` ride up
+  with booting classes (TST-006.D1) but each passes alone (checked); they
+  are over-tiered, not order-dependent, and TST-006.D3 reports those
+  rather than moving them.
+
+## TST-007 — Plan
+
+- `tests/screens/test_ultrawide.py`: `LevelUpPanelMarginTests` with a
+  `setUpClass` that initialises the display and font modules; the test
+  moves there unchanged.
+- Verify: the test alone (fails before, passes after), the whole module,
+  the module's `unit` slice (no Game in the process at all),
+  `tier_audit` (0 under-tiered), `tests/devtools/test_tier_audit.py`.
+
+## TST-007 — Todo
+
+- [x] TST-007.1 — Move the level-up margin test into its own pure class
+  with its own setup (D1).
+- [x] TST-007.2 — Verify and close: runs, tier audit, index.
+
+## TST-007 — Log
+
+### 2026-09-29 — TST-007.1: the test gets its own class
+
+- Before (`9cf0139`, run alone):
+  `python -m pytest -p no:cacheprovider "tests/screens/test_ultrawide.py::PanelsStayInTheBoxTests::test_a_level_up_draw_without_the_dim_leaves_the_margins_alone"`
+  → 1 failed, `pygame.error: font not initialized` from `pygame.sysfont`
+  under `LevelUpPanel.draw`.
+- After, the same test under its new node
+  `tests/screens/test_ultrawide.py::LevelUpPanelMarginTests::test_a_level_up_draw_without_the_dim_leaves_the_margins_alone`:
+  1 passed alone (0.5 s); `python -m unittest
+  tests.screens.test_ultrawide.LevelUpPanelMarginTests` OK.
+
+### 2026-09-29 — TST-007.2: verified, closed
+
+- Whole module: 12 passed (the one warning, "no fast renderer available",
+  is the dummy video driver in `game/display/window.py`, there before).
+- Tiers: `-m unit` on the module selects `LongBackgroundStripTests` and
+  `LevelUpPanelMarginTests` (2 passed); `-m integration` selects the other
+  ten, `PanelsStayInTheBoxTests` now holding only the pause test.
+- `python -m tools.verification.tier_audit`: 3480 tests read; 0
+  under-tiered. `--over` listed three tests of this module before and lists
+  two now (the D2 pair); the moved test is no longer over-tiered.
+- `tests/devtools/test_tier_audit.py`: 30 passed, `SuiteTests` included.
+- **Only the isolated run proves the fix.** With `setUpClass` deleted from
+  the new class, the module's `unit` slice still passed: it runs
+  `LongBackgroundStripTests` first, and the cut script it checks calls
+  `pygame.init()` (`tools/asset_pipeline/cut_menu_background_long.py`).
+  So any run with an earlier test in the process can hide this bug again;
+  running the class or test alone is the check.
