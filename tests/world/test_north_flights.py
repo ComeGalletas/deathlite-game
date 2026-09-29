@@ -28,7 +28,7 @@ from tests import worlds as W
 from world.gen.height.graph import walk_links
 from world.layout import GROUND, VSTAIR
 from world.nav.field import NavField, _INF
-from world.rules.steps import can_cross
+from world.rules.steps import can_cross, can_step
 
 SEEDS = (35, 7)
 
@@ -95,6 +95,37 @@ class GeneratedTests(unittest.TestCase):
                 self.assertTrue(can_cross(ix, (a[0], a[1] - 1), a))
                 self.assertTrue(can_cross(ix, (a[0], a[1] + 1), a))
 
+    def test_a_body_walks_through_the_door_sideways(self):
+        """WLD-014: a north flight has no walls at its flanks. On every one,
+        a body walks from each flank onto the flight and back, and from the
+        flank down through the flight to the landing -- while the frontier
+        beside the door stays shut: no step from a flank straight to the
+        low ground north of it, nor diagonally to the landing."""
+        for seed in SEEDS:
+            gm = W.game_map(seed)
+            ix = gm._levels
+            for room, pos, _cell in _north_flights(gm.layout):
+                at = _abs_tiles(room)
+                a = at(pos)
+                where = f"seed {seed} at {pos}"
+                landing = (a[0], a[1] - 1)
+                for dc in (-1, 1):
+                    flank = (a[0] + dc, a[1])
+                    north = (flank[0], flank[1] - 1)
+                    self.assertTrue(can_cross(ix, flank, a), where)
+                    self.assertTrue(can_cross(ix, a, flank), where)
+                    self.assertTrue(gm.path_ok(_centre(ix, flank), _centre(ix, a)),
+                                    where)
+                    self.assertTrue(gm.path_ok(_centre(ix, a), _centre(ix, flank)),
+                                    where)
+                    self.assertTrue(gm.is_walkable(_centre(ix, a), 16.0,
+                                                   frm=_centre(ix, flank)),
+                                    f"{where}: a small body is refused the door "
+                                    f"from its {'west' if dc < 0 else 'east'} flank")
+                    self.assertFalse(can_step(ix, flank, north), where)
+                    self.assertFalse(can_step(ix, flank, landing), where)
+                    self.assertFalse(can_step(ix, landing, flank), where)
+
     def test_both_nav_classes_can_climb_one(self):
         """From the low landing, the field reaches the terrace tile south of
         the flight, and back the other way.
@@ -121,8 +152,11 @@ class GeneratedTests(unittest.TestCase):
                 checked = 0
                 for room, (c, r), _cell in _north_flights(layout):
                     at = _abs_tiles(room)
+                    # up and down, and in from either flank (WLD-014)
                     for frm, to in (((c, r - 1), (c, r + 1)),
-                                    ((c, r + 1), (c, r - 1))):
+                                    ((c, r + 1), (c, r - 1)),
+                                    ((c - 1, r), (c, r - 1)),
+                                    ((c + 1, r), (c, r - 1))):
                         ff.rebuild(_centre(ix, at(frm)), min_clearance=clearance)
                         self.assertTrue(
                             any(ff.cost_at(p) < _INF

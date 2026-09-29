@@ -20,7 +20,8 @@ def walk_links(grid, pos) -> list:
     terrace on the opposite side of its foot -- the entry and exit tiles the
     journal's diagram calls for. A north flight (`dir == "n"`) is one cell on
     a plateau's back and is the mirror: the low ground lies north of it and
-    its own terrace south.
+    its own terrace south -- and, being a door rather than a corridor, its
+    own terrace east and west as well.
 
     One rule per cell kind, each in its own function below; this picks it."""
     cell = grid.get(pos)
@@ -71,10 +72,19 @@ def _ground_links(grid, pos, cell) -> list:
 
 def _north_flight_links(grid, pos, cell, out) -> None:
     """The rim cell of a plateau's back. Down is north, up is south; there
-    is no stack, the one cell is both head and foot."""
+    is no stack, the one cell is both head and foot.
+
+    It is a door in the frontier between the two floors (WLD-014), not a
+    corridor: the plateau ground either side of it at its own level joins
+    it too, so the only walls left are the frontier itself -- the north
+    edges of the rim cells beside the door. Changing floors still means
+    standing on the flight: the flanks are ground at `level`, and
+    `steps.diagonal_blocked` refuses the flank-to-landing corner."""
     c, r = pos
     _ground(grid, out, (c, r - 1), cell.level - cell.drop)
     _ground(grid, out, (c, r + 1), cell.level)
+    _ground(grid, out, (c - 1, r), cell.level)
+    _ground(grid, out, (c + 1, r), cell.level)
 
 
 def _wall_flight_links(grid, pos, cell, out) -> None:

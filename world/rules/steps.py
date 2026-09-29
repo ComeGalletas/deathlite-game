@@ -37,9 +37,13 @@ def _flight_opens(index, ftile, gtile) -> bool:
 
     if cell.kind == VSTAIR and cell.dir == "n":
         # The rim cell on a plateau's back: the runtime half of the north
-        # branch in `walk_links`. Down is north, up is south, one cell.
+        # branch in `walk_links`. Down is north, up is south, one cell, and
+        # it is a door rather than a corridor (WLD-014): the plateau ground
+        # beside it at its own level opens onto it as well.
         return (ground((c, r - 1), cell.level - cell.drop)
-                or ground((c, r + 1), cell.level))
+                or ground((c, r + 1), cell.level)
+                or ground((c - 1, r), cell.level)
+                or ground((c + 1, r), cell.level))
 
     if cell.kind == VSTAIR:
         return ((cell.row == 0 and ground((c, r - 1), cell.level))
@@ -127,7 +131,8 @@ def can_cross(index, a, b) -> bool:
     """May a body move from tile `a` to the orthogonally adjacent tile `b`?
 
     Ground joins ground of its own level; a flight joins the flight cells above
-    and below it in its own stack, and joins ground only at its head and foot.
+    and below it in its own stack, and joins ground only at its head and foot
+    (a north flight, a door, also at its two flanks; see `_flight_opens`).
     Anything else -- a lateral level change with no stone in it, a terrace's
     back edge, the middle of a staircase -- is a wall you cannot walk through
     even though both tiles are floor.

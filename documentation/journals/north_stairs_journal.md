@@ -394,13 +394,15 @@ and a body steps east and west off the flight cell onto the plateau.
   tile is plain interior grass with no lip and no stair, landing tile
   carries the half, both tags required per seed; south flights still
   pixel-identical. Bake and draw digests re-pinned.
-- [ ] WLD-014.2 — Gameplay: `_north_flight_links` and `_flight_opens` add
+- [x] WLD-014.2 — Gameplay: `_north_flight_links` and `_flight_opens` add
   east and west to ground at `level`. Hand-built grid tests for the four
   edges, the unchanged diagonal refusal across the drop, and the
   runtime-mirrors-generator test over the shared worlds.
-- [ ] WLD-014.3 — Generator consequence (D3): measure the north-flight
+- [x] WLD-014.3 — Generator consequence (D3): measure the north-flight
   count before and after, retire the dead rollback in `_cut` and replace
-  its test, re-pin the world digests, record the rates here.
+  its test, re-pin the world digests, record the rates here. Landed in
+  the WLD-014.2 commit: the link change is what moves generation and
+  invalidates the rollback test, and that commit has to be green.
 - [ ] WLD-014.4 — Screenshot of a rock and a grass north flight on the
   seed 35 island used for NS-6/NS-7, before and after; journal results and
   close WLD-014 in `INDEX.md`.
@@ -446,4 +448,73 @@ and a body steps east and west off the flight cell onto the plateau.
   (the other readers of the baked terrain) 75 passed.
 - **Screenshot delivered:** seed 35, room 0, the rock flight at (20, 6) and
   the grass flight at (11, 8), before and after.
+
+### WLD-014.2 — What landed (2026-09-29), with WLD-014.3
+
+- `world/gen/height/graph.py::_north_flight_links` and its runtime mirror
+  `world/rules/steps.py::_flight_opens` join the flight to plateau ground
+  at its own level east and west, as well as the landing north and the
+  terrace south. Nothing else in nav, the collider, the flow field or the
+  inset field needed to change: they all read these two.
+- **What stays shut.** A flank does not reach the low ground north of it
+  (ground at two levels never joins), and a flank and the landing are
+  never one move apart (`diagonal_blocked` refuses a ground-to-ground
+  diagonal across levels). Changing floors still means standing on the
+  flight.
+- **D3, confirmed.** With the flanks joined through the flight, the
+  rollback in `flights._cut` could no longer fire, so it is gone: a north
+  cut always stands, and the stranded-cap loop takes its first pick. Its
+  two draws (the site, then the tag) are the same draws in the same order,
+  so the stream is unchanged.
+- **Knock-on.** `scatter._flight_keepouts` reads `walk_links`, so each
+  north flight's keep-out now covers its two flanks as well. That is right
+  (a tree on a flank would block the door the same way one on the landing
+  blocks it) and it is what moves the obstacles below.
+
+**Measured** over the NS-4 seeds (35, 7, 1234, 42, 3, 99), before and
+after:
+
+| seed | north flights | obstacles |
+|---|---|---|
+| 35 | 22 → 22 | 618 → 620 |
+| 7 | 21 → 22 | 608 → 587 |
+| 1234 | 13 → 13 | 563 → 576 |
+| 42 | 13 → 14 | 606 → 595 |
+| 3 | 14 → 14 | 552 → 561 |
+| 99 | 23 → 24 | 651 → 670 |
+| **total** | **106 → 109** | **3598 → 3609** |
+
+Before the change 109 north cuts were attempted and 3 rolled back (one
+each on seeds 7, 42 and 99); after, all 109 stand, which is the +3. Wall-cut
+(73) and east/west plus lateral (324) flights are unchanged, and every grid
+validates (`check_grid` empty on all six). The obstacle counts move because
+the flank keep-outs shift the scatter's accepted spots and so its stream;
+the totals move by 0.3%.
+
+**Tests.**
+- `tests/world/grids/test_north_flight_rules.py`:
+  `test_the_door_has_no_walls_at_its_flanks` (the four links, both ways),
+  `test_the_frontier_stays_shut_beside_the_door` (flank to low ground
+  refused; the landing reaches the terrace only through the flight),
+  `test_a_flank_at_another_level_does_not_link`. The rollback test is
+  replaced by `test_a_rim_cell_that_is_the_only_join_keeps_its_strip_joined`
+  (the generator leads, the tests follow).
+- `tests/world/test_north_flights.py`:
+  `test_a_body_walks_through_the_door_sideways` on every north flight of
+  seeds 35 and 7: `can_cross` both ways at each flank, `path_ok` both
+  ways, `is_walkable` for a radius-16 body stepping in from each flank, and
+  `can_step` refused from a flank to the low ground north of it and between
+  a flank and the landing in both directions. The nav-class test now also
+  reaches the landing from each flank, for both nav classes.
+  `test_the_runtime_rule_mirrors_the_generator` and
+  `tests/world/test_elevation.py` (mirror on every cell of every island)
+  hold the two sides together.
+- **Mutation check.** Four mutants, all caught: flanks dropped from the
+  generator side only, from the runtime side only, from both, and the
+  generator linking a flank at the low level.
+- **Pins.** World digests re-pinned (layout, bake and frame moved on all
+  four digest seeds). `tools/verification/run_digests.json` re-pinned:
+  seeds 7 and 123 moved, as the world under them did. That pin is a manual
+  A/B tool; `tests/flows/test_run_determinism.py` compares processes with
+  each other, not with it.
 

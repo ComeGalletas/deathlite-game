@@ -382,7 +382,10 @@ instead of surf, keyed **directly** by the open sides: `"" → 15`, `"n" → 6`,
 - A north flight is a **door** in the frontier between two floors
   (WLD-014): its rim cell is plain interior grass, so the rim's lip breaks
   there, and only the landing half of the channel or stone is drawn, on the
-  low floor's band. Nothing of it covers the rim.
+  low floor's band. Nothing of it covers the rim. It walks as a door too:
+  `walk_links` (and its runtime mirror `steps._flight_opens`) join it to
+  the plateau ground at its east and west flanks as well as to the landing
+  and the terrace, so the only walls left are the frontier's own.
 
 ### Bridges (`bridge`)
 
