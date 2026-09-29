@@ -375,6 +375,33 @@ class BombletFxTests(unittest.TestCase):
                     if p.active and "cluster" in p.source_tags]
         return ps, fx, w, bomblets
 
+    def test_bomblets_are_thrown_from_the_bombs_floor(self):
+        """CMB-010: a bomblet inherits the bomb's floor. Stamping its own at
+        the scatter point would read the height of the cliff face a blocked
+        bomb stopped on -- the terrace above -- and let the bomblets fly up
+        onto it."""
+        ps = fake_ps([])
+        fx = TransientFx(ps)
+        w = bomb()
+        w.forge = self.FORGE
+        w.effects.update(get_content().forges[self.FORGE]["effects"])
+        ps.player.weapons.append(w)
+        w.update(1 / 60, FireContext(
+            origin=pygame.Vector2(0, 0), enemies=[_Target(NEAR, 0)],
+            damage_multiplier=1.0, attack_speed_multiplier=1.0,
+            projectile_speed_multiplier=1.0, area_multiplier=1.0,
+            fallback_dir=pygame.Vector2(1, 0),
+            spawn_projectile=ps._spawn_projectile))
+        (parent,) = [p for p in ps.projectiles if p.active]
+        parent.floor = 1                 # the flat map stamps nothing itself
+        for _ in range(67):
+            fx.update_projectiles(1 / 60)
+        bomblets = [p for p in ps.projectiles
+                    if p.active and "cluster" in p.source_tags]
+        self.assertGreater(len(bomblets), 0)
+        for b in bomblets:
+            self.assertEqual(b.floor, 1)
+
     # --- the rig each detonation plays -----------------------
     def test_burst_rig_is_the_small_sheet_only_for_a_bomblet(self):
         fx = TransientFx(fake_ps([]))

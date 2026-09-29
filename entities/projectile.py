@@ -15,12 +15,15 @@ Extra hit filters:
                  blocked) `TransientFx.detonate` spawns a blast of
                  `blast_radius` that lasts `blast_lifetime`.
   * stun_chance > 0       -- Hammer (P1); the resolver rolls a stun on hit.
-  * bounces_left > 0      -- a pinball (buff buildings); the obstacle and
-                 terrain blocks reflect it instead of killing it.
+  * bounces_left > 0      -- a bouncing shot (the pinball buff by default;
+                 any spawn may pass `bounces=N`). Obstacles and terrain
+                 reflect it instead of killing it, and it moves over the
+                 terrain like a walking body (CMB-010).
 `weapon_id` names the weapon that fired it (synergies read it later).
 
-`fire_level` carries the terrain elevation the shot was fired from, for the
-LD-9 D10 rule; see `TransientFx.block_on_terrain`.
+`floor` carries the elevation the shot is travelling on: stamped at the
+muzzle, raised when it climbs a staircase. See
+`game/states/playing/core/shot_terrain.py`.
 """
 from __future__ import annotations
 
@@ -42,11 +45,11 @@ class Projectile:
         "anchor", "orbit_angle", "orbit_radius", "orbit_speed",
         "rehit_interval", "rehit_timer",
         "cone_dir", "cone_half_angle", "style", "fx", "trail_shed",
-        "fire_level",
+        "floor",
         "weapon_id", "age", "stop_after", "inert", "blast_radius",
         "blast_lifetime", "detonated", "stun_chance", "stun_duration",
         "no_block", "mine", "arm_delay", "swing", "sticky", "stuck_to",
-        "bounces_left", "element", "infusion",
+        "bounces_left", "landed", "element", "infusion",
     )
 
     def __init__(self) -> None:
@@ -76,13 +79,16 @@ class Projectile:
         self.style = ""          # render-only: forces a `projectiles/` draw family
         self.fx: dict = {}       # render-only: per-weapon effect tuning
         self.trail_shed = 0.0    # render-only: world px travelled since the last trail puff
-        # LD-9 D10: the terrain elevation this shot was fired from. Stamped by
-        # the spawner right after `reset`, because only the spawner knows the
-        # true muzzle position -- by the projectile's first update it has
-        # already moved several pixels, which at a rim is enough to sample the
-        # wrong tile. `NONE` disables the rule, which is what a flat world and
-        # every unit test that builds a projectile directly get.
-        self.fire_level = _NO_LEVEL
+        # The elevation this shot is travelling on (CMB-010). Stamped by the
+        # spawner right after `reset` from the terrain under the muzzle,
+        # because only the spawner knows the true muzzle position -- by the
+        # projectile's first update it has already moved several pixels,
+        # which at a rim is enough to sample the wrong tile. A plain shot's
+        # floor rises when it climbs a staircase and never drops; a bouncing
+        # shot's follows the ground. `NONE` switches the plain rule off, which
+        # is what a flat world and every unit test that builds a projectile
+        # directly get.
+        self.floor = _NO_LEVEL
         self.weapon_id = ""
         self.age = 0.0
         self.stop_after = 0.0        # > 0: halt after this many seconds
@@ -98,10 +104,14 @@ class Projectile:
         self.swing = 0               # CR2: the attack's ordinal (1 = first); picks the slash
         self.sticky = False          # Sticky Bomb: attaches to the first enemy it touches...
         self.stuck_to = None         # ...and this is the enemy it rides on
-        # Buff buildings: a pinball reflects off obstacles, cliffs and the
-        # shoreline this many more times before it is spent; 0 for every
-        # ordinary shot, which the blocks kill on contact as before.
+        # A bouncing shot reflects off obstacles and off every wall a body
+        # could not cross -- cliffs up or down, the shoreline -- this many
+        # more times before it is spent. The pinball buff sets it; 0 for every
+        # other shot, which the blocks kill on contact.
         self.bounces_left = 0
+        # A bouncing shot on the ground (True) or in flight (False); None
+        # until its first frame decides (CMB-010, `TransientFx.bounce`).
+        self.landed = None
         # Elemental system: the element this attack carries, stamped by
         # the spawner (M6). `NONE` for a plain attack, which is every
         # attack until a weapon is infused.
@@ -155,7 +165,7 @@ class Projectile:
         self.fx = fx if fx is not None else {}
         self.trail_shed = 0.0
         # Pooled: a recycled projectile must not inherit the last shot's level.
-        self.fire_level = _NO_LEVEL
+        self.floor = _NO_LEVEL
         self.weapon_id = weapon_id
         self.age = 0.0
         self.stop_after = stop_after
@@ -172,6 +182,7 @@ class Projectile:
         self.sticky = sticky
         self.stuck_to = None
         self.bounces_left = int(bounces)
+        self.landed = None
         self.element = element
         self.infusion = infusion
 

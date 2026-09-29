@@ -320,7 +320,7 @@ class ShotsOverTheSeaTests(unittest.TestCase):
         p.reset(pos=pygame.Vector2(self.sea), vel=pygame.Vector2(), damage=1,
                 radius=4, lifetime=1.0)
         p.active = True                          # the pool's job, done by hand
-        p.fire_level = 2                         # fired from a high terrace
+        p.floor = 2                              # fired from a high terrace
         fx.block_on_terrain(p)
         self.assertTrue(p.active)
         self.assertEqual(bursts, [])
@@ -333,8 +333,8 @@ class ShotsOverTheSeaTests(unittest.TestCase):
         p.reset(pos=pygame.Vector2(self.sea), vel=pygame.Vector2(), damage=1,
                 radius=4, lifetime=1.0)
         p.active = True                          # the pool's job, done by hand
-        fx.stamp_fire_level(p)
-        self.assertEqual(p.fire_level, NONE)
+        fx.stamp_floor(p)
+        self.assertEqual(p.floor, NONE)
         # ...and later over the highest ground on the map
         ix = self.gm._levels
         high = max(((ix.top_at_point(r.rect.centerx, r.rect.centery), r)
