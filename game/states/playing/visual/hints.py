@@ -13,9 +13,8 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config
 from ui import keycap, scale
-from ui.text import shadowed
 
 CAP = keycap.CAP_PX
 CAP_GAP = 4             # between caps of a cluster
@@ -48,12 +47,13 @@ def _cluster_size(rows: list[list[str]]) -> tuple[int, int]:
     return w, h
 
 
-def layout(ps, clusters, top: int, cx: int, font) -> list:
+def layout(ps, clusters, top: int, cx: int, cache) -> list:
     """Where everything goes: `[("cap", label, face_center) | ("word",
     surface, rect), ...]` for a block whose bottom sits `CLEAR_PX` above
-    `top`, centred on `cx`."""
+    `top`, centred on `cx`. The words come from `cache` (the run's
+    `TextCache`), rendered once rather than every frame."""
     cap, gap = scale.px(CAP), scale.px(CAP_GAP)
-    words = [shadowed(font, w, config.COLOR_TEXT) for w, _rows in clusters]
+    words = [cache.shadowed("body", WORD_PX, w, config.COLOR_TEXT) for w, _rows in clusters]
     sizes = [_cluster_size(rows) for _w, rows in clusters]
     widths = [cw + scale.px(WORD_GAP) + word.get_width() for (cw, _), word in zip(sizes, words)]
     height = max(h for _, h in sizes)
@@ -79,34 +79,59 @@ def layout(ps, clusters, top: int, cx: int, font) -> list:
     return out
 
 
+def extent(ps, items, states=None) -> pygame.Rect:
+    """The screen rect `layout`'s items paint: every cap's `keycap.
+    footprint` (its frame, and its written label where that runs past the
+    frame, as the mouse cap's `CLICK` does without the cursor art) and
+    every word. `states` is each item's cap state, raised when omitted."""
+    rects = []
+    for i, (kind, a, b) in enumerate(items):
+        if kind == "cap":
+            state = states[i] if states else "raised"
+            rects.append(keycap.footprint(ps.game.assets, b, a, state=state, colour="blue",
+                                          cache=ps.text_cache))
+        else:
+            rects.append(b)
+    return rects[0].unionall(rects[1:])
+
+
 def draw(surface: pygame.Surface, ps) -> pygame.Rect | None:
     """Paint the current stage (or the one fading out); returns the rect
-    the block covered, or None when nothing is shown."""
+    the block covered, or None when nothing is shown.
+
+    Fonts and words come from the run's `TextCache`, so a frame builds
+    none (RND-008.3). A fading stage is drawn into a buffer covering
+    everything the block paints (`extent`), not the whole screen, and laid
+    over it at the fade's alpha: the whole-screen buffer was transparent
+    everywhere else, so the result is the same."""
     hints = getattr(ps, "hints", None)
     if hints is None or not hints.visible:
         return None
-    font = fonts.body(WORD_PX)
+    cache = ps.text_cache
     cx, top = hero_top(ps)
     if hints.fading is not None:
         clusters, left = hints.fading
         alpha = max(0, min(255, int(255 * left / max(1e-6, config.HINT_FADE))))
-        target = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
     else:
-        clusters, alpha, target = hints.clusters(), 255, surface
+        clusters, alpha = hints.clusters(), 255
     if not clusters:
         return None
-    items = layout(ps, clusters, top, cx, font)
-    covered = None
-    for kind, a, b in items:
+    items = layout(ps, clusters, top, cx, cache)
+    states = ["pressed" if kind == "cap" and alpha == 255 and hints.held(a) else "raised"
+              for kind, a, _b in items]
+    block = extent(ps, items, states)
+    if alpha == 255:
+        target, dx, dy = surface, 0, 0
+    else:
+        target = pygame.Surface(block.size, pygame.SRCALPHA)
+        dx, dy = -block.x, -block.y
+    for (kind, a, b), state in zip(items, states):
         if kind == "cap":
-            held = hints.held(a) if alpha == 255 else False
-            r = keycap.draw_keycap(target, ps.game.assets, b, a, colour="blue",
-                                   state="pressed" if held else "raised")
+            keycap.draw_keycap(target, ps.game.assets, (b[0] + dx, b[1] + dy), a,
+                               colour="blue", state=state, cache=cache)
         else:
-            target.blit(a, b)
-            r = b
-        covered = r if covered is None else covered.union(r)
+            target.blit(a, b.move(dx, dy))
     if target is not surface:
         target.set_alpha(alpha)
-        surface.blit(target, (0, 0))
-    return covered
+        surface.blit(target, block.topleft)
+    return block

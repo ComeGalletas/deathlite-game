@@ -74,36 +74,86 @@ def begin_frame(run) -> None:
     visuals.auras_drawn = 0
 
 
-def draw_under(surface, run, level=None) -> None:
+class Bands:
+    """One frame's bodies and aura motes, sorted onto their terraces once.
+
+    `draw_under` runs once per terrace, and each run used to test the
+    whole field against the terrace being painted: every body in view
+    twice (the aura pass and the status pass) and every mote once, per
+    terrace. That was about 820 terrain lookups a frame in the stress
+    harness's packed, primed fight (measured). `bands` does the sort once,
+    before the terraces are painted, and each pass takes its own list
+    (RND-008.4). Nothing is kept between frames, so there is nothing to go
+    stale.
+    """
+    __slots__ = ("bodies", "motes")
+
+    def __init__(self, bodies: dict, motes: dict) -> None:
+        self.bodies = bodies       # level -> bodies in view, in `_bodies` order
+        self.motes = motes         # level -> under-layer particles, in pool order
+
+
+def bands(run) -> Bands | None:
+    """The frame's `Bands`, or None when there is no map to sort against
+    (the passes then sort their own, as they did before).
+
+    Sorting ahead is the same as sorting in each pass: nothing between the
+    first terrace and the last moves a body or a mote, and the motes an
+    aura sheds during the passes land on the body's own terrace, whose
+    motes are already drawn, so they wait for the next frame either way.
+    """
+    game_map = getattr(run, "game_map", None)
+    if game_map is None or run.element_visuals is None:
+        return None                 # nothing to sort for, or nothing to draw
+    level_at = game_map.renderer.level_at
+    bodies: dict = {}
+    for body in layers.in_band(run, None):
+        bodies.setdefault(level_at(body.pos.x, body.pos.y), []).append(body)
+    motes: dict = {}
+    particles = getattr(run, "particles", None)
+    if particles is not None:
+        for p in particles.layer(True):
+            motes.setdefault(level_at(p.pos.x, p.pos.y), []).append(p)
+    return Bands(bodies, motes)
+
+
+def draw_under(surface, run, level=None, bands=None) -> None:
     """The elemental state of the field, under the bodies it belongs to.
 
     Auras, the Wind tornado, the status marks and Thunder's jump arcs. All
     of them describe something that *is the case* about a body or a patch of
     ground, so they paint with the terrace and the sprites go over them
     (M10 rule 3). `level=None` draws the lot wherever it is, which is what
-    the headless tests and `draw` below pass.
+    the headless tests and `draw` below pass. `bands` is the frame's
+    `Bands`, when the caller sorted it once for every terrace.
     """
     visuals = run.element_visuals
     if visuals is None:
         return
     now = run.stats["time"]
-    _shed_particles(surface, run, level)
+    sorted_ = bands is not None and level is not None
+    bodies = bands.bodies.get(level, ()) if sorted_ else None
+    _shed_particles(surface, run, level, bands.motes.get(level, ()) if sorted_ else None)
     transient.draw_areas(surface, run, visuals.profiles, now, level)
     visuals.auras_drawn += layers.draw_auras(
-        surface, run, visuals.profiles, now, visuals.budget, level)
-    layers.draw_statuses(surface, run, visuals.profiles, now, level)
+        surface, run, visuals.profiles, now, visuals.budget, level, bodies)
+    layers.draw_statuses(surface, run, visuals.profiles, now, level, bodies)
     transient.draw_transient(surface, run, visuals.profiles, now, level,
                              over=False)
 
 
-def _shed_particles(surface, run, level) -> None:
+def _shed_particles(surface, run, level, motes=None) -> None:
     """The aura's shed, with this terrace and under its bodies.
 
     Lowest of the elemental layers: these are motes coming off a body, so
-    they belong beneath even the tornado and the jump arcs.
+    they belong beneath even the tornado and the jump arcs. `motes` is this
+    terrace's share when the frame was sorted ahead (`bands`).
     """
     particles = getattr(run, "particles", None)
     if particles is None:
+        return
+    if motes is not None:
+        particles.draw(surface, run.camera, under=True, only=motes)
         return
     keep = None
     if level is not None:

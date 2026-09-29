@@ -780,7 +780,8 @@ MUSIC_DUCK: float = 0.4
 # die fast, so the crowd should sit near its ceiling rather than creep to it.
 # BASE 40 -> 100 (the schedule no longer throttles the first two minutes;
 # placement is what paces the fill, about one body a second) and LIVE_CAP
-# 100 -> 150. Measured with `python -m tools.benchmarks.spawn_stress` and a two-minute run:
+# 100 -> 150. Measured with `python -m tools.benchmarks.spawn_stress` (its
+# pre-RND-008 defaults; `--hints --live-director` re-takes them) and a two-minute run:
 # a real run holds ~125 live at p50 7.4 / p99 11.6 ms a frame, 4 frames of
 # 7,200 over the 60 fps budget; the harness, which packs every body into the
 # zone around the hero, takes 146 live at p50 13.4 ms (2 % over budget) and
@@ -801,7 +802,8 @@ ENEMY_LIVE_CAP: int = 250
 # on screen. 1 updates every enemy every frame; 2 updates such an enemy
 # every other frame with a doubled `dt` and skips it entirely on the frames
 # between (the profile put the per-enemy cost in the movement probe, not the
-# AI). Measured with `python -m tools.benchmarks.spawn_stress` before choosing the default:
+# AI). Measured with `python -m tools.benchmarks.spawn_stress` before choosing the default
+# (its pre-RND-008 defaults; `--hints --live-director` re-takes them):
 # 2 took the 100-live p50 from 7.8 to 5.8 ms, 3 only to 5.1 -- see the spawn
 # master journal (S7).
 ENEMY_LOD_SKIP: int = 2

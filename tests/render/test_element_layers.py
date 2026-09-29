@@ -90,9 +90,9 @@ class DrawOrderTests(unittest.TestCase):
         real_begin = element_fx.begin_frame
         real_enemy = self.ps._draw_one_enemy
 
-        def under(surface, run, level=None):
+        def under(surface, run, level=None, **kw):     # kw: the frame's `bands`
             events.append("under")
-            return real_under(surface, run, level)
+            return real_under(surface, run, level, **kw)
 
         def reactions(surface, run):
             events.append("reaction")

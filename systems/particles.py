@@ -78,8 +78,12 @@ class ParticleSystem:
             p.update(dt)
         self._pool.sweep()
 
+    def layer(self, under: bool):
+        """The live particles of one layer, in pool (drawing) order."""
+        return [p for p in self._pool if p.under is under]
+
     def draw(self, surface: pygame.Surface, camera, under=None,
-             keep=None) -> None:
+             keep=None, only=None) -> None:
         """One layer of the pool, or both.
 
         `under` selects a layer: `True` for the ones that paint with the
@@ -89,10 +93,12 @@ class ParticleSystem:
 
         `keep` is an optional predicate on a particle's position, used by
         the banded pass to take only the ones standing on the terrace being
-        painted.
+        painted. `only` is the same thing done ahead of time: a list taken
+        from `layer`, already sorted onto the terrace, drawn instead of the
+        pool (RND-008.4).
         """
         z = getattr(camera, "zoom", 1.0)
-        for p in self._pool:
+        for p in self._pool if only is None else only:
             if under is not None and p.under is not under:
                 continue
             if keep is not None and not keep(p.pos):

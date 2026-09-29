@@ -32,6 +32,7 @@ import pygame
 from game import config, fonts
 from game.state import State
 from ui import controls_block, scale, widgets
+from ui.text_cache import TextCache
 from ui.menu_nav import MenuNav
 
 _ROWS = ("resume", "status", "options", "key_layout", "quit")
@@ -76,6 +77,9 @@ class PausedState(State):
         self._hint = fonts.body(16)
         self._controls_font = fonts.body(20)
         self._controls_head = fonts.heading(26)
+        # The Controls block's keycap labels, drawn every paused frame
+        # (RND-008.3): built once per scale, not once per cap per frame.
+        self._text_cache = TextCache()
 
     def on_display_changed(self) -> None:
         self._build_fonts()          # the sizes follow the new scale
@@ -155,7 +159,8 @@ class PausedState(State):
 
         controls_block.draw(surface, self.game.assets,
                             (cx + scale.px(_CONTROLS_X), scale.px(_CONTROLS_Y)), self.game,
-                            font=self._controls_font, heading_font=self._controls_head)
+                            font=self._controls_font, heading_font=self._controls_head,
+                            cache=self._text_cache)
 
         hint = self._hint.render(
             "Up / Down select    -    ENTER pick    -    ESC / P resume",

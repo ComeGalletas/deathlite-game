@@ -202,4 +202,5 @@ def draw(surface: pygame.Surface, ps) -> None:
         surface.blit(halo, halo.get_rect(center=cap.center))
     keycap.draw_keycap(surface, ps.game.assets, at,
                        keycap.label_for(config.KEY_INTERACT), size=CAP_PX,
-                       state="pressed" if interact_held() else "raised")
+                       state="pressed" if interact_held() else "raised",
+                       cache=ps.text_cache)

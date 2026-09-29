@@ -12,20 +12,56 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --render                # time the draw as well
     python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
     python -m tools.benchmarks.spawn_stress --cascade --render      # CMB-008: a staged reaction cascade
+    python -m tools.benchmarks.spawn_stress --pack --bump           # RND-008: the bump pass alone
 
-Headless: the dummy SDL drivers are set before pygame is imported, so
-this runs anywhere the tests do. Numbers land in
-`journals/spawn_master_journal.md`, not in a test -- a timing assertion
-in the suite would only ever be flaky.
+What it measures is play, not the run's opening (RND-008.D3):
+
+* The opening hints are dismissed. The hero only jitters, by up to 24 px,
+  and the Move hint waits for 96 px (`config.HINT_MOVE_DISTANCE`), so a
+  kept hint never clears and every frame paid for it: about 17 ms of
+  draw on the owner's machine, which the first findings report read as
+  the cost of the resolution. `--hints` keeps them, whatever the Options
+  "Tutorials" row says.
+* The master stays frozen through the timing, with the company it had in
+  flight dropped, so the director adds no one. Before RND-008 it was
+  unfrozen once the crowd was seated and the director kept adding
+  companies (60 asked became 79); `--live-director` is that behaviour, and
+  what the numbers in `journals/spawn_master_journal.md` and the
+  `game/config.py` notes were taken with. The crowd still moves: the
+  despawn ring may put a few seated bodies to sleep during the warm-up,
+  and enemy summons arrive while timing (they are behaviour, not the
+  director). Every run prints the crowd at the start of timing and what
+  arrived, by owner.
+* One budget, `BUDGET_MS`, counts the frames over it.
+
+Every run prints the display it drew into: surface, driver, vsync, render
+scale and zoom, so two runs can be told apart.
+
+Headless by default: the dummy SDL drivers are set before pygame is
+imported, so this runs anywhere the tests do. `SDL_VIDEODRIVER=windows`
+draws into the real window at its saved size. Numbers land in the
+journals, not in a test -- a timing assertion in the suite would only
+ever be flaky.
 """
 from __future__ import annotations
 
 import argparse
 import os
 import time
+from collections import Counter
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+# The frame budget: one 60 Hz vsync period. The game caps itself at
+# `config.FPS` (62, 16.13 ms) but presents on vsync, so on a 60 Hz display a
+# frame has 16.7 ms. pygame 2.5 cannot read the refresh rate, so this is the
+# owner's display, fixed (RND-008.D3). The cap's figure is printed beside it.
+BUDGET_MS = 1000.0 / 60.0
+
+# Where `bump_times` parks the hero: far outside every broad-phase query, so
+# the pass measured is enemy against enemy only.
+_HERO_OFFSIDE = 1.0e6
 
 
 def _percentile(sorted_vals: list, q: float) -> float:
@@ -35,8 +71,33 @@ def _percentile(sorted_vals: list, q: float) -> float:
     return sorted_vals[i]
 
 
-def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
-    """A dev run at `elapsed` seconds with the population asked for."""
+def _force_hints(ps) -> None:
+    """The run's opening hints, as if the Options "Tutorials" row were on.
+    The setting is flipped in memory only while `RunHints` reads it, and
+    nothing is persisted."""
+    from game.states.playing.core.hints import RunHints
+
+    settings = ps.game.save.settings
+    had = settings.get("tutorials", True)
+    settings["tutorials"] = True
+    try:
+        ps.hints = RunHints(ps)
+    finally:
+        settings["tutorials"] = had
+
+
+def build(seed: int, live: int, dormant: int, elapsed: float, lod: int, *,
+          hints: bool = False, live_director: bool = False,
+          save_path: str | None = None):
+    """A dev run at `elapsed` seconds with the population asked for.
+
+    `hints=False` dismisses the run's opening hints, as a player's first
+    few steps do; `hints=True` shows them even with the Options
+    "Tutorials" row off. `live_director=False` keeps the master frozen
+    after the crowd is seated, so the director adds nothing while the
+    frames are timed (see the module doc). `save_path` is the save the
+    `Game` reads; the tests pass a fresh one, so the owner's settings
+    cannot reach them."""
     import pygame
     from game import config
     from game.game import Game
@@ -44,14 +105,23 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
     from spawn.population import DormantEnemy
     from tests.boot import settle
 
-    game = Game()
+    game = Game(save_path=save_path)
     game.state_machine.change(LoadingState(game), seed=seed, dev=True)
     ps = settle(game)
+    if not hints:
+        ps.hints.dismiss()
+    elif not ps.hints.visible:
+        _force_hints(ps)
     ps.player.invulnerable = True
     ps._dev_no_attack = True                     # the crowd survives the run
     ps.stats["time"] = elapsed
     m = ps.spawn.master
     m.frozen = True                              # the population is ours to set
+    if not live_director:
+        # A frozen master still lands a company it has paid for, and one
+        # in flight counts as live against the cap while the crowd is
+        # seated. Neither is the crowd asked for.
+        m.drop_pending()
     m.update(0.0)                                # settle the zone
     config.ENEMY_LOD_SKIP = lod
     # Every body the master could field, from the resolved roster. This read
@@ -87,7 +157,7 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int):
         rec = DormantEnemy(ids[k % len(ids)], c.x + (k % 7) * 40, c.y + (k // 7 % 5) * 40,
                            10.0, 10.0, 0.0, 90.0, owner="stress", room_id=room.id)
         m.population.dormant.setdefault(room.id, []).append(rec)
-    m.frozen = False
+    m.frozen = not live_director
     return game, ps
 
 
@@ -345,7 +415,89 @@ def report(times: list, ps) -> str:
             f"dormant {m.population.total_dormant} recycled {m.recycled}")
 
 
-def main(argv=None) -> int:
+def over_budget(frame_times: list) -> int:
+    """How many of `frame_times` (ms) miss `BUDGET_MS`."""
+    return sum(1 for x in frame_times if x > BUDGET_MS)
+
+
+def arrivals(ps, before: list) -> Counter:
+    """The bodies live now that were not in `before`, counted by spawn
+    owner: `summon` for an enemy's summons, `director` for a company, the
+    record's own owner for a body the ring woke or the watchdog rebuilt.
+
+    `before` is the list of the bodies themselves, not their `id()`s: the
+    list keeps them alive, so a body freed during the timing cannot hand
+    its address to a newcomer and hide it."""
+    owner_of = ps.spawn.master.host.owner_of
+    seen = {id(e) for e in before}
+    return Counter(owner_of(e) for e in ps.enemies if id(e) not in seen)
+
+
+def arrivals_line(ps, before: list) -> str:
+    """The crowd at the start of the timed frames and what joined it."""
+    came = arrivals(ps, before)
+    joined = "  ".join(f"{k} {v}" for k, v in sorted(came.items())) or "none"
+    return (f"  crowd     {len(before)} at the start of timing, "
+            f"{len(ps.enemies)} at the end  |  arrived: {joined}")
+
+
+def display_line(ps) -> str:
+    """What the frames were drawn into, and under which harness settings."""
+    import pygame
+    from game import config
+
+    surface = pygame.display.get_surface()
+    size = "x".join(map(str, surface.get_size())) if surface is not None else "none"
+    try:
+        driver = pygame.display.get_driver()
+    except pygame.error:
+        driver = "none"
+    game = ps.game
+    return (f"display {size} ({driver}, vsync {'on' if game.vsync else 'off'})  "
+            f"render scale {config.RENDER_SCALE:.3f} zoom {config.effective_zoom():.3f}  |  "
+            f"hints {'on' if ps.hints.visible else 'off'}  "
+            f"director {'frozen' if ps.spawn.master.frozen else 'live'}  |  "
+            f"budget {BUDGET_MS:.2f} ms (60 Hz vsync; the {config.FPS} fps cap is "
+            f"{1000.0 / config.FPS:.2f} ms)")
+
+
+def bump_times(ps, frames: int) -> list:
+    """`BumpResolver.resolve` alone, `frames` times, in milliseconds.
+
+    The report's isolated bump test (RND-008.2): nothing updates, so every
+    pass sees the same positions, and the hero is parked out of reach so
+    only enemy-against-enemy pairs are met. The impulses a pass adds are
+    put back after it, outside the timer: left to pile up, they push
+    bodies past the ice slide's speed and every later pass takes the
+    frozen-contact branch no real frame takes. The hero goes back at the
+    end, so the run is left as it was found. Not for an elemental run:
+    the frozen-contact rule deals damage, which is not put back (`main`
+    refuses `--bump` with the element flags).
+    """
+    import pygame
+
+    home = pygame.Vector2(ps.player.pos)
+    knocks = [(e, pygame.Vector2(e._knock)) for e in ps.enemies]
+    ps.player.pos.update(home.x + _HERO_OFFSIDE, home.y + _HERO_OFFSIDE)
+    times = []
+    try:
+        for _ in range(frames):
+            t0 = time.perf_counter()
+            ps.bump.resolve()
+            times.append((time.perf_counter() - t0) * 1000.0)
+            for e, k in knocks:
+                e._knock.update(k)
+    finally:
+        ps.player.pos.update(home)
+        for e, k in knocks:
+            e._knock.update(k)
+    return times
+
+
+def parse(argv=None) -> argparse.Namespace:
+    """The command line, checked: a combination the harness would ignore or
+    measure wrongly is refused here (argparse exits with status 2). Kept
+    apart from `main` so the flags can be checked without booting a run."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--seed", type=int, default=35)
     ap.add_argument("--live", type=int, default=100)
@@ -357,7 +509,7 @@ def main(argv=None) -> int:
                          "(default: config.ENEMY_LOD_SKIP)")
     ap.add_argument("--render", action="store_true",
                     help="time ps.draw as well, and report update + draw "
-                         "together against the 16.7 ms frame budget")
+                         "together against the frame budget (BUDGET_MS)")
     ap.add_argument("--elements", action="store_true",
                     help="infuse three weapons and prime every enemy, so the "
                          "elemental system runs at its worst plausible load")
@@ -374,11 +526,49 @@ def main(argv=None) -> int:
     ap.add_argument("--pack", action="store_true",
                     help="the --cascade crowd, packed round the hero, with no "
                          "elements at all: the control for --cascade")
+    ap.add_argument("--hints", action="store_true",
+                    help="keep the run's opening hints; the jittered hero "
+                         "never clears them, so every frame draws them")
+    ap.add_argument("--live-director", action="store_true",
+                    help="let the director add companies while the frames "
+                         "are timed (the behaviour before RND-008)")
+    ap.add_argument("--jitter", type=float, default=24.0,
+                    help="how far the hero is moved about each frame, px "
+                         "(0: it stands still, so the flow field is not "
+                         "re-aimed every frame; RND-008.5)")
+    ap.add_argument("--bump", action="store_true",
+                    help="time BumpResolver.resolve alone, --frames times, "
+                         "with nothing moving and the hero out of reach; "
+                         "add --pack for the packed crowd (not with "
+                         "--render, --profile or the element flags)")
     ap.add_argument("--profile", action="store_true")
     args = ap.parse_args(argv)
+    if args.frames < 1:
+        ap.error("--frames must be at least 1")
+    if not args.jitter >= 0:                    # also refuses nan
+        ap.error("--jitter must be a number of px, 0 or more")
+    if args.bump:
+        clash = [flag for flag, on in (
+            ("--render", args.render), ("--profile", args.profile),
+            ("--elements", args.elements), ("--element-rate", args.element_rate > 0),
+            ("--cascade", args.cascade)) if on]
+        if clash:
+            ap.error(f"--bump times the bump pass alone; drop {', '.join(clash)}")
+    return args
+
+
+def build_options(args: argparse.Namespace) -> dict:
+    """The keywords `main` hands `build`, from the parsed flags."""
+    return {"hints": args.hints, "live_director": args.live_director}
+
+
+def main(argv=None) -> int:
+    args = parse(argv)
     from game import config
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
-    game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod)
+    game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod,
+                     **build_options(args))
+    print(display_line(ps))
     elements = args.elements or args.element_rate > 0 or args.cascade
     pump = None
     instruments = None
@@ -386,7 +576,7 @@ def main(argv=None) -> int:
         infuse(ps, args.seed)
         if args.element_rate > 0:
             pump = element_pump(ps, args.element_rate, args.seed)
-    run(ps, 60, render=args.render, pump=pump)       # warm the caches
+    run(ps, 60, jitter=args.jitter, render=args.render, pump=pump)   # warm the caches
     if args.pack and not args.cascade:
         cascade_setup(ps, prime=False)
     if args.cascade:
@@ -395,24 +585,33 @@ def main(argv=None) -> int:
         # measures -- warming on it would leave only the aftermath.
         cascade_setup(ps)
         instruments = Instruments(ps)
+    before = list(ps.enemies)
+    if args.bump:
+        b = sorted(bump_times(ps, args.frames))
+        print(f"seed {args.seed}  bump {len(b)} passes: p50 {_percentile(b, 0.5):.3f}  "
+              f"p90 {_percentile(b, 0.9):.3f}  p99 {_percentile(b, 0.99):.3f}  "
+              f"max {b[-1]:.3f} ms  |  crowd {len(before)}")
+        return 0
     if args.profile:
         import cProfile
         import pstats
         prof = cProfile.Profile()
         prof.enable()
-        times, draws, in_view = run(ps, args.frames, render=args.render,
+        times, draws, in_view = run(ps, args.frames, jitter=args.jitter, render=args.render,
                                     pump=pump, instruments=instruments)
         prof.disable()
         print(report(times, ps))
+        print(arrivals_line(ps, before))
         if elements:
             print(element_report(ps))
         if instruments is not None:
             print(instruments.report())
         pstats.Stats(prof).sort_stats("cumulative").print_stats(28)
     else:
-        times, draws, in_view = run(ps, args.frames, render=args.render,
+        times, draws, in_view = run(ps, args.frames, jitter=args.jitter, render=args.render,
                                     pump=pump, instruments=instruments)
         print(f"seed {args.seed} lod {lod}  " + report(times, ps))
+        print(arrivals_line(ps, before))
         if elements:
             print(element_report(ps))
         if instruments is not None:
@@ -424,10 +623,10 @@ def main(argv=None) -> int:
                   f"max {d[-1]:.2f} ms  |  in view p50 {_percentile(v, 0.5)} "
                   f"max {v[-1]}")
             both = sorted(a + b for a, b in zip(times, draws))
-            over = sum(1 for x in both if x > 16.7)
             print(f"  update + draw   p50 {_percentile(both, 0.5):.2f}  "
                   f"p90 {_percentile(both, 0.9):.2f}  p99 {_percentile(both, 0.99):.2f}  "
-                  f"max {both[-1]:.2f} ms  |  over 16.7 ms: {over} / {len(both)}")
+                  f"max {both[-1]:.2f} ms  |  over {BUDGET_MS:.2f} ms: "
+                  f"{over_budget(both)} / {len(both)}")
     return 0
 
 
