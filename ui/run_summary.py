@@ -107,11 +107,11 @@ def fmt_time(seconds: float) -> str:
 
 
 def fmt_damage(v: float) -> str:
-    return f"{v:,.0f}"
+    return locale.grouped(v)
 
 
 def fmt_dps(v: float) -> str:
-    return f"{v:.1f}"
+    return locale.decimals(f"{v:.1f}")
 
 
 # The keys `Item.from_dict` needs; a dict without them is a row from before
@@ -479,7 +479,8 @@ class RunSummaryPanel:
         # damage actually drawn (a 7-figure one at least), and every name is
         # trimmed to the room left of it, so no number can be overdrawn.
         x_dps, x_share = area.right, area.right - S(_SHARE_X)
-        x_dmg = area.right - S(_DAMAGE_X)
+        shares = [r.get("share") for r in (*rows, *others)] + [1.0]
+        x_dmg = area.right - _damage_offset(self._row, [s for s in shares if s is not None])
         damages = [r.get("damage") for r in (*rows, *others)] + [total]
         dmg_w = max(_widest(self._row, _WIDEST_DAMAGE),
                     *(self._row.size(fmt_damage(d))[0] for d in damages if d is not None))
@@ -511,7 +512,7 @@ class RunSummaryPanel:
                 lv = self._row.render(locale.t("summary.level_value", n=level), True, colour)
                 surface.blit(lv, lv.get_rect(midright=(x_lv, y)))
             cells = ((x_dmg, "-" if dmg is None else fmt_damage(dmg)),
-                     (x_share, "-" if share is None else f"{share:.0%}"),
+                     (x_share, "-" if share is None else _share_text(share)),
                      (x_dps, "-" if dps is None else fmt_dps(dps)))
             for x, text in cells:
                 c = self._row.render(text, True, colour)
@@ -550,7 +551,23 @@ def weapons_min_width(font: pygame.font.Font) -> int:
     """
     return (widest_weapon_name(font) + S(_CELL_GAP)
             + _widest(font, _widest_level()) + S(_CELL_GAP)
-            + _widest(font, _WIDEST_DAMAGE) + S(_DAMAGE_X) + S(_COLUMN_PAD))
+            + _widest(font, _WIDEST_DAMAGE) + _damage_offset(font, [1.0]) + S(_COLUMN_PAD))
+
+
+def _share_text(share: float) -> str:
+    return locale.unit("percent", f"{share * 100:.0f}")
+
+
+def _damage_offset(font, shares) -> int:
+    """How far left of the column's right edge the damage cell ends: the
+    design `_DAMAGE_X`, plus however much wider the widest share drawn is
+    in this language than in English ("100 %" against "100%"). English is
+    at `_DAMAGE_X` at every render scale, as it always was, and a
+    translation keeps English's gap before its share rather than eating it."""
+    here = max(font.size(_share_text(s))[0] for s in shares)
+    english = max(font.size(locale.english("unit.percent", n=f"{s * 100:.0f}"))[0]
+                  for s in shares)
+    return S(_DAMAGE_X) + max(0, here - english)
 
 
 def widest_weapon_name(font) -> int:

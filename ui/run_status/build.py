@@ -70,11 +70,11 @@ def _fmt(v, kind: str, table: str | None = None) -> str:
     if table is not None and isinstance(v, str):
         return locale.name(table, v)
     if kind == "s":
-        return f"{float(v):g}s"
+        return locale.unit("seconds", locale.decimals(f"{float(v):g}"))
     if kind == "deg":
-        return f"{float(v):g}°"
+        return locale.unit("degrees", locale.decimals(f"{float(v):g}"))
     try:
-        return f"{float(v):g}"
+        return locale.decimals(f"{float(v):g}")
     except (TypeError, ValueError):
         return str(v)
 
@@ -105,7 +105,8 @@ def weapon_numbers(weapon) -> list[tuple[str, str, str | None]]:
                     _fmt(now, kind) if abs(now - base) > 1e-9 else None))
     crit = float(b.get("crit_chance", 0.0))
     if crit > 0.0:
-        out.append((locale.name("stat", "crit_chance"), f"+{crit * 100:.0f}%", None))
+        out.append((locale.name("stat", "crit_chance"),
+                    locale.unit("percent", f"+{crit * 100:.0f}"), None))
     return out
 
 
@@ -113,8 +114,8 @@ def infusion_text(weapon) -> str:
     """`fire  ·  every attack` -- the element and the cadence it lands
     at, which is the half of an infusion the numbers do not show."""
     if weapon.element_mode == TIME_MODE:
-        pace = locale.t("status.pace.time",
-                        s=locale.decimals(f"{weapon.element_window:.2g}"))
+        pace = locale.t("status.pace.time", s=locale.unit(
+            "seconds", locale.decimals(f"{weapon.element_window:.2g}")))
     elif weapon.element_interval:
         pace = locale.t("status.pace.count", n=weapon.element_interval + 1)
     else:

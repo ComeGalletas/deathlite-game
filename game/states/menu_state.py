@@ -161,7 +161,7 @@ class MenuState(State):
         save = self.game.save
         best = save.best
         summary = locale.t("menu.summary", salvage=save.currency,
-                           time=f"{best.get('time', 0):.0f}",
+                           time=locale.unit("seconds", f"{best.get('time', 0):.0f}"),
                            level=int(best.get("level", 1)),
                            kills=int(best.get("kills", 0)),
                            items=len(save.discovered_items))

@@ -32,7 +32,8 @@ def item_lines(item, content=None) -> list[str]:
     out = [c.fmt_mod(item.base_stat, item.base_op, item.base_value)]
     for a in item.affixes:
         if a.kind == "tag_damage":
-            out.append(locale.t("status.tag_damage", pct=f"{a.value * 100:+.0f}%",
+            out.append(locale.t("status.tag_damage",
+                                pct=locale.unit("percent", f"{a.value * 100:+.0f}"),
                                 tag=locale.name("tag", a.tag)))
         else:
             out.append(c.fmt_mod(a.stat, a.op, a.value))

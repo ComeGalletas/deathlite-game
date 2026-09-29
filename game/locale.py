@@ -220,7 +220,28 @@ def decimals(body: str) -> str:
     """`body`, an already formatted number, with its `.` swapped for the
     language's `format.decimal` (one character; `.` when no table has one).
     For a number whose English text is not `num`'s, such as a `.2g`."""
-    decimal = next((d for d in (_table(_language).get("format.decimal"),
-                                _table(DEFAULT).get("format.decimal"))
-                    if isinstance(d, str) and len(d) == 1), ".")
+    decimal = _mark("format.decimal", ".")
     return body.replace(".", decimal) if decimal != "." else body
+
+
+def grouped(value: float) -> str:
+    """A whole number with its thousands grouped in the language's style
+    (`format.thousands`: "12,345" / "12.345"), the text `f"{v:,.0f}"`
+    printed before (UI-014.10)."""
+    body = f"{value:,.0f}"
+    mark = _mark("format.thousands", ",")
+    return body.replace(",", mark) if mark != "," else body
+
+
+def unit(kind: str, n: Any) -> str:
+    """`n`, already formatted, with its unit in the language's style:
+    `unit.percent` ("25%" / "25 %"), `unit.seconds`, `unit.mult`,
+    `unit.degrees` (UI-014.D7, UI-014.10)."""
+    return t(f"unit.{kind}", n=n)
+
+
+def _mark(key: str, default: str) -> str:
+    """A one-character number mark from the current language, then English,
+    then `default`: a malformed table cannot put a word inside a number."""
+    return next((d for d in (_table(_language).get(key), _table(DEFAULT).get(key))
+                 if isinstance(d, str) and len(d) == 1), default)

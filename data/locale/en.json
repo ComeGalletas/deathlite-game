@@ -11,7 +11,8 @@
   },
   "format": {
     "_doc": "Number style, read by game.locale.num().",
-    "decimal": "."
+    "decimal": ".",
+    "thousands": ","
   },
   "menu": {
     "start": "Start new game",
@@ -19,7 +20,7 @@
     "rankings": "Rankings",
     "options": "Options",
     "exit": "Exit",
-    "summary": "Salvage {salvage}    Best: {time}s / Lv {level} / {kills} kills    Items found {items}"
+    "summary": "Salvage {salvage}    Best: {time} / Lv {level} / {kills} kills    Items found {items}"
   },
   "hero_select": {
     "title": "Choose your hero",
@@ -72,7 +73,6 @@
     "back": "Back",
     "on": "On",
     "off": "Off",
-    "percent": "{n}%",
     "hint": "Up / Down select    -    Left / Right adjust    -    ENTER toggle / open    -    ESC back"
   },
   "display": {
@@ -216,7 +216,7 @@
     "replace": "Replaces {old} with {element} ({pace}).",
     "carry": "Carries {element} {pace}.",
     "pace": {
-      "time": "every {s}s",
+      "time": "every {s}",
       "count": "on 1 attack in {n}",
       "every": "on every attack"
     },
@@ -438,7 +438,7 @@
     "yes": "yes",
     "no": "no",
     "pace": {
-      "time": "every {s}s",
+      "time": "every {s}",
       "count": "1 attack in {n}",
       "every": "every attack"
     },
@@ -472,5 +472,11 @@
     "stash": "Stash",
     "max": "MAX",
     "empty": "(no items yet - beat elites / the boss)"
+  },
+  "unit": {
+    "percent": "{n}%",
+    "seconds": "{n}s",
+    "mult": "x{n}",
+    "degrees": "{n}°"
   }
 }

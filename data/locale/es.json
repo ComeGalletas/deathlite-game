@@ -10,7 +10,8 @@
   },
   "format": {
     "_doc": "Decimal comma (UI-014.D7).",
-    "decimal": ","
+    "decimal": ",",
+    "thousands": "."
   },
   "menu": {
     "start": "Nueva partida",
@@ -18,7 +19,7 @@
     "rankings": "Clasificación",
     "options": "Opciones",
     "exit": "Salir",
-    "summary": "Chatarra {salvage}    Mejor: {time} s / Nv. {level} / {kills} bajas    Objetos hallados {items}"
+    "summary": "Chatarra {salvage}    Mejor: {time} / Nv. {level} / {kills} bajas    Objetos hallados {items}"
   },
   "hero_select": {
     "title": "Elige a tu héroe",
@@ -71,7 +72,6 @@
     "back": "Volver",
     "on": "Sí",
     "off": "No",
-    "percent": "{n} %",
     "hint": "Arriba / Abajo: elegir    -    Izquierda / Derecha: ajustar    -    ENTER: cambiar / abrir    -    ESC: volver"
   },
   "display": {
@@ -215,7 +215,7 @@
     "replace": "Cambia {old} por {element} ({pace}).",
     "carry": "Porta {element} {pace}.",
     "pace": {
-      "time": "cada {s} s",
+      "time": "cada {s}",
       "count": "en 1 de cada {n} ataques",
       "every": "en cada ataque"
     },
@@ -437,7 +437,7 @@
     "yes": "sí",
     "no": "no",
     "pace": {
-      "time": "cada {s} s",
+      "time": "cada {s}",
       "count": "1 de cada {n} ataques",
       "every": "cada ataque"
     },
@@ -471,5 +471,11 @@
     "stash": "Inventario",
     "max": "MÁX",
     "empty": "(aún no hay objetos: vence a élites o al jefe)"
+  },
+  "unit": {
+    "percent": "{n} %",
+    "seconds": "{n} s",
+    "mult": "x{n}",
+    "degrees": "{n}°"
   }
 }

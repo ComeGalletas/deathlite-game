@@ -311,7 +311,7 @@ class OptionsState(State):
         fill.width = int(fill.width * level)
         if fill.width > 0:
             pygame.draw.rect(surface, colour, fill, border_radius=3)
-        pct = self._row.render(locale.t("options.percent", n=round(level * 100)),
+        pct = self._row.render(locale.t("unit.percent", n=round(level * 100)),
                                True, colour)
         surface.blit(pct, pct.get_rect(midleft=(vx + scale.px(_PCT_DX), y)))
         return bar

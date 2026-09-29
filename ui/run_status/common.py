@@ -73,16 +73,20 @@ def stat_label(stat: str) -> str:
 
 
 def fmt_stat(stat: str, value: float) -> str:
+    """A hero stat as the panes print it, in the language's number style
+    (UI-014.10): "x1.25" / "x1,25", "12%" / "12 %", "1 / 5s" / "1 / 5 s"."""
     kind = _KINDS.get(stat, "num")
+    d = locale.decimals
     if kind == "mult":
-        return f"x{value:.2f}"
+        return locale.unit("mult", d(f"{value:.2f}"))
     if kind == "pct":
-        return f"{value * 100:.0f}%"
+        return locale.unit("percent", f"{value * 100:.0f}")
     if kind == "pctplus":
-        return f"{value * 100:+.0f}%"
+        return locale.unit("percent", f"{value * 100:+.0f}")
     if kind == "regen":
-        return f"{value:g} / {config.HP_REGEN_INTERVAL:g}s"
-    return f"{value:g}"
+        return f"{d(f'{value:g}')} / " + locale.unit(
+            "seconds", d(f"{config.HP_REGEN_INTERVAL:g}"))
+    return d(f"{value:g}")
 
 
 def fmt_mod(stat: str, op: str | None, value: float) -> str:
@@ -90,13 +94,13 @@ def fmt_mod(stat: str, op: str | None, value: float) -> str:
     `+12% Damage`, `x1.1 Attack speed`."""
     label = stat_label(stat)
     if op == "pct":
-        return f"{value * 100:+.0f}% {label}"
+        return f"{locale.unit('percent', f'{value * 100:+.0f}')} {label}"
     if op == "mult":
-        return f"x{1.0 + value:.2f} {label}"
+        return f"{locale.unit('mult', locale.decimals(f'{1.0 + value:.2f}'))} {label}"
     # flat: chances and multipliers are fractions even when flat
     kind = _KINDS.get(stat, "num")
     if kind in ("pct", "pctplus", "mult"):
-        return f"{value * 100:+.0f}% {label}"
+        return f"{locale.unit('percent', f'{value * 100:+.0f}')} {label}"
     # Item rolls are unrounded floats (+3.917 armor); one decimal is what a
     # player can use, and a whole number stays whole.
     return f"{_one_decimal(value)} {label}"
@@ -104,7 +108,7 @@ def fmt_mod(stat: str, op: str | None, value: float) -> str:
 
 def _one_decimal(value: float) -> str:
     text = f"{value:+.1f}"
-    return text[:-2] if text.endswith(".0") else text
+    return locale.decimals(text[:-2] if text.endswith(".0") else text)
 
 
 TITLE_PX = 28          # a weapon card's title (the Build pane steps it down to fit)

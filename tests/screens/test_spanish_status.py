@@ -308,7 +308,7 @@ class BuildHelperTests(unittest.TestCase):
                          ("nearest", "el más cercano"))
         self.assertEqual(_both(lambda: fmt(True, "n")), ("yes", "sí"))
         self.assertEqual(_both(lambda: fmt(False, "n")), ("no", "no"))
-        self.assertEqual(_both(lambda: fmt(2.5, "s")), ("2.5s", "2.5s"))   # numbers: UI-014.10
+        self.assertEqual(_both(lambda: fmt(2.5, "s")), ("2.5s", f"2,5{NB}s"))   # D7 style (UI-014.10)
         self.assertEqual(build._VALUE_TABLES, {"category": "weapon_category",
                                                "special_effect": "special",
                                                "targeting_mode": "targeting", "tags": "tag"})
@@ -864,7 +864,7 @@ class BuildPaneDetailTests(unittest.TestCase):
                         return ", ".join(show(x, lang) for x in v)
                     if table and isinstance(v, str):
                         return ES_NAMES[table].get(v, v) if lang == "es" else v
-                    return f"{float(v):g}"
+                    return f"{float(v):g}".replace(".", "," if lang == "es" else ".")
                 with self.subTest(forge=w.forge, key=key):
                     for lang, rows in (("en", en_rows), ("es", es_rows)):
                         want = (f"+ {show(after, lang)}" if before is None
@@ -939,7 +939,7 @@ class BuildPaneDetailTests(unittest.TestCase):
         sword.bonus["crit_chance"] = 0.8                 # 1 % off prints another number
         en, es = _both(lambda: build.weapon_numbers(sword))
         self.assertIn(("Crit chance", "+80%", None), en)
-        self.assertIn(("Prob. crítico", "+80%", None), es)
+        self.assertIn(("Prob. crítico", f"+80{NB}%", None), es)
 
     def test_the_number_rows_units_and_bonus_keys(self):
         from combat.weapons import Weapon
@@ -1093,7 +1093,7 @@ class ItemLineTests(unittest.TestCase):
                                unique_effect=None)
         en, es = _both(lambda: item_lines(item))
         self.assertEqual(en, ["+2 Armor", "+80% damage vs elite"])
-        self.assertEqual(es, ["+2 Armadura", "+80% de daño contra élite"])
+        self.assertEqual(es, ["+2 Armadura", f"+80{NB}% de daño contra élite"])
 
 
 class SummaryRowTests(unittest.TestCase):
@@ -1296,7 +1296,7 @@ class SummaryPairTests(unittest.TestCase):
         self.assertEqual(en_text.count("Total"), 2)              # and the damage total
         self.assertEqual(es_text.count("Total"), 2)
         self.assertEqual(en_text.count("100%"), 1)               # the total's share only
-        self.assertEqual(es_text.count("100%"), 1)
+        self.assertEqual(es_text.count(f"100{NB}%"), 1)
 
     def test_a_long_weapon_name_stops_short_of_its_level(self):
         stats = dict(_summary_stats(), weapon_rows=[
@@ -1321,6 +1321,84 @@ class SummaryPairTests(unittest.TestCase):
                 self.assertLessEqual(placed.where[names[0]][0].right,
                                      x_lv - cell - scale.px(run_summary._CELL_GAP))
         locale.set_language(locale.DEFAULT)
+
+
+class ShareCellTests(unittest.TestCase):
+    """The weapons table's share cell ("100%", "100 %" in Spanish): a
+    translation keeps English's gap before it -- on every row, the total
+    included -- and English stays at `_DAMAGE_X` at every render scale
+    (UI-014.10)."""
+
+    SCALES = (0.6, 0.7, 0.75, 0.8, 720 / 900, 0.9, 1.0, 1.2, 1.25, 1.5, 1.6, 1.8, 2.0, 2.4, 2.7)
+
+    def setUp(self):
+        _display()
+        self.addCleanup(locale.set_language, locale.DEFAULT)
+
+    def gaps(self, lang, scale_, stats):
+        """`[(damage text, gap to its share)]` per row, as drawn."""
+        from game import config
+        from ui import scale
+        with mock.patch.object(config, "RENDER_SCALE", scale_):
+            locale.set_language(lang)
+            placed = _Placed()
+            panel = RunSummaryPanel(stats)
+            panel._row = placed.font(panel._row)
+            w, h = round(1600 * scale_), round(900 * scale_)
+            panel.draw(placed.Surface((w, h)), None, scale.px(178), scale.px(762),
+                       columns=VICTORY_COLUMNS)
+        pct = "%" if lang == "en" else "\u00a0%"
+        shares = [(r, t) for t, rs in placed.where.items() if t.endswith(pct) for r in rs]
+        grouped = r"\d{1,3}(,\d{3})+" if lang == "en" else r"\d{1,3}(\.\d{3})+"
+        damages = sorted(((r, t) for t, rs in placed.where.items() if re.fullmatch(grouped, t)
+                          for r in rs), key=lambda x: x[0].centery)
+        out = []
+        for d, _dt in damages:
+            # The share on the damage figure's own row, right of it.
+            (sr, st), = [(r, t) for r, t in shares if r.centery == d.centery and r.left > d.left]
+            out.append((st, sr.left - d.right))
+        return out
+
+    def test_a_translation_keeps_englishs_gap_on_every_row(self):
+        """Two weapons at half each: the rows draw "50 %", the total "100 %"."""
+        stats = dict(_summary_stats(), weapon_rows=[
+            {"name": "Sword", "level": 5, "damage": 617283.0, "share": 0.5, "dps": 9.9},
+            {"name": "Bow", "level": 3, "damage": 617284.0, "share": 0.5, "dps": 9.9}],
+            other_rows=[], damage_dealt=1234567.0)
+        for scale_ in (1.0, 0.8, 1.5):
+            en, es = self.gaps("en", scale_, stats), self.gaps("es", scale_, stats)
+            with self.subTest(scale=scale_):
+                self.assertEqual([t for t, _g in es], ["50\u00a0%", "50\u00a0%", "100\u00a0%"])
+                self.assertEqual([g for _t, g in en], [g for _t, g in es])
+        # At the design scale the gap is the design's.
+        from ui import scale
+        self.assertGreaterEqual(min(g for _t, g in self.gaps("es", 1.0, stats)),
+                                scale.px(run_summary._CELL_GAP))
+
+    def test_english_keeps_the_design_offset_at_every_scale(self):
+        from game import config
+        from ui import scale
+        for scale_ in self.SCALES:
+            with self.subTest(scale=scale_), mock.patch.object(config, "RENDER_SCALE", scale_):
+                font = fonts.body(22)
+                self.assertEqual(run_summary._damage_offset(font, [1.0, 0.5, 0.98]),
+                                 scale.px(run_summary._DAMAGE_X))
+
+    def test_spanish_widens_by_its_share_alone(self):
+        from ui import scale
+        font = fonts.body(22)
+        locale.set_language("es")
+        extra = font.size("100\u00a0%")[0] - font.size("100%")[0]
+        self.assertGreater(extra, 0)
+        self.assertEqual(run_summary._damage_offset(font, [1.0, 0.5]),
+                         scale.px(run_summary._DAMAGE_X) + extra)
+        es_min = run_summary.weapons_min_width(font)
+        locale.set_language("en")
+        en_min = run_summary.weapons_min_width(font)
+        # The Spanish floor: English's, the wider share, and the wider
+        # level cell ("Nv. ##") -- nothing else.
+        level = (run_summary._widest(font, "Nv. ##") - run_summary._widest(font, "Lv ##"))
+        self.assertEqual(es_min, en_min + extra + level)
 
 
 class VictoryAt1280Tests(unittest.TestCase):

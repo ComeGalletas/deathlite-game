@@ -29,30 +29,33 @@ def roman(level: int) -> str:
 
 
 def format_value(value: float, display: str) -> str:
-    """The value as the card prints it."""
+    """The value as the card prints it, in the current language's number
+    style (UI-014.D7): the decimal mark and the unit come from the locale,
+    so English is "+0.3s" / "+25%" and Spanish "+0,3 s" / "+25 %"."""
+    d = locale.decimals
     if display == "flat":
-        return f"+{value:g}"
+        return d(f"+{value:g}")
     if display == "pct":
-        return f"+{value * 100:.0f}%"
+        return locale.unit("percent", f"+{value * 100:.0f}")
     if display == "pct_gain":
         # A growth multiplier read as the growth: 1.15 -> "+15%". The mirror
         # of `pct_drop`, for a `mult` bonus that makes something bigger.
-        return f"+{(value - 1.0) * 100:.0f}%"
+        return locale.unit("percent", f"+{(value - 1.0) * 100:.0f}")
     if display == "pct_drop":
-        return f"{(1.0 - value) * 100:.0f}%"
+        return locale.unit("percent", f"{(1.0 - value) * 100:.0f}")
     if display == "chance":
-        return f"{value * 100:.0f}%"
+        return locale.unit("percent", f"{value * 100:.0f}")
     if display == "seconds":
-        return f"+{value:g}s"
+        return locale.unit("seconds", d(f"+{value:g}"))
     if display == "duration":
         # A length of time, not an increase of one: "burns for 2s", where
         # `seconds` would read "for +2s" (UI-014.D15).
-        return f"{value:g}s"
+        return locale.unit("seconds", d(f"{value:g}"))
     if display == "mult":
-        return f"x{value:g}"
+        return locale.unit("mult", d(f"{value:g}"))
     if display == "degrees":
-        return f"+{value:g}°"
-    return f"{value:g}"                                       # raw / hidden
+        return locale.unit("degrees", d(f"+{value:g}"))
+    return d(f"{value:g}")                                    # raw / hidden
 
 
 @dataclass(frozen=True)

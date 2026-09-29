@@ -102,8 +102,8 @@ def _pace(weapon) -> str:
     if weapon.element_mode == TIME_MODE:
         # Two significant figures, exactly as before (`1e+02` included),
         # with the language's decimal point.
-        return locale.t("infusion.pace.time",
-                        s=locale.decimals(f"{weapon.element_window:.2g}"))
+        return locale.t("infusion.pace.time", s=locale.unit(
+            "seconds", locale.decimals(f"{weapon.element_window:.2g}")))
     if weapon.element_interval:
         return locale.t("infusion.pace.count", n=weapon.element_interval + 1)
     return locale.t("infusion.pace.every")

@@ -462,8 +462,25 @@ Options.
   - tests: English byte-identity against the old strings, every screen drawn
     in Spanish with its text checked where drawn, the name tables complete
     for the data; screenshots; cold critic loop; full suite.
-- [ ] UI-014.10 — Numbers through `locale.num` (UI-014.D7), with the
-  `format_value` tests in both languages.
+- [x] UI-014.10 — Numbers through `locale.num` (UI-014.D7), with the
+  `format_value` tests in both languages. Plan (2026-09-29):
+  - every player-facing number keeps the exact f-string it has (so English
+    stays byte-identical by construction) and goes through the locale for
+    its style: `locale.decimals` for the decimal mark, a new
+    `format.thousands` for the damage figures ("1,234" / "1.234"), and new
+    `unit.*` templates for what follows a number -- `unit.percent`
+    ("{n}%" / "{n} %"), `unit.seconds` ("{n}s" / "{n} s"), `unit.mult`
+    ("x{n}"), `unit.degrees` ("{n}°"), with the no-break space of D7;
+  - the sites: `progression/blessings/catalog.format_value` (every card and
+    data description), `ui/run_status/common` (`fmt_stat`, `fmt_mod`),
+    `ui/run_status/build` (`_fmt`, the crit line), `ui/run_status/overview`
+    (tag damage), `ui/run_summary` (damage, share, DPS);
+    `options.percent` folds into `unit.percent`;
+  - unchanged: the `mm:ss` timers (D7), whole numbers (HP, kills, gold,
+    levels), the developer tools (D6);
+  - tests: `format_value` and every site in both languages, English pinned
+    to the old strings (and the English layout gate of UI-014.9), Spanish
+    checked for the D7 style; the full suite; a cold critic loop.
 - [ ] UI-014.11 — The "no stray English" AST test and the fit test, and fixes
   for everything they flag.
 - [ ] UI-014.12 — The full suite, the Spanish screenshots, the results, and
@@ -1205,3 +1222,54 @@ UI-014.7 to .9. Values ("+5%") are UI-014.10. Item names are UI-014.6.
     unchanged from the old code, comments).
 - **Left for UI-014.11:** the Run column trims "Kills" when a kill record,
   a four-digit count and a long rate all meet; English does too.
+
+### UI-014.10 — numbers in the language's style
+
+- **Locale:** `unit.percent`, `unit.seconds`, `unit.mult`, `unit.degrees`
+  ("25%" / "25 %", "0.3s" / "0,3 s", with the no-break space of D7) and
+  `format.thousands` ("," / "."). `options.percent` folded into
+  `unit.percent`. The seconds unit is set in one place: the infusion rail,
+  the TAB pace line and the menu's best line take the number with its unit
+  (`infusion.pace.time` "every {s}", `menu.summary` "Best: {time}").
+  `rankings.seconds` keeps its own English "95 s" (a plain space, as the
+  rankings always read) and is pinned to `unit.seconds` in Spanish.
+- **`game/locale.py`:** `grouped(value)` (the thousands mark), `unit(kind,
+  n)`, and `_mark`, the one lookup of a one-character number mark: the
+  current language, then English, then the default, so a malformed table
+  never puts a word inside a number.
+- **Sites:** `format_value` (every card and data description),
+  `ui/run_status/common` (`fmt_stat`, `fmt_mod`, `_one_decimal`),
+  `ui/run_status/build` (`_fmt`, the crit line, the pace),
+  `ui/run_status/overview` (tag damage), `ui/run_summary` (damage, DPS,
+  share). Each keeps the exact f-string it had; only its decimal mark,
+  grouping and unit go through the locale, so English is byte-identical by
+  construction -- checked over 26,565 values against the old functions, and
+  by the English layout gate.
+- **The share cell:** Spanish "100 %" is wider than "100%". The damage cell
+  moves left by exactly that extra (`_damage_offset`), so Spanish keeps
+  English's gap on every row and English stays at `_DAMAGE_X` at every
+  render scale (a first version moved English a pixel at 0.8; tested now
+  over 15 scales). `weapons_min_width` grows by the same extra.
+- **Decision (for the owner to overrule):** "." is the Spanish thousands
+  mark ("12.345"), the traditional style in Spain; D7 did not name one. RAE
+  prefers no grouping under five digits and a thin space above.
+- **Tests:** `tests/locale/test_numbers.py` (new): every `format_value`
+  display in both languages, every Spanish card at every level in the D7
+  style, the marks and their fallback, each unit reaching its call sites,
+  the menu's best line, the stats, modifiers, weapon numbers and summary
+  figures. `test_spanish_status.py`: the share cell's gap in both languages
+  and at three scales, English's offset at 15 scales, the Spanish minimum
+  width. Four UI-014.9 expectations moved to the D7 style.
+- **Tests run:** the full default suite on the final code: 3806 passed, 0 failed,
+  0 skipped (21 min 2 s).
+- **Cold critic loop:** three rounds.
+  - Round 1: the English step of the mark fallback untested (the English
+    marks equal the defaults); the Spanish share crowding the damage
+    figure (7 px of a 12 px gap); the seconds unit repeated in four
+    templates.
+  - Round 2: English moving a pixel at non-1.0 render scales; the total's
+    share, the menu's best line, the Spanish minimum width and the unit
+    routing untested; a test that could leave Spanish on.
+  - Round 3: PASS. The one survivor (`+ [1.0]` to `+ [0.0]`) is equivalent:
+    the extra width is the no-break space's, the same whatever number it
+    follows (measured for 0-100 at 17 scales).

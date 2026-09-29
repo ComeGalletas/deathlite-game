@@ -61,7 +61,8 @@ class ShippedFilesTests(unittest.TestCase):
                            "status.no",                  # "no"
                            "summary.head.dps",           # "DPS"
                            "summary.total",              # "Total"
-                           "summary.kills_value"}        # "/min"
+                           "summary.kills_value",        # "/min"
+                           "unit.mult", "unit.degrees"}  # "x2", "30°"
         tables = get_content().locale
         copied = sorted(k for k, v in tables["es"].items()
                         if v == tables["en"][k] and k not in same_on_purpose
