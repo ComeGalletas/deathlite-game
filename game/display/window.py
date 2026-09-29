@@ -147,8 +147,11 @@ class DisplayWindow:
             self._apply_render_size()
         else:
             # Not ours to size: the browser profile owns SCREEN_* (1280x720).
+            # The interface scale is the surface's height over the design's,
+            # as under native rendering: 0.8 in the browser, 1.0 at every
+            # 900-row desktop size (UI-016.D3).
             self.render_aspect = "16:9"
-            config.RENDER_SCALE = 1.0
+            config.RENDER_SCALE = config.SCREEN_HEIGHT / config.UI_HEIGHT
         # Always opened windowed, even for a saved borderless mode: with the
         # FULLSCREEN flag pygame's scaled path picks a *display mode* for the
         # logical size (a 2100x900 render came up in a 2560x1440 mode on the

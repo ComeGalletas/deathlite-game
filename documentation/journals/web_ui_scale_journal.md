@@ -83,6 +83,6 @@ Closes UI-014.D20 (`localization_journal.md`).
 ## Tasks
 
 - [x] UI-016.1 — journal, index entry
-- [ ] UI-016.2 — web profile at scale 0.8, compensated zoom, window scale, test helper, zoom pin
+- [x] UI-016.2 — web profile at scale 0.8, compensated zoom, window scale, test helper, zoom pin
 - [ ] UI-016.3 — fit harness under the web profile, `WEB_UNFIT` emptied, web-profile tests moved on
 - [ ] UI-016.4 — screenshots, docs, D20 closed

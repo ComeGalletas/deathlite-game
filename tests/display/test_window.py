@@ -469,13 +469,29 @@ class NativeRenderTests(unittest.TestCase):
         self.assertEqual(config.effective_zoom(), config.CAMERA_ZOOM)
 
     def test_the_web_profile_keeps_its_own_size(self):
-        with mock.patch.object(config, "WINDOW_RESIZABLE", False), \
-                mock.patch.object(config, "SCREEN_WIDTH", 1280), \
-                mock.patch.object(config, "SCREEN_HEIGHT", 720):
+        """The browser's window is not ours to size: it opens at the
+        profile's 1280x720 and draws the interface at 720 / 900, the world
+        still at 1.25 (UI-016.D2, D3). It used to force the scale to 1.0 and
+        run the 900-row screens off the canvas."""
+        from tests.web_profile import web_profile
+        with web_profile(), mock.patch.object(config, "RENDER_SCALE", 1.0):
             dw = _open(self.h)
             self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), (1280, 720))
-            self.assertEqual(config.RENDER_SCALE, 1.0)
+            self.assertEqual(config.RENDER_SCALE, 0.8)
+            self.assertEqual(config.effective_zoom(), 1.25)
             self.assertFalse(dw.available)
+
+    def test_a_fixed_design_window_draws_the_interface_at_one(self):
+        """Not scalable at a 900-row design size (16:9, 21:9): scale 1.0,
+        whatever a native window left behind."""
+        for size in ((1600, 900), (2100, 900)):
+            with self.subTest(size=size), \
+                    mock.patch.object(config, "WINDOW_RESIZABLE", False), \
+                    mock.patch.object(config, "SCREEN_WIDTH", size[0]), \
+                    mock.patch.object(config, "SCREEN_HEIGHT", size[1]), \
+                    mock.patch.object(config, "RENDER_SCALE", 1.6):
+                _open(self.h)
+                self.assertEqual(config.RENDER_SCALE, 1.0)
 
 
 class SettingsTests(unittest.TestCase):

@@ -96,19 +96,19 @@ class ZoomGranularityTests(unittest.TestCase):
     through the 1 px crack as blue seams along the tile frontiers. The web
     profile shipped at 1.2 (76.8 px per tile) and had them; 1.25 (80 px) does
     not.
+
+    The zoom drawn at is `config.effective_zoom()`, `CAMERA_ZOOM` times the
+    interface scale: the web profile draws its interface at 0.8 and
+    compensates its `CAMERA_ZOOM` (1.5625) so the world still draws at 1.25
+    (UI-016.D2).
     """
 
     def _shipped_zooms(self):
         from game import config
-        saved = (config.SCREEN_WIDTH, config.SCREEN_HEIGHT, config.CAMERA_ZOOM,
-                 config.SAVE_ENABLED, config.FPS)
-        yield "desktop", config.CAMERA_ZOOM, config.TILE_PX
-        try:
-            config.apply_web_profile()
-            yield "web", config.CAMERA_ZOOM, config.TILE_PX
-        finally:
-            (config.SCREEN_WIDTH, config.SCREEN_HEIGHT, config.CAMERA_ZOOM,
-             config.SAVE_ENABLED, config.FPS) = saved
+        from tests.web_profile import web_profile
+        yield "desktop", config.effective_zoom(), config.TILE_PX
+        with web_profile():
+            yield "web", config.effective_zoom(), config.TILE_PX
 
     def test_a_tile_is_a_whole_number_of_pixels(self):
         for name, zoom, px in self._shipped_zooms():
@@ -116,6 +116,17 @@ class ZoomGranularityTests(unittest.TestCase):
             self.assertEqual(scaled, int(scaled),
                              f"{name} build: tile is {scaled} px at zoom {zoom}")
 
+    def test_the_web_world_draws_at_1_25_whatever_the_interface_scale(self):
+        """The owner's call (UI-016.D2): the web interface scale moved to 0.8
+        and the web world view did not move."""
+        from game import config
+        from tests.web_profile import web_profile
+        with web_profile():
+            self.assertEqual(config.RENDER_SCALE, 0.8)
+            self.assertEqual(config.CAMERA_ZOOM, 1.5625)
+            self.assertEqual(config.effective_zoom(), 1.25)
+            self.assertEqual(config.effective_zoom(), config.WEB_VIEW_ZOOM)
+            self.assertEqual(config.CAMERA_ZOOM * config.RENDER_SCALE, 1.25)
 
 if __name__ == "__main__":
     unittest.main()

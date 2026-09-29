@@ -35,7 +35,7 @@ UI_HEIGHT: int = 900
 # `RENDER_SCALE`, snapped so `TILE_PX x zoom` is whole -- so it covers the
 # same world area as the 1600x900 design at every size. `RENDER_SCALE` is
 # native height over `UI_HEIGHT`, set by `game/display/window.py`; 1.0
-# in the plain fallback and the browser build. A drag resize keeps the
+# in the plain fallback, 0.8 in the browser build (`apply_web_profile`). A drag resize keeps the
 # logical size until the next Options change (the frame is scaled, soft,
 # until then -- the owner's call).
 RENDER_NATIVE: bool = True
@@ -113,8 +113,10 @@ MAX_DT: float = 1.0 / 20.0
 #
 # Keep `TILE_PX * CAMERA_ZOOM` a whole number of pixels, or the tile grid lands
 # on fractional boundaries and the seams shimmer. At the 64 px tile that means
-# steps of 0.25: 1.25 -> 80, 1.5 -> 96, 1.75 -> 112, 2.0 -> 128.
-# `tests/systems/test_camera.py` pins this for the desktop and web profiles.
+# steps of 0.25: 1.25 -> 80, 1.5 -> 96, 1.75 -> 112, 2.0 -> 128. What
+# counts is the zoom drawn at, `effective_zoom()`; `tests/systems/
+# test_camera.py` pins it for the desktop and web profiles (the web
+# profile's own CAMERA_ZOOM is 1.5625, compensating its 0.8 RENDER_SCALE).
 CAMERA_ZOOM: float = 1.5
 
 # --- Persistence -----------------------------------------------------------
@@ -1122,6 +1124,11 @@ DEFAULT_KEY_LAYOUT: str = "wasd_move"
 
 
 # --- Browser (pygbag) profile ---------------------------------------------
+# The zoom the web build's world draws at (`effective_zoom()` under the
+# profile): 80 px per 64 px tile, whole, so no seams.
+WEB_VIEW_ZOOM: float = 1.25
+
+
 def apply_web_profile() -> None:
     """Mutate the module-level constants for the WebAssembly build. Call once at
     startup, before `Game()` is constructed (see `main.py` / `main_web.py`).
@@ -1129,11 +1136,21 @@ def apply_web_profile() -> None:
     * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
     * `FPS = 60` -- the page composites at ~60 Hz; targeting 120 just spends
       WASM budget on frames that are never presented.
-    * `1280x720` render target at `CAMERA_ZOOM = 1.25` -- that is the pygbag
-      canvas size, so there is no downscale, and per-frame blit work drops by
-      ~35% against the desktop target.
+    * `1280x720` render target -- that is the pygbag canvas size (pygbag's
+      default framebuffer; `dist/web/build.sh` passes no `--width`), so there
+      is no downscale, and per-frame blit work drops by ~35% against the
+      desktop target.
+    * `RENDER_SCALE = 720 / 900 = 0.8` -- the interface is laid out in
+      design pixels for the 1600x900 box, so on 720 rows it is drawn at 80%
+      through `ui/scale.py` and `game/fonts.py`, the same path a native
+      1440-row window takes at 1.6. At 1.0 the title menu, hero select,
+      Options and end screens ran below the canvas (UI-016.D1).
+    * `CAMERA_ZOOM = WEB_VIEW_ZOOM / RENDER_SCALE = 1.5625`, so the world
+      draws at `effective_zoom() == WEB_VIEW_ZOOM == 1.25` whatever the
+      interface scale: 80 px per tile, the web view it always had
+      (UI-016.D2, `tests/systems/test_camera.py`).
 
-      The zoom used to be 1.2, chosen because `1280 / 1.2 == 1600 / 1.5` made
+      The view's zoom used to be 1.2, chosen because `1280 / 1.2 == 1600 / 1.5` made
       the visible world extent identical to desktop. It cost more than it was
       worth: terrain is composited from several independently scaled surfaces
       (per room, per corridor, per cliff band), each blitted at a truncated
@@ -1148,10 +1165,11 @@ def apply_web_profile() -> None:
     `PlayingState`), so a plain reassignment here propagates.
     """
     global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
-    global WINDOW_RESIZABLE
+    global WINDOW_RESIZABLE, RENDER_SCALE
     SAVE_ENABLED = False
     VSYNC = False
     WINDOW_RESIZABLE = False        # pygbag owns the canvas
     FPS = 60
     SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
-    CAMERA_ZOOM = 1.25
+    RENDER_SCALE = SCREEN_HEIGHT / UI_HEIGHT
+    CAMERA_ZOOM = WEB_VIEW_ZOOM / RENDER_SCALE
