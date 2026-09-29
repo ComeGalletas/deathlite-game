@@ -233,8 +233,9 @@ Each task names the number it has to move. "Before" is the rerun above.
       current output.
     - A display re-open rebuilds the cache at the new `RENDER_SCALE`.
   - Outcome: at 2560 × 1080 with 100 packed, draw p50 with the hints on
-    within 1 ms of the hints-off figure (28.91 → about 11.5 ms). The
-    hints' own cost drops from about 16 ms to under 1 ms.
+    within 1 ms of the hints-off figure (RND-008.2 baseline: 27.27 →
+    about 10.2 ms). The hints' own cost drops from about 17 ms to under
+    1 ms.
 - **RND-008.4: The elemental draw.**
   - Walk the bodies once per frame, bucket them by terrace level, and
     hand each band its bucket. Today each of the three band passes tests
@@ -244,8 +245,8 @@ Each task names the number it has to move. "Before" is the rerun above.
   - Tests: pixel-identical frames for a primed crowd across terrace
     bands, and the same draw order (auras under bodies, reactions on
     top).
-  - Outcome: the infused-minus-packed draw gap at 2560 × 1080 (15.83 −
-    11.48 = 4.35 ms p50) halved or better.
+  - Outcome: the infused-minus-packed draw gap at 2560 × 1080 halved or
+    better (RND-008.2 baseline: 15.99 − 10.22 = 5.77 ms p50).
 - **RND-008.5: Update, re-measured, then decide on bump.**
   - With the harness fixed: stationary versus jittered hero, frozen
     master, 60 / 100 / 150 packed. Take a cProfile of `ps.update`.
@@ -268,14 +269,154 @@ Each task names the number it has to move. "Before" is the rerun above.
 ## RND-008: Tasks
 
 - [x] RND-008.1: This journal, with the reviewed findings and the report; the index row
-- [ ] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
+- [x] RND-008.2: Harness: hints off by default, master frozen through timing, one budget, `--bump`; re-baseline
 - [ ] RND-008.3: No font built during a run's draw (hints, keycaps, interact key); cached word and label surfaces; a block-sized fade buffer; the `fonts._load` sweep test
 - [ ] RND-008.4: Elemental draw: bodies bucketed by band once a frame; cached status-mark shapes; cached plain damage-number glyphs
 - [ ] RND-008.5: Update re-measured with a stationary hero and frozen master; the bump decision, and the cheap wins if taken
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
 - [ ] RND-008.7: Results, before and after; index to done
 
+## RND-008: Results
+
+### RND-008.2: the harness
+
+- **What changed** (`tools/benchmarks/spawn_stress.py`):
+  - `build(..., hints=False, live_director=False)`. By default the opening
+    hints are dismissed, and the master is frozen before the crowd is
+    seated, with its in-flight company dropped (`drop_pending`), and stays
+    frozen through the timed frames.
+  - `--hints` and `--live-director` bring each old behaviour back, so the
+    numbers in the spawn master journal can still be re-taken.
+  - `BUDGET_MS` is one 60 Hz vsync period (16.67 ms). It counts the frames
+    over, and the 62 fps cap's 16.13 ms is printed beside it. pygame 2.5
+    cannot read the refresh rate, so the value is fixed.
+  - Every run prints a display line (surface, driver, vsync, render scale,
+    zoom, hints, director, budget). It also prints the crowd at the start
+    of timing and what arrived during it, by spawn owner.
+  - `--bump` times `BumpResolver.resolve` alone with nothing moving and the
+    hero parked out of reach. The impulses a pass adds are put back after
+    it, outside the timer, so every pass meets the same crowd. The hero is
+    put back at the end. `--bump` refuses `--render`, `--profile` and the
+    element flags: it would ignore the first two, and with elements the
+    frozen-contact rule deals damage that is not put back.
+  - `build(..., save_path=...)`, and `--hints` shows the hints even with the
+    Options "Tutorials" row off (flipped in memory while `RunHints` reads
+    it, never persisted).
+  - `arrivals` keeps the bodies themselves, not bare `id()`s, so a body freed
+    during the timing cannot hand its address to a newcomer and hide it.
+  - `--frames` below 1 is refused.
+  - The two `game/config.py` notes that cite harness measurements now say
+    they were taken with the pre-RND-008 defaults, and how to re-take them.
+- **What still moves the crowd:**
+  - **Enemy summons.** They are behaviour, not the director, and D3 keeps
+    them in, reported. At 100 asked they add 11 to 18 bodies over 240
+    frames.
+  - **The despawn ring.** `build` seats all it is asked for (100 of 100,
+    60 of 60). During the 60-frame warm-up the ring puts a few seated
+    bodies to sleep (5 of 100, 3 of 60), so timing starts at 95 and 57.
+  - Both are printed, so each table row below says what it measured.
+- **Cold critic (medium rule).** A separate agent reviewed the diff against
+  a frozen rubric and returned FAIL, with five should-fix findings and four
+  nits. All were fixed:
+  - `--bump` let impulses pile up, so later passes took the frozen-contact
+    branch (sliding bodies went from 1 to 74 over 300 passes).
+  - The journal blamed walkability for the seating shortfall. It was the
+    ring.
+  - The tests read the owner's `save.json`, so Tutorials off would have
+    broken two and made a third pass without testing anything.
+  - The command-line test passed `--hints --live-director` together, so it
+    could not see the two swapped.
+  - `arrivals` compared bare `id()`s.
+  - The nits: the flags `--bump` ignored, `--frames 0`, one blank line,
+    and the stale `config.py` notes.
+- **Tests:** `tests/devtools/test_spawn_stress.py`, 17 tests (4 subtests).
+  Three classes boot a run on seed 35, each on a fresh save
+  (`integration`, registered in `tests/conftest.py`). The flag-plumbing and
+  budget classes boot nothing (`unit`, 0.04 s).
+  - They pin:
+    - the hints are dismissed (enabled, not shown);
+    - `--hints` shows them with Tutorials off and leaves the setting off;
+    - a kept Move hint is still up after 300 frames of the harness's
+      jitter;
+    - the master stays frozen through 300 timed frames, with no `director`
+      arrival;
+    - no company is left in flight (one is put in the air on purpose,
+      because seed 35 has none at the freeze);
+    - a live director does add companies (the control);
+    - every bump pass shoves the same bodies by the same total impulse,
+      never meets the parked hero, and leaves positions, impulses and the
+      hero as found;
+    - each flag reaches `build` on its own;
+    - `--bump` refuses the four flags, and `--frames 0` is refused;
+    - a default `--pack --bump` run prints its display line and passes;
+    - the budget count.
+  - **Mutation check** (`mutate.py` in the session scratchpad): each
+    pre-fix behaviour was put back in turn, and every one failed at least
+    one test:
+
+    | Behaviour put back | Tests failed |
+    |---|---|
+    | the master unfrozen after seating | 4 |
+    | the hints kept by default | 3 |
+    | the in-flight company kept | 1 |
+    | impulses left to pile up between bump passes | 1 |
+    | `--hints` silent with Tutorials off | 2 |
+    | the two flags swapped on the way to `build` | 2 |
+    | `--bump` accepting `--render` | 1 |
+
+    The bare-`id()` arrival bug is fixed but not pinned: it needs CPython
+    to reuse a freed address, which no test can arrange reliably.
+  - Result: 17 passed in 13.3 s. `tests/devtools` 85 passed (6 subtests)
+    in 41.8 s. The suite collects 3,456 of 3,467, with the 11 `sweep`
+    deselected.
+- **Re-baseline.** Windows renderer, 2560 × 1080, render scale 1.2, zoom
+  1.797, seed 35, 240 timed frames:
+
+  | Workload | Crowd start → end (arrived) | Update p50 / p90 | Draw p50 / p90 / p99 | Update + draw p50 / p90 | Over 16.67 ms |
+  |---|---|---|---|---|---|
+  | 60 packed | 57 → 66 (summon 9) | 4.59 / 5.57 ms | 8.17 / 9.95 / 22.01 ms | **12.82** / 15.68 ms | 12 / 240 |
+  | 100 packed | 95 → 113 (summon 18) | 7.87 / 12.70 ms | 10.22 / 13.39 / 20.72 ms | 17.86 / 25.80 ms | 167 / 240 |
+  | 100 packed, infused | 96 → 107 (summon 11) | 8.34 / 11.29 ms | 15.99 / 21.11 / 38.75 ms | 24.76 / 30.46 ms | 237 / 240 |
+  | 100 packed, `--hints` | 95 → 113 (summon 18) | 8.36 / 10.87 ms | 27.27 / 31.55 / 40.66 ms | 35.10 / 42.04 ms | 240 / 240 |
+  | 100 packed, `--hints --live-director` (the report's setup) | 103 → 131 (director 10, summon 18) | 7.88 / 9.60 ms | 27.07 / 29.77 / 38.73 ms | 35.40 / 38.70 ms | 240 / 240 |
+
+  - This table was taken before the critic's fixes. It still stands for
+    the final code: those fixes touched `bump_times`, the arrival
+    bookkeeping done after timing, argument checks, and the Tutorials-off
+    branch. None of them runs inside a timed render frame. A second run
+    on the final code gave identical crowds (57 → 66, 95 → 113, 96 → 107,
+    103 → 131), but timings 20 to 60 % higher with a 242 ms spike. A game
+    client and another long-running Python process had the CPU at 57 %
+    load, so that run is not used.
+  - The last row is the report's setup, and it lands on the report's
+    numbers (131 live, draw p50 27.21 ms in the report). So the new
+    defaults are the only thing that moved the other rows.
+  - On the same crowd, the hints cost **17.05 ms** of draw p50
+    (27.27 − 10.22). That is RND-008.3's target.
+  - In the infused run the damage-number pool hit its cap (200 / 200).
+
+  Bump alone (`--pack --bump`, dummy driver, 300 passes, final code, **CPU
+  under the load above**):
+
+  | Crowd | Bump p50 / p90 / p99 |
+  |---|---|
+  | 18 | 0.103 / 0.122 / 0.185 ms |
+  | 58 | 0.911 / 1.199 / 1.869 ms |
+  | 95 | 2.175 / 2.534 / 2.947 ms |
+  | 144 | 4.716 / 5.350 / 6.012 ms |
+
+  These are in the range of the review's probe (4.10 ms p50 at 144) and
+  the report (4.56 ms at 150). The load makes them an upper bound, not a
+  baseline. RND-008.5 takes its before and after back to back in one
+  sitting, which is the only comparison this machine supports.
+
 ## RND-008: Method
+
+**Timings are only compared within one sitting.** On 2026-09-28 the same
+code ran 20 to 60 % slower when other programs loaded the CPU, with the
+crowd identical. So every before-and-after in this journal is taken back
+to back, and the display line and a note of the machine's load go with
+it.
 
 Every run: seed 35, `--dormant 0`, a 60-frame warm-up, then 240 timed
 frames. Windows runs set `SDL_VIDEODRIVER=windows` and opened the saved

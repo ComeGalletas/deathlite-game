@@ -132,6 +132,11 @@ INTEGRATION = (
     "tests/playing/test_enemy_nav.py::PlayingStateNavWiringTests",
     "tests/playing/test_enemy_nav.py::NavRebuildStaggerTests",
     "tests/render/test_depth_sort.py::DepthOrderTests",
+    # RND-008.2: the stress harness boots a run; its flag and budget checks
+    # boot nothing and stay unit.
+    "tests/devtools/test_spawn_stress.py::HarnessDefaultsTests",
+    "tests/devtools/test_spawn_stress.py::LiveDirectorTests",
+    "tests/devtools/test_spawn_stress.py::CommandLineTests",
 )
 
 
