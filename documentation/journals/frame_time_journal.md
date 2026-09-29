@@ -1,8 +1,8 @@
 # Gameplay frame time: journal
 
 **ID:** RND-008 · **System:** rendering (+ SYS, ENT, CMB) · **Type:**
-performance · **Status:** in progress (plan confirmed by the owner,
-2026-09-28) ·
+performance · **Status:** done (2026-09-29; RND-008.4 short of its
+target and accepted in D7, re-checked in RND-008.8) ·
 **Branch:** ComeGalletas/rnd-008-frame-time-9ec11fc6 (its own worktree, cut
 from `origin/main` at `5176c0c`, owner 2026-09-28)
 
@@ -295,7 +295,7 @@ Each task names the number it has to move. "Before" is the rerun above.
 - [x] RND-008.5: Update re-measured by part (60 / 100 / 150 packed, hero jittered and still, plain and infused); the bump decision; the bump pass about halved, bit for bit the same; `--jitter` on the harness
 - [x] ~~RND-008.6: Render-scale comparison~~: dropped, D4 (the resolution stays native)
 - [x] RND-008.7: Results, before and after, in one place; the follow-ups found on the way (the index moves to done in RND-008.8)
-- [ ] RND-008.8: The full test at the end (D7). The whole suite, `sweep` included, on the final branch, and the harness workloads (plain, infused, hints on and off, bump) against the RND-008.1 base in one sitting, with RND-008.4's accepted −20 % re-checked in the elemental fight. Loading time is compared too.
+- [x] RND-008.8: The full test at the end (D7). The whole suite, `sweep` included, on the final branch, and the harness workloads (plain, infused, hints on and off, bump) against the RND-008.1 base in one sitting, with RND-008.4's accepted −20 % re-checked in the elemental fight. Loading time is compared too.
 
 ## RND-008: Results
 
@@ -954,7 +954,10 @@ packed, 2560 × 1080, hints dismissed:
   navigation 0.9 to 1.4 ms.
 - **Combined:** at 100 packed that is inside the 16.67 ms budget. At 150
   to 170 packed the update alone is 6.7 to 7.7 ms, and a crowded
-  infused fight is at or over budget.
+  infused fight is at or over budget. *Corrected by RND-008.8:* this
+  added up parts measured in different sittings and drivers, and was
+  wrong. Measured end to end on the Windows renderer, 100 packed takes
+  18.4 to 19.1 ms of update and draw (p50), still over budget.
 - RND-008.8 measures this directly instead of adding it up.
 
 **What is left.** Found on the way, outside RND-008's plan. Each would be
@@ -979,9 +982,96 @@ its own requirement:
 7. **The in-game debug overlay's render time includes the vsync wait**
    (`game/game.py` `_step` times `display.flip()`), so it is not
    comparable with the harness's draw figure.
+8. **The update costs more in the real loop than headless** (found in
+   RND-008.8): 8.5 ms at 113 packed with the Windows renderer drawing
+   between updates, against 5.2 ms on the dummy driver. The cause was not
+   isolated.
 - Also found, and handed off during RND-008.3: run-booting tests sitting in
   the `unit` tier. The owner ran it as TST-006, now merged. Its tier audit
   shaped the harness's flag tests (RND-008.5).
+
+### RND-008.8: the full test (D7)
+
+The frozen rubric, written before measuring:
+1. The whole suite, `sweep` included, has no failure.
+2. In one sitting, alternating base and branch, no workload is slower:
+   plain pack with hints off and on, infused with hints off, bump alone
+   at about 144, and loading.
+3. On the branch, hints on draws within noise of hints off.
+4. RND-008.4 re-checked: the infused-minus-plain draw gap is lower on the
+   branch, reported as a percentage.
+5. The whole frame at 100 packed is stated against the budget.
+
+- **The base** is `origin/main` (TST-006 and TST-007 on top of
+  `5176c0c`). Its game code is byte-identical to where RND-008 started
+  (`git diff 5176c0c origin/main` over the game's packages is empty).
+- **The workloads.** The base harness has none of RND-008.2's flags, so
+  `scratchpad/final8.py` builds each workload the same way in both trees:
+  - seed 35, 100 packed round the hero;
+  - the master frozen with its in-flight company dropped;
+  - the hints dismissed or kept (forced on if the saved Options have them
+    off);
+  - 60 warm-up frames, then 240 timed frames of update and draw, jittered
+    as the harness does;
+  - Windows renderer, 2560 × 1080.
+
+  Bump alone is `bump8.py`: the packed crowd, nothing moving, the impulses
+  put back after each pass. Loading is `load_time.py`, loading screen to
+  the first frame. Two rounds, base then branch, with the CPU load logged
+  before each run (11 to 71 %).
+- **Results** (p50; `scratchpad/final8_numbers.py` computes the
+  differences):
+
+  | Workload | Base, round 1 / 2 | Branch, round 1 / 2 | Change |
+  |---|---|---|---|
+  | plain, hints off: update | 9.65 / 9.48 ms | 8.54 / 8.57 ms | −1.11 / −0.91 ms |
+  | plain, hints off: draw | 10.95 / 11.00 ms | 10.32 / 10.50 ms | −0.63 / −0.50 ms |
+  | plain, hints off: update + draw | 20.56 / 20.57 ms | 18.40 / 19.11 ms | −10.5 / −7.1 % |
+  | plain, hints on: draw | 31.76 / 30.80 ms | 10.43 / 10.44 ms | −21.33 / −20.36 ms |
+  | plain, hints on: update + draw | 41.52 / 40.33 ms | 18.41 / 18.18 ms | −55.7 / −54.9 % |
+  | infused, hints off: update | 8.80 / 8.98 ms | 7.59 / 7.89 ms | −1.21 / −1.09 ms |
+  | infused, hints off: draw | 15.48 / 15.51 ms | 14.40 / 14.86 ms | −1.08 / −0.65 ms |
+  | infused, hints off: update + draw | 24.29 / 24.50 ms | 22.14 / 22.83 ms | −8.9 / −6.8 % |
+  | bump alone, 144 packed | 4.57 / 4.54 ms | 1.91 / 2.39 ms | −58.1 / −47.3 % |
+  | loading to the first frame | 2.93 / 3.00 s | 2.92 / 2.87 s | none |
+  | the first frame after loading | 22.9 / 21.8 ms | 4.6 / 5.0 ms | −18.3 / −16.8 ms |
+
+  Frames over 16.67 ms, update + draw, of 240: plain hints off 204 / 217
+  → 170 / 174; plain hints on 240 / 240 → 174 / 157; infused 240 / 238
+  → 232 / 239.
+- **Against the rubric:**
+  1. **The whole suite with `sweep`:** 3,544 passed (2,534 subtests), 0 failed, 0 deselected, in 25 min 22 s: the 3,533 of the default suite and the 11 `sweep` tests. **Met.**
+  2. **Nothing is slower:** every workload is faster in both rounds.
+     Loading is unchanged. The first frame after loading is 17 to 18 ms
+     faster, because the opening hints no longer build their fonts on it
+     (RND-008.3). **Met.**
+  3. **Hints on against hints off, branch:** +0.11 / −0.06 ms of draw (the
+     base: +20.81 / +19.80 ms). **Met.**
+  4. **RND-008.4 re-checked:** the infused-minus-plain draw gap went from
+     4.53 / 4.51 ms to 4.08 / 4.36 ms, **−9.9 / −3.3 %**.
+     - That is lower, as the rubric asks, but short of the −20 % accepted
+       in D7, which came from RND-008.4's part-by-part means.
+     - Measured here by the whole draw's p50, the elemental fight's draw
+       is 0.65 to 1.08 ms faster, and the plain draw is also 0.50 to
+       0.63 ms faster from the same change. The gap subtracts the second
+       from the first, so it shows less than either.
+     - What the owner accepted as −20 % reads as −3 to −10 % in the gap
+       measured this way, or as −0.65 to −1.08 ms of the elemental
+       fight's draw. **Reported to the owner.**
+  5. **The whole frame at 100 packed:** 18.40 / 19.11 ms (p50) with hints
+     off, against 20.56 / 20.57 on the base. **Still over the 16.67 ms
+     budget**, 170 / 174 frames of 240.
+     - With the opening hints up it is 18.41 / 18.18 against 41.52 /
+       40.33: the largest win, felt in the first seconds of every run.
+     - RND-008.7's statement that 100 packed fits the budget was wrong,
+       and is marked corrected there.
+- **Found here, and added to what is left:** with the Windows renderer
+  drawing between updates, the update measures 8.5 ms at 113 packed,
+  against 5.2 ms in RND-008.5's dummy-driver runs of the same crowd. The
+  cause was not isolated. The draw may evict the update's data from the
+  caches between frames, but that is a guess, not a measurement. It
+  matters because the update budget is spent in the real loop, not the
+  headless one.
 
 ## RND-008: Method
 
