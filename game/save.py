@@ -17,6 +17,9 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from game.locale import DEFAULT as _DEFAULT_LANGUAGE
+from game.locale import LANGUAGES as _LANGUAGES
+
 log = logging.getLogger(__name__)
 
 SAVE_VERSION = 2      # 2: per-hero `heroes` state (six-weapon system P5)
@@ -59,6 +62,9 @@ _KEY_LAYOUTS = ("wasd_move", "arrows_move")
 _DEFAULT_KEY_LAYOUT = "wasd_move"
 _DISPLAY_MODES = ("windowed", "borderless")   # game/display/window.MODES
 _RENDER_ASPECTS = ("16:9", "21:9")            # game/display/window.ASPECTS
+# The UI language (UI-014) is read from `game.locale` rather than mirrored:
+# that module imports nothing from the game at load time, so the save stays
+# free of the content layer and the list of languages has one home.
 
 
 @dataclass
@@ -85,7 +91,9 @@ class SaveData:
         "key_layout": _DEFAULT_KEY_LAYOUT,
         # Options "Tutorials": the run's opening keycap hints (owner,
         # 2026-09-19 -- every run, until switched off here).
-        "tutorials": True})
+        "tutorials": True,
+        # Options "Language" (UI-014): English unless the player picks another.
+        "language": _DEFAULT_LANGUAGE})
     # P5 (design §20): per hero, whether the boss has been cleared with that
     # hero (which unlocks the main-weapon choice) and the chosen main weapon.
     heroes: dict[str, dict] = field(default_factory=dict)
@@ -186,6 +194,8 @@ def _coerce(raw: dict) -> SaveData:
         d.settings.update(raw["settings"])
     if d.settings.get("key_layout") not in _KEY_LAYOUTS:
         d.settings["key_layout"] = _DEFAULT_KEY_LAYOUT
+    if d.settings.get("language") not in _LANGUAGES:
+        d.settings["language"] = _DEFAULT_LANGUAGE
     # The window (game/display/): a mode the game knows and a plausible
     # size, or nothing -- the desktop can change between sessions, so the
     # size is clamped when applied, not here.

@@ -2,6 +2,7 @@
 screen updates every `config.ENEMY_LOD_SKIP` frames with a `dt` spanning
 the gap; anything the player can see or is fighting updates every frame."""
 import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -19,7 +20,7 @@ from tests.boot import settle
 
 
 def _run():
-    game = Game()
+    game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(LoadingState(game), seed=35, dev=True)
     ps = settle(game)
     ps.player.invulnerable = True

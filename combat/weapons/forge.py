@@ -17,10 +17,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from combat.weapons.core import CATEGORIES, CLASSES, SPECIAL_EFFECTS, Weapon
+from game import locale
 
+# The text keys a Forging may override. Each also takes its translations
+# (`name_es`, UI-014), derived from the shipped languages so a new language
+# needs no change here. `TEXT_OVERRIDE_KEYS` is the one list of every text
+# key, translations included: the parser, `apply_forge`, `forge_changes`
+# and `tools/gen_weapon_tables.py` all read it.
+TEXT_OVERRIDES = ("name", "description")
+# translation key -> the English key it translates (`name_es` -> `name`),
+# built rather than parsed back out, so a language code may hold "_".
+_TRANSLATES = {f"{key}_{lang}": key for key in TEXT_OVERRIDES
+               for lang in locale.LANGUAGES if lang != locale.DEFAULT}
+TEXT_TRANSLATIONS = frozenset(_TRANSLATES)
+TEXT_OVERRIDE_KEYS = frozenset(TEXT_OVERRIDES) | TEXT_TRANSLATIONS
 # Definition keys a Forging may override. Anything else is bad data.
 OVERRIDABLE = frozenset((
-    "name", "description", "damage", "cooldown", "projectile_count",
+    *TEXT_OVERRIDE_KEYS, "damage", "cooldown", "projectile_count",
     "projectile_speed", "projectile_lifetime", "spread_deg", "area", "weight",
     "targeting_mode", "pierce", "special_effect", "category", "tags", "reach",
     "aim_assist_deg", "cone_half_angle", "stun_chance", "stun_duration",
@@ -48,6 +61,25 @@ class ForgeDef:
     description: str
     overrides: dict = field(default_factory=dict)
     effects: dict = field(default_factory=dict)
+    # The data entry, for its translations (UI-014.5). `name`, `identity`
+    # and `description` stay English (identities: dev-menu order, logs);
+    # the player reads the `display_*` properties, resolved on every call.
+    texts: dict = field(default_factory=dict, compare=False, repr=False)
+
+    def _text(self, key: str, english: str) -> str:
+        return locale.text(self.texts, key) if self.texts else english
+
+    @property
+    def display_name(self) -> str:
+        return self._text("name", self.name)
+
+    @property
+    def display_identity(self) -> str:
+        return self._text("identity", self.identity)
+
+    @property
+    def display_description(self) -> str:
+        return self._text("description", self.description)
 
 
 class Forges:
@@ -79,6 +111,12 @@ def _parse(fid: str, d: dict, weapons: dict) -> ForgeDef:
     bad = set(ov) - OVERRIDABLE
     if bad:
         raise ValueError(f"forge {fid!r}: cannot override {sorted(bad)}")
+    # A translation overrides only alongside its English field, or the
+    # forged weapon would carry a Spanish name over the base's English one.
+    orphans = sorted(k for k in set(ov) & TEXT_TRANSLATIONS
+                     if _TRANSLATES[k] not in ov)
+    if orphans:
+        raise ValueError(f"forge {fid!r}: overrides {orphans} without the English field")
     if "category" in ov and ov["category"] not in CATEGORIES:
         raise ValueError(f"forge {fid!r}: category {ov['category']!r}")
     if "special_effect" in ov and ov["special_effect"] not in SPECIAL_EFFECTS:
@@ -87,7 +125,8 @@ def _parse(fid: str, d: dict, weapons: dict) -> ForgeDef:
     bad = set(fx) - EFFECT_KEYS
     if bad:
         raise ValueError(f"forge {fid!r}: unknown effects {sorted(bad)}")
-    return ForgeDef(fid, d["name"], d["weapon"], d["identity"], d["description"], ov, fx)
+    return ForgeDef(fid, d["name"], d["weapon"], d["identity"], d["description"], ov, fx,
+                    texts=d)
 
 
 # --- per-content cache -------------------------------------------------
@@ -121,6 +160,13 @@ def apply_forge(weapon: Weapon, fdef: ForgeDef) -> None:
     if weapon.forge is not None:
         raise ValueError(f"{weapon.weapon_id} is already forged into {weapon.forge}")
     merged = dict(weapon.definition)
+    # Overriding a text field invalidates the base's translations of it: a
+    # forge that renamed the Sword but had no `name_es` would otherwise
+    # still read "Espada" in Spanish. Dropped first, so the forge's own
+    # translations (if any) land and a missing one falls back to its English.
+    for key, english in _TRANSLATES.items():
+        if english in fdef.overrides:
+            merged.pop(key, None)
     merged.update(fdef.overrides)
     if merged.get("class") not in CLASSES:
         raise ValueError(f"{fdef.id}: the merged definition lost its class")
@@ -137,10 +183,6 @@ def apply_forge(weapon: Weapon, fdef: ForgeDef) -> None:
 
 
 # --- readout ---------------------------------------------------------------
-# Text keys a Forging overrides that are not numbers to compare.
-_TEXT_KEYS = frozenset(("name", "description"))
-
-
 def forge_changes(content, weapon: Weapon) -> list[tuple[str, object, object]]:
     """What a weapon's Forging changed, for the run status screen:
     `(key, before, after)` for every override against the *base* weapon
@@ -150,6 +192,9 @@ def forge_changes(content, weapon: Weapon) -> list[tuple[str, object, object]]:
         return []
     fdef = get_forges(content).get(weapon.forge)
     base = content.weapon(weapon.weapon_id)
-    out = [(k, base.get(k), v) for k, v in fdef.overrides.items() if k not in _TEXT_KEYS]
+    # Text (the name, the description and their translations) is not a
+    # number to compare.
+    out = [(k, base.get(k), v) for k, v in fdef.overrides.items()
+           if k not in TEXT_OVERRIDE_KEYS]
     out += [(k, None, v) for k, v in fdef.effects.items()]
     return out

@@ -43,13 +43,13 @@ import sys
 
 import pygame
 
-from game import config
+from game import config, locale
 from game.display import fit, native
 
 log = logging.getLogger(__name__)
 
 MODES = ("windowed", "borderless")
-MODE_LABELS = {"windowed": "Windowed", "borderless": "Borderless"}
+# A mode's label is `display.<mode>` in `data/locale/` (UI-014.7).
 ASPECTS = ("16:9", "21:9")
 
 
@@ -365,18 +365,19 @@ class DisplayWindow:
         return self.set_windowed_size(entries[i])
 
     def mode_label(self) -> str:
-        return MODE_LABELS[self.mode] if self.available else "Unavailable"
+        return locale.t(f"display.{self.mode}" if self.available else "display.unavailable")
 
     def resolution_label(self) -> str:
         """What the Resolution row shows: the desktop size in borderless,
         the windowed size otherwise ("Custom" when dragged)."""
         if not self.available:
-            return "Unavailable"
+            return locale.t("display.unavailable")
         if self.mode == "borderless":
             w, h = self.desktop_size()
             return f"{w}x{h}"
         w, h = self.windowed_size or _logical()
-        return f"{w}x{h}" if self.resolution_index() >= 0 else f"Custom {w}x{h}"
+        return (f"{w}x{h}" if self.resolution_index() >= 0
+                else locale.t("display.custom", w=w, h=h))
 
     def resolution_selectable(self) -> bool:
         return self.available and self.mode == "windowed"

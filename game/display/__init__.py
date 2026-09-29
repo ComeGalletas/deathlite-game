@@ -8,6 +8,6 @@ scaling", 2026-09-15).
     window.py   -- `DisplayWindow`: open, windowed / borderless, the
                    Resolution row, drag resizes, the saved settings
 """
-from game.display.window import DisplayWindow, MODES, MODE_LABELS
+from game.display.window import DisplayWindow, MODES
 
-__all__ = ["DisplayWindow", "MODES", "MODE_LABELS"]
+__all__ = ["DisplayWindow", "MODES"]

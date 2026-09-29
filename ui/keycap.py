@@ -32,8 +32,9 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import scale
+from ui.text import fit_font
 
 STATES = ("raised", "pressed")
 COLOURS = ("blue", "grey")
@@ -59,13 +60,18 @@ KEYCAPS = {
 
 # What a key's cap says. `pygame.key.name` gives lower-case words; single
 # characters are shown upper-case, the arrows as arrows, and the long names
-# shortened to what a keyboard prints.
+# shortened to what a keyboard prints. `_NAMES` are the legends the key
+# itself carries, the same in every language (UI-014.D16); `_WORDS` are
+# words the player reads, locale keys read each time a cap is labelled.
 _NAMES = {
-    "space": "SPACE", "tab": "TAB", "escape": "ESC", "return": "ENTER",
-    "left shift": "SHIFT", "right shift": "SHIFT",
+    "tab": "TAB", "escape": "ESC", "return": "ENTER",
     "left ctrl": "CTRL", "right ctrl": "CTRL",
-    "left alt": "ALT", "right alt": "ALT", "backspace": "BKSP",
+    "left alt": "ALT", "right alt": "ALT",
     "up": "↑", "down": "↓", "left": "←", "right": "→",
+}
+_WORDS = {
+    "space": "keys.space", "backspace": "keys.backspace",
+    "left shift": "keys.shift", "right shift": "keys.shift",
 }
 
 
@@ -75,8 +81,12 @@ ARROWS = {"↑": (0, -1), "↓": (0, 1), "←": (-1, 0), "→": (1, 0)}
 # in the pack, and the arrow is the thing the player clicks with. Falls
 # back to the word when the cursor file is missing.
 MOUSE = ""
-MOUSE_WORD = "CLICK"
+MOUSE_WORD = "keys.click"  # a locale key: the word when the cursor art is missing
 MOUSE_PX = 20           # the cursor glyph's height at CAP_PX
+# The share of a wide cap's width its word may fill: the face spans columns
+# 16-176 of the 192 px sheet (83 %), less a margin so no letter touches the
+# bevel. A translation longer than that steps down in size (UI-014.8).
+WORD_ROOM = 0.75
 _glyphs: dict[tuple, pygame.Surface | None] = {}
 
 
@@ -121,8 +131,10 @@ def draw_arrow(surface: pygame.Surface, center, direction, size: int, colour) ->
 
 
 def label_for(keycode: int) -> str:
-    """The text on the cap of `keycode`."""
+    """The text on the cap of `keycode`, in the current language."""
     name = pygame.key.name(keycode)
+    if name in _WORDS:
+        return locale.t(_WORDS[name])
     return _NAMES.get(name, name.upper())
 
 
@@ -196,19 +208,25 @@ def _words(assets, label: str, size: int) -> tuple[str | None, pygame.Surface | 
         return None, None
     if label == MOUSE:
         glyph = mouse_glyph(assets, scale.px(MOUSE_PX * size / CAP_PX))
-        return (None, glyph) if glyph is not None else (MOUSE_WORD, None)
+        return (None, glyph) if glyph is not None else (locale.t(MOUSE_WORD), None)
     return label, None
 
 
-def _text(words: str, ink, wide: bool, size: int, font, cache) -> pygame.Surface:
+def _text(words: str, ink, wide: bool, size: int, font, cache, rect) -> pygame.Surface:
     """`words` rendered in the cap's label face: `font` when given, else
-    the body face at the cap's size, from `cache` when there is one."""
+    the body face at the cap's size, from `cache` when there is one. A wide
+    cap's word longer than `WORD_ROOM` of its width steps down in size
+    (UI-014.8: a translation); a caller's own font is theirs."""
     if font is not None:
         return font.render(words, True, ink)
     px = int(round((WORD_PX if wide else LABEL_PX) * size / CAP_PX))
+    base = cache.font("body", px, bold=True) if cache is not None else fonts.body(px, bold=True)
+    room = int(rect.width * WORD_ROOM)
+    if wide and base.size(words)[0] > room:
+        return fit_font(fonts.body, px, words, room, bold=True).render(words, True, ink)
     if cache is not None:
         return cache.render("body", px, words, ink, bold=True)
-    return fonts.body(px, bold=True).render(words, True, ink)
+    return base.render(words, True, ink)
 
 
 def draw_keycap(surface: pygame.Surface, assets, face_center, label: str, *,
@@ -240,7 +258,7 @@ def draw_keycap(surface: pygame.Surface, assets, face_center, label: str, *,
         else:
             draw_arrow(surface, at, ARROWS[label], int(round(ARROW_PX * size / CAP_PX)), ink)
         return rect
-    text = _text(words, ink, wide, size, font, cache)
+    text = _text(words, ink, wide, size, font, cache, rect)
     surface.blit(text, text.get_rect(center=at))
     return rect
 
@@ -261,4 +279,4 @@ def footprint(assets, face_center, label: str, *, state: str = "raised",
     words, _glyph = _words(assets, label, size)
     if words is None:
         return rect
-    return rect.union(_text(words, ink, wide, size, font, cache).get_rect(center=at))
+    return rect.union(_text(words, ink, wide, size, font, cache, rect).get_rect(center=at))

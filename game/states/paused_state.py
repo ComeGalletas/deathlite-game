@@ -29,18 +29,19 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import State
 from ui import controls_block, scale, widgets
 from ui.text_cache import TextCache
 from ui.menu_nav import MenuNav
+from ui.text import fit_font
 
 _ROWS = ("resume", "status", "options", "key_layout", "quit")
 # 64-px `wide` buttons on a 72-px step; the Quit row on the red sheet.
 _ROW_TOP, _ROW_STEP, _ROW_H, _ROW_W = 330, 72, 64, 560
 _DANGER = {"quit"}
-_LABELS = {"resume": "Resume", "status": "Run status", "options": "Options",
-           "key_layout": "Key layout", "quit": "Quit to menu"}
+_FONT_PX = 26                        # the row labels' design font size
+# Each row's label is `pause.<row>` in `data/locale/` (UI-014.7).
 # The Controls block: left edge this far right of the screen centre (the
 # buttons end at +280), top level with the first row's top.
 _CONTROLS_X, _CONTROLS_Y = 340, _ROW_TOP - _ROW_H // 2
@@ -73,9 +74,8 @@ class PausedState(State):
 
     def _build_fonts(self) -> None:
         self._title_font = fonts.heading(48)
-        self._font = fonts.body(26)
+        self._font = fonts.body(_FONT_PX)
         self._hint = fonts.body(16)
-        self._controls_font = fonts.body(20)
         self._controls_head = fonts.heading(26)
         # The Controls block's keycap labels, drawn every paused frame
         # (RND-008.3): built once per scale, not once per cap per frame.
@@ -129,7 +129,7 @@ class PausedState(State):
 
     def draw(self, surface: pygame.Surface) -> None:
         cx = surface.get_width() // 2
-        title = self._title_font.render("Paused", True, config.COLOR_ACCENT)
+        title = self._title_font.render(locale.t("pause.title"), True, config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(cx, scale.px(250))))
 
         hits = self._mouse.hits
@@ -149,21 +149,23 @@ class PausedState(State):
                                 shape="wide",
                                 variant="danger" if rid in _DANGER else "primary")
             dy = scale.px(widgets.LABEL_DY + (widgets.PRESSED_DY if state == "pressed" else 0))
-            lab = self._font.render(_LABELS[rid], True, config.COLOR_ON_BUTTON)
+            lab = self._font.render(locale.t(f"pause.{rid}"), True, config.COLOR_ON_BUTTON)
             surface.blit(lab, lab.get_rect(midleft=(rect.left + scale.px(40), rect.centery + dy)))
             if rid == "key_layout":
-                val = self._font.render(
-                    config.KEY_LAYOUT_LABELS[self.game.key_layout], True,
-                    config.COLOR_ON_BUTTON_DIM)
+                text = locale.t(f"key_layout.{self.game.key_layout}")
+                # From the label's end to the button's inner edge; a longer
+                # translation steps down in size rather than overlap it.
+                room = (rect.right - scale.px(40)) - (rect.left + scale.px(40)
+                                                      + lab.get_width() + scale.px(24))
+                font = (self._font if self._font.size(text)[0] <= room
+                        else fit_font(fonts.body, _FONT_PX, text, room))
+                val = font.render(text, True, config.COLOR_ON_BUTTON_DIM)
                 surface.blit(val, val.get_rect(midright=(rect.right - scale.px(40), rect.centery + dy)))
 
         controls_block.draw(surface, self.game.assets,
                             (cx + scale.px(_CONTROLS_X), scale.px(_CONTROLS_Y)), self.game,
-                            font=self._controls_font, heading_font=self._controls_head,
-                            cache=self._text_cache)
+                            heading_font=self._controls_head, cache=self._text_cache)
 
-        hint = self._hint.render(
-            "Up / Down select    -    ENTER pick    -    ESC / P resume",
-            True, config.COLOR_TEXT_DIM)
+        hint = self._hint.render(locale.t("pause.hint"), True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(
             center=(cx, scale.px(_ROW_TOP + (len(_ROWS) - 1) * _ROW_STEP + _ROW_H // 2 + 30))))

@@ -10,17 +10,28 @@ vertical clamp here; a caller that needs one caps the list it gets back.
 """
 from __future__ import annotations
 
+import re
+
 import pygame
 
 from game import config
 
 
+# Where a line may break: any whitespace `str.split()` breaks at, except the
+# no-break spaces (U+00A0, figure U+2007, narrow U+202F). Spanish text puts
+# one between a number and its unit ("+25 %", UI-014.D7) precisely so the
+# two stay on one line.
+_BREAK = re.compile(r"[^\S   ]+")
+
+
 def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
-    """Lines of `text` no wider than `max_width` px in `font`."""
+    """Lines of `text` no wider than `max_width` px in `font`. A no-break
+    space (U+00A0) keeps the words either side of it on one line."""
     lines: list[str] = []
     cur = ""
-    for word in text.split():
-        candidate = f"{cur} {word}".strip()
+    for word in (w for w in _BREAK.split(text) if w):
+        # Not `.strip()`: that would eat a no-break space at a word's edge.
+        candidate = f"{cur} {word}" if cur else word
         if cur and font.size(candidate)[0] > max_width:
             lines.append(cur)
             cur = word
@@ -29,6 +40,56 @@ def wrap(font: pygame.font.Font, text: str, max_width: int) -> list[str]:
     if cur:
         lines.append(cur)
     return lines
+
+
+_FIT_CACHE: dict[tuple, pygame.font.Font] = {}
+_quit_hooked = False
+
+
+def _forget_fonts() -> None:
+    """`pygame.quit()` invalidates every `Font`: one used after a
+    quit / init cycle is an access violation (see `game/fonts.py`, which
+    keeps no cache for this reason). `pygame.register_quit` calls this on
+    the next quit, once; `cached_font` re-arms it when it caches again."""
+    global _quit_hooked
+    _FIT_CACHE.clear()
+    _quit_hooked = False
+
+
+def fit_font(role, px: int, text: str, max_width: int, *,
+             min_ratio: float = 0.7, **kwargs) -> pygame.font.Font:
+    """The largest `role(size)` font, from design size `px` down to
+    `px * min_ratio`, in which `text` is no wider than `max_width` native px;
+    the smallest when none fits. `role` is a `game.fonts` role (`body`,
+    `heading`); `kwargs` pass through to it.
+
+    For a label whose slot is fixed and whose text is not: a translation
+    longer than the English it was laid out for (UI-014.7) steps down in
+    size rather than running into its neighbour. Fonts are cached by role,
+    native size and options, so a label drawn every frame builds none; the
+    cache is dropped when pygame quits (`_forget_fonts`)."""
+    floor = max(1, int(round(px * min_ratio)))
+    font = None
+    for size in range(int(px), floor - 1, -1):
+        font = cached_font(role, size, **kwargs)
+        if font.size(text)[0] <= max_width:
+            return font
+    return font
+
+
+def cached_font(role, px: int, **kwargs) -> pygame.font.Font:
+    """`role(px, **kwargs)`, built once per render scale and kept until
+    pygame quits: for text that steps down in size every frame (`fit_font`,
+    the level-up card descriptions)."""
+    global _quit_hooked
+    if not _quit_hooked:
+        pygame.register_quit(_forget_fonts)
+        _quit_hooked = True
+    key = (role, config.RENDER_SCALE, int(px), tuple(sorted(kwargs.items())))
+    font = _FIT_CACHE.get(key)
+    if font is None:
+        font = _FIT_CACHE[key] = role(int(px), **kwargs)
+    return font
 
 
 def ellipsize(font: pygame.font.Font, text: str, max_width: int) -> str:

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config
+from game import config, locale
 from progression.blessings.catalog import roman
 from ui.run_status import common as c
 from ui.text import wrap
@@ -54,11 +54,13 @@ class BlessingsPane:
         lst = pygame.Rect(area.left, area.top, list_w, area.height)
         detail = pygame.Rect(area.left + list_w + g, area.top, area.width - list_w - g, area.height)
 
-        y = c.subheader(surface, f.sub, lst, lst.top + c.S(2), f"Blessings  ({len(rows)})")
+        y = c.subheader(surface, f.sub, lst, lst.top + c.S(2),
+                        locale.t("status.blessings", n=len(rows)))
         if not rows:
-            c.line(surface, f.row, lst, y, "none yet", colour=config.COLOR_TEXT_DIM)
+            c.line(surface, f.row, lst, y, locale.t("status.none_yet"),
+                   colour=config.COLOR_TEXT_DIM)
             c.line(surface, f.row, detail, detail.top + c.S(c.ROW_STEP),
-                   "Blessings come from level-ups and the village.", colour=config.COLOR_TEXT_DIM)
+                   locale.t("status.blessings_help"), colour=config.COLOR_TEXT_DIM)
             return
 
         list_row = c.S(LIST_ROW)
@@ -69,7 +71,8 @@ class BlessingsPane:
             self.scroll = self.sel - visible + 1
         self.scroll = max(0, min(self.scroll, max(0, len(rows) - visible)))
 
-        names = {wid: d.get("name", wid) for wid, d in ps.content.weapons.items()}
+        names = {wid: locale.text(d, "name") if "name" in d else wid
+                 for wid, d in ps.content.weapons.items()}
         for i in range(self.scroll, min(len(rows), self.scroll + visible)):
             bid, lvl, bdef = rows[i]
             r = pygame.Rect(lst.left, y - list_row // 2 + c.S(2), lst.width, list_row)
@@ -77,20 +80,22 @@ class BlessingsPane:
             if i == self.sel:
                 pygame.draw.rect(surface, (40, 36, 60), r, border_radius=c.S(6))
                 pygame.draw.rect(surface, config.COLOR_ACCENT, r, width=1, border_radius=c.S(6))
-            name = bdef.name if bdef else bid.replace("_", " ").title()
+            name = bdef.display_name if bdef else bid.replace("_", " ").title()
             colour = c.RARITY_ON_DARK.get(bdef.rarity if bdef else "common", config.COLOR_TEXT)
             t = f.row.render(f"{name} {roman(lvl)}", True, colour)
             surface.blit(t, t.get_rect(midleft=(lst.left + c.S(10), y)))
-            owner = names.get(bdef.weapon, "Hero") if bdef and bdef.weapon else "Hero"
+            hero = locale.t("status.owner_hero")
+            owner = names.get(bdef.weapon, hero) if bdef and bdef.weapon else hero
             o = f.small.render(owner, True, config.COLOR_TEXT_DIM)
             surface.blit(o, o.get_rect(midright=(lst.right - c.S(10), y)))
             y += list_row
         if self.scroll > 0:
-            up = f.small.render("^ more", True, config.COLOR_TEXT_DIM)
+            up = f.small.render(locale.t("status.more_up"), True, config.COLOR_TEXT_DIM)
             surface.blit(up, up.get_rect(midright=(lst.right - c.S(10), lst.top + c.S(12))))
         if self.scroll + visible < len(rows):
             c.line(surface, f.small, lst, min(y, lst.bottom - c.S(8)),
-                   f"+{len(rows) - self.scroll - visible} more  (scroll)", colour=config.COLOR_TEXT_DIM)
+                   locale.t("status.more_scroll", n=len(rows) - self.scroll - visible),
+                   colour=config.COLOR_TEXT_DIM)
 
         self._draw_detail(surface, detail, rows[self.sel], names)
 
@@ -101,15 +106,19 @@ class BlessingsPane:
         if bdef is None:
             c.line(surface, f.title, area, y, bid, step=34)
             return
-        y = c.line(surface, f.title, area, y, f"{bdef.name} {roman(lvl)}",
+        y = c.line(surface, f.title, area, y, bdef.title(lvl),
                    colour=c.RARITY_ON_DARK.get(bdef.rarity, config.COLOR_TEXT), step=34)
-        owner = names.get(bdef.weapon, bdef.weapon) if bdef.weapon else "Hero"
-        y = c.line(surface, f.small, area, y,
-                   f"{bdef.rarity}  ·  {bdef.category}  ·  {owner}", colour=config.COLOR_TEXT_DIM, step=24)
+        owner = names.get(bdef.weapon, bdef.weapon) if bdef.weapon else locale.t("status.owner_hero")
+        # The rarity and category in lower case, as the ids always read.
+        rarity = locale.name("rarity", bdef.rarity).lower()
+        category = locale.name("category", bdef.category).lower()
+        y = c.line(surface, f.small, area, y, f"{rarity}  ·  {category}  ·  {owner}",
+                   colour=config.COLOR_TEXT_DIM, step=24)
         y = c.rule(surface, area, y + c.S(6))
         y += c.S(10)
         for text_line in wrap(f.row, bdef.describe(lvl), area.width):
             y = c.line(surface, f.row, area, y, text_line, step=28)
         y += c.S(10)
-        c.kv(surface, f.row, area, y, "Level", f"{roman(lvl)} of {roman(bdef.max_level)}",
+        c.kv(surface, f.row, area, y, locale.t("status.level"),
+             locale.t("status.level_of", level=roman(lvl), max=roman(bdef.max_level)),
              colour=config.COLOR_ACCENT)

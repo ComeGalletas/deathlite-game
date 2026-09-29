@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from ui import widgets
 from ui import scale
 from ui.menu_nav import MenuNav
@@ -46,7 +46,9 @@ TITLE_CY, SUBTITLE_CY = 66, 118
 class Button:
     """One button in the row.
 
-    `hint` is what the hint line calls its key. `key` is the pygame key that
+    `label` is a locale key; `text` reads it in the current language when
+    the button is drawn (UI-014.8). `hint` is what the hint line calls its
+    key. `key` is the pygame key that
     fires it from anywhere on the screen regardless of what is selected;
     `None` means the confirm keys (ENTER / SPACE) are its only way in, which
     is how the first button doubles as the default action.
@@ -56,6 +58,10 @@ class Button:
     hint: str
     key: int | None = None
     variant: str = "primary"
+
+    @property
+    def text(self) -> str:
+        return locale.t(self.label)
 
 
 def run_subtitle(stats: dict, *, lead: tuple[str, ...] = ()) -> str:
@@ -69,9 +75,10 @@ def run_subtitle(stats: dict, *, lead: tuple[str, ...] = ()) -> str:
     parts.append(str(stats.get("character", "-")))
     diff = stats.get("difficulty")
     if diff:
-        parts.append(config.DIFFICULTY_LABELS.get(diff, str(diff)))
+        key = f"difficulty.{diff}"
+        parts.append(locale.t(key) if locale.has(key) else str(diff))
     if stats.get("seed") is not None:
-        parts.append(f"seed {stats['seed']}")
+        parts.append(locale.t("end.seed", n=stats["seed"]))
     return "   -   ".join(parts)
 
 
@@ -160,9 +167,10 @@ class EndScreen:
                          columns=self.columns)
         self._draw_buttons(surface, assets, cx)
 
+        sep = locale.t("end.hint_separator")
         hint = self._hint_font.render(
-            "   -   ".join(f"{b.hint} {b.label.lower()}" for b in self.buttons)
-            + "   -   Left / Right select",
+            sep.join([locale.t("end.button_hint", key=b.hint, label=b.text.lower())
+                      for b in self.buttons] + [locale.t("end.select")]),
             True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(cx, S(BTN_CY + BTN_H // 2 + 30))))
 
@@ -180,6 +188,6 @@ class EndScreen:
             hits.add(rect, i)                 # the button *is* the mouse target
             state = ("pressed" if self.mouse.pressed_on == i
                      else "hover" if i == self.sel else "normal")
-            widgets.draw_button(surface, assets, rect, b.label, state=state,
+            widgets.draw_button(surface, assets, rect, b.text, state=state,
                                 shape="wide", variant=b.variant,
                                 font=self._btn_font)

@@ -1,0 +1,499 @@
+{
+  "_doc": "UI text in Spanish (UI-014). Same keys and same {placeholders} as en.json; a key missing here is shown in English.",
+  "language": {
+    "name": "Español"
+  },
+  "item": {
+    "_doc": "The rarity adjective follows the base and agrees with its gender_es (UI-014.D9): Coraza de hierro rúnica de vitalidad.",
+    "name": "{base} {prefix}",
+    "name_affix": "{base} {prefix} {affix}"
+  },
+  "format": {
+    "_doc": "Decimal comma (UI-014.D7).",
+    "decimal": ",",
+    "thousands": "."
+  },
+  "menu": {
+    "start": "Nueva partida",
+    "dev_start": "Nueva partida en modo desarrollador",
+    "rankings": "Clasificación",
+    "options": "Opciones",
+    "exit": "Salir",
+    "summary": "Chatarra {salvage}    Mejor: {time} / Nv. {level} / {kills} bajas    Objetos hallados {items}"
+  },
+  "hero_select": {
+    "title": "Elige a tu héroe",
+    "trait": "Rasgo - {name}",
+    "starts_with": "Empieza con: {weapon}",
+    "main_weapon": "Arma principal:",
+    "difficulty": "Dificultad:",
+    "begin": "Comenzar",
+    "hint": "Izquierda / Derecha: héroe    -    Arriba / Abajo o clic: dificultad",
+    "hint_weapon": "    -    Q / E: arma principal",
+    "hint_end": "    -    ENTER / Comenzar    -    ESC: volver",
+    "back": "<  Volver"
+  },
+  "instructions": {
+    "move": "Mover",
+    "aim": "Apuntar",
+    "auto_attack": "Ataque automático",
+    "stat_screen": "Estadísticas",
+    "pause": "Pausa",
+    "mute": "Silenciar",
+    "keys": {
+      "aim": "Flechas / Clic"
+    },
+    "note": {
+      "fire": "Las armas disparan solas; mantén una dirección o haz clic para apuntarlas.",
+      "goal": "Sobrevive, sube de nivel, vence al jefe."
+    }
+  },
+  "difficulty": {
+    "normal": "Normal",
+    "fast": "Rápido",
+    "super_fast": "Superrápido"
+  },
+  "key_layout": {
+    "wasd_move": "WASD: mover / Flechas: apuntar",
+    "arrows_move": "Flechas: mover / WASD: apuntar"
+  },
+  "options": {
+    "title": "Opciones",
+    "master": "Volumen general",
+    "music": "Volumen de la música",
+    "sfx": "Efectos de sonido",
+    "mute": "Silenciar",
+    "key_layout": "Teclas",
+    "tutorials": "Tutoriales",
+    "language": "Idioma",
+    "display": "Modo de pantalla",
+    "resolution": "Resolución",
+    "sanctuary": "Santuario",
+    "back": "Volver",
+    "on": "Sí",
+    "off": "No",
+    "hint": "Arriba / Abajo: elegir    -    Izquierda / Derecha: ajustar    -    ENTER: cambiar / abrir    -    ESC: volver"
+  },
+  "display": {
+    "windowed": "En ventana",
+    "borderless": "Sin bordes",
+    "unavailable": "No disponible",
+    "custom": "Personalizada {w}x{h}"
+  },
+  "pause": {
+    "title": "Pausa",
+    "resume": "Continuar",
+    "status": "Estado de la partida",
+    "options": "Opciones",
+    "key_layout": "Teclas",
+    "quit": "Salir al menú",
+    "hint": "Arriba / Abajo: elegir    -    ENTER: aceptar    -    ESC / P: continuar"
+  },
+  "controls": {
+    "title": "Controles",
+    "move": "Mover",
+    "aim": "Apuntar (mantener)",
+    "attack": "Atacar",
+    "interact": "Interactuar",
+    "auto_attack": "Ataque automático",
+    "build": "Equipo",
+    "pause": "Pausa"
+  },
+  "level_up": {
+    "title": "Subes de nivel  -  elige una",
+    "hint_cards": "{keys} o Izquierda/Derecha + Enter para elegir    -    o haz clic en una carta",
+    "hint_leave": "{keys} o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
+    "hint_rows": "Arriba/Abajo: elegir fila    -    {keys} o Izquierda/Derecha + Enter para elegir    -    ESC para salir",
+    "new": "Nueva arma: {name}",
+    "line": {
+      "weapon": "{weapon} · {category}",
+      "hero": "{category} del héroe",
+      "grant": "Arma {weapon_class}",
+      "forge": "Forja · {weapon}"
+    }
+  },
+  "rarity": {
+    "common": "Común",
+    "uncommon": "Poco común",
+    "rare": "Raro",
+    "epic": "Épico",
+    "legendary": "Legendario",
+    "forge": "Forja"
+  },
+  "category": {
+    "power": "Poder",
+    "coverage": "Cobertura",
+    "behavior": "Comportamiento",
+    "synergy": "Sinergia"
+  },
+  "weapon_class": {
+    "melee": "cuerpo a cuerpo",
+    "ranged": "a distancia",
+    "summon": "de invocación"
+  },
+  "loading": {
+    "label": "Cargando..."
+  },
+  "rankings": {
+    "title": "Clasificación",
+    "subtitle": "Mejor partida por dificultad  -  nunca se comparan entre dificultades",
+    "time": "Tiempo",
+    "level": "Nivel",
+    "kills": "Bajas",
+    "damage": "Daño",
+    "seconds": "{n} s",
+    "empty": "aún no hay partidas",
+    "hint": "ENTER / ESC  -  volver al menú"
+  },
+  "hints": {
+    "move": "Mover",
+    "attack": "Atacar",
+    "aim": "Apuntar"
+  },
+  "keys": {
+    "space": "ESPACIO",
+    "shift": "MAYÚS",
+    "backspace": "BORRAR",
+    "click": "CLIC"
+  },
+  "chest": {
+    "notice": "Cofre {rarity}: {contents}.",
+    "gold": "{n} de oro",
+    "potion": "una poción {rarity}",
+    "rarity": {
+      "common": "común",
+      "uncommon": "poco común",
+      "rare": "raro",
+      "epic": "épico"
+    }
+  },
+  "potion": {
+    "rarity": {
+      "common": "común",
+      "uncommon": "poco común",
+      "rare": "rara"
+    }
+  },
+  "list": {
+    "pair": "{a} y {b}",
+    "pair_i": "{a} e {b}",
+    "separator": ", "
+  },
+  "forge": {
+    "title": "La Forja  -  elige un arma para reforjar",
+    "hint": "Arriba/Abajo: elegir arma    -    {keys} o Izquierda/Derecha + Enter para forjar    -    ESC para salir",
+    "reforged": "Reforja de {weapon}: {forge}.",
+    "all_forged": "Todas las armas ya están forjadas.",
+    "needs": {
+      "one": "La Forja necesita un arma con {need} bendiciones. {weapon}: falta {n}.",
+      "other": "La Forja necesita un arma con {need} bendiciones. {weapon}: faltan {n}."
+    },
+    "rail": {
+      "heading": "¿QUÉ ARMA REFORJAR?",
+      "forged": "ya tiene forja: {name}",
+      "ready": "{have} / {need} bendiciones",
+      "short": {
+        "one": "{have} / {need} - falta {n} bendición",
+        "other": "{have} / {need} - faltan {n} bendiciones"
+      }
+    }
+  },
+  "element": {
+    "fire": "Fuego",
+    "ice": "Hielo",
+    "thunder": "Trueno",
+    "wind": "Viento"
+  },
+  "infusion": {
+    "monastery_title": "El Monasterio  -  elige un elemento y luego un arma",
+    "rail": {
+      "heading": "¿CON QUÉ ELEMENTO INFUNDIR?",
+      "on": "en {weapons}",
+      "none": "sin portar"
+    },
+    "refresh": "Ya porta {element}. Lo renueva ({pace}).",
+    "replace": "Cambia {old} por {element} ({pace}).",
+    "carry": "Porta {element} {pace}.",
+    "pace": {
+      "time": "cada {s}",
+      "count": "en 1 de cada {n} ataques",
+      "every": "en cada ataque"
+    },
+    "no_weapon": "No hay armas que infundir.",
+    "hint_rail": "Arriba/Abajo: elegir elemento    -    {keys} o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
+    "hint": "{keys} o Izquierda/Derecha + Enter para infundir    -    ESC para salir",
+    "title": "Elige un elemento y luego un arma",
+    "buff_title": "{element} - elige un arma para infundir",
+    "done": "Infusión de {element} en {weapon}."
+  },
+  "effect": {
+    "fire_hit": "Fuego",
+    "burn": "Quemadura",
+    "wind_hit": "Viento",
+    "wind_area": "Área de viento",
+    "thunder_chain": "Cadena de trueno",
+    "frozen_contact": "Contacto helado",
+    "frostburn": "Quemadura gélida",
+    "overload": "Sobretensión",
+    "overload_wave": "Onda de sobretensión",
+    "superconduct": "Superconducción",
+    "firewind": "Viento ígneo",
+    "icewind": "Viento helado",
+    "thunderwind": "Viento tormentoso",
+    "thunder_strike": "Rayo"
+  },
+  "boss": {
+    "approaches": "{boss} SE ACERCA"
+  },
+  "banner": {
+    "loss": "FIN DE LA PARTIDA",
+    "win": "¡VICTORIA!"
+  },
+  "end": {
+    "game_over": "Fin de la partida",
+    "victory": "Victoria",
+    "new_run": "Nueva partida",
+    "sanctuary": "Santuario",
+    "menu": "Menú principal",
+    "seed": "semilla {n}",
+    "button_hint": "{key}: {label}",
+    "hint_separator": "   -   ",
+    "select": "Izquierda / Derecha: elegir"
+  },
+  "stat": {
+    "max_hp": "PV máximos",
+    "hp_regen": "Regen. PV",
+    "move_speed": "Vel. movimiento",
+    "armor": "Armadura",
+    "damage_multiplier": "Daño",
+    "melee_damage": "Daño c. a c.",
+    "ranged_damage": "Daño a dist.",
+    "attack_speed_multiplier": "Vel. ataque",
+    "projectile_speed_multiplier": "Vel. proyectil",
+    "area_multiplier": "Área",
+    "crit_chance": "Prob. crítico",
+    "crit_damage": "Daño crítico",
+    "evasion_chance": "Evasión",
+    "block_chance": "Prob. bloqueo",
+    "block_strength": "Fuerza bloqueo",
+    "pickup_radius": "Radio recogida",
+    "luck": "Suerte",
+    "xp_gain": "EXP obtenida",
+    "gold_gain": "Oro obtenido"
+  },
+  "weapon_stat": {
+    "damage": "Daño",
+    "cooldown": "Recarga",
+    "projectile_count": "Proyectiles",
+    "area": "Área",
+    "reach": "Alcance",
+    "pierce": "Perforación",
+    "blast_radius": "Radio de explosión",
+    "cone_half_angle": "Cono",
+    "chain_count": "Cadenas",
+    "weight": "Peso"
+  },
+  "forge_field": {
+    "area": "área",
+    "blast_radius": "radio de explosión",
+    "category": "categoría",
+    "cluster_count": "bombas de racimo",
+    "cluster_damage_mult": "daño del racimo",
+    "cluster_fuse": "mecha del racimo",
+    "cluster_radius_mult": "radio del racimo",
+    "cluster_speed": "velocidad del racimo",
+    "cone_half_angle": "semiángulo del cono",
+    "cooldown": "recarga",
+    "damage": "daño",
+    "hazard_dps_mult": "daño por segundo de la zona",
+    "hazard_duration": "duración de la zona",
+    "hazard_radius": "radio de la zona",
+    "mine": "mina",
+    "mine_arm_delay": "armado de la mina",
+    "mine_lifetime": "duración de la mina",
+    "orbit_radius": "radio de órbita",
+    "orbit_speed": "velocidad de órbita",
+    "pierce": "perforación",
+    "projectile_count": "proyectiles",
+    "projectile_lifetime": "duración del proyectil",
+    "projectile_speed": "velocidad del proyectil",
+    "reach": "alcance",
+    "rehit_interval": "intervalo entre golpes",
+    "shockwave_damage_mult": "daño de la onda",
+    "shockwave_radius": "radio de la onda",
+    "special_effect": "efecto especial",
+    "spread_deg": "dispersión",
+    "tags": "etiquetas",
+    "targeting_mode": "apuntado",
+    "twin_offset_deg": "desfase gemelo",
+    "weight": "peso"
+  },
+  "class": {
+    "melee": "cuerpo a cuerpo",
+    "ranged": "a distancia",
+    "summon": "invocación"
+  },
+  "weapon_category": {
+    "melee": "cuerpo a cuerpo",
+    "orbit": "órbita",
+    "projectile": "proyectil",
+    "summon": "invocación"
+  },
+  "special": {
+    "bomb": "bomba",
+    "cone": "cono",
+    "orbit": "órbita",
+    "slam": "golpe",
+    "summon": "invocación"
+  },
+  "tag": {
+    "arcane": "arcano",
+    "area": "área",
+    "explosive": "explosivo",
+    "melee": "cuerpo a cuerpo",
+    "orbit": "órbita",
+    "projectile": "proyectil",
+    "ranged": "a distancia",
+    "summon": "invocación",
+    "elite": "élite"
+  },
+  "targeting": {
+    "nearest": "el más cercano",
+    "none": "ninguno"
+  },
+  "slot": {
+    "weapon": "arma",
+    "armor": "armadura",
+    "accessory": "accesorio"
+  },
+  "summary": {
+    "run": "Partida",
+    "kills_title": "Enemigos abatidos",
+    "weapons": "Armas",
+    "hero_title": "Héroe",
+    "best": "récord",
+    "survived": "Tiempo",
+    "cleared": "Tiempo",
+    "level": "Nivel",
+    "kills": "Bajas",
+    "kills_value": "{kills}   ({rate}/min)",
+    "gold_earned": "Oro ganado",
+    "potions": "Pociones",
+    "potions_value": "{n}   ({hp} PV)",
+    "chests": "Cofres",
+    "elements": "Elementos",
+    "none": "ninguno",
+    "blessings_none": "ninguna",
+    "items": "Objetos obtenidos  ({n})",
+    "more": {
+      "items": {
+        "one": "+{n} objeto más",
+        "other": "+{n} objetos más"
+      },
+      "stats": {
+        "one": "+{n} estadística más",
+        "other": "+{n} estadísticas más"
+      },
+      "types": {
+        "one": "+{n} tipo más",
+        "other": "+{n} tipos más"
+      },
+      "blessings": {
+        "one": "+{n} bendición más",
+        "other": "+{n} bendiciones más"
+      },
+      "sources": {
+        "one": "+{n} fuente más",
+        "other": "+{n} fuentes más"
+      }
+    },
+    "main_weapon": "Arma principal liberada",
+    "hero": "Héroe",
+    "trait": "Rasgo",
+    "stats": "Estadísticas",
+    "equipped": "Equipado  ({n})",
+    "nothing_slain": "sin bajas",
+    "total": "Total",
+    "blessings": "Bendiciones  ({n})",
+    "level_value": "Nv. {n}",
+    "head": {
+      "level": "Nv.",
+      "damage": "Daño",
+      "share": "Parte",
+      "dps": "DPS",
+      "weapon": "Arma"
+    },
+    "no_weapons": "sin armas",
+    "procs": "Efectos de bendiciones y otros"
+  },
+  "status": {
+    "tab": {
+      "overview": "Resumen",
+      "build": "Arsenal",
+      "blessings": "Bendiciones"
+    },
+    "no_run": "sin partida",
+    "hint": "TAB / ESC: cerrar   -   Izquierda / Derecha o 1 2 3: cambiar panel   -   Arriba / Abajo o rueda: elegir",
+    "hero": "Héroe",
+    "difficulty": "Dificultad",
+    "survived": "Tiempo",
+    "hp": "PV",
+    "level": "Nivel",
+    "kills": "Bajas",
+    "gold": "Oro",
+    "salvage": "Chatarra",
+    "potions": "Pociones",
+    "equipped": "Objetos equipados  ({n})",
+    "none": "ninguno",
+    "item_value": "{slot}  Nv. {level}",
+    "tag_damage": "{pct} de daño contra {tag}",
+    "hero_stats": "Estadísticas del héroe",
+    "no_weapons": "sin armas",
+    "yes": "sí",
+    "no": "no",
+    "pace": {
+      "time": "cada {s}",
+      "count": "1 de cada {n} ataques",
+      "every": "cada ataque"
+    },
+    "gate": {
+      "summon": "no se puede forjar",
+      "forged": "con forja  -  {identity}",
+      "ready": "puede ir a la Forja ({need})",
+      "short": "Forja con {need}  -  tiene {have}"
+    },
+    "owner_hero": "Héroe",
+    "weapon_level": "{name}  Nv. {level}",
+    "more": "+{n} más",
+    "blessing_levels": "Niveles de bendición",
+    "not_forged": "{weapon}  -  sin forja",
+    "forging": "Forja: {name}  -  {identity}",
+    "synergies": "Sinergias  ({n})",
+    "synergies_none": "ninguna aún  -  una sinergia une dos armas",
+    "more_synergies": {
+      "one": "+{n} sinergia más",
+      "other": "+{n} sinergias más"
+    },
+    "blessings": "Bendiciones  ({n})",
+    "none_yet": "ninguna aún",
+    "blessings_help": "Las bendiciones llegan al subir de nivel y en la aldea.",
+    "more_up": "^ más",
+    "more_scroll": "+{n} más  (desplaza)",
+    "level_of": "{level} de {max}"
+  },
+  "meta": {
+    "title": "Santuario",
+    "salvage": "Chatarra: {n}",
+    "hint": "TAB: cambiar panel   -   Arriba/Abajo: elegir   -   ENTER: comprar/equipar   -   U: desequipar   -   ESC: volver",
+    "upgrades": "Mejoras",
+    "stash": "Inventario",
+    "max": "MÁX",
+    "empty": "(aún no hay objetos: vence a élites o al jefe)"
+  },
+  "unit": {
+    "percent": "{n} %",
+    "seconds": "{n} s",
+    "mult": "x{n}",
+    "degrees": "{n}°"
+  }
+}

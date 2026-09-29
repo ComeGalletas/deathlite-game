@@ -16,6 +16,7 @@ OUT_HTML = Path(sys.argv[3])
 
 sys.path.insert(0, str(ROOT))
 from progression.blessings.catalog import format_value  # noqa: E402
+from combat.weapons.forge import TEXT_OVERRIDE_KEYS  # noqa: E402
 
 D = ROOT / "data"
 weapons = json.loads((D / "weapons/weapons.json").read_text(encoding="utf-8"))
@@ -356,7 +357,7 @@ for wid in WEAPON_ORDER:
     for fid, f in my_forges:
         ov = []
         for k, v in f["overrides"].items():
-            if k in ("name",):
+            if k in TEXT_OVERRIDE_KEYS:          # the name, description, translations
                 continue
             old = w.get(k)
             if old is None:

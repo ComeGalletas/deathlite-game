@@ -23,9 +23,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from combat.elements.ids import ELEMENTS, ElementId
+from game import locale
 from progression.upgrades import Upgrade
 
-RAIL_HEADING = "INFUSE WITH WHICH ELEMENT"
+RAIL_HEADING = "infusion.rail.heading"       # a locale key, read when drawn
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,15 @@ class ElementRow:
 
     @property
     def name(self) -> str:
-        return self.element.key.title()
+        return element_name(self.element)
+
+
+def element_name(element: ElementId) -> str:
+    """The element's name, capitalised, in the current language (UI-014.8);
+    a sentence lowers it. The id, title-cased, for an element the locale
+    does not list."""
+    key = f"element.{element.key}"
+    return locale.t(key) if locale.has(key) else element.key.title()
 
 
 def infusable(player) -> list:
@@ -52,7 +61,9 @@ def element_rows(player) -> list[tuple]:
     rows = []
     for element in ELEMENTS:
         carriers = [w.name for w in player.weapons if w.element == element]
-        note = f"on {', '.join(carriers)}" if carriers else "not carried"
+        note = (locale.t("infusion.rail.on",
+                         weapons=locale.t("list.separator").join(carriers))
+                if carriers else locale.t("infusion.rail.none"))
         rows.append((ElementRow(element), True, note))
     return rows
 
@@ -74,12 +85,13 @@ def weapon_cards(player, element: ElementId) -> list[Upgrade]:
 
 def _describe(weapon, element: ElementId) -> str:
     held = weapon.element
+    word = element_name(element).lower()
     if held == element:
-        pace = _pace(weapon)
-        return f"Already carries {element.key}. Refreshes it ({pace})."
+        return locale.t("infusion.refresh", element=word, pace=_pace(weapon))
     if held != ElementId.NONE:
-        return f"Replaces {held.key} with {element.key} ({_pace(weapon)})."
-    return f"Carries {element.key} {_pace(weapon)}."
+        return locale.t("infusion.replace", old=element_name(held).lower(),
+                        element=word, pace=_pace(weapon))
+    return locale.t("infusion.carry", element=word, pace=_pace(weapon))
 
 
 def _pace(weapon) -> str:
@@ -88,10 +100,13 @@ def _pace(weapon) -> str:
     from combat.weapons.core import TIME_MODE
 
     if weapon.element_mode == TIME_MODE:
-        return f"every {weapon.element_window:.2g}s"
+        # Two significant figures, exactly as before (`1e+02` included),
+        # with the language's decimal point.
+        return locale.t("infusion.pace.time", s=locale.unit(
+            "seconds", locale.decimals(f"{weapon.element_window:.2g}")))
     if weapon.element_interval:
-        return f"on 1 attack in {weapon.element_interval + 1}"
-    return "on every attack"
+        return locale.t("infusion.pace.count", n=weapon.element_interval + 1)
+    return locale.t("infusion.pace.every")
 
 
 def _infuser(weapon, element: ElementId):
@@ -106,7 +121,7 @@ def offer(ps, *, element=None, title=None, on_done=None) -> None:
     run = getattr(ps, "run", ps)
     player = run.player
     if not infusable(player):
-        ps.notice("No weapon to infuse.")
+        ps.notice(locale.t("infusion.no_weapon"))
         return
 
     from game.states.level_up_state import LevelUpState
@@ -124,11 +139,8 @@ def offer(ps, *, element=None, title=None, on_done=None) -> None:
         choices=() if element is None else weapon_cards(player, element),
         weapon_rows=rows, offers_for=offers_for,
         rail_heading=RAIL_HEADING,
-        hint=("Up/Down pick the element    -    1/2/3 or Left/Right + Enter "
-              "to infuse    -    ESC to leave")
-        if element is None else
-        ("1/2/3 or Left/Right + Enter to infuse    -    ESC to leave"),
-        title=title or "Choose an element, then a weapon",
+        hint_key="infusion.hint_rail" if element is None else "infusion.hint",
+        title=title or locale.t("infusion.title"),
         cancelable=True,
         on_done=on_done or (lambda u: _noticed(ps, u)))
 
@@ -138,4 +150,5 @@ def _noticed(ps, upgrade) -> None:
     weapon = run.player.weapon_by_id(upgrade.weapon)
     if weapon is not None and weapon.infused:
         run.unlocked_elements.add(weapon.element)
-        ps.notice(f"The {weapon.name.lower()} carries {weapon.element.key}.")
+        ps.notice(locale.t("infusion.done", weapon=weapon.name.lower(),
+                           element=element_name(weapon.element).lower()))

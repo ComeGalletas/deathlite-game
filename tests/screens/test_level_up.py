@@ -398,13 +398,22 @@ class DescriptionCentringTests(unittest.TestCase):
         self.assertAlmostEqual((top + bottom) // 2, (band_top + band_bottom) // 2,
                                delta=8)
 
-    def test_a_description_that_overflows_the_band_starts_at_its_top(self):
-        """Nothing in the catalog is this long, but the clamp is what keeps a
-        future one from riding up over the title instead of down over the tag."""
+    def test_a_description_too_long_for_the_band_steps_down_and_fits(self):
+        """Five lines at 18 px overflow the band; since UI-014.8 the font
+        steps down until they fit, and the block is centred like any other."""
         overflowing = ("Every arrow that lands on a Rod-marked enemy within the "
                        "last 1.5 seconds deals a great deal more damage, and "
                        "marks spread to any enemy standing close enough to be "
                        "caught.")
+        top, bottom, band_top, band_bottom = self._text_span(overflowing)
+        self.assertGreaterEqual(top, band_top)
+        self.assertLessEqual(bottom, band_bottom)
+
+    def test_a_description_that_overflows_the_band_starts_at_its_top(self):
+        """Nothing in the catalog is this long, even at the smallest step, but
+        the clamp is what keeps a future one from riding up over the title
+        instead of down over the tag."""
+        overflowing = " ".join(["Every arrow that lands on a Rod-marked enemy."] * 12)
         top, _bottom, band_top, _bb = self._text_span(overflowing)
         self.assertLess(top - band_top, 12, "the block rode above the band's top")
 

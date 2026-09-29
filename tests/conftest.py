@@ -70,6 +70,8 @@ INTEGRATION = (
     "tests/playing/test_bomb.py",
     "tests/playing/test_chest_open.py",
     "tests/playing/test_potion_drops.py",
+    "tests/playing/test_spanish_run.py",
+    "tests/playing/test_spanish_run_notices.py",
     "tests/screens/test_hero_select_preview.py",
     "tests/playing/test_manual_aim.py",
     "tests/combat/test_weapon_specials.py",
@@ -145,6 +147,17 @@ INTEGRATION = (
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
     "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
+    # UI-014: screens drawn from a booted `Game`; the fit test boots a run.
+    "tests/locale/test_numbers.py::LocaleNumberTests",
+    "tests/screens/test_english_layout.py",
+    "tests/screens/test_fit.py",
+    "tests/screens/test_fit_rules.py::ControlsWordTests",
+    "tests/screens/test_fit_rules.py::HeroCardTests",
+    "tests/screens/test_fit_rules.py::SummaryPanelTests",
+    "tests/screens/test_spanish_menus.py::FitTests",
+    "tests/screens/test_spanish_menus.py::MenuEnglishTests",
+    "tests/screens/test_spanish_menus.py::SpanishScreenTests",
+    "tests/screens/test_spanish_status.py::SanctuaryTests",
 )
 
 
@@ -163,3 +176,16 @@ def tier(nodeid: str) -> str:
 def pytest_collection_modifyitems(config, items):
     for item in items:
         item.add_marker(getattr(pytest.mark, tier(item.nodeid)))
+
+
+@pytest.fixture(autouse=True)
+def _english_ui():
+    """Every test starts and ends in English (UI-014.3). The UI language is
+    process-global in `game.locale`, and `Game()` sets it from the save it
+    loads -- a test that boots a `Game` without a temp `save_path` reads the
+    developer's own `save.json`, which may say Spanish. A test that wants
+    another language sets it itself; this puts English back after it."""
+    from game import locale
+    locale.set_language(locale.DEFAULT)
+    yield
+    locale.set_language(locale.DEFAULT)

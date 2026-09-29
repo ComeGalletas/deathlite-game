@@ -1,6 +1,7 @@
 {
   "the_first_hunger": {
     "name": "The First Hunger",
+    "name_es": "El Hambre Primigenia",
     "hp": 9990,
     "speed": 78,
     "contact_damage": 31,
@@ -43,6 +44,7 @@
   },
   "the_tusked_lance": {
     "name": "The Tusked Lance",
+    "name_es": "La Lanza Colmilluda",
     "hp": 9990,
     "speed": 92,
     "contact_damage": 28,

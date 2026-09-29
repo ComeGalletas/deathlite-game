@@ -17,11 +17,31 @@ itself comes from the offering, filtered to the rarity the chest rolled.
 """
 from __future__ import annotations
 
+import re
+
 import pygame
 
 from entities.chest import Chest
+from game import locale
 from progression import chests as chest_rules
 from progression.blessings import roll_offering
+
+
+# A last item that opens on an /i/ sound: "i" or "hi" not followed by another
+# vowel ("Imán", "Hilo", but not "Hielo", "hiato"). Spanish joins it with "e",
+# not "y" (`list.pair_i`); English has one word for both.
+_I_SOUND = re.compile(r"h?[ií](?![aeouáéóú])", re.IGNORECASE)
+
+
+def _rarity_word(kind: str, rarity: str) -> str:
+    """A chest's or a potion's rarity as the notice says it. They are two
+    tables because Spanish agrees the word with the noun ("cofre raro",
+    "poción rara"). A rarity the locale does not list (new data) shows as
+    its id, capitalised where the chest's word leads the sentence."""
+    key = f"{kind}.rarity.{rarity}"
+    if locale.has(key):
+        return locale.t(key)
+    return rarity.capitalize() if kind == "chest" else rarity
 
 
 class Chests:
@@ -82,23 +102,28 @@ class Chests:
         gold = chest_rules.gold(chest.rarity, table, run.rng)
         ps.add_gold(gold)
 
-        parts = [f"{gold} gold"]
+        parts = [locale.t("chest.gold", n=gold)]
         potion = self._spill_potion(chest, table)
         if potion is not None:
-            parts.append(f"a {potion} potion")
+            parts.append(locale.t("chest.potion",
+                                  rarity=_rarity_word("potion", potion)))
         blessing = self._grant_blessing(chest, table)
         if blessing is not None:
             parts.append(blessing)
 
         run.particles.burst(chest.pos, chest_rules.colour(chest.rarity, table),
                            count=26, speed=220, life=0.6)
-        ps.notice(f"{chest.rarity.capitalize()} chest: {self._listed(parts)}.")
+        # Composed when the chest opens, like every notice: it is gone in a
+        # few seconds, so a language switch shows from the next one.
+        ps.notice(locale.t("chest.notice", contents=self._listed(parts),
+                           rarity=_rarity_word("chest", chest.rarity)))
 
     @staticmethod
     def _listed(parts: list[str]) -> str:
         if len(parts) == 1:
             return parts[0]
-        return ", ".join(parts[:-1]) + " and " + parts[-1]
+        key = "list.pair_i" if _I_SOUND.match(parts[-1]) else "list.pair"
+        return locale.t(key, a=locale.t("list.separator").join(parts[:-1]), b=parts[-1])
 
     def _spill_potion(self, chest, table) -> str | None:
         """Put this chest's one potion **on** it -- centred `potion_lift` px

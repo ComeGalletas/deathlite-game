@@ -157,7 +157,7 @@ class DrawTests(unittest.TestCase):
         with mock.patch.object(keycap, "mouse_glyph", return_value=None):
             keycap.draw_keycap(self.surface, self.assets, (60, 60), keycap.MOUSE,
                                colour="grey", font=_Font())
-        self.assertEqual([a[0] for a in calls], [keycap.MOUSE_WORD])
+        self.assertEqual([a[0] for a in calls], ["CLICK"])   # the word, not its key
 
 
 if __name__ == "__main__":

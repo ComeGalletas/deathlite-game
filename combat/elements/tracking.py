@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from combat.elements.ids import (ELEMENTS, REACTIONS, ElementId,
                                  ReactionId)
+from game import locale
 
 # --- effect ids -------------------------------------------------------------------
 # What dealt a piece of elemental damage. Strings, like every other damage
@@ -50,19 +51,11 @@ EFFECTS: tuple[str, ...] = (
     FROSTBURN, OVERLOAD, OVERLOAD_WAVE, SUPERCONDUCT, FIREWIND, ICEWIND,
     THUNDERWIND, THUNDER_STRIKE)
 
-_LABELS = {
-    FIRE_HIT: "Fire", BURN: "Burn", WIND_HIT: "Wind", WIND_AREA: "Wind area",
-    THUNDER_CHAIN: "Thunder chain", FROZEN_CONTACT: "Frozen contact",
-    FROSTBURN: "Frostburn", OVERLOAD: "Overload",
-    OVERLOAD_WAVE: "Overload shockwave", SUPERCONDUCT: "Superconduct",
-    FIREWIND: "FireWind", ICEWIND: "IceWind", THUNDERWIND: "ThunderWind",
-    THUNDER_STRIKE: "Thunder strike",
-}
 
 UNATTRIBUTED = "other"      # matches `RunLedger.UNATTRIBUTED`
 
 # Which element or reaction a piece of damage came from (M11). Keyed the
-# same way `_LABELS` is, and living beside it for the same reason: the
+# same way the `effect.<id>` locale labels are, for the same reason: the
 # effect id is the one name every part of the system already agrees on.
 #
 # Deliberately *not* a colour. This module is combat-side and has no
@@ -82,7 +75,10 @@ _SOURCE: dict[str, object] = {
 
 
 def label(effect: str) -> str:
-    return _LABELS.get(effect, effect.replace("_", " ").title())
+    """What the player reads for an effect: `effect.<id>` in the current
+    language (UI-014.8), the id title-cased for one the locale lacks."""
+    key = f"effect.{effect}"
+    return locale.t(key) if locale.has(key) else effect.replace("_", " ").title()
 
 
 def source_of(effect: str):

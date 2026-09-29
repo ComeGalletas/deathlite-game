@@ -22,7 +22,7 @@ from collections import namedtuple
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.content import get_content
 from game.state import State
 from ui import scale
@@ -70,7 +70,7 @@ class LoadingState(State):
         self._hero_color = tuple(cdef.get("color", config.COLOR_PLAYER))
 
         self._font = fonts.heading(48)
-        self._label = "Loading..."
+        self._label = "loading.label"            # a text key, read when drawn
         self._steps = self._work()
         self._prebuilt: PrebuiltWorld | None = None
 
@@ -165,7 +165,7 @@ class LoadingState(State):
     def draw(self, surface: pygame.Surface) -> None:
         surface.fill(_BG)
         cx, cy = surface.get_width() // 2, surface.get_height() // 2
-        text = self._font.render(self._label, True, _FG)
+        text = self._font.render(locale.t(self._label), True, _FG)
         surface.blit(text, text.get_rect(center=(cx, cy - scale.px(40))))
         self._draw_hero(surface, cx, cy + scale.px(60))
 

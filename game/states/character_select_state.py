@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.content import get_content
 from game.state import State
 from systems.animation import Animator
 from ui import widgets
 from ui import scale as ui_scale     # `scale` is a rig field here
 from ui.menu_nav import MenuNav
-from ui.text import shadowed, wrap
+from ui.text import cached_font, shadowed, wrap
 
 # The preview cycles these; idle / walk are held for a beat, attack plays once.
 _PREVIEW_PHASES = ("idle", "walk", "attack")
@@ -41,6 +41,13 @@ _PREVIEW_ZOOM = 3.0
 # Card body text wraps to the card width minus this inset each side, measured
 # in the body font (`ui.text.wrap`), so it always clears the 9-slice frame.
 _CARD_TEXT_INSET = 19       # 16 for the 9-slice frame + 3 px of breathing room
+# The card's text rows: the first row's top below the card's, the room kept
+# above its bottom bevel, and the row step at the body size.
+_CARD_ROWS_TOP = 66
+_CARD_ROWS_BOTTOM = 22
+_CARD_ROW_STEP = 24
+_CARD_BODY_PX = 20
+_CARD_TRAIT_PX = 20
 # The Begin button under the difficulty line, and the gaps around it. Drawn
 # from the `wide` button sheets at the pack's native 64 px (the caps and
 # bevel are authored for that height); 256 wide = four tiles.
@@ -69,9 +76,9 @@ class CharacterSelectState(State):
         self.diff_index = config.DIFFICULTY_ORDER.index(config.DIFFICULTY_DEFAULT)
         self._title = fonts.heading(44)
         self._name = fonts.heading(30)          # hero names, "Difficulty:", Begin (title face)
-        self._trait = fonts.heading(20)         # the trait line, title face
+        self._trait = fonts.heading(_CARD_TRAIT_PX)   # the trait line, title face
         self._diff_type = fonts.body(26)        # the difficulty *type*, body face
-        self._body = fonts.body(20)
+        self._body = fonts.body(_CARD_BODY_PX)
         self._instr = fonts.body(17)   # ~85% of the body font
         self._hint = fonts.body(16)
         # The hero cards run left to right; Up / Down come back as the cross
@@ -171,6 +178,39 @@ class CharacterSelectState(State):
         elif kind == "click" and key == "weapon_next":
             self._step_weapon(+1)
 
+    def _card_rows(self, c, trait_line, weapon_line, unlocked, text_w, room):
+        """`(body font, trait font, row step, rows)` for a hero card whose
+        rows get `room` native px. As always when they fit; else without the
+        blank separators; else the body and trait text a size smaller at a
+        time, re-wrapped, with their step (to 70 %; at the floor the rows are
+        what they are). An unlocked hero's two main-weapon rows in Spanish
+        ("Arma principal:" / "< Espada >") ran off Aegis's card
+        (UI-014.11)."""
+        S = ui_scale.px
+
+        def rows_in(font, gaps):
+            gap = [""] if gaps else []
+            return (wrap(font, locale.text(c, "identity"), text_w) + gap + [trait_line]
+                    + wrap(font, locale.text(c, "trait_desc"), text_w) + gap
+                    + [locale.t("hero_select.main_weapon") if unlocked else weapon_line]
+                    + ([weapon_line] if unlocked else []))
+        step = S(_CARD_ROW_STEP)
+        rows = rows_in(self._body, True)
+        if len(rows) * step <= room:
+            return self._body, self._trait, step, rows
+        rows = rows_in(self._body, False)
+        if len(rows) * step <= room:
+            return self._body, self._trait, step, rows
+        floor = max(1, int(round(_CARD_BODY_PX * 0.7)))
+        for px in range(_CARD_BODY_PX - 1, floor - 1, -1):
+            font = cached_font(fonts.body, px)
+            trait = cached_font(fonts.heading, round(_CARD_TRAIT_PX * px / _CARD_BODY_PX))
+            step = S(_CARD_ROW_STEP * px / _CARD_BODY_PX)
+            rows = rows_in(font, False)
+            if len(rows) * step <= room:
+                break
+        return font, trait, step, rows
+
     def _card_state(self, i: int) -> str:
         """Armed (first click landed) or held down -> `pressed`; the selected
         hero -> `hover` (gold); else `normal`. Hover selects, so a hovered
@@ -245,7 +285,7 @@ class CharacterSelectState(State):
         cx = w // 2
 
         S = ui_scale.px
-        title = self._title.render("Choose your hero", True, config.COLOR_ACCENT)
+        title = self._title.render(locale.t("hero_select.title"), True, config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(cx, S(80))))
 
         hits = self._mouse.hits
@@ -269,25 +309,23 @@ class CharacterSelectState(State):
 
             # Text on the light card: the name and the trait line are titles
             # (title face, black); the rest is body text in the dark grey.
-            name = shadowed(self._name, c["name"], config.COLOR_ACCENT)   # gold with a dark drop shadow
+            name = shadowed(self._name, locale.text(c, "name"), config.COLOR_ACCENT)   # gold with a dark drop shadow
             surface.blit(name, name.get_rect(midtop=(rect.centerx, y + S(16) + dy)))
 
-            trait_line = f"Trait - {c['trait_name']}"
+            trait_line = locale.t("hero_select.trait", name=locale.text(c, "trait_name"))
             text_w = card_w - 2 * S(_CARD_TEXT_INSET)      # pixel-measured wrap
             unlocked = self.weapon_unlocked(cid)
             weapon_line = (f"<  {self._weapon_name(self._main_weapon[cid])}  >" if unlocked
-                           else f"Starts with: {self._weapon_name(c['starting_weapon'])}")
-            rows = wrap(self._body, c["identity"], text_w) + [
-                "", trait_line,
-            ] + wrap(self._body, c["trait_desc"], text_w) + [
-                "", "Main weapon:" if unlocked else weapon_line,
-            ] + ([weapon_line] if unlocked else [])
+                           else locale.t("hero_select.starts_with",
+                                         weapon=self._weapon_name(c["starting_weapon"])))
+            body, trait, step, rows = self._card_rows(c, trait_line, weapon_line, unlocked, text_w,
+                                               card_h - S(_CARD_ROWS_TOP + _CARD_ROWS_BOTTOM))
             for j, line in enumerate(rows):
                 if line == trait_line:
-                    surf = shadowed(self._trait, line, config.COLOR_ACCENT)
+                    surf = shadowed(trait, line, config.COLOR_ACCENT)
                 else:
-                    surf = self._body.render(line, True, config.COLOR_ON_BUTTON_DIM)
-                r = surf.get_rect(midtop=(rect.centerx, y + S(66 + j * 24) + dy))
+                    surf = body.render(line, True, config.COLOR_ON_BUTTON_DIM)
+                r = surf.get_rect(midtop=(rect.centerx, y + S(_CARD_ROWS_TOP) + j * step + dy))
                 surface.blit(surf, r)
                 if unlocked and line == weapon_line and i == self.index:
                     # The arrows are click targets (P5): each takes its half
@@ -305,8 +343,9 @@ class CharacterSelectState(State):
         # runs, centred as a pair: "Difficulty:" in the title face (black),
         # the type in the body face (dark grey).
         diff_y = y + card_h + S(178)
-        run_a = self._name.render("Difficulty:  ", True, config.COLOR_ON_BUTTON)
-        run_b = self._diff_type.render(config.DIFFICULTY_LABELS[self.difficulty], True,
+        run_a = self._name.render(locale.t("hero_select.difficulty") + "  ", True,
+                                  config.COLOR_ON_BUTTON)
+        run_b = self._diff_type.render(locale.t(f"difficulty.{self.difficulty}"), True,
                                        config.COLOR_ON_BUTTON_DIM)
         pair_w = run_a.get_width() + run_b.get_width()
         ribbon = pygame.Rect(0, 0, max(S(_RIBBON_MIN_W), pair_w + 2 * S(_RIBBON_END)), S(_RIBBON_H))
@@ -326,7 +365,7 @@ class CharacterSelectState(State):
         begin = pygame.Rect(0, 0, S(_BEGIN_W), S(_BEGIN_H))
         begin.center = (cx, diff_y + S(_BEGIN_GAP + _BEGIN_H // 2))
         hits.add(begin, "begin")          # register once it is in place (add copies)
-        widgets.draw_button(surface, self.game.assets, begin, "Begin",
+        widgets.draw_button(surface, self.game.assets, begin, locale.t("hero_select.begin"),
                             state=self._button_state("begin"), shape="wide",
                             font=self._name,
                             label_dy=widgets.LABEL_DY - _BEGIN_TEXT_DY)
@@ -334,16 +373,15 @@ class CharacterSelectState(State):
         # Instructions sit under the button now; the hint under them.
         instr_bottom = self._draw_instructions(surface, cx, begin.bottom + S(_INSTR_GAP))
 
-        weapon_hint = ("    -    Q / E main weapon" if self.weapon_unlocked() else "")
+        weapon_hint = (locale.t("hero_select.hint_weapon") if self.weapon_unlocked() else "")
         hint = self._hint.render(
-            "Left / Right hero    -    Up / Down or click difficulty" + weapon_hint
-            + "    -    ENTER / Begin    -    ESC back",
+            locale.t("hero_select.hint") + weapon_hint + locale.t("hero_select.hint_end"),
             True, config.COLOR_TEXT_DIM)
         hint_rect = hint.get_rect(center=(cx, instr_bottom + S(18)))
         surface.blit(hint, hint_rect)
 
         # Back target, bottom-left (ESC's twin).
-        back = self._hint.render("<  Back", True, config.COLOR_TEXT_DIM)
+        back = self._hint.render(locale.t("hero_select.back"), True, config.COLOR_TEXT_DIM)
         back_rect = back.get_rect(bottomleft=(S(28), surface.get_height() - S(16)))
         surface.blit(back, back_rect)
         hits.add(back_rect.inflate(S(20), S(12)), "back")
@@ -420,14 +458,19 @@ class CharacterSelectState(State):
         y = top - line_h
         for note in instr["notes"]:
             y += line_h
-            surf = self._instr.render(note, True, config.COLOR_TEXT_DIM)
+            surf = self._instr.render(locale.t(f"instructions.note.{note}"), True,
+                                      config.COLOR_TEXT_DIM)
             surface.blit(surf, surf.get_rect(center=(cx, y)))
         y += line_h
-        keys = "      ".join(f"{label}  {combo}" for label, combo in instr["rows"])
+        keys = "      ".join(
+            f"{locale.t(f'instructions.{row}')}  "
+            f"{combo if combo is not None else locale.t(f'instructions.keys.{row}')}"
+            for row, combo in instr["rows"])
         surf = self._instr.render(keys, True, config.COLOR_TEXT_DIM)
         surface.blit(surf, surf.get_rect(center=(cx, y)))
         return y
 
     def _weapon_name(self, wid: str) -> str:
-        return self.content.weapons.get(wid, {}).get("name", wid)
+        d = self.content.weapons.get(wid)
+        return locale.text(d, "name") if d and "name" in d else wid
 

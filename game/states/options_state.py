@@ -15,8 +15,10 @@ Start-screen milestone M2. Reached from the menu's "Options" entry. Up / Down
 (also W / S) move the cursor; Left / Right adjust the master volume, cycle
 the key layout (CB-5: WASD move / arrows aim, or the swap), toggle the
 Tutorials (the run's opening keycap hints -- journal key_icons_journal.md,
-pass 5), switch the display mode or step the resolution; ENTER toggles mute
-or the tutorials, cycles the layout or the mode, steps the resolution, or
+pass 5), step the Language (UI-014.3: English / Español, each shown by its
+own name, applied on the next frame), switch the display mode or step the
+resolution; ENTER toggles mute or the tutorials, cycles the layout, the
+language or the mode, steps the resolution, or
 opens the selected screen; ESC (or the
 "Back" row) returns to the menu. Every change is persisted immediately, the
 same as the `M` mute key.
@@ -52,29 +54,35 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import MUSIC_INHERIT, State
 from ui import scale
 from ui.menu_nav import MenuNav
 from ui.mouse import BUTTON_LEFT
+from ui.text import fit_font
 
-_LABELS = {"master": "Master volume", "music": "Music volume",
-           "sfx": "Sound effects", "mute": "Mute", "key_layout": "Key layout",
-           "tutorials": "Tutorials",
-           "display": "Display mode", "resolution": "Resolution",
-           "sanctuary": "Sanctuary", "back": "Back"}
+# Each row's label is `options.<row>` in `data/locale/` (UI-014.7), read
+# when drawn so a language switch made here shows on the next frame.
 
 _SLIDER_ROWS = ("master", "music", "sfx")
+
+
+def _on_off(on: bool) -> str:
+    return locale.t("options.on" if on else "options.off")
 
 # Design-pixel layout, all of it relative to the screen centre. The label
 # column sits `_LABEL_DX` left of centre and the value column `_VALUE_DX`
 # right of it; the mouse band spans from just left of the `>` marker to past
 # the percentage, and is exactly `_ROW_STEP` tall so bands touch but never
 # overlap.
-_ROW_TOP, _ROW_STEP = 180, 68        # ten rows from here still clear the hint (pass 5)
+# Eleven rows since the Language row (UI-014.3): the last lands at 810, a
+# half-row clear of the hint line at 860.
+_ROW_TOP, _ROW_STEP = 170, 64
 _LABEL_DX, _VALUE_DX = -250, 250
+_LABEL_GAP = 16                      # the least room between a label and its value
+_ROW_PX = 26                         # the rows' design font size
 _BAR_W, _BAR_H, _PCT_DX = 220, 22, 236
-_BAND_DX, _BAND_W = -40, 590         # from the label column
+_BAND_DX, _BAND_W = -40, 700         # from the label column; covers the longest value (UI-014.7)
 
 _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN,
                  pygame.MOUSEBUTTONUP, pygame.MOUSEWHEEL)
@@ -97,9 +105,9 @@ class OptionsState(State):
         if self.in_run:
             self.music = MUSIC_INHERIT   # keep the run's track playing
         self._rows = ("master", "music", "sfx", "mute", "key_layout", "tutorials",
-                      "display", "resolution", "back") if self.in_run else (
-            "master", "music", "sfx", "mute", "key_layout", "tutorials", "display",
-            "resolution", "sanctuary", "back")
+                      "language", "display", "resolution", "back") if self.in_run else (
+            "master", "music", "sfx", "mute", "key_layout", "tutorials", "language",
+            "display", "resolution", "sanctuary", "back")
         self.sel = 0
         self._nav = MenuNav()        # the cursor keys and the mouse (ui/menu_nav.py)
         self._mouse = self._nav.mouse   # rows registered in draw(); see ui/mouse.py
@@ -109,7 +117,7 @@ class OptionsState(State):
 
     def _build_fonts(self) -> None:
         self._title = fonts.heading(40)
-        self._row = fonts.body(26)
+        self._row = fonts.body(_ROW_PX)
         self._hint = fonts.body(16)
 
     def on_display_changed(self) -> None:
@@ -239,6 +247,9 @@ class OptionsState(State):
         if rid == "tutorials":
             self.game.set_tutorials(not self.game.tutorials)
             return
+        if rid == "language":
+            self.game.cycle_language(direction)
+            return
         if rid == "display":
             self._toggle_display_mode()
             return
@@ -267,6 +278,8 @@ class OptionsState(State):
             self.game.cycle_key_layout()
         elif rid == "tutorials":
             self.game.set_tutorials(not self.game.tutorials)
+        elif rid == "language":
+            self.game.cycle_language(+1)
         elif rid == "display":
             self._toggle_display_mode()
         elif rid == "resolution":
@@ -298,7 +311,8 @@ class OptionsState(State):
         fill.width = int(fill.width * level)
         if fill.width > 0:
             pygame.draw.rect(surface, colour, fill, border_radius=3)
-        pct = self._row.render(f"{round(level * 100)}%", True, colour)
+        pct = self._row.render(locale.t("unit.percent", n=round(level * 100)),
+                               True, colour)
         surface.blit(pct, pct.get_rect(midleft=(vx + scale.px(_PCT_DX), y)))
         return bar
 
@@ -306,7 +320,7 @@ class OptionsState(State):
         surface.fill(config.COLOR_BG)
         cx = surface.get_width() // 2
 
-        title = self._title.render("Options", True, config.COLOR_ACCENT)
+        title = self._title.render(locale.t("options.title"), True, config.COLOR_ACCENT)
         surface.blit(title, title.get_rect(center=(cx, scale.px(96))))
 
         x0 = cx + scale.px(_LABEL_DX)    # label column
@@ -332,24 +346,32 @@ class OptionsState(State):
             if selected:
                 mark = self._row.render(">", True, config.COLOR_ACCENT)
                 surface.blit(mark, mark.get_rect(midright=(x0 - scale.px(14), y)))
-            lab = self._row.render(_LABELS[rid], True, colour)
+            text = locale.t(f"options.{rid}")
+            room = scale.px(_VALUE_DX) - scale.px(_LABEL_GAP)   # up to the value column
+            font = (self._row if self._row.size(text)[0] <= room
+                    else fit_font(fonts.body, _ROW_PX, text, room))
+            lab = font.render(text, True, colour)
             surface.blit(lab, lab.get_rect(midleft=(x0, y)))
 
             if rid in _SLIDER_ROWS:
                 self._bars[rid] = self._draw_slider(
                     surface, vx, y, self._level_of(rid), colour)
             elif rid == "mute":
-                val = self._row.render("On" if self.audio.muted else "Off",
-                                       True, colour)
+                val = self._row.render(_on_off(self.audio.muted), True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
             elif rid == "key_layout":
                 val = self._row.render(
-                    config.KEY_LAYOUT_LABELS[self.game.key_layout], True, colour)
+                    locale.t(f"key_layout.{self.game.key_layout}"), True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
             elif rid == "tutorials":
                 # The run's opening keycap hints (journal: key_icons_journal.md,
                 # pass 5). Every run while On; Off hides them.
-                val = self._row.render("On" if self.game.tutorials else "Off", True, colour)
+                val = self._row.render(_on_off(self.game.tutorials), True, colour)
+                surface.blit(val, val.get_rect(midleft=(vx, y)))
+            elif rid == "language":
+                # Each language by its own name (UI-014.3), so a player who
+                # cannot read the current one still recognises theirs.
+                val = self._row.render(locale.name_of(self.game.language), True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
             elif rid == "display":
                 val = self._row.render(self.game.display.mode_label(), True, colour)
@@ -358,7 +380,5 @@ class OptionsState(State):
                 val = self._row.render(self.game.display.resolution_label(), True, colour)
                 surface.blit(val, val.get_rect(midleft=(vx, y)))
 
-        hint = self._hint.render(
-            "Up / Down select    -    Left / Right adjust    -    "
-            "ENTER toggle / open    -    ESC back", True, config.COLOR_TEXT_DIM)
+        hint = self._hint.render(locale.t("options.hint"), True, config.COLOR_TEXT_DIM)
         surface.blit(hint, hint.get_rect(center=(cx, surface.get_height() - scale.px(40))))

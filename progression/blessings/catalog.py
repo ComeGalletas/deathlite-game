@@ -9,6 +9,9 @@ rarity, category, effect type, display or weapon id raises at load.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Mapping
+
+from game import locale
 
 KINDS = ("stat", "weapon")
 RARITIES = ("common", "uncommon", "rare", "forge")
@@ -17,7 +20,7 @@ EFFECT_TYPES = ("stat", "weapon_bonus", "weapon_effect")
 STAT_OPS = ("flat", "pct", "mult")
 BONUS_MODES = ("add", "mult")
 DISPLAYS = ("flat", "pct", "pct_gain", "pct_drop", "chance", "seconds",
-            "mult", "raw", "degrees", "hidden")
+            "duration", "mult", "raw", "degrees", "hidden")
 ROMAN = ("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X")
 
 
@@ -26,26 +29,33 @@ def roman(level: int) -> str:
 
 
 def format_value(value: float, display: str) -> str:
-    """The value as the card prints it."""
+    """The value as the card prints it, in the current language's number
+    style (UI-014.D7): the decimal mark and the unit come from the locale,
+    so English is "+0.3s" / "+25%" and Spanish "+0,3 s" / "+25 %"."""
+    d = locale.decimals
     if display == "flat":
-        return f"+{value:g}"
+        return d(f"+{value:g}")
     if display == "pct":
-        return f"+{value * 100:.0f}%"
+        return locale.unit("percent", f"+{value * 100:.0f}")
     if display == "pct_gain":
         # A growth multiplier read as the growth: 1.15 -> "+15%". The mirror
         # of `pct_drop`, for a `mult` bonus that makes something bigger.
-        return f"+{(value - 1.0) * 100:.0f}%"
+        return locale.unit("percent", f"+{(value - 1.0) * 100:.0f}")
     if display == "pct_drop":
-        return f"{(1.0 - value) * 100:.0f}%"
+        return locale.unit("percent", f"{(1.0 - value) * 100:.0f}")
     if display == "chance":
-        return f"{value * 100:.0f}%"
+        return locale.unit("percent", f"{value * 100:.0f}")
     if display == "seconds":
-        return f"+{value:g}s"
+        return locale.unit("seconds", d(f"+{value:g}"))
+    if display == "duration":
+        # A length of time, not an increase of one: "burns for 2s", where
+        # `seconds` would read "for +2s" (UI-014.D15).
+        return locale.unit("seconds", d(f"{value:g}"))
     if display == "mult":
-        return f"x{value:g}"
+        return locale.unit("mult", d(f"{value:g}"))
     if display == "degrees":
-        return f"+{value:g}°"
-    return f"{value:g}"                                       # raw / hidden
+        return locale.unit("degrees", d(f"+{value:g}"))
+    return d(f"{value:g}")                                    # raw / hidden
 
 
 @dataclass(frozen=True)
@@ -88,17 +98,31 @@ class BlessingDef:
     requires_weapons: tuple[str, ...] = ()
     requires_forge: str | None = None
     tags: tuple[str, ...] = ()
+    # The data entry, for its translations (UI-014.5). `name` and
+    # `description` stay English: `name` is an identity (dev-menu order,
+    # logs); what the player reads comes through `display_name`,
+    # `describe` and `title`, resolved on every call so a language switch
+    # mid-run shows at once. Empty for a def built by hand in a test.
+    texts: Mapping[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     @property
     def max_level(self) -> int:
         return len(self.effects[0].levels)
 
+    @property
+    def display_name(self) -> str:
+        """The name in the current language."""
+        return locale.text(self.texts, "name") if self.texts else self.name
+
     def describe(self, level: int) -> str:
+        """The card text in the current language, values filled in."""
+        template = (locale.text(self.texts, "description") if self.texts
+                    else self.description)
         values = [format_value(e.value_at(level), e.display) for e in self.effects]
-        return self.description.format(*values)
+        return template.format(*values)
 
     def title(self, level: int) -> str:
-        return f"{self.name} {roman(level)}"
+        return f"{self.display_name} {roman(level)}"
 
 
 class Catalog:
@@ -172,7 +196,7 @@ def _parse(bid: str, d: dict, weapons: dict, forges: dict) -> BlessingDef:
         id=bid, name=need("name"), kind=kind, category=category, rarity=rarity,
         description=need("description"), effects=effects, weapon=weapon,
         requires_weapons=tuple(req.get("weapons", ())),
-        requires_forge=req.get("forge"), tags=tuple(d.get("tags", ())))
+        requires_forge=req.get("forge"), tags=tuple(d.get("tags", ())), texts=d)
 
 
 def _parse_effect(bid: str, e: dict) -> Effect:

@@ -1,8 +1,8 @@
 {
-  "constitution": {"name": "Constitution", "desc": "+2% max HP per level",        "stat": "max_hp",   "op": "pct",  "per_level": 0.02, "max_level": 10, "cost_base": 35, "cost_step": 20},
-  "swiftness":    {"name": "Swiftness",    "desc": "+1% movement speed per level", "stat": "move_speed","op": "pct",  "per_level": 0.01, "max_level": 10, "cost_base": 35, "cost_step": 20},
-  "fortune":      {"name": "Fortune",      "desc": "+1 luck per level",            "stat": "luck",     "op": "flat", "per_level": 1.0,  "max_level": 5,  "cost_base": 50, "cost_step": 35},
-  "scholar":      {"name": "Scholar",      "desc": "+2% XP gain per level",        "stat": "xp_gain",  "op": "flat", "per_level": 0.02, "max_level": 10, "cost_base": 40, "cost_step": 25},
-  "ferocity":     {"name": "Ferocity",     "desc": "+1% damage per level",         "stat": "damage_multiplier", "op": "flat", "per_level": 0.01, "max_level": 10, "cost_base": 45, "cost_step": 30},
-  "salvager":     {"name": "Salvager",     "desc": "+4% Salvage from runs per level", "stat": "__salvage_gain", "op": "flat", "per_level": 0.04, "max_level": 8, "cost_base": 60, "cost_step": 40}
+  "constitution": {"name": "Constitution", "name_es": "Constitución", "desc": "+2% max HP per level", "desc_es": "+2 % de PV máximos por nivel",        "stat": "max_hp",   "op": "pct",  "per_level": 0.02, "max_level": 10, "cost_base": 35, "cost_step": 20},
+  "swiftness":    {"name": "Swiftness", "name_es": "Presteza",    "desc": "+1% movement speed per level", "desc_es": "+1 % de velocidad de movimiento por nivel", "stat": "move_speed","op": "pct",  "per_level": 0.01, "max_level": 10, "cost_base": 35, "cost_step": 20},
+  "fortune":      {"name": "Fortune", "name_es": "Fortuna",      "desc": "+1 luck per level", "desc_es": "+1 de suerte por nivel",            "stat": "luck",     "op": "flat", "per_level": 1.0,  "max_level": 5,  "cost_base": 50, "cost_step": 35},
+  "scholar":      {"name": "Scholar", "name_es": "Erudito",      "desc": "+2% XP gain per level", "desc_es": "+2 % de EXP obtenida por nivel",        "stat": "xp_gain",  "op": "flat", "per_level": 0.02, "max_level": 10, "cost_base": 40, "cost_step": 25},
+  "ferocity":     {"name": "Ferocity", "name_es": "Ferocidad",     "desc": "+1% damage per level", "desc_es": "+1 % de daño por nivel",         "stat": "damage_multiplier", "op": "flat", "per_level": 0.01, "max_level": 10, "cost_base": 45, "cost_step": 30},
+  "salvager":     {"name": "Salvager", "name_es": "Chatarrero",     "desc": "+4% Salvage from runs per level", "desc_es": "+4 % de chatarra de cada partida, por nivel", "stat": "__salvage_gain", "op": "flat", "per_level": 0.04, "max_level": 8, "cost_base": 60, "cost_step": 40}
 }

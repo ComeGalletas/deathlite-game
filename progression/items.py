@@ -15,6 +15,8 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+from game import locale
+
 RARITIES = ("common", "uncommon", "rare", "epic", "legendary")
 _AFFIX_COUNT = {"common": 0, "uncommon": 1, "rare": 2, "epic": 3, "legendary": 4}
 
@@ -67,6 +69,10 @@ class Item:
     base_value: float
     affixes: list[AffixRoll] = field(default_factory=list)
     unique_effect: str | None = None
+    # The base's id in `items.json` (UI-014.6), so the name can be built in
+    # any language when shown. None on an item saved before it existed;
+    # `item_name` recovers the base from the slot and the base stat.
+    base_id: str | None = None
 
     # --- serialisation (spec 4.7: human-readable save) -----------------
     def to_dict(self) -> dict:
@@ -77,6 +83,7 @@ class Item:
             "base_value": self.base_value,
             "affixes": [a.to_dict() for a in self.affixes],
             "unique_effect": self.unique_effect,
+            "base_id": self.base_id,
         }
 
     @classmethod
@@ -85,7 +92,7 @@ class Item:
             d["item_id"], d["slot"], d["name"], d["rarity"], int(d["level"]),
             d["base_stat"], d["base_op"], float(d["base_value"]),
             [AffixRoll.from_dict(a) for a in d.get("affixes", [])],
-            d.get("unique_effect"),
+            d.get("unique_effect"), d.get("base_id"),
         )
 
     # --- effect contributions ---------------------------------------
@@ -101,11 +108,21 @@ class Item:
         return [(a.tag, a.value) for a in self.affixes if a.kind == "tag_damage"]
 
     def short(self) -> str:
+        """The English tag and name, for logs and the developer tools; the
+        player sees `item_name` (UI-014.6)."""
         return f"[{self.rarity[:1].upper()}] {self.name}"
 
 
 def _round(op: str, value: float) -> float:
     return round(value, 3) if op in ("flat", "mult", "pct") else value
+
+
+def stored_name(data: dict, base: dict, rarity: str, first_affix: str | None) -> str:
+    """The English name an item is generated and saved with: its identity.
+    `item_name` builds the shown name through the locale templates instead;
+    in English the two must agree (tests/progression/test_item_names.py)."""
+    suffix = f" {first_affix}" if first_affix else ""
+    return f"{data['prefixes'][rarity]} {base['name']}{suffix}"
 
 
 def generate_item(content, *, seed: int, item_level: int = 1, luck: float = 0.0,
@@ -144,10 +161,64 @@ def generate_item(content, *, seed: int, item_level: int = 1, luck: float = 0.0,
     if rarity == "legendary":
         unique = data["unique_effects"].get(slot, {}).get("id")
 
-    prefix = data["prefixes"][rarity]
-    suffix = f" {rolled[0].name}" if rolled else ""
-    name = f"{prefix} {base['name']}{suffix}"
+    name = stored_name(data, base, rarity, rolled[0].name if rolled else None)
     item_id = f"{slot}-{seed}-{rarity}"
 
     return Item(item_id, slot, name, rarity, item_level, base["stat"],
-                base["op"], base_value, rolled, unique)
+                base["op"], base_value, rolled, unique, base["id"])
+
+
+# --- the name the player reads (UI-014.6, UI-014.D9) ----------------------
+def _base_of(item: Item, data: dict) -> dict | None:
+    """The item's base entry: by `base_id`, else (an item saved before
+    UI-014.6) the one base of its slot with its base stat. None when neither
+    finds exactly one."""
+    bases = data["bases"].get(item.slot, [])
+    if item.base_id is not None:
+        match = [b for b in bases if b.get("id") == item.base_id]
+    else:
+        match = [b for b in bases if b.get("stat") == item.base_stat]
+    return match[0] if len(match) == 1 else None
+
+
+def item_name(item: Item, content) -> str:
+    """The item's name in the current language, built from its parts: the
+    base, the rarity word and the first affix, in the word order of the
+    locale's `item.name` / `item.name_affix` templates. English builds
+    exactly the name stored at generation.
+
+    Spanish puts the rarity adjective after the base and agrees it with the
+    base's `gender_es` ("Coraza de hierro rúnica de vitalidad"); a missing
+    translation falls back to the English part. An item whose base cannot
+    be found shows the stored name."""
+    data = content.items
+    base = _base_of(item, data)
+    if base is None or "name" not in base:
+        return item.name
+    lang = locale.language()
+    prefix = data["prefixes"][item.rarity]
+    if lang != locale.DEFAULT:
+        forms = data.get(f"prefixes_{lang}", {}).get(item.rarity, {})
+        form = forms.get(base.get(f"gender_{lang}"))
+        if locale.renderable(form):
+            prefix = form
+    fields = {"prefix": prefix, "base": locale.text(base, "name")}
+    if not item.affixes:
+        return locale.t("item.name", **fields)
+    first = item.affixes[0]
+    adef = data["affixes"].get(first.affix_id)
+    fields["affix"] = (locale.text(adef, "name") if adef and "name" in adef
+                       else first.name)
+    return locale.t("item.name_affix", **fields)
+
+
+def rarity_tag(rarity: str) -> str:
+    """`[C]`: the rarity's initial in the current language ([C]ommon,
+    [P]oco común), from the same `rarity.*` names the cards print, so a tag
+    and the rarity it stands for agree (UI-014.9)."""
+    return f"[{locale.name('rarity', rarity)[:1].upper()}]"
+
+
+def item_label(item: Item, content) -> str:
+    """`item_name` behind the rarity tag, as the item lists show it."""
+    return f"{rarity_tag(item.rarity)} {item_name(item, content)}"

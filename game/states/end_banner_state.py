@@ -27,9 +27,15 @@ underneath does not act on it either.
 
 The sprite is driven by `systems.animation.Animator` off the
 `end_banner_loss` / `end_banner_win` rigs in `data/ui/ui_sprites.json`, so
-the frame count, the 15 FPS and the one-shot come from data. With the art
-missing (an empty `assets/`) the banner is the same words in the heading
-face, so the timing is identical with or without pixels.
+the frame count, the 15 FPS and the one-shot come from data. With a rig
+whose frames are missing the banner draws the words in the heading face on
+the rig's clock; with no assets at all there is no clock, and the banner
+phase lasts a single frame.
+
+The art is the banner in every language (UI-015.D1, owner, 2026-09-29):
+its English words stay, as the rest of the pack's art does. Only when the
+art is missing does the banner draw words, and those are the language's
+own (`banner.loss`, `banner.win`).
 """
 from __future__ import annotations
 
@@ -37,7 +43,7 @@ from typing import Callable
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import State
 from systems.animation import Animator
 from ui import scale
@@ -46,7 +52,7 @@ WAIT, BANNER, HOLD, DONE = "wait", "banner", "hold", "done"
 
 RIGS = {False: "end_banner_loss", True: "end_banner_win"}
 ANIM = "show"
-FALLBACK_TEXT = {False: "GAME OVER", True: "YOU WON!"}
+FALLBACK_TEXT = {False: "banner.loss", True: "banner.win"}   # locale keys
 FALLBACK_COLOUR = {False: (230, 90, 90), True: (255, 214, 112)}
 # The banner's centre, as a fraction of the box height: a touch above the
 # middle so it reads as a title over the scene rather than a caption on it.
@@ -163,8 +169,12 @@ class EndBannerState(State):
             frame = self._anim.frame(size=size)
         if frame is None:
             # No art: the same words, the same clock.
-            if self._font is None:
-                self._font = fonts.heading(96)
-            frame = self._font.render(FALLBACK_TEXT[self.victory], True,
-                                      FALLBACK_COLOUR[self.victory])
+            frame = self._words()
         surface.blit(frame, frame.get_rect(center=centre))
+
+    def _words(self) -> pygame.Surface:
+        """The banner's words in the current language, in the heading face."""
+        if self._font is None:
+            self._font = fonts.heading(96)
+        return self._font.render(locale.t(FALLBACK_TEXT[self.victory]), True,
+                                 FALLBACK_COLOUR[self.victory])

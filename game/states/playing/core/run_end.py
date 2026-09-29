@@ -13,7 +13,19 @@ under the banner: no input, no combat, only what is in flight plays out.
 """
 from __future__ import annotations
 
+from game import locale
 from game.events import Events
+
+
+def trait_name(cdef: dict, trait_id: str) -> str:
+    """A hero's trait name in the current language: the data's
+    `trait_name`, else the id titled (what the screens showed before
+    UI-014.5), else nothing when the hero has no trait."""
+    if not trait_id:
+        return ""
+    if "trait_name" in cdef:
+        return locale.text(cdef, "trait_name")
+    return str(trait_id).replace("_", " ").title()
 
 
 class RunEnd:
@@ -62,7 +74,10 @@ class RunEnd:
         summary["weapons"] = [(w.name, w.level) for w in player.weapons]
         summary["seed"] = run.seed
         summary["difficulty"] = run.difficulty
-        summary["character"] = content.character(run.character_id)["name"]
+        # Names are resolved here, in the language in use when the run ends:
+        # the end screens that read this dict cannot change the language.
+        cdef = content.character(run.character_id)
+        summary["character"] = locale.text(cdef, "name")
         summary["character_id"] = run.character_id
         summary["blessings"] = dict(player.blessings)
         # The elements this run obtained (design §7.3): a set, so it can
@@ -77,14 +92,15 @@ class RunEnd:
         # rankings and the victory screen read the keys they always did.
         end = run.stats["time"]
         held = [w.weapon_id for w in player.weapons]
-        names = {wid: d.get("name", wid) for wid, d in content.weapons.items()}
+        names = {wid: locale.text(d, "name") if "name" in d else wid
+                 for wid, d in content.weapons.items()}
         lib = ps.blessing_lib
-        names.update({bid: b.name for bid, b in lib.by_id.items()})
+        names.update({bid: b.display_name for bid, b in lib.by_id.items()})
         summary["weapon_rows"] = run.ledger.weapon_rows(player.weapons, end)
         summary["other_rows"] = run.ledger.other_rows(held, names, end)
         summary["kill_rows"] = run.ledger.kill_rows()
         summary["blessing_rows"] = [
-            (lib.by_id[bid].name if bid in lib.by_id else bid, lvl)
+            (lib.by_id[bid].display_name if bid in lib.by_id else bid, lvl)
             for bid, lvl in player.blessings.items()]
         summary["damage_by_source"] = dict(run.ledger.damage)
         # The end screens are one piece of code (`ui/end_screen.py`), so what
@@ -93,6 +109,9 @@ class RunEnd:
         boss = ps.rewards.boss_defeated
         if boss is not None:
             summary["boss_id"], summary["boss"] = boss
+            bdef = content.bosses.get(boss[0])
+            if bdef is not None and "name" in bdef:     # else the stored name stays
+                summary["boss"] = locale.text(bdef, "name")
         # Read *before* the RUN_ENDED publish below: `Game._on_run_ended` calls
         # `save.mark_cleared`, so asking afterwards always answers "already
         # cleared" and the first-clear reward could never be announced.
@@ -110,10 +129,12 @@ class RunEnd:
         # `player.stats` is already the resolved plain dict (the `StatSet`
         # itself is `player.statset`), so this is a copy, not a recompute.
         summary["trait"] = getattr(player, "trait", "")
+        # The trait's own name for the screens; `trait` stays the id.
+        summary["trait_name"] = trait_name(cdef, summary["trait"])
         summary["hero_stats"] = dict(getattr(player, "stats", None) or {})
-        summary["equipment"] = [
-            {"name": it.name, "rarity": it.rarity, "slot": it.slot, "level": it.level}
-            for it in getattr(player, "equipment", ())]
+        # Whole items (UI-014.6): the summary builds each name from its parts
+        # in the language in use, as it does for the dropped items.
+        summary["equipment"] = [it.to_dict() for it in getattr(player, "equipment", ())]
         return summary
 
     def hand_off(self, summary: dict, victory: bool) -> None:

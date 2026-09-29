@@ -1,0 +1,500 @@
+{
+  "_doc": "UI text in English, the reference language (UI-014). Grouped by screen and read as dotted keys: t(\"format.decimal\"). Every other language file must have the same keys with the same {placeholders}; tests/locale/ checks this. Data text (names, descriptions) is not here: it sits in each entity's JSON as <field>, with <field>_<lang> beside it.",
+  "language": {
+    "_doc": "The language's own name, shown on the Options row whatever language is active (locale.name_of).",
+    "name": "English"
+  },
+  "item": {
+    "_doc": "An item's name from its parts (progression.items.item_name): {prefix} is the rarity word, {base} the base, {affix} the first affix's name. English builds exactly the name stored at generation.",
+    "name": "{prefix} {base}",
+    "name_affix": "{prefix} {base} {affix}"
+  },
+  "format": {
+    "_doc": "Number style, read by game.locale.num().",
+    "decimal": ".",
+    "thousands": ","
+  },
+  "menu": {
+    "start": "Start new game",
+    "dev_start": "Start new developer mode game",
+    "rankings": "Rankings",
+    "options": "Options",
+    "exit": "Exit",
+    "summary": "Salvage {salvage}    Best: {time} / Lv {level} / {kills} kills    Items found {items}"
+  },
+  "hero_select": {
+    "title": "Choose your hero",
+    "trait": "Trait - {name}",
+    "starts_with": "Starts with: {weapon}",
+    "main_weapon": "Main weapon:",
+    "difficulty": "Difficulty:",
+    "begin": "Begin",
+    "hint": "Left / Right hero    -    Up / Down or click difficulty",
+    "hint_weapon": "    -    Q / E main weapon",
+    "hint_end": "    -    ENTER / Begin    -    ESC back",
+    "back": "<  Back"
+  },
+  "instructions": {
+    "move": "Move",
+    "aim": "Aim",
+    "auto_attack": "Auto attack toggle",
+    "stat_screen": "Stat screen",
+    "pause": "Pause",
+    "mute": "Mute",
+    "keys": {
+      "aim": "Arrows / Click"
+    },
+    "note": {
+      "fire": "Weapons fire on their own; hold a direction or click to aim them.",
+      "goal": "Survive, level up, beat the boss."
+    }
+  },
+  "difficulty": {
+    "normal": "Normal",
+    "fast": "Fast",
+    "super_fast": "Super Fast"
+  },
+  "key_layout": {
+    "wasd_move": "WASD move / Arrows aim",
+    "arrows_move": "Arrows move / WASD aim"
+  },
+  "options": {
+    "title": "Options",
+    "master": "Master volume",
+    "music": "Music volume",
+    "sfx": "Sound effects",
+    "mute": "Mute",
+    "key_layout": "Key layout",
+    "tutorials": "Tutorials",
+    "language": "Language",
+    "display": "Display mode",
+    "resolution": "Resolution",
+    "sanctuary": "Sanctuary",
+    "back": "Back",
+    "on": "On",
+    "off": "Off",
+    "hint": "Up / Down select    -    Left / Right adjust    -    ENTER toggle / open    -    ESC back"
+  },
+  "display": {
+    "windowed": "Windowed",
+    "borderless": "Borderless",
+    "unavailable": "Unavailable",
+    "custom": "Custom {w}x{h}"
+  },
+  "pause": {
+    "title": "Paused",
+    "resume": "Resume",
+    "status": "Run status",
+    "options": "Options",
+    "key_layout": "Key layout",
+    "quit": "Quit to menu",
+    "hint": "Up / Down select    -    ENTER pick    -    ESC / P resume"
+  },
+  "controls": {
+    "title": "Controls",
+    "move": "Move",
+    "aim": "Aim (hold)",
+    "attack": "Attack",
+    "interact": "Interact",
+    "auto_attack": "Auto attack",
+    "build": "Build",
+    "pause": "Pause"
+  },
+  "level_up": {
+    "title": "Level Up  -  choose one",
+    "hint_cards": "{keys} or Left/Right + Enter to pick    -    or click a card",
+    "hint_leave": "{keys} or Left/Right + Enter to pick    -    ESC to leave",
+    "hint_rows": "Up/Down pick the row    -    {keys} or Left/Right + Enter to choose    -    ESC to leave",
+    "new": "New: {name}",
+    "line": {
+      "weapon": "{weapon} {category}",
+      "hero": "Hero {category}",
+      "grant": "{weapon_class} Weapon Grant",
+      "forge": "{weapon} Forge"
+    }
+  },
+  "rarity": {
+    "common": "Common",
+    "uncommon": "Uncommon",
+    "rare": "Rare",
+    "epic": "Epic",
+    "legendary": "Legendary",
+    "forge": "Forge"
+  },
+  "category": {
+    "power": "Power",
+    "coverage": "Coverage",
+    "behavior": "Behavior",
+    "synergy": "Synergy"
+  },
+  "weapon_class": {
+    "melee": "Melee",
+    "ranged": "Ranged",
+    "summon": "Summon"
+  },
+  "loading": {
+    "label": "Loading..."
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Best run per difficulty  -  never compared across difficulties",
+    "time": "Survived",
+    "level": "Level",
+    "kills": "Kills",
+    "damage": "Damage",
+    "seconds": "{n} s",
+    "empty": "no runs yet",
+    "hint": "ENTER / ESC  -  back to menu"
+  },
+  "hints": {
+    "move": "Move",
+    "attack": "Attack",
+    "aim": "Aim"
+  },
+  "keys": {
+    "space": "SPACE",
+    "shift": "SHIFT",
+    "backspace": "BKSP",
+    "click": "CLICK"
+  },
+  "chest": {
+    "notice": "{rarity} chest: {contents}.",
+    "gold": "{n} gold",
+    "potion": "a {rarity} potion",
+    "rarity": {
+      "common": "Common",
+      "uncommon": "Uncommon",
+      "rare": "Rare",
+      "epic": "Epic"
+    }
+  },
+  "potion": {
+    "rarity": {
+      "common": "common",
+      "uncommon": "uncommon",
+      "rare": "rare"
+    }
+  },
+  "list": {
+    "pair": "{a} and {b}",
+    "pair_i": "{a} and {b}",
+    "separator": ", "
+  },
+  "forge": {
+    "title": "The Forge  -  choose a weapon to reforge",
+    "hint": "Up/Down pick the weapon    -    {keys} or Left/Right + Enter to forge    -    ESC to leave",
+    "reforged": "The {weapon} is reforged: {forge}.",
+    "all_forged": "Every weapon is already forged.",
+    "needs": {
+      "one": "The Forge needs a weapon with {need} blessings: the {weapon} needs {n} more.",
+      "other": "The Forge needs a weapon with {need} blessings: the {weapon} needs {n} more."
+    },
+    "rail": {
+      "heading": "REFORGE WHICH WEAPON",
+      "forged": "already forged into {name}",
+      "ready": "{have} / {need} blessings",
+      "short": {
+        "one": "{have} / {need} - needs {n} more blessing",
+        "other": "{have} / {need} - needs {n} more blessings"
+      }
+    }
+  },
+  "element": {
+    "fire": "Fire",
+    "ice": "Ice",
+    "thunder": "Thunder",
+    "wind": "Wind"
+  },
+  "infusion": {
+    "monastery_title": "The Monastery  -  choose an element, then a weapon",
+    "rail": {
+      "heading": "INFUSE WITH WHICH ELEMENT",
+      "on": "on {weapons}",
+      "none": "not carried"
+    },
+    "refresh": "Already carries {element}. Refreshes it ({pace}).",
+    "replace": "Replaces {old} with {element} ({pace}).",
+    "carry": "Carries {element} {pace}.",
+    "pace": {
+      "time": "every {s}",
+      "count": "on 1 attack in {n}",
+      "every": "on every attack"
+    },
+    "no_weapon": "No weapon to infuse.",
+    "hint_rail": "Up/Down pick the element    -    {keys} or Left/Right + Enter to infuse    -    ESC to leave",
+    "hint": "{keys} or Left/Right + Enter to infuse    -    ESC to leave",
+    "title": "Choose an element, then a weapon",
+    "buff_title": "{element} - choose a weapon to infuse",
+    "done": "The {weapon} carries {element}."
+  },
+  "effect": {
+    "fire_hit": "Fire",
+    "burn": "Burn",
+    "wind_hit": "Wind",
+    "wind_area": "Wind area",
+    "thunder_chain": "Thunder chain",
+    "frozen_contact": "Frozen contact",
+    "frostburn": "Frostburn",
+    "overload": "Overload",
+    "overload_wave": "Overload shockwave",
+    "superconduct": "Superconduct",
+    "firewind": "FireWind",
+    "icewind": "IceWind",
+    "thunderwind": "ThunderWind",
+    "thunder_strike": "Thunder strike"
+  },
+  "boss": {
+    "approaches": "{boss} APPROACHES"
+  },
+  "banner": {
+    "loss": "GAME OVER",
+    "win": "YOU WON!"
+  },
+  "end": {
+    "game_over": "Game Over",
+    "victory": "Victory",
+    "new_run": "New run",
+    "sanctuary": "Sanctuary",
+    "menu": "Main menu",
+    "seed": "seed {n}",
+    "button_hint": "{key} {label}",
+    "hint_separator": "   -   ",
+    "select": "Left / Right select"
+  },
+  "stat": {
+    "max_hp": "Max HP",
+    "hp_regen": "HP regen",
+    "move_speed": "Move speed",
+    "armor": "Armor",
+    "damage_multiplier": "Damage",
+    "melee_damage": "Melee damage",
+    "ranged_damage": "Ranged damage",
+    "attack_speed_multiplier": "Attack speed",
+    "projectile_speed_multiplier": "Projectile speed",
+    "area_multiplier": "Area",
+    "crit_chance": "Crit chance",
+    "crit_damage": "Crit damage",
+    "evasion_chance": "Evasion",
+    "block_chance": "Block chance",
+    "block_strength": "Block strength",
+    "pickup_radius": "Pickup radius",
+    "luck": "Luck",
+    "xp_gain": "XP gain",
+    "gold_gain": "Gold gain"
+  },
+  "weapon_stat": {
+    "damage": "Damage",
+    "cooldown": "Cooldown",
+    "projectile_count": "Projectiles",
+    "area": "Area",
+    "reach": "Reach",
+    "pierce": "Pierce",
+    "blast_radius": "Blast radius",
+    "cone_half_angle": "Cone",
+    "chain_count": "Chains",
+    "weight": "Weight"
+  },
+  "forge_field": {
+    "area": "area",
+    "blast_radius": "blast radius",
+    "category": "category",
+    "cluster_count": "cluster count",
+    "cluster_damage_mult": "cluster damage mult",
+    "cluster_fuse": "cluster fuse",
+    "cluster_radius_mult": "cluster radius mult",
+    "cluster_speed": "cluster speed",
+    "cone_half_angle": "cone half angle",
+    "cooldown": "cooldown",
+    "damage": "damage",
+    "hazard_dps_mult": "hazard dps mult",
+    "hazard_duration": "hazard duration",
+    "hazard_radius": "hazard radius",
+    "mine": "mine",
+    "mine_arm_delay": "mine arm delay",
+    "mine_lifetime": "mine lifetime",
+    "orbit_radius": "orbit radius",
+    "orbit_speed": "orbit speed",
+    "pierce": "pierce",
+    "projectile_count": "projectile count",
+    "projectile_lifetime": "projectile lifetime",
+    "projectile_speed": "projectile speed",
+    "reach": "reach",
+    "rehit_interval": "rehit interval",
+    "shockwave_damage_mult": "shockwave damage mult",
+    "shockwave_radius": "shockwave radius",
+    "special_effect": "special effect",
+    "spread_deg": "spread deg",
+    "tags": "tags",
+    "targeting_mode": "targeting mode",
+    "twin_offset_deg": "twin offset deg",
+    "weight": "weight"
+  },
+  "class": {
+    "melee": "melee",
+    "ranged": "ranged",
+    "summon": "summon"
+  },
+  "weapon_category": {
+    "melee": "melee",
+    "orbit": "orbit",
+    "projectile": "projectile",
+    "summon": "summon"
+  },
+  "special": {
+    "bomb": "bomb",
+    "cone": "cone",
+    "orbit": "orbit",
+    "slam": "slam",
+    "summon": "summon"
+  },
+  "tag": {
+    "arcane": "arcane",
+    "area": "area",
+    "explosive": "explosive",
+    "melee": "melee",
+    "orbit": "orbit",
+    "projectile": "projectile",
+    "ranged": "ranged",
+    "summon": "summon",
+    "elite": "elite"
+  },
+  "targeting": {
+    "nearest": "nearest",
+    "none": "none"
+  },
+  "slot": {
+    "weapon": "weapon",
+    "armor": "armor",
+    "accessory": "accessory"
+  },
+  "summary": {
+    "run": "Run",
+    "kills_title": "Enemies slain",
+    "weapons": "Weapons",
+    "hero_title": "Hero",
+    "best": "best",
+    "survived": "Survived",
+    "cleared": "Cleared in",
+    "level": "Level",
+    "kills": "Kills",
+    "kills_value": "{kills}   ({rate}/min)",
+    "gold_earned": "Gold earned",
+    "potions": "Potions",
+    "potions_value": "{n}   ({hp} HP)",
+    "chests": "Chests",
+    "elements": "Elements",
+    "none": "none",
+    "blessings_none": "none",
+    "items": "Items acquired  ({n})",
+    "more": {
+      "items": {
+        "one": "+{n} more item",
+        "other": "+{n} more items"
+      },
+      "stats": {
+        "one": "+{n} more stat",
+        "other": "+{n} more stats"
+      },
+      "types": {
+        "one": "+{n} more type",
+        "other": "+{n} more types"
+      },
+      "blessings": {
+        "one": "+{n} more blessing",
+        "other": "+{n} more blessings"
+      },
+      "sources": {
+        "one": "+{n} more source",
+        "other": "+{n} more sources"
+      }
+    },
+    "main_weapon": "Main weapon unlocked",
+    "hero": "Hero",
+    "trait": "Trait",
+    "stats": "Stats",
+    "equipped": "Equipped  ({n})",
+    "nothing_slain": "nothing slain",
+    "total": "Total",
+    "blessings": "Blessings  ({n})",
+    "level_value": "Lv {n}",
+    "head": {
+      "level": "Lv",
+      "damage": "Damage",
+      "share": "Share",
+      "dps": "DPS",
+      "weapon": "Weapon"
+    },
+    "no_weapons": "no weapons",
+    "procs": "Blessing procs & other"
+  },
+  "status": {
+    "tab": {
+      "overview": "Overview",
+      "build": "Build",
+      "blessings": "Blessings"
+    },
+    "no_run": "no run",
+    "hint": "TAB / ESC close   -   Left / Right or 1 2 3 switch pane   -   Up / Down or wheel select",
+    "hero": "Hero",
+    "difficulty": "Difficulty",
+    "survived": "Survived",
+    "hp": "HP",
+    "level": "Level",
+    "kills": "Kills",
+    "gold": "Gold",
+    "salvage": "Salvage",
+    "potions": "Potions",
+    "equipped": "Equipped items  ({n})",
+    "none": "none",
+    "item_value": "{slot}  Lv {level}",
+    "tag_damage": "{pct} damage vs {tag}",
+    "hero_stats": "Hero stats",
+    "no_weapons": "no weapons",
+    "yes": "yes",
+    "no": "no",
+    "pace": {
+      "time": "every {s}",
+      "count": "1 attack in {n}",
+      "every": "every attack"
+    },
+    "gate": {
+      "summon": "cannot be forged",
+      "forged": "forged  -  {identity}",
+      "ready": "ready for the Forge ({need})",
+      "short": "Forge at {need}  -  has {have}"
+    },
+    "owner_hero": "Hero",
+    "weapon_level": "{name}  Lv {level}",
+    "more": "+{n} more",
+    "blessing_levels": "Blessing levels",
+    "not_forged": "{weapon}  -  not forged",
+    "forging": "Forging: {name}  -  {identity}",
+    "synergies": "Synergies  ({n})",
+    "synergies_none": "none yet  -  a synergy blessing links two weapons",
+    "more_synergies": {
+      "one": "+{n} more synergy",
+      "other": "+{n} more synergies"
+    },
+    "blessings": "Blessings  ({n})",
+    "none_yet": "none yet",
+    "blessings_help": "Blessings come from level-ups and the village.",
+    "more_up": "^ more",
+    "more_scroll": "+{n} more  (scroll)",
+    "level_of": "{level} of {max}"
+  },
+  "meta": {
+    "title": "Sanctuary",
+    "salvage": "Salvage: {n}",
+    "hint": "TAB switch panel   -   Up/Down select   -   ENTER buy/equip   -   U unequip   -   ESC back",
+    "upgrades": "Upgrades",
+    "stash": "Stash",
+    "max": "MAX",
+    "empty": "(no items yet - beat elites / the boss)"
+  },
+  "unit": {
+    "percent": "{n}%",
+    "seconds": "{n}s",
+    "mult": "x{n}",
+    "degrees": "{n}°"
+  }
+}

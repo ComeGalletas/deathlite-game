@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import pygame
 
-from game import config, fonts
+from game import config, fonts, locale
 from game.state import State
 from ui import scale, widgets
 from ui.menu_nav import MenuNav
@@ -41,20 +41,25 @@ class MenuState(State):
         self._font = fonts.body(self._menu_font_px)
         self._small = fonts.body(16)
 
-        # (label, action). `action` is dispatched in _activate(); an entry whose
-        # action is None is drawn but does nothing when selected.
-        self._options: list[tuple[str, str | None]] = [
-            ("Start new game", "start"),
-            ("Start new developer mode game", "dev_start"),
-            ("Rankings", "rankings"),
-            ("Options", "options"),
-            ("Exit", "exit"),
+        # (text key, action). `action` is dispatched in _activate(); an entry
+        # whose action is None is drawn but does nothing when selected.
+        self._option_keys: list[tuple[str, str | None]] = [
+            ("menu.start", "start"),
+            ("menu.dev_start", "dev_start"),
+            ("menu.rankings", "rankings"),
+            ("menu.options", "options"),
+            ("menu.exit", "exit"),
         ]
         self._index = 0
         self._nav = MenuNav()        # the cursor keys and the mouse (ui/menu_nav.py)
         self._mouse = self._nav.mouse   # rows registered in draw(); see ui/mouse.py
 
     # --- input ---------------------------------------------------------
+    @property
+    def _options(self) -> list[tuple[str, str | None]]:
+        """(label, action) in the current language, read on every use."""
+        return [(locale.t(key), action) for key, action in self._option_keys]
+
     def handle_event(self, event: pygame.event.Event) -> None:
         verb = self._nav.event(event, index=self._index, count=len(self._options))
         if verb is None:
@@ -155,9 +160,10 @@ class MenuState(State):
         # --- save summary, bottom centre ---
         save = self.game.save
         best = save.best
-        summary = (f"Salvage {save.currency}    "
-                   f"Best: {best.get('time', 0):.0f}s / Lv {int(best.get('level', 1))} / "
-                   f"{int(best.get('kills', 0))} kills    "
-                   f"Items found {len(save.discovered_items)}")
+        summary = locale.t("menu.summary", salvage=save.currency,
+                           time=locale.unit("seconds", f"{best.get('time', 0):.0f}"),
+                           level=int(best.get("level", 1)),
+                           kills=int(best.get("kills", 0)),
+                           items=len(save.discovered_items))
         s = self._small.render(summary, True, config.MENU_FG_DIM)
         surface.blit(s, s.get_rect(center=(cx, h - scale.px(40))))
