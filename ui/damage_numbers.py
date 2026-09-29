@@ -111,6 +111,12 @@ class DamageNumbers:
         self._pool: Pool[DamageNumber] = Pool(DamageNumber, max_numbers, prefill=32)
         self._cap = max_numbers
         self._font_cache: dict[int, tuple] = {}   # zoom-key -> (common, crit, incoming)
+        # (id(font), text, colour) -> the plain number's glyph. The outlined
+        # ones are kept by `_outlined`; a weapon's plain numbers were
+        # rendered afresh for every number every frame (RND-008.4). The
+        # fonts are this instance's own, so their ids stay put while it
+        # lives.
+        self._glyphs: dict[tuple, pygame.Surface] = {}
 
     def __len__(self) -> int:
         return len(self._pool)
@@ -200,9 +206,20 @@ class DamageNumbers:
             elif n.colour is not None:
                 glyph = _outlined(fnt, n.text, _lifted(n.colour))
             else:
-                glyph = fnt.render(n.text, True, colour)
+                glyph = self._plain(fnt, n.text, colour)
+            # The glyph is shared by every number that says the same thing,
+            # so its alpha is set here, right before its blit.
             glyph.set_alpha(int(255 * frac))
             surface.blit(glyph, glyph.get_rect(center=(sx, sy)))
+
+    def _plain(self, font, text: str, colour) -> pygame.Surface:
+        key = (id(font), text, tuple(colour))
+        hit = self._glyphs.get(key)
+        if hit is None:
+            if len(self._glyphs) >= _PLAIN_CACHE_CAP:
+                self._glyphs.clear()
+            hit = self._glyphs[key] = font.render(text, True, colour)
+        return hit
 
     def _label_font(self, zoom: float = 1.0):
         key = ("label", max(1, round(zoom * 100)))
@@ -219,6 +236,9 @@ class DamageNumbers:
 
 _OUTLINE_CACHE: dict[tuple, pygame.Surface] = {}
 _OUTLINE_CACHE_CAP = 256
+# The plain numbers' glyphs (`DamageNumbers._plain`): whole numbers in three
+# fonts and a few colours, a few hundred at most in a long fight.
+_PLAIN_CACHE_CAP = 256
 
 
 def _outlined(font, text: str, colour):

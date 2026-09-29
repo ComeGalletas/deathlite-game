@@ -34,6 +34,30 @@ _QUERY_PAD = 72.0
 # ~0.6 s instead of ~1.7 s, with no effect on shallow everyday overlaps.
 _PEN_CAP_FRAC = 0.6
 
+# The early drop in `resolve` computes the pair's distance in Python floats;
+# `_bump` computes it through `Vector2`. Those are the same IEEE operations,
+# but a pair within a billionth of either limit is left to `_bump` to
+# decide, so the two can never disagree about a pair that matters.
+_MARGIN_OUT = 1.0 + 1e-9
+_COINCIDENT = 1e-9 * (1.0 - 1e-9)     # `_bump`'s coincident limit, a billionth under
+
+
+def _pad(population) -> float:
+    """The broad-phase pad for this frame: the largest collider present,
+    never more than `_QUERY_PAD`.
+
+    A body touching `a` has its centre within `a.radius + b.radius` of `a`,
+    so a pad of the largest radius already reaches every body that can
+    touch it. The grid's query covers whole cells, so a smaller pad returns
+    a sub-block of the same cells in the same order, and every pair that
+    matters in the same order (RND-008.5). It is capped at the old pad so
+    a body bigger than that, such as a boss, is found exactly as before.
+    Only the living count: a dead body is skipped on both sides of a pair.
+    """
+    biggest = max((b.radius for b in population if getattr(b, "alive", True)),
+                  default=0.0)
+    return min(_QUERY_PAD, float(biggest))
+
 
 class BumpResolver:
     def __init__(self, ps) -> None:
@@ -51,16 +75,32 @@ class BumpResolver:
         if not population:
             return
         self._grid.rebuild(population)
+        pad = _pad(population)
+        grid = self._grid
+        push = config.CROWD_PUSH_RADIUS_FRAC
 
         # enemy <-> enemy  and  enemy <-> boss
+        #
+        # RND-008.5: a pair that does not touch is dropped on two float
+        # products, before any tuple, set or vector: `_bump` does nothing to
+        # it (no shove, no frozen contact), so neither does skipping it.
+        # The pairs that do touch go through exactly as before, in the same
+        # order and the same way round, because the knockbacks they add are
+        # summed and a float sum depends on its order.
         seen: set[tuple[int, int]] = set()
         for a in enemies:
             if not a.alive:
                 continue
-            for b in self._grid.query_circle(a.pos.x, a.pos.y,
-                                             a.radius + _QUERY_PAD):
+            ax, ay, ar = a.pos.x, a.pos.y, a.radius
+            for b in grid.query_circle(ax, ay, ar + pad):
                 if b is a or not getattr(b, "alive", True):
                     continue
+                bpos = b.pos
+                dx, dy = ax - bpos.x, ay - bpos.y
+                d2 = dx * dx + dy * dy
+                touch = ar + b.radius
+                if d2 >= touch * touch * _MARGIN_OUT or d2 < _COINCIDENT:
+                    continue                          # `_bump` would return at once
                 key = (id(a), id(b)) if id(a) < id(b) else (id(b), id(a))
                 if key in seen:
                     continue
@@ -68,14 +108,12 @@ class BumpResolver:
                 # ENT-016: two enemies push at a fraction of their colliders,
                 # so a pack can compress and file across a one-tile deck; the
                 # boss still shoulders through at its full radius.
-                frac = (1.0 if b is boss else config.CROWD_PUSH_RADIUS_FRAC)
-                self._bump(a, b, contact=True, reach=frac)
+                self._bump(a, b, contact=True, reach=1.0 if b is boss else push)
 
         # hero <-> enemy / boss
         p = run.player
         if p.alive:
-            for e in self._grid.query_circle(p.pos.x, p.pos.y,
-                                             p.radius + _QUERY_PAD):
+            for e in grid.query_circle(p.pos.x, p.pos.y, p.radius + pad):
                 if getattr(e, "alive", True):
                     self._bump(p, e)
 

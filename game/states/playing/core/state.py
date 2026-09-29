@@ -53,6 +53,7 @@ from systems.screen_shake import ScreenShake
 from ui.hud import HUD
 from game.display import uibox
 from ui.damage_numbers import DamageNumbers
+from ui.text_cache import TextCache
 from world.map import GameMap
 from world.nav.field import NavField
 from spawn.budget import SpawnDirector
@@ -226,6 +227,9 @@ class PlayingState(State):
         self.hud = HUD()
         self._banner_font = fonts.heading(40)
         self._prompt_font = fonts.heading(20)
+        # Fonts and text drawn every frame (the opening hints, the interact
+        # cap), built once instead of per frame (RND-008.3).
+        self.text_cache = TextCache()
 
         # World-layer painter. Read-only view of this state (see rendering.py).
         self.renderer = WorldRenderer(self)
@@ -347,6 +351,7 @@ class PlayingState(State):
         self.hud = HUD()
         self._banner_font = fonts.heading(40)
         self._prompt_font = fonts.heading(20)
+        self.text_cache = TextCache()              # empty: refilled at the new scale
         gm = self.game_map
         if getattr(gm, "_tiles_ready", False):
             from world.terrain import bake as terrain_bake

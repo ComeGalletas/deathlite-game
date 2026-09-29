@@ -50,9 +50,10 @@ def cluster_width(labels: list[str]) -> int:
 
 
 def draw(surface: pygame.Surface, assets, topleft, game, *,
-         font=None, heading_font=None, colour="grey") -> pygame.Rect:
+         font=None, heading_font=None, colour="grey", cache=None) -> pygame.Rect:
     """Paint the block with its top-left at `topleft` (native px); returns
-    the rect it covered."""
+    the rect it covered. A caller that draws it every frame passes `cache`
+    (a `ui.text_cache.TextCache`) for the caps' labels (RND-008.3)."""
     font = font or fonts.body(20)
     heading_font = heading_font or fonts.heading(26)
     x0, y0 = int(topleft[0]), int(topleft[1])
@@ -67,7 +68,7 @@ def draw(surface: pygame.Surface, assets, topleft, game, *,
             wide = keycap.is_wide(label)
             w = scale.px(CAP * (keycap.WIDE_RATIO if wide else 1))
             keycap.draw_keycap(surface, assets, (x + w // 2, y), label,
-                               state="raised", colour=colour, wide=wide)
+                               state="raised", colour=colour, wide=wide, cache=cache)
             x += w + scale.px(CAP_GAP)
         text = font.render(what, True, config.COLOR_TEXT)
         tx = x0 + scale.px(widest + LABEL_GAP)

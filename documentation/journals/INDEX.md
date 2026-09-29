@@ -48,6 +48,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | ENT-015 | The boss on the shared AI components | ENT | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | ENT-016 | Crowd push radius, low enough to stack and cross bridges | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
+| ENT-018 | The enemies' own update made cheaper, bit for bit the same (crowding push, floor lookups) | ENT, WLD | performance | done | [enemy_update_journal.md](enemy_update_journal.md) | ComeGalletas/ent-018-enemy-update-9ec11fc6 | 2026-09-29 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
@@ -72,6 +73,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | RND-005 | Warm every animation frame on the loading screen, so the first frame of a run scales nothing | RND, SYS | feature | done | [frame_warmup_journal.md](frame_warmup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
 | RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | done | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | RND-007 | The `mark` status drawn as raspberry lock-on brackets, shown with a blessing that reads it | RND, CMB | feature | done | [mark_overlay_journal.md](mark_overlay_journal.md) | claude/rnd-007-mark-overlay | 2026-09-24 |
+| RND-008 | Gameplay frame time: the reviewed performance findings and their todo list (per-frame font builds in the hints, the harness, the elemental draw, bump) | RND, SYS, ENT, CMB | performance | done | [frame_time_journal.md](frame_time_journal.md) | ComeGalletas/rnd-008-frame-time-9ec11fc6 | 2026-09-28 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |

@@ -174,36 +174,91 @@ def label_center(face_center, state: str, size: int = CAP_PX, *,
     return (rect.centerx, rect.top + int(round(face_y(colour, state) * k)))
 
 
-def draw_keycap(surface: pygame.Surface, assets, face_center, label: str, *,
-                state: str = "raised", colour: str = "blue", size: int = CAP_PX,
-                wide: bool | None = None, font: pygame.font.Font | None = None,
-                fallback_colour=(240, 240, 245)) -> pygame.Rect:
-    """Paint one cap with `label` on its face; returns the cap's frame rect.
-    `wide` defaults to whatever the label needs. With no art the label
-    alone is drawn in `fallback_colour` at the cap's raised face centre."""
-    if wide is None:
-        wide = is_wide(label)
+def _face(assets, face_center, state: str, colour: str, size: int, wide: bool,
+          fallback_colour):
+    """`(rect, art, ink, at)` for one cap: its frame, the art (None when
+    missing), and the colour and centre of what goes on its face."""
     rect = cap_rect(face_center, size, colour=colour, wide=wide)
     art = (assets.image(keycap_sheet(colour, state, wide=wide), size=rect.size)
            if assets is not None else None)
-    if font is None:
-        px = (WORD_PX if wide else LABEL_PX) * size / CAP_PX
-        font = fonts.body(int(round(px)), bold=True)
     if art is not None:
-        surface.blit(art, rect.topleft)
-        ink, at = config.COLOR_ON_BUTTON, label_center(face_center, state, size,
-                                                       colour=colour, wide=wide)
-    else:
-        ink, at = fallback_colour, (rect.centerx, int(face_center[1]))
+        at = label_center(face_center, state, size, colour=colour, wide=wide)
+        return rect, art, config.COLOR_ON_BUTTON, at
+    return rect, None, fallback_colour, (rect.centerx, int(face_center[1]))
+
+
+def _words(assets, label: str, size: int) -> tuple[str | None, pygame.Surface | None]:
+    """`(words, glyph)`: what a cap writes on its face, or None when it
+    draws its label instead, and the cursor glyph when that is what it
+    draws. An arrow is neither. Without the cursor art the mouse cap
+    writes `MOUSE_WORD`."""
     if label in ARROWS:
-        draw_arrow(surface, at, ARROWS[label], int(round(ARROW_PX * size / CAP_PX)), ink)
-        return rect
+        return None, None
     if label == MOUSE:
         glyph = mouse_glyph(assets, scale.px(MOUSE_PX * size / CAP_PX))
+        return (None, glyph) if glyph is not None else (MOUSE_WORD, None)
+    return label, None
+
+
+def _text(words: str, ink, wide: bool, size: int, font, cache) -> pygame.Surface:
+    """`words` rendered in the cap's label face: `font` when given, else
+    the body face at the cap's size, from `cache` when there is one."""
+    if font is not None:
+        return font.render(words, True, ink)
+    px = int(round((WORD_PX if wide else LABEL_PX) * size / CAP_PX))
+    if cache is not None:
+        return cache.render("body", px, words, ink, bold=True)
+    return fonts.body(px, bold=True).render(words, True, ink)
+
+
+def draw_keycap(surface: pygame.Surface, assets, face_center, label: str, *,
+                state: str = "raised", colour: str = "blue", size: int = CAP_PX,
+                wide: bool | None = None, font: pygame.font.Font | None = None,
+                fallback_colour=(240, 240, 245), cache=None) -> pygame.Rect:
+    """Paint one cap with `label` on its face; returns the cap's frame rect.
+    `wide` defaults to whatever the label needs. With no art the label
+    alone is drawn in `fallback_colour` at the cap's raised face centre.
+    `footprint` gives everything it paints, which can be wider than the
+    frame.
+
+    The label's font is `font` when given, else the body face at the cap's
+    size. Anything drawn every frame passes `cache` (a `ui.text_cache.
+    TextCache`), which keeps that font and the rendered label; without it
+    both are built on each call, which is fine for a menu drawn once
+    (RND-008.3). An arrow or the mouse glyph renders no text and builds
+    no font."""
+    if wide is None:
+        wide = is_wide(label)
+    rect, art, ink, at = _face(assets, face_center, state, colour, size, wide,
+                               fallback_colour)
+    if art is not None:
+        surface.blit(art, rect.topleft)
+    words, glyph = _words(assets, label, size)
+    if words is None:
         if glyph is not None:
             surface.blit(glyph, glyph.get_rect(center=at))
-            return rect
-        label = MOUSE_WORD
-    text = font.render(label, True, ink)
+        else:
+            draw_arrow(surface, at, ARROWS[label], int(round(ARROW_PX * size / CAP_PX)), ink)
+        return rect
+    text = _text(words, ink, wide, size, font, cache)
     surface.blit(text, text.get_rect(center=at))
     return rect
+
+
+def footprint(assets, face_center, label: str, *, state: str = "raised",
+              colour: str = "blue", size: int = CAP_PX, wide: bool | None = None,
+              font: pygame.font.Font | None = None, fallback_colour=(240, 240, 245),
+              cache=None) -> pygame.Rect:
+    """Everything `draw_keycap` paints for the same arguments: the cap's
+    frame, grown to take in its written label where that runs past it.
+    It does, for the mouse cap without the cursor art: `MOUSE_WORD` on a
+    square cap is wider than the cap (RND-008.3). The arrows and the
+    cursor glyph are drawn inside the frame."""
+    if wide is None:
+        wide = is_wide(label)
+    rect, _art, ink, at = _face(assets, face_center, state, colour, size, wide,
+                                fallback_colour)
+    words, _glyph = _words(assets, label, size)
+    if words is None:
+        return rect
+    return rect.union(_text(words, ink, wide, size, font, cache).get_rect(center=at))

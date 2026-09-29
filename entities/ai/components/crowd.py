@@ -11,6 +11,11 @@ from entities.ai.machine import Component
 
 _SEP_RADIUS_MULT = 1.6
 _SEP_CAP = 0.6            # was _SEP_MAX
+# `Separation`'s early drop keeps a billionth inside the vector test's own
+# limits (`r * r` and `1e-6`), so the two never disagree about a neighbour
+# that pushes (ENT-018.2).
+_MARGIN_OUT = 1.0 + 1e-9
+_NEAR = 1e-6 * (1.0 - 1e-9)
 _OBSTACLE_MARGIN = 14.0
 _OBSTACLE_CAP = 0.7      # was _OBSTACLE_MAX
 
@@ -27,10 +32,24 @@ class Separation(Component):
     def tick(self, actor, per, cmb, acc):
         r = actor.radius * self.radius_mult
         push = pygame.Vector2()
-        for other in per.neighbors(actor.pos, r):
+        # ENT-018.2: the grid hands back whole cells, so most candidates are
+        # beyond `r`. They are dropped on float products before any vector;
+        # a candidate within a billionth of either limit is left to the
+        # vector test below, which decides exactly as it always has. The
+        # ones that push go through unchanged and in the same order, so the
+        # summed push is the same float.
+        apos = actor.pos
+        ax, ay = apos.x, apos.y
+        far = r * r * _MARGIN_OUT
+        for other in per.neighbors(apos, r):
             if other is actor or not getattr(other, "alive", True):
                 continue
-            away = actor.pos - other.pos
+            opos = other.pos
+            dx, dy = ax - opos.x, ay - opos.y
+            d2 = dx * dx + dy * dy
+            if d2 >= far or d2 < _NEAR:
+                continue
+            away = apos - opos
             dsq = away.length_squared()
             if dsq < 1e-6 or dsq >= r * r:
                 continue

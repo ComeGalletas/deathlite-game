@@ -132,6 +132,19 @@ INTEGRATION = (
     "tests/playing/test_enemy_nav.py::PlayingStateNavWiringTests",
     "tests/playing/test_enemy_nav.py::NavRebuildStaggerTests",
     "tests/render/test_depth_sort.py::DepthOrderTests",
+    # RND-008.2: the stress harness boots a run; its flag and budget checks
+    # boot nothing and stay unit.
+    "tests/devtools/test_spawn_stress.py::HarnessDefaultsTests",
+    "tests/devtools/test_spawn_stress.py::LiveDirectorTests",
+    "tests/devtools/test_spawn_stress.py::CommandLineTests",
+    # RND-008.3: a whole run's draw, three booted runs.
+    "tests/playing/test_frame_fonts.py",
+    # RND-008.4: the harness's packed, primed fight; the cache checks stay unit.
+    "tests/render/test_elemental_draw_cost.py::TerraceSortTests",
+    # RND-008.5: seed 35's fight as it plays; the random crowds stay unit.
+    "tests/playing/test_bump_exact.py::HarnessFightTests",
+    # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
+    "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
 )
 
 
