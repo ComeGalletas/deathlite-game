@@ -176,4 +176,17 @@ Closes UI-014.D20 (`localization_journal.md`).
 
 - [x] UI-016.5 — the web HUD bars (and the boss bar) at 80%: `bars.bar`
   resample, `ui/hud.py`, tests
-- [ ] UI-017.1 — `UI_CURSOR_SCALE` 0.85, its comment, a pinning test
+- [x] UI-017.1 — `UI_CURSOR_SCALE` 0.85, its comment, a pinning test
+
+### Results
+
+- **HUD bars (UI-016.5):** on web the HP/XP bars and the boss bar are
+  exactly 80% of the desktop's (`test_hud.py: WebBarScaleTests`, which
+  fails with the old rounding put back); at 1.0 and 1.6 they are
+  unchanged (x3, x5). The boss bar is still half the screen wide.
+- **Cursor (UI-017.1):** `UI_CURSOR_SCALE` 0.85, pinned in
+  `test_mouse.py`; the system-match and render-scale tests now include
+  the base scale.
+- **Tests run:** `test_hud`, `test_hud_bars`, `test_ui_bar_sprites`,
+  `test_ui_scale`, `test_mouse`, `test_fit`, `test_english_layout`,
+  `tests/render`: all pass.

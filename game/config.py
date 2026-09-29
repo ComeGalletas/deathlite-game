@@ -574,10 +574,12 @@ WINDOW_ICON: str = "ui/icon.png"
 UI_CURSOR_IMAGE: str = "ui/pointers/arrow.png"
 # The arrow is drawn at the size the desktop draws its own cursor (Windows'
 # `CursorBaseSize` times the display DPI, times the system arrow's ink
-# fraction -- `game/display/native.py`), so 1.0 means "the same size as the
-# system cursor". Raise it only to make the game's arrow deliberately larger
-# than the player's; the render scale no longer enters the sizing.
-UI_CURSOR_SCALE: float = 1.0
+# fraction -- `game/display/native.py`), times this: 1.0 would be "the same
+# size as the system cursor", and the owner set it 15% smaller (UI-017,
+# 2026-09-29). The render scale does not enter that sizing; it does enter
+# the fallback where the platform will not say its cursor size
+# (`Game._cursor_scale`: this x RENDER_SCALE, 0.68 on the web profile).
+UI_CURSOR_SCALE: float = 0.85
 
 # Game instructions, surfaced on the character-select screen (they lived on the
 # start menu until the hero-preview rework). A (row, keys) grid plus free

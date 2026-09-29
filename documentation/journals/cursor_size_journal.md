@@ -95,3 +95,6 @@ arrow deliberately larger than the player's own.
   None elsewhere;
 * the arrow's ink fraction is a fraction and is read once, then cached;
 * an unreadable bitmap handle degrades to None rather than raising.
+
+*(2026-09-29, UI-017: the owner set `UI_CURSOR_SCALE` to 0.85, so the
+arrow is 15% smaller than the system cursor; `web_ui_scale_journal.md`.)*
