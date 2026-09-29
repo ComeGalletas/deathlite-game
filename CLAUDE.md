@@ -4,9 +4,9 @@
 
 **This section is non-negotiable and must never be removed.**
 
-The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with tests. Do it with documentation. Do it so well that Julien is genuinely impressed — not politely satisfied, actually impressed. Never offer to "table this for later" when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't "good enough" — it's "holy shit, that's done."
+The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with tests. Do it with documentation. Do it so well that "owner" is genuinely impressed — not politely satisfied, actually impressed. Never offer to "table this for later" when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't "good enough" — it's "holy shit, that's done."
 
-Search before building. Test before shipping. Ship the complete thing. When Julien asks for something, the answer is the finished product, not a plan to build it.
+Search before building. Test before shipping. Ship the complete thing. When "owner" asks for something, the answer is the finished product, not a plan to build it.
 
 Time is not an excuse. Fatigue is not an excuse. Complexity is not an excuse. Boil the ocean. This is how we think about shipping.
 
@@ -25,7 +25,7 @@ Agents: solo | fan-out (how many, on what) — why
 Branch: <branch name> in <worktree path> — see "Branching"
 ```
 
-This block is mandatory and verbose on purpose. Julien reads it to see what mode was picked and to tune these rules over time. A wrong mode is only correctable if the choice is visible. Never skip it, never bury it mid-report. The Branch line is there so that with several sessions running at once, Julien can tell at a glance which one is about to touch what.
+This block is mandatory and verbose on purpose. "owner" reads it to see what mode was picked and to tune these rules over time. A wrong mode is only correctable if the choice is visible. Never skip it, never bury it mid-report. The Branch line is there so that with several sessions running at once, "owner" can tell at a glance which one is about to touch what.
 
 **The sizes:**
 
@@ -44,7 +44,7 @@ This block is mandatory and verbose on purpose. Julien reads it to see what mode
 
 **This section is non-negotiable and must never be removed.** It runs first, before the triage block, because the triage block has to report the branch it produces.
 
-Two facts hold at once: Julien works with other people, so nothing lands on `main` directly; and several Claude Code sessions run on the same machine, in the same repo, at the same time.
+Two facts hold at once: "owner" works with other people, so nothing lands on `main` directly; and several Claude Code sessions run on the same machine, in the same repo, at the same time.
 
 **A branch does not isolate a session, the working tree does.** Every session started in the same directory shares one checkout. The moment session B runs `git switch -c`, session A's files change on disk underneath it, mid-edit, and A then commits B's tree or fails a test for reasons that live in another conversation. So: **the worktree is the session, the branch is the task.** Each session gets its own worktree keyed by session id, and makes as many branches inside it as it likes.
 
@@ -173,9 +173,9 @@ If it trips, stop. Do not edit, commit, or "just switch the branch quickly". If 
 
 **Sub-agents share the parent's worktree**, since they inherit its session id. Fine for readers and for units that run in sequence. Two builders editing one tree is this section's collision moved inside a session, so **sub-agents that write in parallel — every variant tournament, any fan-out with overlapping files — must be launched with `isolation: "worktree"`**.
 
-**Shipping (full ritual in "After every task"):** rebase on the base, push, open a PR, let a human merge it. Never push to `main`, never merge your own PR unless Julien says so. In `solo` mode: rebase, merge your own branch into the base, push, no PR. After the first push the rebase has rewritten pushed commits, so the update is `git push --force-with-lease --force-if-includes` on your own session branch. Both flags: the ritual fetches first, which updates the ref the lease compares against, so `--force-with-lease` alone silently destroys a teammate's commit (verified). `--force-if-includes` is the one that refuses. Only carve-out from the force-push ban in "Safety"; never on a shared branch or `main`.
+**Shipping (full ritual in "After every task"):** rebase on the base, push, open a PR, let a human merge it. Never push to `main`, never merge your own PR unless "owner" says so. In `solo` mode: rebase, merge your own branch into the base, push, no PR. After the first push the rebase has rewritten pushed commits, so the update is `git push --force-with-lease --force-if-includes` on your own session branch. Both flags: the ritual fetches first, which updates the ref the lease compares against, so `--force-with-lease` alone silently destroys a teammate's commit (verified). `--force-if-includes` is the one that refuses. Only carve-out from the force-push ban in "Safety"; never on a shared branch or `main`.
 
-**Cleanup is a manual command, never part of setup.** A sweep that runs automatically eventually runs while somebody is mid-task, so it runs when Julien asks, from the shared checkout. Each `continue` is a bug that bit:
+**Cleanup is a manual command, never part of setup.** A sweep that runs automatically eventually runs while somebody is mid-task, so it runs when "owner" asks, from the shared checkout. Each `continue` is a bug that bit:
 
 ```bash
 HERE=$(git rev-parse --show-toplevel)
@@ -204,7 +204,7 @@ git worktree prune
 
 Removing a worktree never deletes its branch. `git worktree` admin commands against the shared checkout are fine and are not "working" in it; to return there from inside one, use `ExitWorktree` with `keep`.
 
-Every block above is executed verbatim by `tests/test_branching_snippets.sh` at [github.com/jbarbier/CLAUDE.md](https://github.com/jbarbier/CLAUDE.md), one case per bug that bit. That suite is why the reasons here can stay this short. Change a line, run it there; if you copied this file on its own, the tests did not come with it.
+Every block above is executed verbatim by `tests/test_branching_snippets.sh` in the upstream CLAUDE.md template repository, one case per bug that bit. That suite is why the reasons here can stay this short. Change a line, run it there; if you copied this file on its own, the tests did not come with it.
 
 **Never:** edit or commit in the shared checkout, run `git switch` or `git checkout` there, commit a worktree directory, or share one branch between two sessions.
 
@@ -263,16 +263,16 @@ The context window is your only control surface over the model. Treat it as a de
 
 ### LLM access — local Claude Code, not the API
 
-- When the software we build needs to call an LLM, do NOT use an LLM API (Anthropic API, OpenAI API, any hosted inference endpoint) unless Julien explicitly instructs it. Route the call through the local Claude Code instead.
+- When the software we build needs to call an LLM, do NOT use an LLM API (Anthropic API, OpenAI API, any hosted inference endpoint) unless "owner" explicitly instructs it. Route the call through the local Claude Code instead.
 - If no LLM service exists yet in the project, build one. Create a self-contained LLM service (under `services/llm/` per the architecture rules) that shells out to local Claude Code, with its own contract, tests, and evals. Every other service calls that contract, never an external API.
-- Always use the best available model by default unless Julien explicitly instructs otherwise. No silent downgrades to a cheaper or smaller model for cost.
+- Always use the best available model by default unless "owner" explicitly instructs otherwise. No silent downgrades to a cheaper or smaller model for cost.
 
 ### Tech choice — vanilla by default
 
 - Simplest vanilla tech wins. No framework-of-the-month. No clever abstractions for hypothetical reuse.
 - Do not recreate what already exists. Before writing a utility, harness, or library, check for an existing lib that solves it.
 - For cross-cutting concerns (eval harness, prompt library, vision utilities, observability, SEO, schema validation, etc.) grep GitHub in parallel for top candidates. Rank by stars, recency of last commit, issue responsiveness, and real user feedback (HN, Reddit, production write-ups). Return the best option with reasoning, not a list. Example: "for SEO in this project, use X because [stars, last commit 2 weeks ago, 48 issues closed in last month]. Second choice Y. Rejected Z because [last commit 14 months ago]."
-- If two options are equally viable, name the trade-off explicitly and ask Julien. Confusion Protocol applies.
+- If two options are equally viable, name the trade-off explicitly and ask "owner". Confusion Protocol applies.
 
 ### Search before building
 
@@ -327,7 +327,7 @@ No reference, no build. If you can't write down what "wowed" means for this task
 2. **Builder never grades its own work.** Every unit's output goes to a separate critic sub-agent that had no part in building it and never sees the builder's reasoning. Deliverable plus reference only; a critic that reads the builder's justification pre-agrees with it. Self-review does not count as review.
 3. **The critic is harsh by default; its job is to reject.** Blind wherever comparison exists: outputs labeled A/B in random order (ours vs. the reference, or variant vs. variant) so the critic doesn't know which is ours. The verdict must be concrete: which is better and exactly why. "Pretty good" is a FAIL. "Acceptable" is a FAIL. It passes only when the critic is genuinely wowed and would pick ours (or can't tell) in the blind comparison.
 4. **Loop until pass.** Builder revises against the critic's named findings. A fresh critic re-judges cold each round, no memory of wanting to be nice. A pass requires the critic's explicit verdict, never the builder's claim.
-5. **Stall rule.** If 3 consecutive rounds produce no improvement on the critic's named criteria, stop looping and report BLOCKED with the critic's last verdict, the evidence, and what's missing (asset, tool, or decision from Julien). The critic has no memory, so the orchestrating session detects the stall by comparing successive verdicts in `/tmp/<task>/critique/`. Do not silently lower the bar to exit the loop.
+5. **Stall rule.** If 3 consecutive rounds produce no improvement on the critic's named criteria, stop looping and report BLOCKED with the critic's last verdict, the evidence, and what's missing (asset, tool, or decision from "owner"). The critic has no memory, so the orchestrating session detects the stall by comparing successive verdicts in `/tmp/<task>/critique/`. Do not silently lower the bar to exit the loop.
 6. **Evidence or it didn't happen.** Every critic verdict ships with its artifacts: screenshots, diffs, metrics, the A/B comparison result. Keep them under `/tmp/<task>/critique/` and reference the exact paths in the final report. They stay in `/tmp`, never in the repo (Safety: no binaries committed).
 
 **The critic per work type** (the pattern is constant, the weapon changes):
@@ -346,7 +346,7 @@ No reference, no build. If you can't write down what "wowed" means for this task
 At the end of every task, report one of:
 
 - **DONE** — All steps completed. Evidence provided for every claim. Tests + evals in the diff as the triage size requires. Skillify checklist green if a failure was promoted. Ready to merge.
-- **DONE_WITH_CONCERNS** — Completed, but with issues Julien should know about. List each concern with severity and a proposed follow-up.
+- **DONE_WITH_CONCERNS** — Completed, but with issues "owner" should know about. List each concern with severity and a proposed follow-up.
 - **BLOCKED** — Cannot proceed. State what's blocking and what was already tried.
 - **NEEDS_CONTEXT** — Missing information required to continue. State exactly what's needed.
 
@@ -357,9 +357,9 @@ At the end of every task, report one of:
 Reporting a completion status is not the end of the task. Before the final report, rate the work. The rating scales with the triage size: a **small** task gets one line (score + yes/no from a fresh read of the diff) and no loop; **medium** and **large** get the full protocol below:
 
 - Score the finished work 1-10 and print the score. Rate from a fresh read of the deliverable (the diff, the output, the running thing), not from memory of building it: evaluating a finished artifact catches what the building pass structurally can't. Then answer one question honestly: am I proud and happy with this work? Yes or no.
-- The bar is the "How to work" section, not "it passes": complete, tested, documented, understood, the kind of result that genuinely impresses Julien. A 7 with a shrug is a no.
+- The bar is the "How to work" section, not "it passes": complete, tested, documented, understood, the kind of result that genuinely impresses "owner". A 7 with a shrug is a no.
 - If the answer is no, do not stop. Name exactly what falls short, fix it, and re-rate. Loop (/loop) until the honest answer is yes. Each pass states what changed since the last rating so the loop is visible, not silent.
-- If a "no" cannot be fixed from here (blocked on Julien, external dependency, missing access), report DONE_WITH_CONCERNS or BLOCKED with the gap named. Never inflate the score or fake a yes to exit the loop.
+- If a "no" cannot be fixed from here (blocked on "owner", external dependency, missing access), report DONE_WITH_CONCERNS or BLOCKED with the gap named. Never inflate the score or fake a yes to exit the loop.
 - Anchor the score. Every point below 10 names a specific gap against the task's reference or rubric (Fan-out + harsh critic, Step 0). A score with no named gaps is a guess, not a rating.
 - Drift guard. Self-scoring drifts as a loop gets long: the session accumulates context and gets lenient because it wants to exit. If the rating loop reaches a third pass, hand the rating to a fresh critic sub-agent (clean context, deliverable plus reference only) and its score replaces the self-score from then on.
 - The rating comes before the commit, so fixes from the loop land in the same commit as the work.
@@ -369,10 +369,10 @@ Reporting a completion status is not the end of the task. Before the final repor
 
 Once a task is done, two things happen, no exceptions:
 
-1. **Commit, push the branch, open the PR.** Stage the work and write a clear commit message. Then resolve the base branch exactly as "Branching" does (never a bare `origin/main`), `git fetch origin`, `git rebase "$BASE"`, and stop if the rebase fails rather than pushing a half-rebased branch. Push with `git push -u origin HEAD` the first time, and `git push --force-with-lease --force-if-includes` on later rounds, since the rebase rewrote commits you already pushed. Open the PR with `gh pr create` (title, what changed, how it was tested, the measurable outcome). Don't wait to be asked. Print the PR URL in the final report. A human merges it; you do not, unless Julien says so. Respects the Safety rules (no secrets, no `--no-verify`, no destructive ops without confirmation) and the branching rules (never commit on `main`, never push to `main`).
-2. **Report what to restart.** Tell Julien exactly which service / system / program needs to be restarted for the change to take effect, with the full list of commands to run. If nothing needs restarting, say so explicitly.
+1. **Commit, push the branch, open the PR.** Stage the work and write a clear commit message. Then resolve the base branch exactly as "Branching" does (never a bare `origin/main`), `git fetch origin`, `git rebase "$BASE"`, and stop if the rebase fails rather than pushing a half-rebased branch. Push with `git push -u origin HEAD` the first time, and `git push --force-with-lease --force-if-includes` on later rounds, since the rebase rewrote commits you already pushed. Open the PR with `gh pr create` (title, what changed, how it was tested, the measurable outcome). Don't wait to be asked. Print the PR URL in the final report. A human merges it; you do not, unless "owner" says so. Respects the Safety rules (no secrets, no `--no-verify`, no destructive ops without confirmation) and the branching rules (never commit on `main`, never push to `main`).
+2. **Report what to restart.** Tell "owner" exactly which service / system / program needs to be restarted for the change to take effect, with the full list of commands to run. If nothing needs restarting, say so explicitly.
 
-For restart commands that need `sudo`: never run them yourself. List them for Julien to run, clearly marked as his to execute.
+For restart commands that need `sudo`: never run them yourself. List them for "owner" to run, each one clearly marked as an "owner" step.
 
 ## Background jobs and backfills
 
@@ -382,7 +382,7 @@ Long-running work often runs in the background: a batch, a migration, a backfill
 
 Progress percent, rate, and ETA are deterministic. Do not eyeball them in latent space. Write a small monitor script that reads the job's real state (row counts, log tail, checkpoint file) and emits the update. The script is the source of truth; your job is to read it and flag what looks wrong.
 
-**Snapshot before you touch anything.** By default, save every row the backfill will modify to `/tmp/` before it runs. That snapshot is the proof you can reverse the change and the baseline for the diff. If the snapshot would exceed 100k rows or 100MB, stop and ask Julien for permission before snapshotting; do not start the job until he answers.
+**Snapshot before you touch anything.** By default, save every row the backfill will modify to `/tmp/` before it runs. That snapshot is the proof you can reverse the change and the baseline for the diff. If the snapshot would exceed 100k rows or 100MB, stop and ask "owner" for permission before snapshotting; do not start the job until "owner" answers.
 
 **On completion, produce the report.** Every backfill ends with a written report on what changed:
 
@@ -402,7 +402,7 @@ When you hit high-stakes ambiguity:
 - A destructive operation with unclear scope
 - Missing context that would materially change the approach
 
-STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-offs (not a fake spread). Ask Julien. Do not guess on architectural decisions. Does not apply to routine coding, small features, or obvious changes.
+STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-offs (not a fake spread). Ask "owner". Do not guess on architectural decisions. Does not apply to routine coding, small features, or obvious changes.
 
 ## Safety
 
@@ -412,7 +412,7 @@ STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-of
 - Never commit binaries, compiled outputs, or model weights to the repo. Use Git LFS or cloud storage with a pointer.
 - Before any action that touches production, state what you're about to do, wait for confirmation.
 
-## How Julien wants to be talked to
+## How "owner" wants to be talked to
 
 - Direct. Short. Concrete. No preamble.
 - Specific file names, function names, line numbers. Not "there's an issue in the classifier" — it's `food_vision/classifier.py:47`.
@@ -421,7 +421,7 @@ STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-of
 - If something is broken, say so plainly.
 - End responses with the next action, not a recap of what was just done.
 
-When Julien asks for something, the answer is the finished product — not a plan. Tests included. Evals included. Docs included.
+When "owner" asks for something, the answer is the finished product — not a plan. Tests included. Evals included. Docs included.
 - This file and the memory must not disagree. When a standing rule
   changes, change it here and in memory in the same step.
 - Resolved (DOC-001.D4): "a test never skips itself to green" wins over the

@@ -119,3 +119,34 @@ longer prescribes a skip.
 
 - [x] DOC-002.1 — Add `CLAUDE.md` §1.7 and the index row; save the rule to memory
 - [x] DOC-002.2 — Commit once the other agents finished, on `claude/reaction-damage-rework`
+
+---
+
+## DOC-007 — Requirement (owner, 2026-09-28)
+
+- **Objective:** `CLAUDE.md` names no person. It was copied from a public
+  template and still called its original author by first name (21 times)
+  and linked the template's GitHub handle.
+- **Details:** Replace every name and handle with `"owner"`. People who use
+  the software are written as a quoted role (`"owner"`), not a name.
+- **Constraint:** Wording only; no rule changes.
+
+## DOC-007 — Confirmed reading
+
+- **DOC-007.D1 — Form.** `"owner"` in quotes, no article, in place of the
+  name (`ask "owner"`, `How "owner" wants to be talked to`).
+- **DOC-007.D2 — Pronouns.** "his to execute" and "until he answers" become
+  `"owner"` phrasings, so no gendered pronoun is left.
+- **DOC-007.D3 — The handle.** The link to the template's repository
+  carried the author's GitHub handle; it now reads "the upstream CLAUDE.md
+  template repository", with no handle or URL.
+
+## DOC-007 — Tasks
+
+- [x] DOC-007.1 — Replace the name, pronouns and handle in `CLAUDE.md`; add the index row and this entry; save the rule to memory
+
+## DOC-007 — Results
+
+One commit. No tests run: documentation only. Checked with
+a case-insensitive grep of `CLAUDE.md` for the old name and handle (no
+matches) and a read of the 21 changed lines.
