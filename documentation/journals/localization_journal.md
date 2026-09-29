@@ -334,6 +334,9 @@ tools.
   while Spanish has no more of them than English; above it every screen is
   held to the full rule. An entry whose screen fits fails the test, so the
   list goes when that task lands.
+  **Closed 2026-09-29 by UI-016** (`web_ui_scale_journal.md`): the web
+  profile draws the interface at 0.8, every listed screen fits, and
+  `WEB_UNFIT` and its exemption are gone (UI-016.D5).
 - **UI-014.D21 — a summary label is never trimmed** (UI-014.11; replaces
   the trimming half of D19). A label / value row takes, in order: both at
   the row size; the value alone stepped beside the whole label while it

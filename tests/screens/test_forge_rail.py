@@ -218,7 +218,8 @@ class RailLayoutTests(unittest.TestCase):
 
     def test_the_rail_sits_left_of_the_cards_on_both_profiles(self):
         """It is placed relative to the cards, not at a fixed x, so it stays
-        beside them at 1600 and at the 1280 web profile."""
+        beside them on the desktop and under the web profile (1280x720, the
+        interface at 0.8)."""
         from ui.forge_rail import WIDTH
         rows = rows_for([_Weapon("sword", "Sword", levels=2),
                          _Weapon("bow", "Bow", levels=2)], 2, _levels)

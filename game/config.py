@@ -109,7 +109,8 @@ MAX_DT: float = 1.0 / 20.0
 # so the picture is a "closer" view that stays crisp (sprites scale *down* from
 # their large source frames -- no upscale blur). The HUD and feedback overlays
 # are drawn afterwards at full resolution and are unaffected. 1.0 == no zoom.
-# The visible world extent is therefore SCREEN_* / CAMERA_ZOOM.
+# The visible world extent is therefore SCREEN_* / effective_zoom() (the
+# zoom drawn at, CAMERA_ZOOM times the interface scale).
 #
 # Keep `TILE_PX * CAMERA_ZOOM` a whole number of pixels, or the tile grid lands
 # on fractional boundaries and the seams shimmer. At the 64 px tile that means

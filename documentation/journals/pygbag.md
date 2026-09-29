@@ -209,6 +209,16 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
   `systems.camera.Camera` is overridden by an explicit arg in `PlayingState`),
   so the reassignment propagates. `PlayingState.camera.world_span()` verified
   identical `(1066.67, 600.0)` in both profiles.
+* **UI-016 (2026-09-29): the interface at 0.8, the world still at 1.25.**
+  The zoom above later moved to 1.25 (the seam rule, `apply_web_profile`'s
+  docstring). The canvas is confirmed 1280×720: pygbag 0.9.3's default
+  framebuffer (`DEFAULT_WIDTH/HEIGHT` in `pygbag/app.py`), which
+  `dist/web/build.sh` does not override. The interface is laid out for the
+  1600×900 design box, so the web profile now sets `RENDER_SCALE = 720 / 900
+  = 0.8` (the title menu, hero select, Options and end screens ran below the
+  canvas at 1.0) and compensates `CAMERA_ZOOM = 1.25 / 0.8 = 1.5625`, so
+  `config.effective_zoom()` is still exactly 1.25. See
+  `web_ui_scale_journal.md`.
 * **Mixer runs at the browser's rate** (observed 96000 Hz / 2 ch). `BrowserMixer`
   resamples each of the 8 synth buffers 22050 → device rate and up-mixes to
   stereo once at startup (pure-Python loops) — a one-time ~sub-second cost, no

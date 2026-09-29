@@ -13,8 +13,10 @@ The loop is `asyncio`-driven (`Game.run_async`), so one code path serves the
 desktop and web builds. `main.py` is the only entry point; under the emscripten
 runtime (or with `--web` on the desktop) it calls `config.apply_web_profile()` —
 **session-only save** (never reads or writes `save.json`), **60 fps** to match
-the browser compositor, and a **1280×720** render target that keeps the desktop
-field of view while cutting per-frame work ~35%.
+the browser compositor, and a **1280×720** render target (pygbag's canvas)
+that cuts per-frame work ~35%. The interface is drawn at 0.8 there (the
+1600×900 design at 80%) and the world at zoom 1.25, a view ~4% tighter than
+the desktop's (1024×576 world px against 1067×600; UI-016).
 
 Everything else pygbag needs lives in `dist/web/` (`pygbag.ini`, `build.sh`,
 `serve.sh`, and `dist/web/README.md` with the details):
@@ -155,7 +157,7 @@ a **draw-time camera zoom** (`config.CAMERA_ZOOM`, default 1.5): the world is
 drawn straight to the screen with every sprite, tile and shape scaled by the
 zoom, so the picture is "closer" but stays crisp — sprites scale *down* from
 their large source frames, no upscale blur. The visible world extent is
-`SCREEN / CAMERA_ZOOM`. The HUD and damage feedback are drawn afterwards at
+`SCREEN / config.effective_zoom()` (`CAMERA_ZOOM` times the interface scale). The HUD and damage feedback are drawn afterwards at
 full resolution, unscaled, into the centred 16:9 **UI box**
 (`game/display/uibox.py`; on a 21:9 render the world fills the width and the
 interface stays where a 16:9 player sees it). `CAMERA_ZOOM = 1.0` disables the

@@ -98,4 +98,44 @@ Closes UI-014.D20 (`localization_journal.md`).
 - [x] UI-016.1 — journal, index entry
 - [x] UI-016.2 — web profile at scale 0.8, compensated zoom, window scale, test helper, zoom pin
 - [x] UI-016.3 — fit harness under the web profile, `WEB_UNFIT` emptied, web-profile tests moved on
-- [ ] UI-016.4 — screenshots, docs, D20 closed
+- [x] UI-016.4 — screenshots, docs, D20 closed
+
+## Results (2026-09-29)
+
+- **Fit, measured.** Every `WEB_UNFIT` screen (menu, hero select x6,
+  Options x4, Game Over, Victory) draws with no cut, overlap or crossing at
+  1280x720 under the web profile, in English and Spanish; the lowest ink
+  now ends between y 696 and 712. With the old scale-1 behaviour forced
+  back the same scenes run to y 801-890 with 3-5 problems each (critic
+  probe), so the web leg of the fit test is not vacuous. The menu's summary
+  line (the peer session's note: row 620 at scale 1) sits clear under
+  Exit.
+- **1600x900 unchanged:** `test_english_layout.py` and every per-screen
+  test pass untouched; nothing desktop-side reads the new values.
+- **World view unchanged:** `effective_zoom()` is exactly 1.25 on web
+  (`test_camera.py`), 80 px per tile; aim, terrain bake, spawn ring and
+  culling all read `effective_zoom()` (critic grep: no direct
+  `CAMERA_ZOOM` reads outside `config.py`).
+- **Screenshots:** the six web screens at 1280x720 (menu, hero select,
+  Options, Game Over, Victory, HUD) were delivered to the owner; they
+  are kept out of the repo.
+- **Tests run:** `tests/screens`, `tests/display`, `tests/systems`,
+  `tests/flows`, `tests/render`: 1657 passed, 2255 subtests (12 min).
+  The critic ran the full default tier: 4007 passed, 6676 subtests.
+  Regression tests fail with the bug put back (window forcing 1.0;
+  `CAMERA_ZOOM` left at 1.25).
+- **Cold critic:** one pass, PASS, four low findings. Fixed:
+  `test_a_tile_is_a_whole_number_of_pixels` read the snapped
+  `effective_zoom()` and could not fail; it now checks the raw product
+  (a desktop `CAMERA_ZOOM` of 1.7 fails it). The generator that yielded
+  from inside the profile is now a list, so a failure cannot leave the
+  profile applied. Stale "extent is SCREEN / CAMERA_ZOOM" and "keeps the
+  desktop field of view" lines in `config.py`, `FUNCTIONAL_README.md`
+  and `plans/web_plan.md` were corrected.
+- **Open for the owner:** the software cursor on web follows the rule it
+  already follows natively (`UI_CURSOR_SCALE x RENDER_SCALE`,
+  `game/game.py:180`, when the platform does not report its cursor size),
+  so it is now 20% smaller in the browser, like the rest of the
+  interface. That is presentation only and was not decided explicitly.
+  The HUD's pixel-art bars use `scale.int_scale`, which rounds x3 at 0.8
+  to x2, so they are ~67% of their desktop size rather than 80%.

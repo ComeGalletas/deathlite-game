@@ -104,11 +104,14 @@ class ZoomGranularityTests(unittest.TestCase):
     """
 
     def _shipped_zooms(self):
+        """`(profile, CAMERA_ZOOM x RENDER_SCALE, TILE_PX)`, unsnapped:
+        `effective_zoom()` rounds to whole tiles, so it cannot be the check."""
         from game import config
         from tests.web_profile import web_profile
-        yield "desktop", config.effective_zoom(), config.TILE_PX
+        out = [("desktop", config.CAMERA_ZOOM * config.RENDER_SCALE, config.TILE_PX)]
         with web_profile():
-            yield "web", config.effective_zoom(), config.TILE_PX
+            out.append(("web", config.CAMERA_ZOOM * config.RENDER_SCALE, config.TILE_PX))
+        return out
 
     def test_a_tile_is_a_whole_number_of_pixels(self):
         for name, zoom, px in self._shipped_zooms():

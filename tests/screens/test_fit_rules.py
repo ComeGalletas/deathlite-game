@@ -86,7 +86,7 @@ def _cases():
 class SummaryRowTests(unittest.TestCase):
     def test_a_label_is_never_trimmed_or_left_out(self):
         """Every row, both languages, a record marker or none, every column
-        width from the web profile's narrowest to 1600's: the label is drawn
+        width from narrower than any shipped column to 1600's: the label is drawn
         whole, the value whole (or wrapped, its lines rejoining it), all of
         it inside the column, and the row as tall as `_kv_lines` says."""
         step = scale.px(rs.ROW_STEP)
@@ -282,7 +282,8 @@ class SummaryPanelTests(unittest.TestCase):
                 "kill_rows": [("Skitter", 2400)], "new_records": ["kills"]}
 
     def test_the_panel_never_draws_below_the_surface(self):
-        """The end screens place it for 900 rows; on the web profile's 720 it
+        """The end screens place it for 900 rows; on a 720-row surface at
+        scale 1 (the web profile before UI-016, which now draws at 0.8) it
         ends at the surface's edge and says "+n more" instead."""
         def draw(surface):
             rs.RunSummaryPanel(self._stats()).draw(surface, None, 178, 762,
@@ -297,7 +298,8 @@ class SummaryPanelTests(unittest.TestCase):
     def test_a_ribbon_title_sits_on_the_raised_front_of_the_art(self):
         """With the real ribbon art: the title's ink lies over the band's
         raised front, read from the art's alpha, in both languages; whole at the Victory columns' real
-        widths (172 px on the web profile, 284 at 1600), trimmed on the
+        widths (284 at 1600; 172 on the scale-1 web surface before UI-016),
+        trimmed on the
         front below them; a widened ribbon stays within 8 px of its column."""
         game = _game()
         for lang in ("en", "es"):

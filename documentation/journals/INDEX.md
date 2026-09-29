@@ -90,7 +90,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | UI-013 | Run summary weapons table: the level never overlaps the damage | UI | bug | done | [game_over_journal.md](game_over_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | UI-014 | Spanish localization: locale files, `_es` data fields, a Language option | UI, SYS, PRG | feature | done | [localization_journal.md](localization_journal.md) | claude/ui-014-localization | 2026-09-25 |
 | UI-015 | Build pane numbers without float noise; the end banner plays its sprite in every language | UI | bug | done | [localization_journal.md](localization_journal.md) | claude/ui-014-localization | 2026-09-29 |
-| UI-016 | Web build: the interface at scale 0.8 so the 900-row screens fit the 720-row canvas | UI, BLD | bug | in progress | [web_ui_scale_journal.md](web_ui_scale_journal.md) | ComeGalletas/ui-016-web-ui-scale-b5bf589e | 2026-09-29 |
+| UI-016 | Web build: the interface at scale 0.8 so the 900-row screens fit the 720-row canvas | UI, BLD | bug | done | [web_ui_scale_journal.md](web_ui_scale_journal.md) | ComeGalletas/ui-016-web-ui-scale-b5bf589e | 2026-09-29 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |

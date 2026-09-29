@@ -157,6 +157,8 @@ for.
    pixels -- consistent once (3b) is done. Manual aim reads the camera, so
    it is unchanged.
 6. **The web profile** keeps the fixed 1280x720 canvas: `render_scale = 1`.
+   *(Superseded 2026-09-29 by UI-016: the canvas stays 1280x720, drawn at
+   `render_scale = 0.8`; `web_ui_scale_journal.md`.)*
 7. **Backdrops are the whole surface, never the box** (owner, 2026-09-16:
    the Loading screen shows as a black square on a 21:9 render). Today
    `Game._render` fills the surface with `COLOR_BG` and each box state
