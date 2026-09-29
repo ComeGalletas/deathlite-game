@@ -217,7 +217,105 @@ class WorldTests(_Tree):
                                "T::test_seeded": "world"})
 
 
+class CycleTests(_Tree):
+    """Found by the TST-006 critic: a partial answer cached mid-cycle made
+    the result depend on which test was read first."""
+
+    SOURCE = """
+        import unittest
+        from game.game import Game
+        def f():
+            g()
+            Game()
+        def g():
+            f()
+        class A(unittest.TestCase):
+            def test_f(self): f()
+        class B(unittest.TestCase):
+            def test_g(self): g()
+    """
+
+    def test_both_ends_of_a_cycle_see_the_boot(self):
+        self.assertEqual(self.needs(self.SOURCE),
+                         {"A::test_f": "integration", "B::test_g": "integration"})
+
+    def test_whichever_end_is_read_first(self):
+        a, b = "class A(unittest.TestCase):\n    def test_f(self): f()\n", \
+            "class B(unittest.TestCase):\n    def test_g(self): g()\n"
+        source = textwrap.dedent(self.SOURCE)
+        self.assertIn(a + b, source)
+        self.assertEqual(self.needs(source.replace(a + b, b + a)),
+                         {"A::test_f": "integration", "B::test_g": "integration"})
+
+
+class ChildProcessTests(_Tree):
+    """A test that boots a run in a child interpreter (`test_run_determinism.py`)
+    is read through the child's program."""
+
+    def setUp(self):
+        super().setUp()
+        self._write("tools/__init__.py", "")
+        self._write("tools/boots.py", """
+            from game.game import Game
+            def run(): Game()
+            if __name__ == "__main__":
+                run()
+        """)
+        self._write("tools/cut.py", """
+            def main(): return 0
+            if __name__ == "__main__":
+                raise SystemExit(main())
+        """)
+
+    def _needs(self, call, prelude=""):
+        return self.needs(f"""
+            import os
+            import subprocess
+            import sys
+            import unittest
+            {prelude}
+            class T(unittest.TestCase):
+                def test_a(self):
+                    {call}
+        """)["T::test_a"]
+
+    def test_inline_code_that_boots_is_integration(self):
+        self.assertEqual(self._needs(
+            'subprocess.Popen([sys.executable, "-c", CHILD])',
+            prelude='CHILD = ("from tools.boots import run; " f"run({1})")'),
+            "integration")
+
+    def test_a_module_run_with_dash_m_is_followed(self):
+        self.assertEqual(self._needs(
+            'subprocess.run([sys.executable, "-m", "tools.boots"])'), "integration")
+
+    def test_a_script_path_is_followed_and_a_pure_one_is_unit(self):
+        self.assertEqual(self._needs(
+            'subprocess.run([sys.executable, os.path.join("tools", "boots.py")])'),
+            "integration")
+        self.assertEqual(self._needs(
+            'subprocess.run([sys.executable, CUTTER, "--check"])',
+            prelude='CUTTER = os.path.join("tools", "cut.py")'), "unit")
+
+    def test_a_child_it_cannot_read_is_integration(self):
+        self.assertEqual(self._needs(
+            'subprocess.run([sys.executable, "-c", self.code])'), "integration")
+        self.assertEqual(self._needs('subprocess.run(self.argv)'), "integration")
+
+    def test_a_non_python_command_is_unit(self):
+        self.assertEqual(self._needs('subprocess.run(["git", "status"])'), "unit")
+
+
 class CollectionTests(_Tree):
+
+    def test_module_level_test_functions_are_read(self):
+        got = self.needs("""
+            from game.game import Game
+            def test_boots(): Game()
+            def test_pure(): pass
+        """)
+        self.assertEqual(got, {"test_boots": "integration", "test_pure": "unit"})
+
 
     def test_only_testcases_are_collected_and_inherited_tests_count(self):
         got = self.needs("""
@@ -261,6 +359,24 @@ class GroupingTests(_Tree):
             ("unit", "integration"): {
                 "tests/x/test_m.py::Boots": ("Boots.test_b", "game.game.Game",
                                              "Game(")}})
+
+    def test_moving_down_names_only_the_pure_tests_of_a_mixed_class(self):
+        """`--over`: a class whose other tests boot cannot move down whole
+        (the TST-006 critic found `test_window.py::WindowTests` named so)."""
+        self._write("tests/x/test_m.py", """
+            import unittest
+            from game.game import Game
+            class Mixed(unittest.TestCase):
+                def test_boots(self): Game()
+                def test_pure(self): pass
+            class Pure(unittest.TestCase):
+                def test_p(self): pass
+        """)
+        results = list(A.tests(A.Index(self.root), lambda nodeid: "integration"))
+        self.assertEqual(A.grouped(A.over(results), results, whole_classes=False), {
+            ("integration", "unit"): {
+                "tests/x/test_m.py::Mixed::test_pure": (),
+                "tests/x/test_m.py::Pure": ()}})
 
     def test_a_uniform_module_is_named_whole(self):
         grouped = self._grouped(self.SOURCE.replace("def test_p(self): pass",
@@ -312,6 +428,13 @@ class SuiteTests(unittest.TestCase):
             self.assertTrue(mine, path)
             self.assertEqual({(t.tier, t.need.tier) for t in mine},
                              {("integration", "integration")}, path)
+
+    def test_the_child_process_run_is_read_as_integration(self):
+        mine = [t for t in self.results
+                if t.nodeid.startswith("tests/flows/test_run_determinism.py")]
+        self.assertTrue(mine)
+        self.assertEqual({t.need.tier for t in mine}, {"integration"})
+        self.assertIn("child -c", mine[0].need.chain)
 
     def test_this_module_is_unit(self):
         mine = [t for t in self.results

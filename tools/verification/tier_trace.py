@@ -10,11 +10,13 @@ name; it changes no result and fails nothing::
 
     python -m pytest -m unit -p tools.verification.tier_trace
 
-What it cannot see is what a cache hides: the first test that asks
-`tests/worlds.py` for a seed pays the build and is listed, a later one gets
-the cached map and is not; a module-level run cache (`test_buffs.py`) shows on
-its first test only. So a clean trace confirms the audit, it does not replace
-it. Work done at import time is attributed to the module's collection.
+What it cannot see is what a cache hides, or another process does: the first
+test that asks `tests/worlds.py` for a seed pays the build and is listed, a
+later one gets the cached map and is not; a `setUpClass` boot or a module-level
+run cache (`test_buffs.py`) shows on the class's or module's first test only;
+a run in a child interpreter (`test_run_determinism.py`) is not seen at all.
+So a clean trace confirms the audit, it does not replace it. Work done at
+import time is attributed to the module's collection.
 """
 from __future__ import annotations
 

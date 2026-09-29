@@ -24,10 +24,25 @@ body, or the module body and `setUpModule`. It is *under-tiered* when conftest
 gives it less. Over-tiering (a pure test listed in `integration`) only costs
 the fast tier some coverage and is reported separately.
 
-What the reading cannot see: a call through an object it cannot type
-(`game.state_machine.change(...)`, a factory passed in as an argument). Those
-reach the primitives through a constructor that *can* be seen in every test
-this suite has today; `tier_trace.py` is the runtime cross-check for the rest.
+A Python child process (`subprocess.run/Popen/...`) is read too: the code of a
+`-c` argument, the module of `-m`, or the script a path names, when the
+argument is a literal, an f-string, `os.path.join` of literals, or a module
+constant built from those. A child the reader cannot resolve counts as
+`integration`, because a fresh interpreter is never cheap and usually boots.
+
+What the reading cannot see (TST-006 critic pass; none of these occur in the
+suite today, and `tier_trace.py` is the runtime cross-check):
+
+- a call through an object it cannot type: a helper instance's own method
+  (`Harness().boot()`, `self.h.boot()`), `game.state_machine.change(...)`,
+  a factory passed in as an argument;
+- an alias made by assignment (`G = Game`, a class attribute
+  `factory = Game`), `functools.partial(Game)`, `getattr`/`importlib`;
+- a base `setUp` that calls a method only the subclass defines;
+- a boot inside a test decorator;
+- `GameMap(**kwargs)` (read as unseeded);
+- two different imports under one local name in one module (the last one
+  read wins).
 
 From the command line::
 
@@ -102,6 +117,8 @@ class Index:
         self.root = Path(root)
         self._modules: dict = {}
         self._needs: dict = {}
+        self._open: set = set()     # keys being evaluated right now
+        self._hits: list = []       # per open body: open keys it ran into
 
     # -- modules ------------------------------------------------------------
 
@@ -118,7 +135,10 @@ class Index:
 
     def _load(self, name: str, path: Path) -> Module:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        mod = Module(name, path, tree)
+        return self._index(Module(name, path, tree))
+
+    def _index(self, mod: Module) -> Module:
+        name, path, tree = mod.name, mod.path, mod.tree
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 mod.functions[node.name] = node
@@ -126,7 +146,7 @@ class Index:
                 mod.classes[node.name] = node
         # Imports anywhere in the module: tests import inside setUpClass.
         package = name if path.name == "__init__.py" else name.rpartition(".")[0]
-        for node in ast.walk(tree):
+        for node in _statements(tree):
             if isinstance(node, ast.Import):
                 for a in node.names:
                     if a.asname:
@@ -235,11 +255,21 @@ class Index:
 
     def need_of_body(self, mod: Module, nodes, owner=None, key=None) -> Need:
         """The tier the statements `nodes` need; `owner` is the (module, class)
-        they are a method of, for `self.`/`cls.`/`super()` calls."""
+        they are a method of, for `self.`/`cls.`/`super()` calls.
+
+        Recursion: a body that calls back into one still being read gets
+        NOTHING for that call. Its answer is then partial -- it depends on
+        where the cycle was entered -- so it is not cached until every body
+        of the cycle has closed; the outermost one caches the whole answer."""
         if key is not None:
             if key in self._needs:
-                return self._needs[key] or NOTHING    # None: in progress (a cycle)
-            self._needs[key] = None
+                return self._needs[key]
+            if key in self._open:
+                if self._hits:
+                    self._hits[-1].add(key)
+                return NOTHING
+            self._open.add(key)
+        self._hits.append(set())
         need = NOTHING
         for stmt in nodes:
             for node in ast.walk(stmt):
@@ -249,9 +279,25 @@ class Index:
                         break
             if need.tier == "integration":
                 break
+        hits = self._hits.pop()
+        hits.discard(key)
         if key is not None:
+            self._open.discard(key)
+        if hits:                                      # still inside a cycle
+            if self._hits:
+                self._hits[-1] |= hits
+        elif key is not None:
             self._needs[key] = need
         return need
+
+    def module_body(self, modname: str) -> Need:
+        """What importing (or running) a module does: its statements outside
+        any `def` or `class`, which include an `if __name__ == "__main__"`."""
+        mod = self.module(modname)
+        body = [s for s in mod.tree.body
+                if not isinstance(s, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                      ast.ClassDef))]
+        return self.need_of_body(mod, body, key=("body", modname))
 
     def function(self, modname: str, name: str) -> Need:
         mod = self.module(modname)
@@ -279,9 +325,48 @@ class Index:
                 need = need | self.bound(*found).via(f"{found[1]}.{hook}")
         return need
 
+    def _child(self, mod: Module, call: ast.Call) -> Need:
+        """What a `subprocess` child runs: `-c` code, a `-m` module, or a
+        script path; `integration` when it cannot be read."""
+        unread = Need("integration", ("a child process the reader cannot read",))
+        argv = _resolve(mod, call.args[0]) if call.args else None
+        if not isinstance(argv, (ast.List, ast.Tuple)):
+            return unread
+        texts = [_text(mod, a) for a in argv.elts]
+        for flag, value in zip(texts, texts[1:]):
+            if flag == "-c":
+                if value is None:
+                    return unread
+                try:
+                    tree = ast.parse(value)
+                except SyntaxError:
+                    return unread
+                child = self._index(Module(f"{mod.name}.<child>", mod.path, tree))
+                return self.need_of_body(child, tree.body).via("child -c")
+            if flag == "-m":
+                if value is None or self.module(value) is None:
+                    return unread
+                return self.module_body(value).via(f"child -m {value}")
+        for value in texts:
+            if value and value.endswith(".py"):
+                rel = Path(value)
+                if rel.is_absolute() or not (self.root / rel).is_file():
+                    return unread
+                name = ".".join(rel.with_suffix("").parts)
+                if self.module(name) is None:
+                    return unread
+                return self.module_body(name).via(f"child {rel.as_posix()}")
+        if any(t is None for t in texts):
+            return unread
+        return NOTHING                                # not a Python program
+
     def _call(self, mod: Module, call: ast.Call, owner) -> Need:
         func = call.func
-        target = None
+        if _dotted(func) in _SPAWN or (
+                isinstance(func, ast.Name)
+                and mod.imports.get(func.id, (None,))[0] == "subprocess"
+                and func.id in {n.split(".")[1] for n in _SPAWN}):
+            return self._child(mod, call)
         if isinstance(func, ast.Attribute) and owner is not None:
             recv = func.value
             if isinstance(recv, ast.Name) and recv.id in ("self", "cls"):
@@ -317,6 +402,56 @@ class Index:
         return NOTHING
 
 
+def _statements(node):
+    """Every statement under `node`, without descending into expressions --
+    an import is always a statement, and this is a fraction of `ast.walk`."""
+    for name in ("body", "orelse", "finalbody", "handlers", "cases"):
+        for child in getattr(node, name, ()) or ():
+            if isinstance(child, list):              # a match case's body
+                continue
+            yield child
+            yield from _statements(child)
+
+
+_SPAWN = {"subprocess.run", "subprocess.Popen", "subprocess.call",
+          "subprocess.check_call", "subprocess.check_output"}
+
+
+def _resolve(mod: Module, node):
+    """A bare name bound once at module level stands for its value."""
+    seen = set()
+    while isinstance(node, ast.Name) and node.id not in seen:
+        seen.add(node.id)
+        found = [s.value for s in mod.tree.body if isinstance(s, ast.Assign)
+                 and any(isinstance(t, ast.Name) and t.id == node.id
+                         for t in s.targets)]
+        if len(found) != 1:
+            return node
+        node = found[0]
+    return node
+
+
+def _text(mod: Module, node):
+    """The string an argv element is, as far as it can be read: literals,
+    f-strings (a placeholder for each value), `+`, `os.path.join`, module
+    constants. None when it cannot be read."""
+    node = _resolve(mod, node)
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value if isinstance(v, ast.Constant) else "0"
+                       for v in node.values)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _text(mod, node.left), _text(mod, node.right)
+        return None if left is None or right is None else left + right
+    if isinstance(node, ast.Call) and _dotted(node.func) == "os.path.join":
+        parts = [_text(mod, a) for a in node.args]
+        return None if None in parts else "/".join(parts)
+    if _dotted(node) == "sys.executable":
+        return "<python>"
+    return None
+
+
 def _seeded(call: ast.Call) -> bool:
     """Whether a `GameMap(...)` call hands it a seed that is not `None`."""
     args = list(call.args[:1])
@@ -343,8 +478,9 @@ class Test:
 
 
 def tests(index: Index, tier_of, paths=None):
-    """Every collected test method under `index.root/tests`, with the tier it
-    needs and the tier `tier_of(nodeid)` gives it."""
+    """Every collected test under `index.root/tests` -- unittest methods and
+    module-level `test_*` functions, which pytest collects too -- with the
+    tier it needs and the tier `tier_of(nodeid)` gives it."""
     root = index.root
     paths = sorted((root / "tests").rglob("test_*.py")) if paths is None else paths
     for path in paths:
@@ -352,14 +488,15 @@ def tests(index: Index, tier_of, paths=None):
         modname = rel[:-3].replace("/", ".")
         mod = index.module(modname)
         # The module body runs at import; setUpModule before any class.
-        body = [s for s in mod.tree.body
-                if not isinstance(s, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                      ast.ClassDef))]
-        need_mod = index.need_of_body(mod, body, key=("body", modname)) \
-            .via(f"{rel} (module body)")
+        need_mod = index.module_body(modname).via(f"{rel} (module body)")
         for fx in _MODULE_FIXTURES:
             if fx in mod.functions:
                 need_mod = need_mod | index.function(modname, fx).via(fx)
+        for fname in mod.functions:
+            if fname.startswith("test"):
+                need = need_mod | index.function(modname, fname).via(fname)
+                nodeid = f"{rel}::{fname}"
+                yield Test(nodeid, need, tier_of(nodeid))
         for cname in mod.classes:
             if not index.is_testcase(modname, cname):
                 continue
@@ -399,36 +536,52 @@ def over(results):
             and RANK[t.tier] > RANK[t.need.tier]]
 
 
-def grouped(selected, everything) -> dict:
-    """{(tier given, tier needed): {prefix: chain}} for the `selected` tests:
-    the module when *every* test in it (from `everything`) shares the pair,
-    otherwise the class. That is the granularity conftest registers at: a
-    module that mixes pure and booting classes is listed class by class, and
-    a class that mixes them goes whole to the highest tier any test in it
-    needs, rather than method by method."""
+def _split(nodeid: str):
+    """(module path, class or None) of a nodeid."""
+    parts = nodeid.split("::")
+    return parts[0], (parts[1] if len(parts) == 3 else None)
+
+
+def grouped(selected, everything, whole_classes=True) -> dict:
+    """{(tier given, tier needed): {prefix: chain}} for the `selected` tests,
+    at the granularity conftest registers at: the module when *every* test in
+    it (from `everything`) shares the pair, otherwise the class.
+
+    With `whole_classes` (moving tests *up*) a class that mixes pure and
+    booting tests goes whole to the highest tier any test in it needs, not
+    method by method (TST-006.D1). Without it (moving tests *down*, `--over`)
+    a class is named only when every test in it shares the pair; otherwise
+    each test is, since the rest of the class needs the tier it is in."""
     def pairs(ts):
         return {(t.tier, t.need.tier) for t in ts}
 
     by_mod: dict = {}
     for t in everything:
-        path, cls, _name = t.nodeid.split("::")
+        path, cls = _split(t.nodeid)
         by_mod.setdefault(path, {}).setdefault(cls, []).append(t)
     out: dict = {}
     for t in selected:
-        path, cls, _name = t.nodeid.split("::")
+        path, cls = _split(t.nodeid)
         pair = (t.tier, t.need.tier)
-        whole = pairs(t for ts in by_mod[path].values() for t in ts) == {pair}
-        prefix = path if whole else f"{path}::{cls}"
+        if pairs(u for ts in by_mod[path].values() for u in ts) == {pair}:
+            prefix = path
+        elif cls is not None and (whole_classes
+                                  or pairs(by_mod[path][cls]) == {pair}):
+            prefix = f"{path}::{cls}"
+        else:
+            prefix = t.nodeid
         out.setdefault(pair, {}).setdefault(prefix, t.need.chain)
     return out
 
 
-def _report(title: str, selected, everything) -> None:
-    for (given, needs), prefixes in sorted(grouped(selected, everything).items()):
+def _report(title: str, selected, everything, whole_classes=True) -> None:
+    groups = grouped(selected, everything, whole_classes)
+    for (given, needs), prefixes in sorted(groups.items()):
         print(f"{title}: in `{given}`, needs `{needs}` ({len(prefixes)})")
         for prefix, chain in sorted(prefixes.items()):
             print(f"  {prefix}")
-            print(f"      via {' -> '.join(chain)}")
+            print(f"      via {' -> '.join(chain)}" if chain
+                  else "      reaches nothing that boots or generates")
 
 
 def main(argv=None) -> int:
@@ -440,7 +593,7 @@ def main(argv=None) -> int:
     print(f"{len(results)} tests read; {len(bad)} under-tiered")
     _report("UNDER", bad, results)
     if "--over" in argv:
-        _report("OVER", over(results), results)
+        _report("OVER", over(results), results, whole_classes=False)
     return 1 if bad else 0
 
 
