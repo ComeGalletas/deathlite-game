@@ -112,8 +112,8 @@ Inside the movement probe (`walk_parts.py`, same crowd):
 
 - [x] ENT-018.1: This journal; the index row
 - [x] ENT-018.2: Separation drops far candidates on floats first, bit for bit the same
-- [ ] ENT-018.3: The floor index for the collider's lookups, bit for bit the same
-- [ ] ENT-018.4: Re-measure by part; decide on what is left
+- [x] ~~ENT-018.3: The floor index for the collider's lookups~~: built, exact, measured **slower**, reverted (see Results)
+- [x] ENT-018.4: Re-measured by part without wrappers; what is left is spread thin (see Results); the direction is the owner's call
 - [ ] ENT-018.5: Results, fingerprint, suites
 
 ## ENT-018: Results
@@ -140,4 +140,80 @@ Inside the movement probe (`walk_parts.py`, same crowd):
   - a dead neighbour pushing.
 - `tests/entities`: 356 passed. The tier audit passes.
 - Its timing is taken with ENT-018.3's, in ENT-018.4.
+
+### ENT-018.3: the floor index, built and reverted
+
+- **Built.** A per-256 px-square index of the islands and bridges, in
+  layout order, keyed the way each test reads a point (islands floored,
+  bridges truncated like `Rect.collidepoint`, nan and inf handed the whole
+  list). `GameMap` built it on first use. It was exact: 7 tests over the
+  four pinned worlds, every edge and square boundary, a hand-drawn keying
+  layout and the collider's own lookups, and five mutations, all caught.
+  `tests/world`, `playing`, `entities` and `flows` gave 1,209 passed.
+- **Measured slower.** Old against new in one process, no wrappers, on the
+  packed crowd's own probe points (`scratchpad/micro4.py`):
+  - the floor lookups at all 475 probe points: 0.170 → 0.226 ms, **+33 %**;
+  - the inset lookups at all centres: 0.087 → 0.100 ms, **+15 %**.
+- **Why.** Seed 35 has 9 islands and 13 bridges, and the linear scan's
+  failing bounds tests are cheaper than keying a point, a method call and
+  a dictionary lookup.
+  - The plan's reading was wrong. The timing wrappers used for it add
+    about half a microsecond per call. That made a floor lookup of
+    0.36 µs look like 1.2 µs, and the scans look like the cost.
+  - It is the trap RND-008.4 met with cProfile, one level down.
+- **Reverted,** with a revert commit, so the history is kept. What was
+  learned is the rule now used here: a candidate is timed without
+  wrappers, old against new, before it is built.
+
+### ENT-018.4: the enemy update, measured without wrappers
+
+Each part timed in isolation over the whole packed crowd, 95 enemies, one
+frame's worth each (`scratchpad/micro_parts.py`, best of 5):
+
+| Part | Time a frame |
+|---|---|
+| `Enemy.update`, every enemy | **2.31 ms** (24 µs each) |
+| · the behaviour machine | 1.12 ms |
+| · · `Separation` (after ENT-018.2) | 0.29 ms |
+| · · `SeekTarget` | 0.21 ms |
+| · · `AggroSense`, `AvoidObstacles`, `Cooldown`, `MaintainRange`, `Unstick`, `Charge` | 0.23 ms together |
+| · · the machine's own bookkeeping (the rest) | about 0.39 ms |
+| · `GameMap.resolve_movement` | 0.65 ms |
+| · · five floor lookups | 0.24 ms |
+| · · the inset | 0.12 ms |
+| · · the path check | 0.09 ms |
+| · · the obstacles | 0.06 ms |
+| · `Enemy.update`'s own body (vector math, knock decay, a `pow` per enemy) | about 0.5 ms |
+| · status and animation | 0.04 ms |
+| the flow-field lookup (inside `SeekTarget` and others) | 0.23 ms |
+| the neighbour query (inside `Separation`) | 0.11 ms |
+
+- **ENT-018.2's gain,** old against new over every enemy
+  (`micro4.py`): `Separation` 0.618 → 0.469 ms, **−24 %**, about
+  0.15 ms a frame at 113 packed.
+- **What is left is spread thin.** No part is above 0.65 ms. The exact,
+  small changes still open are:
+  - a `pow` computed once per frame instead of once per enemy;
+  - the machine's dictionary bookkeeping;
+  - vectors allocated per step;
+  - the floor rule's scan order.
+  They come to about 0.5 ms at 100 packed, a fifth of the enemy update.
+- **The real-loop question, answered** (`scratchpad/loop_gap.py`, two
+  rounds). RND-008.8 recorded the update at 8.5 ms in the real Windows
+  loop against 5.2 headless, and listed it as follow-up 8. Timed the four
+  ways in one sitting (Windows or dummy driver, drawing between updates
+  or not), there is no consistent difference:
+  - round 1: 8.69 / 8.55 / 8.32 / 8.15 ms;
+  - round 2: 5.75 / 6.50 / 8.29 / 8.06 ms, with Windows the faster.
+  - The gap was the machine's load between sittings, not the loop.
+  - Follow-up 8 in `frame_time_journal.md` is marked accordingly.
+- **The decision is the owner's.** Three directions, with what each buys:
+  1. **Finish ENT-018's exact changes:** about 0.5 ms at 100 packed, each
+     pinned bit for bit, as ENT-018.2 was.
+  2. **Close ENT-018 and turn to the terrain's ground bands:** 3.4 ms of
+     the draw, the largest single item left in the frame.
+  3. **Do less per enemy:** for example, steer a packed on-screen crowd
+     every other frame, as the off-screen LOD already does. This buys
+     most (about 1 ms at 100 packed), but it changes how a crowd moves,
+     so it is a gameplay decision.
 
