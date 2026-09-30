@@ -76,7 +76,7 @@ PRG-004 · AUD-004 · SYS-012 · TST-008 · BLD-004 · DOC-008
 | RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | done | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | RND-007 | The `mark` status drawn as raspberry lock-on brackets, shown with a blessing that reads it | RND, CMB | feature | done | [mark_overlay_journal.md](mark_overlay_journal.md) | claude/rnd-007-mark-overlay | 2026-09-24 |
 | RND-008 | Gameplay frame time: the reviewed performance findings and their todo list (per-frame font builds in the hints, the harness, the elemental draw, bump) | RND, SYS, ENT, CMB | performance | done | [frame_time_journal.md](frame_time_journal.md) | ComeGalletas/rnd-008-frame-time-9ec11fc6 | 2026-09-28 |
-| RND-010 | Web draw, the cheap wins: constant-alpha full-screen overlays and the frozen backdrop under level-up, pause and TAB | RND, UI, BLD | performance | in progress | [web_draw_journal.md](web_draw_journal.md) | ComeGalletas/web-draw-cheap-5be9212c | 2026-09-30 |
+| RND-010 | Web draw, the cheap wins: constant-alpha full-screen overlays and the frozen backdrop under level-up, pause and TAB | RND, UI, BLD | performance | done (PR open; D6/D7 sign-off owed) | [web_draw_journal.md](web_draw_journal.md) | ComeGalletas/web-draw-cheap-5be9212c | 2026-09-30 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |

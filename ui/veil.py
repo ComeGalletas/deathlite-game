@@ -38,6 +38,13 @@ def fill_surface(size, rgb) -> pygame.Surface:
     return surf
 
 
+def clear() -> None:
+    """Drop every cached fill: after a display change the old full-frame
+    sizes are dead weight (a 1440p frame is ~15 MB). `StateMachine.
+    on_display_changed` calls it."""
+    _CACHE.clear()
+
+
 def veil(surface: pygame.Surface, rgb, alpha: float, rect=None) -> None:
     """Blend `rgb` over `surface` (or over `rect` of it) at constant `alpha`
     (0-255, clamped). Nothing is drawn at alpha 0 or over an empty rect."""

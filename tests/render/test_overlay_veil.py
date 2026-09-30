@@ -25,7 +25,9 @@ from game.states.paused_state import PausedState
 from game.states.playing.visual import rendering
 from game.states.run_status_state import RunStatusState
 from ui import veil
+from ui import run_summary
 from ui.level_up import LevelUpPanel
+from ui.run_status import common as rs_common
 
 SIZE = (320, 180)
 
@@ -110,40 +112,54 @@ class FrameStripTests(unittest.TestCase):
 class OverlayParityTests(unittest.TestCase):
     """Every converted overlay against the old per-pixel-alpha result."""
 
-    def _check(self, draw_new, draw_old, exact=False, via_veil=True):
+    def _check(self, draw_new, draw_old, exact=False, via_veil=True, calls=None):
+        """`calls`: the (rgb, alpha) or (rgb, alpha, rect) every veil call
+        must carry. The pixel bound is +-1 (D2), so the colour and alpha
+        are pinned exactly here: a drift of 1 fails."""
         a, b = _noise(), _noise()
         with mock.patch.object(veil, "veil", wraps=veil.veil) as spy:
             draw_new(a)
         if via_veil:
             self.assertTrue(spy.called, "not drawn through the constant-alpha veil")
+        if calls is not None:
+            got = [tuple(tuple(x) if isinstance(x, (tuple, list)) else x
+                         for x in c.args[1:]) for c in spy.call_args_list]
+            want = [tuple(tuple(x) if isinstance(x, (tuple, list)) else x for x in w)
+                    for w in calls]
+            self.assertEqual(got, want)
         draw_old(b)
         worst, changed = _max_diff(a, b)
         self.assertLessEqual(worst, 0 if exact else 1, f"{changed} pixels differ")
         self.assertNotEqual(_max_diff(a, _noise()), (0, 0), "the overlay drew nothing")
 
     def test_level_up_dim(self):
-        self._check(LevelUpPanel.draw_dim, lambda s: _old_fill(s, (8, 6, 16), 200))
+        self._check(LevelUpPanel.draw_dim, lambda s: _old_fill(s, (8, 6, 16), 200),
+                    calls=[((8, 6, 16), 200)])
 
     def test_pause_dim_is_exact(self):
         self._check(lambda s: PausedState.draw_backdrop(None, s),
-                    lambda s: _old_fill(s, (0, 0, 0), 150), exact=True)
+                    lambda s: _old_fill(s, (0, 0, 0), 150), exact=True,
+                    calls=[((0, 0, 0), 150)])
 
     def test_run_status_dim_is_exact(self):
         self._check(lambda s: RunStatusState.draw_backdrop(None, s),
-                    lambda s: _old_fill(s, (0, 0, 0), 150), exact=True)
+                    lambda s: _old_fill(s, (0, 0, 0), 150), exact=True,
+                    calls=[((0, 0, 0), 150)])
 
     def test_end_banner_dim_at_every_step_of_its_fade(self):
         for alpha in (1, 40, 128, 200, 255):
             with self.subTest(alpha=alpha):
                 fake = types.SimpleNamespace(_dim_alpha=lambda a=alpha: a)
                 self._check(lambda s: EndBannerState.draw_backdrop(fake, s),
-                            lambda s: _old_fill(s, (0, 0, 0), alpha), exact=True)
+                            lambda s: _old_fill(s, (0, 0, 0), alpha), exact=True,
+                            calls=[((0, 0, 0), alpha)])
 
     def test_hurt_flash(self):
         for alpha in (6, 60, 120):
             with self.subTest(alpha=alpha):
                 self._check(lambda s: rendering.hurt_flash(s, alpha),
-                            lambda s: _old_fill(s, (200, 30, 30), alpha))
+                            lambda s: _old_fill(s, (200, 30, 30), alpha),
+                            calls=[((200, 30, 30), alpha)])
 
     def test_low_hp_vignette(self):
         def old(s, alpha):
@@ -153,7 +169,9 @@ class OverlayParityTests(unittest.TestCase):
         for alpha in (20, 60, 100):
             with self.subTest(alpha=alpha):
                 self._check(lambda s: rendering.low_hp_vignette(s, alpha),
-                            lambda s: old(s, alpha))
+                            lambda s: old(s, alpha),
+                            calls=[((180, 20, 20), alpha, r)
+                                   for r in veil.frame_strips(SIZE, 24)])
 
     def test_buff_tint(self):
         palette = [(255, 200, 40), (200, 60, 220), (40, 120, 255)]
@@ -185,6 +203,28 @@ class OverlayParityTests(unittest.TestCase):
                 # No alpha channel. `get_flags()` reports SRCALPHA once
                 # `set_alpha` has run, even on an RGB surface, so read the mask.
                 self.assertEqual(self_._tint_cache[1].get_masks()[3], 0)
+
+
+    def test_run_status_panel(self):
+        rect = pygame.Rect(30, 20, 250, 130)
+
+        def old(s):
+            panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+            panel.fill((10, 8, 14, 215))
+            s.blit(panel, rect.topleft)
+            pygame.draw.rect(s, rs_common._RULE, rect, width=1, border_radius=rs_common.S(8))
+        self._check(lambda s: rs_common.draw_panel(s, rect), old,
+                    calls=[((10, 8, 14), 215, rect)])
+
+    def test_run_summary_column_fill_is_exact(self):
+        rect = pygame.Rect(40, 10, 120, 150)
+
+        def old(s):
+            panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+            panel.fill((0, 0, 0, 110))
+            s.blit(panel, rect.topleft)
+        self._check(lambda s: run_summary.draw_column_fill(s, rect), old, exact=True,
+                    calls=[((0, 0, 0), 110, rect)])
 
 
 if __name__ == "__main__":

@@ -335,8 +335,9 @@ the HUD icon, from `data/world/buildings.json` (`palette: [c1, c2, c3]`):
 | Pinball | violet → pink | violet top, pink bottom | `spell_dispel_001` violet — orbs circling the hero, 22 f | a still of one orb |
 | Vampire | crimson → black | red top, dark bottom | `spell_attack_up_001` red — the sword and plus, 18 f | `symbol_attack_up` red |
 
-- **Screen tint**: a full-screen `SRCALPHA` surface with a vertical two-colour
-  gradient, alpha peaking at ~55 (the hurt flash peaks at 120) and fading to
+- **Screen tint**: a full-screen vertical two-colour gradient (an opaque
+  surface faded with `set_alpha` since RND-010, which was an `SRCALPHA`
+  one), alpha peaking at ~55 (the hurt flash peaks at 120) and fading to
   0 over 0.9 s. Drawn where the hurt flash is drawn
   (`visual/rendering.py:130`), before the HUD, so the HUD stays clean.
 - **Hero effect**: the Gigapack strip packed to a horizontal sheet by a

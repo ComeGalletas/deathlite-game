@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from game.display import uibox
+from ui import veil
 
 if TYPE_CHECKING:  # avoid a runtime import cycle game <-> state
     from game.game import Game
@@ -57,7 +58,9 @@ class State:
     # run while it is open (the dev menu) or whose freeze comes and goes
     # (the end banner) leaves it False. The wall-clock animations under the
     # overlay (water foam, animated scenery) stop while it is open (owner,
-    # RND-010.D1). This overlay's own `draw_backdrop` and `draw` still run
+    # RND-010.D1), and the run draws no held input under any overlay
+    # (`playing/visual/live_input.py`, RND-010.D6), so the kept frame matches
+    # a full redraw. This overlay's own `draw_backdrop` and `draw` still run
     # every frame. Anything the overlay changes that the frame below shows
     # calls `StateMachine.invalidate_backdrop()`.
     freeze_backdrop: bool = False
@@ -164,6 +167,11 @@ class StateMachine:
             self._stack.pop().exit()
         self.push(state, **enter_kwargs)
 
+    def is_covered(self, state: State) -> bool:
+        """True when `state` is on the stack with another state above it (an
+        overlay over the run). A state not on the stack is not covered."""
+        return state in self._stack and self._stack[-1] is not state
+
     def invalidate_backdrop(self) -> None:
         """Redraw the frozen states below the overlay on the next frame: for
         a change the overlay makes that the frame below shows (the pause
@@ -204,6 +212,7 @@ class StateMachine:
         """Every state on the stack, bottom first, so the run under a pause
         overlay rebuilds before the overlay redraws over it."""
         self._frozen = None
+        veil.clear()                     # old full-frame fills (RND-010)
         for state in list(self._stack):
             state.on_display_changed()
 

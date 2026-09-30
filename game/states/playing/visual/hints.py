@@ -3,9 +3,10 @@
 
 Blue because these are "press this now" prompts, and blue has the pressed
 frame: each cap sinks while its key is actually held, which is the
-teaching. The block hangs off the hero's **drawn art** -- the sprite
-frame's ink top, the way the key marker hangs off a chest -- its bottom
-`CLEAR_PX` above the helmet, and follows the hero. A finished stage fades
+teaching (not under an overlay: RND-010.D6). The block hangs off the
+hero's **drawn art** -- the sprite frame's ink top, the way the key marker
+hangs off a chest -- its bottom `CLEAR_PX` above the helmet, and follows
+the hero. A finished stage fades
 out over `config.HINT_FADE` before the next appears. Drawn after the world,
 inside the shake offset, before the HUD.
 """
@@ -14,6 +15,7 @@ from __future__ import annotations
 import pygame
 
 from game import config
+from game.states.playing.visual.live_input import run_on_top
 from ui import keycap, scale
 
 CAP = keycap.CAP_PX
@@ -117,8 +119,9 @@ def draw(surface: pygame.Surface, ps) -> pygame.Rect | None:
     if not clusters:
         return None
     items = layout(ps, clusters, top, cx, cache)
-    states = ["pressed" if kind == "cap" and alpha == 255 and hints.held(a) else "raised"
-              for kind, a, _b in items]
+    live = run_on_top(ps)                  # no held input under an overlay (RND-010.D6)
+    states = ["pressed" if kind == "cap" and alpha == 255 and live and hints.held(a)
+              else "raised" for kind, a, _b in items]
     block = extent(ps, items, states)
     if alpha == 255:
         target, dx, dy = surface, 0, 0

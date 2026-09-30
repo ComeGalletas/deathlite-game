@@ -7,7 +7,9 @@ states below are drawn once and that frame is blitted while the overlay is
 on top; the overlay's own dim and panel still draw every frame.
 
 Pinned here: the run is drawn once over many frames; a cached frame is
-byte-identical to a full redraw; every change that could alter the frame
+byte-identical to a full redraw (the run's draw has one side effect, the
+aura shed, which the kept frame deliberately stops: `AuraShedTests`,
+RND-010.D7); every change that could alter the frame
 below (a push or pop, a display change, another target surface, the pause
 menu's key-layout toggle, an explicit invalidation) redraws it; a
 per-pixel-alpha target and the overlays that do not opt in (the dev menu,
@@ -15,6 +17,7 @@ the end banner) are drawn in full every frame; and the overlay itself stays
 live. The renderer's wall clock is pinned so animated water and scenery do
 not differ between frames for reasons of their own.
 """
+import math
 import os
 import random
 import unittest
@@ -25,10 +28,14 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from combat.elements.ids import ElementId
+from game import config
 from game.states.dev_menu_state import DevMenuState
 from game.states.end_banner_state import BANNER, EndBannerState
 from game.states.level_up_state import LevelUpState
 from game.states.paused_state import PausedState
+from game.states.playing.core import interactions
+from game.states.playing.visual import key_marker
 from game.states.run_status_state import RunStatusState
 from progression.blessings.offer import roll_offering
 from tests.flows import test_lod as L
@@ -182,6 +189,26 @@ class FrozenBackdropTests(unittest.TestCase):
         self.assertEqual(spy.call_count, 1, "the run was not redrawn")
         self.assertNotEqual(before, after, "the new selection reached the screen")
 
+    # --- held input (RND-010.D6) --------------------------------------------
+    def test_a_held_hint_key_is_not_kept_pressed_under_the_overlay(self):
+        """The opening hints draw a held key pressed. Under an overlay the
+        run is frozen: a key held on the frame the overlay opened must not
+        stay pressed in the kept frame (critic pass, RND-010.4)."""
+        self.assertTrue(self.ps.hints.visible, "the opening hints must be on screen here")
+        with mock.patch.object(self.ps.hints, "held", return_value=True):
+            self.sm.draw(self.screen)
+            held = _frame(self.screen)
+        self.sm.draw(self.screen)
+        self.assertNotEqual(held, _frame(self.screen), "with the run on top a held key shows")
+        self._push("level_up")
+        with mock.patch.object(self.ps.hints, "held", return_value=True):
+            self.sm.draw(self.screen)                      # the frame that is kept
+        self.sm.draw(self.screen)
+        kept = _frame(self.screen)
+        self.sm.invalidate_backdrop()
+        self.sm.draw(self.screen)
+        self.assertEqual(kept, _frame(self.screen))
+
     def test_the_level_up_selection_reaches_the_screen(self):
         lu = self._push("level_up")
         self.sm.draw(self.screen)
@@ -189,6 +216,84 @@ class FrozenBackdropTests(unittest.TestCase):
         lu.selected = (lu.selected + 1) % max(1, len(lu.choices))
         self.sm.draw(self.screen)
         self.assertNotEqual(before, _frame(self.screen))
+
+
+class HeldInteractTests(unittest.TestCase):
+    """The E keycap over a location draws pressed while E is held. Opening
+    the location with E pushes an overlay while E is still down; the kept
+    frame must not carry the pressed cap (critic pass, RND-010.4). Its own
+    run: the hero is moved onto a location."""
+
+    def test_the_e_cap_is_not_kept_pressed_after_opening_a_location(self):
+        ps = L._run()
+        game, sm, screen = ps.game, ps.game.state_machine, ps.game.screen
+        ps.game_map.renderer.clock = lambda: 3.0
+        ps.hints.dismiss()
+        usable = [o for o in ps.interactables if interactions.usable(o)]
+        self.assertTrue(usable, "seed 35 has a usable location")
+        press = pygame.event.Event(pygame.KEYDOWN, key=config.KEY_INTERACT,
+                                   mod=0, unicode="e", scancode=0)
+        for target in usable:
+            for _ in range(30):
+                ps.player.pos.update(target.pos)
+                sm.update(1 / 60)
+            with mock.patch.object(key_marker, "interact_held", lambda: True):
+                sm.draw(screen)
+                held = _frame(screen)
+            with mock.patch.object(key_marker, "interact_held", lambda: False):
+                sm.draw(screen)
+                raised = _frame(screen)
+            if held == raised:
+                continue                                   # no cap drawn here
+            sm.handle_event(press)
+            if sm.current is not ps:
+                break
+        self.assertIsNot(sm.current, ps, "E opened a location")
+        self.assertTrue(sm.current.freeze_backdrop)
+        with mock.patch.object(key_marker, "interact_held", lambda: True):
+            sm.draw(screen)                                # E still down: this is kept
+        with mock.patch.object(key_marker, "interact_held", lambda: False):
+            sm.draw(screen)
+            kept = _frame(screen)
+            sm.invalidate_backdrop()
+            sm.draw(screen)
+            full = _frame(screen)
+        self.assertEqual(kept, full)
+
+
+class AuraShedTests(unittest.TestCase):
+    """The run's draw sheds aura particles (`elements/layers.py` `_shed`):
+    each draw of an aura'd body rolls `run.rng` and may add a particle. The
+    old per-frame redraw under a frozen overlay therefore piled particles up
+    and used up the run's random stream for as long as the game was paused.
+    With the kept frame the run is drawn once (RND-010.D7): nothing piles up,
+    the stream is untouched, and the frame holds still (critic pass 2)."""
+
+    def test_nothing_piles_up_under_the_pause(self):
+        ps = L._run()
+        game, sm, screen = ps.game, ps.game.state_machine, ps.game.screen
+        ps.game_map.renderer.clock = lambda: 3.0
+        run, now = ps.run, ps.run.stats["time"]
+        for i in range(8):
+            ang = i * math.tau / 8
+            e = ps.spawn.spawn_enemy("skull", at=ps.player.pos + pygame.Vector2(
+                140 * math.cos(ang), 140 * math.sin(ang)))
+            self.assertIsNotNone(e)
+            e.elemental.set_aura(ElementId.FIRE, now, 1e6)
+        sm.push(PausedState(game))
+        sm.draw(screen)                                    # the run, drawn once
+        kept, particles, rng = _frame(screen), len(run.particles), run.rng.getstate()
+        for _ in range(60):
+            sm.draw(screen)
+        self.assertEqual(len(run.particles), particles, "no aura particles piled up")
+        self.assertEqual(run.rng.getstate(), rng, "the run's random stream is untouched")
+        self.assertEqual(_frame(screen), kept)
+        # The control: redrawing the run every frame, as before RND-010,
+        # does pile them up -- which is what the kept frame stopped.
+        for _ in range(60):
+            sm.invalidate_backdrop()
+            sm.draw(screen)
+        self.assertGreater(len(run.particles), particles)
 
 
 if __name__ == "__main__":

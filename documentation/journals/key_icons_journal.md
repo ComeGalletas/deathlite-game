@@ -97,6 +97,8 @@ Decisions the request left open, taken here (say if you want them changed):
 2. **Pressed feedback** — the cap shows its pressed frame while
    `KEY_INTERACT` is physically held (`pygame.key.get_pressed()`), which is
    the same "baked press" the menu buttons use. No timer, no animation.
+   (Since RND-010.D6, 2026-09-30: not while another state covers the run,
+   so a frozen overlay's kept frame never holds a pressed cap.)
 3. **Size** — the cap is drawn at **32 design px** (`scale.px(32)`): 64 → 32
    is an exact ×0.5 nearest-neighbour step so the pixel grid stays clean, and
    32 px sits well beside the 20 px prompt font. The label is Fredoka at
