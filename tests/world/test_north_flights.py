@@ -26,6 +26,7 @@ import pygame
 from game import config
 from tests import worlds as W
 from world.gen.height.graph import walk_links
+from world.gen.spawnpoints import body_radii  # the large body the world is certified for (ENT-021)
 from world.layout import GROUND, VSTAIR
 from world.nav.field import NavField, _INF
 from world.rules.steps import can_cross, can_step
@@ -147,7 +148,7 @@ class GeneratedTests(unittest.TestCase):
             gm = W.game_map(seed)
             layout, ix = gm.layout, gm._levels
             nf = NavField(layout, layout.obstacles)
-            for cls, clearance in (("small", 16.0), ("large", 22.0)):
+            for cls, clearance in (("small", 16.0), ("large", body_radii()[1])):
                 ff = nf.fields[cls]
                 checked = 0
                 for room, (c, r), _cell in _north_flights(layout):

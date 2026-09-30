@@ -57,6 +57,8 @@ WORLD = (
     "tests/playing/test_projectile_elevation.py",
     # TST-006.2: reads the shared worlds; the module's boats boot a run.
     "tests/entities/test_fish_huts.py::PlacementTests",
+    # ENT-021: the 20 px gap routing, on a pinned world's shared nav field.
+    "tests/entities/ai/test_melee_enemies.py::ColliderRoutingTests",
 )
 
 # Modules that boot a real `Game` and drive its states -- the menu into a run,
@@ -146,6 +148,9 @@ INTEGRATION = (
     "tests/playing/test_frame_fonts.py",
     # RND-008.4: the harness's packed, primed fight; the cache checks stay unit.
     "tests/render/test_elemental_draw_cost.py::TerraceSortTests",
+    # RND-011: the draw and the update-time shed in a booted run; the fake
+    # crowds' rate and budget checks stay unit.
+    "tests/render/test_aura_shed.py::BootedRunTests",
     # RND-008.5: seed 35's fight as it plays; the random crowds stay unit.
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.

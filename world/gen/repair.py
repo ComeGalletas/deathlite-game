@@ -42,14 +42,18 @@ from __future__ import annotations
 from array import array
 from collections import deque
 
+from world.gen.tuning import _WORLD_BODY_FLOOR
 from world.nav.field import _NAV_CLASSES
 from world.nav.lattice import NAV_DIRS, NavGrid
 
 
 def _widest_class():
-    """`(cell px, body radius)` of the navigation class with the largest body."""
+    """`(cell px, body radius)` of the navigation class with the largest body.
+    The radius is never below `_WORLD_BODY_FLOOR` (ENT-021): the class's
+    clearance can drop for routing without the repair keeping obstacles
+    that seal off the bodies wider than it."""
     _name, cell, _ceiling, clearance = max(_NAV_CLASSES, key=lambda c: c[3])
-    return int(cell), float(clearance)
+    return int(cell), max(float(clearance), _WORLD_BODY_FLOOR)
 
 
 # What a precious obstacle costs the repair's Dijkstra against an ordinary

@@ -351,10 +351,20 @@ class FlowField:
 # the small common enemies precise while the big rare ones (tank/elite/summoner/
 # brute) get a coarser field they can actually fit through. See the journal's
 # reevaluation trigger: collapse to one 32 px grid if the two ever disagree in a
-# way that misbehaves.
+# way that misbehaves. The large clearance is the radius of the class's common
+# bodies, the Ravager and Grudge (20 each, ENT-021; it was 22, the Ravager's
+# old radius), so the field routes them through every gap they fit. Wider
+# large walkers (the turtle, 24; the Tusked Lance boss, 40) were already wider
+# than the clearance at 22 and lean on the corridor leniency and the movement
+# escape. At 20 the lattice sends the turtle at a too-tight cell about twice
+# as often, but a kinematic check showed no loss in arrivals (ENT-021 in
+# journals/enemy_ai_journal.md). World generation
+# reads these classes too (the unseal repair, the large spawn points) but
+# floors the body at `world.gen.tuning._WORLD_BODY_FLOOR` (22), so lowering
+# a clearance here re-routes the enemies without reshaping the world.
 _NAV_CLASSES = (
     ("small", 32, 16.0, 16.0),
-    ("large", 48, 1.0e9, 22.0),
+    ("large", 48, 1.0e9, 20.0),
 )
 
 

@@ -7,10 +7,11 @@ Three changes, each pinned against the path it replaced:
   view and the aura motes onto their terraces before the banded passes,
   where each pass used to test every body and mote against its own
   terrace. Pinned: each terrace's share is exactly, and in the same order,
-  what its own pass would pick; the auras shed (which draws on the
-  gameplay RNG) in the same body order; a whole frame is pixel-identical
-  with and without the sort. The fight is seed 35's harness crowd, packed
-  and primed, which stands on three terraces.
+  what its own pass would pick; a whole frame is pixel-identical with and
+  without the sort; and, since RND-011 moved the aura's shed into the
+  update, the world draw leaves the run's random streams and particle
+  pool as it found them, sorted or not. The fight is seed 35's harness
+  crowd, packed and primed, which stands on three terraces.
 * **The burn flame scaled once** per frame and size, not every frame:
   the same pixels, kept per source surface, not served for another.
 * **Plain damage numbers rendered once** per font, text and colour: the
@@ -51,7 +52,7 @@ class TerraceSortTests(unittest.TestCase):
         S.run(ps, 20)
         S.cascade_setup(ps)                     # every body primed, packed round the hero
         cls._add_the_edge_cases(ps)
-        S.run(ps, 10, render=True)              # statuses, and the motes auras shed when drawn
+        S.run(ps, 10, render=True)              # statuses, and the motes the auras shed
         cls.fight = ps.run
         cls.bands = element_fx.bands(ps.run)
         cls.levels = sorted(set(cls.bands.bodies) | set(cls.bands.motes))
@@ -102,8 +103,8 @@ class TerraceSortTests(unittest.TestCase):
         # The oracle is the filter each pass ran before RND-008.4, written
         # out here: in view with a 140 px pad, on the pass's terrace. One
         # body is moved out of view so the view half has something to drop
-        # (an aura off screen draws nothing, but it would still shed, and
-        # the shed draws on the gameplay RNG).
+        # (an aura off screen draws nothing; the shed, in the update since
+        # RND-011, uses the same filter and sheds nothing for it either).
         fight = self.fight
         body = fight.enemies[0]
         home = body.pos.copy()
@@ -135,24 +136,25 @@ class TerraceSortTests(unittest.TestCase):
                           if not transient.off_band(self.fight, level, p.pos)]
                 self.assertEqual(self.bands.motes.get(level, []), picked)
 
-    def _sheds(self, sorted_: bool):
-        """The bodies whose aura shed, in order, over one world pass. The
-        shed is stubbed, so the pass moves no RNG and adds no mote."""
-        order = []
-        real = element_fx.bands if sorted_ else (lambda run: None)
-        with mock.patch.object(layers, "_shed",
-                               lambda run, body, *a: order.append(id(body))), \
-                mock.patch.object(element_fx, "bands", real):
-            element_fx.begin_frame(self.fight)
-            self.ps._draw_world(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
-        return order
-
-    def test_the_auras_shed_in_the_same_body_order(self):
-        # `_shed` draws on `run.rng`, the gameplay RNG: another order would
-        # be another game.
-        with_sort, without = self._sheds(True), self._sheds(False)
-        self.assertTrue(with_sort)
-        self.assertEqual(with_sort, without)
+    def test_the_world_draw_leaves_the_run_as_it_found_it(self):
+        # Before RND-011 each drawn aura rolled `run.rng`, so the order the
+        # sort visited bodies in was a gameplay fact. The draw rolls
+        # nothing now, sorted or not: both streams and the pool hold still.
+        fight = self.fight
+        vis = fight.element_visuals
+        for sorted_ in (True, False):
+            with self.subTest(sorted=sorted_):
+                real = element_fx.bands if sorted_ else (lambda run: None)
+                rng, own = fight.rng.getstate(), vis.rng.getstate()
+                motes = len(fight.particles)
+                with mock.patch.object(element_fx, "bands", real):
+                    element_fx.begin_frame(fight)
+                    self.ps._draw_world(pygame.Surface(
+                        (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
+                self.assertGreater(vis.auras_drawn, 0, "no aura was drawn")
+                self.assertEqual(fight.rng.getstate(), rng)
+                self.assertEqual(vis.rng.getstate(), own)
+                self.assertEqual(len(fight.particles), motes)
 
     def test_the_burn_mark_scales_its_flame_once(self):
         visuals = self.fight.element_visuals.profiles
@@ -178,8 +180,7 @@ class TerraceSortTests(unittest.TestCase):
     def test_a_frame_sorts_its_bodies_once_not_once_per_terrace(self):
         # The saving itself: the passes take their share of the sort and
         # never filter the whole field again for their own terrace.
-        with mock.patch.object(layers, "in_band", wraps=layers.in_band) as m, \
-                mock.patch.object(layers, "_shed", lambda *a: None):
+        with mock.patch.object(layers, "in_band", wraps=layers.in_band) as m:
             element_fx.begin_frame(self.fight)
             self.ps._draw_world(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
         self.assertEqual([c.args[1] for c in m.call_args_list], [None])
@@ -190,8 +191,9 @@ class TerraceSortTests(unittest.TestCase):
         def frame(sorted_):
             real = element_fx.bands if sorted_ else (lambda run: None)
             s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-            with mock.patch.object(layers, "_shed", lambda *a: None), \
-                    mock.patch.object(element_fx, "bands", real):
+            # No stub needed since RND-011: the draw sheds nothing, so the
+            # three frames differ only if the sort changes the picture.
+            with mock.patch.object(element_fx, "bands", real):
                 ps.draw(s)
             return _pixels(s)
 

@@ -76,7 +76,7 @@
                    "hazard_tick": null, "hazard_sprite": null}
     },
     "path_chase_attack": {
-      "_comment": "The melee poke. The wind-up and swing defaults are 0.15 x 1.25 and 0.35 x 1.25 -- CB-4 stretched them so the player can read the telegraph and step out (combat_balance_journal.md); an enemy's own values are absolute. The trigger is `radius + PLAYER_RADIUS + attack_reach_pad` unless the enemy names an `attack_range`.",
+      "_comment": "The melee poke. The wind-up and swing defaults are 0.15 x 1.25 and 0.35 x 1.25 -- CB-4 stretched them so the player can read the telegraph and step out (combat_balance_journal.md); an enemy's own values are absolute. The trigger is `r + PLAYER_RADIUS + attack_reach_pad` unless the enemy names an `attack_range`; the `poke` hitbox is `r / 2` at `r` out. `r` is the enemy's `attack_radius` if it names one, else its collider `radius` (ENT-020: the Ravager's body shrank, its swing did not).",
       "shape": "telegraph_cycle", "chase": "pursuit", "trigger": "melee_reach",
       "timings": {"telegraph": "attack_telegraph", "active": "attack_active",
                   "recover": "attack_recover", "cooldown": "attack_cooldown"},

@@ -222,7 +222,7 @@ class PlayingState(State):
         # the per-enemy-type profiles, resolved once here because the data
         # does not change mid-run.
         run.elements = build_resolver(run)
-        run.element_visuals = ElementVisuals(run.content)
+        run.element_visuals = ElementVisuals(run.content, seed=run.seed)
 
         self.hud = HUD()
         self._banner_font = fonts.heading(40)
@@ -477,6 +477,10 @@ class PlayingState(State):
         self.fx.update_trail_fx(dt)
         self.fx.update_spawn_fx(dt)
         run.particles.update(dt)
+        # The aura's shed, after the particles age so a mote is drawn where
+        # it was born: in the update, at a rate per second, on its own
+        # random stream -- never in the draw (RND-011).
+        element_fx.shed.update(run, dt)
         run.damage_numbers.update(dt)
         run.shake.update(dt)
         self.fx.update_explosions(dt)
@@ -576,13 +580,14 @@ class PlayingState(State):
         try:
             # The elemental state of the field is painted terrace by terrace
             # inside `_draw_world`, under the bodies it belongs to; this
-            # resets the per-frame budget and counter before those passes
-            # start (M10 rule 3).
+            # resets the per-frame aura counter before those passes start
+            # (M10 rule 3).
             element_fx.begin_frame(run)
             self._draw_world(surface)
             self._draw_hostile_projectiles(surface)     # enemy shots stay on top (danger readability)
             # Only the event particles: the aura's shed is `under` and was
-            # already painted with its own terrace inside `_draw_world`.
+            # already painted with its own terrace inside `_draw_world`
+            # (it is shed in the update, RND-011; the draw only paints it).
             run.particles.draw(surface, run.camera, under=False)
             run.damage_numbers.draw(surface, run.camera)
             element_fx.draw_reactions(surface, run)     # over everything, and brief

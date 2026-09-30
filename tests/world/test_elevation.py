@@ -21,6 +21,7 @@ import pygame
 from game import config
 from world.rules.steps import can_cross, can_step
 from world.gen.height.graph import reachable, walk_links
+from world.gen.spawnpoints import body_radii  # the large body the world is certified for (ENT-021)
 from world.layout import (GROUND, CLIFF, VSTAIR, EWSTAIR,
                           WALKABLE_KINDS)
 from tests import worlds
@@ -763,7 +764,7 @@ class ScatterTests(unittest.TestCase):
         for seed in SEEDS:
             layout, _gm, ix = _world(seed)
             nf = NavField(layout, layout.obstacles)
-            for cls, clearance in (("small", 16.0), ("large", 22.0)):
+            for cls, clearance in (("small", 16.0), ("large", body_radii()[1])):
                 ff = nf.fields[cls]
                 checked = 0
                 for room in layout.rooms:

@@ -15,8 +15,9 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-012 · UI-019 ·
-PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-004 · DOC-008
+**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-018 ·
+PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
+(RND-010 and RND-012 are taken on branches not yet merged here.)
 
 ## Requirements
 
@@ -51,6 +52,8 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-004 · DOC-008
 | ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | ENT-018 | The enemies' own update made cheaper, bit for bit the same (crowding push, floor lookups) | ENT, WLD | performance | done | [enemy_update_journal.md](enemy_update_journal.md) | ComeGalletas/ent-018-enemy-update-9ec11fc6 | 2026-09-29 |
 | ENT-019 | The crowd bump shoves a fast display's frames at the tuned rate a second; the 62 fps cap and every slower frame bit for bit as before | ENT, SYS | bug | done | [bump_frame_rate_journal.md](bump_frame_rate_journal.md) | ComeGalletas/ent-019-bump-frame-rate-417b14b3 | 2026-09-30 |
+| ENT-020 | Ravager and Grudge colliders 30 % smaller to fit tighter ground; sprites and the Ravager's reach unchanged | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/bear-troll-collision-rings-0e37b7 | 2026-09-30 |
+| ENT-021 | Ravager and Grudge colliders a fixed 20 px, large nav clearance 22 -> 20 so the field routes them through every gap they fit | ENT, WLD | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/bear-troll-collision-rings-0e37b7 | 2026-09-30 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
@@ -77,6 +80,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-004 · DOC-008
 | RND-007 | The `mark` status drawn as raspberry lock-on brackets, shown with a blessing that reads it | RND, CMB | feature | done | [mark_overlay_journal.md](mark_overlay_journal.md) | claude/rnd-007-mark-overlay | 2026-09-24 |
 | RND-008 | Gameplay frame time: the reviewed performance findings and their todo list (per-frame font builds in the hints, the harness, the elemental draw, bump) | RND, SYS, ENT, CMB | performance | done | [frame_time_journal.md](frame_time_journal.md) | ComeGalletas/rnd-008-frame-time-9ec11fc6 | 2026-09-28 |
 | RND-009 | The terrain's ground bands: investigated, at the alpha blitter's floor, no exact speed-up; no code change | RND | performance | done | [ground_bands_journal.md](ground_bands_journal.md) | ComeGalletas/rnd-009-ground-bands-9ec11fc6 | 2026-09-29 |
+| RND-011 | The aura shed moves from the draw to the update: its own RNG, a chance of `rate * dt` per step, the budget scaled to the step | RND, CMB | bug | done | [aura_shed_journal.md](aura_shed_journal.md) | ComeGalletas/aura-shed-update-a10d79ed | 2026-09-30 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
