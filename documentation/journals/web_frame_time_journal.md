@@ -533,4 +533,6 @@ instead of per-pixel alpha for the flat overlays, and a cached frozen
 backdrop behind the level-up and pause screens, are the cheap ones; the
 terrain and scenery need the renderer work of review item 5 (fewer, larger,
 opaque-where-possible blits). Resolution stays out of it (owner,
-2026-09-28). That is a new requirement, not BLD-003.
+2026-09-28). That is a new requirement, not BLD-003. The cheap ones were done as RND-012
+(`web_draw_journal.md`): the level-up screen went from 19-20 to 172-175 fps
+in Chrome.

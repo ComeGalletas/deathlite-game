@@ -46,7 +46,7 @@ import pygame
 from game import config, fonts, locale
 from game.state import State
 from systems.animation import Animator
-from ui import scale
+from ui import scale, veil
 
 WAIT, BANNER, HOLD, DONE = "wait", "banner", "hold", "done"
 
@@ -74,7 +74,6 @@ class EndBannerState(State):
         self._on_done: Callable[[], None] | None = None
         self._anim: Animator | None = None
         self._font = None
-        self._dim: pygame.Surface | None = None
 
     # --- lifecycle ---------------------------------------------------
     def enter(self, *, victory: bool = False, on_done: Callable[[], None] | None = None,
@@ -90,7 +89,6 @@ class EndBannerState(State):
 
     def on_display_changed(self) -> None:
         self._font = None
-        self._dim = None
 
     # --- timing ------------------------------------------------------
     @property
@@ -151,10 +149,7 @@ class EndBannerState(State):
         alpha = self._dim_alpha()
         if alpha <= 0:
             return
-        if self._dim is None or self._dim.get_size() != surface.get_size():
-            self._dim = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        self._dim.fill((0, 0, 0, alpha))
-        surface.blit(self._dim, (0, 0))
+        veil.veil(surface, (0, 0, 0), alpha)     # constant alpha (RND-012)
 
     def draw(self, surface: pygame.Surface) -> None:
         if self.phase != BANNER:
