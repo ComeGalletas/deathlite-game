@@ -61,8 +61,9 @@
   up`) turns false with this change. Whichever of RND-012 and RND-011
   lands second updates it as written under *For RND-012* below.
 - **RND-011.D5 — no shed under the end banner** (builder, within the
-  banner's own rule). `run_end.ending_sequence` stands in for the update
-  while the end banner waits, and its contract is "no clock, only what is
+  banner's own rule; confirmed by the owner 2026-09-30).
+  `run_end.ending_sequence` stands in for the update while the end banner
+  waits, and its contract is "no clock, only what is
   already in flight plays out": it ages the particles but births none. The
   shed now lives in the update, so a primed body stops shedding for the
   banner's wait. Before, the draw kept shedding there at the draw rate.
@@ -109,6 +110,7 @@ changes only the shed.
 - [x] RND-011.2 — The shed in the update, on its own RNG, budget scaled to the step (`e9d24cf`)
 - [x] RND-011.3 — Docs, critic pass, done
 - [x] RND-011.4 — IDs after the rebase: the web-draw work is RND-012 (renamed from RND-010, which PR #55 took); index next-free RND-013
+- [x] RND-011.5 — D5 confirmed by the owner: no shed under the end banner
 
 ## RND-011: Results
 
