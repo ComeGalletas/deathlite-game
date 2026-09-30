@@ -202,8 +202,8 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
 
 * **Frame cap 60.** The page composites at ~60 Hz; `FPS = 120` just spends WASM
   budget on frames that are never presented. *Superseded in the browser by
-  BLD-003 (below): the page's refresh paces the loop there (per pygbag's
-  `aio.run` comment; not measured), and a page
+  BLD-003 (below): the page's refresh paces the loop there (measured in
+  Chrome, BLD-003.6), and a page
   refreshes at the display's rate, which is not always 60 Hz; the cap stays
   for `--web` on the desktop. The desktop's own `FPS` is 62 now, not 120.*
 * **Render target 1280×720 @ `CAMERA_ZOOM 1.2`.** That is the pygbag canvas
@@ -243,9 +243,11 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
   size, AI fidelity, and, on a display faster than 60 Hz in a light frame,
   whatever the game does per step rather than per unit of game time (wakes,
   fill slices, reaction budget and the bump impulse among what is known;
-  not an exhaustive audit), which host pacing would run more times a second
-  if the page's refresh paces the loop (not measured; BLD-003.D4). See
-  `web_frame_time_journal.md`.
+  not an exhaustive audit), which host pacing runs more times a second
+  (BLD-003.D4; the refresh pacing itself was measured in Chrome,
+  BLD-003.6). Chrome, 2026-09-30: a run draws at 22-26 fps, update 4 ms and
+  render 32-43 ms, per-pixel-alpha blits the cost (a full-screen one is
+  8.3 ms). See `web_frame_time_journal.md`.
 * **Mixer runs at the browser's rate** (observed 96000 Hz / 2 ch). `BrowserMixer`
   resamples each of the 8 synth buffers 22050 → device rate and up-mixes to
   stereo once at startup (pure-Python loops) — a one-time ~sub-second cost, no

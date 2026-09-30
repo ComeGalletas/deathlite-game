@@ -23,10 +23,20 @@ packs the folder that contains the entry, so it has to stay at the repo root.
 file, the browser's own crowd (the spawn master stops spawning at 100 live
 enemies against the desktop's 250, bar dev-menu and dummy spawns; waking
 enemies can still push past it, as on the desktop), and frames paced by the
-page's `requestAnimationFrame`
-rather than a 60 fps cap, per a comment in pygbag's `aio.run`; not yet
-measured in a browser). The numbers and why are in
+page's `requestAnimationFrame` rather than a 60 fps cap, measured in
+Chrome). The numbers and why are in
 `../../documentation/journals/web_frame_time_journal.md` (BLD-003).
+
+**The build currently needs `--disable-sound-format-error`**: pygbag refuses
+the MP3 music (`assets/music/*.mp3`, "Use OGG format instead") and
+`build.sh` / `serve.sh` do not pass the flag, so both fail as they stand
+(found 2026-09-30, BLD-003.6; the fix is the owner's call).
+
+**A static host works once the pygame wheel sits next to the page**:
+`out/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl`, from
+`https://pygame-web.github.io/cdn/cp312/`. Served that way by
+`python -m http.server -d dist/web/out 8000`, the game boots and runs in
+Chrome (BLD-003.6).
 
 To see what a frame costs under the profile without a browser:
 `python -m tools.benchmarks.spawn_stress --web --render`. It runs on the

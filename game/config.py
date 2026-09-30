@@ -72,20 +72,21 @@ VSYNC: bool = True
 # Who paces the loop. False: `Game._step` does, with `clock.tick(FPS)`.
 # True: the host does, and the tick only measures. In the browser pygbag
 # resumes the loop after the `await asyncio.sleep(0)` in `Game.run_async`
-# from its `requestAnimationFrame` stepper (a comment in pygbag 0.9.3's
-# `aio.run`, `support/cross/aio/__init__.py`; the scheduler itself is in
-# the runtime, not the wheel, and this is not yet measured in a browser).
-# Modelled, not measured (`tools/benchmarks/raf_pacing.py`): on a 60 Hz
-# display a capped tick there costs ~nothing, the steps already arrive
-# ~16.7 ms apart; on a faster display with a light frame it fights the
-# refresh. SDL2's `SDL_Delay`, which pygame-ce's tick calls, would
-# busy-wait the page's only thread if the runtime has no Asyncify
-# (unconfirmed for pygbag's build), 5.0-8.4 ms a light frame at 75-165 Hz,
-# and, in the model, at 75 Hz a 12 ms frame drops to 50 fps where the
-# refresh gives 75.
-# The cost of no cap, in the model: on a fast display a light scene (a
-# menu) draws at the display's rate, up to 2.6x the frames at 165 Hz. Set
-# only by `apply_web_profile`, and only in that runtime (BLD-003.D4):
+# from its `requestAnimationFrame` stepper, measured in Chrome on a 175 Hz
+# display (BLD-003.6): every step lands on a whole number of refreshes.
+# There, on the menu (~14 ms of work a step), the capped tick held the loop
+# to 62.5 fps (pygame truncates 1000/60 to a 16 ms frame) where no cap gave
+# 72-74 fps. The model (`tools/benchmarks/raf_pacing.py`) predicts the same
+# and more: on a 60 Hz display a capped tick costs ~nothing, the steps
+# already arrive ~16.7 ms apart; SDL2's `SDL_Delay`, which pygame-ce's tick
+# calls, would busy-wait the page's only thread if the runtime has no
+# Asyncify (unconfirmed for pygbag's build), 5.0-8.4 ms a light frame at
+# 75-165 Hz; and, in the model, at 75 Hz a 12 ms frame drops to 50 fps
+# where the refresh gives 75. The cost of no cap: on a fast display a light
+# scene (a menu) draws at the display's rate, up to 2.6x the frames at
+# 165 Hz in the model. In gameplay (40 ms frames in Chrome) neither pacing
+# changes the rate. Set only by `apply_web_profile`, and only in that
+# runtime (BLD-003.D4):
 # `main.py --web` on the desktop keeps the cap, because nothing else paces
 # it there.
 HOST_PACES_FRAMES: bool = False
@@ -1162,12 +1163,12 @@ def apply_web_profile() -> None:
 
     * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
     * `FPS = 60` -- the cap `main.py --web` runs at on the desktop. In the
-      browser the page's refresh paces the loop instead, per a comment in
-      pygbag's `aio.run` and not yet measured (`HOST_PACES_FRAMES`, below).
-      In the model that means no 60 fps cap fighting a 75-165 Hz display
-      and no busy-wait on the page's thread if the runtime lacks Asyncify,
-      at the price of light scenes drawing at the display's full rate; the
-      trade-off is at `HOST_PACES_FRAMES`.
+      browser the page's refresh paces the loop instead (measured in Chrome,
+      BLD-003.6; `HOST_PACES_FRAMES`, below): no 60 fps cap fighting a
+      faster display (on a 175 Hz one the menu ran 72-74 fps against the
+      cap's 62.5), and in the model no busy-wait on the page's thread if the
+      runtime lacks Asyncify, at the price of light scenes drawing at the
+      display's full rate; the trade-off is at `HOST_PACES_FRAMES`.
     * `HOST_PACES_FRAMES = sys.platform == "emscripten"` -- True only in
       the browser runtime itself (BLD-003.D4).
     * `1280x720` render target -- that is the pygbag canvas size (pygbag's
@@ -1194,11 +1195,11 @@ def apply_web_profile() -> None:
       seams; `TILE_PX * 1.25 == 80.0` does not. The web view is ~4% tighter
       than desktop as a result (1024 px of world across, against 1066).
 
-    * The browser's own crowd (BLD-003, owner 2026-09-29). A frame's update
-      is estimated at ~1.3-2.5x and its draw ~3.5-5x the desktop's cost in
-      WebAssembly (one 2026-09-03 overlay reading, `web_plan.md` section 1;
-      not yet measured in a real Chrome), and the 16.7 ms budget does not
-      grow, so:
+    * The browser's own crowd (BLD-003, owner 2026-09-29), set when a
+      frame's update was estimated at ~1.3-2.5x and its draw ~3.5-5x the
+      desktop's cost in WebAssembly. Measured in Chrome since (BLD-003.6):
+      update ~1.05-1.1x (3.8 ms at 99 live), draw ~11-17x (32-43 ms), so the
+      crowd is cheap and the draw is the browser's budget. The values:
       `ENEMY_LIVE_CAP = ENEMY_COUNT_BASE` (100), so a run opens with the
       desktop's crowd and only growth past it is cut: every spawn through
       the spawn master stops there bar its `cap_exempt` owners, while

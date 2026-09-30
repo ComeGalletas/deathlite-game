@@ -170,9 +170,11 @@ done, and two items block the build from being playable by anyone else.
 - Still open behind those: the finer loading steps and progress bar, and
   the manifest-driven pack. ~~Browser spawn-master knobs in
   `config.apply_web_profile()`~~ -- done 2026-09-29 as BLD-003 (live cap
-  100, LOD 3, nav 0.6 s, fill 3500), with host-paced frames (modelled, not
-  yet measured); a real-Chrome measurement is still owed
-  (`journals/web_frame_time_journal.md`).
+  100, LOD 3, nav 0.6 s, fill 3500), with host-paced frames; measured in
+  Chrome 2026-09-30 (BLD-003.6): a run draws at 22-26 fps and the draw is
+  the whole cost, per-pixel-alpha blits first
+  (`journals/web_frame_time_journal.md`). The draw work is the next web
+  item.
 
 ## 8. Test and infrastructure debt
 

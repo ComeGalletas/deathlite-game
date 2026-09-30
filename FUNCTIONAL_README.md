@@ -16,14 +16,15 @@ runtime (or with `--web` on the desktop) it calls `config.apply_web_profile()` �
 render target (pygbag's canvas) that cuts per-frame work ~35%. The interface
 is drawn at 0.8 there (the 1600×900 design at 80%) and the world at zoom
 1.25, a view ~4% tighter than the desktop's (1024×576 world px against
-1067×600; UI-016). In the browser the page's refresh paces the loop (per a
-comment in pygbag's `aio.run`, not yet measured; the game's own 60 fps cap
-is only for `--web` on the desktop), and the crowd is the browser's own: the
-spawn master stops spawning at **100 live enemies** (desktop 250; bar
-dev-menu and dummy spawns, and waking enemies can still push past it, as on
-the desktop), off-screen idle
-enemies tick every third frame, and the flow-field fill is a little shorter
-and less frequent (BLD-003).
+1067×600; UI-016). In the browser the page's refresh paces the loop
+(measured in Chrome; the game's own 60 fps cap is only for `--web` on the
+desktop), and the crowd is the browser's own: the spawn master stops
+spawning at **100 live enemies** (desktop 250; bar dev-menu and dummy
+spawns, and waking enemies can still push past it, as on the desktop),
+off-screen idle enemies tick every third frame, and the flow-field fill is a
+little shorter and less frequent (BLD-003). Measured in Chrome
+(2026-09-30): a run draws at about 22-26 fps, the draw being the cost, not
+the crowd (`documentation/journals/web_frame_time_journal.md`).
 
 Everything else pygbag needs lives in `dist/web/` (`pygbag.ini`, `build.sh`,
 `serve.sh`, and `dist/web/README.md` with the details):

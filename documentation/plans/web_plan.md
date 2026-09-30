@@ -115,16 +115,17 @@ Measure on a real browser with the F1 overlay before committing to the
 values -- the pane used here cannot.
 
 > **Done 2026-09-29 as BLD-003** (`../journals/web_frame_time_journal.md`),
-> before the real-browser measurement, which is still owed. The desktop
+> before the real-browser measurement, taken the next day in Chrome
+> (BLD-003.6: the draw, not the crowd, is the browser's cost). The desktop
 > cap had meanwhile moved to 250, and the owner set the browser's at
 > **100**, not 60: it is `ENEMY_COUNT_BASE`, so a run opens with the
 > desktop's crowd. The other three knobs are the values above. The same
 > requirement dropped the browser's own `clock.tick` cap, so the page's
-> refresh alone paces the loop (`config.HOST_PACES_FRAMES`; per a comment
-> in pygbag 0.9.3's `aio.run`, not yet measured in a browser). In the model
-> (`tools/benchmarks/raf_pacing.py`, not measured) the cap costs nothing at
-> 60 Hz; on a faster display it can spin the page's thread, if the
-> runtime has no Asyncify, or drop frames.
+> refresh alone paces the loop (`config.HOST_PACES_FRAMES`; measured in
+> Chrome on a 175 Hz display, where the menu ran 72-74 fps uncapped against
+> the cap's 62.5). In the model (`tools/benchmarks/raf_pacing.py`) the cap
+> costs nothing at 60 Hz; on a faster display it can spin the page's
+> thread, if the runtime has no Asyncify, or drop frames.
 
 **Render.** 14-20 ms at 1280x720 with fifteen bodies in view is already
 most of the frame. The terrain path composites several scaled surfaces

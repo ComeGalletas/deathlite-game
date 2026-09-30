@@ -300,9 +300,8 @@ class Game:
         the host event loop once per frame with `await asyncio.sleep(0)` so the
         page stays responsive. In the browser that yield is also what paces
         the frame (pygbag's stepper resumes the loop from
-        `requestAnimationFrame`, per a comment in its `aio.run`; not yet
-        measured), so
-        `_step` drops its own cap there (`config.HOST_PACES_FRAMES`). Works
+        `requestAnimationFrame`, measured in Chrome, BLD-003.6), so `_step`
+        drops its own cap there (`config.HOST_PACES_FRAMES`). Works
         on desktop too (`asyncio.run`), where the yield paces nothing and
         the cap stays."""
         import asyncio

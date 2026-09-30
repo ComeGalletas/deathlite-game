@@ -17,8 +17,9 @@ It is a model, not a measurement. What it assumes:
   runtime), `SDL_Delay` spins the page's thread for that long; that time
   is reported as `spin`.
 * **One step per refresh**, because pygbag resumes `Game.run_async` after
-  `await asyncio.sleep(0)` from its `requestAnimationFrame` stepper (per a
-  comment in pygbag 0.9.3's `aio.run`; not measured). A step (tick, then
+  `await asyncio.sleep(0)` from its `requestAnimationFrame` stepper
+  (measured in Chrome, BLD-003.6: steps land on whole refreshes, and the
+  capped menu ran the 62.5 fps this model predicts). A step (tick, then
   `work` ms of update and draw) that ends between two refreshes resumes on
   the next one; a step longer than a period skips the refreshes it overran.
 * **No noise.** Refreshes are exact and the work is constant.

@@ -143,7 +143,8 @@ second, 72 fps), so it trades the spin for a per-display tuning problem.
   in BLD-003.4's two sessions) until measured. The web plan's 60
   was the alternative. D1 relaxes BLD-001's "zero gameplay divergence"
   goal for crowd size; D2 adds AI fidelity and D4 the per-step budgets on
-  fast displays (if the page's refresh paces the loop; not measured). What
+  fast displays (the page's refresh does pace the loop, measured in
+  BLD-003.6). What
   the cap gates: every spawn through the spawn master
   (the director's companies, residents, enemy summoners' broods;
   `spawn/master.py`, "every entry point checks both per body") except the
@@ -181,9 +182,10 @@ second, 72 fps), so it trades the spin for a per-display tuning problem.
   step rather than per unit of game time runs more times a second when
   there are more steps a second. The desktop's cap keeps it at most 62.5
   steps a second (the 62 fps cap truncates to 16 ms frames; a little under
-  in practice as `SDL_Delay` overshoots); if the
-  page's refresh paces the browser's loop (not measured), a fast display
-  with a light frame goes past that. Known per-step work, found by reading
+  in practice as `SDL_Delay` overshoots); the page's refresh paces the
+  browser's loop (measured in BLD-003.6: the menu ran 72-74 steps a second
+  on a 175 Hz display), so a fast display with a light frame goes past
+  that. Known per-step work, found by reading
   the code and not an exhaustive audit:
   - the population's wakes (`wake_budget` a frame, `spawn/population.py`)
     and the flow field's `ENEMY_NAV_FILL_BUDGET` relaxations a frame: fills
@@ -248,10 +250,12 @@ hedged when its own sentence or clause carries the qualifier.
 - [x] BLD-003.4 — `spawn_stress --web`, test, measurement
 - [x] BLD-003.5 — docs, the pacing model (`tools/benchmarks/raf_pacing.py`),
   the critic passes' fixes, close
+- [x] BLD-003.6 — the real-Chrome measurement (review item 1, owner
+  2026-09-30), and the docs it made stale
 
-Out of scope, from the same review: measure in a real Chrome (item 1),
-remove the desktop draw spikes that become browser hitches (4), fewer and
-larger terrain blits (5), `gc.freeze()` after loading (6).
+Out of scope, from the same review: remove the desktop draw spikes that
+become browser hitches (4), fewer and larger terrain blits (5),
+`gc.freeze()` after loading (6). Item 1 was done as BLD-003.6.
 
 ## Results
 
@@ -375,5 +379,119 @@ frame time needs a real Chrome with the F1 overlay, review item 1), and the
 pacing trade-off, which the owner approved on the review's first, wrong
 wording and has not yet re-approved on the corrected one (D4).
 
-**Status:** done, pending the owner's re-approval of D4 and the real-Chrome
-measurement.
+**Status:** done, pending the owner's re-approval of D4. The real-Chrome
+measurement followed as BLD-003.6.
+
+### BLD-003.6 — measured in Chrome (2026-09-30)
+
+- **Requirement (owner, 2026-09-30):** run the web build in Chrome and
+  measure it (review item 1).
+- **Setup:** this branch at `bd7a80d`, built with pygbag 0.9.3 plus
+  `--disable-sound-format-error` (see below), the pygame-ce 2.5.7 wheel
+  put in `out/cdn/cp312/`, served statically by `python -m http.server`.
+  Chrome through Claude in Chrome, tab visible, on the owner's machine. Its
+  display refreshes at ~175 Hz: every `requestAnimationFrame` interval is a
+  whole multiple of 5.71 ms. One run, seed not pinned (the page's run),
+  hero Aegis on Normal; for the steady readings the hero was made
+  invulnerable and non-attacking from inside the page, and for the crowd
+  reading 72 enemies were seated near the hero through
+  `ps.spawn.spawn_enemy`. Python ran inside the page through
+  `window.python.PyRun_SimpleString`; pygbag's stdlib has no `cProfile`,
+  so stages were timed by wrapping the draw functions for 20 frames and
+  restoring them. Raw results: `/tmp/bld-003/chrome/results.md` (kept
+  outside the repo).
+
+**The static host works.** The page boots from a plain `http.server` once
+the wheel is beside it: the fix a Vercel or Pages deploy needs, now shown
+end to end. The bundle is a 19.6 MB `.apk` (44.8 MB on 2026-09-03). The
+menu was up about 10 s after navigating; the loading screen took about
+3 s (the web plan feared 5-10 s).
+
+**Frame rate, from the page's refresh intervals and the F1 overlay:**
+
+| Scene | fps | Interval p50 | Update / render (overlay) |
+|---|---|---|---|
+| Menu (as shipped, uncapped) | 68-74 | 11.4-17.1 ms | about 14 ms a step in all |
+| Level-up screen over the run | 19-20 | 51.5 ms | 0.00 / 47.2 ms |
+| Run start, 21-25 enemies, hero still | 22-23 | 45.7 ms | 4.1-4.4 / 38.7-42.7 ms |
+| 99 live enemies | 25.6 | 40.0 ms | 3.8 / 38.0 ms |
+
+**The review's estimate was wrong in both directions.** Update is about
+1.05-1.1x the desktop's (3.8 ms at 99 live against 3.6 ms for 100 on the
+desktop harness), not 1.3-2.5x; draw is about 11-17x (32.6-42.7 ms
+against the desktop harness's 2.45-2.95 ms at 58-100 live), not 3.5-5x. So the crowd is cheap in the browser, the cap
+(D1) and knobs (D2) are not what holds it back, and the draw is the whole
+budget. The cap held: seating stopped at exactly 100.
+
+**Where the draw goes** (ms per frame, 20 frames, wrappers removed after):
+
+| Stage | Gameplay, 24 enemies | Level-up open, 21 enemies |
+|---|---|---|
+| Scenery sprites (trees, decor; 165 in view) | 15.3 | 17.0 |
+| Ground bands | 7.3 | 8.8 |
+| Water | 4.6 | 5.3 |
+| Actors (hero, enemies) | 1.7 | 2.9 |
+| Flat effects | 1.5 | 1.9 |
+| `feedback_overlays` | 0.03 | 8.9 (hurt flash active) |
+| Level-up dim backdrop / cards | - | 9.9 / 3.3 |
+| HUD, ghost pass | 0.4 | 0.8 |
+| **State draw** | **32.6** | **60.3** |
+
+`Game._render`'s other parts are small: fill 0.4, debug overlay 1.3,
+`display.flip` (the copy to the canvas) 0.5 ms. The review's guess that
+the canvas copy costs several ms is wrong.
+
+**Why: per-pixel alpha.** One 1280x720 blit inside the page, median of 15:
+
+| Blit | ms |
+|---|---|
+| Opaque surface | 0.1 |
+| Constant alpha (`set_alpha` on an RGB surface) | 1.0 |
+| Per-pixel alpha (`SRCALPHA`), prebuilt | 8.3 |
+| `SRCALPHA` built, filled and blitted | 8.5 |
+| `fill(..., BLEND_RGB_ADD)` | 7.5 |
+
+Per-pixel alpha is ~8x constant alpha and ~80x opaque, about 9 ns a pixel,
+which fits the review's guess that the wasm wheel lacks the SIMD blitters
+(still not confirmed from the wheel itself). Every full-screen `SRCALPHA`
+overlay (the hurt flash, the low-HP vignette, the level-up and pause dims)
+costs ~8-10 ms on its own, and the scenery, ground and water are
+per-pixel-alpha sprites and bands.
+
+**Pacing (item 3, D4), A/B on the menu** (~14 ms of work a step), by
+setting `config.HOST_PACES_FRAMES` inside the page:
+
+| | Game clock fps | Page fps | Refreshes per step (2 / 3 / 4) |
+|---|---|---|---|
+| Uncapped (as shipped) | 74.1 | 74.0 | 236 / 133 / 1 |
+| Capped `tick(60)` | 62.5 | 62.2 | 73 / 225 / 14 |
+| Uncapped again | 71.9 | 69.5 | 171 / 174 / 3 |
+
+The premise holds: steps land on whole refreshes, and the game clock's fps
+equals the page's. The capped figure is exactly the 62.5 fps
+`raf_pacing` predicts. On this 175 Hz display, removing the cap is worth
+12-19 % on a light screen (game clock 15-19 %, page refreshes 12-19 %);
+in gameplay (40 ms frames) the cap changes nothing. Whether the capped wait spins or yields (Asyncify) is still not
+measured: the rates cannot tell them apart.
+
+**Found on the way:**
+
+- `dist/web/build.sh` and `serve.sh` fail: pygbag refuses the MP3 music
+  ("Use OGG format instead"). They have failed since the music landed
+  (2026-09-16). This build passed `--disable-sound-format-error`; whether
+  the MP3s play in the browser was not checked. Converting to OGG would
+  change the owner's MP3 decision, so it is the owner's call.
+- The bundle still carries `unused/` folders below the top level
+  (`assets/effects/status/unused/`, `assets/effects/weapons/grave_totem/unused/`
+  and others): `pygbag.ini` ignores only `/assets/unused`.
+- The level-up screen draws the whole run beneath it every frame, dim
+  included: 19-20 fps while the player picks a card.
+
+**What moves the browser's frame, in measured order:** the scenery
+sprites (15-17 ms), the full-screen `SRCALPHA` overlays (8-10 ms each when
+shown), the ground bands (7-9 ms), the water (5 ms). Constant alpha
+instead of per-pixel alpha for the flat overlays, and a cached frozen
+backdrop behind the level-up and pause screens, are the cheap ones; the
+terrain and scenery need the renderer work of review item 5 (fewer, larger,
+opaque-where-possible blits). Resolution stays out of it (owner,
+2026-09-28). That is a new requirement, not BLD-003.
