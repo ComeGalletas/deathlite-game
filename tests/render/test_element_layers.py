@@ -30,7 +30,6 @@ from combat.elements.ids import ELEMENTS, REACTIONS
 from game.game import Game
 from game.states.menu_state import MenuState
 from game.states.playing.visual import elements as element_fx
-from game.states.playing.visual import elements as fx
 from game.states.playing.visual import scene
 from game.states.playing.visual.elements import transient
 from tests import worlds as W
@@ -136,10 +135,10 @@ class DrawOrderTests(unittest.TestCase):
                            "a reaction goes over every body")
 
     def test_the_frame_begins_once_however_many_bands_there_are(self):
-        """The particle budget and the aura counter are per frame. The
-        under-pass runs once per terrace, so resetting them there would
-        hand each band the whole budget and leave the counter showing only
-        the last band's auras."""
+        """The aura counter is per frame. The under-pass runs once per
+        terrace, so resetting it there would leave the counter showing only
+        the last band's auras. (The particle budget is the shed's, refilled
+        per update step since RND-011.)"""
         events = self._trace()
         self.assertEqual(events.count("begin"), 1)
         self.assertGreaterEqual(events.count("under"), 1)
@@ -242,21 +241,22 @@ class ShedParticleLayerTests(unittest.TestCase):
                          "a recycled particle kept the old layer")
 
     def test_the_shed_asks_for_the_lower_layer(self):
-        """The one caller that wants it. Checked through `fx.draw` rather
-        than by reading `_shed`, so a refactor that stops passing the flag
-        is caught."""
+        """The one caller that wants it. Checked through the shed's own
+        update (RND-011: the update sheds, the draw only paints) against a
+        real pool, so a refactor that stops passing the flag is caught."""
+        from game.states.playing.visual.elements import shed
         from tests.combat.fakes import FakeEnemy
 
         body = FakeEnemy(0.0, 0.0)
         body.elemental.set_aura(ELEMENTS[0], 0.0, 10.0)
         run = fake_run([body])
         run.particles = self.particles
-        # The shed is a once-a-frame chance per aura, so drive enough
-        # frames that it cannot plausibly have been skipped every time.
+        # The shed is a chance of `rate * dt` a step, so drive enough steps
+        # that it cannot plausibly have been skipped every time.
         for _ in range(400):
-            fx.draw(self.surface, run)
+            shed.update(run, 1 / 60)
         under = [p for p in self.particles._pool if p.under]
-        self.assertTrue(under, "the aura shed nothing in 400 frames")
+        self.assertTrue(under, "the aura shed nothing in 400 steps")
         self.assertEqual(len(under), len(list(self.particles._pool)),
                          "the aura shed an event-layer particle")
 
