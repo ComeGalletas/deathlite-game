@@ -3,6 +3,8 @@ falls back to a plain one when the driver refuses -- which the headless
 dummy driver the suite runs under does, so what is pinned here is the
 fallback and the report, not the sync itself."""
 import os
+import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -53,6 +55,19 @@ class WindowTests(unittest.TestCase):
         # dormant and the window is the plain fixed one.
         self.assertFalse(g.display.available)
         self.assertEqual(g.screen.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+
+    def test_the_game_asks_windows_to_honor_its_timer(self):
+        """SYS-011: `Game()` sets the timer policy at startup and keeps the
+        answer, so a hidden, silent game (every headless run) paces on the
+        1 ms timer and not on Windows' ~15.6 ms default."""
+        from game.display import native
+        saved = native._throttling() or (0, 0)
+        self.addCleanup(native._set_throttling, *saved)
+        native._set_throttling(0, 0)                  # Windows-managed, as a fresh process
+        g = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        self.assertIs(g.timer_honored, sys.platform == "win32")
+        if sys.platform == "win32":
+            self.assertEqual(native._throttling(), (native._IGNORE_TIMER_RESOLUTION, 0))
 
     def test_the_scaled_window_is_asked_for_resizable(self):
         real = pygame.display.set_mode

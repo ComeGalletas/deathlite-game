@@ -126,11 +126,21 @@ class StateMachine:
     def __init__(self, game: "Game") -> None:
         self.game = game
         self._stack: list[State] = []
+        # The deepest state the last `update` reached: the run itself under
+        # the end banner's wait phase, the pause over a frozen run (read by
+        # the frame trace, SYS-010.D3).
+        self.updated: State | None = None
 
     # --- stack operations -------------------------------------------------
     @property
     def current(self) -> State | None:
         return self._stack[-1] if self._stack else None
+
+    @property
+    def stack(self) -> tuple:
+        """The states, bottom first (read-only; the frame trace reads the
+        run under a pause menu from it)."""
+        return tuple(self._stack)
 
     def push(self, state: State, **enter_kwargs) -> None:
         self._stack.append(state)
@@ -188,6 +198,7 @@ class StateMachine:
         # Walk from the top down; stop once a state says the one below it is
         # frozen. This lets PAUSED sit on top of a non-updating PLAYING.
         for state in reversed(self._stack):
+            self.updated = state
             state.update(dt)
             if not state.update_below:
                 break

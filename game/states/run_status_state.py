@@ -32,7 +32,7 @@ _MARGIN_X, _TOP, _BOTTOM = 60, 96, 56
 def find_playing(state_machine):
     """The run under the overlays: the lowest state on the stack that has a
     `player` (the pause menu opens this screen from one level up)."""
-    for state in getattr(state_machine, "_stack", ()):
+    for state in getattr(state_machine, "stack", ()):
         if hasattr(state, "player") and hasattr(state, "stats"):
             return state
     return None

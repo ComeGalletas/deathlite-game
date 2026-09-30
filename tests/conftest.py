@@ -137,6 +137,9 @@ INTEGRATION = (
     "tests/devtools/test_spawn_stress.py::HarnessDefaultsTests",
     "tests/devtools/test_spawn_stress.py::LiveDirectorTests",
     "tests/devtools/test_spawn_stress.py::CommandLineTests",
+    # SYS-011: the timer eval's command line reads as far as the Game it
+    # builds on Windows; its judgment tests stay unit.
+    "tests/devtools/test_timer_regime.py::CommandLineTests",
     # RND-008.3: a whole run's draw, three booted runs.
     "tests/playing/test_frame_fonts.py",
     # RND-008.4: the harness's packed, primed fight; the cache checks stay unit.
@@ -145,6 +148,9 @@ INTEGRATION = (
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
     "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
+    # SYS-010: a real Game stepped with and without a trace, and main.py run.
+    "tests/devtools/test_frame_trace.py::GameWiringTests",
+    "tests/devtools/test_frame_trace.py::MainTests",
 )
 
 
