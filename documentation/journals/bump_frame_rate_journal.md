@@ -141,9 +141,51 @@
        fails, so it catches the bug.
 4. A cold critic pass (an attacker on the repro); fixes; results; docs.
 
+## ENT-019: Results
+
+### ENT-019.2: the bench, and the pass before the fix
+
+- `tools/benchmarks/bump_rate.py`. `--markdown` prints the tables below,
+  each value beside its share of the 62 Hz one. The same arguments print
+  the same numbers in any process (the crowd rows match the scratch probe
+  in the confirmed reading to the digit).
+- The crowd: seed 35, 60 bodies in 70 px, AI inert, hero out of reach.
+  Time until the total overlap is down to half, a quarter, a tenth:
+
+  | Rate | t50 | t25 | t10 |
+  |---|---|---|---|
+  | 20 Hz | 0.147 (188 %) | 0.243 (194 %) | 0.442 (197 %) |
+  | 30 Hz | 0.120 (153 %) | 0.211 (169 %) | 0.342 (153 %) |
+  | 45 Hz | 0.093 (119 %) | 0.178 (142 %) | 0.288 (129 %) |
+  | 62 Hz | 0.078 (100 %) | 0.125 (100 %) | 0.224 (100 %) |
+  | 144 Hz | 0.048 (61 %) | 0.081 (65 %) | 0.170 (76 %) |
+  | 165 Hz | 0.045 (57 %) | 0.074 (59 %) | 0.171 (76 %) |
+
+- The pairs, 12 px inside their push radius: "equal" is two bears (r 22,
+  w 30); "lopsided" is the troll (r 26, w 80) against the bumblebee (r 9,
+  w 3), the heaviest and lightest in the crowd. Distance after 1 s, and the
+  peak knock (px/s):
+
+  | Rate | equal: distance at 1 s | equal: peak knock | lopsided: distance at 1 s | lopsided: peak knock |
+  |---|---|---|---|---|
+  | 20 Hz | 55.2 (76 %) | 80 (55 %) | 84.3 (80 %) | 396 (75 %) |
+  | 30 Hz | 59.1 (81 %) | 100 (70 %) | 80.6 (77 %) | 396 (75 %) |
+  | 45 Hz | 66.7 (91 %) | 121 (84 %) | 93.5 (89 %) | 434 (82 %) |
+  | 62 Hz | 73.0 (100 %) | 144 (100 %) | 105.0 (100 %) | 532 (100 %) |
+  | 144 Hz | 96.9 (133 %) | 226 (157 %) | 143.0 (136 %) | 788 (148 %) |
+  | 165 Hz | 102.2 (140 %) | 241 (167 %) | 148.9 (142 %) | 836 (157 %) |
+
+- **Read:** on a 144 Hz display a light scene shoves a pair a third
+  further than at 62 Hz, and half again as fast. A heavy scene at 30 Hz
+  shoves it a fifth short, and a crowd takes half as long again to come
+  apart.
+- **Tests:** `tests/playing/test_bump_rate.py`, 14 (the bench class is
+  `integration`; the series readers and the flags are `unit`), plus
+  `tests/devtools/test_tier_audit.py`, green.
+
 ## ENT-019: Tasks
 
 - [x] ENT-019.1: This block, the index row
-- [ ] ENT-019.2: `tools/benchmarks/bump_rate.py`, its test, the before table
+- [x] ENT-019.2: `tools/benchmarks/bump_rate.py`, its test, the before table
 - [ ] ENT-019.3: The dt-scaled bump; tests; digests re-pinned
 - [ ] ENT-019.4: Critic pass, results, docs; ENT-019 done
