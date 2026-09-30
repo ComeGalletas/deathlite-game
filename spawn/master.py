@@ -131,7 +131,7 @@ class SpawnMaster:
             director.live_cap = config.ENEMY_LIVE_CAP
         self.world_cap = int(config.ENEMY_COUNT_HARD_CAP)
         self._active: set[int] = set()
-        self._small, self._large = self._class_radii()
+        self._small = self._small_class_radius()
         # (queued_at, ids, owner, stagger)
         self._debt: list[tuple[float, list[str], str, bool]] = []
         # A company already committed, materialising body by body:
@@ -153,10 +153,12 @@ class SpawnMaster:
         return get_content().enemies
 
     @staticmethod
-    def _class_radii() -> tuple[float, float]:
+    def _small_class_radius() -> float:
+        """The small nav class's body: a company wider than this asks for a
+        large spawn point. (The large class's own clearance is not read here:
+        the large points are certified by world generation, ENT-021.)"""
         from world.nav.field import _NAV_CLASSES
-        radii = sorted(float(c[3]) for c in _NAV_CLASSES)
-        return radii[0], radii[-1]
+        return min(float(c[3]) for c in _NAV_CLASSES)
 
     # G3 (owner, 2026-09-17): the pacing multiplier and its named modifiers
     # are gone, and `spawn/pacing.py` with them. The cooldown ladder is the
