@@ -303,3 +303,6 @@ merged) and brings in:
 3. The `AuraShedTests` rewrite owed to RND-011 (D7 above); the test failed
    at its control on the merged tree (`0 not greater than 0`) and passes
    with it.
+
+Merged to `main` as PR #62 (`b863278`, 2026-09-30), after #60 and #55 had
+landed; the branch brought them in first, and only `INDEX.md` conflicted.
