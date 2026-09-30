@@ -279,3 +279,17 @@ instead of 30.7 (32 fps to 60). With vsync on the minimized present is
 DWM's (the tick never waits), and the coarse timer stretched that too:
 46.9 ms down to 33.6. Real play, visible or with a device open, was never
 exposed and keeps its 16.5 to 16.7 ms.
+
+**In SYS-010's own trace.** The same outcome through the recorder and the
+report on the final code, stacked on SYS-010 (`0de00e4`): a headless
+session (dummy video and audio), 10 menu frames, `start_run(seed=35)`, 240
+play frames, one process per arm; ms, p50 / p90 / p99 / max:
+
+| policy | long frames in play | what took most of each | period | `wait_ms` |
+|---|---|---|---|---|
+| ignored (what Windows does to a hidden, silent process) | 181 of 240 (75.4 %) | the wait, all 181 | 30.80 / 31.60 / 32.33 / 32.64 | 24.73 / 27.21 / 28.15 / 28.51 |
+| honored (the fix) | 0 of 240 | none | 16.65 / 17.27 / 17.97 / 18.17 | 12.20 / 13.33 / 14.14 / 14.33 |
+
+Work over budget was 0 in play in both. The D4 run's picture (period p50
+30.9 ms against 6.3 ms of work) is the first row; with the fix a headless
+trace reads like real play.
