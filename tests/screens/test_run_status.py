@@ -51,7 +51,7 @@ class _Machine:
     """Records pushes and pops; holds a stack for `find_playing`."""
 
     def __init__(self, stack=()):
-        self._stack = list(stack)
+        self.stack = tuple(stack)              # `StateMachine.stack`, bottom first
         self.pushed = []
         self.popped = 0
 

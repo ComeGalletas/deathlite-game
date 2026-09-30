@@ -42,6 +42,57 @@ python main.py
 Progress is stored in `save.json` next to `main.py` (human-readable; a missing
 or corrupt file is handled gracefully — the game never crashes over it).
 
+### Measuring frame time in real play
+
+Play with the trace on, then read it:
+
+```bash
+python main.py --trace
+```
+
+```bash
+python -m tools.benchmarks.trace_report
+```
+
+- **What it records.** Every frame of the session is written to
+  `traces/frames-<date>-<time>-<pid>.csv` beside the save. The path is
+  logged at start. Each row holds the frame's own period (from the start of
+  its work to the start of the next frame's), its update, draw and present
+  (`flip`: the upload and the vsync wait) times, the frame cap's wait in
+  `clock.tick` after it, the deepest state the frame's update reached, the
+  state shown at its end and whether that update opened it, and the crowd.
+- **What the report says.** With no argument it reads the newest trace. For
+  the frames whose update ran the run itself (the end banner's first second
+  included; not the pause, the level-up cards, the loading screen or the
+  menus) it answers the questions below. A play frame that opened an
+  overlay, such as the one that brings up the level-up cards (the next
+  cards of a chained level-up too), draws that overlay's first frame, so it
+  is counted apart, by the overlay's name.
+  The report answers:
+  - how many went over the 16.67 ms budget, and whether the update or the
+    draw was to blame;
+  - how many ran long (over 1.5 x the 16.67 ms budget), and what
+    took most of each one: the update, the draw, the present, the frame
+    cap's wait, or the rest (the input, the music, the trace itself). A long frame the wait
+    took is the frame cap's sleep overshooting, most often the OS timer
+    being coarse for a hidden or silent process (a headless run), and the
+    report says so;
+  - the same at each crowd size, and which seconds of each run were worst.
+- **The packaged game** takes the same flag (`DeathliteGame.exe --trace`,
+  from a terminal or a shortcut's target), or `DEATHLITE_TRACE=1` set once
+  in its environment instead of at each start. Its traces go beside its
+  save, in `%LOCALAPPDATA%\DeathliteGame\traces\`. The report's default
+  looks there too and reads the newest trace of either place; pass a file
+  to pick another. An empty file, a file that is not a UTF-8 CSV, or a
+  trace from an older recorder, is refused by name.
+- **Cost.** The trace is off by default; off, it costs two clock reads,
+  four checks a frame, and one stored reference per state updated
+  (0.15 µs). When on, it costs 12 to 21 µs a frame with
+  100 enemies alive, about 0.1 % of the budget, plus a batch write once a
+  second of 0.1 to 0.3 ms (an odd one 1 to 4 ms), which shows in that
+  frame's "rest"
+  (`documentation/journals/frame_trace_journal.md`).
+
 ## Controls
 
 | Key | Action |

@@ -3,6 +3,9 @@
     python main.py            # desktop
     python main.py --web      # desktop, but with the browser profile applied
                               # (1280x720 / 60 fps / no save file) for testing
+    python main.py --trace    # desktop, recording every frame's timings to
+                              # traces/ beside the save (SYS-010); read it with
+                              # python -m tools.benchmarks.trace_report FILE
 
 PyInstaller also runs this file -- `dist/desktop/DeathliteGame.spec` names it as the
 entry, and the `sys.frozen` check below sends the save to %LOCALAPPDATA% rather
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 
 import pygame  # noqa: F401  -- pygbag scans THIS file's imports to preload the
@@ -33,6 +37,7 @@ import pygame  # noqa: F401  -- pygbag scans THIS file's imports to preload the
 
 from game import config, save
 from game.game import Game
+from systems import frame_trace
 
 
 async def main() -> None:
@@ -51,7 +56,13 @@ async def main() -> None:
     # build never gets this far, since the web profile disables saving outright.
     save_path = save.user_save_path() if getattr(sys, "frozen", False) else None
 
-    await Game(save_path=save_path).run_async()
+    # SYS-010: `--trace` (or DEATHLITE_TRACE=1) records this session's frame
+    # times beside the save, for `python -m tools.benchmarks.trace_report`.
+    trace = frame_trace.trace_path(sys.argv, os.environ, save_path or save.DEFAULT_PATH)
+    if trace is not None:
+        logging.getLogger(__name__).info("frame trace: %s", trace)
+
+    await Game(save_path=save_path, trace_path=trace).run_async()
 
 
 asyncio.run(main())
