@@ -129,10 +129,20 @@ def _charge(cfg: dict) -> list:
 
 @trigger("melee_reach")
 def _melee_reach(cfg: dict) -> float:
-    """Touching distance: the enemy's collider, the hero's and a small pad."""
+    """Touching distance: the enemy's swing radius (`_swing_radius`), the
+    hero's collider and a small pad."""
     if "attack_range" in cfg:
         return cfg["attack_range"]
-    return cfg["radius"] + config.PLAYER_RADIUS + cfg["attack_reach_pad"]
+    return _swing_radius(cfg) + config.PLAYER_RADIUS + cfg["attack_reach_pad"]
+
+
+def _swing_radius(cfg: dict) -> float:
+    """The radius a melee swing is sized from: the collider, unless the
+    enemy names an `attack_radius`. That key lets a body shrink to fit
+    tighter ground while its reach stays where the art puts it (ENT-020):
+    the trigger above and the `poke` hitbox both read it, so the swing
+    starts only where it can land."""
+    return float(cfg.get("attack_radius", cfg["radius"]))
 
 
 @trigger("breath_reach")
@@ -192,14 +202,16 @@ def _cast_hazard(cfg: dict):
 
 @action("poke")
 def _poke(cfg: dict):
-    """A small hitbox on the facing side (`radius / 2`, `contact_damage`-worth)
-    that lasts the swing -- the melee enemies' damage path, since their
-    passive body bite is off (see `enemies.json`)."""
+    """A small hitbox on the facing side (`r / 2` at `r` out, where `r` is
+    `_swing_radius`, `contact_damage`-worth) that lasts the swing -- the melee
+    enemies' damage path, since their passive body bite is off (see
+    `enemies.json`)."""
     active = cfg["attack_active"]
+    r = _swing_radius(cfg)
 
     def fn(actor, per, cmb):
-        pos = actor.pos + _facing(actor, per) * actor.radius
-        cmb.melee_hit(pos, actor.radius / 2.0, actor._base_contact, active)
+        pos = actor.pos + _facing(actor, per) * r
+        cmb.melee_hit(pos, r / 2.0, actor._base_contact, active)
     return fn
 
 
