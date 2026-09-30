@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from game.display import uibox
+from ui import veil
 
 if TYPE_CHECKING:  # avoid a runtime import cycle game <-> state
     from game.game import Game
@@ -50,6 +51,19 @@ class State:
     # If True, the state below still receives update(dt). Overlays set False so
     # gameplay is genuinely frozen while paused / choosing an upgrade.
     update_below: bool = False
+    # If True (with `draw_below` and not `update_below`), the frozen states
+    # below are drawn once and that frame is reused while this overlay is on
+    # top (RND-012: the world under the level-up screen was redrawn every
+    # frame, 47 ms in Chrome). Opt-in: an overlay whose actions change the
+    # run while it is open (the dev menu) or whose freeze comes and goes
+    # (the end banner) leaves it False. The wall-clock animations under the
+    # overlay (water foam, animated scenery) stop while it is open (owner,
+    # RND-012.D1), and the run draws no held input under any overlay
+    # (`playing/visual/live_input.py`, RND-012.D6), so the kept frame matches
+    # a full redraw. This overlay's own `draw_backdrop` and `draw` still run
+    # every frame. Anything the overlay changes that the frame below shows
+    # calls `StateMachine.invalidate_backdrop()`.
+    freeze_backdrop: bool = False
     # If True, `draw` is handed the centred UI box (`game/display/uibox.py`)
     # rather than the whole render surface, and mouse events reach
     # `handle_event` in box coordinates. Every screen and overlay panel is a
@@ -126,6 +140,8 @@ class StateMachine:
     def __init__(self, game: "Game") -> None:
         self.game = game
         self._stack: list[State] = []
+        # The frozen backdrop (`State.freeze_backdrop`): (key, frame) or None.
+        self._frozen: tuple | None = None
 
     # --- stack operations -------------------------------------------------
     @property
@@ -133,20 +149,34 @@ class StateMachine:
         return self._stack[-1] if self._stack else None
 
     def push(self, state: State, **enter_kwargs) -> None:
+        self._frozen = None
         self._stack.append(state)
         state.enter(**enter_kwargs)
         self._apply_music()
 
     def pop(self) -> None:
+        self._frozen = None
         if self._stack:
             self._stack.pop().exit()
             self._apply_music()
 
     def change(self, state: State, **enter_kwargs) -> None:
         """Replace the whole stack with a single new state."""
+        self._frozen = None
         while self._stack:
             self._stack.pop().exit()
         self.push(state, **enter_kwargs)
+
+    def is_covered(self, state: State) -> bool:
+        """True when `state` is on the stack with another state above it (an
+        overlay over the run). A state not on the stack is not covered."""
+        return state in self._stack and self._stack[-1] is not state
+
+    def invalidate_backdrop(self) -> None:
+        """Redraw the frozen states below the overlay on the next frame: for
+        a change the overlay makes that the frame below shows (the pause
+        menu's key-layout toggle, which the run's hints spell out)."""
+        self._frozen = None
 
     def _apply_music(self) -> None:
         """Hand the top state's `music` declaration to the player. Walks down
@@ -181,6 +211,8 @@ class StateMachine:
     def on_display_changed(self) -> None:
         """Every state on the stack, bottom first, so the run under a pause
         overlay rebuilds before the overlay redraws over it."""
+        self._frozen = None
+        veil.clear()                     # old full-frame fills (RND-012)
         for state in list(self._stack):
             state.on_display_changed()
 
@@ -198,8 +230,25 @@ class StateMachine:
         first = len(self._stack) - 1
         while first > 0 and self._stack[first].draw_below:
             first -= 1
+        layers = self._stack[first:]
         box = None
-        for state in self._stack[first:]:
+        key = self._frozen_key(layers, surface)
+        if key is None:
+            self._frozen = None
+        elif self._frozen is not None and self._frozen[0] == key:
+            # The frozen states below, as drawn when the overlay opened.
+            surface.blit(self._frozen[1], (0, 0))
+            layers = layers[-1:]
+        else:
+            box = self._paint(layers[:-1], surface, box)
+            self._frozen = (key, surface.copy())
+            layers = layers[-1:]
+        self._paint(layers, surface, box)
+
+    @staticmethod
+    def _paint(layers, surface, box):
+        """Draw `layers` bottom first; returns the UI box it built, if any."""
+        for state in layers:
             state.draw_backdrop(surface)
             if state.ui_box and surface is not None:
                 if box is None:
@@ -207,3 +256,23 @@ class StateMachine:
                 state.draw(box)
             else:
                 state.draw(surface)
+        return box
+
+    @staticmethod
+    def _frozen_key(layers, surface):
+        """What the frozen backdrop is valid for, or None when this frame
+        cannot use one: the top overlay has to opt in and freeze what it
+        draws over, and the target has to be opaque. A blitted copy blends
+        differently from drawing directly onto a per-pixel-alpha target
+        (offscreen tests and tools), so those are always drawn in full
+        (RND-012.D5). The key holds the states below by identity and the
+        surface by identity and size, so a new stack, a re-opened display
+        or another target redraws."""
+        if surface is None or len(layers) < 2:
+            return None
+        top = layers[-1]
+        if not (top.freeze_backdrop and top.draw_below and not top.update_below):
+            return None
+        if surface.get_masks()[3]:
+            return None
+        return (tuple(id(s) for s in layers), id(surface), surface.get_size())

@@ -115,6 +115,11 @@ class Game:
             raise ValueError(f"unknown key layout: {name!r}")
         self.save.settings["key_layout"] = name
         self.persist()
+        # The run's hints spell out the keys, and the pause menu's toggle
+        # changes them under a frozen backdrop (RND-012).
+        machine = getattr(self, "state_machine", None)
+        if machine is not None:
+            machine.invalidate_backdrop()
 
     def set_master_volume(self, v: float, *, persist: bool = True) -> None:
         """The mixer's master, held by both players so each folds it into the
