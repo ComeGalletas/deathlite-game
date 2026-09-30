@@ -9,8 +9,8 @@ Three rules hold across all of it:
 * **shape as well as colour.** Every element has a marker silhouette, so
   none of this depends on telling orange from yellow.
 * **a budget, not a flood.** Elemental particles draw from their own
-  per-frame allowance, so a hundred auras cannot starve the hit bursts of
-  the shared pool.
+  allowance, refilled each update step for its length, so a hundred auras
+  cannot starve the hit bursts of the shared pool.
 * **authored art where it exists, procedural where it does not.** Only
   Thunder has an authored aura today and only Fire a flame; the rest fall
   back to the ring, which the design names as the baseline.
@@ -19,9 +19,11 @@ This package replaces the placeholder `visual/element_fx.py` of M3.
 """
 from __future__ import annotations
 
+import random
+
 import pygame
 
-from game.states.playing.visual.elements import layers, transient
+from game.states.playing.visual.elements import layers, shed, transient
 from game.states.playing.visual.elements.budget import ParticleBudget
 from game.states.playing.visual.elements.building_glow import BuildingGlow
 from game.states.playing.visual.elements.profiles import get_visuals
@@ -30,16 +32,22 @@ from game.states.playing.visual.elements.transient import (  # noqa: F401
 
 
 class ElementVisuals:
-    """What a run holds: the profiles, the budget and the frame's counters.
+    """What a run holds: the profiles, the budget, the shed's random stream
+    and the frame's counters.
 
-    One per run, built beside the resolver. The drawing functions are free
-    functions; this is the state they share.
+    One per run, built beside the resolver. The drawing functions and the
+    shed are free functions; this is the state they share.
     """
 
-    def __init__(self, content, assets=None) -> None:
+    def __init__(self, content, assets=None, seed=0) -> None:
         self.profiles = get_visuals(content, assets)
         self.budget = ParticleBudget(self.profiles.budget.per_frame,
                                      self.profiles.budget.per_element)
+        # The aura shed's own stream (RND-011.D1): seeded from the run so
+        # the same seed picks the same bodies to shed and how many, and
+        # apart from `run.rng` so gameplay's numbers never depend on what
+        # was on screen. A string seed, as `fish_huts` and `npcs` use.
+        self.rng = random.Random(f"{seed}:aura_shed")
         self.auras_drawn = 0
         # CMB-009.1: the glow under an elemental buff building. No `elements`
         # block means no building is ever elemental, so there is no glow.
@@ -49,9 +57,6 @@ class ElementVisuals:
     def update(self, dt: float) -> None:
         """Advance the shared per-element animation clocks."""
         self.profiles.update(dt)
-
-    def begin_frame(self) -> None:
-        self.budget.begin_frame()
 
     def tint(self, element):
         return self.profiles.tint(element)
@@ -63,14 +68,14 @@ class ElementVisuals:
 def begin_frame(run) -> None:
     """Once a frame, before the banded passes start.
 
-    The particle budget and the aura counter are per *frame*: `draw_under`
-    runs once per terrace and resetting them there would give each band the
-    whole budget and leave the counter showing only the last band's auras.
+    The aura counter is per *frame*: `draw_under` runs once per terrace and
+    resetting it there would leave it showing only the last band's auras.
+    The particle budget is not touched here: it belongs to the shed, which
+    refills it once per update step (RND-011).
     """
     visuals = run.element_visuals
     if visuals is None:
         return
-    visuals.begin_frame()
     visuals.auras_drawn = 0
 
 
@@ -98,9 +103,8 @@ def bands(run) -> Bands | None:
     (the passes then sort their own, as they did before).
 
     Sorting ahead is the same as sorting in each pass: nothing between the
-    first terrace and the last moves a body or a mote, and the motes an
-    aura sheds during the passes land on the body's own terrace, whose
-    motes are already drawn, so they wait for the next frame either way.
+    first terrace and the last moves a body or adds a mote (the aura's shed
+    runs in the update since RND-011, so the draw adds none).
     """
     game_map = getattr(run, "game_map", None)
     if game_map is None or run.element_visuals is None:
@@ -136,7 +140,7 @@ def draw_under(surface, run, level=None, bands=None) -> None:
     _shed_particles(surface, run, level, bands.motes.get(level, ()) if sorted_ else None)
     transient.draw_areas(surface, run, visuals.profiles, now, level)
     visuals.auras_drawn += layers.draw_auras(
-        surface, run, visuals.profiles, now, visuals.budget, level, bodies)
+        surface, run, visuals.profiles, now, level, bodies)
     layers.draw_statuses(surface, run, visuals.profiles, now, level, bodies)
     transient.draw_transient(surface, run, visuals.profiles, now, level,
                              over=False)
@@ -291,4 +295,4 @@ def blend(colour, toward, amount: float = 0.55):
 
 
 __all__ = ["ElementVisuals", "draw", "sweep", "tint", "blend", "mix",
-           "Arc", "Flash", "ARC_SECONDS"]
+           "Arc", "Flash", "ARC_SECONDS", "shed"]

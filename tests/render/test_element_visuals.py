@@ -154,42 +154,84 @@ class ProfileTests(unittest.TestCase):
 # --- the budget --------------------------------------------------------------------
 
 class BudgetTests(unittest.TestCase):
-    def test_it_grants_up_to_the_frame_cap_and_then_refuses(self):
+    """The allowance is per 1/60 s of play, granted per update step for the
+    step's length (RND-011.D3); a 1/60 s step gets the numbers whole."""
+
+    def test_it_grants_up_to_the_step_cap_and_then_refuses(self):
         b = ParticleBudget(per_frame=10, per_element=10)
-        b.begin_frame()
+        b.begin_step(1 / 60)
         self.assertEqual(sum(b.take(ELEMENTS[0]) for _ in range(12)), 10)
         self.assertEqual(b.spent, 10)
         self.assertEqual(b.refused, 2)
 
-    def test_one_element_cannot_take_the_whole_frame(self):
+    def test_one_element_cannot_take_the_whole_step(self):
         b = ParticleBudget(per_frame=100, per_element=3)
-        b.begin_frame()
+        b.begin_step(1 / 60)
         self.assertEqual(sum(b.take(ELEMENTS[0]) for _ in range(9)), 3)
         self.assertEqual(sum(b.take(ELEMENTS[1]) for _ in range(9)), 3,
                          "its neighbour still has its own share")
 
-    def test_it_refills_each_frame(self):
+    def test_it_refills_each_step(self):
         b = ParticleBudget(per_frame=4, per_element=4)
-        b.begin_frame()
+        b.begin_step(1 / 60)
         self.assertEqual(sum(b.take(ELEMENTS[0]) for _ in range(9)), 4)
-        b.begin_frame()
+        b.begin_step(1 / 60)
         self.assertEqual(sum(b.take(ELEMENTS[0]) for _ in range(9)), 4)
+
+    def test_nothing_is_granted_before_the_first_step(self):
+        b = ParticleBudget(per_frame=10, per_element=10)
+        self.assertEqual(b.take(ELEMENTS[0]), 0)
+
+    def test_the_report_reads_against_the_steps_own_grant(self):
+        # At 175 steps a second a step is granted about 31 of the 90 per
+        # 1/60 s; a saturated step must read full, not "31/90".
+        b = ParticleBudget(per_frame=90, per_element=90)
+        b.begin_step(1 / 175)
+        taken = sum(b.take(ELEMENTS[0]) for _ in range(200))
+        self.assertEqual(b.report(), f"{taken}/{taken} used, {200 - taken} refused")
+        self.assertIn(taken, (30, 31))
+
+    def test_a_second_of_steps_grants_the_same_at_any_step_length(self):
+        """The whole point of the scaling: 40 per element and 90 in all per
+        1/60 s are 2,400 and 5,400 a second at 30, 62 or 175 steps a
+        second, with the fraction a step cannot grant whole carried on."""
+        for hz in (30, 62, 175):
+            with self.subTest(hz=hz, cap="per element"):
+                b = ParticleBudget(per_frame=900, per_element=40)
+                got = 0
+                for _ in range(hz):
+                    b.begin_step(1 / hz)
+                    got += sum(b.take(ELEMENTS[0]) for _ in range(500))
+                self.assertEqual(got, 40 * 60)
+            with self.subTest(hz=hz, cap="per step"):
+                b = ParticleBudget(per_frame=90, per_element=40)
+                got = 0
+                for _ in range(hz):
+                    b.begin_step(1 / hz)
+                    got += sum(b.take(e) for e in ELEMENTS for _ in range(500))
+                self.assertEqual(got, 90 * 60)
+
+    def test_unspent_allowance_is_not_banked(self):
+        b = ParticleBudget(per_frame=10, per_element=10)
+        for _ in range(5):
+            b.begin_step(1 / 60)                 # nothing taken
+        self.assertEqual(sum(b.take(ELEMENTS[0]) for _ in range(99)), 10)
 
     def test_a_crowd_of_auras_cannot_outspend_it(self):
         """The point of the budget: the shared particle pool keeps room for
         the hit bursts and death poofs however many auras are alive."""
-        _init()
+        from game.states.playing.visual.elements import shed
         from tests.combat.fakes import FakeEnemy
 
         crowd = [FakeEnemy(i * 4.0, 0.0) for i in range(120)]
         run = fake_run(crowd)
         for enemy in crowd:
             enemy.elemental.set_aura(ElementId.FIRE, 0.0, 10.0)
-        surface = pygame.Surface((320, 240))
-        for _ in range(8):
-            fx.draw(surface, run)
-            self.assertLessEqual(run.element_visuals.budget.spent,
-                                 run.element_visuals.budget.per_frame)
+        budget = run.element_visuals.budget
+        for dt in (1 / 60, 1 / 175):
+            for _ in range(8):
+                shed.update(run, dt)
+                self.assertLess(budget.spent, budget.per_frame * 60 * dt + 1)
 
 
 # --- the transient pool ---------------------------------------------------------------
