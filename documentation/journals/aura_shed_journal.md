@@ -2,7 +2,7 @@
 
 **ID:** RND-011 · **System:** rendering (elemental visuals) · **Type:** bug ·
 **Status:** done · **Branch:** ComeGalletas/aura-shed-update-a10d79ed
-(owner, 2026-09-30; found by RND-010's critic passes, RND-010.D7 in
+(owner, 2026-09-30; found by the web draw's critic passes, RND-012.D7 in
 `web_draw_journal.md` on `ComeGalletas/web-draw-cheap-5be9212c`)
 
 ---
@@ -15,13 +15,13 @@
   - Today `game/states/playing/visual/elements/layers.py` `_shed` runs
     inside `_aura`, once per drawn body wearing an aura: it rolls
     `run.rng.random() > rate / 60.0` and may call `run.particles.burst`.
-  - Three consequences, measured in RND-010's critic passes: the shed's
+  - Three consequences, measured in RND-012's critic passes: the shed's
     density scales with the draw rate (about 3x denser in the browser,
     host-paced at the display's refresh, e.g. 175 Hz, than at the
     desktop's 62 fps cap); the run's random stream, which gameplay also
     rolls on, is consumed per drawn frame, so gameplay randomness depends
     on how many frames were drawn (SYS-008, `run_determinism_journal.md`);
-    and, before RND-010's frozen backdrop, pausing piled aura particles up
+    and, before RND-012's frozen backdrop, pausing piled aura particles up
     (3 to 142 in 120 paused frames).
   - Tests to pin: the draw leaves `run.rng` and `run.particles` untouched;
     the shed's particles per second are the same at dt 1/30, 1/62 and
@@ -54,12 +54,12 @@
   protects the particle pool by the same amount per second at 62 fps and
   at 175 Hz. The keys keep their names (renaming is a data-contract change
   with nothing gained); the `_doc` says what they mean.
-- **RND-011.D4 — branch off `main`** (owner, 2026-09-30). RND-010 is still
+- **RND-011.D4 — branch off `main`** (owner, 2026-09-30). RND-012 is still
   in progress on another session's branch. Its
   `tests/flows/test_frozen_backdrop.py::AuraShedTests` documents the
   draw-time shed and its control (`the per-frame redraw piles particles
-  up`) turns false with this change. Whichever of RND-010 and RND-011
-  lands second updates it as written under *For RND-010* below.
+  up`) turns false with this change. Whichever of RND-012 and RND-011
+  lands second updates it as written under *For RND-012* below.
 - **RND-011.D5 — no shed under the end banner** (builder, within the
   banner's own rule). `run_end.ending_sequence` stands in for the update
   while the end banner waits, and its contract is "no clock, only what is
@@ -106,8 +106,9 @@ changes only the shed.
 ## RND-011: Todo
 
 - [x] RND-011.1 — Journal and index
-- [x] RND-011.2 — The shed in the update, on its own RNG, budget scaled to the step (`67f6737`)
+- [x] RND-011.2 — The shed in the update, on its own RNG, budget scaled to the step (`e9d24cf`)
 - [x] RND-011.3 — Docs, critic pass, done
+- [x] RND-011.4 — IDs after the rebase: the web-draw work is RND-012 (renamed from RND-010, which PR #55 took); index next-free RND-013
 
 ## RND-011: Results
 
@@ -167,7 +168,7 @@ budget, the shed moved before the ageing, a shed added to
 `ending_sequence`, `count` for `granted`, and the old report string each
 fail a test; restored, all pass.
 
-## For RND-010
+## For RND-012
 
 `tests/flows/test_frozen_backdrop.py::AuraShedTests` on
 `ComeGalletas/web-draw-cheap-5be9212c` asserts, as its control, that
