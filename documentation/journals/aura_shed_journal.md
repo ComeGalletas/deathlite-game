@@ -111,6 +111,7 @@ changes only the shed.
 - [x] RND-011.3 — Docs, critic pass, done
 - [x] RND-011.4 — IDs after the rebase: the web-draw work is RND-012 (renamed from RND-010, which PR #55 took); index next-free RND-013
 - [x] RND-011.5 — D5 confirmed by the owner: no shed under the end banner
+- [x] RND-011.6 — Merge review of the open PRs: the `AuraShedTests` rewrite verified on a combined merge
 
 ## RND-011: Results
 
@@ -181,3 +182,34 @@ meet, keep the test's first half (60 paused frames: no particles added,
 the per-frame redraw also adds nothing and leaves `run.rng` alone, because
 the draw no longer sheds (RND-011). The docstring's first sentence
 becomes history: "Before RND-011 the run's draw shed aura particles".
+
+**Verified on a combined merge (2026-09-30).** main `a6ac6c3` + #61 + #60
++ #57 + #55, in that order, in a scratch worktree. The only conflicts are
+`INDEX.md` (rows from both sides, next-free the highest per system) and,
+between #57 and #60, one hunk in `game/state.py` `StateMachine.__init__`
+(keep both: #60's `self.updated`, #57's `self._frozen`). On that tree
+`AuraShedTests` fails exactly at the control (`0 not greater than 0`,
+`test_frozen_backdrop.py:296`) and passes with this replacement for the
+control block (the docstring rewritten as above):
+
+```python
+        # A full redraw every frame, as before RND-012, adds nothing either
+        # since RND-011: the shed is the update's, never the draw's.
+        for _ in range(60):
+            sm.invalidate_backdrop()
+            sm.draw(screen)
+        self.assertEqual(len(run.particles), particles, "a redraw shed particles")
+        self.assertEqual(run.rng.getstate(), rng, "a redraw rolled run.rng")
+        # The control: these auras do shed, in the update, once the pause
+        # is gone.
+        sm.pop()
+        for _ in range(30):
+            ps.update(1 / 62)
+        self.assertGreater(len(run.particles.layer(True)), 0, "the auras never shed")
+```
+
+It holds only once both are in: on #57 alone the redraw still sheds, so
+the change goes with whichever of the two merges second.
+
+With it, the default suite on the combined tree: 4,221 passed, 7,547
+subtests (21.8 min), nothing else broken by the four PRs meeting.
