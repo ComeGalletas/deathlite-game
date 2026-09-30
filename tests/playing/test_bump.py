@@ -17,7 +17,7 @@ import pygame
 
 from game import config
 from combat.knockback import knock_split
-from game.states.playing.core.physics import BumpResolver, _PEN_CAP_FRAC
+from game.states.playing.core.physics import BumpResolver, _PEN_CAP_FRAC, tuned_dt
 
 
 class Body:
@@ -39,8 +39,14 @@ def _ps(enemies=(), boss=None, player=None):
                            player=player or Body(10_000, 10_000, 10, 40))
 
 
+# One tuned frame (16 ms, the loop's frame at the 62 fps cap), where the shove
+# is exactly `BUMP_GAIN x penetration` (ENT-019; other rates:
+# test_bump_rate.py).
+TUNED_DT = tuned_dt()
+
+
 def _resolve(ps):
-    BumpResolver(ps).resolve()
+    BumpResolver(ps).resolve(TUNED_DT)
 
 
 class BumpResolverTests(unittest.TestCase):
@@ -142,7 +148,7 @@ class PushRadiusTests(unittest.TestCase):
         r = BumpResolver(_ps([a, b]))
         seen = []
         r._frozen_contact = lambda x, y: seen.append((x, y))
-        r.resolve()
+        r.resolve(TUNED_DT)
         self.assertEqual(len(seen), 1)
 
 

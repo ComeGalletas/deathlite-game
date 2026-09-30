@@ -468,15 +468,17 @@ def bump_times(ps, frames: int) -> list:
     refuses `--bump` with the element flags).
     """
     import pygame
+    from game.states.playing.core.physics import tuned_dt
 
     home = pygame.Vector2(ps.player.pos)
     knocks = [(e, pygame.Vector2(e._knock)) for e in ps.enemies]
+    step = tuned_dt()                            # the tuned shove (ENT-019)
     ps.player.pos.update(home.x + _HERO_OFFSIDE, home.y + _HERO_OFFSIDE)
     times = []
     try:
         for _ in range(frames):
             t0 = time.perf_counter()
-            ps.bump.resolve()
+            ps.bump.resolve(step)
             times.append((time.perf_counter() - t0) * 1000.0)
             for e, k in knocks:
                 e._knock.update(k)

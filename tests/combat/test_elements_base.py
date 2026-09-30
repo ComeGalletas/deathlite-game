@@ -313,7 +313,7 @@ class FrozenContactTests(unittest.TestCase):
         hero's mitigation (evasion, block, armor) is its own."""
         from types import SimpleNamespace
 
-        from game.states.playing.core.physics import BumpResolver
+        from game.states.playing.core.physics import BumpResolver, tuned_dt
 
         class Hero:
             def __init__(self):
@@ -337,7 +337,7 @@ class FrozenContactTests(unittest.TestCase):
         bump = BumpResolver(ps)
         self.freeze_and_shove()
         self.slider.pos.update(hero.pos)
-        bump.resolve()
+        bump.resolve(tuned_dt())
         self.assertEqual(hero.hits, [])
 
     def test_the_toggle_in_the_data_switches_it_off(self):

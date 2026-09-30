@@ -150,6 +150,9 @@ INTEGRATION = (
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
     "tests/entities/test_enemy_update_exact.py::SeparationFightTests",
+    # ENT-019: the bump-rate bench boots seed 35's packed crowd; the series
+    # readers and the flag checks stay unit.
+    "tests/playing/test_bump_rate.py::BenchTests",
     # UI-014: screens drawn from a booted `Game`; the fit test boots a run.
     "tests/locale/test_numbers.py::LocaleNumberTests",
     "tests/screens/test_english_layout.py",

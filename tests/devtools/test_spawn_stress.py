@@ -110,8 +110,8 @@ class HarnessDefaultsTests(unittest.TestCase):
         hero_met = []
         real_resolve, real_bump = ps.bump.resolve, ps.bump._bump
 
-        def resolve():
-            real_resolve()
+        def resolve(dt):
+            real_resolve(dt)
             added = [(e._knock - k).length() for e, k in zip(ps.enemies, knocks)]
             pushed.append((sum(1 for a in added if a > 0.0), round(sum(added), 6)))
 

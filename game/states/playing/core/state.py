@@ -455,7 +455,7 @@ class PlayingState(State):
         if run.boss is not None and run.boss.alive:
             run.boss.update(ectx)
 
-        self.bump.resolve()          # CB-3: overlapping bodies shove each other
+        self.bump.resolve(dt)        # CB-3: overlapping bodies shove each other
         self.buffs.update(dt)        # timers, Turbo's bites, Pinball's throws
 
         self.fx.update_projectiles(dt)
