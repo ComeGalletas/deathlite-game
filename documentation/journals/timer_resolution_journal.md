@@ -1,8 +1,8 @@
 # Frame-cap timer resolution on Windows 11: journal
 
 **ID:** SYS-011 · **System:** systems (display shims) · **Type:** bug ·
-**Status:** in progress · **Branch:** ComeGalletas/sys-011-timer-resolution-26b3a82b
-(stacked on SYS-010, whose trace found it; owner, 2026-09-29)
+**Status:** done · **Branch:** ComeGalletas/sys-011-timer-resolution-26b3a82b
+(stacked on SYS-010, whose trace found it: `0de00e4`; owner, 2026-09-29)
 
 ---
 
@@ -173,13 +173,16 @@ vsync row at 46.9 ms sits close to that clamp.)
   says so. It never raises: off Windows, or on a Windows too old for the
   policy, it answers `False` and logs why.
 - **SYS-011.D3: the gate test switches the policy on itself.** Windows
-  applying the rule automatically and a process setting
-  `IGNORE_TIMER_RESOLUTION` on are the same policy (the
-  `SetProcessInformation` remarks describe the automatic case as that
-  flag's default). Set explicitly, it reproduces the stretch every time
-  (`Sleep(1)` median 15.27 ms, three cycles of three) and the fix lifts it
-  (1.51 ms), 240 ms a cycle. So the test that pins the fix is
-  deterministic and needs no minimized window.
+  applying the rule on its own and a process setting
+  `IGNORE_TIMER_RESOLUTION` on read as one policy here. Microsoft does not
+  say so: its `SetProcessInformation` remarks say only that Windows 11
+  "may automatically ignore" the request for a hidden, silent process. The
+  equivalence is measured. The flag set explicitly reproduces the stretch
+  every time (`Sleep(1)` median 15.27 ms, three cycles of three, 240 ms a
+  cycle), the same 15.3 ms the eval's control arms read when Windows
+  applies the rule to the real minimized game, and the fix lifts both. So
+  the test that pins the fix is deterministic and needs no minimized
+  window; the eval is what ties it to Windows' own decision.
 
 ## SYS-011: Plan
 
@@ -193,18 +196,86 @@ vsync row at 46.9 ms sits close to that clamp.)
   In the `Game` wiring tests: `Game()` calls it and keeps the answer.
 - **SYS-011.4: The eval,** `python -m tools.benchmarks.timer_regime`: the
   real `Game` in a real window with no audio device, minimized, stepped by
-  `_step`, with the policy honored and then system-managed. It passes when
-  the honored arm paces at the tick's own rate, and says whether Windows
-  still reproduces the rule in the control arm.
-- **SYS-011.5: Results;** the index to done.
+  `_step`, with the policy handed to Windows, honored, and handed back. It
+  passes when the honored arm paces at the tick's own rate, and says
+  whether Windows reproduced the rule in the control arms.
+- **SYS-011.5: A cold critic pass** (CLAUDE.md, medium bug fix: an
+  attacker on the repro), its findings fixed.
+- **SYS-011.6: Results;** the index to done.
 - **Outcome:** a headless `--trace` or benchmark run, and a hidden window
-  with no audio device, pace at 60 fps, not 32. Measured by the eval and
-  by the frame trace's `wait_ms`.
+  with no audio device, pace at 60 fps, not 32. Measured by the eval, and
+  in a trace by SYS-010's `wait_ms` column.
 
 ## SYS-011: Tasks
 
 - [x] SYS-011.1: This journal; the index row
-- [ ] SYS-011.2: The fix (`native.honor_timer_resolution`, `Game.timer_honored`)
-- [ ] SYS-011.3: Tests
-- [ ] SYS-011.4: The eval (`tools/benchmarks/timer_regime.py`)
-- [ ] SYS-011.5: Results; index to done
+- [x] SYS-011.2: The fix (`native.honor_timer_resolution`, `Game.timer_honored`)
+- [x] SYS-011.3: Tests
+- [x] SYS-011.4: The eval (`tools/benchmarks/timer_regime.py`)
+- [x] SYS-011.5: The cold critic's findings, fixed
+- [x] SYS-011.6: Results; index to done
+
+## SYS-011.3: What the tests catch
+
+Mutation check (a throwaway script, not kept: each mutant is one source
+edit, the three touched test modules run against it, the source restored
+byte for byte): 12 mutants, 12 caught. The fix removed; the policy set to
+ignore instead of honor; handed back to Windows instead; the wrong
+information class; `Game` never calling it; a refusal not checked; either
+platform gate dropped; exceptions escaping; the read's failure log
+dropped; the eval ignoring the shipped call; the eval with no
+inconclusive status. The critic's load run: the timer tests ten times
+under 32 busy processes on the 16 logical cores, no failure. The tier
+audit: 4036 tests read, 0 under-tiered.
+
+## SYS-011.5: The cold critic's findings, and what changed
+
+A critic that had not built it read the four commits, the repro and the
+requirement cold, re-ran the eval and a mutation and load run of its own.
+It could not break the fix (the eval, the ctypes layout against the
+`SetProcessInformation` page, the web build, every pacing entry point, a
+re-init, the load run). Verdict: FAIL, on these:
+
+| Finding | Fix |
+|---|---|
+| The journal said the branch was stacked on SYS-010 while it sat on `main` | Rebased onto SYS-010's pushed tip before the PR; the line is now true |
+| Tasks .2 to .4 unticked after they landed; no results; status in progress | Ticked; results below; the index row to done |
+| The regression pin passed with the policy handed back to Windows, the pre-fix state, whenever Windows was not applying its rule to the test process at that moment | The pin asserts the policy reads `(IGNORE_TIMER_RESOLUTION, 0)` after the fix, not only the sleep |
+| The eval's honored arm set the bits with the private setter, never the shipped call, and ignored `Game.timer_honored` | The arm calls `native.honor_timer_resolution()`; `judge` fails when it or `Game`'s call answered False |
+| A pass with neither control arm reproducing exited 0, though it would pass with the fix deleted | Exit 3, "inconclusive"; 0 needs a control arm to have reproduced |
+| The wiring test left the process policy changed | It restores what it found |
+| `_throttling` failed without saying why, against the module's contract | It logs on each failure path |
+| D3 said Microsoft documents the equivalence | Reworded: measured, not documented |
+| The import test depended on the caller's `SDL_VIDEODRIVER` | It reloads the module and compares the drivers before and after |
+| `Next free: SYS-012` with no SYS-010 row on the branch | Resolved by the rebase: SYS-010's row is there |
+
+Not verified here: whether Windows 10 refuses the timer bit. The code
+treats a refusal as `False` and a log line, and before Windows 11 the
+request is never set aside, so either answer is safe. It would take a
+Windows 10 machine running
+`python -c "from game.display import native; print(native.honor_timer_resolution())"`.
+
+## SYS-011.6: Results
+
+`python -m tools.benchmarks.timer_regime`, the final code, 2026-09-29, on
+the owner's machine (as above). The real `Game`, real window, no audio
+device, minimized, 5 s an arm after a 3 s settle; ms:
+
+| run | arm | `SDL_Delay(1)` before -> after | frame p50 / p90 | tick wait p50 |
+|---|---|---|---|---|
+| 1, vsync off | managed | 15.51 -> 15.30 | 30.66 / 31.79 | 29.11 |
+| | **honored** | 1.51 -> 1.51 | **16.64** / 17.52 | 14.99 |
+| | managed again | 15.27 -> 15.28 | 30.70 / 31.63 | 29.13 |
+| 2, vsync off | managed | 15.33 -> 15.55 | 30.82 / 31.89 | 29.05 |
+| | **honored** | 1.52 -> 1.53 | **16.62** / 17.85 | 15.01 |
+| | managed again | 15.33 -> 15.42 | 30.74 / 31.78 | 28.96 |
+| 3, vsync on | managed | 15.44 -> 15.76 | 46.86 / 47.96 | 0.00 |
+| | **honored** | 1.51 -> 1.52 | **33.59** / 34.35 | 0.00 |
+| | managed again | 15.51 -> 15.24 | 46.88 / 48.02 | 0.00 |
+
+All three: the rule reproduced in both control arms, the fix PASS, exit 0.
+With vsync off a hidden, silent game paces at the cap's 16.6 ms again
+instead of 30.7 (32 fps to 60). With vsync on the minimized present is
+DWM's (the tick never waits), and the coarse timer stretched that too:
+46.9 ms down to 33.6. Real play, visible or with a device open, was never
+exposed and keeps its 16.5 to 16.7 ms.
