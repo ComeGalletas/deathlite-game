@@ -1,6 +1,6 @@
 # Projectiles climb stairs — journal
 
-**ID:** CMB-010 · **System:** CMB (+ WLD) · **Type:** feature · **Status:** done (PR open) ·
+**ID:** CMB-010 · **System:** CMB (+ WLD) · **Type:** feature · **Status:** done (merged as PR #46, `cf5145b`) ·
 **Branch:** claude/projectile-collision-priority-aaaf97 (worktree `.claude/worktrees/projectile-collision-priority-aaaf97`)
 
 ---
