@@ -10,7 +10,9 @@ lopsided the matchup is:
     push_tgt  = total * w_src / (w_src + w_tgt)     # shove,  per the source's mass
 
 Callers pick `base`:
-  * a bump -> ``config.BUMP_GAIN * penetration_px``
+  * a bump -> ``config.BUMP_GAIN * penetration_px``, times this frame's
+    ``physics.bump_scale(dt)``, below 1.0 only on a frame shorter than the
+    tuned 16 ms one (ENT-019: a bump repeats every frame)
   * a hit  -> ``config.HIT_KNOCK_GAIN * weapon_weight``  (weight 0 -> base 0 -> nothing)
 
 `inf` weights (the boss) are handled by explicit branches, never IEEE

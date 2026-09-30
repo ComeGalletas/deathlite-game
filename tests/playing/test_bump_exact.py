@@ -21,6 +21,15 @@ frozen-contact exchange in order):
   coincident limit;
 * seed 35's harness fight, packed and primed round the hero with the boss
   in it, frame after frame as it plays.
+
+ENT-019 made the pass take the frame's `dt` and size each shove by
+`physics.bump_scale(dt)`, which is exactly 1.0 on the tuned 16 ms frame (the
+loop's frame at the 62 fps cap) or any longer one. The oracle keeps its own
+copy of the pre-ENT-019 `_bump`, and the new pass runs here on the tuned
+frame, and the random crowds on every slow frame the loop makes, so these
+same comparisons are ENT-019's pin: at the 62 fps cap and below, the pass is
+the one CB-3/H tuned, bit for bit (`journals/bump_frame_rate_journal.md`).
+Faster frames are `test_bump_rate.py`'s.
 """
 import os
 import random
@@ -34,13 +43,35 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from combat.elements import ice as ice_rules
+from combat.knockback import knock_split
 from game import config
 from game.states.playing.core import physics
 from game.states.playing.core.physics import BumpResolver
 
 
+def _old_bump(self, a, b, contact: bool = False, reach: float = 1.0) -> None:
+    """`BumpResolver._bump` as it was before ENT-019, verbatim: no `dt`,
+    every frame's shove the tuned one whatever the frame's length. Kept
+    here, not borrowed from the resolver, so the comparison pins the shove
+    itself and not only the factor that ENT-019 put in front of it."""
+    delta = a.pos - b.pos
+    d2 = delta.length_squared()
+    touch = a.radius + b.radius
+    if d2 >= touch * touch or d2 < 1e-9:
+        return                                   # not overlapping / coincident
+    rr = touch * reach
+    if d2 < rr * rr:
+        pen = min(rr - d2 ** 0.5, rr * physics._PEN_CAP_FRAC)
+        push_a, push_b = knock_split(a.weight, b.weight, config.BUMP_GAIN * pen)
+        a.apply_knockback(delta, push_a)         # a shoved away from b
+        b.apply_knockback(-delta, push_b)        # b shoved away from a
+    if contact:
+        self._frozen_contact(a, b)
+
+
 def _old_resolve(self) -> None:
-    """`BumpResolver.resolve` as it was before RND-008.5, verbatim."""
+    """`BumpResolver.resolve` as it was before RND-008.5, verbatim, calling
+    the pre-ENT-019 `_bump` above."""
     ps = self.ps
     run = getattr(self, "run", ps)
     enemies = run.enemies
@@ -64,14 +95,23 @@ def _old_resolve(self) -> None:
                 continue
             seen.add(key)
             frac = (1.0 if b is boss else config.CROWD_PUSH_RADIUS_FRAC)
-            self._bump(a, b, contact=True, reach=frac)
+            _old_bump(self, a, b, contact=True, reach=frac)
 
     p = run.player
     if p.alive:
         for e in self._grid.query_circle(p.pos.x, p.pos.y,
                                          p.radius + physics._QUERY_PAD):
             if getattr(e, "alive", True):
-                self._bump(p, e)
+                _old_bump(self, p, e)
+
+
+# The tuned frame: 16 ms, what the loop's millisecond clock gives at the
+# 62 fps cap (`physics.tuned_dt`).
+TUNED_DT = physics.tuned_dt()
+# The frames ENT-019 leaves as they were: exactly 1/62 s, the loop's 17 and
+# 18 ms frames at the cap, 60 Hz vsync, a heavy scene, and the longest frame
+# the loop allows.
+SLOW_DTS = (1 / 62, 0.017, 0.018, 1 / 60, 1 / 30, config.MAX_DT)
 
 
 class _Body:
@@ -90,13 +130,14 @@ class _Body:
             self._knock += direction.normalize() * strength
 
 
-def _both(run, resolver, kill=None):
+def _both(run, resolver, kill=None, dt=TUNED_DT):
     """Knocks, frozen-contact exchanges and deaths from the old pass and the
     new, each from the same starting state.
 
     `kill=(every, side)` makes every `every`-th exchange kill its `a` or its
     `b`, as frozen-contact damage can: the one state that changes inside a
-    pass, and what the new pass's order of checks must not trip over."""
+    pass, and what the new pass's order of checks must not trip over.
+    `dt` is the new pass's frame (the old one has none, ENT-019)."""
     # The real boss is immovable (`apply_knockback` ignores it) and keeps no
     # knock; every other body does.
     everyone = [b for b in [*run.enemies, run.player, run.boss] if b is not None]
@@ -104,7 +145,11 @@ def _both(run, resolver, kill=None):
     start = [b._knock.copy() for b in bodies]
     living = [b.alive for b in everyone]
     out = []
-    for resolve in (_old_resolve, BumpResolver.resolve):
+
+    def new_resolve(r):
+        BumpResolver.resolve(r, dt)
+
+    for resolve in (_old_resolve, new_resolve):
         for b, k in zip(bodies, start):
             b._knock.update(k)
         for b, alive in zip(everyone, living):
@@ -181,6 +226,27 @@ class RandomCrowdTests(unittest.TestCase):
                 _assert_same(self, new, old)
             cases += 1
         self.assertEqual(cases, 400)
+
+    def test_a_slow_frame_is_shoved_exactly_as_before(self):
+        # ENT-019.D5: only a frame shorter than the tuned 16 ms one is
+        # scaled; every longer one is the tuned pass, bit for bit.
+        rng = random.Random(8007)
+        for i in range(120):
+            run, resolver = self._run(
+                rng, rng.randrange(2, 90), boss=i % 3 == 0, giant=i % 7 == 0,
+                stacked=i % 5 == 0, touching=i % 4 == 0)
+            for dt in SLOW_DTS:
+                old, new = _both(run, resolver, dt=dt)
+                with self.subTest(case=i, fps=round(1 / dt, 2)):
+                    _assert_same(self, new, old)
+
+    def test_a_fast_frame_is_not(self):
+        # The comparison above means something: at 144 Hz the pass does
+        # shove differently.
+        rng = random.Random(8007)
+        run, resolver = self._run(rng, 60)
+        old, new = _both(run, resolver, dt=1 / 144)
+        self.assertNotEqual(new[0], old[0])
 
     def test_bodies_killed_by_a_frozen_contact_mid_pass(self):
         # Frozen-contact damage can kill a body in the middle of a pass; the

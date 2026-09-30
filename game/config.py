@@ -1028,7 +1028,8 @@ GRID_CELL_SIZE: int = 96
 # and weapon hits both run through `combat.knockback.knock_split`, which shares
 # the impulse by the *other* body's weight fraction and amplifies it by the
 # weight gap:  total = base * (1 + BUMP_DIFF_GAIN * |dw| / sum_w).
-#   * a bump's base    = BUMP_GAIN * penetration_px
+#   * a bump's base    = BUMP_GAIN * penetration_px * bump_scale(dt), every
+#                        frame the pair overlaps (see BUMP_REFERENCE_FPS)
 #   * a hit's base      = HIT_KNOCK_GAIN * weapon_weight  (weight 0 -> no push)
 # The resulting push is added to the body's `_knock` accumulator, which decays
 # by pow(BUMP_DECAY, dt) each frame (same curve enemies already used for
@@ -1039,6 +1040,18 @@ BUMP_GAIN: float = 12.0          # penetration px -> bump impulse
 BUMP_DIFF_GAIN: float = 2.0      # how hard a weight mismatch amplifies the shove
 BUMP_DECAY: float = 0.001        # `_knock *= pow(BUMP_DECAY, dt)` per frame (~0.7 s fade)
 HIT_KNOCK_GAIN: float = 2.5      # weapon weight -> hit impulse base
+# ENT-019: the frame rate the bump above was tuned at (CB-3/H, the desktop
+# loop). A hit is one impulse, but a bump repeats every frame an overlap
+# lasts, so `physics.bump_scale(dt)` sizes a shorter frame's share to shove at
+# the same speed per game-second as the tuned frame. The loop's clock ticks in
+# whole ms, so the tuned frame is 16 ms (`physics.tuned_dt`), which is what
+# this cap runs. It is not `FPS`, though the value matches today: the web
+# profile sets `FPS` to 60, and moving the loop's cap must not retune the
+# bump. The share only ever scales *down* (owner, ENT-019.D5): a 16 ms frame
+# or a longer one shoves exactly as it always has, so a heavy scene separates
+# a crowd more slowly a second, as before, and only faster frames (a 120-165 Hz
+# browser) are scaled. See journals/bump_frame_rate_journal.md.
+BUMP_REFERENCE_FPS: int = 62
 # ENT-016: the crowd push radius. Two *enemies* bump only when their centres
 # are closer than this fraction of their summed radii, so a pack can compress
 # and file across a one-tile bridge deck instead of shoving itself back off
