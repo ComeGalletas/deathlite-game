@@ -1226,3 +1226,122 @@ Closed as non-breaking:
   built, not from `actor.radius` when it fires. The two are the same
   value: an enemy's radius is set once and never written at runtime. A
   future runtime size modifier would have to update the cfg too.
+
+## ENT-021 — Requirement (owner, 2026-09-30)
+
+- **Objective:** Set the Ravager's (`bear`) and Grudge's (`troll`) collider
+  to a fixed 20 px, and change the pathfinding values to match.
+- **Details:** A follow-up to ENT-020, which set 15.4 and 18.2. It answers
+  ENT-020.Q1: Grudge, at 18.2 in the large nav class (22 px clearance),
+  fit gaps the pathfinder would not send it through.
+- **Constraint:** As in ENT-020: the sprites keep their size, and the
+  Ravager keeps its reach (`attack_radius: 22`).
+
+## ENT-021 — Confirmed reading
+
+- At 20 both bodies are in the **large** nav class (radius > 16) and the
+  large spawn class. That brings the bear back to where it was before
+  ENT-020 moved it to small.
+- **ENT-021.D1 — The large clearance goes 22 -> 20.** 22 was the
+  Ravager's old radius. At 20 the field routes both bodies through every
+  gap they fit (`_NAV_CLASSES` in `world/nav/field.py`).
+  - The turtle (24) paths in the same class. It was already 2 px wider
+    than the clearance and leans on the corridor leniency; it is now 4 px
+    wider. That is measured below rather than assumed.
+- **The same number drives world generation**, in two places:
+  - `world/gen/spawnpoints.py: body_radii` sizes the large spawn points.
+  - `world/gen/repair.py: _widest_class` sets the body the unseal repair
+    certifies can reach everything.
+- The first cut let both follow 22 -> 20. The cold critic failed it.
+  - The journal said only spawn points moved. In fact the repair also kept
+    and dropped obstacles on all four shipping seeds: 620 -> 621,
+    587 -> 591, 576 -> 580, 595 -> 599.
+  - Those obstacles sealed pockets off from the turtle. Reach from the start
+    room for a 24 px body fell 1-3 % (seed 35: 10441 -> 10348 cells).
+  - Large spawn points whose cell a 24 px body cannot reach went from 6 to 20.
+  - The bridge bench could not see any of this, because bridges are
+    corridor cells and the corridor leniency lets every body through.
+- **ENT-021.D2 — World generation keeps a 22 px floor.**
+  `world/gen/tuning.py: _WORLD_BODY_FLOOR = 22.0`.
+  - The repair and the large spawn points certify ground for the widest
+    nav class's clearance, but never less than 22, the body both were
+    measured and tuned against.
+  - A new, wider class still raises it, which is why the repair read the
+    classes in the first place.
+  - The owner asked for pathfinding values, not a different world. With the
+    floor, the world is **byte-identical** to before ENT-021: all twelve
+    pinned digests in `tests/world/digests.json` hold without a re-pin.
+
+## ENT-021 — Tasks
+
+- [x] ENT-021.1 — Large nav clearance 20, with world generation floored at
+  22 (D2) so the world is unchanged; the world tests read the certified
+  body; the spawn master's dead large radius removed.
+- [x] ENT-021.2 — Bear and troll radius 20, with the clearance, routing and
+  floor tests (`ColliderRoutingTests` registered in the `world` tier).
+- [x] ENT-021.3 — Journal, index, bench numbers.
+
+## ENT-021 — Results
+
+The same bridge bench as ENT-020: push fraction 0.75, 40 s per trial, three
+seeds with two bridges each. Crossed / stuck / median time for half the pack
+to cross:
+
+| pack | original (22 / 26, clearance 22) | ENT-020 (15.4 / 18.2, clearance 22) | ENT-021 (20 / 20, clearance 20) |
+|---|---|---|---|
+| bears + trolls | 126/139 (91 %) · 6 · 13.7 s | 142/144 (99 %) · 0 · 12.1 s | 136/144 (94 %) · 2 · 12.7 s |
+| turtles only | 109/133 (82 %) · 4 · 15.4 s | — | 114/133 (86 %) · 0 · 15.0 s |
+
+- Against the original, the heavy pack crosses better at 20: all six
+  packs could be seated, and fewer bodies stuck. It crosses less well
+  than at ENT-020's smaller bodies, as expected for wider bodies.
+- The turtle is not hurt by the lower clearance on the bridges. It
+  crosses slightly better and none got stuck. Seed 42's long 1984 px deck
+  is the same 3/19 at both clearances; that is the deck, not the class.
+  - The bridge bench cannot see island pockets. That risk is closed by D2,
+    not by this table: the world is byte-identical, so the turtle's reach
+    on the islands is what it was.
+  - Numbers are from the final tree (D2 in place). The run on the first
+    cut gave the same totals.
+- **Off the bridges** (the second critic's measurement, with its
+  scripts in the session scratchpad):
+  - About 100 large-lattice cells per world open up at 20: 35: 101,
+    7: 94, 1234: 104, 42: 94. All have 20-22 px of clearance and none are
+    corridor cells.
+  - A 20 px body can stand on almost all of them: 96 of 101 on seed 35 and
+    92 of 94 on seed 7. A 24 px body can stand on none.
+  - Routes to large-room targets get shorter. Reach grows by 93-101 cells,
+    and the median saving is 28-136 px.
+  - The turtle's lattice mis-steps (a next cell too tight for 24 px) went
+    from 58-92 to 126-165 per world.
+  - It still arrives: a kinematic run with 80 starts per seed, 25 s each,
+    the real `resolve_movement` and no unstick component gave:
+    - turtle: 92 -> 97 of 320 arrivals;
+    - bear: 149 -> 146 (noise).
+    So the extra mis-steps do not cost it anything.
+  - The Tusked Lance boss (40, `via="nav"`) is barely touched: its
+    mis-step count rose 3-6 %.
+- **Tests** (`tests/entities/ai/test_melee_enemies.py`,
+  `ColliderShrinkTests`), each checked against its bug in process:
+  - `test_the_nav_class_clearance_matches_them`: the class a 20 px body
+    paths in asks for exactly 20. It fails at 22 and at 18.
+  - `test_the_field_routes_them_through_a_20_px_gap`: the behaviour. On
+    seed 35's shared nav field, open cells with 20-22 px of clearance are
+    reached by the large field. It fails at 22.
+  - `test_the_world_is_still_certified_for_the_wider_walkers`: the repair
+    and the large spawn points stay at 22. It fails without the floor, and
+    so does `tests/world/test_digest.py`.
+  - `tests/world/test_elevation.py` and `test_north_flights.py` used to
+    hard-code 22 as "the large class". They now read `body_radii()[1]`,
+    the body the world is certified for.
+- `spawn/master.py`: `_class_radii` returned a large radius nothing read,
+  and it would now have disagreed with the certified 22. It became
+  `_small_class_radius`, the only half that is used.
+- **ENT-020's notes at 20 px:**
+  - Q1 is answered by this requirement.
+  - Q2, the hurtbox: against a 4 px shot the hit area is 85 % of the
+    original for the bear ((24/26)^2) and 64 % for the troll ((24/30)^2).
+  - Q3, the overlays: the elemental aura is 97 px for both, down from 105
+    (bear) and 122 (troll).
+  - The watchdog note no longer applies: the bear's contact reach is
+    20 + 10 + 8 = 38, which covers its 37 px swing.
