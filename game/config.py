@@ -489,6 +489,7 @@ SHOW_ENEMY_STATE_RINGS: bool = False
 # An enemy outside the bound keeps `steer_at`'s bearing fallback, so it still
 # moves; it just has no routed path, and its pursuit timer ends the attempt.
 # `None` restores the unbounded fill.
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 NAV_FILL_MAX_COST: int | None = 4500
 
 # through doorways and around obstacle clusters. `resolve_movement` stays the
@@ -498,6 +499,7 @@ NAV_FILL_MAX_COST: int | None = 4500
 ENEMY_PATHFINDING: bool = True
 # Seconds between full field rebuilds toward the player (also rebuilt early once
 # the player drifts a couple of navigation cells from the last rebuild target).
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 ENEMY_NAV_REBUILD_INTERVAL: float = 0.4
 # How much of a flow-field fill runs a frame before it yields and picks up
 # next frame, in **relaxations** (cells settled). A fill used to run whole
@@ -802,6 +804,7 @@ ENEMY_COUNT_HARD_CAP: int = 600
 # p50 15.2 (126 over) and 297 at p50 16.5 (250 over). 250 sits between the
 # last two rows, so a crowded frame is expected to miss 60 fps on this
 # machine. The owner asked for the larger crowd knowing that.
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 ENEMY_LIVE_CAP: int = 250
 # Spawn master S7: update divisor for enemies that are neither chasing nor
 # on screen. 1 updates every enemy every frame; 2 updates such an enemy
@@ -811,6 +814,7 @@ ENEMY_LIVE_CAP: int = 250
 # (its pre-RND-008 defaults; `--hints --live-director` re-takes them):
 # 2 took the 100-live p50 from 7.8 to 5.8 ms, 3 only to 5.1 -- see the spawn
 # master journal (S7).
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 ENEMY_LOD_SKIP: int = 2
 # How far past the view's edge an enemy still counts as on screen for the
 # LOD (world px, added to each side), so a body walking into view is
@@ -1163,16 +1167,32 @@ def apply_web_profile() -> None:
       seams; `TILE_PX * 1.25 == 80.0` does not. The web view is ~4% tighter
       than desktop as a result (1024 px of world across, against 1066).
 
+    * The browser's own crowd (BLD-003, owner 2026-09-29). WebAssembly makes
+      a frame's update ~1.3-2.5x and its draw ~3.5-5x dearer than the
+      desktop's, and the 16.7 ms budget does not grow, so:
+      `ENEMY_LIVE_CAP = 100` -- `ENEMY_COUNT_BASE`, so a run opens with the
+      desktop's crowd and only the director's growth past 100 is cut (BLD-003.D1);
+      `ENEMY_LOD_SKIP = 3`, `ENEMY_NAV_REBUILD_INTERVAL = 0.6` and
+      `NAV_FILL_MAX_COST = 3500` -- off-screen idle enemies tick every third
+      frame, routing refreshes less often and fills a little less far (BLD-003.D2,
+      `documentation/plans/web_plan.md` section 4).
+
     Everything reads these at call time (the one default-arg capture,
     `systems.camera.Camera`, is overridden by an explicit argument in
     `PlayingState`), so a plain reassignment here propagates.
     """
     global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
     global WINDOW_RESIZABLE, RENDER_SCALE
+    global ENEMY_LIVE_CAP, ENEMY_LOD_SKIP, ENEMY_NAV_REBUILD_INTERVAL
+    global NAV_FILL_MAX_COST
     SAVE_ENABLED = False
     VSYNC = False
     WINDOW_RESIZABLE = False        # pygbag owns the canvas
     FPS = 60
+    ENEMY_LIVE_CAP = 100
+    ENEMY_LOD_SKIP = 3
+    ENEMY_NAV_REBUILD_INTERVAL = 0.6
+    NAV_FILL_MAX_COST = 3500
     SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
     RENDER_SCALE = SCREEN_HEIGHT / UI_HEIGHT
     CAMERA_ZOOM = WEB_VIEW_ZOOM / RENDER_SCALE
