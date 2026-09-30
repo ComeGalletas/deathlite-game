@@ -15,7 +15,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-020 · SPN-004 · WLD-015 · RND-010 · UI-018 ·
+**Next free:** CMB-011 · ENT-021 · SPN-004 · WLD-015 · RND-010 · UI-018 ·
 PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
 
 ## Requirements
@@ -51,6 +51,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
 | ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | ENT-018 | The enemies' own update made cheaper, bit for bit the same (crowding push, floor lookups) | ENT, WLD | performance | done | [enemy_update_journal.md](enemy_update_journal.md) | ComeGalletas/ent-018-enemy-update-9ec11fc6 | 2026-09-29 |
 | ENT-019 | The crowd bump shoves a fast display's frames at the tuned rate a second; the 62 fps cap and every slower frame bit for bit as before | ENT, SYS | bug | done | [bump_frame_rate_journal.md](bump_frame_rate_journal.md) | ComeGalletas/ent-019-bump-frame-rate-417b14b3 | 2026-09-30 |
+| ENT-020 | Ravager and Grudge colliders 30 % smaller to fit tighter ground; sprites and the Ravager's reach unchanged | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/bear-troll-collision-rings-0e37b7 | 2026-09-30 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |

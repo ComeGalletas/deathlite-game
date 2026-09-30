@@ -1089,3 +1089,140 @@ many were stuck:
   - the shapes.
 - **Full default suite: 3425 passed, 0 failed, 0 skipped** (11 sweep
   deselected, 13 min 55 s).
+
+## ENT-020 — Requirement (owner, 2026-09-30)
+
+- **Objective:** Make the Ravager's (`bear`) and Grudge's (`troll`)
+  collision rings 30 % smaller so they fit smaller areas more easily.
+- **Details:** The owner confirmed 30 % off the **radius** (linear), not
+  off the area: bear 22 -> 15.4, troll 26 -> 18.2.
+- **Constraint:** The sprites keep their size. The owner also chose to keep
+  the Ravager's melee reach where it was.
+
+## ENT-020 — Confirmed reading
+
+- The collider is `radius` in `data/enemies/enemies.json`. The drawn size is
+  the rig's `scale` in `enemy_sprites.json` (bear `[113, 96]`, troll
+  `[99, 77]`), which never reads the radius. Both enemies name their
+  `weight` (30, 80), so the bump mass does not follow the radius either.
+- The render seats the feet `SPRITE_ANCHOR_DROP x radius` (0.83) below the
+  collider centre (`rendering.py: sprite_drop`). With a smaller ring the
+  sprite sits 5.5 px (bear) and 6.5 px (troll) higher over its centre. The
+  feet stay on the smaller ring the same way, and the size does not change.
+- World generation keeps bridge decks clear for the widest walker
+  (`Content.widest_walker_radius`, WLD-012). That is `the_tusked_lance` at
+  40, so the generated world is unchanged.
+- Grudge's `brute` slam reads `slam_range` and `slam_radius` (60, 60), not
+  the body, so its reach is unchanged.
+- The Ravager's `path_chase_attack` is sized from the body **twice**. The
+  swing starts at `radius + PLAYER_RADIUS + attack_reach_pad` (22 + 10 + 5
+  = 37). Then the `poke` hitbox lands `radius / 2` wide, `radius` out, and
+  catches the hero up to `1.5 x radius + 10` away (43).
+  - **ENT-020.D1 — One key sizes the swing: `attack_radius`.** Pinning only
+    the trigger (an `attack_range` of 37) would make a whiff: the swing
+    starts at 37 while a hitbox sized from 15.4 reaches only 33.1. So the
+    bear names `attack_radius: 22`, and both the trigger and `poke` read it
+    through `actions._swing_radius`. An enemy without the key uses its
+    collider, exactly as before. One number, so the two cannot drift apart.
+
+## ENT-020 — Plan
+
+- `_swing_radius(cfg)` in `entities/ai/actions.py`, read by `melee_reach`
+  and `poke`.
+- The data: the two radii, the bear's `attack_radius`, and the arithmetic in
+  a `_radius_comment` next to each value.
+- **Tests** (`tests/entities/ai/test_melee_enemies.py`,
+  `ColliderShrinkTests`):
+  - the colliders are 0.7 of 22 and 26, and the rigs' `scale` is unchanged;
+  - the Ravager's trigger is still 37, and its hitbox is still 11 wide at
+    22 out;
+  - **the general rule:** every `path_chase_attack` enemy's poke reaches a
+    hero standing at its trigger range. Checked against the bug: with
+    `poke` back on `actor.radius`, the bear subtest fails.
+- **Measurement:** the ENT-016 bridge bench with a pack of only bears and
+  trolls, old radii against new.
+
+## ENT-020 — Tasks
+
+- [x] ENT-020.1 — `attack_radius` / `_swing_radius` sizes the melee swing
+  (no enemy names it yet, so behaviour is unchanged), with its tests.
+- [x] ENT-020.2 — Bear and troll colliders 30 % smaller, the bear's reach
+  kept, with their tests.
+- [x] ENT-020.3 — Journal and index, bench numbers recorded.
+
+## ENT-020 — Results
+
+**The bench.** This is the ENT-016 bridge bench at the shipped push fraction
+(0.75), 40 s per trial, three seeds and two bridges each. The pack has only
+bears and trolls (`bridge_crowd.MIX = ("bear", "troll")`). A scratch wrapper
+put the old radii back in process for the "old" column; the bench itself is
+unchanged. Each cell is crossed/pack, the time half the pack took to cross,
+and how many were stuck:
+
+| seed | bridge | old (22 / 26) | new (15.4 / 18.2) |
+|---|---|---|---|
+| 35 | 0-1 | 20/21 · 12.4 s · 1 | 24/24 · 10.9 s · 0 |
+| 35 | 0-1 (lane 2) | 24/24 · 13.7 s · 0 | 24/24 · 12.1 s · 0 |
+| 7 | 0-1 | 17/24 · 12.8 s · 4 | 23/24 · 11.5 s · 0 |
+| 7 | 0-1 (lane 2) | 22/24 · 11.8 s · 1 | 24/24 · 10.2 s · 0 |
+| 42 | 0-1 (1984 px deck) | 19/22 · 36.4 s · 0 | 23/24 · 34.9 s · 0 |
+| 42 | 0-2 (832 px deck) | 24/24 · 17.7 s · 0 | 24/24 · 15.3 s · 0 |
+| **all** | | **126/139 (91 %) · 13.7 s · 6** | **142/144 (99 %) · 12.1 s · 0** |
+
+- With the old radii the bench could not seat a full pack of 24 at two of
+  the mouths (21 and 22). The big bodies did not fit the ground behind
+  them, which is the problem this change fixes.
+- Crossed went from 91 % to 99 %, stuck from 6 to 0, and the median time
+  for half the pack to cross from 13.7 s to 12.1 s.
+- **Tests:** `tests/entities/ai`, `tests/render/test_enemy_sprite.py` and
+  `tests/render/test_enemy_hp_bar.py` all pass. The new whiff rule was
+  checked against the bug: reverting `poke` to `actor.radius` fails the
+  bear subtest and the hitbox pin (7.7 != 11.0).
+
+## ENT-020 — Critic pass (cold, 2026-09-30)
+
+**Verdict: PASS** on the requirement. The radii are 15.4 and 18.2, the
+sprite size is the rig `scale` and never reads the radius, and the bear's
+trigger (37) and hitbox (11 at 22 out) are unchanged. For every other
+`path_chase_attack` enemy (skull, turtle, panda, hammer_gnome) the trigger
+and hitbox are identical to before. The critic mutation-tested the new tests:
+reverting `poke`, the trigger, or both fails at least one test each time.
+
+Open for the owner (they follow from shrinking the collider; not changed
+here):
+
+- **ENT-020.Q1 — The troll still paths as a large body.**
+  `world/nav/field.py` has two nav classes: small (32 px grid, clearance
+  16, radius <= 16) and large (48 px, clearance 22).
+  - The bear (15.4) moved from large to small, both for pathing and for
+    its spawn class (`spawn/master.py`, `radius > 16`). That helps it
+    reach tight ground.
+  - The troll (18.2) is still large. It now physically fits gaps with
+    18.2-22 px of clearance, but the flow field never routes it through
+    them.
+  - Options: radius <= 16 for the troll, or a nav-class change, which
+    would move every enemy.
+- **ENT-020.Q2 — The hurtbox shrank too.** Player shots and melee test
+  `enemy.radius`. Against a 4 px shot, the area that registers a hit is 56 %
+  (bear) and 55 % (troll) of what it was, while the sprites stay the same
+  size. A shot that visibly clips the outer body can now pass through.
+- **ENT-020.Q3 — Overlays sized from the radius shrink over an unchanged
+  sprite.**
+  - The elemental aura sprite: bear 105 -> 77 px, troll 122 -> 89 px.
+  - The freeze block: bear 57 -> 40 px, troll 68 -> 47 px.
+  - The burn and chill marks sit about 12-14 px lower on the sprite.
+  - The HP bar, spawn and death effects and mark brackets follow the rig,
+    so they are unaffected.
+
+Closed as non-breaking:
+
+- **The watchdog's contact reach** (`spawn/watchdog.py`,
+  `radius + PLAYER_RADIUS + 8`) is 33.4 for the bear now, below its
+  37 px swing. A blocked bear 33.4-37 px from a still hero could be
+  sampled as stuck. Each swing resets the hold, and an on-screen verdict
+  waits, so it never recycles in practice. A real fix would add a
+  host-contract method; not worth it for this.
+- `poke` now reads its radius from the enemy's cfg when the behaviour is
+  built, not from `actor.radius` when it fires. The two are the same
+  value: an enemy's radius is set once and never written at runtime. A
+  future runtime size modifier would have to update the cfg too.
