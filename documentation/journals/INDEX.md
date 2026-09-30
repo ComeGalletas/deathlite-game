@@ -15,8 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-019 · SPN-004 · WLD-015 · RND-009 · UI-018 ·
-PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
+**Next free:** CMB-011 · ENT-019 · SPN-004 · WLD-015 · RND-010 · UI-018 ·
+PRG-004 · AUD-004 · SYS-012 · TST-008 · BLD-003 · DOC-008
 
 ## Requirements
 
@@ -75,6 +75,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | RND-006 | Close the wolf-art plan (WA5); no wolf-specific ignore rules | RND, DOC | process | done | [assets_journal.md](assets_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | RND-007 | The `mark` status drawn as raspberry lock-on brackets, shown with a blessing that reads it | RND, CMB | feature | done | [mark_overlay_journal.md](mark_overlay_journal.md) | claude/rnd-007-mark-overlay | 2026-09-24 |
 | RND-008 | Gameplay frame time: the reviewed performance findings and their todo list (per-frame font builds in the hints, the harness, the elemental draw, bump) | RND, SYS, ENT, CMB | performance | done | [frame_time_journal.md](frame_time_journal.md) | ComeGalletas/rnd-008-frame-time-9ec11fc6 | 2026-09-28 |
+| RND-009 | The terrain's ground bands: investigated, at the alpha blitter's floor, no exact speed-up; no code change | RND | performance | done | [ground_bands_journal.md](ground_bands_journal.md) | ComeGalletas/rnd-009-ground-bands-9ec11fc6 | 2026-09-29 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
@@ -107,6 +108,8 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | SYS-007 | Structure review | SYS | refactor | legacy | [structure_review_journal.md](structure_review_journal.md) | — | 2026-09-20 |
 | SYS-008 | Same seed, same run across processes (watchdog `id()` stagger, hash-seed and memory-order dependence on the spawn path) | SYS, SPN | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | claude/sys-008-run-determinism | 2026-09-22 |
 | SYS-009 | One sprite-blit core, a `TimedVisual` for transient effects, `MELEE_REACT_SCALE` to config | SYS, RND, ENT | refactor | done | [playing_state_refactor.md](playing_state_refactor.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
+| SYS-010 | A frame-time trace of real play (`--trace`) and its report | SYS | feature | done | [frame_trace_journal.md](frame_trace_journal.md) | ComeGalletas/sys-010-frame-trace-9ec11fc6 | 2026-09-29 |
+| SYS-011 | `clock.tick` held at ~31 ms on Windows 11: the timer request ignored for a hidden, silent process; opt out at startup | SYS | bug | done | [timer_resolution_journal.md](timer_resolution_journal.md) | ComeGalletas/sys-011-timer-resolution-26b3a82b | 2026-09-29 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |

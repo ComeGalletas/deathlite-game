@@ -74,3 +74,6 @@ Super Pixel Effects Gigapack/
 
 # Claude Code session data (worktrees, preview config)
 .claude/
+
+# SYS-010: frame-time traces written beside the save by `python main.py --trace`.
+/traces/
