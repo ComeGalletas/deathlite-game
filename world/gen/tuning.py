@@ -211,6 +211,19 @@ _V_CLUSTER_MAX = 4.0                    # tiles: no house stands farther than th
 _V_STREET_REACH = 4.5                   # tiles: a road bends onto the street (the forge's row) no nearer the axis than this
 
 
+# --- the widest body the world is certified for ------------------------------
+#
+# The unseal repair (`world/gen/repair.py`) and the large spawn points
+# (`world/gen/spawnpoints.py`) certify ground for the widest navigation class
+# (`world/nav/field.py: _NAV_CLASSES`), but never for a body narrower than
+# this. 22 px is the body both were measured and tuned against. ENT-021
+# lowered the large class's clearance to 20 so the flow field routes the
+# Ravager and Grudge through every gap they fit. Without this floor the
+# repair would have kept obstacles that seal pockets off from the turtle (24),
+# 1-3 % of the cells it reaches. The world is the same as before ENT-021.
+_WORLD_BODY_FLOOR = 22.0
+
+
 # --- spawn points (`world/gen/spawnpoints.py`) ------------------------------
 #
 # How many per terrace is `config.SPAWN_POINTS_PER_FLOOR` (a `GenSettings`
