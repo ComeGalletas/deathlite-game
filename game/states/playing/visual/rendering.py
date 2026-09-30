@@ -27,7 +27,7 @@ from game.states.playing.visual.projectiles import draw_projectile
 from game.states.playing.visual.summons import draw_summon
 from progression import chests as _chests
 from progression import potions as _potions
-from ui import buff_marks
+from ui import buff_marks, veil
 from ui.text import shadowed
 
 # Re-exported so `PlayingState._draw_cone` (a `test_depth_sort` entry point) and
@@ -72,6 +72,25 @@ def hit_tinted(frame):
         _TINT_CACHE.clear()
     _TINT_CACHE[id(frame)] = (frame, out)
     return out
+
+
+VIGNETTE_RGB = (180, 20, 20)
+VIGNETTE_PX = 24
+HURT_FLASH_RGB = (200, 30, 30)
+
+
+def low_hp_vignette(surface: pygame.Surface, alpha: int) -> None:
+    """The low-HP red frame: a `VIGNETTE_PX` border at `alpha`, as four
+    constant-alpha strips rather than a full-frame per-pixel-alpha surface
+    (RND-010: the same pixels within 1 per channel, a tenth of the area,
+    and the browser's fast blend)."""
+    for strip in veil.frame_strips(surface.get_size(), VIGNETTE_PX):
+        veil.veil(surface, VIGNETTE_RGB, alpha, strip)
+
+
+def hurt_flash(surface: pygame.Surface, alpha: int) -> None:
+    """The full-frame red flash on taking a hit, at constant alpha (RND-010)."""
+    veil.veil(surface, HURT_FLASH_RGB, alpha)
 
 
 def aura_colour(run, body):
@@ -170,16 +189,11 @@ class WorldRenderer:
         frac = run.player.hp / run.player.max_hp if run.player.max_hp else 1.0
         if frac < 0.3:
             pulse = 60 + int(40 * math.sin(run.stats["time"] * 8))
-            vig = pygame.Surface((w, h), pygame.SRCALPHA)
-            pygame.draw.rect(vig, (180, 20, 20, max(0, pulse)), (0, 0, w, h), 24)
-            surface.blit(vig, (0, 0))
+            low_hp_vignette(surface, max(0, pulse))
 
         # Brief full-screen red flash on taking a hit.
         if run._hurt_flash_t > 0.0:
-            a = int(120 * min(1.0, run._hurt_flash_t / 0.35))
-            flash = pygame.Surface((w, h), pygame.SRCALPHA)
-            flash.fill((200, 30, 30, a))
-            surface.blit(flash, (0, 0))
+            hurt_flash(surface, int(120 * min(1.0, run._hurt_flash_t / 0.35)))
 
         # A buff's screen-wide tint (journal: buff_buildings_journal.md): the
         # buff's palette as a vertical gradient, light and brief.
@@ -232,15 +246,17 @@ class WorldRenderer:
         if cached is None or cached[0] != key:
             # A one-column gradient through the palette, stretched to the
             # frame: built once per activation, faded with `set_alpha`.
+            # Opaque RGB, not SRCALPHA: every pixel was alpha 255 anyway, and
+            # a per-pixel-alpha surface takes the slow blend (RND-010).
             steps = 64
-            column = pygame.Surface((1, steps), pygame.SRCALPHA)
+            column = pygame.Surface((1, steps), 0, 32)
             for i in range(steps):
                 t = i / (steps - 1) * (len(palette) - 1)
                 k, f = int(t), t - int(t)
                 a_col = palette[min(k, len(palette) - 1)]
                 b_col = palette[min(k + 1, len(palette) - 1)]
                 column.set_at((0, i), tuple(int(a_col[c] + (b_col[c] - a_col[c]) * f)
-                                            for c in range(3)) + (255,))
+                                            for c in range(3)))
             self._tint_cache = cached = (key, pygame.transform.smoothscale(column, (w, h)))
         grad = cached[1]
         grad.set_alpha(alpha)

@@ -15,7 +15,7 @@ from __future__ import annotations
 import pygame
 
 from game import config, fonts, locale
-from ui import scale, widgets
+from ui import scale, veil, widgets
 from ui.mouse import HitMap
 from ui.text import cached_font, fit_font, shadowed, wrap
 
@@ -113,10 +113,7 @@ class LevelUpPanel:
         """The dark layer under the cards. The state paints it on the whole
         render surface (`draw_backdrop`) so a 21:9 render's side margins
         darken too, then draws the cards on the UI box with `dim=False`."""
-        w, h = surface.get_size()
-        dim = pygame.Surface((w, h), pygame.SRCALPHA)
-        dim.fill((8, 6, 16, 200))
-        surface.blit(dim, (0, 0))
+        veil.veil(surface, (8, 6, 16), 200)      # constant alpha (RND-010)
 
     def draw(self, surface: pygame.Surface, choices, selected: int, *,
              assets=None, pressed=None, title=None, hint=None,

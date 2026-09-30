@@ -55,7 +55,8 @@ def draw_cone(surface, cx: float, cy: float, p, zoom: float = 1.0) -> None:
     if gfx is not None:
         gfx.filled_polygon(surface, pts, (*col, _FILL_A))
         gfx.aapolygon(surface, pts, (*col, _EDGE_A))
-    else:  # pygbag / no gfxdraw: a plain translucent sector, no AA edge
+    else:  # no gfxdraw (not the pygbag build: it has it, checked in Chrome
+        # 2026-09-30, RND-010): a plain translucent sector, no AA edge
         fill = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         pygame.draw.polygon(fill, (*col, _FILL_A), pts)
         pygame.draw.polygon(fill, (*col, _EDGE_A), pts, 2)

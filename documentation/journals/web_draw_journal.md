@@ -108,6 +108,6 @@ there. Its comment is corrected, nothing else.
 ## Tasks
 
 - [x] RND-010.1 — journal, index entry
-- [ ] RND-010.2 — constant-alpha overlays and the vignette strips, tests
+- [x] RND-010.2 — constant-alpha overlays and the vignette strips, tests
 - [ ] RND-010.3 — the frozen backdrop, tests
 - [ ] RND-010.4 — measure (Chrome and desktop), docs, critic, close

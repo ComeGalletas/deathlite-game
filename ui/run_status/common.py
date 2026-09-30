@@ -12,7 +12,7 @@ import pygame
 from game import config, fonts, locale
 from ui import text as uitext
 from ui import widgets
-from ui import scale
+from ui import scale, veil
 
 ROW_STEP = 26          # design px: every number in this package is, and is
 RIBBON_H = 48          # scaled at the point of use with `S` (`ui/scale.px`)
@@ -138,9 +138,7 @@ class Fonts:
 
 # --- surfaces ----------------------------------------------------------
 def draw_dim(surface: pygame.Surface) -> None:
-    dim = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-    dim.fill((0, 0, 0, 150))
-    surface.blit(dim, (0, 0))
+    veil.veil(surface, (0, 0, 0), 150)            # constant alpha (RND-010)
 
 
 def draw_panel(surface: pygame.Surface, rect: pygame.Rect) -> None:

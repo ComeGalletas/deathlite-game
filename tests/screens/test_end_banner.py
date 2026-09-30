@@ -227,11 +227,22 @@ class DrawTests(unittest.TestCase):
         while st.phase != HOLD:
             game.state_machine.update(DT)
         game.assets.asked.clear()
-        surface = pygame.Surface((1600, 900), pygame.SRCALPHA)
+        # An opaque white frame, like the screen: the dim darkens it exactly
+        # as a black fill at END_BANNER_DIM_ALPHA would. (RND-010: the dim is
+        # constant alpha now, so on a transparent SRCALPHA target it no
+        # longer writes its alpha into the destination; the screen has no
+        # alpha channel, so that was never what the player saw.)
+        surface = pygame.Surface((1600, 900))
+        surface.fill((255, 255, 255))
         st.draw_backdrop(surface)
         st.draw(surface)
         self.assertEqual(game.assets.asked, [])
-        self.assertEqual(surface.get_at((0, 0))[3], config.END_BANNER_DIM_ALPHA)
+        want = pygame.Surface((1, 1))
+        want.fill((255, 255, 255))
+        dim = pygame.Surface((1, 1), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, config.END_BANNER_DIM_ALPHA))
+        want.blit(dim, (0, 0))
+        self.assertEqual(surface.get_at((0, 0)), want.get_at((0, 0)))
 
     def test_without_art_the_words_are_drawn(self):
         game = SimpleNamespace()
