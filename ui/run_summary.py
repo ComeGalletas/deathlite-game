@@ -40,7 +40,7 @@ from game.content import get_content
 from progression.items import Item, item_name, rarity_tag
 from ui import text as uitext
 from ui import widgets
-from ui import scale
+from ui import scale, veil
 
 ROW_STEP = 28          # design px, scaled at the point of use with `S`
 _ROW_PX = 22           # the row font's design size
@@ -99,6 +99,13 @@ VICTORY_COLUMNS = ("run", "kills", "weapons", "hero")
 
 _PANEL_FILL = (0, 0, 0, 110)
 _RULE = config.COLOR_WORLD_BORDER
+
+
+def draw_column_fill(surface: pygame.Surface, rect: pygame.Rect) -> None:
+    """A column's dark backdrop, at constant alpha (RND-012)."""
+    veil.veil(surface, _PANEL_FILL[:3], _PANEL_FILL[3], rect)
+
+
 # Item names by rarity, for the dark backdrop. `config.RARITY_COLOURS` are the
 # level-up cards' inks for the light button art and vanish on this ground.
 _RARITY_ON_DARK = {"common": config.COLOR_TEXT, "uncommon": (130, 225, 150),
@@ -200,9 +207,7 @@ class RunSummaryPanel:
 
     def _column(self, surface, assets, rect, title, colour) -> pygame.Rect:
         """Backdrop and ribbon; returns the content rect beneath the ribbon."""
-        panel = pygame.Surface(rect.size, pygame.SRCALPHA)
-        panel.fill(_PANEL_FILL)
-        surface.blit(panel, rect.topleft)
+        draw_column_fill(surface, rect)
         pygame.draw.rect(surface, _RULE, rect, width=1, border_radius=S(8))
         ribbon = _ribbon_rect(assets, rect, title, colour, self._ribbon)
         widgets.draw_ribbon(surface, assets, ribbon, None, colour=colour)

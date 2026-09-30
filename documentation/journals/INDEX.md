@@ -15,8 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-020 · SPN-004 · WLD-015 · RND-011 · UI-019 ·
-PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
+**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-019 ·
+PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-004 · DOC-008
 
 ## Requirements
 
@@ -81,6 +81,7 @@ PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 | RND-009 | The terrain's ground bands: investigated, at the alpha blitter's floor, no exact speed-up; no code change | RND | performance | done | [ground_bands_journal.md](ground_bands_journal.md) | ComeGalletas/rnd-009-ground-bands-9ec11fc6 | 2026-09-29 |
 | RND-010 | Drawing big crowds: the draw measured by layer at 150 to 250 enemies, then cut where the crowd costs it, pixel-identical | RND | performance | planned | [crowd_draw_journal.md](crowd_draw_journal.md) | ComeGalletas/crowd-draw-levelup-9ec11fc6 | 2026-09-30 |
 | RND-011 | The aura shed moves from the draw to the update: its own RNG, a chance of `rate * dt` per step, the budget scaled to the step | RND, CMB | bug | done | [aura_shed_journal.md](aura_shed_journal.md) | ComeGalletas/aura-shed-update-a10d79ed | 2026-09-30 |
+| RND-012 | Web draw, the cheap wins: constant-alpha full-screen overlays and the frozen backdrop under level-up, pause and TAB | RND, UI, BLD | performance | done (D6 approved and play-tested; D7 superseded by RND-011; landing PR open from `ComeGalletas/land-rnd-012-a10d79ed`) | [web_draw_journal.md](web_draw_journal.md) | ComeGalletas/web-draw-cheap-5be9212c | 2026-09-30 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |

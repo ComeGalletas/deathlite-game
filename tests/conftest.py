@@ -176,6 +176,8 @@ INTEGRATION = (
     # the profile's values and the pacing flag boot nothing and stay unit.
     "tests/flows/test_web_crowd.py::WebCrowdRunTests",
     "tests/flows/test_frame_pacing.py::StepTickTests",
+    # RND-012: overlays over a booted run.
+    "tests/flows/test_frozen_backdrop.py",
 )
 
 
