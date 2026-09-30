@@ -1,9 +1,16 @@
 # Web draw: the cheap wins
 
-**ID:** RND-010 · **Systems:** RND (+ UI, BLD) · **Type:** performance ·
+**ID:** RND-012 · **Systems:** RND (+ UI, BLD) · **Type:** performance ·
 **Branch:** `ComeGalletas/web-draw-cheap-5be9212c` (this session's worktree,
 stacked on BLD-003's `ComeGalletas/web-frame-pacing-5be9212c`, PR #48, which
 sits on UI-016, PR #47) · **Started:** 2026-09-30
+
+**Renamed 2026-09-30:** opened as RND-010, which PR #55 ("Drawing big
+crowds, and the level-up hitch") had already claimed on its own branch; the
+index here listed RND-010 as free because that branch had not merged. The
+commits up to `4b3c657` carry RND-010 in their subjects (search this
+branch's history for RND-010); every later commit, and every file, says
+RND-012.
 
 Follows the Chrome measurement of BLD-003.6 (`web_frame_time_journal.md`):
 in the browser the draw, not the crowd, is the cost, and per-pixel alpha is
@@ -34,37 +41,38 @@ alpha and 0.1 ms opaque).
 
 ## Decisions
 
-- **RND-010.D1 — freeze the world under frozen overlays** (owner,
+- **RND-012.D1 — freeze the world under frozen overlays** (owner,
   2026-09-30). Water foam and animated scenery run on a wall clock
   (`world/terrain/render.py` `seconds()`) and today keep moving under the
   pause and level-up dim. Caching the frame beneath the overlay stops that
   motion while the overlay is open. Chosen over keeping them animated.
-- **RND-010.D2 — ±1 rounding is accepted for overlay alpha** (owner,
+- **RND-012.D2 — ±1 rounding is accepted for overlay alpha** (owner,
   2026-09-30). Constant alpha (`set_alpha` on an RGB surface) differs from
   today's per-pixel alpha by at most 1 in one colour channel on some pixels
   (measured on desktop pygame 2.5.2: (8,6,16) at 200 moved 1,805 of 57,600
   pixels by 1; (200,30,30) at 120 moved most pixels by 1; black at 150 is
   exact). Tests pin the new output and the ±1 bound.
-- **RND-010.D3 — a new branch in this session's worktree, stacked on #48**
+- **RND-012.D3 — a new branch in this session's worktree, stacked on #48**
   (owner chose "new worktree, stacked on #48"; CLAUDE.md allows one
   worktree per session and a new branch per task, so the branch is new and
   the worktree is this session's).
-- **RND-010.D4 — the frozen backdrop is opt-in per overlay.** Level-up,
+- **RND-012.D4 — the frozen backdrop is opt-in per overlay.** Level-up,
   pause and TAB opt in. The dev menu does not (its actions change the run
   while it is open), nor the end banner (it toggles `update_below` between
   phases). The cache holds only the states *below* the overlay; the
   overlay's own `draw_backdrop` (the dim) is drawn every frame, cheaply,
   so an animated dim would still animate.
-- **RND-010.D5 — no cache on a per-pixel-alpha target.** A cached frame is
+- **RND-012.D5 — no cache on a per-pixel-alpha target.** A cached frame is
   blitted, not redrawn; onto an `SRCALPHA` surface (offscreen tests and
   tools) that could blend differently from drawing directly, so the state
   machine draws those uncached. The screen is never `SRCALPHA`.
 
-- **RND-010.D6 — no held input under an overlay** (builder, after the
-  critic pass; within D1's "the world is frozen"). **Approved by the owner
-  2026-09-30, pending proper testing** (in play: hold E into the Forge or a
-  building, hold a move key into the pause, and check the caps under the
-  dim are raised and show pressed again on return). The interact keycap
+- **RND-012.D6 — no held input under an overlay** (builder, after the
+  critic pass; within D1's "the world is frozen"). **Approved and
+  play-tested by the owner, 2026-09-30:** works in gameplay. The caps under
+  an overlay draw raised; back in play, a key still held shows pressed
+  again, which the owner accepts: a player does not keep holding E after
+  the interaction, and releasing it resets the cap. The interact keycap
   (`key_marker.py`) and the opening hints (`hints.py`) draw a held key
   pressed, read live as they are drawn. Opening the Forge or a building
   with E pushes the overlay while E is still down, so the kept frame
@@ -73,9 +81,9 @@ alpha and 0.1 ms opaque).
   state covers the run (`playing/visual/live_input.py`, on
   `StateMachine.is_covered`); under any overlay the caps draw raised. A run
   drawn on its own, off the stack as tests draw it, still shows held keys.
-  Before RND-010 a cap held under an overlay showed pressed, dimmed; that
+  Before RND-012 a cap held under an overlay showed pressed, dimmed; that
   detail is gone.
-- **RND-010.D7 — the aura shed stops under a frozen overlay** (builder,
+- **RND-012.D7 — the aura shed stops under a frozen overlay** (builder,
   after critic pass 2; within D1's "the world is frozen"). The run's draw
   is not free of side effects: each draw of a body wearing an elemental
   aura rolls `run.rng` and may add a particle (`elements/layers.py`
@@ -88,7 +96,7 @@ alpha and 0.1 ms opaque).
   at a rate per second, would also end its frame-rate dependence (about 3x
   denser at the browser's 175 Hz) and the draw's use of the run's random
   stream; it changes elemental behaviour and the run's random sequence, so
-  it is the owner's call and a requirement of its own, not RND-010.
+  it is the owner's call and a requirement of its own, not RND-012.
   **Status (2026-09-30): interim, to be superseded by RND-011**
   (`aura_shed_journal.md`, another session, branched off `main`): the shed moves into the update
   on its own random stream (`"{seed}:aura_shed"`), a chance of `rate *
@@ -149,14 +157,14 @@ there. Its comment is corrected, nothing else.
 
 ## Tasks
 
-- [x] RND-010.1 — journal, index entry
-- [x] RND-010.2 — constant-alpha overlays and the vignette strips, tests
-- [x] RND-010.3 — the frozen backdrop, tests
-- [x] RND-010.4 — measure (Chrome and desktop), docs, critic, close
+- [x] RND-012.1 — journal, index entry
+- [x] RND-012.2 — constant-alpha overlays and the vignette strips, tests
+- [x] RND-012.3 — the frozen backdrop, tests
+- [x] RND-012.4 — measure (Chrome and desktop), docs, critic, close
 
 ## Results
 
-### RND-010.2 and .3 — tests
+### RND-012.2 and .3 — tests
 
 - `tests/render/test_overlay_veil.py` (15, unit): each converted overlay
   against the old per-pixel-alpha path on a noisy frame (the pause, TAB
@@ -181,7 +189,7 @@ there. Its comment is corrected, nothing else.
   `tests/playing` with `tests/flows` (541 passed). The runs after the
   critic passes are under "Critic pass" below.
 
-### RND-010.4 — measured
+### RND-012.4 — measured
 
 **Desktop** (browser profile, 1280x720, dummy driver, median of 120;
 `/tmp/rnd-010/critique/desktop_overlay_bench.txt`): a level-up frame
@@ -208,7 +216,7 @@ the flash at or under 1.5 ms (1.0, met). Gameplay itself (29-31 fps with 5
 enemies in this run) was not the target here: its draw is the terrain and
 scenery, review item 5, the next requirement.
 
-### Critic pass (RND-010.4)
+### Critic pass (RND-012.4)
 
 One cold critic, rubric frozen above. **FAIL** on items 2 and 5 (and 6,
 minor): held input in the kept frame, D6 above, reproduced through the real
@@ -267,5 +275,5 @@ Self-rating: 9 / 10. The point short: D6 and D7 are builder decisions
 within D1 that the owner has not yet confirmed, and D2's +-1 bound is
 checked on desktop pygame 2.5.2, not on the browser's pygame-ce 2.5.7.
 
-**Status:** done (PR open). D6 approved by the owner (2026-09-30), pending
-proper testing in play; D7 interim until RND-011 lands.
+**Status:** done (PR open). D6 approved and play-tested by the owner
+(2026-09-30); D7 interim until RND-011 lands.

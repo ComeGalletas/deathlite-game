@@ -1,4 +1,4 @@
-"""Translucent single-colour fills at constant alpha (RND-010).
+"""Translucent single-colour fills at constant alpha (RND-012).
 
 A full-screen dim or flash used to be a fresh `pygame.SRCALPHA` surface
 filled with `(r, g, b, a)` and blitted: a per-pixel-alpha blend over every
@@ -6,7 +6,7 @@ pixel of the frame. In the browser build that blend is the slow path (a
 1280x720 one measured 8.3 ms in Chrome, BLD-003.6); the same fill as an
 opaque RGB surface blitted with `set_alpha(a)` measured 1.0 ms. It blends to
 within 1 per colour channel of the per-pixel path (black is exact), which
-the owner accepted (RND-010.D2).
+the owner accepted (RND-012.D2).
 
     veil(surface, (0, 0, 0), 150)                 # the whole surface
     veil(surface, (180, 20, 20), 60, (0, 0, w, 24))   # one strip of it

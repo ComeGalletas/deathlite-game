@@ -116,7 +116,7 @@ class Game:
         self.save.settings["key_layout"] = name
         self.persist()
         # The run's hints spell out the keys, and the pause menu's toggle
-        # changes them under a frozen backdrop (RND-010).
+        # changes them under a frozen backdrop (RND-012).
         machine = getattr(self, "state_machine", None)
         if machine is not None:
             machine.invalidate_backdrop()

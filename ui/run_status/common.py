@@ -138,11 +138,11 @@ class Fonts:
 
 # --- surfaces ----------------------------------------------------------
 def draw_dim(surface: pygame.Surface) -> None:
-    veil.veil(surface, (0, 0, 0), 150)            # constant alpha (RND-010)
+    veil.veil(surface, (0, 0, 0), 150)            # constant alpha (RND-012)
 
 
 def draw_panel(surface: pygame.Surface, rect: pygame.Rect) -> None:
-    # Constant alpha (RND-010): the panel covers most of the frame every frame.
+    # Constant alpha (RND-012): the panel covers most of the frame every frame.
     veil.veil(surface, _PANEL_FILL[:3], _PANEL_FILL[3], rect)
     pygame.draw.rect(surface, _RULE, rect, width=1, border_radius=S(8))
 

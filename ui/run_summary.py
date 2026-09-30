@@ -102,7 +102,7 @@ _RULE = config.COLOR_WORLD_BORDER
 
 
 def draw_column_fill(surface: pygame.Surface, rect: pygame.Rect) -> None:
-    """A column's dark backdrop, at constant alpha (RND-010)."""
+    """A column's dark backdrop, at constant alpha (RND-012)."""
     veil.veil(surface, _PANEL_FILL[:3], _PANEL_FILL[3], rect)
 
 

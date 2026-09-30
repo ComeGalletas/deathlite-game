@@ -3,7 +3,7 @@
 
 Blue because these are "press this now" prompts, and blue has the pressed
 frame: each cap sinks while its key is actually held, which is the
-teaching (not under an overlay: RND-010.D6). The block hangs off the
+teaching (not under an overlay: RND-012.D6). The block hangs off the
 hero's **drawn art** -- the sprite frame's ink top, the way the key marker
 hangs off a chest -- its bottom `CLEAR_PX` above the helmet, and follows
 the hero. A finished stage fades
@@ -119,7 +119,7 @@ def draw(surface: pygame.Surface, ps) -> pygame.Rect | None:
     if not clusters:
         return None
     items = layout(ps, clusters, top, cx, cache)
-    live = run_on_top(ps)                  # no held input under an overlay (RND-010.D6)
+    live = run_on_top(ps)                  # no held input under an overlay (RND-012.D6)
     states = ["pressed" if kind == "cap" and alpha == 255 and live and hints.held(a)
               else "raised" for kind, a, _b in items]
     block = extent(ps, items, states)

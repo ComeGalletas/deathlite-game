@@ -1,10 +1,10 @@
-"""Full-screen overlays at constant alpha (RND-010.2).
+"""Full-screen overlays at constant alpha (RND-012.2).
 
 The dims, the hurt flash, the low-HP vignette and the buff tint used to blit a
 full-frame per-pixel-alpha (`SRCALPHA`) surface, the browser's slow blend
 (8.3 ms a frame in Chrome, BLD-003.6). They now blend an opaque RGB surface at
 constant alpha (`ui/veil.py`). The owner accepted a difference of at most 1
-per colour channel against the old result (RND-010.D2); black is exact.
+per colour channel against the old result (RND-012.D2); black is exact.
 
 Each overlay is drawn over the same noisy frame both ways, the old per-pixel
 path written out here as the reference, and compared pixel by pixel.

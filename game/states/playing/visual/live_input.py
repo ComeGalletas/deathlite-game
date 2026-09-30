@@ -1,4 +1,4 @@
-"""Whether the run's draw may show held input (RND-010.D6).
+"""Whether the run's draw may show held input (RND-012.D6).
 
 Two things the run draws read the keyboard or mouse as they are drawn: the
 interact keycap's pressed look (`key_marker.py`) and the opening hints'

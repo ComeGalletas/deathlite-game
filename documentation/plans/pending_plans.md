@@ -174,7 +174,7 @@ done, and two items block the build from being playable by anyone else.
   Chrome 2026-09-30 (BLD-003.6): a run draws at 22-26 fps and the draw is
   the whole cost, per-pixel-alpha blits first
   (`journals/web_frame_time_journal.md`). The cheap draw wins followed as
-  RND-010 (`journals/web_draw_journal.md`: overlays at constant alpha, the
+  RND-012 (`journals/web_draw_journal.md`: overlays at constant alpha, the
   run drawn once under level-up, pause and TAB); the terrain and scenery
   blits (review item 5) are the next web item.
 

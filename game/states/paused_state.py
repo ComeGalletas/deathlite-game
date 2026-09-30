@@ -50,7 +50,7 @@ _CONTROLS_X, _CONTROLS_Y = 340, _ROW_TOP - _ROW_H // 2
 class PausedState(State):
     draw_below = True      # keep the frozen game visible behind the dim layer
     update_below = False   # ...but do not advance it
-    freeze_backdrop = True # ...and drawn once while paused (RND-010)
+    freeze_backdrop = True # ...and drawn once while paused (RND-012)
     # `music` is inherited: the run's track keeps playing, dipped to
     # `config.MUSIC_DUCK` by the enter/exit hooks below.
 
@@ -124,7 +124,7 @@ class PausedState(State):
     # --- render ------------------------------------------------------
     def draw_backdrop(self, surface: pygame.Surface) -> None:
         # The whole render surface, side margins included on a 21:9 render,
-        # at constant alpha (RND-010).
+        # at constant alpha (RND-012).
         veil.veil(surface, (0, 0, 0), 150)
 
     def draw(self, surface: pygame.Surface) -> None:

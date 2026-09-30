@@ -41,7 +41,7 @@ def find_playing(state_machine):
 class RunStatusState(State):
     draw_below = True
     update_below = False
-    freeze_backdrop = True  # the run below is drawn once (RND-010)
+    freeze_backdrop = True  # the run below is drawn once (RND-012)
 
     def enter(self, *, playing=None, pane: str = "overview", **kwargs) -> None:
         self.playing = playing if playing is not None else find_playing(self.game.state_machine)

@@ -184,7 +184,7 @@ scripts + `build/` output are not packed. Verified: `bash web/build.sh` packs
   pygbag hook hazard. Moved to a lazy `_get_gfxdraw()` (import inside a
   try/except on first `_draw_cone` call); `None` → a plain translucent
   `pygame.draw.polygon` sector on an SRCALPHA scratch surface, no AA edge.
-  (2026-09-30, RND-010: `pygame.gfxdraw` does load in the browser build,
+  (2026-09-30, RND-012: `pygame.gfxdraw` does load in the browser build,
   checked in Chrome, so that fallback does not run there.)
 * **Entry point.** pygbag's generated `index.html` runs `appdir/assets/main.py`
   regardless of the CLI arg, and sources it with `__name__` set to the module

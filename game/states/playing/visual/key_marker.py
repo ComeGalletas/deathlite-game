@@ -8,7 +8,7 @@ design px), not zoomed with the world, so it stays as crisp as the HUD. It
 is painted after the whole world so the hero standing on a chest never
 covers it, and inside the shake offset so it shakes with the element. The
 cap shows its pressed frame while the interact key is held, unless another
-state covers the run (RND-010.D6: an overlay's kept frame must not freeze a
+state covers the run (RND-012.D6: an overlay's kept frame must not freeze a
 held key).
 
 **Where it hangs is read from the drawn art, not typed** (pass 3, after

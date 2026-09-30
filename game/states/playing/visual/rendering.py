@@ -82,14 +82,14 @@ HURT_FLASH_RGB = (200, 30, 30)
 def low_hp_vignette(surface: pygame.Surface, alpha: int) -> None:
     """The low-HP red frame: a `VIGNETTE_PX` border at `alpha`, as four
     constant-alpha strips rather than a full-frame per-pixel-alpha surface
-    (RND-010: the same pixels within 1 per channel, a tenth of the area,
+    (RND-012: the same pixels within 1 per channel, a tenth of the area,
     and the browser's fast blend)."""
     for strip in veil.frame_strips(surface.get_size(), VIGNETTE_PX):
         veil.veil(surface, VIGNETTE_RGB, alpha, strip)
 
 
 def hurt_flash(surface: pygame.Surface, alpha: int) -> None:
-    """The full-frame red flash on taking a hit, at constant alpha (RND-010)."""
+    """The full-frame red flash on taking a hit, at constant alpha (RND-012)."""
     veil.veil(surface, HURT_FLASH_RGB, alpha)
 
 
@@ -247,7 +247,7 @@ class WorldRenderer:
             # A one-column gradient through the palette, stretched to the
             # frame: built once per activation, faded with `set_alpha`.
             # Opaque RGB, not SRCALPHA: every pixel was alpha 255 anyway, and
-            # a per-pixel-alpha surface takes the slow blend (RND-010).
+            # a per-pixel-alpha surface takes the slow blend (RND-012).
             steps = 64
             column = pygame.Surface((1, steps), 0, 32)
             for i in range(steps):

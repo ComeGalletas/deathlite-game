@@ -1,4 +1,4 @@
-"""The frozen backdrop under the level-up, pause and TAB screens (RND-010.3).
+"""The frozen backdrop under the level-up, pause and TAB screens (RND-012.3).
 
 Those overlays freeze the run (`update_below` False), and the state machine
 used to redraw the whole world under them every frame: 47 ms of the level-up
@@ -9,7 +9,7 @@ on top; the overlay's own dim and panel still draw every frame.
 Pinned here: the run is drawn once over many frames; a cached frame is
 byte-identical to a full redraw (the run's draw has one side effect, the
 aura shed, which the kept frame deliberately stops: `AuraShedTests`,
-RND-010.D7); every change that could alter the frame
+RND-012.D7); every change that could alter the frame
 below (a push or pop, a display change, another target surface, the pause
 menu's key-layout toggle, an explicit invalidation) redraws it; a
 per-pixel-alpha target and the overlays that do not opt in (the dev menu,
@@ -189,11 +189,11 @@ class FrozenBackdropTests(unittest.TestCase):
         self.assertEqual(spy.call_count, 1, "the run was not redrawn")
         self.assertNotEqual(before, after, "the new selection reached the screen")
 
-    # --- held input (RND-010.D6) --------------------------------------------
+    # --- held input (RND-012.D6) --------------------------------------------
     def test_a_held_hint_key_is_not_kept_pressed_under_the_overlay(self):
         """The opening hints draw a held key pressed. Under an overlay the
         run is frozen: a key held on the frame the overlay opened must not
-        stay pressed in the kept frame (critic pass, RND-010.4)."""
+        stay pressed in the kept frame (critic pass, RND-012.4)."""
         self.assertTrue(self.ps.hints.visible, "the opening hints must be on screen here")
         with mock.patch.object(self.ps.hints, "held", return_value=True):
             self.sm.draw(self.screen)
@@ -221,7 +221,7 @@ class FrozenBackdropTests(unittest.TestCase):
 class HeldInteractTests(unittest.TestCase):
     """The E keycap over a location draws pressed while E is held. Opening
     the location with E pushes an overlay while E is still down; the kept
-    frame must not carry the pressed cap (critic pass, RND-010.4). Its own
+    frame must not carry the pressed cap (critic pass, RND-012.4). Its own
     run: the hero is moved onto a location."""
 
     def test_the_e_cap_is_not_kept_pressed_after_opening_a_location(self):
@@ -266,7 +266,7 @@ class AuraShedTests(unittest.TestCase):
     each draw of an aura'd body rolls `run.rng` and may add a particle. The
     old per-frame redraw under a frozen overlay therefore piled particles up
     and used up the run's random stream for as long as the game was paused.
-    With the kept frame the run is drawn once (RND-010.D7): nothing piles up,
+    With the kept frame the run is drawn once (RND-012.D7): nothing piles up,
     the stream is untouched, and the frame holds still (critic pass 2)."""
 
     def test_nothing_piles_up_under_the_pause(self):
@@ -288,7 +288,7 @@ class AuraShedTests(unittest.TestCase):
         self.assertEqual(len(run.particles), particles, "no aura particles piled up")
         self.assertEqual(run.rng.getstate(), rng, "the run's random stream is untouched")
         self.assertEqual(_frame(screen), kept)
-        # The control: redrawing the run every frame, as before RND-010,
+        # The control: redrawing the run every frame, as before RND-012,
         # does pile them up -- which is what the kept frame stopped.
         for _ in range(60):
             sm.invalidate_backdrop()

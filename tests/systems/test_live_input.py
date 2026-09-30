@@ -1,4 +1,4 @@
-"""`run_on_top` and `StateMachine.is_covered` (RND-010.D6): the run shows held
+"""`run_on_top` and `StateMachine.is_covered` (RND-012.D6): the run shows held
 input unless another state sits above it on the stack. A run drawn on its
 own, as many tests draw it, counts as on top."""
 import types

@@ -149,7 +149,7 @@ class EndBannerState(State):
         alpha = self._dim_alpha()
         if alpha <= 0:
             return
-        veil.veil(surface, (0, 0, 0), alpha)     # constant alpha (RND-010)
+        veil.veil(surface, (0, 0, 0), alpha)     # constant alpha (RND-012)
 
     def draw(self, surface: pygame.Surface) -> None:
         if self.phase != BANNER:

@@ -228,7 +228,7 @@ class DrawTests(unittest.TestCase):
             game.state_machine.update(DT)
         game.assets.asked.clear()
         # An opaque white frame, like the screen: the dim darkens it exactly
-        # as a black fill at END_BANNER_DIM_ALPHA would. (RND-010: the dim is
+        # as a black fill at END_BANNER_DIM_ALPHA would. (RND-012: the dim is
         # constant alpha now, so on a transparent SRCALPHA target it no
         # longer writes its alpha into the destination; the screen has no
         # alpha channel, so that was never what the player saw.)

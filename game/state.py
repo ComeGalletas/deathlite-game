@@ -53,13 +53,13 @@ class State:
     update_below: bool = False
     # If True (with `draw_below` and not `update_below`), the frozen states
     # below are drawn once and that frame is reused while this overlay is on
-    # top (RND-010: the world under the level-up screen was redrawn every
+    # top (RND-012: the world under the level-up screen was redrawn every
     # frame, 47 ms in Chrome). Opt-in: an overlay whose actions change the
     # run while it is open (the dev menu) or whose freeze comes and goes
     # (the end banner) leaves it False. The wall-clock animations under the
     # overlay (water foam, animated scenery) stop while it is open (owner,
-    # RND-010.D1), and the run draws no held input under any overlay
-    # (`playing/visual/live_input.py`, RND-010.D6), so the kept frame matches
+    # RND-012.D1), and the run draws no held input under any overlay
+    # (`playing/visual/live_input.py`, RND-012.D6), so the kept frame matches
     # a full redraw. This overlay's own `draw_backdrop` and `draw` still run
     # every frame. Anything the overlay changes that the frame below shows
     # calls `StateMachine.invalidate_backdrop()`.
@@ -212,7 +212,7 @@ class StateMachine:
         """Every state on the stack, bottom first, so the run under a pause
         overlay rebuilds before the overlay redraws over it."""
         self._frozen = None
-        veil.clear()                     # old full-frame fills (RND-010)
+        veil.clear()                     # old full-frame fills (RND-012)
         for state in list(self._stack):
             state.on_display_changed()
 
@@ -265,7 +265,7 @@ class StateMachine:
         draws over, and the target has to be opaque. A blitted copy blends
         differently from drawing directly onto a per-pixel-alpha target
         (offscreen tests and tools), so those are always drawn in full
-        (RND-010.D5). The key holds the states below by identity and the
+        (RND-012.D5). The key holds the states below by identity and the
         surface by identity and size, so a new stack, a re-opened display
         or another target redraws."""
         if surface is None or len(layers) < 2:
