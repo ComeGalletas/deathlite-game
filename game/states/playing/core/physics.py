@@ -1,6 +1,6 @@
 """Unit bumping for PLAYING (CB-3).
 
-`BumpResolver.resolve()` runs once per frame at the end of `_phase_update`,
+`BumpResolver.resolve(dt)` runs once per frame at the end of `_phase_update`,
 after every body has moved. Any two overlapping mobile bodies -- enemy/enemy,
 enemy/boss, hero/enemy, hero/boss -- shove each other apart with a
 weight-split impulse from `combat.knockback.knock_split`. Nothing is moved
@@ -12,10 +12,21 @@ work of keeping crowds loosely apart; this pass is the harder kick when bodies
 genuinely interpenetrate -- a spawn on top of another, a charger tunnelling in,
 a swarm herded against a wall.
 
+The shove repeats every frame an overlap lasts, so it is a rate, and the pass
+takes the frame's `dt` (ENT-019). On a frame shorter than the tuned one
+(`tuned_dt`, 16 ms: the loop's frame at the 62 fps cap), `bump_scale(dt)`
+sizes its share so a held overlap is shoved at the tuned speed a second
+exactly, and a crowd comes apart in about the tuned time (within the bounds
+`tests/playing/test_bump_rate.py` holds). On the tuned frame and any longer
+one it is exactly 1.0 and the pass is what CB-3/H tuned, bit for bit (the
+owner's call: slow frames keep their shove).
+
 Read-only w.r.t. `PlayingState` apart from the `_knock` it induces:
 `ps.enemies`, `ps.boss`, `ps.player`.
 """
 from __future__ import annotations
+
+import math
 
 from combat.elements import ice as ice_rules
 from combat.knockback import knock_split
@@ -42,6 +53,46 @@ _MARGIN_OUT = 1.0 + 1e-9
 _COINCIDENT = 1e-9 * (1.0 - 1e-9)     # `_bump`'s coincident limit, a billionth under
 
 
+def tuned_dt() -> float:
+    """The frame CB-3/H tuned the bump on, in seconds (ENT-019).
+
+    The loop's clock ticks in whole milliseconds (`Game._step`), so a cap
+    of `BUMP_REFERENCE_FPS` (62) is a 16 ms frame, not 1/62 s: that is the
+    frame the desktop actually ran, and still runs, at its cap."""
+    return math.floor(1000.0 / config.BUMP_REFERENCE_FPS) / 1000.0
+
+
+def bump_scale(dt: float) -> float:
+    """This frame's share of the bump, as a multiple of the tuned one
+    (ENT-019, `journals/bump_frame_rate_journal.md`).
+
+    A pair held at the same overlap is handed `J` a frame and its knock
+    decays by `BUMP_DECAY ** dt` a frame, so the knock settles at
+    `J / (1 - BUMP_DECAY ** dt)`: that is the speed it is shoved at, and
+    its distance a game-second. Sizing `J` by `1 - BUMP_DECAY ** dt` keeps
+    both what they are on the tuned frame, at every shorter frame, exactly
+    and not only as `dt` shrinks (`dt x 62` is 3 % weak at 144 Hz).
+
+    It only ever scales down (owner, ENT-019.D5). The tuned frame and every
+    longer one return exactly 1.0, so the shove there is the tuned one bit
+    for bit: scaled up, a long frame hands a stiff pair (troll against
+    bumblebee) its whole share at the overlap it started with, and flings
+    the light one up to twice as far at 20 fps. Just under the tuned frame
+    the share meets 1.0 continuously. A knock that never decayed
+    (`BUMP_DECAY` 1.0) is the limit, `dt` over the tuned frame. A frame of
+    no time, or a nonsense one (negative, NaN), shoves nothing.
+    """
+    ref_dt = tuned_dt()
+    if dt >= ref_dt:
+        return 1.0
+    if not dt > 0.0:
+        return 0.0
+    decay = config.BUMP_DECAY
+    if decay == 1.0:
+        return dt / ref_dt
+    return (1.0 - decay ** dt) / (1.0 - decay ** ref_dt)
+
+
 def _pad(population) -> float:
     """The broad-phase pad for this frame: the largest collider present,
     never more than `_QUERY_PAD`.
@@ -65,7 +116,8 @@ class BumpResolver:
         self.run = getattr(ps, "run", ps)
         self._grid = SpatialGrid()
 
-    def resolve(self) -> None:
+    def resolve(self, dt: float) -> None:
+        """Shove every overlapping pair apart for a frame of `dt` seconds."""
         ps = self.ps
         run = getattr(self, "run", ps)
         enemies = run.enemies
@@ -78,6 +130,7 @@ class BumpResolver:
         pad = _pad(population)
         grid = self._grid
         push = config.CROWD_PUSH_RADIUS_FRAC
+        scale = bump_scale(dt)
 
         # enemy <-> enemy  and  enemy <-> boss
         #
@@ -108,18 +161,21 @@ class BumpResolver:
                 # ENT-016: two enemies push at a fraction of their colliders,
                 # so a pack can compress and file across a one-tile deck; the
                 # boss still shoulders through at its full radius.
-                self._bump(a, b, contact=True, reach=1.0 if b is boss else push)
+                self._bump(a, b, contact=True, reach=1.0 if b is boss else push,
+                           scale=scale)
 
         # hero <-> enemy / boss
         p = run.player
         if p.alive:
             for e in grid.query_circle(p.pos.x, p.pos.y, p.radius + pad):
                 if getattr(e, "alive", True):
-                    self._bump(p, e)
+                    self._bump(p, e, scale=scale)
 
-    def _bump(self, a, b, contact: bool = False, reach: float = 1.0) -> None:
+    def _bump(self, a, b, contact: bool = False, reach: float = 1.0,
+              scale: float = 1.0) -> None:
         """Shove `a` and `b` apart if they are closer than `reach` x their
-        summed radii (the push radius; 1.0 is the colliders touching).
+        summed radii (the push radius; 1.0 is the colliders touching), by
+        `scale` x the tuned shove (`bump_scale`; 1.0 is one tuned frame).
 
         The frozen-contact rule keeps the full colliders whatever the push
         radius: an ice slide clips what it touches, and a crowd allowed to
@@ -132,7 +188,8 @@ class BumpResolver:
         rr = touch * reach
         if d2 < rr * rr:
             pen = min(rr - d2 ** 0.5, rr * _PEN_CAP_FRAC)
-            push_a, push_b = knock_split(a.weight, b.weight, config.BUMP_GAIN * pen)
+            push_a, push_b = knock_split(a.weight, b.weight,
+                                          config.BUMP_GAIN * pen * scale)
             a.apply_knockback(delta, push_a)         # a shoved away from b
             b.apply_knockback(-delta, push_b)        # b shoved away from a
         if contact:

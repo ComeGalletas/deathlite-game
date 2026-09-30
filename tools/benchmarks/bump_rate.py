@@ -24,6 +24,7 @@ The steps are the game's own: every enemy's real `Enemy.update`, then
     python -m tools.benchmarks.bump_rate
     python -m tools.benchmarks.bump_rate --rates 30 62 144 --seconds 1
     python -m tools.benchmarks.bump_rate --markdown       # the journal's tables
+    python -m tools.benchmarks.bump_rate --unscaled       # the pass before ENT-019
 
 Headless and deterministic: the same arguments print the same table. The
 tables land in `journals/bump_frame_rate_journal.md`;
@@ -34,6 +35,7 @@ from __future__ import annotations
 import argparse
 import os
 import tempfile
+from contextlib import contextmanager, nullcontext
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -45,6 +47,20 @@ PACK = 70.0            # px: the disc round the hero the crowd is packed into
 PAIR_DEPTH = 12.0      # px a pair starts inside its push radius
 CHECKPOINTS = (0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1.0)
 FRACTIONS = (0.5, 0.25, 0.1)   # of the starting overlap, for the crowd's times
+
+
+@contextmanager
+def unscaled():
+    """The pass as it was before ENT-019: every frame's shove the tuned
+    one, whatever the frame's length (`physics.bump_scale` held at 1.0)."""
+    from game.states.playing.core import physics
+
+    real = physics.bump_scale
+    physics.bump_scale = lambda _dt: 1.0
+    try:
+        yield
+    finally:
+        physics.bump_scale = real
 
 
 class _Inert:
@@ -95,7 +111,7 @@ class Bench:
         ctx = ps._enemy_context(dt)
         for e in ps.run.enemies:
             e.update(ctx)
-        ps.bump.resolve()
+        ps.bump.resolve(dt)
 
     def _run(self, hz: float, seconds: float, measure) -> list:
         """`[(t, measure())]` from t = 0, one entry a frame."""
@@ -270,6 +286,8 @@ def parse(argv=None) -> argparse.Namespace:
     ap.add_argument("--live", type=int, default=LIVE, help="bodies in the crowd")
     ap.add_argument("--pack", type=float, default=PACK,
                     help="px round the hero the crowd is packed into")
+    ap.add_argument("--unscaled", action="store_true",
+                    help="the pass as it was before ENT-019 (no dt in the shove)")
     ap.add_argument("--markdown", action="store_true",
                     help="the journal's tables, each value beside its share "
                          "of the 62 Hz one")
@@ -283,7 +301,8 @@ def main(argv=None) -> int:
     args = parse(argv)
     bench = Bench(args.seed, args.live, args.pack)
     rates = [int(r) if float(r).is_integer() else r for r in args.rates]
-    print((markdown if args.markdown else report)(bench, rates, args.seconds))
+    with unscaled() if args.unscaled else nullcontext():
+        print((markdown if args.markdown else report)(bench, rates, args.seconds))
     return 0
 
 

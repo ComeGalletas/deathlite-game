@@ -4,6 +4,7 @@ same numbers -- or the refactor moved something.
     python -m tools.verification.run_digest            # print the digests
     python -m tools.verification.run_digest --write    # pin them
     python -m tools.verification.run_digest --check    # compare to the pin
+    python -m tools.verification.run_digest --fps 62   # step at 1/62 s instead
 
 Boots a `Game` on the dummy SDL drivers with a throwaway save, drives the
 menu into a run on each pinned seed (`tests/boot.start_run`), steps it
@@ -15,6 +16,10 @@ digest before the split is the digest after it, frame for frame.
 
 Not a test: it costs a boot and two world builds. Run it by hand around a
 change to the run's wiring.
+
+`--fps N` steps the same frames at 1/N s. The pin is taken at 60, so it
+only prints: it is for comparing a change by hand at another rate, as
+ENT-019 did at 62 to show a frame-rate fix leaves the 62 fps run as it was.
 """
 from __future__ import annotations
 
@@ -48,7 +53,7 @@ def _vec(v):
     return [_num(v.x), _num(v.y)]
 
 
-def run_digest(seed: int) -> str:
+def run_digest(seed: int, fps: int = 60) -> str:
     import pygame
     from game.game import Game
     from tests.boot import start_run
@@ -56,7 +61,7 @@ def run_digest(seed: int) -> str:
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
     game.state_machine.change(_menu(game))
     ps = start_run(game, seed=seed)
-    dt = 1 / 60
+    dt = 1 / fps
     for frame in range(FRAMES):
         if frame in (30, 90, 150):
             ps._spawn_enemy("skull", owner="dev")
@@ -98,7 +103,17 @@ def _menu(game):
 
 
 def main(argv) -> int:
-    got = {str(s): run_digest(s) for s in SEEDS}
+    fps = 60
+    if "--fps" in argv:
+        i = argv.index("--fps") + 1
+        if i >= len(argv) or not argv[i].isdigit() or int(argv[i]) <= 0:
+            print("--fps takes a whole number of frames a second, above 0")
+            return 2
+        fps = int(argv[i])
+    if fps != 60 and ("--write" in argv or "--check" in argv):
+        print("the pin is taken at 60 fps; --fps is for comparing by hand")
+        return 2
+    got = {str(s): run_digest(s, fps) for s in SEEDS}
     if "--write" in argv:
         PIN.write_text(json.dumps(got, indent=2) + "\n", encoding="utf-8")
         print("pinned", got)
