@@ -267,7 +267,7 @@ class CommandLineTests(unittest.TestCase):
 
 
 class BudgetTests(unittest.TestCase):
-    def test_the_budget_is_one_60_hz_period(self):
+    def test_the_budget_is_the_60_fps_target(self):
         self.assertAlmostEqual(S.BUDGET_MS, 1000.0 / 60.0)
 
     def test_only_frames_past_the_budget_count(self):

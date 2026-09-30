@@ -118,8 +118,8 @@ owner, 2026-09-29)
   period: update, draw, present and wait are disjoint spans inside it
   (pinned by `test_every_frame_is_recorded`), and what is left is the
   input, the music and the trace's own sample.
-  - **The cause (SYS-011, `timer_resolution_journal.md` on its own branch,
-    stacked on this one, holds the evidence):** Windows 11
+  - **The cause (SYS-011, `timer_resolution_journal.md`, on main since
+    PR #54, holds the evidence):** Windows 11
     may ignore the 1 ms timer request of a process that owns windows but is
     neither visible nor audible. A headless pygame process owns hidden
     message-only windows, and with the dummy audio driver it has no audio
@@ -134,10 +134,10 @@ owner, 2026-09-29)
     `flip` returns in about 0.2 ms and `tick(62)` paces every real frame.
     The wait column is therefore most of every healthy play row's period
     (p50 11.2 ms in the second end-to-end run below), and the budget's own
-    premise, one 60 Hz refresh (`BUDGET_MS`, RND-008.D3), is a question for
-    the owner rather than for this trace. Until it is answered the budget
-    reads as the 60 fps target, and the report no longer calls a long frame
-    "a missed refresh".
+    premise, one 60 Hz refresh (`BUDGET_MS`, RND-008.D3), was a question for
+    the owner rather than for this trace. The owner answered it on
+    2026-09-30 (SYS-012): the budget stays the 60 fps target, and the report
+    no longer calls a long frame "a missed refresh".
 - **SYS-010.D5: a long frame is put down to its largest part.** The report
   first split long frames into "the tick's own wait" and the rest. The
   second critic showed a frame long because of its present (work 12 ms,
@@ -436,11 +436,34 @@ display; every run here was headless, where the OS timer can stretch the
 cap's sleep (D4) and nothing is presented. The next step is the owner's:
 play a normal run with `--trace` and read the report.
 
-**Open for the owner.** The budget is one 60 Hz period (RND-008.D3), but
-SYS-011 found the owner's display runs at 174 Hz, where the 62 fps cap
-alone paces the game. Whether the budget stays the 60 fps target is the
-owner's call; the trace reports against `BUDGET_MS` either way, from one
-constant.
+**The budget (closed by SYS-012).** The budget was set as one 60 Hz period
+(RND-008.D3), but SYS-011 found the owner's display runs at 174 Hz, where
+the 62 fps cap alone paces the game. The owner decided on 2026-09-30 that
+the budget stays the 60 fps target, 16.67 ms; the trace keeps reporting
+against `BUDGET_MS`, the one constant in `systems/frame_trace.py`.
 
-**Follow-ups.** SYS-011 (timer resolution, on its own branch stacked on
-this one) owns the cause of the D4 stretch.
+**Follow-ups.** SYS-011 (timer resolution, on main since PR #54) owns the
+cause of the D4 stretch.
+
+---
+
+## SYS-012: The budget stays the 60 fps target (owner, 2026-09-30)
+
+**ID:** SYS-012 · **System:** systems · **Type:** process (text only) ·
+**Status:** done · **Branch:** ComeGalletas/sys-012-budget-decided-c17f955f
+
+- **Objective:** Bring the text in line with the owner's decision that the
+  frame budget stays the 60 fps target (16.67 ms, `BUDGET_MS`) even though
+  the owner's display runs at 174 Hz. No behaviour changes.
+- **SYS-012.D1 (owner, 2026-09-30):** the budget stays `1000 / 60` ms. It
+  is the frame-rate target, not a refresh period; the stress harness and
+  the trace report keep reading it from `systems/frame_trace.py`.
+- **Tasks:**
+  - [x] SYS-012.1: the `BUDGET_MS` comment records the decision instead of
+    calling it an open question; this journal's "Open for the owner"
+    paragraph is closed and its SYS-011 "on its own branch" wording now
+    says main (PR #54); `frame_time_journal.md`'s RND-008 budget lines get
+    a pointer to the decision; `test_the_budget_is_one_60_hz_period` is
+    renamed `test_the_budget_is_the_60_fps_target` (same assertion).
+- **Checked:** `tests/devtools/test_spawn_stress.py` and
+  `tests/devtools/test_frame_trace.py`.
