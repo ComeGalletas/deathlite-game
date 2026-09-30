@@ -172,6 +172,10 @@ INTEGRATION = (
     # SYS-010: a real Game stepped with and without a trace, and main.py run.
     "tests/devtools/test_frame_trace.py::GameWiringTests",
     "tests/devtools/test_frame_trace.py::MainTests",
+    # BLD-003: a run booted under the web profile, and the main loop's tick;
+    # the profile's values and the pacing flag boot nothing and stay unit.
+    "tests/flows/test_web_crowd.py::WebCrowdRunTests",
+    "tests/flows/test_frame_pacing.py::StepTickTests",
 )
 
 

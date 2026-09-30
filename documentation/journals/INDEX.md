@@ -15,9 +15,9 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-018 ·
-PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
-(RND-010 and RND-012 are taken on branches not yet merged here.)
+**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-019 ·
+PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-004 · DOC-008
+(RND-010, RND-012 and UI-018 are taken on branches not yet merged here.)
 
 ## Requirements
 
@@ -127,6 +127,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
 | TST-009 | The stray-English scan excuses names looked up through a loop (`getattr` over a literal tuple, SYS-011's ctypes prototypes) | TST, UI | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-stray-english-ctypes-03622970 | 2026-09-30 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
+| BLD-003 | Web frame time: the browser's own crowd (live cap 100, AI knobs) and host-paced frames | BLD, SPN, SYS | performance | done (D4 re-approval owed; measured in Chrome 2026-09-30) | [web_frame_time_journal.md](web_frame_time_journal.md) | ComeGalletas/web-frame-pacing-5be9212c | 2026-09-29 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
