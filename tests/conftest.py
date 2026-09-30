@@ -57,6 +57,8 @@ WORLD = (
     "tests/playing/test_projectile_elevation.py",
     # TST-006.2: reads the shared worlds; the module's boats boot a run.
     "tests/entities/test_fish_huts.py::PlacementTests",
+    # ENT-021: the 20 px gap routing, on a pinned world's shared nav field.
+    "tests/entities/ai/test_melee_enemies.py::ColliderRoutingTests",
 )
 
 # Modules that boot a real `Game` and drive its states -- the menu into a run,

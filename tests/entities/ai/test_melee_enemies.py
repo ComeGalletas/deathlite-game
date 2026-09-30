@@ -20,6 +20,9 @@ from entities.ai import actions, build_behavior, templates
 from entities.melee_hitbox import MeleeHitbox
 from game import config
 from game.content import get_content
+from tests import worlds as W
+from world.gen import repair, spawnpoints
+from world.nav.field import _INF
 
 MELEE = ("skull", "panda", "bear", "turtle")
 WINDUP_BONUS = 1.15
@@ -122,11 +125,13 @@ class _Hits:
 
 
 class ColliderShrinkTests(unittest.TestCase):
-    """ENT-020: the Ravager's and Grudge's colliders are 30 % smaller so they
-    fit tighter ground. The sprites keep their size, and the Ravager's swing
-    keeps its reach through `attack_radius`."""
+    """ENT-020 / ENT-021: the Ravager's and Grudge's colliders are a fixed
+    20 px so they fit tighter ground, and the large nav class routes them
+    through every gap that size fits. The sprites keep their size, and the
+    Ravager's swing keeps its reach through `attack_radius`."""
 
     OLD = {"bear": 22.0, "troll": 26.0}
+    RADIUS = 20.0
 
     def setUp(self):
         self.enemies = get_content().enemies
@@ -145,10 +150,19 @@ class ColliderShrinkTests(unittest.TestCase):
         actions.ACTIONS["poke"](cfg)(actor, per, hits)
         return hits.boxes[0]
 
-    def test_the_colliders_are_30_percent_smaller(self):
-        for eid, old in self.OLD.items():
+    def test_the_colliders_are_a_fixed_20(self):
+        for eid in self.OLD:
             with self.subTest(eid):
-                self.assertAlmostEqual(self.enemies[eid]["radius"], old * 0.7)
+                self.assertEqual(self.enemies[eid]["radius"], self.RADIUS)
+
+    def test_the_world_is_still_certified_for_the_wider_walkers(self):
+        """ENT-021: lowering the large class's clearance to route these two
+        does not lower the body world generation certifies ground for. The
+        unseal repair and the large spawn points stay at 22, so the turtle
+        (24) keeps the reach it had. `tests/world/test_digest.py` pins the
+        world itself byte for byte."""
+        self.assertEqual(repair._widest_class(), (48, 22.0))
+        self.assertEqual(spawnpoints.body_radii(), (16.0, 22.0))
 
     def test_the_sprites_keep_their_size(self):
         rigs = _sprites()
@@ -184,6 +198,53 @@ class ColliderShrinkTests(unittest.TestCase):
                 box = self._swing_at(eid, reach)
                 self.assertTrue(box.contains(pygame.Vector2(reach, 0),
                                              config.PLAYER_RADIUS))
+
+
+class ColliderRoutingTests(unittest.TestCase):
+    """ENT-021: the large nav class routes the 20 px Ravager and Grudge
+    through every gap they fit. World tier: reads the shared nav field of a
+    pinned world (`tests/conftest.py: WORLD`)."""
+
+    def setUp(self):
+        self.enemies = get_content().enemies
+
+    def test_the_nav_class_clearance_matches_them(self):
+        """The class a body paths in asks for exactly its radius. Above it,
+        the pathfinder refuses gaps the body fits (ENT-020.Q1: Grudge at
+        18.2 in a 22 px class); below it, the pathfinder sends the body into
+        gaps it cannot pass."""
+        field = W.nav(W.SEEDS[0])
+        for eid in ("bear", "troll"):
+            with self.subTest(eid):
+                r = float(self.enemies[eid]["radius"])
+                self.assertEqual(field._min_clear[field._class_for(r)], r)
+
+    def test_the_field_routes_them_through_a_20_px_gap(self):
+        """Behaviour, not the config: on a pinned world, every open (non
+        corridor) large-lattice cell with 20-22 px of clearance -- ground
+        a 20 px body fits and the old 22 px class refused -- is reached
+        by the large field, rebuilt toward a roomier neighbour."""
+        field = W.nav(W.SEEDS[0])
+        ng = field.grids["large"]
+        r = float(self.enemies["bear"]["radius"])
+        checked = 0
+        for row in range(1, ng.rows - 1):
+            for col in range(1, ng.cols - 1):
+                i = row * ng.cols + col
+                if not ng.walkable[i] or ng.corridor[i] or not r <= ng.clearance[i] < 22.0:
+                    continue
+                roomy = [(col + dc, row + dr) for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                         if ng.walkable[(row + dr) * ng.cols + col + dc]
+                         and ng.clearance[(row + dr) * ng.cols + col + dc] >= 22.0]
+                if not roomy:
+                    continue
+                field.rebuild(ng.world_of(*roomy[0]), only="large")
+                self.assertLess(field.cost(ng.world_of(col, row), r), _INF,
+                                f"cell {(col, row)} clearance {ng.clearance[i]:.1f}")
+                checked += 1
+                if checked >= 12:
+                    return
+        self.assertGreater(checked, 0, "no 20-22 px gap on the pinned world")
 
 
 if __name__ == "__main__":
