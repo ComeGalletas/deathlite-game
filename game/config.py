@@ -69,6 +69,16 @@ VERSION: str = "0.5"
 # if the driver refuses (the tests' dummy driver does); `Game.vsync` says
 # which you got. Off in the browser profile, where pygbag owns the canvas.
 VSYNC: bool = True
+# Who paces the loop. False: `Game._step` does, with `clock.tick(FPS)`.
+# True: the host does, and the tick only measures. In the browser pygbag
+# steps the loop once per `requestAnimationFrame`, after the
+# `await asyncio.sleep(0)` in `Game.run_async`; a capped tick there would be
+# pygame-ce's `SDL_Delay`, which busy-waits the page's only thread when the
+# runtime has no Asyncify, so a frame that fits the budget would be held
+# twice. Set only by `apply_web_profile`, and only in that runtime
+# (BLD-003.D4): `main.py --web` on the desktop keeps the cap, because
+# nothing else paces it there.
+HOST_PACES_FRAMES: bool = False
 
 # The window (journal "Dynamic window scaling", 2026-09-15). Changed only in
 # the Options screen -- there is no hotkey, so nothing changes during a run.
@@ -1141,8 +1151,12 @@ def apply_web_profile() -> None:
     startup, before `Game()` is constructed (see `main.py` / `main_web.py`).
 
     * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
-    * `FPS = 60` -- the page composites at ~60 Hz; targeting 120 just spends
-      WASM budget on frames that are never presented.
+    * `FPS = 60` -- the cap `main.py --web` runs at on the desktop. In the
+      browser the page's refresh paces the loop instead
+      (`HOST_PACES_FRAMES`, below), so the game presents at the display's
+      rate and never waits on a cap of its own.
+    * `HOST_PACES_FRAMES = sys.platform == "emscripten"` -- True only in
+      the browser runtime itself (BLD-003.D4).
     * `1280x720` render target -- that is the pygbag canvas size (pygbag's
       default framebuffer; `dist/web/build.sh` passes no `--width`), so there
       is no downscale, and per-frame blit work drops by ~35% against the
@@ -1182,13 +1196,15 @@ def apply_web_profile() -> None:
     `PlayingState`), so a plain reassignment here propagates.
     """
     global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
-    global WINDOW_RESIZABLE, RENDER_SCALE
+    global WINDOW_RESIZABLE, RENDER_SCALE, HOST_PACES_FRAMES
     global ENEMY_LIVE_CAP, ENEMY_LOD_SKIP, ENEMY_NAV_REBUILD_INTERVAL
     global NAV_FILL_MAX_COST
+    import sys                      # local: this module imports nothing at load
     SAVE_ENABLED = False
     VSYNC = False
     WINDOW_RESIZABLE = False        # pygbag owns the canvas
     FPS = 60
+    HOST_PACES_FRAMES = sys.platform == "emscripten"
     ENEMY_LIVE_CAP = 100
     ENEMY_LOD_SKIP = 3
     ENEMY_NAV_REBUILD_INTERVAL = 0.6

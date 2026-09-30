@@ -136,7 +136,7 @@ builder writes later:
 
 - [x] BLD-003.1 — journal, index entry
 - [x] BLD-003.2 — browser live cap and AI knobs in the web profile, tests
-- [ ] BLD-003.3 — host-paced frames in the browser, tests
+- [x] BLD-003.3 — host-paced frames in the browser, tests
 - [ ] BLD-003.4 — `spawn_stress --web`, test, measurement
 - [ ] BLD-003.5 — docs, critic pass, close
 
