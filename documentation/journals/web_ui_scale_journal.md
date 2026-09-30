@@ -1,0 +1,192 @@
+# Web UI scale — the 900-row screens on the 720-row web canvas
+
+**ID:** UI-016 · **Systems:** UI, BLD · **Type:** bug · **Branch:**
+`ComeGalletas/ui-016-web-ui-scale-b5bf589e` · **Started:** 2026-09-29
+
+Closes UI-014.D20 (`localization_journal.md`).
+
+## Requirement (owner, 2026-09-29)
+
+- **Objective:** make every text of the title menu, hero select, Options,
+  Game Over and Victory land on the web build's 1280x720 surface, with
+  nothing overlapping.
+- **Details:** the web profile (`config.apply_web_profile`) draws at
+  1280x720 with `RENDER_SCALE 1.0`, but those screens are laid out in
+  design pixels for 900 rows, so their lower buttons, hints and the menu's
+  summary land below 720 or onto each other. The fit harness from UI-014.11
+  (`tests/screens/fit_harness.py`, `fit_scenes.py`, `test_fit.py`) measures
+  it and lists the screens in `WEB_UNFIT`; each fixed screen leaves that
+  list.
+- **Constraint:** check first that pygbag's canvas really is 1280x720. The
+  1600x900 layout stays byte-identical (`test_english_layout.py` and the
+  per-screen tests pin it). The web world view does not change.
+
+## Confirmed reading
+
+- **The canvas is 1280x720.** pygbag 0.9.3 (`.venv`) defaults the
+  framebuffer to `DEFAULT_WIDTH = 1280`, `DEFAULT_HEIGHT = 720`
+  (`pygbag/app.py:90`); `dist/web/build.sh` passes no `--width` /
+  `--height`; the cached template fills `fb_width` / `fb_height` from them
+  and the last build's `build/web/index.html` reads `Screen : 1280x720`,
+  `fb_width "1280"`, `fb_height "720"`. `apply_web_profile` sets
+  `SCREEN_* = 1280, 720`, and `DisplayWindow.open` (not scalable in the
+  browser) forced `RENDER_SCALE = 1.0`.
+- **The scale path already exists.** Native-resolution rendering sets
+  `RENDER_SCALE = h / UI_HEIGHT` (1.6 at 1440 rows) and every screen lays
+  out through `ui/scale.py` and `game/fonts.py` at that factor. The web
+  surface is the same case at `720 / 900 = 0.8`: the 1600x900 layout at 80%,
+  which fits by construction.
+
+## Decisions
+
+- **UI-016.D1 — scale the web interface by 0.8, not re-lay five screens**
+  (owner, 2026-09-29). The web profile sets `RENDER_SCALE = SCREEN_HEIGHT /
+  UI_HEIGHT`. Every screen, the in-run HUD included, becomes the design
+  layout at 80%; text and the 64 px button art are resampled 20% smaller.
+  A per-screen re-layout was the alternative: sizes kept at 1.0, but five
+  screens of their own layout math and the same problem waiting for the
+  next screen drawn for 900 rows.
+- **UI-016.D2 — the web `CAMERA_ZOOM` is compensated so the effective zoom
+  stays 1.25** (owner, 2026-09-29, relayed by the UI-014 session). The
+  world draws at `config.effective_zoom() = CAMERA_ZOOM x RENDER_SCALE`
+  snapped to 1/TILE_PX, so a 0.8 scale alone would shrink the web world
+  view to zoom 1.0. The owner allows the web profile's `CAMERA_ZOOM`
+  constant to change so the effective zoom does not: `1.25 / 0.8 = 1.5625`,
+  `64 x 1.5625 x 0.8 = 80` px per tile, whole, as today (the seam rule in
+  `apply_web_profile`'s docstring). Pinned by a test that
+  `effective_zoom()` under the web profile is exactly 1.25.
+- **UI-016.D3 — the browser window derives its scale, it does not force
+  1.0.** `DisplayWindow.open`'s not-scalable branch set `RENDER_SCALE =
+  1.0`, which would undo D1 after the profile ran. It now derives the scale
+  the same way native rendering does, `SCREEN_HEIGHT / UI_HEIGHT`: 0.8 in
+  the browser, 1.0 for every desktop design size (all 900 rows).
+- **UI-016.D4 — the fit test draws its 1280 scenes under the real web
+  profile.** Until now the 1280 scenes were a 1280x720 surface at scale
+  1.0, which after D1 is no configuration the game runs in. They are drawn
+  inside `apply_web_profile()` (restored after), with the in-run scenes on
+  a run booted under it, so the fonts the run keeps are the web profile's.
+  The other tests that described themselves as "the 1280 web profile" are
+  moved onto it the same way (`tests/web_profile.py: web_profile()`), with
+  one kind of exception: two tests existed to drive the Build pane's
+  title step-down and the run summary's subheader trim, which only the
+  old 1280-at-1.0 surface was narrow enough to reach. At 0.8 the fonts
+  shrink with the layout and both fit whole. Those two keep the narrow
+  surface, now named as a stress case and no shipped configuration, and a
+  new test pins that the web profile shows the subheader whole in both
+  languages.
+- **UI-016.D5 — the web exemption goes, not just its entries.** With all
+  13 `WEB_UNFIT` screens fitting at 0.8, the exemption (`WEB_UNFIT`,
+  `web_held`, `web_exempt`, `spanish_adds_below` and their self-tests)
+  would be machinery with nothing to exempt. It is removed; both sizes are
+  held to one rule in `test_every_screen_fits_at_both_sizes`. A screen that
+  one day misfits at 1280 fails like one that misfits at 1600.
+
+## Plan
+
+1. Journal and index (this file).
+2. The web profile scales the interface by 0.8 and compensates the camera
+   zoom; the window derives its scale; a test helper applies the web
+   profile and restores every config value it touched, so tests stop
+   hand-listing (and missing) the values; the effective-zoom pin.
+3. The fit harness draws the 1280 scenes under the web profile; the fixed
+   screens leave `WEB_UNFIT`; the tests that claim the web profile use it.
+4. Screenshots of the web screens; docs (`pygbag.md`, `ui/scale.py`,
+   `config.py` docstrings); close D20.
+
+## Tasks
+
+- [x] UI-016.1 — journal, index entry
+- [x] UI-016.2 — web profile at scale 0.8, compensated zoom, window scale, test helper, zoom pin
+- [x] UI-016.3 — fit harness under the web profile, `WEB_UNFIT` emptied, web-profile tests moved on
+- [x] UI-016.4 — screenshots, docs, D20 closed
+
+## Results (2026-09-29)
+
+- **Fit, measured.** Every `WEB_UNFIT` screen (menu, hero select x6,
+  Options x4, Game Over, Victory) draws with no cut, overlap or crossing at
+  1280x720 under the web profile, in English and Spanish; the lowest ink
+  now ends between y 696 and 712. With the old scale-1 behaviour forced
+  back the same scenes run to y 801-890 with 3-5 problems each (critic
+  probe), so the web leg of the fit test is not vacuous. The menu's summary
+  line (the peer session's note: row 620 at scale 1) sits clear under
+  Exit.
+- **1600x900 unchanged:** `test_english_layout.py` and every per-screen
+  test pass untouched; nothing desktop-side reads the new values.
+- **World view unchanged:** `effective_zoom()` is exactly 1.25 on web
+  (`test_camera.py`), 80 px per tile; aim, terrain bake, spawn ring and
+  culling all read `effective_zoom()` (critic grep: no direct
+  `CAMERA_ZOOM` reads outside `config.py`).
+- **Screenshots:** the six web screens at 1280x720 (menu, hero select,
+  Options, Game Over, Victory, HUD) were delivered to the owner; they
+  are kept out of the repo.
+- **Tests run:** `tests/screens`, `tests/display`, `tests/systems`,
+  `tests/flows`, `tests/render`: 1657 passed, 2255 subtests (12 min).
+  The critic ran the full default tier: 4007 passed, 6676 subtests.
+  Regression tests fail with the bug put back (window forcing 1.0;
+  `CAMERA_ZOOM` left at 1.25).
+- **Cold critic:** one pass, PASS, four low findings. Fixed:
+  `test_a_tile_is_a_whole_number_of_pixels` read the snapped
+  `effective_zoom()` and could not fail; it now checks the raw product
+  (a desktop `CAMERA_ZOOM` of 1.7 fails it). The generator that yielded
+  from inside the profile is now a list, so a failure cannot leave the
+  profile applied. Stale "extent is SCREEN / CAMERA_ZOOM" and "keeps the
+  desktop field of view" lines in `config.py`, `FUNCTIONAL_README.md`
+  and `plans/web_plan.md` were corrected.
+- **Open for the owner:** the software cursor on web follows the rule it
+  already follows natively (`UI_CURSOR_SCALE x RENDER_SCALE`,
+  `game/game.py:180`, when the platform does not report its cursor size),
+  so it is now 20% smaller in the browser, like the rest of the
+  interface. That is presentation only and was not decided explicitly.
+  The HUD's pixel-art bars use `scale.int_scale`, which rounds x3 at 0.8
+  to x2, so they are ~67% of their desktop size rather than 80%.
+
+## and then: the cursor and the HUD bars (owner, 2026-09-29)
+
+- **Objective:** make the base cursor 15% smaller, and draw the web HUD
+  bars at 80% of their desktop size.
+- **Details:** raised from the two open points above. The owner picked,
+  from two readings each:
+  - cursor: the *base* size, everywhere, not only on web.
+    `UI_CURSOR_SCALE` 1.0 -> 0.85. On desktop the arrow is 85% of the
+    system cursor's size (`ui/mouse.py: system_match_scale`). Where the
+    platform does not report a size, the fallback is
+    `UI_CURSOR_SCALE x RENDER_SCALE`, which on web is 0.85 x 0.8 = 0.68 of
+    the old base.
+  - HUD bars: on web only, a true 80% of desktop (x2.4, not x2). Desktop
+    stays x3.
+- **Constraint:** the 1600x900 layout and the enemy health bars are
+  untouched (the request named the HUD bars). The HUD's integer grid
+  above scale 1 (x5 at 1.6) stays as it is.
+
+### Decisions
+
+- **UI-016.D6 — below scale 1 the HUD bars are resampled, not rounded.**
+  `scale.int_scale` keeps pixel-art bars on a whole-pixel grid by rounding
+  the art scale. Above 1 that costs little (x4.8 -> x5, +4%), but at 0.8 it
+  costs 17% (x2.4 -> x2). Below scale 1 the bar is built at its design
+  scale (x3) and resampled by the interface scale (`bars.bar(...,
+  resample=)`, smoothscale, cached with the bar). Its size is then exactly
+  80%, with slightly soft pixels, the same trade-off as the text and button
+  art at 0.8. The rule reads the interface scale, not the platform, so a
+  native desktop window under 900 rows gets the same bars.
+- **UI-017.D1 — `UI_CURSOR_SCALE = 0.85`** (owner). This is the one
+  constant both cursor paths read.
+
+### Tasks
+
+- [x] UI-016.5 — the web HUD bars (and the boss bar) at 80%: `bars.bar`
+  resample, `ui/hud.py`, tests
+- [x] UI-017.1 — `UI_CURSOR_SCALE` 0.85, its comment, a pinning test
+
+### Results
+
+- **HUD bars (UI-016.5):** on web the HP/XP bars and the boss bar are
+  exactly 80% of the desktop's (`test_hud.py: WebBarScaleTests`, which
+  fails with the old rounding put back); at 1.0 and 1.6 they are
+  unchanged (x3, x5). The boss bar is still half the screen wide.
+- **Cursor (UI-017.1):** `UI_CURSOR_SCALE` 0.85, pinned in
+  `test_mouse.py`; the system-match and render-scale tests now include
+  the base scale.
+- **Tests run:** `test_hud`, `test_hud_bars`, `test_ui_bar_sprites`,
+  `test_ui_scale`, `test_mouse`, `test_fit`, `test_english_layout`,
+  `tests/render`: all pass.

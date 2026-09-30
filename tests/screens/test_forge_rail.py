@@ -9,6 +9,7 @@ cannot be chosen by key or by click, and the level-up screen is untouched.
 Driven with fakes and a recording state machine -- no run, no world -- so these
 stay in the `unit` tier.
 """
+import contextlib
 import os
 import unittest
 from types import SimpleNamespace
@@ -18,6 +19,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
+from game import config
 from game.states.level_up_state import LevelUpState
 from progression.upgrades import Upgrade
 from ui.forge_rail import ForgeRail, rows_for
@@ -216,19 +218,22 @@ class RailLayoutTests(unittest.TestCase):
 
     def test_the_rail_sits_left_of_the_cards_on_both_profiles(self):
         """It is placed relative to the cards, not at a fixed x, so it stays
-        beside them at 1600 and at the 1280 web profile."""
+        beside them on the desktop and under the web profile (1280x720, the
+        interface at 0.8)."""
         from ui.forge_rail import WIDTH
         rows = rows_for([_Weapon("sword", "Sword", levels=2),
                          _Weapon("bow", "Bow", levels=2)], 2, _levels)
-        for w, h in ((1600, 900), (1280, 720)):
-            with self.subTest(f"{w}x{h}"):
+        from tests.web_profile import web_profile
+        from ui import scale
+        for name, profile in (("desktop", contextlib.nullcontext), ("web", web_profile)):
+            with self.subTest(name), profile():
                 s = _state(rows)
-                s.draw(pygame.Surface((w, h)))
+                s.draw(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
                 card = s.panel.hits.rect_of(0)
                 rail = s.rail.hits.rect_of(0)
                 self.assertLess(rail.right, card.left, "the rail overlaps the cards")
                 self.assertGreaterEqual(rail.left, 0, "the rail runs off screen")
-                self.assertEqual(rail.width, WIDTH)
+                self.assertEqual(rail.width, scale.px(WIDTH))
 
 
 if __name__ == "__main__":

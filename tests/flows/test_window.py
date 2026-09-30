@@ -80,14 +80,9 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(surf.get_size(), (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
 
     def test_the_web_profile_turns_vsync_off(self):
-        saved = (config.VSYNC, config.SAVE_ENABLED, config.FPS, config.SCREEN_WIDTH,
-                 config.SCREEN_HEIGHT, config.CAMERA_ZOOM)
-        try:
-            config.apply_web_profile()
+        from tests.web_profile import web_profile
+        with web_profile():
             self.assertFalse(config.VSYNC)
-        finally:
-            (config.VSYNC, config.SAVE_ENABLED, config.FPS, config.SCREEN_WIDTH,
-             config.SCREEN_HEIGHT, config.CAMERA_ZOOM) = saved
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ Text is captured by standing a recorder in for each font the screen draws
 with, since pygame's `Font.render` cannot be patched. Unit tier: a
 hand-built run from `test_run_status`, no world.
 """
+import itertools
 import os
 import re
 import tempfile
@@ -28,7 +29,7 @@ import pygame
 from combat.elements.ids import ElementId
 from combat.weapons.core import ATTACK_MODE, TIME_MODE
 from combat.weapons.forge import TEXT_OVERRIDE_KEYS
-from game import fonts, locale
+from game import config, fonts, locale
 from game.content import get_content
 from game.states.run_status_state import PANES
 from progression.blessings.catalog import get_catalog
@@ -996,8 +997,11 @@ class BuildPaneDetailTests(unittest.TestCase):
                                 [("Héroe + Arco  -  Pacto", "texto")]))
 
     def test_the_card_title_size(self):
-        """28 px heading at 1600; at the 1280 web profile a title too wide for
-        its card steps down in the same heading face."""
+        """28 px heading at 1600; on a 1280x720 surface at scale 1 (the old
+        web profile, before UI-016: the narrowest cards the pane has had) a
+        title too wide for its card steps down in the same heading face.
+        The web profile now draws the pane at 0.8, where the titles fit
+        (`WebProfileFitTests`)."""
         from ui.run_status import common as cm
         self.assertEqual(cm.TITLE_PX, 28)
         probe = "Wim  Lv 10"
@@ -1017,12 +1021,12 @@ class BuildPaneDetailTests(unittest.TestCase):
         s.tab = PANES.index("build")
         with mock.patch.object(build, "fit_font", fit):
             s.draw(pygame.Surface((1280, 720)))
+        steps = [fonts.heading(k).size(probe) for k in range(20, 28)]
         self.assertTrue(chose)
         for role, px, font in chose:
             self.assertIs(role, fonts.heading)
             self.assertEqual(px, 28)
-            self.assertTrue(any(fonts.heading(k).size(probe) == font.size(probe)
-                                for k in range(20, 28)))
+            self.assertIn(font.size(probe), steps)
 
     def test_ids_a_table_does_not_list(self):
         w = self.ps.player.weapons[3]
@@ -1399,7 +1403,8 @@ class ShareCellTests(unittest.TestCase):
 
 
 class VictoryAt1280Tests(unittest.TestCase):
-    """The web profile draws the summary's columns at 1280x720 (scale 1):
+    """The web profile draws the summary's columns at 1280x720 (the
+    interface at 0.8, between the end screen's own panel rows):
     every text stays inside the area it is laid out in -- a row inside its
     column's content area, a title inside its ribbon -- and none sits on
     another, in either language, three columns or four: ribbon titles,
@@ -1410,9 +1415,22 @@ class VictoryAt1280Tests(unittest.TestCase):
         _display()
         self.addCleanup(locale.set_language, locale.DEFAULT)
 
-    def texts(self, stats, columns=VICTORY_COLUMNS):
+    def texts(self, stats, columns=VICTORY_COLUMNS, *, narrow=False):
         """`[(text, rect)]` drawn, and the `(ribbon, area)` of each column,
-        as `_column` laid them out."""
+        as `_column` laid them out: under the web profile, between the end
+        screen's panel rows; or, `narrow`, on a 1280x720 surface at scale 1
+        -- the old web profile, before UI-016, and no shipped configuration
+        now: the tightest columns the panel has had to hold, kept so its
+        step-down and trim paths stay exercised."""
+        from tests.web_profile import web_profile
+        from ui import scale
+        from ui.end_screen import PANEL_BOTTOM, PANEL_TOP
+        if narrow:
+            return self._texts(stats, columns, 142, 610)     # the panel rows at 0.8
+        with web_profile():
+            return self._texts(stats, columns, scale.px(PANEL_TOP), scale.px(PANEL_BOTTOM))
+
+    def _texts(self, stats, columns, top, bottom):
         placed = _Placed()
         panel = RunSummaryPanel(stats)
         for name in ("_ribbon", "_sub", "_row", "_small"):
@@ -1432,7 +1450,7 @@ class VictoryAt1280Tests(unittest.TestCase):
                                 lambda *a, **k: placed.font(real_fit(*a, **k))),
               mock.patch.object(run_summary.widgets, "draw_ribbon", ribbon),
               mock.patch.object(RunSummaryPanel, "_column", column)):
-            panel.draw(placed.Surface((1280, 720)), None, 142, 610, columns=columns)
+            panel.draw(placed.Surface((1280, 720)), None, top, bottom, columns=columns)
         texts = [(t, r) for t, rects in placed.where.items() for r in rects]
         return texts, list(zip(ribbons, areas, strict=True))
 
@@ -1446,11 +1464,12 @@ class VictoryAt1280Tests(unittest.TestCase):
 
     def test_every_text_stays_in_its_area_and_alone(self):
         stats = self.stats()
-        for lang, columns in (("en", VICTORY_COLUMNS), ("es", VICTORY_COLUMNS),
-                              ("en", COLUMNS), ("es", COLUMNS)):
+        for (lang, columns), narrow in itertools.product(
+                (("en", VICTORY_COLUMNS), ("es", VICTORY_COLUMNS), ("en", COLUMNS),
+                 ("es", COLUMNS)), (False, True)):
             locale.set_language(lang)
-            texts, boxes = self.texts(stats, columns)
-            with self.subTest(lang=lang, columns=len(columns)):
+            texts, boxes = self.texts(stats, columns, narrow=narrow)
+            with self.subTest(lang=lang, columns=len(columns), narrow=narrow):
                 for t, r in texts:
                     ribbon, area = next((b, a) for b, a in boxes
                                         if b.left - 20 <= r.centerx <= b.right + 20)
@@ -1463,22 +1482,31 @@ class VictoryAt1280Tests(unittest.TestCase):
                                          and r.clip(q).height > 4, (t, u))
 
     def test_a_subheader_steps_then_trims_words_but_keeps_its_count(self):
+        """On the narrow surface; under the web profile the subheader fits
+        whole in both languages (the next test)."""
         stats = self.stats()
         locale.set_language("en")
-        texts, _boxes = self.texts(stats)
+        texts, _boxes = self.texts(stats, narrow=True)
         drawn = [t for t, _r in texts]
         # English steps down and stays whole.
         self.assertIn("Items acquired  (14)", drawn)
         locale.set_language("es")
-        texts, _boxes = self.texts(stats)
+        texts, _boxes = self.texts(stats, narrow=True)
         heads = [t for t, _r in texts if t.startswith("Objetos")]
         self.assertEqual(len(heads), 1)
         self.assertTrue(heads[0].endswith("...  (14)"), heads[0])   # words gave way, the count did not
 
+    def test_under_the_web_profile_the_subheader_is_whole(self):
+        stats = self.stats()
+        for lang, head in (("en", "Items acquired  (14)"), ("es", "Objetos obtenidos  (14)")):
+            locale.set_language(lang)
+            with self.subTest(lang=lang):
+                self.assertIn(head, [t for t, _r in self.texts(stats)[0]])
+
 
 class WebProfileFitTests(unittest.TestCase):
-    """The 1280x720 web profile, four weapons: nothing on the Build pane
-    trims in Spanish (UI-014.9)."""
+    """The 1280x720 web profile (the interface at 0.8), four weapons:
+    nothing on the Build pane trims in Spanish (UI-014.9)."""
 
     def drawn_and_trimmed(self, ps):
         """(everything the Build pane drew, what it trimmed) at 1280x720, in
@@ -1492,11 +1520,13 @@ class WebProfileFitTests(unittest.TestCase):
             if out != text:
                 trimmed.append(text)
             return out
+        from tests.web_profile import web_profile
         locale.set_language("es")
-        s = _state(ps)
-        s.tab = PANES.index("build")
-        with mock.patch.object(common.uitext, "ellipsize", ellipsize):
-            s.draw(pygame.Surface((1280, 720)))
+        with web_profile():
+            s = _state(ps)
+            s.tab = PANES.index("build")
+            with mock.patch.object(common.uitext, "ellipsize", ellipsize):
+                s.draw(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
         return drawn, trimmed
 
     def test_four_cards_at_level_10_keep_their_titles(self):

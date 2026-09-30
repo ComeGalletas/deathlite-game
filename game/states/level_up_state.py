@@ -187,8 +187,8 @@ class LevelUpState(State):
         if self.rail is None:
             return
         # The rail sits just left of the cards rather than at a fixed x, so it
-        # stays beside them at 1600 and at the 1280 web profile instead of
-        # drifting into the corner on the wider one.
+        # stays beside them at every surface width instead of drifting into
+        # the corner on a wide one.
         first = self.panel.hits.rect_of(0)
         # No cards (a weapon with no Forgings left): a quarter in, or as far
         # in as the rail needs to clear the edge.

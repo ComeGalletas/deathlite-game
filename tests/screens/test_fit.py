@@ -7,17 +7,13 @@ no more than English (UI-014.11).
 show; `fit_harness.record` follows every text through the surfaces it was
 composed on to where its ink lands.
 
-* **1600x900** is the design size: every scene, both languages, nothing
-  cut, nothing overlapping another text, nothing running over the edge of
-  a button, card or ribbon.
-* **1280x720** is the web profile, held to the same rule, with one
-  exemption: `WEB_UNFIT` names the screens whose layout was drawn for 900
-  rows and runs off a 720 surface in English too, and the row their
-  900-row part starts at (the end screens' buttons, the menu's lower
-  buttons). A problem at or below that row, in either language, is the
-  web build's layout -- a task of its own (UI-014.D20) -- and is exempt
-  as long as Spanish has no more of them there than English; everything
-  above it is held to the 1600 rule.
+* **1600x900** is the design size and **1280x720** the web profile
+  (`config.apply_web_profile()`: the interface at 720 / 900 = 0.8, UI-016),
+  each scene drawn under its own profile (`fit_scenes.profile`): every
+  scene, both languages, nothing cut, nothing overlapping another text,
+  nothing running over the edge of a button, card or ribbon. The web
+  profile once drew at scale 1 and exempted the screens laid out for 900
+  rows (UI-014.D20); at 0.8 they fit and the exemption is gone (UI-016.D5).
 * **Lost:** a string rendered while a screen drew and never placed on it
   -- composed through something the harness cannot follow -- fails, so a
   screen cannot pass by losing its text.
@@ -27,8 +23,6 @@ composed on to where its ink lands.
   the affixes', so they are not counted; Spanish may make no more of
   the other trims than English does on the same screen (a count, not a
   pairing: "Recar..." and "Cooldo..." on one screen are even).
-
-`WEB_UNFIT` cannot go stale: a listed screen that fits in English fails.
 """
 import os
 import re
@@ -46,16 +40,6 @@ from tests.screens.fit_scenes import SCENES, SIZES
 
 DESIGN, WEB = SIZES
 ITEM = re.compile(r"^\[[A-Z]\] ")
-# scene -> (the y a 900-row layout's part below 720 starts at, why).
-WEB_UNFIT = {
-    "menu": (620, "the lower buttons (from y 629) and the summary pinned under them meet"),
-    **{f"hero_select{v}_{i}": (740, "Begin and the instructions sit below 720")
-       for i in range(3) for v in ("", "_unlocked")},
-    **{name: (660, "the lower rows sit below 720 and meet the hint line")
-       for name in ("options", "options_in_run", "options_borderless", "options_custom")},
-    "game_over": (780, "the end screen's buttons and hint sit below 720"),
-    "victory": (780, "the end screen's buttons and hint sit below 720"),
-}
 
 _RECORDS = {}
 _TRACKING = H.tracking()
@@ -66,7 +50,9 @@ def setUpModule():
     pygame.display.set_mode((64, 64))
     pygame.font.init()
     _TRACKING.__enter__()
-    fit_scenes.booted()             # boot outside any record: its own text is not a scene's
+    for size in SIZES:              # boot outside any record: its own text is not a scene's
+        with fit_scenes.profile(size):
+            fit_scenes.booted()
 
 
 def tearDownModule():
@@ -80,7 +66,8 @@ def recorded(name, size, lang):
         was = locale.language()
         locale.set_language(lang)
         try:
-            _RECORDS[key] = H.record(SCENES[name], size)
+            with fit_scenes.profile(size):
+                _RECORDS[key] = H.record(SCENES[name], size)
         finally:
             locale.set_language(was)
     return _RECORDS[key]
@@ -100,28 +87,6 @@ def problems(placed, size):
     return out
 
 
-def web_held(name, found):
-    """The problems at 1280 that count: all of them, but for a `WEB_UNFIT`
-    screen those at or below its 900-row part's first row."""
-    if name not in WEB_UNFIT:
-        return found
-    below = WEB_UNFIT[name][0]
-    return [(y, d) for y, d in found if y < below]
-
-
-def web_exempt(name, found):
-    """The problems `web_held` lets go: at or below the listed row."""
-    held = web_held(name, found)
-    return [f for f in found if f not in held]
-
-
-def spanish_adds_below(name, en_found, es_found):
-    """Spanish's problems below a `WEB_UNFIT` row when it has more there than
-    English, or [] -- the D20 rule, as the test and its self-test read it."""
-    en, es = web_exempt(name, en_found), web_exempt(name, es_found)
-    return [d for _y, d in es] if len(es) > len(en) else []
-
-
 def spanish_trims_more(en_placed, es_placed):
     """Spanish's trims past English's on one screen (item names aside), or
     [] -- the trim rule, as the test and its self-test both read it."""
@@ -134,31 +99,14 @@ def trims(placed):
 
 
 class FitTests(unittest.TestCase):
-    def test_every_screen_fits_at_the_design_size(self):
+    def test_every_screen_fits_at_both_sizes(self):
         bad = []
         for name in SCENES:
-            for lang in ("en", "es"):
-                bad += [f"{name} {lang}: {d}"
-                        for _y, d in problems(recorded(name, DESIGN, lang)[0], DESIGN)]
+            for size in SIZES:
+                for lang in ("en", "es"):
+                    bad += [f"{name} {size[0]} {lang}: {d}"
+                            for _y, d in problems(recorded(name, size, lang)[0], size)]
         self.assertEqual(bad, [], "\n" + "\n".join(bad))
-
-    def test_every_screen_fits_the_web_profile_above_its_900_row_part(self):
-        bad = []
-        for name in SCENES:
-            found = {lang: problems(recorded(name, WEB, lang)[0], WEB) for lang in ("en", "es")}
-            for lang in ("en", "es"):
-                bad += [f"{name} {lang}: {d}" for _y, d in web_held(name, found[lang])]
-            added = spanish_adds_below(name, found["en"], found["es"])
-            if added:
-                bad.append(f"{name}: Spanish adds problems below its row: {added}")
-        self.assertEqual(bad, [], "\n" + "\n".join(bad))
-
-    def test_every_listed_web_misfit_is_still_one_in_english(self):
-        """Each `WEB_UNFIT` screen still has an English problem below its
-        row: once the web layout is fixed, the exemption goes."""
-        fits = [name for name in WEB_UNFIT
-                if not web_exempt(name, problems(recorded(name, WEB, "en")[0], WEB))]
-        self.assertEqual(fits, [], "fits at 1280 now: drop it from WEB_UNFIT")
 
     def test_no_text_is_rendered_and_lost(self):
         bad = []
@@ -191,6 +139,19 @@ class FitTests(unittest.TestCase):
                 self.assertTrue(en)
                 if any(re.search(r"[A-Za-z]{3,}", t) for t in en):
                     self.assertNotEqual(en, es)
+
+    def test_the_web_size_is_drawn_under_the_web_profile(self):
+        """Not a 1280 surface at the desktop's scale (UI-016.D4): the web
+        scenes see the browser build's config, and their run was booted
+        under it."""
+        from game import config
+        with fit_scenes.profile(WEB):
+            self.assertEqual((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), WEB)
+            self.assertEqual(config.RENDER_SCALE, 0.8)
+            web_run = fit_scenes.booted()
+        with fit_scenes.profile(DESIGN):
+            self.assertEqual(config.RENDER_SCALE, 1.0)
+            self.assertIsNot(fit_scenes.booted(), web_run)
 
     def test_the_boss_bar_names_the_boss(self):
         for lang in ("en", "es"):
@@ -299,11 +260,6 @@ class HarnessTests(unittest.TestCase):
         self.assertFalse(by["Dentro"].cut)
         self.assertTrue(by["Fuera"].cut)
 
-    def test_the_web_exemption_is_only_below_its_row(self):
-        found = [(100, "cut 'Total'"), (779, "overlap"), (780, "cut 'Nuevo'"), (868, "cut")]
-        self.assertEqual(web_held("victory", found), [(100, "cut 'Total'"), (779, "overlap")])
-        self.assertEqual(web_held("paused", found), found)
-
     def test_text_over_the_edge_of_a_button_is_caught(self):
         from game import fonts
         from ui import widgets
@@ -367,17 +323,6 @@ class HarnessTests(unittest.TestCase):
             surface.blit(f.render("Chatarra 5", True, (1, 1, 1)), (120, 130))
         placed, _ = H.record(draw, DESIGN)
         self.assertEqual([p.text for p, _f in H.crossing(placed)], ["Chatarra 5"])
-
-    def test_below_the_row_spanish_may_not_add_problems(self):
-        en = [(800, "cut 'New run'")]
-        es = [(800, "cut 'Nueva partida'"), (805, "overlap")]
-        self.assertEqual(web_exempt("victory", en), en)
-        self.assertEqual(len(web_exempt("victory", es)), 2)
-        self.assertEqual(web_exempt("paused", es), [])
-        self.assertEqual(spanish_adds_below("victory", en, en), [])
-        self.assertEqual(spanish_adds_below("victory", en, es), ["cut 'Nueva partida'", "overlap"])
-        self.assertEqual(spanish_adds_below("victory", es, en), [])
-        self.assertEqual(spanish_adds_below("victory", en, [(100, "above")]), [])   # held apart
 
     def test_item_names_are_the_one_trim_left_out(self):
         self.assertEqual(trims([H.Placed("[C] Cota de...", pygame.Rect(0, 0, 1, 1), False),

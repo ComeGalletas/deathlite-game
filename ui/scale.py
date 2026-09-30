@@ -13,8 +13,10 @@ surface is the window, so those numbers are multiplied by
 `px` rounds to a whole pixel; `rect` / `size` round each edge. Fonts go
 through `game/fonts.py`, which applies the same factor to the requested
 size, so a screen asks for its design size and gets the native one. At
-scale 1.0 (the fixed 1600x900 frame, the plain fallback, the browser
-build, the test suite) every helper is the identity.
+scale 1.0 (the fixed 1600x900 frame, the plain fallback, most of the test
+suite) every helper is the identity. The browser build draws at 0.8: its
+1280x720 canvas is the design box at 80% (`config.apply_web_profile`,
+UI-016).
 """
 from __future__ import annotations
 

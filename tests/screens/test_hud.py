@@ -212,3 +212,54 @@ class LevelNumberTests(_Base):
             self.assertEqual(bars.core_centre(get_assets(), core=config.HUD_GEM_CORE, size=64),
                              (32.0, 32.0))
 
+
+class WebBarScaleTests(_Base):
+    """The web profile draws the interface at 0.8, and the HUD bars with it:
+    a true 80% of the desktop's x3, not x2 (owner, 2026-09-29, UI-016.D6)."""
+
+    def test_the_bar_scale_at_each_interface_scale(self):
+        from ui.hud import bar_scale
+        for k, want in ((1.0, (3, 1.0)), (1.6, (5, 1.0)), (0.8, (3, 0.8))):
+            with self.subTest(scale=k), mock.patch.object(config, "RENDER_SCALE", k):
+                self.assertEqual(bar_scale(), want)
+
+    def _meters(self):
+        """The HP bar's size and the lit rows of the bar stack, as drawn."""
+        seen = []
+        real = bars.bar
+
+        def spy(*a, **k):
+            out = real(*a, **k)
+            seen.append(out.get_size())
+            return out
+        hud = HUD()
+        with mock.patch.object(bars, "bar", spy):
+            self.assertTrue(hud._draw_meters(self.screen(), self.player, STATS, 0.35))
+        return seen[0]
+
+    def test_the_web_hp_bar_is_80_percent_of_the_desktops(self):
+        from tests.web_profile import web_profile
+        desk = self._meters()
+        bars.clear_cache()
+        with web_profile():
+            web = self._meters()
+        self.assertEqual(web, (round(desk[0] * 0.8), round(desk[1] * 0.8)))
+
+    def test_the_web_boss_bar_is_still_about_half_the_screen(self):
+        from tests.web_profile import web_profile
+        with web_profile():
+            s = self.screen()
+            seen = []
+            real = bars.bar
+
+            def spy(*a, **k):
+                out = real(*a, **k)
+                seen.append(out)
+                return out
+            with mock.patch.object(bars, "bar", spy):
+                self.assertTrue(HUD()._draw_boss(s, _Boss()))
+            self.assertAlmostEqual(seen[0].get_width(),
+                                   config.SCREEN_WIDTH * config.HUD_BOSS_WIDTH,
+                                   delta=config.HUD_BAR_SCALE * 4)
+
+

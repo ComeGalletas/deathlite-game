@@ -116,8 +116,9 @@ values -- the pane used here cannot.
 **Render.** 14-20 ms at 1280x720 with fifteen bodies in view is already
 most of the frame. The terrain path composites several scaled surfaces
 per frame; the `_blit_cache` fills per band on first sight (the 62 ms
-frame on desktop). Two cheap moves, both browser-side only: keep
-`CAMERA_ZOOM` at 1.25 (integer tile size, no seams, already done) and
+frame on desktop). Two cheap moves, both browser-side only: keep the
+drawn zoom (`effective_zoom()`) at 1.25 (integer tile size, no seams, already
+done; since UI-016 that is `CAMERA_ZOOM` 1.5625 at interface scale 0.8) and
 pre-warm the blit cache for the start island during the loading screen,
 so the first seconds of a run do not stutter. Beyond that, profile draw
 under the stress harness (`--draw`, on the fluidity list) before

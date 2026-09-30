@@ -137,6 +137,17 @@ class BarTests(_Base):
         self.assertEqual(big.get_size(),
                          (plain.get_width() * 3, plain.get_height() * 3))
 
+    def test_resample_smooth_scales_the_finished_bar(self):
+        """Below interface scale 1 the HUD builds at x3 and resamples
+        (UI-016.D6): the size is the scaled bar's times the fraction, and a
+        resampled bar is cached apart from the whole-scale one."""
+        big = self.bar(0.5, scale=3)
+        small = self.bar(0.5, scale=3, resample=0.8)
+        self.assertEqual(small.get_size(), (round(big.get_width() * 0.8),
+                                            round(big.get_height() * 0.8)))
+        self.assertIs(self.bar(0.5, scale=3, resample=0.8), small)
+        self.assertEqual(self.bar(0.5, scale=3).get_size(), big.get_size())
+
     def test_the_fill_tracks_the_fraction(self):
         ends = [self.hp_end(self.bar(f)) for f in (0.25, 0.5, 0.75, 1.0)]
         self.assertEqual(ends, sorted(ends), "more HP drew less bar")

@@ -130,9 +130,14 @@ class CursorTests(unittest.TestCase):
                                   round(ink.height * config.UI_CURSOR_SCALE)))
         self.assertEqual(cur.data[0], (0, 0))                 # hotspot: the arrow tip
 
+    def test_the_base_cursor_is_15_percent_under_the_system_arrow(self):
+        """The owner's size (UI-017): 85% of the system cursor's."""
+        self.assertEqual(config.UI_CURSOR_SCALE, 0.85)
+
     def test_the_arrow_is_scaled_to_the_system_arrow_ink_height(self):
         # The whole point of the match: whatever the desktop draws its arrow
-        # at, ours comes out the same number of screen pixels tall.
+        # at, ours comes out that many screen pixels tall, times the base
+        # scale.
         assets = get_assets()
         ink = cursor_ink(assets)
         self.assertIsNotNone(ink)
@@ -140,7 +145,8 @@ class CursorTests(unittest.TestCase):
             with mock.patch.object(native, "system_cursor_ink_height",
                                    return_value=target):
                 scale = system_match_scale(assets)
-            self.assertAlmostEqual(ink.height * scale, target, places=6)
+            self.assertAlmostEqual(ink.height * scale, target * config.UI_CURSOR_SCALE,
+                                   places=6)
 
     def test_the_match_is_absolute_and_ignores_the_render_scale(self):
         # A hardware cursor is in screen pixels: the render width and the
@@ -154,7 +160,8 @@ class CursorTests(unittest.TestCase):
                 game.display.scale = 1.0
                 narrow = game._cursor_scale()
         self.assertEqual(wide, narrow)
-        self.assertAlmostEqual(wide, 33.75 / cursor_ink(game.assets).height, places=6)
+        self.assertAlmostEqual(wide, config.UI_CURSOR_SCALE * 33.75
+                               / cursor_ink(game.assets).height, places=6)
 
     def test_a_platform_that_will_not_say_keeps_the_render_scale_rule(self):
         game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
