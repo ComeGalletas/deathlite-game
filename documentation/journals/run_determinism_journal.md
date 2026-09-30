@@ -143,3 +143,55 @@ which is why seed 7 looked stable and seed 123 "drifted over the day".
 
 **SYS-008 closed** (2026-09-23): a seed now plays the same run in any
 process, under any hash seed and any machine load.
+
+---
+
+## TST-008 — Requirement (owner, 2026-09-30)
+
+- **Objective:** Re-pin the run digest's seed 123 after CMB-010 moved it.
+- **Details:** `python -m tools.verification.run_digest --check` on
+  `origin/main` (`d61d9f2`) prints
+  `MOVED: {'123': ('568ac1aece795e77acc2', '5b25e0c0c3faf4b03eda')}`; seed 7
+  still matches. The value repeats run to run and in a clean checkout.
+  Digesting each first-parent merge since the last pin (`3ecc33a`,
+  WLD-014.2): it holds through `8189c6f` (PR #42) and moves at `cf5145b`,
+  the merge of PR #46 (CMB-010: projectiles climb stairs, bouncing shots
+  follow walking steps), which changed gameplay and did not re-pin.
+- **Constraint:** Confirm the move is projectile-driven before re-pinning;
+  no code change.
+
+## TST-008 — Tasks
+
+- [x] TST-008.1 — Show where the two runs part, re-pin `run_digests.json`,
+  run `tests/flows/test_run_determinism.py`
+
+## TST-008 — Results
+
+- **The move is the bomb.** `run_digest --check --dump` at `8189c6f`
+  (pre), `cf5145b` (post) and `d61d9f2` (main): pre matches the pin; post
+  and main give the same `5b25e0c0…` and identical snapshots. Pre → post,
+  seed 7 is identical and seed 123 differs in the ledger (`bomb` 92 → 69,
+  one 23-damage hit fewer), then everything downstream of it: kills 5 → 4,
+  XP 75 → 65, so a different level-up card (`sword_swift_sweep` →
+  `haste`), the pickup potion never taken (healing 7.7 → 0), hero HP and
+  position, the enemy mix (13 → 14 live), the RNG state and the camera.
+- **Frame by frame.** A probe running the digest's own loop and
+  fingerprinting each frame (RNG, ledger, hero, enemies, live projectiles)
+  finds the two runs identical, bar CMB-010's new `floor` attribute on
+  shots, up to **frame 471**. At frame 472 the bomb thrown at frame 463
+  stops at x = 3391.5, half a pixel short of the cell edge at 3392
+  (53 × 64), and turns into its blast there. Before PR #46 it flew on
+  through the face. The blast deals its first damage at frame 476, and the
+  ledger, the enemies and the RNG part at that frame. The hero parts at 549.
+  This is CMB-010's rule that a shot blocked by a cliff face stops at the
+  face on its own floor, working as designed.
+- **Re-pinned:** `python -m tools.verification.run_digest --write` →
+  seed 7 `42ed121316957e5bde2a` (unchanged), seed 123
+  `5b25e0c0c3faf4b03eda`. `--check` then prints `match`, and again after
+  the rebases onto `c4749ea` (PR #47, UI scale only) and `4a535ce`
+  (PR #51, ENT-019: the bump changes only on frames under 16 ms, and the
+  digest steps 16.7 ms ones).
+- **Tests:** `tests/flows/test_run_determinism.py`, 1 passed (5 s). Nothing
+  else ran: the diff is the pin file and this journal, and no code moved.
+
+**TST-008 closed** (2026-09-30).
