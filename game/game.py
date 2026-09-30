@@ -23,7 +23,6 @@ from game.events import EventBus, Events
 from game.state import StateMachine
 from progression.meta import MetaCatalog
 from systems.audio import AudioManager
-from systems import frame_trace
 from systems.debug_overlay import DebugOverlay
 from systems.frame_trace import FrameTrace
 from systems.music import MusicPlayer
@@ -88,9 +87,14 @@ class Game:
         self.state_machine = StateMachine(self)
         self.debug = DebugOverlay()
         # SYS-010: the frame-time trace of real play, when `--trace` asked
-        # for one (`systems/frame_trace.py`). None costs one check a frame.
-        self.trace = FrameTrace(trace_path) if trace_path is not None else None
+        # for one (`systems/frame_trace.py`). Off, it costs two `perf_counter`
+        # calls and four checks a frame, and `StateMachine.update` one stored
+        # reference per state it updates (`frame_trace_journal.md` has the
+        # measured cost).
+        self.trace = FrameTrace.open(trace_path) if trace_path is not None else None
         self._drawn_at = 0.0
+        # A frame that began and has not been recorded: `(start, wait ms)`.
+        self._unrecorded: tuple | None = None
 
         # A finished run banks its rewards into the save file.
         self.events.subscribe(Events.RUN_ENDED, self._on_run_ended)
@@ -242,13 +246,19 @@ class Game:
         """One iteration of the main loop: timing -> input -> update -> render.
         Clears `self.running` when the state stack drains. Identical work for
         both loop drivers so desktop and browser never diverge."""
-        frame_ms = self.clock.tick(config.FPS)
-        dt = min(frame_ms / 1000.0, config.MAX_DT)  # clamp -- see config.MAX_DT
+        waited = time.perf_counter()
+        dt = self.clock.tick(config.FPS) / 1000.0
+        started = time.perf_counter()               # this frame's work begins (SYS-010)
+        dt = min(dt, config.MAX_DT)  # clamp -- see config.MAX_DT
 
+        if self.trace is not None:
+            self._unrecorded = (started, (started - waited) * 1000.0)
         self._process_input()
         if self.state_machine.is_empty():
             self.running = False
             return
+        if self.trace is not None:
+            before = self.state_machine.current     # did this frame's update open something?
 
         self.music.update(dt)   # advances a track fade; no-op otherwise
 
@@ -261,22 +271,41 @@ class Game:
 
         self.debug.record_timing((t1 - t0) * 1000.0, (t2 - t1) * 1000.0)
         if self.trace is not None:
-            self.trace.record(frame_ms, (t1 - t0) * 1000.0, (self._drawn_at - t1) * 1000.0,
-                              (t2 - self._drawn_at) * 1000.0, frame_trace.sample(self))
+            if not self.trace.broken:
+                # The row is the deepest state this frame's update reached
+                # (SYS-010.D3).
+                updated = type(self.state_machine.updated).__name__
+                opened = self.state_machine.current is not before
+                self.trace.record(started, (started - waited) * 1000.0, (t1 - t0) * 1000.0,
+                                  (self._drawn_at - t1) * 1000.0, (t2 - self._drawn_at) * 1000.0,
+                                  self.trace.sample(self, updated, opened))
+            self._unrecorded = None
 
     def _close(self) -> None:
         """A dragged window size is written once, here, not per event."""
         if self.display.dirty:
             self.persist()
-        if self.trace is not None:
-            self.trace.close()
+        self._close_trace()
         pygame.quit()
+
+    def _close_trace(self) -> None:
+        """Write out the frame trace's last rows (SYS-010); twice is harmless.
+        A frame that began and was never recorded (it raised, or the stack
+        drained) ends the last row where it began."""
+        if self.trace is not None:
+            if self._unrecorded is not None:
+                self.trace.close(*self._unrecorded)
+            else:
+                self.trace.close()
 
     def run(self) -> None:
         """Desktop entry: a plain blocking loop."""
         self._start()
-        while self.running:
-            self._step()
+        try:
+            while self.running:
+                self._step()
+        finally:
+            self._close_trace()          # what was traced survives a crash (SYS-010)
         self._close()
 
     async def run_async(self) -> None:
@@ -286,9 +315,12 @@ class Game:
         import asyncio
 
         self._start()
-        while self.running:
-            self._step()
-            await asyncio.sleep(0)
+        try:
+            while self.running:
+                self._step()
+                await asyncio.sleep(0)
+        finally:
+            self._close_trace()          # what was traced survives a crash (SYS-010)
         self._close()
 
     # --- loop phases ----------------------------------------------
@@ -328,5 +360,6 @@ class Game:
         self.screen.fill(config.COLOR_BG)
         self.state_machine.draw(self.screen)
         self.debug.draw(self.screen, self.clock)
-        self._drawn_at = time.perf_counter()      # draw ends, present begins (SYS-010)
+        if self.trace is not None:
+            self._drawn_at = time.perf_counter()  # draw ends, present begins (SYS-010)
         pygame.display.flip()

@@ -309,7 +309,8 @@ Each task names the number it has to move. "Before" is the rerun above.
   - `--hints` and `--live-director` bring each old behaviour back, so the
     numbers in the spawn master journal can still be re-taken.
   - `BUDGET_MS` is one 60 Hz vsync period (16.67 ms). It counts the frames
-    over, and the 62 fps cap's 16.13 ms is printed beside it. pygame 2.5
+    over, and the 62 fps cap is printed beside it (16 ms: pygame truncates 1000 / 62 to
+    whole milliseconds, corrected from 16.13 by SYS-010). pygame 2.5
     cannot read the refresh rate, so the value is fixed.
   - Every run prints a display line (surface, driver, vsync, render scale,
     zoom, hints, director, budget). It also prints the crowd at the start

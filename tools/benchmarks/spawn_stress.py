@@ -53,21 +53,15 @@ from collections import Counter
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-# The frame budget, one 60 Hz vsync period (RND-008.D3), kept in one place
-# with the frame trace that reports against it too (SYS-010). The cap's
-# figure is printed beside it.
-from systems.frame_trace import BUDGET_MS  # noqa: E402
+# The frame budget, the 60 fps target (RND-008.D3), kept in one place with
+# the frame trace that reports against it too (SYS-010). The cap's figure is
+# printed beside it.
+from systems.frame_trace import BUDGET_MS
+from tools.benchmarks.stats import percentile as _percentile
 
 # Where `bump_times` parks the hero: far outside every broad-phase query, so
 # the pass measured is enemy against enemy only.
 _HERO_OFFSIDE = 1.0e6
-
-
-def _percentile(sorted_vals: list, q: float) -> float:
-    if not sorted_vals:
-        return 0.0
-    i = min(len(sorted_vals) - 1, int(round(q * (len(sorted_vals) - 1))))
-    return sorted_vals[i]
 
 
 def _force_hints(ps) -> None:
@@ -456,8 +450,8 @@ def display_line(ps) -> str:
             f"render scale {config.RENDER_SCALE:.3f} zoom {config.effective_zoom():.3f}  |  "
             f"hints {'on' if ps.hints.visible else 'off'}  "
             f"director {'frozen' if ps.spawn.master.frozen else 'live'}  |  "
-            f"budget {BUDGET_MS:.2f} ms (60 Hz vsync; the {config.FPS} fps cap is "
-            f"{1000.0 / config.FPS:.2f} ms)")
+            f"budget {BUDGET_MS:.2f} ms (the 60 fps target; the {config.FPS} fps cap is "
+            f"{1000 // config.FPS} ms, pygame counting whole milliseconds)")
 
 
 def bump_times(ps, frames: int) -> list:
