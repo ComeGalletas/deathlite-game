@@ -15,9 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-018 ·
-PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
-(RND-010 and RND-012 are taken on branches not yet merged here.)
+**Next free:** CMB-011 · ENT-020 · SPN-004 · WLD-015 · RND-011 · UI-019 ·
+PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 
 ## Requirements
 
@@ -80,6 +79,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
 | RND-007 | The `mark` status drawn as raspberry lock-on brackets, shown with a blessing that reads it | RND, CMB | feature | done | [mark_overlay_journal.md](mark_overlay_journal.md) | claude/rnd-007-mark-overlay | 2026-09-24 |
 | RND-008 | Gameplay frame time: the reviewed performance findings and their todo list (per-frame font builds in the hints, the harness, the elemental draw, bump) | RND, SYS, ENT, CMB | performance | done | [frame_time_journal.md](frame_time_journal.md) | ComeGalletas/rnd-008-frame-time-9ec11fc6 | 2026-09-28 |
 | RND-009 | The terrain's ground bands: investigated, at the alpha blitter's floor, no exact speed-up; no code change | RND | performance | done | [ground_bands_journal.md](ground_bands_journal.md) | ComeGalletas/rnd-009-ground-bands-9ec11fc6 | 2026-09-29 |
+| RND-010 | Drawing big crowds: the draw measured by layer at 150 to 250 enemies, then cut where the crowd costs it, pixel-identical | RND | performance | planned | [crowd_draw_journal.md](crowd_draw_journal.md) | ComeGalletas/crowd-draw-levelup-9ec11fc6 | 2026-09-30 |
 | RND-011 | The aura shed moves from the draw to the update: its own RNG, a chance of `rate * dt` per step, the budget scaled to the step | RND, CMB | bug | done | [aura_shed_journal.md](aura_shed_journal.md) | ComeGalletas/aura-shed-update-a10d79ed | 2026-09-30 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
@@ -98,6 +98,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-003 · DOC-008
 | UI-015 | Build pane numbers without float noise; the end banner plays its sprite in every language | UI | bug | done | [localization_journal.md](localization_journal.md) | claude/ui-014-localization | 2026-09-29 |
 | UI-016 | Web build: the interface at scale 0.8 so the 900-row screens fit the 720-row canvas | UI, BLD | bug | done | [web_ui_scale_journal.md](web_ui_scale_journal.md) | ComeGalletas/ui-016-web-ui-scale-b5bf589e | 2026-09-29 |
 | UI-017 | The base cursor 15% smaller (`UI_CURSOR_SCALE` 0.85) | UI | feature | done | [web_ui_scale_journal.md](web_ui_scale_journal.md) | ComeGalletas/ui-016-web-ui-scale-b5bf589e | 2026-09-29 |
+| UI-018 | The level-up hitch: warm fonts and text rendered once, so the frame that opens the cards fits the budget | UI | performance | planned | [level_up_hitch_journal.md](level_up_hitch_journal.md) | ComeGalletas/crowd-draw-levelup-9ec11fc6 | 2026-09-30 |
 | PRG-001 | Six blessings per weapon | PRG, CMB | feature | legacy | [six_blessings_journal.md](six_blessings_journal.md) | — | 2026-09-20 |
 | PRG-002 | XP curve | PRG | balance | legacy | [xp_curve_journal.md](xp_curve_journal.md) | — | 2026-09-22 |
 | PRG-003 | A gold sink: somewhere for a run's gold to go | PRG, UI | feature | proposed | [gold_sink_journal.md](gold_sink_journal.md) | — | 2026-09-24 |
