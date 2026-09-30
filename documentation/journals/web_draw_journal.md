@@ -61,7 +61,10 @@ alpha and 0.1 ms opaque).
   machine draws those uncached. The screen is never `SRCALPHA`.
 
 - **RND-010.D6 — no held input under an overlay** (builder, after the
-  critic pass; within D1's "the world is frozen"). The interact keycap
+  critic pass; within D1's "the world is frozen"). **Approved by the owner
+  2026-09-30, pending proper testing** (in play: hold E into the Forge or a
+  building, hold a move key into the pause, and check the caps under the
+  dim are raised and show pressed again on return). The interact keycap
   (`key_marker.py`) and the opening hints (`hints.py`) draw a held key
   pressed, read live as they are drawn. Opening the Forge or a building
   with E pushes the overlay while E is still down, so the kept frame
@@ -86,6 +89,16 @@ alpha and 0.1 ms opaque).
   denser at the browser's 175 Hz) and the draw's use of the run's random
   stream; it changes elemental behaviour and the run's random sequence, so
   it is the owner's call and a requirement of its own, not RND-010.
+  **Status (2026-09-30): interim, to be superseded by RND-011**
+  (`aura_shed_journal.md`, another session, branched off `main`): the shed moves into the update
+  on its own random stream (`"{seed}:aura_shed"`), a chance of `rate *
+  dt` per body per step, the budget scaled to the step. That stops the
+  shed under every frozen overlay by construction (the dev menu and the
+  end banner's wait too, which D7 does not cover) and fixes gameplay's
+  frame-rate dependence and `run.rng` use, which D7 does not touch. When
+  both have merged, `AuraShedTests`' control (the per-frame redraw piles
+  particles up) turns false; RND-011's journal says how to rewrite it,
+  whichever lands second.
 
 Found on the way: the cone draw's fallback for "pygbag / no gfxdraw"
 (`game/states/playing/visual/projectiles/cone.py`) builds a full-screen
@@ -254,4 +267,5 @@ Self-rating: 9 / 10. The point short: D6 and D7 are builder decisions
 within D1 that the owner has not yet confirmed, and D2's +-1 bound is
 checked on desktop pygame 2.5.2, not on the browser's pygame-ce 2.5.7.
 
-**Status:** done (PR open), pending the owner's sign-off on D6 and D7.
+**Status:** done (PR open). D6 approved by the owner (2026-09-30), pending
+proper testing in play; D7 interim until RND-011 lands.
