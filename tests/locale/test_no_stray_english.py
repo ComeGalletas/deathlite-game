@@ -9,6 +9,9 @@ is parsed, and every string literal with words in it must be one of:
 * an identifier-like id (`"sword"`, `"status.more"`, `"buff:{kind}"`),
   a name in `__all__`, a regular expression, a `__repr__` / `__str__` body,
   or a ctypes structure's field name;
+* a name handed to `getattr`, `WinDLL` and the like, directly or through a
+  `for` over a literal tuple whose variable is used for nothing else
+  (TST-009);
 * an entry of `ALLOWED`, which says why that English is meant to stay.
 
 The developer tools stay English (UI-014.D6) and are not scanned. A new
@@ -77,6 +80,29 @@ def _docstrings(tree):
     return out
 
 
+def _call_name(f) -> str:
+    return f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+
+
+def _looked_up_names(loop) -> bool:
+    """A `for name in ("A", "B"):` whose loop variable is only ever an argument
+    of a name lookup (`getattr(k32, name)`): the literals are names, as a
+    constant passed straight to `getattr` is (SYS-011's ctypes prototypes)."""
+    if not (isinstance(loop.target, ast.Name) and isinstance(loop.iter, (ast.Tuple, ast.List))
+            and all(isinstance(e, ast.Constant) and isinstance(e.value, str)
+                    for e in loop.iter.elts)):
+        return False
+    var = loop.target.id
+    uses, lookups = set(), set()
+    for stmt in loop.body:
+        for n in ast.walk(stmt):
+            if isinstance(n, ast.Name) and n.id == var and isinstance(n.ctx, ast.Load):
+                uses.add(id(n))
+            elif isinstance(n, ast.Call) and _call_name(n.func) in NAME_ARGS:
+                lookups.update(id(a) for a in n.args if isinstance(a, ast.Name) and a.id == var)
+    return bool(uses) and uses == lookups
+
+
 def _text(node) -> str:
     """A literal's text; an f-string's literal parts with `{}` holes."""
     if isinstance(node, ast.JoinedStr):
@@ -116,9 +142,11 @@ def stray_literals(source: str) -> list[tuple[int, str]]:
                 isinstance(s, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "_fields_"
                                                   for t in s.targets) for s in node.body):
             skip_all(node)                                # a ctypes structure
+        elif isinstance(node, ast.For) and _looked_up_names(node):
+            skip_all(node.iter)
         elif isinstance(node, ast.Call):
             f = node.func
-            name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+            name = _call_name(f)
             owner = f.value.id if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) else ""
             # The receiver's own name, `self.log` included: a `toast.warning(...)`
             # is not a log call.
@@ -189,10 +217,16 @@ class NoStrayEnglishTests(unittest.TestCase):
                '    toast.warning("Low HP")\n'
                '    font.render("loading...", True, (1, 1, 1))\n'
                '    font.render("press any key", True, (1, 1, 1))\n'
-               '    font.render(card.text("Press start"), True, (1, 1, 1))\n')
+               '    font.render(card.text("Press start"), True, (1, 1, 1))\n'
+               '    for n in ("SetProcessInformation", "GetProcessInformation"):\n'
+               '        getattr(font, n).restype = None\n'
+               '    for n in ("Resume Game", "Quit Game"):\n'
+               '        getattr(font, n)\n'
+               '        font.render(n, True, (1, 1, 1))\n')
         got = sorted(t for _l, t in stray_literals(src))
         self.assertEqual(got, sorted(["Game Over", "{} more items", "Low HP", "loading...",
-                                      "press any key", "Press start"]))
+                                      "press any key", "Press start",
+                                      "Resume Game", "Quit Game"]))
 
 
 if __name__ == "__main__":
