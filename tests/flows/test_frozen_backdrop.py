@@ -262,12 +262,15 @@ class HeldInteractTests(unittest.TestCase):
 
 
 class AuraShedTests(unittest.TestCase):
-    """The run's draw sheds aura particles (`elements/layers.py` `_shed`):
-    each draw of an aura'd body rolls `run.rng` and may add a particle. The
-    old per-frame redraw under a frozen overlay therefore piled particles up
-    and used up the run's random stream for as long as the game was paused.
-    With the kept frame the run is drawn once (RND-012.D7): nothing piles up,
-    the stream is untouched, and the frame holds still (critic pass 2)."""
+    """Before RND-011 the run's draw shed aura particles: each draw of an
+    aura'd body rolled `run.rng` and could add a particle, so the old
+    per-frame redraw under a frozen overlay piled particles up and used up
+    the run's random stream for as long as the game was paused. The kept
+    frame drew the run once (RND-012.D7), which stopped that; RND-011 then
+    moved the shed into the update, so no draw sheds at all. Pinned: under
+    the pause nothing piles up, the stream is untouched and the frame holds
+    still, and even a full redraw every frame adds nothing (critic pass 2,
+    revised for RND-011)."""
 
     def test_nothing_piles_up_under_the_pause(self):
         ps = L._run()
@@ -288,12 +291,19 @@ class AuraShedTests(unittest.TestCase):
         self.assertEqual(len(run.particles), particles, "no aura particles piled up")
         self.assertEqual(run.rng.getstate(), rng, "the run's random stream is untouched")
         self.assertEqual(_frame(screen), kept)
-        # The control: redrawing the run every frame, as before RND-012,
-        # does pile them up -- which is what the kept frame stopped.
+        # A full redraw every frame, as before RND-012, adds nothing either
+        # since RND-011: the shed is the update's, never the draw's.
         for _ in range(60):
             sm.invalidate_backdrop()
             sm.draw(screen)
-        self.assertGreater(len(run.particles), particles)
+        self.assertEqual(len(run.particles), particles, "a redraw shed particles")
+        self.assertEqual(run.rng.getstate(), rng, "a redraw rolled run.rng")
+        # The control: these auras do shed, in the update, once the pause
+        # is gone.
+        sm.pop()
+        for _ in range(30):
+            ps.update(1 / 62)
+        self.assertGreater(len(run.particles.layer(True)), 0, "the auras never shed")
 
 
 if __name__ == "__main__":

@@ -107,6 +107,11 @@ alpha and 0.1 ms opaque).
   both have merged, `AuraShedTests`' control (the per-frame redraw piles
   particles up) turns false; RND-011's journal says how to rewrite it,
   whichever lands second.
+  **Superseded 2026-09-30:** RND-011 merged first (PR #61); the landing
+  below rewrote `AuraShedTests`' control to "a full redraw adds nothing and
+  leaves `run.rng` alone; the auras shed in the update once the pause is
+  gone". The kept frame still stops the redraw's cost, which was D7's other
+  half.
 
 Found on the way: the cone draw's fallback for "pygbag / no gfxdraw"
 (`game/states/playing/visual/projectiles/cone.py`) builds a full-screen
@@ -161,6 +166,8 @@ there. Its comment is corrected, nothing else.
 - [x] RND-012.2 — constant-alpha overlays and the vignette strips, tests
 - [x] RND-012.3 — the frozen backdrop, tests
 - [x] RND-012.4 — measure (Chrome and desktop), docs, critic, close
+- [x] RND-012.5 — land on main: #57 merged into its stacked base, not main;
+  `AuraShedTests` brought to RND-011 (see *Landing*)
 
 ## Results
 
@@ -275,5 +282,24 @@ Self-rating: 9 / 10. The point short: D6 and D7 are builder decisions
 within D1 that the owner has not yet confirmed, and D2's +-1 bound is
 checked on desktop pygame 2.5.2, not on the browser's pygame-ce 2.5.7.
 
-**Status:** done (PR open). D6 approved and play-tested by the owner
-(2026-09-30); D7 interim until RND-011 lands.
+**Status:** done. D6 approved and play-tested by the owner (2026-09-30); D7
+superseded by RND-011.
+
+## Landing (2026-09-30)
+
+PR #57 merged into `ComeGalletas/web-frame-pacing-5be9212c`, the BLD-003
+branch it was stacked on, not into `main`, so RND-012 was stranded there
+as BLD-003 had been by #48. The landing branch
+`ComeGalletas/land-rnd-012-a10d79ed` starts at `main` (`a027ffa`, RND-011
+merged) and brings in:
+
+1. #60's branch (`ComeGalletas/land-bld-003-1af16dc8`), BLD-003 with the
+   conflicts it already resolved against `main`; `INDEX.md` next-free takes
+   the higher of each side. If #60 merges first this adds nothing.
+2. `ComeGalletas/web-frame-pacing-5be9212c` (RND-012 over BLD-003).
+   Conflicts: `game/state.py` `StateMachine.__init__`, both fields kept
+   (#60's `updated` for the frame trace, set in `update`; this work's
+   `_frozen`, read in `draw`; they never meet); `INDEX.md` rows kept.
+3. The `AuraShedTests` rewrite owed to RND-011 (D7 above); the test failed
+   at its control on the merged tree (`0 not greater than 0`) and passes
+   with it.
