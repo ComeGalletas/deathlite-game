@@ -50,6 +50,7 @@ _CONTROLS_X, _CONTROLS_Y = 340, _ROW_TOP - _ROW_H // 2
 class PausedState(State):
     draw_below = True      # keep the frozen game visible behind the dim layer
     update_below = False   # ...but do not advance it
+    freeze_backdrop = True # ...and drawn once while paused (RND-010)
     # `music` is inherited: the run's track keeps playing, dipped to
     # `config.MUSIC_DUCK` by the enter/exit hooks below.
 

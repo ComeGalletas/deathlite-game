@@ -30,6 +30,7 @@ _EDGE = 20              # the least margin the rail keeps from the surface's edg
 class LevelUpState(State):
     draw_below = True      # show the frozen battlefield behind the panel
     update_below = False   # ...frozen: no simulation while choosing
+    freeze_backdrop = True # ...and drawn once while choosing (RND-010)
 
     def enter(self, *, player, choices=(), on_done=None, title=None,
               cancelable=False, weapon_rows=None, offers_for=None,
