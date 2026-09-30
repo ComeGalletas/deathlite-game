@@ -70,7 +70,9 @@
   "bear": {
     "name": "Ravager", "name_es": "Devastador", "hp": 125, "speed": 70,
     "aggro_range": 800,
-    "pursuit_seconds": 9.0, "contact_damage": 25, "radius": 22,
+    "pursuit_seconds": 9.0, "contact_damage": 25, "radius": 15.4,
+    "_radius_comment": "ENT-020 (owner, 2026-09-30): the collider is 30 % smaller than the 22 it was (linear, 22 x 0.7), so the Ravager fits tighter ground; the sprite keeps its `scale`. `attack_radius` keeps the swing where it was: the trigger (22 + 10 + 5 = 37) and the poke hitbox are sized from 22, not from the body.",
+    "attack_radius": 22,
     "weight": 30,
     "experience_reward": 30, "behavior": "path_chase_attack", "color": [255, 80, 120],
     "tags": ["elite"], "is_elite": true, "sprite": "bear", "contact_damage_enabled": false,
@@ -112,7 +114,8 @@
   "troll": {
     "name": "Grudge", "name_es": "Rencor", "hp": 290, "speed": 65,
     "aggro_range": 710,
-    "pursuit_seconds": 10.0, "contact_damage": 29, "radius": 26,
+    "pursuit_seconds": 10.0, "contact_damage": 29, "radius": 18.2,
+    "_radius_comment": "ENT-020 (owner, 2026-09-30): the collider is 30 % smaller than the 26 it was (linear, 26 x 0.7), so Grudge fits tighter ground; the sprite keeps its `scale`. The slam reads `slam_range` / `slam_radius`, not the body, so its reach is unchanged.",
     "weight": 80,
     "experience_reward": 60, "behavior": "brute", "color": [200, 60, 60],
     "tags": ["miniboss", "elite"], "is_elite": true, "sprite": "troll",
