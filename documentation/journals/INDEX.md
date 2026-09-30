@@ -16,7 +16,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-011 · ENT-020 · SPN-004 · WLD-015 · RND-009 · UI-018 ·
-PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
+PRG-004 · AUD-004 · SYS-010 · TST-009 · BLD-003 · DOC-008
 
 ## Requirements
 
@@ -115,6 +115,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | TST-005 | numpy as a test-only tool; a faster world tier; the gnome split without fixed values | TST | refactor | done | [test_debt_journal.md](test_debt_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | TST-006 | Tests that boot a Game or generate a world leave the `unit` tier; `tier_audit` finds them | TST | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-006-tier-booting-tests-bb480b0c | 2026-09-29 |
 | TST-007 | The ultrawide level-up margin test runs on its own (font setup, own `unit` class) | TST | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-007-ultrawide-font-init-83009add | 2026-09-29 |
+| TST-008 | Re-pin the run digest's seed 123 after CMB-010 moved it (bomb stops at a cliff face) | TST, CMB | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | ComeGalletas/tst-008-repin-run-digest-8a008ecb | 2026-09-30 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
