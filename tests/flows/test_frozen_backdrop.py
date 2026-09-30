@@ -7,9 +7,10 @@ states below are drawn once and that frame is blitted while the overlay is
 on top; the overlay's own dim and panel still draw every frame.
 
 Pinned here: the run is drawn once over many frames; a cached frame is
-byte-identical to a full redraw (the run's draw has one side effect, the
-aura shed, which the kept frame deliberately stops: `AuraShedTests`,
-RND-012.D7); every change that could alter the frame
+byte-identical to a full redraw (the run's draw has no side effect since
+RND-011 moved the aura shed into the update; before it, the kept frame was
+what stopped the shed under a pause: `AuraShedTests`, RND-012.D7); every
+change that could alter the frame
 below (a push or pop, a display change, another target surface, the pause
 menu's key-layout toggle, an explicit invalidation) redraws it; a
 per-pixel-alpha target and the overlays that do not opt in (the dev menu,
@@ -283,11 +284,15 @@ class AuraShedTests(unittest.TestCase):
                 140 * math.cos(ang), 140 * math.sin(ang)))
             self.assertIsNotNone(e)
             e.elemental.set_aura(ElementId.FIRE, now, 1e6)
-        sm.push(PausedState(game))
-        sm.draw(screen)                                    # the run, drawn once
-        kept, particles, rng = _frame(screen), len(run.particles), run.rng.getstate()
-        for _ in range(60):
-            sm.draw(screen)
+        with mock.patch.object(ps, "draw", wraps=ps.draw) as drawn:
+            sm.push(PausedState(game))
+            sm.draw(screen)                                # the run, drawn once
+            kept, particles, rng = _frame(screen), len(run.particles), run.rng.getstate()
+            for _ in range(60):
+                sm.draw(screen)
+        # The kept frame itself: since RND-011 a redraw would add nothing
+        # either, so the particle checks below cannot tell the two apart.
+        self.assertEqual(drawn.call_count, 1, "the run was redrawn under the pause")
         self.assertEqual(len(run.particles), particles, "no aura particles piled up")
         self.assertEqual(run.rng.getstate(), rng, "the run's random stream is untouched")
         self.assertEqual(_frame(screen), kept)

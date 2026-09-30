@@ -173,6 +173,12 @@ fail a test; restored, all pass.
 
 ## For RND-012
 
+**Applied** on the RND-012 landing branch
+(`ComeGalletas/land-rnd-012-a10d79ed`, RND-012.5), with one addition the
+landing's critic asked for: since the draw sheds nothing, the particle
+checks no longer tell a kept frame from a redraw, so the test also counts
+`PlayingState.draw` calls under the pause (exactly one).
+
 `tests/flows/test_frozen_backdrop.py::AuraShedTests` on
 `ComeGalletas/web-draw-cheap-5be9212c` asserts, as its control, that
 redrawing the run every frame under the pause piles particles up. After
