@@ -77,8 +77,8 @@ ENV = "DEATHLITE_TRACE"
 # measured with `tick_busy_loop`). It was set
 # as one 60 Hz vsync period; SYS-011 found the owner's display runs at
 # 174 Hz, where `flip` returns at once and the cap alone paces, so it reads
-# as the frame-rate target rather than a refresh (an open question for the
-# owner, `frame_trace_journal.md`). The one copy: the stress harness and the
+# as the frame-rate target rather than a refresh (owner, 2026-09-30: it
+# stays the 60 fps target). The one copy: the stress harness and the
 # trace report both read it from here.
 BUDGET_MS = 1000.0 / 60.0
 # A batch is written after this many rows or this much time, whichever

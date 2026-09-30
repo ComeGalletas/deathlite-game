@@ -192,7 +192,9 @@ the totals, so these are shares, not budgets:
   hints dismissed by default (`--hints` to keep them), the master kept
   frozen through timing (`--live-director` to let it run), one budget
   (16.7 ms, the vsync period, reported next to `1000 / FPS`), and the
-  render surface and zoom printed with every run.
+  render surface and zoom printed with every run. (SYS-012: the owner
+  decided on 2026-09-30 that it stays as the 60 fps target, though the
+  display runs at 174 Hz.)
 - **RND-008.D4: The resolution stays native.** Owner, 2026-09-28:
   changing the render resolution is not considered at all, not as a
   default, not as a knob to measure. The frame time is found in the code.
@@ -308,7 +310,8 @@ Each task names the number it has to move. "Before" is the rerun above.
     frozen through the timed frames.
   - `--hints` and `--live-director` bring each old behaviour back, so the
     numbers in the spawn master journal can still be re-taken.
-  - `BUDGET_MS` is one 60 Hz vsync period (16.67 ms). It counts the frames
+  - `BUDGET_MS` is one 60 Hz vsync period (16.67 ms; since SYS-012, the
+    60 fps target, owner 2026-09-30). It counts the frames
     over, and the 62 fps cap is printed beside it (16 ms: pygame truncates 1000 / 62 to
     whole milliseconds, corrected from 16.13 by SYS-010). pygame 2.5
     cannot read the refresh rate, so the value is fixed.
