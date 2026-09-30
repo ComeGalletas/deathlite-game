@@ -15,8 +15,8 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-020 · SPN-004 · WLD-015 · RND-010 · UI-018 ·
-PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
+**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-012 · UI-019 ·
+PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-004 · DOC-008
 
 ## Requirements
 
@@ -121,6 +121,7 @@ PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 | TST-008 | Re-pin the run digest's seed 123 after CMB-010 moved it (bomb stops at a cliff face) | TST, CMB | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | ComeGalletas/tst-008-repin-run-digest-8a008ecb | 2026-09-30 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
+| BLD-003 | Web frame time: the browser's own crowd (live cap 100, AI knobs) and host-paced frames | BLD, SPN, SYS | performance | done (D4 re-approval owed; measured in Chrome 2026-09-30) | [web_frame_time_journal.md](web_frame_time_journal.md) | ComeGalletas/web-frame-pacing-5be9212c | 2026-09-29 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |

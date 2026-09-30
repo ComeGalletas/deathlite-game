@@ -46,21 +46,28 @@ def _far_spot(ps):
     raise AssertionError("no far point")
 
 
+def count_updates(ps, frames: int = 40) -> tuple[dict, dict]:
+    """Run `frames` updates of `ps`; return how many times each enemy
+    updated and the `dt`s it saw, keyed by `id(enemy)`. Shared with the web
+    profile's LOD check (`tests/flows/test_web_crowd.py`)."""
+    counts: dict = {}
+    dts: dict = {}
+    real = Enemy.update
+
+    def counting(self_, ctx):
+        counts[id(self_)] = counts.get(id(self_), 0) + 1
+        dts.setdefault(id(self_), set()).add(round(ctx.dt, 6))
+        return real(self_, ctx)
+
+    with mock.patch.object(Enemy, "update", counting):
+        for _ in range(frames):
+            ps.update(1 / 60)
+    return counts, dts
+
+
 class TickLodTests(unittest.TestCase):
-    def _count(self, ps, frames: int = 40) -> dict:
-        counts: dict = {}
-        dts: dict = {}
-        real = Enemy.update
-
-        def counting(self_, ctx):
-            counts[id(self_)] = counts.get(id(self_), 0) + 1
-            dts.setdefault(id(self_), set()).add(round(ctx.dt, 6))
-            return real(self_, ctx)
-
-        with mock.patch.object(Enemy, "update", counting):
-            for _ in range(frames):
-                ps.update(1 / 60)
-        return counts, dts
+    def _count(self, ps, frames: int = 40) -> tuple[dict, dict]:
+        return count_updates(ps, frames)
 
     def test_far_idle_enemies_tick_every_other_frame_with_a_doubled_dt(self):
         ps = _run()

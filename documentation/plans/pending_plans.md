@@ -155,9 +155,13 @@ every other surface moved to the art.
 
 ## 7. The web build
 
-`documentation/plans/web_plan.md` §6 has the ordered list; none of it has been
-done, and two items block the build from being playable by anyone else.
+`documentation/plans/web_plan.md` §6 has the ordered list; the obstacle index
+and sliced fill (2026-09-03) and the browser crowd knobs (BLD-003) are done,
+and three items block the build from being playable by anyone else.
 
+- **`build.sh` / `serve.sh` fail on the MP3 music** (pygbag: "Use OGG format
+  instead"); a build needs `--disable-sound-format-error` or OGG music, the
+  owner's call (BLD-003.6, `journals/web_frame_time_journal.md`).
 - **There is no `.github/` directory at all**, so the W9 GitHub Pages deploy
   does not exist.
 - **The pygbag wheel is not vendored.** A static host 404s on
@@ -167,9 +171,14 @@ done, and two items block the build from being playable by anyone else.
 - ~~`assets/unused/` is not in `pygbag.ini`'s `ignoreDirs`~~ -- done 2026-09-13
   (`dist/web/pygbag.ini` ignores `/assets/unused`, `/tools`, `/.ruff_cache`).
   The unreferenced art *inside* the shipped folders still needs the manifest pack.
-- Still open behind those: the finer loading steps and progress bar, the
-  manifest-driven pack, and browser spawn-master knobs in
-  `config.apply_web_profile()`.
+- Still open behind those: the finer loading steps and progress bar, and
+  the manifest-driven pack. ~~Browser spawn-master knobs in
+  `config.apply_web_profile()`~~ -- done 2026-09-29 as BLD-003 (live cap
+  100, LOD 3, nav 0.6 s, fill 3500), with host-paced frames; measured in
+  Chrome 2026-09-30 (BLD-003.6): a run draws at 22-26 fps and the draw is
+  the whole cost, per-pixel-alpha blits first
+  (`journals/web_frame_time_journal.md`). The draw work is the next web
+  item.
 
 ## 8. Test and infrastructure debt
 
