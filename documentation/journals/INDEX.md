@@ -16,7 +16,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-011 · ENT-019 · SPN-004 · WLD-015 · RND-009 · UI-018 ·
-PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
+PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-004 · DOC-008
 
 ## Requirements
 
@@ -116,6 +116,7 @@ PRG-004 · AUD-004 · SYS-010 · TST-008 · BLD-003 · DOC-008
 | TST-007 | The ultrawide level-up margin test runs on its own (font setup, own `unit` class) | TST | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-007-ultrawide-font-init-83009add | 2026-09-29 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
+| BLD-003 | Web frame time: the browser's own crowd (live cap 100, AI knobs) and host-paced frames | BLD, SPN, SYS | performance | in progress | [web_frame_time_journal.md](web_frame_time_journal.md) | ComeGalletas/web-frame-pacing-5be9212c | 2026-09-29 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |
