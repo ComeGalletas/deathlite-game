@@ -20,8 +20,9 @@
   - So the push a second grows with the number of frames a second. At the
     desktop's 62 fps cap it is today's tuning. Below it (heavy frames) a
     crowd separates more slowly. The browser build, uncapped at the
-    display's refresh since BLD-003 (`web_frame_time_journal.md`, D4, on
-    its own branch), would separate faster on a 120 to 165 Hz display.
+    display's refresh since BLD-003 (`web_frame_time_journal.md`, D4; on
+    main since the BLD-003 landing), would separate faster on a 120 to
+    165 Hz display.
 - **Constraint:**
   - Measure first: the same packed crowd, or a hand-built overlapping
     pair, stepped for the same game time at dt 1/30, 1/62 and 1/144.
