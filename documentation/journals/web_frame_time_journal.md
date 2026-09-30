@@ -137,9 +137,57 @@ builder writes later:
 - [x] BLD-003.1 — journal, index entry
 - [x] BLD-003.2 — browser live cap and AI knobs in the web profile, tests
 - [x] BLD-003.3 — host-paced frames in the browser, tests
-- [ ] BLD-003.4 — `spawn_stress --web`, test, measurement
+- [x] BLD-003.4 — `spawn_stress --web`, test, measurement
 - [ ] BLD-003.5 — docs, critic pass, close
 
 Out of scope, from the same review: measure in a real Chrome (item 1),
 remove the desktop draw spikes that become browser hitches (4), fewer and
 larger terrain blits (5), `gc.freeze()` after loading (6).
+
+## Results
+
+### BLD-003.2 and .3 — tests
+
+- `tests/flows/test_web_crowd.py` (8): both sides' values pinned; a run
+  booted under the profile shows each value where the game reads it (the
+  director's cap, a fill's `limit`, the refresh timer after a round-robin
+  tick, a far idle enemy ticking 10 times in 30 frames with a 3/60 `dt`).
+  With the four assignments removed from `apply_web_profile`, the five
+  web-side tests fail (`250 != 100`, `4500 != 3500`, `0.2 != 0.3`,
+  `15 != 10`).
+- `tests/flows/test_frame_pacing.py` (6): the flag is False on the
+  desktop, True only when `sys.platform` is `emscripten`, False under the
+  web profile on `win32`; `_step` asks `tick` for `FPS`, `0` and `60` in
+  those three cases. With the old `tick(config.FPS)` the browser case
+  fails (`[60, 60, 60] != [0, 0, 0]`).
+- `tests/web_profile.py` gained `config_restored()` (the snapshot alone),
+  which `web_profile()` now wraps, for a test whose code applies the
+  profile itself.
+- `tests/conftest.py`: `WebCrowdRunTests` and `StepTickTests` boot a
+  `Game` and are `integration`; the tier audit named both.
+
+### BLD-003.4 — the measurement
+
+`python -m tools.benchmarks.spawn_stress --web --render --live 100
+--frames 600` (seed 35, dummy driver, 89 bodies at the start of timing),
+against a control that applies the profile and puts the four desktop
+values back, so only the crowd settings differ. Two runs each:
+
+| | Update p50 / p90 | Draw p50 | Update + draw p50 / p90 | Live at end | Browser estimate p50 |
+|---|---|---|---|---|---|
+| BLD-003 settings, run 1 | 3.57 / 4.24 ms | 2.88 ms | 6.45 / 7.91 ms | 100 | 14.7-23.4 ms |
+| BLD-003 settings, run 2 | 3.67 / 4.40 ms | 2.95 ms | 6.62 / 7.87 ms | 100 | 15.1-24.0 ms |
+| desktop settings, run 1 | 3.98 / 5.31 ms | 3.06 ms | 7.04 / 8.90 ms | 107 | 15.9-25.3 ms |
+| desktop settings, run 2 | 4.52 / 5.42 ms | 3.42 ms | 7.94 / 9.10 ms | 107 | 17.9-28.5 ms |
+
+The browser estimate scales update by 1.30-2.52 and draw by 3.5-5.0 (the
+review above). At this crowd the settings take the frame's p50 down 8-17 %
+and its p90 about 12 %; the larger effect is the cap itself, which stops a
+long run from reaching the ~166-175 live whose estimate was 20.6-33.4 ms.
+The draw p99 ranged 8.1-14.3 ms across these runs: first-sight blit work
+that the harness does not pin, and review item 4.
+
+What this does not settle: the estimate still straddles the 16.7 ms
+budget, and draw, not update, is now most of it. Only a real Chrome with
+the F1 overlay says which end of the range the browser is at (item 1), and
+the frame pacing of BLD-003.3 can only be seen there.

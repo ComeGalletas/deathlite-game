@@ -13,6 +13,7 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
     python -m tools.benchmarks.spawn_stress --cascade --render      # CMB-008: a staged reaction cascade
     python -m tools.benchmarks.spawn_stress --pack --bump           # RND-008: the bump pass alone
+    python -m tools.benchmarks.spawn_stress --web --render          # BLD-003: under the browser profile
 
 What it measures is play, not the run's opening (RND-008.D3):
 
@@ -455,6 +456,8 @@ def display_line(ps) -> str:
     game = ps.game
     return (f"display {size} ({driver}, vsync {'on' if game.vsync else 'off'})  "
             f"render scale {config.RENDER_SCALE:.3f} zoom {config.effective_zoom():.3f}  |  "
+            f"crowd cap {config.ENEMY_LIVE_CAP} nav {config.ENEMY_NAV_REBUILD_INTERVAL:g} s "
+            f"fill {config.NAV_FILL_MAX_COST}  |  "
             f"hints {'on' if ps.hints.visible else 'off'}  "
             f"director {'frozen' if ps.spawn.master.frozen else 'live'}  |  "
             f"budget {BUDGET_MS:.2f} ms (60 Hz vsync; the {config.FPS} fps cap is "
@@ -542,6 +545,12 @@ def parse(argv=None) -> argparse.Namespace:
                          "add --pack for the packed crowd (not with "
                          "--render, --profile or the element flags)")
     ap.add_argument("--profile", action="store_true")
+    ap.add_argument("--web", action="store_true",
+                    help="apply the browser build's profile first "
+                         "(config.apply_web_profile: 1280x720, its crowd cap "
+                         "and AI knobs). The frames still run on the desktop; "
+                         "scale them by the WASM factors in "
+                         "journals/web_frame_time_journal.md (BLD-003)")
     args = ap.parse_args(argv)
     if args.frames < 1:
         ap.error("--frames must be at least 1")
@@ -565,6 +574,8 @@ def build_options(args: argparse.Namespace) -> dict:
 def main(argv=None) -> int:
     args = parse(argv)
     from game import config
+    if args.web:
+        config.apply_web_profile()
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod,
                      **build_options(args))

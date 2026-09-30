@@ -158,6 +158,10 @@ INTEGRATION = (
     "tests/screens/test_spanish_menus.py::MenuEnglishTests",
     "tests/screens/test_spanish_menus.py::SpanishScreenTests",
     "tests/screens/test_spanish_status.py::SanctuaryTests",
+    # BLD-003: a run booted under the web profile, and the main loop's tick;
+    # the profile's values and the pacing flag boot nothing and stay unit.
+    "tests/flows/test_web_crowd.py::WebCrowdRunTests",
+    "tests/flows/test_frame_pacing.py::StepTickTests",
 )
 
 
