@@ -2,7 +2,8 @@
 
     python main.py            # desktop
     python main.py --web      # desktop, but with the browser profile applied
-                              # (1280x720 / 60 fps / no save file) for testing
+                              # (1280x720, the browser's crowd, no save file,
+                              # capped at 60 fps) for testing
 
 PyInstaller also runs this file -- `dist/desktop/DeathliteGame.spec` names it as the
 entry, and the `sys.frozen` check below sends the save to %LOCALAPPDATA% rather

@@ -259,8 +259,9 @@ class Game:
 
     def _step(self) -> None:
         """One iteration of the main loop: timing -> input -> update -> render.
-        Clears `self.running` when the state stack drains. Identical work for
-        both loop drivers so desktop and browser never diverge."""
+        Clears `self.running` when the state stack drains. The same work for
+        both loop drivers, so desktop and browser do not diverge; only the
+        tick's cap differs (`config.HOST_PACES_FRAMES`)."""
         # No cap when the host paces the loop (the browser, BLD-003.3).
         dt = self.clock.tick(0 if config.HOST_PACES_FRAMES else config.FPS) / 1000.0
         dt = min(dt, config.MAX_DT)  # clamp -- see config.MAX_DT
@@ -298,10 +299,12 @@ class Game:
         """Browser (pygbag / emscripten) entry: the same loop, but it yields to
         the host event loop once per frame with `await asyncio.sleep(0)` so the
         page stays responsive. In the browser that yield is also what paces
-        the frame (pygbag resumes the loop on the next
-        `requestAnimationFrame`), so `_step` drops its own cap there
-        (`config.HOST_PACES_FRAMES`). Works on desktop too (`asyncio.run`),
-        where the yield paces nothing and the cap stays."""
+        the frame (pygbag's stepper resumes the loop from
+        `requestAnimationFrame`, per a comment in its `aio.run`; not yet
+        measured), so
+        `_step` drops its own cap there (`config.HOST_PACES_FRAMES`). Works
+        on desktop too (`asyncio.run`), where the yield paces nothing and
+        the cap stays."""
         import asyncio
 
         self._start()

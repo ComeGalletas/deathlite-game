@@ -12,11 +12,18 @@ The game also builds to WebAssembly with [pygbag](https://pygame-web.github.io/)
 The loop is `asyncio`-driven (`Game.run_async`), so one code path serves the
 desktop and web builds. `main.py` is the only entry point; under the emscripten
 runtime (or with `--web` on the desktop) it calls `config.apply_web_profile()` —
-**session-only save** (never reads or writes `save.json`), **60 fps** to match
-the browser compositor, and a **1280×720** render target (pygbag's canvas)
-that cuts per-frame work ~35%. The interface is drawn at 0.8 there (the
-1600×900 design at 80%) and the world at zoom 1.25, a view ~4% tighter than
-the desktop's (1024×576 world px against 1067×600; UI-016).
+**session-only save** (never reads or writes `save.json`), and a **1280×720**
+render target (pygbag's canvas) that cuts per-frame work ~35%. The interface
+is drawn at 0.8 there (the 1600×900 design at 80%) and the world at zoom
+1.25, a view ~4% tighter than the desktop's (1024×576 world px against
+1067×600; UI-016). In the browser the page's refresh paces the loop (per a
+comment in pygbag's `aio.run`, not yet measured; the game's own 60 fps cap
+is only for `--web` on the desktop), and the crowd is the browser's own: the
+spawn master stops spawning at **100 live enemies** (desktop 250; bar
+dev-menu and dummy spawns, and waking enemies can still push past it, as on
+the desktop), off-screen idle
+enemies tick every third frame, and the flow-field fill is a little shorter
+and less frequent (BLD-003).
 
 Everything else pygbag needs lives in `dist/web/` (`pygbag.ini`, `build.sh`,
 `serve.sh`, and `dist/web/README.md` with the details):

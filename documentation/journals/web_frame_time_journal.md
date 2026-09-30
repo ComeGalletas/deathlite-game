@@ -12,7 +12,9 @@ build's own log is `pygbag.md` (BLD-001).
 ## Requirement (owner, 2026-09-29)
 
 - **Objective:** make the browser build cheaper per frame: give it its own
-  crowd numbers, and stop the frame from being paced twice.
+  crowd numbers, and stop the frame from being paced twice (the review's
+  wording; at 60 Hz the cap costs nothing in the model, see "The cap
+  against the refresh").
 - **Details:**
   - Item 2 of the review: `config.apply_web_profile()` sets the browser's
     enemy live cap and the three AI performance knobs of `web_plan.md` §4.
@@ -44,17 +46,24 @@ that opened this requirement:
 - One thread. pygbag's CPython has no threads, and pygame surfaces are
   main-thread only anyway (`../plans/fluidity_plan.md` §4); slicing work
   across frames is the only mechanism.
-- **Double pacing.** `Game._step` calls `clock.tick(config.FPS)`. pygame-ce
+- **Two pacers.** `Game._step` calls `clock.tick(config.FPS)`. pygame-ce
   implements that as `SDL_Delay` of the rest of the frame
   (`src_c/time.c`, `clock_tick_base`, no emscripten branch). SDL2's
   `SDL_Delay` only yields in the browser when the runtime was built with
   Asyncify (`emscripten_sleep`); otherwise it falls through to `nanosleep`,
-  which on the page's main thread busy-waits. pygbag then steps the loop on
-  the next `requestAnimationFrame` after `await asyncio.sleep(0)`. So a
-  frame that fits can be held twice: once spinning in `tick`, once waiting
-  for the refresh.
-- **The crowd.** `ENEMY_LIVE_CAP` went from 100 to 250 on 2026-09-16 (S12)
-  and the web profile never lowered it.
+  which on the page's main thread busy-waits. Whether pygbag's runtime has
+  Asyncify is not confirmed. pygbag resumes the loop after
+  `await asyncio.sleep(0)` from its `requestAnimationFrame` stepper, per
+  a comment in pygbag 0.9.3's `aio.run` (`support/cross/aio/__init__.py`);
+  the scheduler itself lives in the runtime, not the wheel, and this is not
+  measured. *Corrected by the critic pass:* the review first said a frame
+  that fits is "held twice". In the model, at exactly 60 Hz it is not: if
+  pygbag steps once per refresh (not measured), the steps arrive ~16.7 ms
+  apart and the tick waits 0 ms. The modelled cost is on faster displays;
+  see "The cap against the refresh" below.
+- **The crowd.** `ENEMY_LIVE_CAP` went 100 → 150 on 2026-09-03 and
+  150 → 250 on 2026-09-16 (S12, `spawn_master_journal.md`), and the web
+  profile never lowered it.
 
 The desktop numbers under the web profile (1280x720, zoom 1.25, dummy
 driver, seed 35, 600 frames, `tools/benchmarks/spawn_stress` with the
@@ -64,23 +73,84 @@ profile applied by a wrapper), scaled by the factors above:
 |---|---|---|---|
 | 58 live | 5.5 ms (3.08 + 2.45) | 14.5 ms | 12.6-20.0 ms |
 | ~166 live | 9.1 ms (5.11 + 3.99) | 21.4 ms | 20.6-32.8 ms |
-| ~175 live (250 asked) | 9.3 ms (5.39 + 3.96) | 17.3 ms | 20.9-33.4 ms |
+| ~175 live (250 asked) | 9.35 ms (5.39 + 3.96) | 17.3 ms | 20.9-33.4 ms |
 
 These are estimates. The browser pane of the desktop app cannot measure
 frame rate (it never fires `requestAnimationFrame`); a real Chrome with the
 F1 overlay settles them.
 
+### The cap against the refresh
+
+A model, not a measurement: `python -m tools.benchmarks.raf_pacing`
+(tested in `tests/devtools/test_raf_pacing.py`; its docstring states the
+assumptions). A loop stepped once per `requestAnimationFrame` with
+`tick(60)` inside each step, as pygame-ce's `clock_tick_base` computes it on
+SDL's integer ms clock (a 16 ms frame less the whole ms since the last
+tick, then `SDL_Delay`), against the same loop with no cap. `Work` is the
+step's own update + draw. 6,000 steps, steady state from the second half;
+the spin is the range over 20 offsets of the refresh against SDL's ms
+clock (the offset never moves the fps). The table is the tool's output,
+and `test_raf_pacing` fails if it stops being.
+
+| Display | Work | Capped fps (spin ms / frame) | Uncapped fps |
+|---|---|---|---|
+| 60 Hz | 5 ms | 60.0 (0.0) | 60.0 |
+| 60 Hz | 12 ms | 60.0 (0.0) | 60.0 |
+| 75 Hz | 5 ms | 62.5 (5.0-5.6) | 75.0 |
+| 75 Hz | 12 ms | 50.0 (1.0-1.5) | 75.0 |
+| 90 Hz | 5 ms | 62.5 (5.7-6.0) | 90.0 |
+| 90 Hz | 12 ms | 45.0 (0.0) | 45.0 |
+| 120 Hz | 5 ms | 62.5 (7.0) | 120.0 |
+| 120 Hz | 12 ms | 60.0 (0.0) | 60.0 |
+| 144 Hz | 5 ms | 62.5 (7.1) | 144.0 |
+| 144 Hz | 12 ms | 57.6 (1.1) | 72.0 |
+| 165 Hz | 5 ms | 62.5 (8.2-8.4) | 165.0 |
+| 165 Hz | 12 ms | 61.9 (1.9) | 82.5 |
+
+*Corrected by the critic passes:* the first version of this table came
+from a scratch model that mixed a float clock with integer ticks and
+printed 59.3-61.9 fps and 4.5-8.0 ms for the 5 ms rows; the second critic's
+own simulation of `clock_tick_base` gave 62.5 fps, which the checked-in
+model reproduces, and the third found that one clock phase had been
+reported as the range, hence the sweep. The 12 ms rows' fps and the
+conclusions did not change.
+
+So in the model the cap is free at 60 Hz (a refresh that jitters early can
+cost ~1 ms; the model has no jitter). On every faster display it would
+spin the page's thread, if the runtime has no Asyncify, 5.0-8.4 ms a light
+frame to hold 62.5 fps, and at 75 Hz it drops a 12 ms frame to 50 fps where
+the refresh gives 75. The price of no cap, in the model: on a fast display
+a light scene (a menu, an empty early run) draws at the display's rate, up
+to 2.6x the frames at 165 Hz (165 against 62.5), which is CPU and battery
+on a laptop.
+A skip-a-step cap without the spin (skip a refresh while less than some
+threshold has passed) was considered and not pursued: whatever threshold
+holds ~60 on one display quantises differently on the next (at 144 Hz a
+15.7 ms threshold steps every third refresh, 48 fps; a 13 ms one every
+second, 72 fps), so it trades the spin for a per-display tuning problem.
+
 ## Decisions
 
 - **BLD-003.D1 — the browser's live cap is 100** (owner, 2026-09-29).
   100 is `ENEMY_COUNT_BASE`, so a run opens with the desktop's crowd; only
-  the director's growth past 100 is cut (desktop grows +5 x the
-  difficulty's `enemy_count_step_scale` every 20 s up to 250). The cost,
+  growth past 100 is cut (the desktop's director grows by
+  `ceil(5 x enemy_count_step_scale)` every 20 s up to 250,
+  `spawn/budget.py`; what else the cap stops is below). The cost,
   stated when the owner chose: the late-run difference between the
   difficulties flattens in the browser, and 100 live may still miss the
-  16.7 ms budget (estimated p50 16-25 ms) until measured. The web plan's 60
-  was the alternative. This relaxes BLD-001's "zero gameplay divergence"
-  goal for crowd size only.
+  16.7 ms budget (estimated p50 16-25 ms then, by interpolating the review
+  table's 58-live and ~166-live rows at 100; 14.7-24.0 and 20.4-32.3 ms
+  in BLD-003.4's two sessions) until measured. The web plan's 60
+  was the alternative. D1 relaxes BLD-001's "zero gameplay divergence"
+  goal for crowd size; D2 adds AI fidelity and D4 the per-step budgets on
+  fast displays (if the page's refresh paces the loop; not measured). What
+  the cap gates: every spawn through the spawn master
+  (the director's companies, residents, enemy summoners' broods;
+  `spawn/master.py`, "every entry point checks both per body") except the
+  `cap_exempt` owners (`dev`, `dummy`, `data/enemies/spawn_tables.json`).
+  Waking dormant enemies does not consult it (`spawn/population.py`, owner
+  2026-09-18), so the live count can pass 100 in the browser as it passes
+  250 on the desktop.
 - **BLD-003.D2 — all three AI knobs** (owner, 2026-09-29):
   `ENEMY_LOD_SKIP` 2 → 3, `ENEMY_NAV_REBUILD_INTERVAL` 0.4 → 0.6 s,
   `NAV_FILL_MAX_COST` 4500 → 3500, the values and reasons of
@@ -97,7 +167,38 @@ F1 overlay settles them.
   `config.HOST_PACES_FRAMES` is set by `apply_web_profile()` to
   `sys.platform == "emscripten"`. `main.py --web` applies the same profile
   on the desktop, where `asyncio.sleep(0)` paces nothing; dropping the cap
-  there would spin the desktop at thousands of frames a second.
+  there would spin the desktop as fast as its frames allow (hundreds of
+  frames a second or more in a light scene; an estimate, not measured).
+
+  In the browser the trade-off in "The cap against the refresh" was taken
+  by the builder, not yet by the owner, who approved item 3 on the
+  review's first wording ("held twice"): in the model, no spin and the
+  display's cadence, against more frames on fast displays in light scenes.
+  In the model, at 60 Hz it changes nothing (a refresh that jitters early
+  could cost ~1 ms; not measured).
+
+  One more consequence, beyond CPU and battery. Whatever the game does per
+  step rather than per unit of game time runs more times a second when
+  there are more steps a second. The desktop's cap keeps it at most 62.5
+  steps a second (the 62 fps cap truncates to 16 ms frames; a little under
+  in practice as `SDL_Delay` overshoots); if the
+  page's refresh paces the browser's loop (not measured), a fast display
+  with a light frame goes past that. Known per-step work, found by reading
+  the code and not an exhaustive audit:
+  - the population's wakes (`wake_budget` a frame, `spawn/population.py`)
+    and the flow field's `ENEMY_NAV_FILL_BUDGET` relaxations a frame: fills
+    land and dormant enemies wake sooner in wall time;
+  - the elemental reactions (`max_reactions_per_frame`,
+    `combat/elements/resolve.py`): held-over reactions land sooner;
+  - the bump pass (`game/states/playing/core/physics.py`): each step adds a
+    `BUMP_GAIN x penetration` impulse while the knockback decays by `dt`,
+    so crowded enemies separate faster at a higher step rate. This one is
+    already frame-rate dependent on the desktop below 62 fps.
+
+  Per-game-time work does not move: the watchdog, for one, samples each
+  enemy once per `sample_interval` of game time (`spawn/watchdog.py`). In a
+  heavy frame, where the per-step budgets matter most, the frame's own cost
+  caps the rate first. Reported to the owner with the corrected reasoning.
 
 ## Plan
 
@@ -132,13 +233,21 @@ builder writes later:
    with the code: no stale copy of an old value.
 6. The desktop's gameplay and frame pacing are byte-for-byte unchanged.
 
+The second critic round was given item 5 with one added clause, "and no
+claim stated with more certainty than its evidence", after the first round
+had failed the docs on exactly that. It tightens the bar and loosens
+nothing. Later rounds added two scope notes and loosened nothing either:
+dated history in older journals is out of scope, and a claim counts as
+hedged when its own sentence or clause carries the qualifier.
+
 ## Tasks
 
 - [x] BLD-003.1 — journal, index entry
 - [x] BLD-003.2 — browser live cap and AI knobs in the web profile, tests
 - [x] BLD-003.3 — host-paced frames in the browser, tests
 - [x] BLD-003.4 — `spawn_stress --web`, test, measurement
-- [ ] BLD-003.5 — docs, critic pass, close
+- [x] BLD-003.5 — docs, the pacing model (`tools/benchmarks/raf_pacing.py`),
+  the critic passes' fixes, close
 
 Out of scope, from the same review: measure in a real Chrome (item 1),
 remove the desktop draw spikes that become browser hitches (4), fewer and
@@ -148,18 +257,22 @@ larger terrain blits (5), `gc.freeze()` after loading (6).
 
 ### BLD-003.2 and .3 — tests
 
-- `tests/flows/test_web_crowd.py` (8): both sides' values pinned; a run
-  booted under the profile shows each value where the game reads it (the
-  director's cap, a fill's `limit`, the refresh timer after a round-robin
-  tick, a far idle enemy ticking 10 times in 30 frames with a 3/60 `dt`).
-  With the four assignments removed from `apply_web_profile`, the five
-  web-side tests fail (`250 != 100`, `4500 != 3500`, `0.2 != 0.3`,
-  `15 != 10`).
+- `tests/flows/test_web_crowd.py` (10): both sides' values pinned; the web
+  cap follows `ENEMY_COUNT_BASE`; a run booted under the profile shows each
+  value where the game reads it (the director's cap, a fill's `limit`, the
+  refresh timer at boot, after a round-robin tick and after a jump, a far
+  idle enemy ticking 10 times in 30 frames with a 3/60 `dt`). With the four
+  assignments removed from `apply_web_profile` (first version of the
+  file), the five web-side tests of the time failed (`250 != 100`,
+  `4500 != 3500`, `0.2 != 0.3`, `15 != 10`).
 - `tests/flows/test_frame_pacing.py` (6): the flag is False on the
   desktop, True only when `sys.platform` is `emscripten`, False under the
-  web profile on `win32`; `_step` asks `tick` for `FPS`, `0` and `60` in
+  web profile on `win32`; `_step` asks `tick` for `62` (pinned), `0` and `60` in
   those three cases. With the old `tick(config.FPS)` the browser case
-  fails (`[60, 60, 60] != [0, 0, 0]`).
+  fails (`[60, 60, 60] != [0, 0, 0]`). `sys.platform` is patched only
+  while the profile is applied; the `Game` is built as the desktop one.
+- `tests/flows/test_lod.py`: its update counter moved to a module-level
+  `count_updates`, shared with `test_web_crowd`.
 - `tests/web_profile.py` gained `config_restored()` (the snapshot alone),
   which `web_profile()` now wraps, for a test whose code applies the
   profile itself.
@@ -171,7 +284,15 @@ larger terrain blits (5), `gc.freeze()` after loading (6).
 `python -m tools.benchmarks.spawn_stress --web --render --live 100
 --frames 600` (seed 35, dummy driver, 89 bodies at the start of timing),
 against a control that applies the profile and puts the four desktop
-values back, so only the crowd settings differ. Two runs each:
+values back (`ENEMY_LIVE_CAP` 250 included), so only the crowd settings
+differ. "Update + draw" is the harness's own p50 / p90 of each frame's sum,
+as printed. In the four first-session runs the printed p50 happened to
+equal update p50 + draw p50 to the hundredth (a critic pass suspected a
+hand sum; the harness's output in the session, not kept in the repo,
+printed 6.45, 6.62, 7.04 and 7.94);
+in the second session it did not, as usual.
+
+**First session, 600 frames, two runs a side, not interleaved:**
 
 | | Update p50 / p90 | Draw p50 | Update + draw p50 / p90 | Live at end | Browser estimate p50 |
 |---|---|---|---|---|---|
@@ -180,14 +301,79 @@ values back, so only the crowd settings differ. Two runs each:
 | desktop settings, run 1 | 3.98 / 5.31 ms | 3.06 ms | 7.04 / 8.90 ms | 107 | 15.9-25.3 ms |
 | desktop settings, run 2 | 4.52 / 5.42 ms | 3.42 ms | 7.94 / 9.10 ms | 107 | 17.9-28.5 ms |
 
-The browser estimate scales update by 1.30-2.52 and draw by 3.5-5.0 (the
-review above). At this crowd the settings take the frame's p50 down 8-17 %
-and its p90 about 12 %; the larger effect is the cap itself, which stops a
-long run from reaching the ~166-175 live whose estimate was 20.6-33.4 ms.
-The draw p99 ranged 8.1-14.3 ms across these runs: first-sight blit work
-that the harness does not pin, and review item 4.
+The first version of this section read a p50 cut of 8-17 % into these
+four rows by pairing run 1 with run 1. *Corrected by the second critic
+pass:* all four pairings give 6-19 %, and the critic's own interleaved
+600-frame re-run gave 0.5-5 % at p50. At 600 frames the two crowds end
+7 apart (100 against 107), so what is left to measure is the three AI
+knobs alone, and their effect is inside run-to-run noise.
 
-What this does not settle: the estimate still straddles the 16.7 ms
-budget, and draw, not update, is now most of it. Only a real Chrome with
-the F1 overlay says which end of the range the browser is at (item 1), and
-the frame pacing of BLD-003.3 can only be seen there.
+**Second session, 1,200 frames, three pairs, interleaved** (web, control,
+web, control, ...):
+
+| Pair | BLD-003: update p50 / p90, draw p50, both p50 / p90 | Desktop settings: same | Both p50 | Both p90 |
+|---|---|---|---|---|
+| 1 | 4.81 / 6.46, 4.19, 9.06 / 11.41 ms (100 live) | 5.64 / 7.64, 4.38, 10.08 / 12.76 ms (133 live) | -10.1 % | -10.6 % |
+| 2 | 4.72 / 6.08, 4.08, 8.81 / 10.61 ms (100) | 5.53 / 7.55, 4.38, 10.05 / 12.76 ms (133) | -12.3 % | -16.8 % |
+| 3 | 4.73 / 6.10, 4.08, 8.81 / 10.80 ms (100) | 5.77 / 8.35, 4.60, 10.39 / 14.09 ms (133) | -15.2 % | -23.3 % |
+
+Over 1,200 frames the enemy summons grow the control's crowd to 133 while
+the cap holds the browser's at 100, so this is the cap and the knobs
+together, the comparison a longer run makes. Browser estimates from the
+medians of the three pairs' update and draw p50s: 20.4-32.3 ms with the
+BLD-003 settings, 22.7-36.1 ms without.
+
+What the two sessions say together:
+
+- **The cap is the lever; the knobs are small.** With equal crowds the
+  difference is noise-level; once the desktop settings let the crowd grow,
+  the BLD-003 frame is 10-15 % cheaper at p50 and 11-23 % at p90 (the
+  desktop-settings frame is 11.3-17.9 % and 11.8-30.5 % dearer).
+- **The absolute numbers moved between sessions by more than the effect**
+  (BLD-003 draw p50 2.9 ms in the first, 4.1 ms in the second, same seed
+  and crowd), and the browser estimate multiplies draw by 3.5-5.0, so it
+  swings with them: 14.7-24.0 ms in the first session, 20.4-32.3 ms in the
+  second. Both straddle or exceed the 16.7 ms budget. A third data point
+  from the last critic pass (2026-09-30, same command, 600 frames): update
+  + draw p50 10.30 ms, above both sessions, so the spread is wider still.
+- **Draw, not update, is most of the browser frame.** The next lever is the
+  draw (review items 4 and 5), and the next measurement is a real Chrome
+  with the F1 overlay (item 1), which is also the only place the pacing of
+  BLD-003.3 can be seen.
+- The draw p99 ranged 8.1-14.3 ms across the first session's runs (14.25
+  and 8.69 ms with the BLD-003 settings, 8.10 and 8.83 without):
+  first-sight blit work that the harness does not pin (review item 4).
+
+### BLD-003.5 — critic passes, docs, close
+
+Twelve cold critic rounds, each a fresh sub-agent with the diff and the
+rubric only. Rounds 1-11 failed, round 12 passed. Items 1, 3, 4 and 6 held
+in every round; item 2 failed once (round 2: an import-order gap let a
+module-level capture in `state.py` or `navigation.py` pass when
+`test_web_crowd.py` ran alone, fixed by importing every consumer under the
+desktop config first); item 5 carried the rest. What those rounds found in
+the docs, all fixed: the "held twice" premise (false at 60 Hz); a scratch
+pacing model that mixed float and integer clocks, replaced by the tested
+`tools/benchmarks/raf_pacing.py` whose table this journal prints and
+`test_raf_pacing` checks; the knobs' gain first overstated (8-17 %, noise at
+equal crowds); what the live cap gates (every spawn-master entry point bar
+`cap_exempt`, not wakes); which work scales with the step rate (the
+watchdog does not; reactions and the bump impulse do); and claims about
+the unmeasured `requestAnimationFrame` premise without their own hedge.
+Every critic ran its own mutations; all were killed. The verdict log and
+the raw measurements are kept outside the repo, in
+`/tmp/bld-003/critique/` (`verdicts.md`, `interleaved_1200_frames.txt`,
+`raf_pacing_table.md`).
+
+Found on the way and left for its own requirement: the bump pass's
+impulse is per frame while its decay is per `dt`, so crowd separation
+already depends on the frame rate (on the desktop too, below 62 fps).
+
+Self-rating: 8 / 10. The two points short are the outcome this
+requirement exists to move, still estimated rather than measured (browser
+frame time needs a real Chrome with the F1 overlay, review item 1), and the
+pacing trade-off, which the owner approved on the review's first, wrong
+wording and has not yet re-approved on the corrected one (D4).
+
+**Status:** done, pending the owner's re-approval of D4 and the real-Chrome
+measurement.

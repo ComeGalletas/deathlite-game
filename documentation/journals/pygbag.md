@@ -12,7 +12,8 @@ Milestones are **W1–W9**. Each ends green — `python -m unittest discover -s
 tests -t .` plus a `pygbag` local run — before the next.
 
 **Status:** W1–W8 done (2026-08-28) — the browser build runs (menu, gameplay,
-audio, session-only save) at 1280×720/60 fps, and all pygbag files live in
+audio, session-only save) at 1280×720/60 fps (the 60 fps cap later removed
+in the browser by BLD-003, below), and all pygbag files live in
 `web/`. **W9** (the GitHub Pages workflow + `.nojekyll`) is the only one left and
 is deliberately **not created yet** — owner will add it; the ready-to-paste
 sketch is under "GitHub Actions sketch" below.
@@ -200,7 +201,11 @@ scripts + `build/` output are not packed. Verified: `bash web/build.sh` packs
 All applied by `config.apply_web_profile()` under emscripten / `--web`:
 
 * **Frame cap 60.** The page composites at ~60 Hz; `FPS = 120` just spends WASM
-  budget on frames that are never presented.
+  budget on frames that are never presented. *Superseded in the browser by
+  BLD-003 (below): the page's refresh paces the loop there (per pygbag's
+  `aio.run` comment; not measured), and a page
+  refreshes at the display's rate, which is not always 60 Hz; the cap stays
+  for `--web` on the desktop. The desktop's own `FPS` is 62 now, not 120.*
 * **Render target 1280×720 @ `CAMERA_ZOOM 1.2`.** That is the pygbag canvas
   size, so there is no CSS downscale, and `1280 / 1.2 == 1600 / 1.5` keeps the
   visible world extent (and on-screen sprite size) identical to the desktop
@@ -219,6 +224,28 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
   canvas at 1.0) and compensates `CAMERA_ZOOM = 1.25 / 0.8 = 1.5625`, so
   `config.effective_zoom()` is still exactly 1.25. See
   `web_ui_scale_journal.md`.
+* **BLD-003 (2026-09-29): no frame cap in the browser, and its own crowd.**
+  pygbag already resumes the loop from `requestAnimationFrame` (per a
+  comment in its `aio.run`; the scheduler is in the runtime, not the
+  wheel), so the "frame cap 60" above is a second pacer. Modelled, not
+  measured (`tools/benchmarks/raf_pacing.py`): it is free on a 60 Hz
+  display, and on a faster one with a light frame `clock.tick(60)` fights
+  the refresh: SDL2's `SDL_Delay` busy-waits the page's thread when the
+  runtime has no Asyncify (unconfirmed), 5.0-8.4 ms a light frame at
+  75-165 Hz, and a 75 Hz display drops to 50 fps under a 12 ms frame.
+  Under emscripten the profile now sets `config.HOST_PACES_FRAMES`, and
+  `Game._step` ticks without a cap; `FPS = 60` remains the cap for `--web`
+  on the desktop. The price, in the model: light scenes draw at the
+  display's full rate on a fast display. The profile also sets the
+  browser's crowd: live cap 100 (desktop 250), `ENEMY_LOD_SKIP` 3,
+  `ENEMY_NAV_REBUILD_INTERVAL` 0.6, `NAV_FILL_MAX_COST` 3500 (owner). This
+  relaxes the "zero gameplay divergence" goal above in three ways: crowd
+  size, AI fidelity, and, on a display faster than 60 Hz in a light frame,
+  whatever the game does per step rather than per unit of game time (wakes,
+  fill slices, reaction budget and the bump impulse among what is known;
+  not an exhaustive audit), which host pacing would run more times a second
+  if the page's refresh paces the loop (not measured; BLD-003.D4). See
+  `web_frame_time_journal.md`.
 * **Mixer runs at the browser's rate** (observed 96000 Hz / 2 ch). `BrowserMixer`
   resamples each of the 8 synth buffers 22050 → device rate and up-mixes to
   stereo once at startup (pure-Python loops) — a one-time ~sub-second cost, no

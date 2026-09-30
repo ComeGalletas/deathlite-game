@@ -167,9 +167,12 @@ done, and two items block the build from being playable by anyone else.
 - ~~`assets/unused/` is not in `pygbag.ini`'s `ignoreDirs`~~ -- done 2026-09-13
   (`dist/web/pygbag.ini` ignores `/assets/unused`, `/tools`, `/.ruff_cache`).
   The unreferenced art *inside* the shipped folders still needs the manifest pack.
-- Still open behind those: the finer loading steps and progress bar, the
-  manifest-driven pack, and browser spawn-master knobs in
-  `config.apply_web_profile()`.
+- Still open behind those: the finer loading steps and progress bar, and
+  the manifest-driven pack. ~~Browser spawn-master knobs in
+  `config.apply_web_profile()`~~ -- done 2026-09-29 as BLD-003 (live cap
+  100, LOD 3, nav 0.6 s, fill 3500), with host-paced frames (modelled, not
+  yet measured); a real-Chrome measurement is still owed
+  (`journals/web_frame_time_journal.md`).
 
 ## 8. Test and infrastructure debt
 

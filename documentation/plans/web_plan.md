@@ -99,7 +99,8 @@ compositor budget is a hard 16.7 ms at 60 Hz:
    in pygbag; the slice is the browser's only answer.
 
 Then the browser profile gets its own spawn-master numbers, set in
-`config.apply_web_profile()` like the resolution and frame cap:
+`config.apply_web_profile()` like the resolution and frame cap (the table
+is the 2026-09-03 proposal; what shipped is in the note below it):
 
 | Knob | Desktop | Browser | Why |
 |---|---|---|---|
@@ -112,6 +113,18 @@ None of these are new mechanisms; they are the same knobs read at call
 time, so `apply_web_profile()` can set them the way it sets `FPS`.
 Measure on a real browser with the F1 overlay before committing to the
 values -- the pane used here cannot.
+
+> **Done 2026-09-29 as BLD-003** (`../journals/web_frame_time_journal.md`),
+> before the real-browser measurement, which is still owed. The desktop
+> cap had meanwhile moved to 250, and the owner set the browser's at
+> **100**, not 60: it is `ENEMY_COUNT_BASE`, so a run opens with the
+> desktop's crowd. The other three knobs are the values above. The same
+> requirement dropped the browser's own `clock.tick` cap, so the page's
+> refresh alone paces the loop (`config.HOST_PACES_FRAMES`; per a comment
+> in pygbag 0.9.3's `aio.run`, not yet measured in a browser). In the model
+> (`tools/benchmarks/raf_pacing.py`, not measured) the cap costs nothing at
+> 60 Hz; on a faster display it can spin the page's thread, if the
+> runtime has no Asyncify, or drop frames.
 
 **Render.** 14-20 ms at 1280x720 with fifteen bodies in view is already
 most of the frame. The terrain path composites several scaled surfaces
@@ -155,8 +168,8 @@ worker that could share the Python heap; slicing is the mechanism.
 |---|---|---|
 | vendor the wheel in `build.sh` and the deploy action (2a) | an hour | `dist/web/build.sh`, the W9 workflow |
 | move `assets/unordered-effects/` out of the bundle | minutes | `dist/web/pygbag.ini` `ignoreDirs`, or the folder itself |
-| obstacle index, sliced fill (fluidity plan items 1 and 3) | a day and a half | `world/map.py`, `world/nav/field.py` |
-| browser spawn-master knobs in `apply_web_profile()` | an hour, after measuring on a real browser | `game/config.py` |
+| obstacle index, sliced fill (fluidity plan items 1 and 3) -- done 2026-09-03 | a day and a half | `world/map.py`, `world/nav/field.py` |
+| browser spawn-master knobs in `apply_web_profile()` -- done 2026-09-29, BLD-003; the real-browser measurement is still owed | an hour, after measuring on a real browser | `game/config.py` |
 | finer loading steps + progress bar | half a day | `world/gen/__init__.py`, `world/gen/repair.py`, `game/states/loading_state.py` |
 | manifest-driven pack (3) | half a day | new `dist/web/manifest.py`, `dist/web/build.sh` |
 | W9: GitHub Pages workflow | an hour | `.github/workflows/deploy-web.yml` |
