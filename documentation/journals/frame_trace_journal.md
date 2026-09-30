@@ -1,7 +1,7 @@
 # Frame-time trace of real play: journal
 
 **ID:** SYS-010 · **System:** systems (+ tools) · **Type:** feature ·
-**Status:** in progress · **Branch:** ComeGalletas/sys-010-frame-trace-9ec11fc6
+**Status:** done · **Branch:** ComeGalletas/sys-010-frame-trace-9ec11fc6
 (stacked on RND-009, the chain tip, so it measures the game as it will ship;
 owner, 2026-09-29)
 
@@ -73,7 +73,7 @@ owner, 2026-09-29)
 - [x] SYS-010.2: The recorder and its wiring (`--trace`, `DEATHLITE_TRACE`, `traces/` beside the save)
 - [x] SYS-010.3: The report (`tools/benchmarks/trace_report.py`); `BUDGET_MS` moved to `systems/frame_trace.py`, the one copy
 - [x] SYS-010.4: Tests, the recorder's measured cost, the how-to; five cold critics' findings fixed, the sixth passed it
-- [ ] SYS-010.5: Results; index to done
+- [x] SYS-010.5: Results; index to done
 
 ## SYS-010: Decisions
 
@@ -404,3 +404,43 @@ paused, 10 back in play. Then the report on its file. Two runs:
   long. Period p50 16.73 ms: work 4.6 ms, present 0.6 ms, wait 11.2 ms.
 - What a row's four timed parts do not cover (the input, the music, the
   sample) is 0.02 to 4.7 ms.
+
+## SYS-010.5: Results
+
+**What the owner has.** `python main.py --trace` (or `DeathliteGame.exe
+--trace`, or `DEATHLITE_TRACE=1`) records every frame of a session beside
+the save; `python -m tools.benchmarks.trace_report` answers, from the newest
+trace, how many play frames went over the 16.67 ms budget and whether the
+update or the draw did it, how many ran long and what took most of each
+(update, draw, present, the cap's wait, or the rest), the same by crowd
+size, the worst seconds of each run, and which play frames it counted
+apart and why. The how-to is in `README.md`, "Measuring frame time in real
+play".
+
+**What it costs.** Off: 0.15 µs a frame. On: 12 to 21 µs a frame on
+average with 100 alive (0.1 % of the budget), plus one batch write a
+second, typically 0.1 to 0.3 ms.
+
+**How it was checked.** Six cold critics; the sixth passed it (SYS-010.4).
+65 mutants, each caught by the two test modules. Every trace test passes
+alone. The touched suites (`tests/devtools`, `tests/flows`,
+`tests/screens`, `tests/playing`, `tests/systems`, the enemy-update
+exactness suite) pass; the tier audit finds nothing under-tiered; ruff
+finds nothing this branch added. Headless end-to-end sessions, including
+the real loading screen, single and chained level-ups, pause, death, the
+end banner and a second run, read back row for row.
+
+**What it has not answered yet.** The question it was built for, how often
+real play misses the budget, needs a normal session played on the real
+display; every run here was headless, where the OS timer can stretch the
+cap's sleep (D4) and nothing is presented. The next step is the owner's:
+play a normal run with `--trace` and read the report.
+
+**Open for the owner.** The budget is one 60 Hz period (RND-008.D3), but
+SYS-011 found the owner's display runs at 174 Hz, where the 62 fps cap
+alone paces the game. Whether the budget stays the 60 fps target is the
+owner's call; the trace reports against `BUDGET_MS` either way, from one
+constant.
+
+**Follow-ups.** SYS-011 (timer resolution, on its own branch stacked on
+this one) owns the cause of the D4 stretch.
