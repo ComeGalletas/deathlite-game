@@ -1,7 +1,7 @@
 # The aura shed moves out of the draw: journal
 
 **ID:** RND-011 · **System:** rendering (elemental visuals) · **Type:** bug ·
-**Status:** in progress · **Branch:** ComeGalletas/aura-shed-update-a10d79ed
+**Status:** done · **Branch:** ComeGalletas/aura-shed-update-a10d79ed
 (owner, 2026-09-30; found by RND-010's critic passes, RND-010.D7 in
 `web_draw_journal.md` on `ComeGalletas/web-draw-cheap-5be9212c`)
 
@@ -60,6 +60,12 @@
   draw-time shed and its control (`the per-frame redraw piles particles
   up`) turns false with this change. Whichever of RND-010 and RND-011
   lands second updates it as written under *For RND-010* below.
+- **RND-011.D5 — no shed under the end banner** (builder, within the
+  banner's own rule). `run_end.ending_sequence` stands in for the update
+  while the end banner waits, and its contract is "no clock, only what is
+  already in flight plays out": it ages the particles but births none. The
+  shed now lives in the update, so a primed body stops shedding for the
+  banner's wait. Before, the draw kept shedding there at the draw rate.
 
 ## RND-011: What the code did, and what changes
 
@@ -100,8 +106,66 @@ changes only the shed.
 ## RND-011: Todo
 
 - [x] RND-011.1 — Journal and index
-- [ ] RND-011.2 — The shed in the update, on its own RNG, budget scaled to the step
-- [ ] RND-011.3 — Docs, critic pass, done
+- [x] RND-011.2 — The shed in the update, on its own RNG, budget scaled to the step (`67f6737`)
+- [x] RND-011.3 — Docs, critic pass, done
+
+## RND-011: Results
+
+**What changes in play.** A primed body sheds the same motes a second at
+any frame rate (Fire 7, Ice 5, the other two 6, per aura); the browser's
+shed is no longer about 2.8x the desktop's. Pausing, the level-up, TAB and
+any redraw add nothing and roll nothing. A run with auras on screen plays a
+different `run.rng` sequence from before, once (D1); a run without them is
+unchanged: `python -m tools.verification.run_digest --check` reads `match`
+before and after the change (the scripted seeds never draw an aura), so
+`run_digests.json` is not re-pinned. Under the end banner a primed body
+stops shedding (D5). The F1 budget line reads the last step's use against
+that step's own grant (about 31 at 175 Hz), not against 90.
+
+**Cost.** Measured by the critic in the stress harness: `shed.update` is
+about 0.14 ms a step with 100 bodies in view (78 primed), about 1.8 % of
+the 7.7 ms update. The draw loses the same rolls.
+
+**Tests.** New: `tests/render/test_aura_shed.py` (20 tests: draw purity
+headless and booted, including the budget's whole state; rate per second
+per element at dt 1/30, 1/62, 1/175, within 4 % of `rate` on a 5,000 to
+7,000-mote sample; the whole part at dt 0.5; both caps biting by the same
+amount a second; births equal grants; own stream and its seed; shed once a
+step with its `dt`, after the ageing; nothing under the end banner).
+Rewritten to the new contract: `BudgetTests` (`begin_step`, a second of
+steps at 30, 62 and 175 Hz, nothing banked, the report),
+`test_the_shed_asks_for_the_lower_layer`, and in
+`test_elemental_draw_cost.py` the shed-order pin became "the world draw
+leaves the run as it found it". `BootedRunTests` is listed as
+`integration` in `tests/conftest.py`.
+
+Runs: `tests/render tests/flows tests/playing tests/systems tests/devtools
+tests/combat tests/screens`: 2,807 passed, 3,961 subtests (22.7 min),
+before the critic's fixes. After them, the elemental modules, the tier
+audit, `test_spawn_stress`, `test_end_banner` and the stray-English scan:
+153 passed, 1 failed, the scan on `game/display/native.py:216`, which is
+not in this diff and was fixed on `main` by `d99dcc5` (TST-009.1).
+
+**Critic (one cold pass, frozen 8-item rubric).** FAIL on test pinning,
+not on the code: no correctness bug found; rates checked independently
+over 5 seeds and dt up to 0.75 (within 2.7 %); 2,000,000 mixed steps
+drifted the budget by under half a mote; booted runs drawn never, once or
+three times a step ended identical. Its findings and what was done:
+
+| # | finding | done |
+|---|---|---|
+| 1 | draw purity did not see the budget (a refused `take` or a refill left `spent` at 0) | both purity tests compare the budget's whole state after a real step |
+| 2 | D5 (no shed under the end banner) untested | `test_nothing_sheds_under_the_end_banner` |
+| 3 | shed-after-ageing untested | `test_a_mote_is_drawn_whole_on_the_step_it_is_born` |
+| 4 | F1 line `spent/90` misleading at short steps | `spent/granted`, pinned |
+| 5 | "same seed, same motes" overclaimed: a mote's direction, speed and life come from the process-wide `random` in `ParticleSystem.burst` (unchanged, not gameplay) | docstrings say "which bodies, how many" |
+| 6 | branch behind `main` (TST-009, SYS-012) | rebased before the PR |
+| 7 | bursting the owed count rather than the grant was uncaught | `test_a_body_owed_several_motes_is_given_only_what_is_granted` |
+
+Each fix was checked by mutation: the draw taking from or refilling the
+budget, the shed moved before the ageing, a shed added to
+`ending_sequence`, `count` for `granted`, and the old report string each
+fail a test; restored, all pass.
 
 ## For RND-010
 

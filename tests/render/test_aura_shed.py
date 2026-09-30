@@ -215,6 +215,20 @@ class BudgetBoundsTests(unittest.TestCase):
                 self.assertLessEqual(per_second, allowed + 1 / self.SECONDS)
                 self.assertGreater(per_second, 0.95 * allowed, "the cap never bit")
 
+    def test_a_body_owed_several_motes_is_given_only_what_is_granted(self):
+        # Half-second steps owe each Fire aura 3 or 4 motes; a budget of 1
+        # per 1/60 s grants 30 a step, so some body is granted part of its
+        # share. Every step's births must equal the grant, never the debt.
+        from game.states.playing.visual.elements.budget import ParticleBudget
+
+        run = fake_run(_primed(50))
+        run.element_visuals.budget = budget = ParticleBudget(1, 1)
+        for _ in range(20):
+            before = _born(run.particles.bursts)
+            shed.update(run, 0.5)
+            self.assertEqual(budget.spent, 30)
+            self.assertEqual(_born(run.particles.bursts) - before, 30)
+
     def test_the_frame_cap_bites_across_the_elements(self):
         # 300 of each element owe 2,100 + 1,500 + 1,800 + 1,800 = 7,200 a
         # second: every element under its own 2,400, the sum past 5,400.
