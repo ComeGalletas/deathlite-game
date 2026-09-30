@@ -51,6 +51,8 @@ PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 | ENT-017 | Behaviour shape moved into data | ENT, SYS | refactor | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/ent-017-behavior-templates | 2026-09-24 |
 | ENT-018 | The enemies' own update made cheaper, bit for bit the same (crowding push, floor lookups) | ENT, WLD | performance | done | [enemy_update_journal.md](enemy_update_journal.md) | ComeGalletas/ent-018-enemy-update-9ec11fc6 | 2026-09-29 |
 | ENT-019 | The crowd bump shoves a fast display's frames at the tuned rate a second; the 62 fps cap and every slower frame bit for bit as before | ENT, SYS | bug | done | [bump_frame_rate_journal.md](bump_frame_rate_journal.md) | ComeGalletas/ent-019-bump-frame-rate-417b14b3 | 2026-09-30 |
+| ENT-020 | Ravager and Grudge colliders 30 % smaller to fit tighter ground; sprites and the Ravager's reach unchanged | ENT | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/bear-troll-collision-rings-0e37b7 | 2026-09-30 |
+| ENT-021 | Ravager and Grudge colliders a fixed 20 px, large nav clearance 22 -> 20 so the field routes them through every gap they fit | ENT, WLD | feature | done | [enemy_ai_journal.md](enemy_ai_journal.md) | claude/bear-troll-collision-rings-0e37b7 | 2026-09-30 |
 | SPN-001 | Spawn master | SPN | feature | legacy | [spawn_master_journal.md](spawn_master_journal.md) | — | 2026-09-03 |
 | SPN-002 | Spawn groups and ranks | SPN | feature | legacy | [spawn_groups_journal.md](spawn_groups_journal.md) | — | 2026-09-17 |
 | SPN-003 | Enemy despawn by distance | SPN | feature | legacy | [enemy_despawn_journal.md](enemy_despawn_journal.md) | — | 2026-09-19 |
@@ -78,6 +80,7 @@ PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 | RND-008 | Gameplay frame time: the reviewed performance findings and their todo list (per-frame font builds in the hints, the harness, the elemental draw, bump) | RND, SYS, ENT, CMB | performance | done | [frame_time_journal.md](frame_time_journal.md) | ComeGalletas/rnd-008-frame-time-9ec11fc6 | 2026-09-28 |
 | RND-009 | The terrain's ground bands: investigated, at the alpha blitter's floor, no exact speed-up; no code change | RND | performance | done | [ground_bands_journal.md](ground_bands_journal.md) | ComeGalletas/rnd-009-ground-bands-9ec11fc6 | 2026-09-29 |
 | RND-010 | Drawing big crowds: the draw measured by layer at 150 to 250 enemies, then cut where the crowd costs it, pixel-identical | RND | performance | planned | [crowd_draw_journal.md](crowd_draw_journal.md) | ComeGalletas/crowd-draw-levelup-9ec11fc6 | 2026-09-30 |
+| RND-011 | The aura shed moves from the draw to the update: its own RNG, a chance of `rate * dt` per step, the budget scaled to the step | RND, CMB | bug | done | [aura_shed_journal.md](aura_shed_journal.md) | ComeGalletas/aura-shed-update-a10d79ed | 2026-09-30 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |
@@ -113,6 +116,7 @@ PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 | SYS-009 | One sprite-blit core, a `TimedVisual` for transient effects, `MELEE_REACT_SCALE` to config | SYS, RND, ENT | refactor | done | [playing_state_refactor.md](playing_state_refactor.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | SYS-010 | A frame-time trace of real play (`--trace`) and its report | SYS | feature | done | [frame_trace_journal.md](frame_trace_journal.md) | ComeGalletas/sys-010-frame-trace-9ec11fc6 | 2026-09-29 |
 | SYS-011 | `clock.tick` held at ~31 ms on Windows 11: the timer request ignored for a hidden, silent process; opt out at startup | SYS | bug | done | [timer_resolution_journal.md](timer_resolution_journal.md) | ComeGalletas/sys-011-timer-resolution-26b3a82b | 2026-09-29 |
+| SYS-012 | The frame budget stays the 60 fps target (16.67 ms, `BUDGET_MS`) on a 174 Hz display: text brought in line, no behaviour change | SYS | process | done | [frame_trace_journal.md](frame_trace_journal.md) | ComeGalletas/sys-012-budget-decided-c17f955f | 2026-09-30 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |
@@ -121,8 +125,10 @@ PRG-004 · AUD-004 · SYS-012 · TST-009 · BLD-003 · DOC-008
 | TST-006 | Tests that boot a Game or generate a world leave the `unit` tier; `tier_audit` finds them | TST | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-006-tier-booting-tests-bb480b0c | 2026-09-29 |
 | TST-007 | The ultrawide level-up margin test runs on its own (font setup, own `unit` class) | TST | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-007-ultrawide-font-init-83009add | 2026-09-29 |
 | TST-008 | Re-pin the run digest's seed 123 after CMB-010 moved it (bomb stops at a cliff face) | TST, CMB | bug | done | [run_determinism_journal.md](run_determinism_journal.md) | ComeGalletas/tst-008-repin-run-digest-8a008ecb | 2026-09-30 |
+| TST-009 | The stray-English scan excuses names looked up through a loop (`getattr` over a literal tuple, SYS-011's ctypes prototypes) | TST, UI | bug | done | [test_tiers_journal.md](test_tiers_journal.md) | ComeGalletas/tst-stray-english-ctypes-03622970 | 2026-09-30 |
 | BLD-001 | Web build (pygbag) | BLD | feature | legacy | [pygbag.md](pygbag.md) | — | 2026-08-28 |
 | BLD-002 | Desktop packaging (.exe) | BLD | feature | legacy | [desktop_packaging_journal.md](desktop_packaging_journal.md) | — | 2026-09-12 |
+| BLD-003 | Web frame time: the browser's own crowd (live cap 100, AI knobs) and host-paced frames | BLD, SPN, SYS | performance | done (D4 re-approval owed; measured in Chrome 2026-09-30) | [web_frame_time_journal.md](web_frame_time_journal.md) | ComeGalletas/web-frame-pacing-5be9212c | 2026-09-29 |
 | DOC-001 | Process standard: IDs, journals, index, commits | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-002 | Flag and ask about balance tweaks in `data/` | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/reaction-damage-rework | 2026-09-22 |
 | DOC-003 | Documentation cleanup: boxes, stale text, cross-references | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-003-doc-cleanup | 2026-09-22 |

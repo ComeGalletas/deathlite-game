@@ -64,6 +64,7 @@ from world.gen.tuning import (
     _RESOURCE_OFF_SPAWN_TILES, _RESOURCE_POINTS_PER_ISLAND, _RESOURCE_WEIGHTS,
     _SPAWN_BRIDGE_TILES, _SPAWN_EDGE_TILES, _SPAWN_MIN_SPACING_TILES,
     _SPAWN_OBSTACLE_GAP, _SPAWN_RELAX_BELOW, _SPAWN_START_CLEAR_TILES,
+    _WORLD_BODY_FLOOR,
 )
 from world.layout import CLIFF, GROUND, LAKE, VOID, ResourcePoint, SpawnPoint
 from world.nav.field import _NAV_CLASSES
@@ -79,9 +80,11 @@ __all__ = ["place_points", "body_radii"]
 def body_radii() -> tuple[float, float]:
     """`(small, large)`: the body radius of the narrowest and the widest
     navigation class, read from the classes the game steers on rather than
-    restated here."""
+    restated here. The large one is never below `_WORLD_BODY_FLOOR`
+    (ENT-021), so a large point still seats the widest walkers when the
+    class's clearance drops for routing."""
     radii = sorted(float(c[3]) for c in _NAV_CLASSES)
-    return radii[0], radii[-1]
+    return radii[0], max(radii[-1], _WORLD_BODY_FLOOR)
 
 
 def _widest_cell() -> int:

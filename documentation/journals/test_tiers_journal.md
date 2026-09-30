@@ -364,3 +364,52 @@ TST-006's branch; the session worktree `.claude/worktrees/busy-shtern-6bb78d`)
   `pygame.init()` (`tools/asset_pipeline/cut_menu_background_long.py`).
   So any run with an earlier test in the process can hide this bug again;
   running the class or test alone is the check.
+
+## TST-009 — Requirement (owner, 2026-09-30)
+
+**ID:** TST-009 · **System:** tests · **Type:** bug · **Status:** done ·
+**Branch:** ComeGalletas/tst-stray-english-ctypes-03622970 (the session
+worktree `.claude/worktrees/busy-shtern-6bb78d`, cut from `origin/main` at
+`0b56029`)
+
+- **Objective:** `python -m pytest -m unit` is green on `main` again.
+- **Details:**
+  - `tests/locale/test_no_stray_english.py::NoStrayEnglishTests::
+    test_no_player_facing_literal_is_english` (UI-014.11) fails on
+    `game/display/native.py:216`, `'SetProcessInformation'` and
+    `'GetProcessInformation'`.
+  - Those are Win32 API names that SYS-011.5 looks up through ctypes:
+    `for name in (...): fn = getattr(k32, name)`. The scanner already
+    excuses a constant passed straight to `getattr` (`NAME_ARGS`), but not
+    one that reaches it through a loop variable.
+  - Prefer a structural rule over `ALLOWED` entries if the scanner has one
+    for ctypes / `getattr` names.
+- **Constraint:** `game/display/native.py` is not renamed or restructured.
+
+## TST-009 — Decisions
+
+- **D1 — extend the name rule, not `ALLOWED`.** A `for` over a literal
+  tuple or list of strings is excused when its loop variable is used only
+  as an argument of a `NAME_ARGS` call (`getattr`, `WinDLL`, ...). That is
+  the same judgement the direct `getattr(k32, "SetProcessInformation")`
+  already gets, so the next ctypes prototype loop needs no entry. The rule
+  is strict on purpose: if the variable is also used anywhere else (say
+  rendered), the literals are judged as before, so a menu loop that happens
+  to `getattr` its labels is still caught. The self-test carries both cases.
+
+## TST-009 — Todo
+
+- [x] TST-009.1 — The loop-of-looked-up-names rule, its self-test cases,
+  the module docstring; journal and index.
+
+## TST-009 — Log
+
+### 2026-09-30 — TST-009.1: the rule, verified
+
+- Before: `tests/locale/test_no_stray_english.py` 1 failed, 2 passed (the
+  two `native.py:216` literals).
+- After: 3 passed. `test_every_allowed_entry_still_exists` still passes, so
+  the new rule excused no literal that `ALLOWED` names.
+- `test_the_scan_sees_a_stray_literal` gains two loops: one whose names go
+  only to `getattr` (excused) and one that also renders them (both labels
+  still reported).

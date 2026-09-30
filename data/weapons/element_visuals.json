@@ -59,9 +59,15 @@
   },
   "budget": {
     "_doc": [
-      "Elemental particles are capped per frame, separately from the pool's",
-      "own MAX_PARTICLES, so a hundred auras can never starve the hit",
-      "bursts and the death poofs of theirs (design 9, particle budget)."
+      "Elemental particles are capped separately from the pool's own",
+      "MAX_PARTICLES, so a hundred auras can never starve the hit bursts and",
+      "the death poofs of theirs (design 9, particle budget).",
+      "",
+      "Both numbers are per 1/60 s of play, not per drawn frame or per step",
+      "(RND-011, aura_shed_journal.md): the aura's shed runs once per update",
+      "step and each step is granted its share for its length, so the cap is",
+      "the same a second at the desktop's 62 fps and the browser's 175 Hz.",
+      "Each element's `particles.rate` is motes a second per aura, likewise."
     ],
     "per_frame": 90,
     "per_element": 40

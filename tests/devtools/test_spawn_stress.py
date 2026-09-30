@@ -8,8 +8,9 @@ frozen through the timed frames, with nothing in flight, while
 `live_director` still lets companies in (the control that shows the freeze
 is what keeps them out); the isolated bump pass does the same work every
 pass, meets real pairs and never the parked hero, and leaves the run as it
-found it; one budget counts the frames over it; and each command-line flag
-reaches `build` on its own.
+found it; one budget counts the frames over it; each command-line flag
+reaches `build` on its own; and `--web` (BLD-003.4) measures under the
+browser profile and says so on the display line.
 
 No timing is asserted: a timing assertion would only ever be flaky. The
 numbers live in the journal. Runs are booted on seed 35, the harness's
@@ -29,6 +30,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 from game import config, save as save_mod
 from tests import boot
+from tests.web_profile import config_restored
 from tools.benchmarks import spawn_stress as S
 
 SEED = 35
@@ -99,6 +101,9 @@ class HarnessDefaultsTests(unittest.TestCase):
         self.assertIn("director frozen", line)
         self.assertIn(f"budget {S.BUDGET_MS:.2f} ms", line)
         self.assertIn(f"zoom {config.effective_zoom():.3f}", line)
+        self.assertIn(f"crowd cap {config.ENEMY_LIVE_CAP} "
+                      f"nav {config.ENEMY_NAV_REBUILD_INTERVAL:g} s "
+                      f"fill {config.NAV_FILL_MAX_COST}", line)
 
     def test_the_bump_pass_repeats_the_same_work_and_leaves_the_run_as_found(self):
         ps = self.ps
@@ -214,6 +219,10 @@ class FlagPlumbingTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 S.parse(["--frames", "0"])
 
+    def test_web_is_off_unless_asked(self):
+        self.assertFalse(S.parse([]).web)
+        self.assertTrue(S.parse(["--web"]).web)
+
 
 class CommandLineTests(unittest.TestCase):
     """`main` end to end, on a small booted run."""
@@ -240,9 +249,25 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual([(c.args[1], c.kwargs.get("jitter")) for c in spy.call_args_list],
                          [(60, 0.0), (3, 0.0)])
 
+    def test_web_measures_under_the_browser_profile(self):
+        """BLD-003.4: `--web` applies the profile before the run is built,
+        so the display, the crowd knobs and the LOD are the browser's, and
+        the display line says so."""
+        out = io.StringIO()
+        with config_restored(), contextlib.redirect_stdout(out):
+            code = S.main(["--seed", str(SEED), "--live", "10", "--dormant", "0",
+                           "--frames", "3", "--web"])
+        text = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("display 1280x720", text)
+        self.assertIn("render scale 0.800", text)
+        self.assertIn("crowd cap 100 nav 0.6 s fill 3500", text)
+        self.assertIn(f"seed {SEED} lod 3", text)
+        self.assertEqual(config.ENEMY_LIVE_CAP, 250, "the test restores config")
+
 
 class BudgetTests(unittest.TestCase):
-    def test_the_budget_is_one_60_hz_period(self):
+    def test_the_budget_is_the_60_fps_target(self):
         self.assertAlmostEqual(S.BUDGET_MS, 1000.0 / 60.0)
 
     def test_only_frames_past_the_budget_count(self):

@@ -3,6 +3,11 @@
 > Assessment (2026-09-03), after spawn master S7 and the fluidity plan.
 > Measured facts are marked; the rest is a proposal. The pygbag milestones
 > W1-W8 in `../journals/pygbag.md` are the baseline this builds on.
+> Superseded in part by the Chrome measurement of 2026-09-30 (BLD-003.6,
+> `../journals/web_frame_time_journal.md`): update ~4 ms and render
+> 32-43 ms (21-99 live; 38.0 ms at 99; the factor against the desktop
+> depends on the desktop session), frame rate measured, the loading screen ~3 s, and a
+> static host works once the wheel is vendored.
 
 **In one paragraph.** The browser build boots and starts a run with the
 spawn master in it, but three things stand between it and something you
@@ -30,14 +35,17 @@ its own spawn-master numbers.
 
 The desktop loading work under the web profile is 2.3 s (generation
 1.6 s in 32 steps, bake 0.4 s in 14, navigation 0.3 s). At 2-4x that is a
-5-10 s loading screen in the browser, with single steps of up to 0.16 s
-on desktop stalling the hero animation for half a second each in WASM.
+5-10 s loading screen in the browser (BLD-003.6 measured ~3 s), with
+single steps of up to 0.16 s on desktop stalling the hero animation for
+half a second each in WASM.
 
 ---
 
 ## 2. Deploy: make the build static-hostable
 
-The only blocker for W9. Two ways; the first is a line in `build.sh`.
+The only blocker for W9 (BLD-003.6 found a second: the build refuses the
+MP3 music without `--disable-sound-format-error`; see `dist/web/README.md`).
+Two ways; the first is a line in `build.sh`.
 
 **2a. Vendor the wheel next to the page.** After `pygbag --build`, copy
 the pygame-ce wheel the loader asks for into the output:
@@ -88,6 +96,12 @@ tail.
 The fluidity plan's two items (`documentation/plans/fluidity_plan.md`) matter
 more here than on desktop, because everything is 2-4x slower and the
 compositor budget is a hard 16.7 ms at 60 Hz:
+*(2026-09-03 readings. Measured in Chrome since, BLD-003.6: update
+~4 ms, render 32-43 ms (21-99 live; 38.0 ms at 99), so update is about
+the desktop's and the draw is the cost. The page refreshes at the
+display's rate, not always 60 Hz; the budget is the 60 fps target,
+16.67 ms. See the note below the
+table.)*
 
 1. **The obstacle spatial index in `GameMap.is_walkable`** (desktop:
    93 → 4 us a call, update p50 6.0 → 1.2 ms at 100 live). In WASM the
@@ -99,7 +113,8 @@ compositor budget is a hard 16.7 ms at 60 Hz:
    in pygbag; the slice is the browser's only answer.
 
 Then the browser profile gets its own spawn-master numbers, set in
-`config.apply_web_profile()` like the resolution and frame cap:
+`config.apply_web_profile()` like the resolution and frame cap (the table
+is the 2026-09-03 proposal; what shipped is in the note below it):
 
 | Knob | Desktop | Browser | Why |
 |---|---|---|---|
@@ -113,9 +128,24 @@ time, so `apply_web_profile()` can set them the way it sets `FPS`.
 Measure on a real browser with the F1 overlay before committing to the
 values -- the pane used here cannot.
 
+> **Done 2026-09-29 as BLD-003** (`../journals/web_frame_time_journal.md`),
+> before the real-browser measurement, taken the next day in Chrome
+> (BLD-003.6: the draw, not the crowd, is the browser's cost). The desktop
+> cap had meanwhile moved to 250, and the owner set the browser's at
+> **100**, not 60: it is `ENEMY_COUNT_BASE`, so a run opens with the
+> desktop's crowd. The other three knobs are the values above. The same
+> requirement dropped the browser's own `clock.tick` cap, so the page's
+> refresh alone paces the loop (`config.HOST_PACES_FRAMES`; measured in
+> Chrome on the owner's ~175 Hz display, where the menu ran 72-74 fps by the
+> game clock (68-74 by the page's refreshes) uncapped against
+> the cap's 62.5). In the model (`tools/benchmarks/raf_pacing.py`) the cap
+> costs nothing at 60 Hz; on a faster display it can spin the page's
+> thread, if the runtime has no Asyncify, or drop frames.
+
 **Render.** 14-20 ms at 1280x720 with fifteen bodies in view is already
-most of the frame. The terrain path composites several scaled surfaces
-per frame; the `_blit_cache` fills per band on first sight (the 62 ms
+most of the frame (2026-09-03; BLD-003.6 measured 32-43 ms in a run).
+The terrain path composites several scaled surfaces per frame; the
+`_blit_cache` fills per band on first sight (the 62 ms
 frame on desktop). Two cheap moves, both browser-side only: keep the
 drawn zoom (`effective_zoom()`) at 1.25 (integer tile size, no seams, already
 done; since UI-016 that is `CAMERA_ZOOM` 1.5625 at interface scale 0.8) and
@@ -130,8 +160,8 @@ touching the renderer.
 
 The loading screen already slices generation and bake a step per frame
 (`game/states/loading_state.py`). In WASM the whole thing is a 5-10 s
-wait, which is acceptable for a run start if the animation keeps moving.
-Two things keep it moving:
+wait (BLD-003.6 measured ~3 s), which is acceptable for a run start if
+the animation keeps moving. Two things keep it moving:
 
 - **Finer steps where a step is long.** The four slowest generation
   steps are the repair (0.16 s), the scatter (0.13 s), the first
@@ -155,8 +185,9 @@ worker that could share the Python heap; slicing is the mechanism.
 |---|---|---|
 | vendor the wheel in `build.sh` and the deploy action (2a) | an hour | `dist/web/build.sh`, the W9 workflow |
 | move `assets/unordered-effects/` out of the bundle | minutes | `dist/web/pygbag.ini` `ignoreDirs`, or the folder itself |
-| obstacle index, sliced fill (fluidity plan items 1 and 3) | a day and a half | `world/map.py`, `world/nav/field.py` |
-| browser spawn-master knobs in `apply_web_profile()` | an hour, after measuring on a real browser | `game/config.py` |
+| obstacle index, sliced fill (fluidity plan items 1 and 3) -- done 2026-09-03 | a day and a half | `world/map.py`, `world/nav/field.py` |
+| browser spawn-master knobs in `apply_web_profile()` -- done 2026-09-29, BLD-003; measured in Chrome 2026-09-30 (BLD-003.6) | an hour, after measuring on a real browser | `game/config.py` |
+| make `build.sh` / `serve.sh` build with the MP3 music (`--disable-sound-format-error` or OGG; the owner's call, BLD-003.6) | minutes | `dist/web/build.sh`, `dist/web/serve.sh` |
 | finer loading steps + progress bar | half a day | `world/gen/__init__.py`, `world/gen/repair.py`, `game/states/loading_state.py` |
 | manifest-driven pack (3) | half a day | new `dist/web/manifest.py`, `dist/web/build.sh` |
 | W9: GitHub Pages workflow | an hour | `.github/workflows/deploy-web.yml` |

@@ -69,6 +69,29 @@ VERSION: str = "0.5"
 # if the driver refuses (the tests' dummy driver does); `Game.vsync` says
 # which you got. Off in the browser profile, where pygbag owns the canvas.
 VSYNC: bool = True
+# Who paces the loop. False: `Game._step` does, with `clock.tick(FPS)`.
+# True: the host does, and the tick only measures. In the browser pygbag
+# resumes the loop after the `await asyncio.sleep(0)` in `Game.run_async`
+# from its `requestAnimationFrame` stepper, measured in Chrome on the
+# owner's ~175 Hz display (BLD-003.6): every step lands on a whole number of
+# refreshes. There, on the menu (~14 ms of work a step), the capped tick held
+# the loop to 62.5 fps (pygame truncates 1000/60 to a 16 ms frame) where no
+# cap gave 72-74 fps by the game clock (68-74 by the page's refreshes).
+# The model (`tools/benchmarks/raf_pacing.py`) predicts the same and more:
+# on a 60 Hz display a capped tick costs ~nothing, the steps
+# already arrive ~16.7 ms apart; SDL2's `SDL_Delay`, which pygame-ce's tick
+# calls, would busy-wait the page's only thread if the runtime has no
+# Asyncify (unconfirmed for pygbag's build), 5.0-8.4 ms a light frame at
+# 75-165 Hz; and, in the model, at 75 Hz a 12 ms frame drops to 50 fps
+# where the refresh gives 75. The cost of no cap, in the model: on a fast
+# display a light scene (a 5 ms frame) draws at the display's rate, up to
+# 2.6x the frames at 165 Hz (the measured ~14 ms menu ran 72-74 fps on
+# ~175 Hz, not 175). In gameplay (40 ms frames in Chrome) neither pacing
+# changes the rate. Set only by `apply_web_profile`, and only in that
+# runtime (BLD-003.D4):
+# `main.py --web` on the desktop keeps the cap, because nothing else paces
+# it there.
+HOST_PACES_FRAMES: bool = False
 
 # The window (journal "Dynamic window scaling", 2026-09-15). Changed only in
 # the Options screen -- there is no hotkey, so nothing changes during a run.
@@ -125,8 +148,8 @@ CAMERA_ZOOM: float = 1.5
 # persist() (settings, run rewards, records). When False it never touches the
 # disk: each launch starts from a fresh SaveData() and progression lasts only
 # for the session. The browser build (pygbag / emscripten) has no durable,
-# writable filesystem, so `main_web.py` -- and `main.py` when it detects an
-# emscripten runtime -- flips this to False. Desktop leaves it True.
+# writable filesystem, so `apply_web_profile` (called by `main.py` when it
+# detects an emscripten runtime) flips this to False. Desktop leaves it True.
 SAVE_ENABLED: bool = True
 
 # --- World -----------------------------------------------------------------
@@ -489,6 +512,7 @@ SHOW_ENEMY_STATE_RINGS: bool = False
 # An enemy outside the bound keeps `steer_at`'s bearing fallback, so it still
 # moves; it just has no routed path, and its pursuit timer ends the attempt.
 # `None` restores the unbounded fill.
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 NAV_FILL_MAX_COST: int | None = 4500
 
 # through doorways and around obstacle clusters. `resolve_movement` stays the
@@ -498,6 +522,7 @@ NAV_FILL_MAX_COST: int | None = 4500
 ENEMY_PATHFINDING: bool = True
 # Seconds between full field rebuilds toward the player (also rebuilt early once
 # the player drifts a couple of navigation cells from the last rebuild target).
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 ENEMY_NAV_REBUILD_INTERVAL: float = 0.4
 # How much of a flow-field fill runs a frame before it yields and picks up
 # next frame, in **relaxations** (cells settled). A fill used to run whole
@@ -802,6 +827,7 @@ ENEMY_COUNT_HARD_CAP: int = 600
 # p50 15.2 (126 over) and 297 at p50 16.5 (250 over). 250 sits between the
 # last two rows, so a crowded frame is expected to miss 60 fps on this
 # machine. The owner asked for the larger crowd knowing that.
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 ENEMY_LIVE_CAP: int = 250
 # Spawn master S7: update divisor for enemies that are neither chasing nor
 # on screen. 1 updates every enemy every frame; 2 updates such an enemy
@@ -811,6 +837,7 @@ ENEMY_LIVE_CAP: int = 250
 # (its pre-RND-008 defaults; `--hints --live-director` re-takes them):
 # 2 took the 100-live p50 from 7.8 to 5.8 ms, 3 only to 5.1 -- see the spawn
 # master journal (S7).
+# The browser build sets its own value (`apply_web_profile`, BLD-003).
 ENEMY_LOD_SKIP: int = 2
 # How far past the view's edge an enemy still counts as on screen for the
 # LOD (world px, added to each side), so a body walking into view is
@@ -1147,11 +1174,19 @@ WEB_VIEW_ZOOM: float = 1.25
 
 def apply_web_profile() -> None:
     """Mutate the module-level constants for the WebAssembly build. Call once at
-    startup, before `Game()` is constructed (see `main.py` / `main_web.py`).
+    startup, before `Game()` is constructed (see `main.py`).
 
     * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
-    * `FPS = 60` -- the page composites at ~60 Hz; targeting 120 just spends
-      WASM budget on frames that are never presented.
+    * `FPS = 60` -- the cap `main.py --web` runs at on the desktop. In the
+      browser the page's refresh paces the loop instead (measured in Chrome,
+      BLD-003.6; `HOST_PACES_FRAMES`, below): no 60 fps cap fighting a
+      faster display (on the owner's ~175 Hz one the menu ran 72-74 fps by
+      the game clock against the cap's 62.5), and in the model no
+      busy-wait on the page's thread if the runtime lacks Asyncify, at the
+      price of light scenes drawing at the
+      display's full rate; the trade-off is at `HOST_PACES_FRAMES`.
+    * `HOST_PACES_FRAMES = sys.platform == "emscripten"` -- True only in
+      the browser runtime itself (BLD-003.D4).
     * `1280x720` render target -- that is the pygbag canvas size (pygbag's
       default framebuffer; `dist/web/build.sh` passes no `--width`), so there
       is no downscale, and per-frame blit work drops by ~35% against the
@@ -1176,16 +1211,39 @@ def apply_web_profile() -> None:
       seams; `TILE_PX * 1.25 == 80.0` does not. The web view is ~4% tighter
       than desktop as a result (1024 px of world across, against 1066).
 
+    * The browser's own crowd (BLD-003, owner 2026-09-29), set when a
+      frame's update was estimated at ~1.3-2.5x and its draw ~3.5-5x the
+      desktop's cost in WebAssembly. Measured in Chrome since (BLD-003.6):
+      update ~4 ms (3.8 ms at 99 live), render 32-43 ms (the factor against
+      the desktop depends on the desktop session), so the crowd is cheap
+      and the draw is the browser's budget. The values:
+      `ENEMY_LIVE_CAP = ENEMY_COUNT_BASE` (100), so a run opens with the
+      desktop's crowd and only growth past it is cut: every spawn through
+      the spawn master stops there bar its `cap_exempt` owners, while
+      waking dormant enemies ignores it (BLD-003.D1);
+      `ENEMY_LOD_SKIP = 3`, `ENEMY_NAV_REBUILD_INTERVAL = 0.6` and
+      `NAV_FILL_MAX_COST = 3500` -- off-screen idle enemies tick every third
+      frame, routing refreshes less often and fills a little less far (BLD-003.D2,
+      `documentation/plans/web_plan.md` section 4).
+
     Everything reads these at call time (the one default-arg capture,
     `systems.camera.Camera`, is overridden by an explicit argument in
     `PlayingState`), so a plain reassignment here propagates.
     """
     global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
-    global WINDOW_RESIZABLE, RENDER_SCALE
+    global WINDOW_RESIZABLE, RENDER_SCALE, HOST_PACES_FRAMES
+    global ENEMY_LIVE_CAP, ENEMY_LOD_SKIP, ENEMY_NAV_REBUILD_INTERVAL
+    global NAV_FILL_MAX_COST
+    import sys                      # local: this module imports nothing at load
     SAVE_ENABLED = False
     VSYNC = False
     WINDOW_RESIZABLE = False        # pygbag owns the canvas
     FPS = 60
+    HOST_PACES_FRAMES = sys.platform == "emscripten"
+    ENEMY_LIVE_CAP = ENEMY_COUNT_BASE
+    ENEMY_LOD_SKIP = 3
+    ENEMY_NAV_REBUILD_INTERVAL = 0.6
+    NAV_FILL_MAX_COST = 3500
     SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
     RENDER_SCALE = SCREEN_HEIGHT / UI_HEIGHT
     CAMERA_ZOOM = WEB_VIEW_ZOOM / RENDER_SCALE
