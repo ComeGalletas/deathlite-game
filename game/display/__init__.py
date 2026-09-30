@@ -4,7 +4,8 @@ scaling", 2026-09-15).
     fit.py      -- the pure size arithmetic: first-launch fit, clamps, the
                    letterbox, the Resolution list
     native.py   -- the SDL calls pygame does not expose, through ctypes,
-                   each with a fallback
+                   each with a fallback; and the two Windows calls (the
+                   system cursor's size, the frame cap's timer policy)
     window.py   -- `DisplayWindow`: open, windowed / borderless, the
                    Resolution row, drag resizes, the saved settings
 """
