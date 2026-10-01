@@ -181,6 +181,16 @@ class AudioManager:
 
         # Mixer bring-up is platform-specific (desktop vs browser vs headless);
         # the backend owns that decision. A silent backend leaves us disabled.
+        # With `config.AUDIO_ENABLED` off (the web release, BLD-004) no device
+        # is probed at all: the silent backend is asked for by name, and the
+        # music player built on it stays disabled too. `pygame.init()` has
+        # already opened the default device by now, so it is closed here.
+        if not config.AUDIO_ENABLED:
+            if pygame.mixer.get_init() is not None:
+                pygame.mixer.quit()
+            self._backend = make_mixer_backend("silent")
+            log.info("audio off by configuration (AUDIO_ENABLED is False)")
+            return
         self._backend = make_mixer_backend()
         if not self._backend.ready:
             log.warning("audio disabled: no mixer backend")

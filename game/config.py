@@ -741,6 +741,12 @@ VOLUME_STEP: float = 0.05
 # not exist. Overridden by save.settings["master_volume"] / ["volume"].
 MASTER_VOLUME_DEFAULT: float = 1.0
 SFX_VOLUME_DEFAULT: float = 0.7
+# Whether the game makes any sound at all. False opens no mixer device and
+# builds neither the cue library nor the music stream: every audio call is a
+# no-op, as on a machine with no sound device. The web release ships with no
+# audio (owner, 2026-09-30, BLD-004), so `apply_web_profile` turns it off and
+# the audio folders are left out of the web bundle (`dist/web/pygbag.ini`).
+AUDIO_ENABLED: bool = True
 
 # --- Sound effects (recorded) --------------------------------------------
 # Cues that come from files rather than from the synth in `systems/audio.py`
@@ -1177,6 +1183,8 @@ def apply_web_profile() -> None:
     startup, before `Game()` is constructed (see `main.py`).
 
     * `SAVE_ENABLED = False` -- a browser tab has no durable writable filesystem.
+    * `AUDIO_ENABLED = False` -- the web release has no audio (owner,
+      2026-09-30, BLD-004): no music, no sound effects, no mixer device.
     * `FPS = 60` -- the cap `main.py --web` runs at on the desktop. In the
       browser the page's refresh paces the loop instead (measured in Chrome,
       BLD-003.6; `HOST_PACES_FRAMES`, below): no 60 fps cap fighting a
@@ -1233,9 +1241,10 @@ def apply_web_profile() -> None:
     global SAVE_ENABLED, FPS, SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_ZOOM, VSYNC
     global WINDOW_RESIZABLE, RENDER_SCALE, HOST_PACES_FRAMES
     global ENEMY_LIVE_CAP, ENEMY_LOD_SKIP, ENEMY_NAV_REBUILD_INTERVAL
-    global NAV_FILL_MAX_COST
+    global NAV_FILL_MAX_COST, AUDIO_ENABLED
     import sys                      # local: this module imports nothing at load
     SAVE_ENABLED = False
+    AUDIO_ENABLED = False
     VSYNC = False
     WINDOW_RESIZABLE = False        # pygbag owns the canvas
     FPS = 60

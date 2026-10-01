@@ -82,5 +82,5 @@
 ## Tasks
 
 - [x] BLD-004.1 — journal, index entry
-- [ ] BLD-004.2 — `AUDIO_ENABLED`, silent web profile, audio out of the bundle, tests
+- [x] BLD-004.2 — `AUDIO_ENABLED`, silent web profile, audio out of the bundle, tests
 - [ ] BLD-004.3 — real build without the flag, docs, critic, close
