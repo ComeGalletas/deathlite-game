@@ -1,11 +1,13 @@
 """The web release has no audio (BLD-004, owner 2026-09-30).
 
-`config.apply_web_profile()` sets `config.AUDIO_ENABLED = False`. The
-`AudioManager` then closes the device `pygame.init()` opened, takes the
-silent backend by name, builds no cue and loads no file; the `MusicPlayer`
-built on that backend is disabled, so no track is ever opened. The desktop
-keeps its audio exactly as before. The audio folders are left out of the web
-bundle by `dist/web/pygbag.ini`, which the last class reads.
+`config.apply_web_profile()` sets `config.AUDIO_ENABLED = False`. `Game`
+then brings pygame up through `mixer_backend.init_pygame(audio=False)`, which
+opens no mixer device; the `AudioManager` takes the silent backend by name,
+builds no cue and loads no file (and releases a device anything else opened
+first); the `MusicPlayer` built on that backend is disabled, so no track is
+ever opened. The desktop keeps its audio exactly as before. The audio
+folders are left out of the web bundle by `dist/web/pygbag.ini`, which the
+last class reads.
 
 Runs headless on SDL's dummy audio driver, which opens a real device that
 plays nothing, so "a device is open" and "no device is open" are both
@@ -28,13 +30,14 @@ from game import config
 from game.assets import ASSETS_DIR
 from game.events import EventBus, Events
 from systems import audio as audio_mod
+from systems import mixer_backend as mb
 from systems.audio import AudioManager
 from systems.music import MusicPlayer
 from tests.web_profile import web_profile
 
 REPO = Path(__file__).resolve().parents[2]
 PYGBAG_INI = REPO / "dist" / "web" / "pygbag.ini"
-AUDIO_SUFFIXES = {".mp3", ".ogg", ".wav", ".flac", ".opus", ".m4a", ".aac"}
+AUDIO_SUFFIXES = {".mp3", ".ogg", ".wav", ".aiff", ".aif", ".flac", ".opus", ".m4a", ".aac"}
 
 # Every event the manager would subscribe a cue to on the desktop.
 CUE_EVENTS = (Events.DAMAGE_DEALT, Events.ENEMY_KILLED, Events.XP_COLLECTED,
@@ -64,10 +67,57 @@ class AudioSwitchTests(unittest.TestCase):
         self.assertIs(config.AUDIO_ENABLED, True)
 
 
+class InitWithoutMixerTests(unittest.TestCase):
+    """`mixer_backend.init_pygame`: `pygame.init()` with or without the
+    mixer device. Each test starts from a closed mixer, the state of a fresh
+    process (an earlier test may have left one open)."""
+
+    def setUp(self):
+        pygame.mixer.quit()
+
+    def test_plain_pygame_init_opens_a_device(self):
+        """Why the helper exists: the control for the test below."""
+        pygame.init()
+        self.assertIsNotNone(pygame.mixer.get_init())
+
+    def test_audio_off_opens_no_device_and_brings_up_the_rest(self):
+        mb.init_pygame(audio=False)
+        self.assertIsNone(pygame.mixer.get_init())
+        self.assertTrue(pygame.get_init())
+        self.assertTrue(pygame.display.get_init())
+        self.assertTrue(pygame.font.get_init())
+
+    def test_audio_on_is_plain_pygame_init(self):
+        mb.init_pygame(audio=True)
+        self.assertIsNotNone(pygame.mixer.get_init())
+
+    def test_the_audio_driver_variable_is_restored(self):
+        mb.init_pygame(audio=False)
+        self.assertEqual(os.environ.get("SDL_AUDIODRIVER"), "dummy")
+
+    def test_an_unset_audio_driver_variable_stays_unset(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("SDL_AUDIODRIVER", None)
+            with mock.patch.object(pygame, "init", return_value=(4, 1)):
+                mb.init_pygame(audio=False)
+            self.assertNotIn("SDL_AUDIODRIVER", os.environ)
+
+    def test_the_variable_is_restored_when_init_raises(self):
+        with mock.patch.object(pygame, "init", side_effect=RuntimeError("boom")), \
+                self.assertRaises(RuntimeError):
+            mb.init_pygame(audio=False)
+        self.assertEqual(os.environ.get("SDL_AUDIODRIVER"), "dummy")
+
+    def test_a_later_desktop_bring_up_still_opens_a_device(self):
+        mb.init_pygame(audio=False)
+        self.assertTrue(mb.make_mixer_backend("desktop").ready)
+        self.assertIsNotNone(pygame.mixer.get_init())
+
+
 class SilentManagerTests(unittest.TestCase):
-    """An `AudioManager` and `MusicPlayer` built under the web profile, the
-    way `Game.__init__` builds them: after `pygame.init()`, which opens the
-    default device on its own."""
+    """An `AudioManager` and `MusicPlayer` built under the web profile after
+    a plain `pygame.init()`, which opened the default device: the backstop
+    for a device something else opened before the game."""
 
     def setUp(self):
         pygame.init()
@@ -85,9 +135,15 @@ class SilentManagerTests(unittest.TestCase):
         files.assert_not_called()
         return mgr
 
-    def test_no_device_is_left_open(self):
+    def test_a_device_opened_before_it_is_released(self):
         self._silent()
         self.assertIsNone(pygame.mixer.get_init())
+
+    def test_the_release_is_guarded_like_every_teardown(self):
+        with mock.patch.object(pygame.mixer, "quit",
+                               side_effect=pygame.error("context gone")):
+            mgr = self._silent()
+        self.assertFalse(mgr.enabled)
 
     def test_it_takes_the_silent_backend_and_stays_disabled(self):
         mgr = self._silent()
@@ -103,11 +159,19 @@ class SilentManagerTests(unittest.TestCase):
             self.assertFalse(bus._subscribers.get(name), name)
 
     def test_the_silence_is_logged_as_information_not_a_warning(self):
+        """The expected boot: no device open (as `init_pygame` leaves it)."""
+        pygame.mixer.quit()
         with self.assertLogs("systems.audio", level="INFO") as logs:
             self._silent()
         self.assertTrue(logs.records)
         for rec in logs.records:
             self.assertEqual(rec.levelname, "INFO", rec.getMessage())
+
+    def test_a_device_found_open_is_a_warning(self):
+        """Not expected with `init_pygame`, so it is loud when it happens."""
+        with self.assertLogs("systems.audio", level="WARNING") as logs:
+            self._silent()
+        self.assertIn("mixer device was open", logs.output[0])
 
     def test_every_cue_call_is_a_no_op(self):
         mgr = self._silent()
@@ -156,16 +220,28 @@ class SilentManagerTests(unittest.TestCase):
 
 class SilentGameTests(unittest.TestCase):
     """A real `Game` booted under the web profile, the `main.py --web`
-    path: the menu asks for its track and the cue events fire, and still
-    no device is open and no file is read."""
+    path, from a closed mixer as a fresh process has: the menu asks for its
+    track and the cue events fire, and no device is ever opened (it is
+    already closed when the `AudioManager` is built, so nothing was opened
+    and released) and no file is read."""
 
     @classmethod
     def setUpClass(cls):
+        pygame.mixer.quit()                         # a fresh process's state
         cls.enterClassContext(web_profile())
         from game.game import Game
         for patch in _no_file_loads():
             cls.enterClassContext(patch)
-        cls.game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        cls.at_audio_entry = []
+        real_init = AudioManager.__init__
+
+        def spy(mgr, bus):
+            cls.at_audio_entry.append(pygame.mixer.get_init())
+            real_init(mgr, bus)
+
+        cls.enterClassContext(mock.patch.object(AudioManager, "__init__", spy))
+        home = cls.enterClassContext(tempfile.TemporaryDirectory())
+        cls.game = Game(save_path=os.path.join(home, "save.json"))
         cls.game._start()                           # the menu, which wants "menu"
         for _ in range(3):
             cls.game._step()
@@ -175,8 +251,14 @@ class SilentGameTests(unittest.TestCase):
         self.assertFalse(self.game.music.enabled)
         self.assertEqual(self.game.audio.backend.name, "silent")
 
-    def test_no_device_is_open(self):
+    def test_no_device_was_ever_opened(self):
+        self.assertEqual(self.at_audio_entry, [None],
+                         "pygame came up with a mixer device under the web profile")
         self.assertIsNone(pygame.mixer.get_init())
+
+    def test_the_rest_of_pygame_is_up(self):
+        self.assertTrue(pygame.display.get_init())
+        self.assertTrue(pygame.font.get_init())
 
     def test_the_menu_track_is_asked_for_but_never_opened(self):
         self.assertEqual(self.game.music.current, "menu")
@@ -218,6 +300,14 @@ class WebBundleTests(unittest.TestCase):
         shipped = [p for p in ASSETS_DIR.rglob("*")
                    if p.suffix.lower() in AUDIO_SUFFIXES and not self._excluded(p)]
         self.assertEqual(shipped, [])
+
+    def test_every_unused_folder_is_excluded_as_on_the_desktop(self):
+        """The desktop spec skips `unused/` at any depth; pygbag matches
+        whole paths, so each folder has to be listed by hand. A new one
+        fails here instead of quietly shipping in the web bundle."""
+        unused = [p for p in ASSETS_DIR.rglob("unused") if p.is_dir()]
+        self.assertTrue(unused, "control: the walk finds unused/ folders")
+        self.assertEqual([p for p in unused if not self._excluded(p)], [])
 
     def test_the_check_sees_the_audio_it_excludes(self):
         """The control for the test above: the walk does find audio files,

@@ -11,7 +11,7 @@ the assessment of what still stands between this and a publishable page is
 
 | File | Purpose |
 |------|---------|
-| `pygbag.ini` | Bundle exclusions (`.venv`, `tests/`, `documentation/`, `tools/`, `assets/unused/`, …). pygbag reads it from the **current working directory**, which is why the helpers below `cd` into this folder. |
+| `pygbag.ini` | Bundle exclusions (`.venv`, `tests/`, `documentation/`, `tools/`, `assets/unused/`, `assets/music/`, `assets/sound_effects/`, …). pygbag reads it from the **current working directory**, which is why the helpers below `cd` into this folder. |
 | `build.sh` | Build only; copies the finished bundle to `out/` here. |
 | `serve.sh` | Rebuild + serve at <http://localhost:8000> through pygbag's dev server. |
 | `out/` | Generated, gitignored: the deliverable (`index.html`, `deathlite-game.apk`, …). |
@@ -27,10 +27,29 @@ page's `requestAnimationFrame` rather than a 60 fps cap, measured in
 Chrome). The numbers and why are in
 `../../documentation/journals/web_frame_time_journal.md` (BLD-003).
 
-**The build currently needs `--disable-sound-format-error`**: pygbag refuses
-the MP3 music (`assets/music/*.mp3`, "Use OGG format instead") and
-`build.sh` / `serve.sh` do not pass the flag, so both fail as they stand
-(found 2026-09-30, BLD-003.6; the fix is the owner's call).
+**The web release has no audio** (owner, 2026-09-30, BLD-004). The profile
+sets `config.AUDIO_ENABLED = False`: pygame comes up with no mixer device
+(`systems/mixer_backend.py` `init_pygame`), no sound effect or music track
+is loaded, and every audio call is a no-op (the Options volume rows, its mute row and the
+M key still change their values, which drive nothing). The desktop build
+keeps its music and sound effects. Journal:
+`../../documentation/journals/web_audio_journal.md`.
+
+`pygbag.ini` leaves `assets/music/` and `assets/sound_effects/` out of the
+bundle. Sizes in decimal MB: 9.4 MB of audio used to ship (the 5.9 MB of
+`sound_effects/unused/` originals were already excluded). The five nested
+`unused/` folders under `effects/`, `enemies/` and `ui/` (0.8 MB) and the
+`CLAUDE.md` and `FUNCTIONAL_README.md` files are excluded too. The apk
+measured 19.6 MB with the audio (BLD-003.6), 10.4 MB without it, and 9.5 MB
+without all of these (9,538,932 bytes).
+
+That also settles the build failure BLD-003.6 found. On Windows and macOS,
+pygbag 0.9.3 refuses any MP3, WAV or AIFF file with no OGG beside it ("Use
+OGG format instead", `pygbag/pack.py`), so both the MP3 music and the WAV
+cues tripped it (the error names only the first file it meets, the music).
+On Linux it first tries to transcode them with ffmpeg, and without ffmpeg
+stops on an MP3 with a different message. With both folders out of the
+bundle `build.sh` and `serve.sh` build as they stand on any of them.
 
 **A static host works once the pygame wheel sits next to the page**:
 `out/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl`, from
@@ -53,10 +72,6 @@ copies the result into `out/` so the deliverable sits beside its config like
 the desktop build's does.
 
 ## Commands
-
-Until the MP3 decision (BLD-003.6, above) the two scripts fail (they pass
-no extra arguments); use the by-hand commands below with
-`--disable-sound-format-error` added.
 
 ```bash
 # from the repo root

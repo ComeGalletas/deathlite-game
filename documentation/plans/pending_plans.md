@@ -157,11 +157,11 @@ every other surface moved to the art.
 
 `documentation/plans/web_plan.md` §6 has the ordered list; the obstacle index
 and sliced fill (2026-09-03) and the browser crowd knobs (BLD-003) are done,
-and three items block the build from being playable by anyone else.
+and two items block the build from being playable by anyone else. The third,
+`build.sh` / `serve.sh` failing on the MP3 music (BLD-003.6; pygbag refuses the WAV cues too), was closed by
+BLD-004 (2026-09-30, `journals/web_audio_journal.md`): the web release has no
+audio and the audio folders are out of the bundle.
 
-- **`build.sh` / `serve.sh` fail on the MP3 music** (pygbag: "Use OGG format
-  instead"); a build needs `--disable-sound-format-error` or OGG music, the
-  owner's call (BLD-003.6, `journals/web_frame_time_journal.md`).
 - **There is no `.github/` directory at all**, so the W9 GitHub Pages deploy
   does not exist.
 - **The pygbag wheel is not vendored.** A static host 404s on

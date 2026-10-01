@@ -741,7 +741,8 @@ VOLUME_STEP: float = 0.05
 # not exist. Overridden by save.settings["master_volume"] / ["volume"].
 MASTER_VOLUME_DEFAULT: float = 1.0
 SFX_VOLUME_DEFAULT: float = 0.7
-# Whether the game makes any sound at all. False opens no mixer device and
+# Whether the game makes any sound at all. False opens no mixer device (`Game`
+# brings pygame up through `mixer_backend.init_pygame(audio=False)`) and
 # builds neither the cue library nor the music stream: every audio call is a
 # no-op, as on a machine with no sound device. The web release ships with no
 # audio (owner, 2026-09-30, BLD-004), so `apply_web_profile` turns it off and

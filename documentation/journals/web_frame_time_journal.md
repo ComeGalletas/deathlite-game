@@ -517,12 +517,18 @@ tell them apart.
   (2026-09-16). This build passed `--disable-sound-format-error`; whether
   the MP3s play in the browser was not checked. Converting to OGG would
   change the owner's MP3 decision, so it is the owner's call.
+  *(Closed 2026-09-30 by BLD-004, `web_audio_journal.md`: the owner decided
+  the web release has no audio, so `/assets/music` and
+  `/assets/sound_effects` left the bundle and the scripts build unchanged.)*
 - The bundle still carries `unused/` folders below the top level
   (`assets/effects/status/unused/`, `assets/effects/weapons/grave_totem/unused/`
   and others): `pygbag.ini` ignores only `/assets/unused` and
   `/assets/sound_effects/unused`; the other `unused/` folders
   (`effects/spawn`, `effects/status`, `effects/weapons/grave_totem`,
   `enemies/hex_shaman`, `ui/start_screen`) ship.
+  *(Closed 2026-09-30 by BLD-004: all five are listed in `ignoreDirs`
+  (0.8 MB), and `tests/systems/test_web_audio.py` fails on any `unused/`
+  folder in `assets/` that is not.)*
 - The level-up screen draws the whole run beneath it every frame, dim
   included: 19-20 fps while the player picks a card.
 

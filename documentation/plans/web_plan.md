@@ -8,6 +8,10 @@
 > 32-43 ms (21-99 live; 38.0 ms at 99; the factor against the desktop
 > depends on the desktop session), frame rate measured, the loading screen ~3 s, and a
 > static host works once the wheel is vendored.
+> The bundle sizes below (45 MB, 35 MB of unloaded art) are the 2026-09-03
+> reading: `assets/unordered-effects/` is gone since, and after BLD-004
+> (2026-09-30, no audio in the web release, nested `unused/` excluded) the
+> apk measures 9.5 MB (`../journals/web_audio_journal.md`).
 
 **In one paragraph.** The browser build boots and starts a run with the
 spawn master in it, but three things stand between it and something you
@@ -43,8 +47,9 @@ half a second each in WASM.
 
 ## 2. Deploy: make the build static-hostable
 
-The only blocker for W9 (BLD-003.6 found a second: the build refuses the
-MP3 music without `--disable-sound-format-error`; see `dist/web/README.md`).
+The only blocker for W9. (BLD-003.6 found a second, the build refusing the
+MP3 music, and pygbag refuses the WAV cues too; closed by BLD-004, 2026-09-30: the web release has no audio and
+the audio folders are out of the bundle, see `dist/web/README.md`.)
 Two ways; the first is a line in `build.sh`.
 
 **2a. Vendor the wheel next to the page.** After `pygbag --build`, copy
@@ -184,10 +189,10 @@ worker that could share the Python heap; slicing is the mechanism.
 | Step | Effort | Where |
 |---|---|---|
 | vendor the wheel in `build.sh` and the deploy action (2a) | an hour | `dist/web/build.sh`, the W9 workflow |
-| move `assets/unordered-effects/` out of the bundle | minutes | `dist/web/pygbag.ini` `ignoreDirs`, or the folder itself |
+| move `assets/unordered-effects/` out of the bundle -- moot by 2026-09-30: the folder no longer exists | minutes | `dist/web/pygbag.ini` `ignoreDirs`, or the folder itself |
 | obstacle index, sliced fill (fluidity plan items 1 and 3) -- done 2026-09-03 | a day and a half | `world/map.py`, `world/nav/field.py` |
 | browser spawn-master knobs in `apply_web_profile()` -- done 2026-09-29, BLD-003; measured in Chrome 2026-09-30 (BLD-003.6) | an hour, after measuring on a real browser | `game/config.py` |
-| make `build.sh` / `serve.sh` build with the MP3 music (`--disable-sound-format-error` or OGG; the owner's call, BLD-003.6) | minutes | `dist/web/build.sh`, `dist/web/serve.sh` |
+| make `build.sh` / `serve.sh` build again (they failed on the MP3 music; pygbag refuses the WAV cues too) -- done 2026-09-30, BLD-004: the web release has no audio, so the audio folders leave the bundle and the scripts build unchanged | minutes | `dist/web/pygbag.ini`, `game/config.py`, `game/game.py`, `systems/audio.py`, `systems/mixer_backend.py` |
 | finer loading steps + progress bar | half a day | `world/gen/__init__.py`, `world/gen/repair.py`, `game/states/loading_state.py` |
 | manifest-driven pack (3) | half a day | new `dist/web/manifest.py`, `dist/web/build.sh` |
 | W9: GitHub Pages workflow | an hour | `.github/workflows/deploy-web.yml` |
