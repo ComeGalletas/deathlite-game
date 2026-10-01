@@ -38,13 +38,17 @@ SEED = 35
 
 def _fresh_save() -> str:
     """A save of defaults, so the developer's own `save.json` (window size,
-    tutorials) cannot reach a test."""
+    tutorials) cannot reach a test. Its folder is removed at exit."""
+    import atexit
     import os
+    import shutil
     import tempfile
 
     from game import save as save_mod
 
-    path = os.path.join(tempfile.mkdtemp(), "save.json")
+    folder = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, folder, True)
+    path = os.path.join(folder, "save.json")
     save_mod.save(save_mod.SaveData(), path)
     return path
 
@@ -66,6 +70,14 @@ class _Clock:
 
     def __call__(self):
         return next(self._ticks)
+
+
+def _picture(ps) -> bytes:
+    """A frame of `ps`, with the aura shed (random) held still."""
+    s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+    with mock.patch.object(element_layers, "_shed", lambda *a: None):
+        ps.draw(s)
+    return pygame.image.tobytes(s, "RGBA")
 
 
 class LayerSetTests(unittest.TestCase):
@@ -188,6 +200,42 @@ class AccountingTests(unittest.TestCase):
             timer._wrap("draw", timer._wrap("enemies", boom))()
         self.assertEqual(timer.frame(), {})
         self.assertEqual(timer.calls[-1], {})
+
+
+class RollbackTests(unittest.TestCase):
+    """`install` and `uninstall` leave nothing half on, even when an
+    attribute cannot be set or put back."""
+
+    class _Plain:
+        def draw(self):
+            return "plain"
+
+    class _ReadOnly:
+        @property
+        def draw(self):                      # no setter, no deleter
+            return lambda: "read only"
+
+    def test_an_install_that_cannot_set_an_attribute_undoes_the_rest(self):
+        plain, stuck = self._Plain(), self._ReadOnly()
+        timer = DL.LayerTimer()
+        with mock.patch.object(DL.LayerTimer, "_targets", staticmethod(
+                lambda ps: {"plain": plain, "stuck": stuck})), \
+                mock.patch.object(DL, "LAYERS", (("a", "plain", "draw"), ("b", "stuck", "draw"))), \
+                self.assertRaisesRegex(AttributeError, "setter"):
+            timer.install(object())
+        self.assertNotIn("draw", vars(plain))             # back to the class's own
+        self.assertFalse(timer.installed)
+
+    def test_uninstall_puts_back_the_rest_when_one_restore_fails(self):
+        plain, stuck = self._Plain(), self._ReadOnly()
+        plain.draw = lambda: "wrapped"
+        timer = DL.LayerTimer()
+        # Reversed on uninstall: `stuck` is tried first and fails.
+        timer._undo = [(plain, "draw", False, None), (stuck, "draw", False, None)]
+        with self.assertRaisesRegex(AttributeError, "deleter"):
+            timer.uninstall()
+        self.assertNotIn("draw", vars(plain))
+        self.assertFalse(timer.installed)
 
 
 class BareFramesTests(unittest.TestCase):
@@ -441,16 +489,20 @@ class VillagersAndHutsTests(unittest.TestCase):
         cls.ps.game_map.renderer.clock = lambda: 0.0
 
     def _frame_at(self, pos):
+        """Stand the hero on `pos`; draw it bare and timed, check the two
+        pictures are the same, and return the timed frame's calls."""
         self.ps.player.pos.update(pos)
         self.ps.camera.snap_to(self.ps.player.pos)   # the camera eases; snap it
         S.run(self.ps, 1, jitter=0.0)
-        timer = DL.LayerTimer().install(self.ps)
+        timer = DL.LayerTimer()
+        bare = _picture(self.ps)
+        timer.install(self.ps)
         try:
-            with mock.patch.object(element_layers, "_shed", lambda *a: None):
-                self.ps.draw(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
+            timed = _picture(self.ps)
             timer.frame()
         finally:
             timer.uninstall()
+        self.assertEqual(timed, bare)
         return timer.calls[0]
 
     def test_a_villager_in_view_is_timed(self):
@@ -482,18 +534,25 @@ class BossTests(unittest.TestCase):
         self.assertIn("boss due at 570 s", S.display_line(self._built(300.0, boss=True)))
         self.assertIn("boss held back", S.display_line(self._built()))
 
-    def test_the_boss_is_timed_under_its_own_row(self):
+    def test_the_boss_is_timed_under_its_own_row_and_drawn_the_same(self):
         ps = self._run_past_the_boss(boss=True)
+        ps.game_map.renderer.clock = lambda: 0.0
         ps.player.pos.update(ps.run.boss.pos)
         ps.camera.snap_to(ps.player.pos)
+        bare = _picture(ps)
         timer = DL.LayerTimer().install(ps)
         try:
-            with mock.patch.object(element_layers, "_shed", lambda *a: None):
-                ps.draw(pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT)))
+            timed = _picture(ps)
             f = timer.frame()
         finally:
             timer.uninstall()
         self.assertIn("boss", f)
+        self.assertEqual(timed, bare)
+
+    def test_a_boss_that_came_and_went_is_beaten_not_due(self):
+        ps = self._run_past_the_boss(boss=True)
+        ps.run.boss = None                       # as the fight's end leaves it
+        self.assertEqual(S.boss_state(ps), "beaten")
 
     def test_held_back_by_default(self):
         ps = self._run_past_the_boss()
@@ -504,7 +563,6 @@ class BossTests(unittest.TestCase):
         ps = self._run_past_the_boss(boss=True)
         self.assertIsNotNone(ps.run.boss)
         self.assertIn("boss fighting", S.display_line(ps))
-
 
 
 class MainTests(unittest.TestCase):

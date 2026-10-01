@@ -13,6 +13,8 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
     python -m tools.benchmarks.spawn_stress --cascade --render      # CMB-008: a staged reaction cascade
     python -m tools.benchmarks.spawn_stress --pack --bump           # RND-008: the bump pass alone
+    python -m tools.benchmarks.spawn_stress --live 250 --elapsed 600 --pack --layers
+                                                                    # RND-010: the draw by layer
 
 What it measures is play, not the run's opening (RND-008.D3):
 
@@ -32,6 +34,11 @@ What it measures is play, not the run's opening (RND-008.D3):
   and enemy summons arrive while timing (they are behaviour, not the
   director). Every run prints the crowd at the start of timing and what
   arrived, by owner.
+* The boss is held back (RND-010.2): a big crowd needs a late run clock
+  (the director's cap is 100 + 5 per 20 s on normal, up to the live cap),
+  past the boss's time (570 s), and a boss fight would be measured as
+  crowd. `--boss` lets it in. Every run says where the boss stands before
+  and after timing, and says when the cap seated fewer than `--live`.
 * One budget, `BUDGET_MS`, counts the frames over it.
 
 Every run prints the display it drew into: surface, driver, vsync, render
@@ -110,7 +117,8 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int, *,
         _force_hints(ps)
     if not boss:
         # This director only; the tide (`director.update`) is untouched, so
-        # `--live-director` still lands companies.
+        # `--live-director` still lands companies, even past the boss's
+        # time, where a real run's tide stops for the fight.
         ps.director.should_spawn_boss = lambda elapsed: False
     ps.player.invulnerable = True
     ps._dev_no_attack = True                     # the crowd survives the run
@@ -482,12 +490,14 @@ def display_line(ps) -> str:
 
 
 def boss_state(ps) -> str:
-    """`fighting` when a boss is on the field, `held back` when `build` kept
-    it out, otherwise when it is due: `due now` when the run clock is
-    already past its time (it arrives on the next frame), `due at N s`
-    when not."""
+    """`fighting` when a boss is on the field, `beaten` when it came and is
+    gone, `held back` when `build` kept it out, otherwise when it is due:
+    `due now` when the run clock is already past its time (it arrives on
+    the next frame), `due at N s` when not."""
     if ps.run.boss is not None and ps.run.boss.alive:
         return "fighting"
+    if ps.director.boss_spawned:
+        return "beaten"
     if "should_spawn_boss" in vars(ps.director):
         return "held back"
     due = ps.director.boss_time()

@@ -29,7 +29,10 @@ frame's parts add up to its whole draw time exactly:
   invulnerable); the buff marks and banners over the hero are in
   `feedback`, with the hurt flash and the buff tint;
 * `enemies`: each enemy's record for the ghost pass (and the copy of a
-  shaded frame it keeps).
+  shaded frame it keeps), and the elemental wash (`element_fx.washed`) and
+  hit tint (`hit_tinted`) of its frame; `boss` and `player` hold their own
+  hit tint the same way. (None of these cost anything in the stress
+  harness's fights, where nothing is hit or primed unless asked.)
 
 The wrappers cost time of their own: a call, two clock reads, the name and
 the bookkeeping, much of it landing in the caller's row (`enemies` carries
@@ -136,21 +139,31 @@ class LayerTimer:
                 obj = targets[where]
                 own = attr in vars(obj)
                 original = getattr(obj, attr)
-                self._undo.append((obj, attr, own, vars(obj)[attr] if own else None))
+                saved = (obj, attr, own, vars(obj)[attr] if own else None)
                 wrap = self._wrap_items if label in ITEMS else self._wrap
                 setattr(obj, attr, wrap(label, original))
+                self._undo.append(saved)       # only what was actually wrapped
         except BaseException:
             self.uninstall()                   # none of it half on
             raise
         return self
 
     def uninstall(self) -> None:
+        """Put every wrapped attribute back. A restore that fails does not
+        stop the others: all are tried, the record is cleared, and the first
+        failure is raised after."""
+        failed = None
         for obj, attr, own, value in reversed(self._undo):
-            if own:
-                setattr(obj, attr, value)
-            else:
-                delattr(obj, attr)             # back to the class's own
+            try:
+                if own:
+                    setattr(obj, attr, value)
+                else:
+                    delattr(obj, attr)         # back to the class's own
+            except Exception as exc:           # noqa: BLE001 - keep restoring the rest
+                failed = failed or exc
         self._undo.clear()
+        if failed is not None:
+            raise failed
 
     def _wrap(self, label: str, fn):
         clock = time.perf_counter
