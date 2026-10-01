@@ -139,6 +139,11 @@ INTEGRATION = (
     "tests/devtools/test_spawn_stress.py::HarnessDefaultsTests",
     "tests/devtools/test_spawn_stress.py::LiveDirectorTests",
     "tests/devtools/test_spawn_stress.py::CommandLineTests",
+    # RND-010.2: the draw timed by layer on a packed seed-35 fight.
+    "tests/devtools/test_draw_layers.py::WiringTests",
+    "tests/devtools/test_draw_layers.py::MainTests",
+    "tests/devtools/test_draw_layers.py::VillagersAndHutsTests",
+    "tests/devtools/test_draw_layers.py::BossTests",
     # SYS-011: the timer eval's command line reads as far as the Game it
     # builds on Windows; its judgment tests stay unit.
     "tests/devtools/test_timer_regime.py::CommandLineTests",
