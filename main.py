@@ -3,7 +3,7 @@
     python main.py            # desktop
     python main.py --web      # desktop, but with the browser profile applied
                               # (1280x720, the browser's crowd, no save file,
-                              # capped at 60 fps) for testing
+                              # no audio, capped at 60 fps) for testing
     python main.py --trace    # desktop, recording every frame's timings to
                               # traces/ beside the save (SYS-010); read it with
                               # python -m tools.benchmarks.trace_report FILE

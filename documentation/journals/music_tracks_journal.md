@@ -309,6 +309,9 @@ credit them by name.
   no `assets/music/unused/` archive — there is no spent source to archive.
 - **The web build ships the music too.** `dist/web/pygbag.ini` is left alone;
   `assets/music/` rides along on the deny-list as it already would.
+  *(Superseded 2026-09-30 by BLD-004, `web_audio_journal.md`: the web release
+  has no audio, `/assets/music` is in `ignoreDirs`, and the web profile opens
+  no mixer. The desktop decision above stands.)*
 
 Two consequences of that last pair are accepted going in, and are written
 here so they are not rediscovered as surprises: the pygbag bundle grows by
@@ -318,7 +321,8 @@ failure, the worst case in the browser is a silent game, not a broken one.
 If the web bundle size or a browser decode failure becomes a real problem,
 the OGG re-encode and the `MUSIC_ENABLED = False` web-profile switch
 described above are still the answer, and neither is invalidated by
-shipping MP3 first.
+shipping MP3 first. *(For the web, superseded by BLD-004 as noted above: no
+audio ships there, so neither consequence applies. The "8.5 MB" in this journal is binary: 8.5 MiB, 8.9 MB decimal.)*
 
 ### Transitions — settled
 
@@ -424,6 +428,13 @@ entry first claimed. See the measurement in the device section above.
 The OGG re-encode, the pygbag `MUSIC_ENABLED` switch and the seamless-loop
 trim pass were all declined for now and are described above where they were
 proposed.
+
+*(BLD-004, 2026-09-30, `web_audio_journal.md`: the web side of this is
+settled. The owner decided the web release has no audio at all, so the
+switch landed wider than proposed, as `config.AUDIO_ENABLED` (music and
+sound effects both), set False by `apply_web_profile()`; `/assets/music` and
+`/assets/sound_effects` are in `pygbag.ini`'s `ignoreDirs`. The OGG
+re-encode is not needed for the web. The desktop keeps the delivered MP3s.)*
 
 ## Progress
 

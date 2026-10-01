@@ -13,7 +13,8 @@ tests -t .` plus a `pygbag` local run — before the next.
 
 **Status:** W1–W8 done (2026-08-28) — the browser build runs (menu, gameplay,
 audio, session-only save) at 1280×720/60 fps (the 60 fps cap later removed
-in the browser by BLD-003, below), and all pygbag files live in
+in the browser by BLD-003, below; the audio removed from the web release by
+BLD-004, 2026-09-30, `web_audio_journal.md`), and all pygbag files live in
 `web/`. **W9** (the GitHub Pages workflow + `.nojekyll`) is the only one left and
 is deliberately **not created yet** — owner will add it; the ready-to-paste
 sketch is under "GitHub Actions sketch" below.
@@ -30,7 +31,9 @@ fragile audio context, so the two places the builds legitimately differ are
    session starts clean (owner's call: *no* IndexedDB save for the web version),
    and
 2. **mixer bring-up** — the web build must not tear down and re-open the
-   WebAudio context.
+   WebAudio context. *(Since BLD-004, 2026-09-30, the web release opens no
+   mixer at all: `config.AUDIO_ENABLED` is False under the browser profile.
+   The browser backend stays in `systems/mixer_backend.py`, unused.)*
 
 Both are handled behind flags / an adapter so desktop is untouched.
 
@@ -255,7 +258,9 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
 * **Mixer runs at the browser's rate** (observed 96000 Hz / 2 ch). `BrowserMixer`
   resamples each of the 8 synth buffers 22050 → device rate and up-mixes to
   stereo once at startup (pure-Python loops) — a one-time ~sub-second cost, no
-  steady-state impact.
+  steady-state impact. *(No longer in the web release since BLD-004,
+  2026-09-30: with `config.AUDIO_ENABLED` False pygame comes up with no mixer
+  device and no cue is synthesised; `BrowserMixer` is kept, unused.)*
 
 ## Local test
 
@@ -275,7 +280,7 @@ does not survive a reload.
 
 ## TODO
 
-*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished)*
+*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished. The bundle trim is moot since BLD-004, 2026-09-30: the web release has no audio, see the item below.)*
 
 - [x] W1 — async loop + `main.py` / `main_web.py` entry points
 - [x] W2 — `config.SAVE_ENABLED`, save read/write skipped when off
@@ -290,7 +295,7 @@ does not survive a reload.
 - [x] W7 — `config.apply_web_profile()`: 60 fps + 1280×720 @ zoom 1.2 (same FOV); `main_web.py` folded into `main.py --web`
 - [x] W8 — pygbag files moved to `web/` (`pygbag.ini`, `build.sh`, `serve.sh`, README); `build/` gitignored; root clean
 - [-] W9 — `.nojekyll` + `.github/workflows/deploy-web.yml` (sketch above); enable Pages (GitHub Actions source) *(DOC-003: parked — the owner said on 2026-09-22 it is not needed for now; reopen as a new BLD requirement if wanted)*
-- [ ] (optional) trim the browser bundle — audio synth runs at load; measure and, if slow in WASM, pre-bake the 8 buffers
+- [-] (optional) trim the browser bundle — audio synth runs at load; measure and, if slow in WASM, pre-bake the 8 buffers *(moot since BLD-004, 2026-09-30: the web release has no audio, so the synth never runs in the browser and the audio folders are out of the bundle)*
 
 ---
 

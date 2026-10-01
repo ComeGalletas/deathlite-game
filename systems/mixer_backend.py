@@ -15,16 +15,25 @@ differs:
   leaves audio dead. Init **once**, no teardown, accept whatever sample rate and
   channel count the browser hands back, and resample / up-mix each buffer once
   at load time so pitch stays correct.
-* **Headless / dummy driver** (`SilentMixer`, tests + CI) -- no device; every
-  call is a no-op and `ready` stays False.
+* **No device** (`SilentMixer`) -- the fallback when a bring-up fails; every
+  call is a no-op and `ready` stays False. (SDL's dummy driver, which the
+  test suite sets, does open a device that plays nothing, so tests get
+  `DesktopMixer`.)
+* **Audio off** (`config.AUDIO_ENABLED` False: the web release, BLD-004) --
+  `init_pygame(audio=False)` brings pygame up with no mixer device at all, and
+  `AudioManager` asks for `SilentMixer` by name. The shipped web build
+  therefore never reaches `BrowserMixer`; it stays for a browser build with
+  audio, should one be wanted again.
 
 `make_mixer_backend()` selects one (override with `force=`). `AudioManager`
-talks only to the returned object -- it never calls `pygame.mixer` directly.
+talks only to the returned object, except that with audio off it reads
+`pygame.mixer.get_init()` to check that no device was left open.
 """
 from __future__ import annotations
 
 import array
 import logging
+import os
 import sys
 
 import pygame
@@ -175,6 +184,35 @@ class BrowserMixer(MixerBackend):
         self.ready = True
         log.info("browser mixer up: %d Hz, %d ch", self.rate, self.channels)
         return True
+
+
+# An SDL audio driver name that no SDL build has. Set for the length of one
+# `pygame.init()` call, it makes the mixer's share of that call fail cleanly:
+# no device, and no WebAudio context in the browser, is ever opened. Every
+# other module comes up as `pygame.init()` brings it up (measured on pygame
+# 2.5.2 and 2.6.1: it returns (4, 1) instead of (5, 0), and the clock, timers
+# and events behave the same). SDL reads the variable when its audio subsystem
+# starts, so once it is restored a later `pygame.mixer.init()` opens a device
+# as usual.
+NO_AUDIO_DRIVER = "deathlite-no-audio"
+
+
+def init_pygame(audio: bool = True) -> tuple[int, int]:
+    """`pygame.init()`, without opening a mixer device when `audio` is False
+    (BLD-004). Returns what `pygame.init()` returns. The caller's
+    `SDL_AUDIODRIVER` (the test suite's "dummy", or unset) is put back
+    whatever happens."""
+    if audio:
+        return pygame.init()
+    saved = os.environ.get("SDL_AUDIODRIVER")
+    os.environ["SDL_AUDIODRIVER"] = NO_AUDIO_DRIVER
+    try:
+        return pygame.init()
+    finally:
+        if saved is None:
+            os.environ.pop("SDL_AUDIODRIVER", None)
+        else:
+            os.environ["SDL_AUDIODRIVER"] = saved
 
 
 _BACKENDS = {

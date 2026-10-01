@@ -34,10 +34,13 @@ bash dist/web/serve.sh   # rebuild + serve at http://localhost:8000
 bash dist/web/build.sh   # build only -> dist/web/out/  (gitignored)
 ```
 
-First run downloads a CPython-WASM runtime (cached after). Mixer bring-up is
-platform-specific behind `systems/mixer_backend.py` (desktop re-inits at
-44100 Hz stereo and resamples the 22050 Hz synth cues up to it; the browser
-keeps the WebAudio context it was given and resamples to that instead).
+First run downloads a CPython-WASM runtime (cached after). The web release
+has **no audio** (BLD-004): the browser profile sets `config.AUDIO_ENABLED =
+False`, so no mixer is opened and no cue or track loads, and `pygbag.ini`
+keeps `assets/music/` and `assets/sound_effects/` out of the bundle. On the
+desktop, mixer bring-up sits behind `systems/mixer_backend.py` (it re-inits
+at 44100 Hz stereo and resamples the 22050 Hz synth cues up to it; a browser
+backend that keeps the WebAudio context is still there, unused).
 Fonts are the bundled **Fredoka** face (`assets/fonts/`, via `game/fonts.py`).
 See `documentation/journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
 

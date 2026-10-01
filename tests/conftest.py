@@ -178,6 +178,9 @@ INTEGRATION = (
     "tests/flows/test_frame_pacing.py::StepTickTests",
     # RND-012: overlays over a booted run.
     "tests/flows/test_frozen_backdrop.py",
+    # BLD-004: a Game booted silent under the web profile; the switch, the
+    # managers and the bundle check boot nothing and stay unit.
+    "tests/systems/test_web_audio.py::SilentGameTests",
 )
 
 

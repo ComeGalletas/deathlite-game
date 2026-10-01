@@ -25,6 +25,7 @@ from progression.meta import MetaCatalog
 from systems.audio import AudioManager
 from systems.debug_overlay import DebugOverlay
 from systems.frame_trace import FrameTrace
+from systems.mixer_backend import init_pygame
 from systems.music import MusicPlayer
 from ui.mouse import install_cursor, system_match_scale
 
@@ -39,7 +40,8 @@ class Game:
         # frame then holds ~31 ms (SYS-011). Process-wide, so any order works.
         self.timer_honored = native.honor_timer_resolution()
         log.info("timer resolution request always honored: %s", self.timer_honored)
-        pygame.init()
+        # With audio off (the web release, BLD-004) no mixer device is opened.
+        init_pygame(audio=config.AUDIO_ENABLED)
         pygame.display.set_caption(config.TITLE)
         self._set_icon()                    # before the window: SDL reads it there
         # Persistent progression (spec 4.7). Load is corruption-tolerant. Read
