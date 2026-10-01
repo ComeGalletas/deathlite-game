@@ -38,7 +38,8 @@ What it measures is play, not the run's opening (RND-008.D3):
   (the director's cap is 100 + 5 per 20 s on normal, up to the live cap),
   past the boss's time (570 s), and a boss fight would be measured as
   crowd. `--boss` lets it in. Every run says where the boss stands before
-  and after timing, and says when the cap seated fewer than `--live`.
+  the frames, and every run that times frames (not `--bump`) again after;
+  every run says when the cap seated fewer than `--live`.
 * One budget, `BUDGET_MS`, counts the frames over it.
 
 Every run prints the display it drew into: surface, driver, vsync, render
@@ -442,6 +443,29 @@ def report(times: list, ps) -> str:
             f"dormant {m.population.total_dormant} recycled {m.recycled}")
 
 
+def draw_headline(times: list, draws: list, in_view: list, alternate=None) -> list[str]:
+    """The draw and update + draw lines. Under `--layers` (`alternate`)
+    they are the bare frames' alone, each frame's update paired with its own
+    draw: the timed frames' draws are slower by the timers' cost."""
+    lines = []
+    if alternate is not None:
+        from tools.benchmarks import draw_layers
+        times, draws, in_view = draw_layers.bare_frames(alternate, times, draws, in_view)
+        lines.append(f"  (the update line above: every frame; the lines below: the "
+                     f"{len(draws)} frames drawn without the timers)")
+    d, v = sorted(draws), sorted(in_view)
+    lines.append(f"  draw   p50 {_percentile(d, 0.5):.2f}  "
+                 f"p90 {_percentile(d, 0.9):.2f}  p99 {_percentile(d, 0.99):.2f}  "
+                 f"max {d[-1]:.2f} ms  |  in view p50 {_percentile(v, 0.5)} "
+                 f"max {v[-1]}")
+    both = sorted(a + b for a, b in zip(times, draws, strict=True))
+    lines.append(f"  update + draw   p50 {_percentile(both, 0.5):.2f}  "
+                 f"p90 {_percentile(both, 0.9):.2f}  p99 {_percentile(both, 0.99):.2f}  "
+                 f"max {both[-1]:.2f} ms  |  over {BUDGET_MS:.2f} ms: "
+                 f"{over_budget(both)} / {len(both)}")
+    return lines
+
+
 def over_budget(frame_times: list) -> int:
     """How many of `frame_times` (ms) miss `BUDGET_MS`."""
     return sum(1 for x in frame_times if x > BUDGET_MS)
@@ -632,7 +656,7 @@ def shortfall(ps, asked: int, elapsed: float) -> str | None:
     most = director.enemy_count_cap(1.0e9)
     msg = f"  asked for {asked} alive, built {built}: the cap at {elapsed:g} s is {cap}"
     if most < asked:
-        msg += f"; no run seats more than {most} (the live cap)"
+        msg += f"; the director seats no more than {most} (the live cap)"
         return msg + ("; raise --elapsed to reach it" if cap < most else "")
     return msg + ("; raise --elapsed" if cap < asked else "")
 
@@ -685,6 +709,7 @@ def main(argv=None) -> int:
         prof.disable()
         print(report(times, ps))
         print(arrivals_line(ps, before))
+        print(f"  boss at the end of timing: {boss_state(ps)}")
         if elements:
             print(element_report(ps))
         if instruments is not None:
@@ -706,23 +731,11 @@ def main(argv=None) -> int:
         if instruments is not None:
             print(instruments.report())
         if args.render:
-            if alternate is not None:
-                # The headline is the bare frames': the timed ones are slower.
-                from tools.benchmarks import draw_layers
-                times, draws, in_view = draw_layers.bare_frames(alternate, times, draws, in_view)
-                print(f"  (draw lines below: the {len(draws)} frames drawn without the timers)")
-            d, v = sorted(draws), sorted(in_view)
-            print(f"  draw   p50 {_percentile(d, 0.5):.2f}  "
-                  f"p90 {_percentile(d, 0.9):.2f}  p99 {_percentile(d, 0.99):.2f}  "
-                  f"max {d[-1]:.2f} ms  |  in view p50 {_percentile(v, 0.5)} "
-                  f"max {v[-1]}")
-            both = sorted(a + b for a, b in zip(times, draws))
-            print(f"  update + draw   p50 {_percentile(both, 0.5):.2f}  "
-                  f"p90 {_percentile(both, 0.9):.2f}  p99 {_percentile(both, 0.99):.2f}  "
-                  f"max {both[-1]:.2f} ms  |  over {BUDGET_MS:.2f} ms: "
-                  f"{over_budget(both)} / {len(both)}")
+            print("\n".join(draw_headline(times, draws, in_view, alternate)))
         if alternate is not None:
-            print(draw_layers.format_layers(alternate.timer, draws))
+            from tools.benchmarks import draw_layers
+            bare = draw_layers.bare_frames(alternate, draws)[0]
+            print(draw_layers.format_layers(alternate.timer, bare))
     return 0
 
 

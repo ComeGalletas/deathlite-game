@@ -156,7 +156,8 @@ sitting 1 only, with the old tool. Four sittings, each with the tool as it
 stood then:
 
 - **Sitting 1:** no `hud` or `feedback` rows (the HUD sat in `draw`, 0.18
-  to 0.48 ms), no `scenery_list` row (the scenery's list in `world`), no
+  to 0.48 ms), no `scenery_list`, `villagers_list` or `huts_list` rows
+  (those lists, and any villager or hut drawn, in `world`), no
   garbage collection between frames, a calibrated per-call cost where the
   measured one is printed now; the boss not held back. Other work ran on
   the machine.
@@ -165,11 +166,14 @@ stood then:
   recorded.
 - **Sitting 3:** as sitting 2, with the garbage collection between frames
   and the boss held back (`boss held back` on the display line).
-- **Sitting 4:** the tool as committed: the `scenery_list` row, the boss's
+- **Sitting 4:** the tool as committed: the `scenery_list`,
+  `villagers_list` and `huts_list` rows (and villagers and huts as rows of
+  their own), the boss's
   other states on the display line (`due now`, `due at N s`, `beaten`) and
   its state again after timing.
 
-The rows other than these mean the same in all four.
+The rows other than these mean the same in all four; the lists moved out
+of `world` are about 0.2 ms together, the scenery's nearly all of it.
 
 **Sitting 4, the tool as committed, the boss held back** (the figures the
 conclusions rest on):
@@ -204,11 +208,12 @@ p50s; they are not the p50 of a sum. The smaller rows, sitting 4, 150 then
 250: `projectiles` (the enemies' shots) 0.05 then 0.07 at p50, 0.12 then
 0.17 at p90; `elemental_sort` 0.09 then 0.13 to 0.14; `flat/elemental` 0.09
 then 0.13; `enemies/hpbar` and `enemies/marks` 0.04 then 0.06; `hud` 0.09;
-`huts_list` and `villagers_list` 0.01 or less. In the boss runs of sittings
-1 and 2, `hud` rose to 0.28 to 0.30 with the boss bar; `elemental_sort` and
-`flat/elemental` reached 0.19 to 0.31 in sittings 1 and 2's slower runs,
-the boss's or not (sitting 1's 200, with no boss, had 0.19 and 0.25). Particles, damage numbers and
-hints are under 0.05 ms, since the hero does not attack.)
+`huts_list` and `villagers_list` 0.01 or less. In sitting 2's boss runs,
+`hud` rose to 0.28 and 0.30 with the boss bar (sitting 1 had the HUD in
+`draw`); `elemental_sort` and `flat/elemental` reached 0.19 to 0.31 in
+sittings 1 and 2's slower runs, the boss's or not (sitting 1's 200, with no
+boss, had 0.19 and 0.25). Particles, damage numbers and hints are under
+0.05 ms, since the hero does not attack.)
 
 **What it says.**
 
@@ -230,44 +235,45 @@ hints are under 0.05 ms, since the hero does not attack.)
   224 (sitting 4). The elemental sort and under-layer, the health bars and
   the marks grow with it too but stay small (0.38 to 0.39 ms together at
   224).
-  `enemies`' own time is 14 µs per enemy drawn at 250 in sitting 4 (13 to
-  14 µs in sitting 3, 18 to 26 µs in the boss runs of sittings 1 and 2),
-  for what is one sprite blit and a few lookups each; the timers' share is
-  in it (below).
+  `enemies`' own row is 14 µs per enemy drawn at 250 in sitting 4 (13 to
+  14 µs in sitting 3, 18 to 26 µs in the boss runs of sittings 1 and 2);
+  about 4 µs of that is the nested timers (below), so an enemy's own draw
+  is about 10 µs, for what is one sprite blit and a few lookups each.
 - **Against the budget:** the bare draw alone, with the hero not attacking
   and no boss, is about 10.4 ms at 147 in view and 12.2 ms at 224 in
-  sitting 4, about 62 % and 73 % of the 16.67 ms before the update; with
-  other work running (sittings 1 and 2) it was 10.5 to 15 ms at 147 and
-  19.8 ms at 178. The terrain is about 6.4 ms of it in sitting 4, the
-  crowd's part 3.7 to 5.7 ms.
+  sitting 4, about 62 % and 73 % of the 16.67 ms before the update; in
+  sittings 1 and 2 (other work ran in sitting 1; sitting 2's conditions
+  were not recorded) it was 10.5 to 15 ms at 147 and 19.8 ms at 178. The
+  terrain is about 6.4 ms of it in sitting 4, the crowd's part 3.7 to
+  5.7 ms as timed, 4.5 to 4.7 ms at 224 without the nested timers'
+  1 ms.
 
 **Its limits, carried into RND-010.3.**
 
 - **The timers' cost.** Against the bare frames they added 0.7 to 1.1 ms a
   frame in sittings 3 and 4 and 0.9 to 2.2 ms in sittings 1 and 2: 0.9 to
   2.0 µs a timed call in place, over about 740 to 1,080 calls. Much of it
-  lands in the callers' rows: `enemies` carries its three nested wrappers
-  per enemy, estimated (three wrappers × 243 enemies × the measured cost
-  per call, not measured on its own) at up to about 1.5 ms at 250 in the
-  slow sittings and about half that in sittings 3 and 4; `world` carries each enemy wrapper's own
-  bookkeeping and the closures that wrap the items' draw functions, a few
-  tenths of a millisecond at 243 enemies by a reviewer's micro-benchmark,
-  not reproduced here. So the per-layer rows, and any sum of them, are a
-  little high; candidates are timed old against new without the timers
+  lands in the callers' rows. Measured on sitting 4's scene (2560 × 1080,
+  250 alive, 100 frames of each kind interleaved): `enemies` and its
+  nested rows came to 6.17 ms with the shade, bar and marks wrappers and
+  5.19 ms without them, so those three wrappers add about 1 ms there
+  (19 %, about 4 µs per enemy); all the timers together added 1.5 ms over
+  the bare draw (17.60 against 16.09 ms). `world` also carries each enemy
+  wrapper's own bookkeeping and the closures that wrap the items' draw
+  functions. So the crowd's rows read about a fifth high and the terrain's
+  barely at all; candidates are timed old against new without the timers
   (the constraint above), and this breakdown only aims them.
-- **Whether the alternation moves the bare frames is not settled.** After
-  sitting 4, on the Windows renderer (the probe's own log does not record
-  the display), four rounds each ran 200 plain `--render` frames and then
-  400 layered ones over one crowd that drifted between rounds (150 to 175
-  in view): the bare frames' draw p50 against the plain one was 8.53
-  against 8.69, 8.75 against 8.30, 8.83 against 8.63, 8.24 against
-  8.42 ms, differences of mixed sign within 0.45 ms, while the layered
-  runs' update p50 was up to 10 % higher (8.51 against 9.40, 10.94 against
-  11.70), as the crowd grew. Sequential runs over a drifting crowd cannot
-  separate a bias of that size from the drift; and the young-garbage
-  collection between frames, if anything, makes the bare frames a little
-  faster than plain ones, not slower. The bare draw is read as the plain
-  draw to within about half a millisecond.
+- **The alternation does not move the bare frames by more than about a
+  tenth of a millisecond.** On sitting 4's scene (2560 × 1080, render
+  scale 1.2, zoom 1.797, 150 packed), sixteen paired blocks over one crowd
+  each drew 40 plain `--render` frames and then 80 layered ones, so the
+  crowd's drift cancels in the pairs: the plain draw p50 was 12.65 ms and
+  the bare frames' 12.72 ms over 640 frames each, and the bare minus plain
+  p50 per block had a median of +0.13 ms (from -0.48 to +0.52; bare slower
+  in 10 of 16). (An earlier sequential probe, four rounds of 200 plain then
+  400 layered frames over a drifting crowd and on a fresh save's 2000 ×
+  1125 display, not sitting 4's, could not separate a bias from the
+  drift.)
 - **No fight.** The hero does not attack, so there are no particles, damage
   numbers or damaged health bars, where the owner's trace had about 120
   particles at 150+. The combat effects' share is not in these numbers.

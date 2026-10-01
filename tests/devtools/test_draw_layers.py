@@ -166,6 +166,26 @@ class AccountingTests(unittest.TestCase):
                       "the timers add +1.00 ms at p50, 4 timed calls a frame, 285.71 us a call "
                       "in place", text)
 
+    def test_every_row_and_column_of_the_printout(self):
+        # Three frames, two layers; the bare frames [4, 5, 6] (p50 5).
+        timer = DL.LayerTimer()
+        timer.frames = [{"a": 1.0, "b": 2.0}, {"a": 3.0, "b": 2.0}, {"a": 7.0}]
+        timer.calls = [{"a": 1, "b": 2}, {"a": 3, "b": 2}, {"a": 5}]
+        lines = DL.format_layers(timer, bare=[6.0, 4.0, 5.0]).splitlines()
+        # a: sorted [1, 3, 7]: p50 3, p90 7 (index round(1.8) = 2), mean
+        # 11/3 = 3.67; share of the mean draw (totals [3, 5, 7], mean 5):
+        # 73.3 %; calls 3 a frame. b: [0, 2, 2]: p50 2, p90 2, mean 4/3 =
+        # 1.33, 26.7 %, calls 4/3 = 1.3.
+        self.assertEqual(lines[1], "    a                        3.00 /   7.00 /   3.67    73.3 %       3.0")
+        self.assertEqual(lines[2], "    b                        2.00 /   2.00 /   1.33    26.7 %       1.3")
+        # Totals sorted [3, 5, 7]: p50 5, p90 7, mean 5: three different
+        # columns, so none can stand in for another.
+        self.assertEqual(lines[3], "    (all layers)             5.00 /   7.00 /   5.00")
+        # Timed p50 5 against bare p50 5: +0.00 ms over 4.33 calls a frame.
+        self.assertEqual(lines[4], "  the 3 frames between, drawn without the timers: draw p50 5.00 ms; "
+                                   "the timers add +0.00 ms at p50, 4 timed calls a frame, 0.00 us a call "
+                                   "in place")
+
     def test_no_timed_frames_is_said_plainly(self):
         self.assertEqual(DL.format_layers(DL.LayerTimer(), bare=[1.0]),
                          "  draw by layer: no timed frames (--layers needs --frames 2 or more)")
@@ -244,6 +264,33 @@ class BareFramesTests(unittest.TestCase):
         alt.bare, alt.timed = [0, 2], [1, 3]
         self.assertEqual(DL.bare_frames(alt, [10, 11, 12, 13], "abcd"),
                          [[10, 12], ["a", "c"]])
+
+
+class HeadlineTests(unittest.TestCase):
+    """`spawn_stress.draw_headline`: under `--layers`, the bare frames
+    alone, each frame's update paired with its own draw."""
+
+    def test_layers_reads_the_bare_frames_each_update_with_its_own_draw(self):
+        alt = DL.Alternate(DL.LayerTimer(), ps=None)
+        alt.bare, alt.timed = [0, 2], [1, 3]
+        # Bare frames 0 and 2: updates 1 and 3, draws 10 and 12, in view 7 and 9;
+        # the timed frames (1, 3) are far off, so taking them would show.
+        lines = S.draw_headline([1.0, 50.0, 3.0, 50.0], [10.0, 90.0, 12.0, 90.0],
+                                [7, 99, 9, 99], alt)
+        self.assertEqual(lines[0], "  (the update line above: every frame; the lines below: the 2 frames "
+                                   "drawn without the timers)")
+        self.assertEqual(lines[1], "  draw   p50 10.00  p90 12.00  p99 12.00  max 12.00 ms  |  "
+                                   "in view p50 7 max 9")
+        # 1 + 10 = 11 and 3 + 12 = 15: an update paired with another
+        # frame's draw would give 13s.
+        self.assertEqual(lines[2], "  update + draw   p50 11.00  p90 15.00  p99 15.00  max 15.00 ms  |  "
+                                   "over 16.67 ms: 0 / 2")
+
+    def test_without_layers_every_frame(self):
+        lines = S.draw_headline([1.0, 2.0], [10.0, 20.0], [5, 6])
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[1], "  update + draw   p50 11.00  p90 22.00  p99 22.00  max 22.00 ms  |  "
+                                   "over 16.67 ms: 1 / 2")
 
 
 class AlternateTests(unittest.TestCase):
@@ -462,12 +509,12 @@ class ShortfallTests(unittest.TestCase):
     def test_the_live_cap_is_named_when_no_run_could_seat_it(self):
         self.assertEqual(S.shortfall(self._ps(250, 250, most=250), 300, 5000.0),
                          "  asked for 300 alive, built 250: the cap at 5000 s is 250; "
-                         "no run seats more than 250 (the live cap)")
+                         "the director seats no more than 250 (the live cap)")
 
     def test_both_caps_named_when_the_clock_still_holds_it_back(self):
         self.assertEqual(S.shortfall(self._ps(175, 175, most=250), 300, 300.0),
                          "  asked for 300 alive, built 175: the cap at 300 s is 175; "
-                         "no run seats more than 250 (the live cap); raise --elapsed to reach it")
+                         "the director seats no more than 250 (the live cap); raise --elapsed to reach it")
 
     def test_the_cap_is_named_and_the_fix_given(self):
         self.assertEqual(S.shortfall(self._ps(175, 175, most=250), 250, 300.0),
@@ -575,6 +622,13 @@ class MainTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_the_profile_path_reports_the_boss_after_timing_too(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            S.main(["--seed", str(SEED), "--live", "20", "--dormant", "0", "--frames", "2",
+                    "--profile"])
+        self.assertIn("  boss at the end of timing: held back", out.getvalue())
+
     def test_the_boss_is_reported_after_timing(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -589,8 +643,9 @@ class MainTests(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             S.main(["--seed", str(SEED), "--live", "300", "--elapsed", "300",
                     "--dormant", "0", "--frames", "1"])
-        self.assertIn("  asked for 300 alive, built 175: the cap at 300 s is 175; no run seats "
-                      "more than 250 (the live cap); raise --elapsed to reach it", out.getvalue())
+        self.assertIn("  asked for 300 alive, built 175: the cap at 300 s is 175; the director "
+                      "seats no more than 250 (the live cap); raise --elapsed to reach it",
+                      out.getvalue())
 
     def test_layers_prints_the_breakdown_and_reads_the_bare_frames(self):
         out = io.StringIO()
@@ -598,7 +653,8 @@ class MainTests(unittest.TestCase):
             S.main(["--seed", str(SEED), "--live", "40", "--pack", "--layers", "--frames", "4",
                     "--dormant", "0"])
         text = out.getvalue()
-        self.assertIn("  (draw lines below: the 2 frames drawn without the timers)", text)
+        self.assertIn("  (the update line above: every frame; the lines below: the 2 frames "
+                      "drawn without the timers)", text)
         self.assertIn("over 16.67 ms: ", text)
         self.assertRegex(text, r"over 16\.67 ms: \d+ / 2\n")
         self.assertIn("draw by layer, exclusive ms over 2 timed frames", text)
