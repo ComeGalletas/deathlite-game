@@ -25,6 +25,7 @@ of them:
 * **The version is `config.VERSION`** in `game/config.py`, read by both
   targets. There is nothing else to bump.
 
-Browser deployment (GitHub Pages, vendoring the pygame wheel next to the page)
-is not wired up; the plan is in
+Browser deployment (GitHub Pages) is not wired up. `web/build.sh` vendors the
+pygame wheel next to the page, which a local static server on
+`localhost:8000` needs (BLD-006, `web/README.md`); the plan is in
 [`../documentation/plans/web_plan.md`](../documentation/plans/web_plan.md).

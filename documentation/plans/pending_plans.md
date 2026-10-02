@@ -12,7 +12,7 @@
 >   `documentation/designs/`, and the `MENU_SCRIM` text was corrected in
 >   `FUNCTIONAL_README.md` (§9).
 > - ~~**Still open:** the Echo and Fragmentation blessings (§1)~~ — see the
->   2026-09-24 update below; vendoring the pygame wheel for a static host
+>   2026-09-24 update below; vendoring the pygame wheel for a static host (done 2026-10-02, BLD-006)
 >   (§7); the test debt now tracked in `test_suite_review.md` (§8).
 > - **Parked:** the W9 GitHub Pages deploy (§7), not needed for now (owner,
 >   2026-09-22).
@@ -29,7 +29,7 @@
 >   screen, which reads the catalog's names (§4).
 > - **Still pending:** Kestrel and Nihil's `attack2` / `guard` sheets and an
 >   on-screen `mark` overlay (§2); an auto-attack / aim toggle in Options —
->   still only the in-run `Q` key (§3); the web build's wheel vendoring,
+>   still only the in-run `Q` key (§3); the web build's wheel vendoring (done 2026-10-02, BLD-006),
 >   finer loading steps with a progress bar, a manifest-driven pack and
 >   browser spawn-master settings, waiting on the web build (§7); the test
 >   debt in `test_suite_review.md` (§8).
@@ -157,17 +157,22 @@ every other surface moved to the art.
 
 `documentation/plans/web_plan.md` §6 has the ordered list; the obstacle index
 and sliced fill (2026-09-03) and the browser crowd knobs (BLD-003) are done,
-and two items block the build from being playable by anyone else. The third,
-`build.sh` / `serve.sh` failing on the MP3 music (BLD-003.6; pygbag refuses the WAV cues too), was closed by
+and one item blocks the build from being playable by anyone else: the
+missing deploy. The other two are closed. `build.sh` / `serve.sh` failing on
+the MP3 music (BLD-003.6; pygbag refuses the WAV cues too) was closed by
 BLD-004 (2026-09-30, `journals/web_audio_journal.md`): the web release has no
-audio and the audio folders are out of the bundle.
+audio and the audio folders are out of the bundle. The unvendored wheel was
+closed by BLD-006 (2026-10-02, `journals/web_wheel_journal.md`), below.
 
 - **There is no `.github/` directory at all**, so the W9 GitHub Pages deploy
   does not exist.
-- **The pygbag wheel is not vendored.** A static host 404s on
-  `/cdn/cp312/pygame_ce-…whl` and the page reloads in a loop; only pygbag's own
-  dev server serves it. Vendoring it into `build/web/cdn/cp312/` is what makes
-  the bundle hostable.
+- ~~**The pygbag wheel is not vendored.**~~ -- done 2026-10-02, BLD-006:
+  `dist/web/build.sh` vendors it into `out/cdn/`. Measuring it showed pygbag
+  fetches wheels from `localhost:8000/cdn/` only when the page address starts
+  with `http://localhost:8` (the 404 on port 8000; any other such port fails
+  to fetch from 8000), while any other address, a real host included, takes
+  them from the public CDN, so the Pages deploy should not need it (measured
+  on `127.0.0.1`; a real host is not verified yet).
 - ~~`assets/unused/` is not in `pygbag.ini`'s `ignoreDirs`~~ -- done 2026-09-13
   (`dist/web/pygbag.ini` ignores `/assets/unused`, `/tools`, `/.ruff_cache`).
   The unreferenced art *inside* the shipped folders still needs the manifest pack.
