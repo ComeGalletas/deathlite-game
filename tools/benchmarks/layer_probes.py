@@ -18,8 +18,10 @@ the hero), so their figures sit beside a `--layers` run's.
   stand, so the alternation and the garbage collection `--layers` adds
   after every frame are covered together; two effects that cancelled
   would not show. Prints the plain and the bare draw p50 over all blocks
-  and the per-block bare minus plain p50: its median, its range and how
-  many blocks had the bare frames slower.
+  and the per-block bare minus plain p50: their own p50 (nearest-index,
+  `stats.percentile`: the 9th of 16 blocks), their range and how many
+  blocks had the bare frames slower. (`da7ab7e` printed that p50 as
+  "median".)
 * `nested`: what the wrappers nested inside `enemies` (`shade`, `hpbar`,
   `marks`) cost. Frames rotate four ways (`Rotate`): bare, every timer,
   every timer but those three, the root alone. Prints each kind's whole
@@ -101,7 +103,7 @@ def format_bias(result: dict) -> str:
         (f"  bias: {len(diffs)} blocks; draw p50 plain {_p50(result['plain']):.2f} ms "
         f"({len(result['plain'])} frames), bare {_p50(result['bare']):.2f} ms "
         f"({len(result['bare'])} frames)"),
-        (f"  per block, bare minus plain p50: median {_p50(diffs):+.2f} ms, from "
+        (f"  per block, bare minus plain p50: p50 {_p50(diffs):+.2f} ms, from "
         f"{diffs[0]:+.2f} to {diffs[-1]:+.2f}; bare slower in {slower} of {len(diffs)}"),
     ])
 

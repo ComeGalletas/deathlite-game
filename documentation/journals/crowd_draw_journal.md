@@ -159,7 +159,17 @@ mode windowed, window 2560 × 1080, render 21:9, set with the Options
 screen's Display mode row (Windowed) and Resolution row (2560 × 1080; a
 21:9 size gives the 21:9 render), which give render scale 1.2 and zoom
 1.797; the window always asks for vsync, and every run's display line
-prints all of these, so a run on another save shows it at once. Seed 35,
+prints all of these, so a run on another save shows it at once. In the
+save itself that is `"display": {"mode": "windowed", "render": "21:9",
+"window": [2560, 1080]}` under `settings`. The Resolution row lists only
+sizes that fit the desktop and the window is clamped to it, so the
+desktop must be at least 2560 × 1080 (the owner's primary screen reads
+2752 × 1152 to Windows). The owner's own save in the main checkout,
+which the game was played on, holds the same display block today; the
+frame trace does not record the display, so that is the closest tie
+between these runs and the trace. Machine: AMD Ryzen 7 9800X3D, NVIDIA
+GeForce RTX 5080, 31 GB; Python 3.12.0, pygame 2.5.2, SDL 2.28.3 (every
+run's first line). Seed 35,
 400 dormant records (the default), the crowd packed round a hero standing
 still but for the harness's 24 px jitter, 600 frames (300 timed, 300
 bare, alternating), the boss held back. Each run, from the repo root in
@@ -181,30 +191,43 @@ the same commands without the prefix. Without the driver the harness
 draws headless into the dummy driver's surface, which is not the cost on
 screen.
 
-Three sittings count, and none ran on a quiet machine:
+Every raw output below is kept in
+[`data/rnd-010.2/`](data/rnd-010.2/README.md): each run's and probe's
+printout, each sitting's log and the script that ran it, and the scripts
+that build the tables and the derived figures from them. Three sittings
+count, and none ran on a quiet machine. Sittings 1 to 3 (2026-09-30) do
+not: they ran uncommitted, earlier versions of the tool (`b6f7269` is the
+first commit of it), all without the lists' own rows; sitting 1 also
+without the `hud` and `feedback` rows and with a calibrated rather than a
+measured timers' cost, sittings 1 and 2 without garbage collection
+between frames and with a boss fight in their 250 runs. Their conditions
+were mostly unrecorded; sittings 1 and 2's outputs were not kept, and
+sitting 3's are left out of the data folder with them.
 
 - **Sitting 6 (2026-10-02, 12:24 to 12:30), commit `da7ab7e`**: the runs
-  and both probes. The sitting's log records the CPU load before each run
-  (43 % to 80 %, rising through it) and the top processes by CPU time at
-  its start and end: a game (`deadlock`) gained 1,223 s of CPU time over
-  the six minutes, three to four cores' worth.
-- **Sitting 5 (2026-10-02, 11:40 to 11:45), commit `c53225e`**: the runs.
-  `c53225e` and `da7ab7e` time the runs with the same code (no change to
-  `draw_layers.py`, `spawn_stress.py` or `stats.py` between them; only
-  the probes changed, so sitting 5's probe figures are dropped). The CPU
-  load before each run was 39 % to 68 %; a game client was seen in a
-  process list just after it, not kept in a file.
-- **Sitting 4 (2026-09-30, 20:00), the tool of `b6f7269`**: its output
-  matches that commit line for line (the same rows, the villagers', huts'
+  and both probes (`s6_*.txt`). The sitting's log (`s6_meta.txt`) records
+  the CPU load before each run (43 % to 80 %, highest in the second round
+  and the first probes, 47 % before the last) and the top processes by
+  CPU time at its start and end: a game (`deadlock`) gained 1,223 s of
+  CPU time over the six minutes, three to four cores' worth.
+- **Sitting 5 (2026-10-02, 11:40 to 11:45), commit `c53225e`**: the runs
+  (`s5_*.txt`). `c53225e` and `da7ab7e` time the runs with the same code
+  (no change to `draw_layers.py`, `spawn_stress.py` or `stats.py` between
+  them; only the probes changed, so sitting 5's probe figures are dropped
+  and not kept). The CPU load before each run was 39 % to 68 %
+  (`s5_meta.txt`); a game client was seen in a process list just after
+  it, not kept in a file.
+- **Sitting 4 (2026-09-30, 20:00), the tool of `b6f7269`** (`s4_*.txt`;
+  no log was kept): its output matches that commit line for line (the same rows, the villagers', huts'
   and lists' among them; the same printed strings, the after-timing boss
   line among them; the call count printed whole), and the commit, 58
   minutes later, says its figures were taken on the tool as committed.
   `b6f7269` computes every number as the later commits do, except that it
   collected the young garbage only after the timed frames, so each bare
   frame started right after a collection and each timed one did not; the
-  `bias` probe never ran on that tool. 150 and 250 only, two runs each. The load was not recorded;
-  its bare draws are 5 % to 31 % lower than sitting 6's at the same crowd,
-  so it is the quietest record.
+  `bias` probe never ran on that tool. 150 and 250 only, two runs each.
+  The load was not recorded; its bare draws are 5 % to 31 % lower than
+  sitting 6's at the same crowd, so it is the quietest record.
 
 **Sitting 6, `da7ab7e`, the boss held back** (layer figures are p50 ms of
 each layer's own time over the timed frames, so they carry the timers'
@@ -256,9 +279,13 @@ at p90), since the hero does not attack.
   the terrain the ground, water, scenery and its list, and the crowd's
   part the enemies, the tree shade over them, the ghost pass and the
   scene's lists and sorts (`world`). The terrain is the same work at
-  every crowd, so it also gauges how fast the machine was running; the
-  crowd's part over the terrain then reads the crowd's cost with the
-  machine's speed taken out. Within a sitting, the two runs of a crowd
+  every crowd, so it also gauges how fast the machine was running, and
+  the crowd's part over the terrain reads the crowd's cost with most of
+  the machine's speed taken out. Two judgements sit in that: the terrain
+  (blit-bound) and the crowd (more Python) need not slow alike under
+  contention, and the crowd's part as timed carries timer overhead that
+  grows with the crowd (each enemy's wrappers, below), so the ratio and
+  the growth figures read somewhat high. Within a sitting, the two runs of a crowd
   size give ratios within 3.5 % of each other while their bare draws
   differ by up to 26.5 %; across the three sittings the ratio is 0.567 to
   0.592 at 147 in view (a spread of 4.4 %), 0.717 to 0.736 at 178 (2.6 %)
@@ -292,6 +319,17 @@ at p90), since the hero does not attack.
   (74 % to 91 %) and 16.79 to 17.14 ms at 224 (101 % to 103 %). No
   sitting on the current tool ran on a quiet machine; the quiet figure on
   it is still to be taken (below).
+- **What it ranks, and what it does not.** Inside the crowd's part, by
+  p50 in sitting 6: `enemies`' own row first (2.36 to 2.98 ms at 147 in
+  view, 4.69 to 4.84 at 224), then the ghost pass (0.57 to 0.76, 1.18 to
+  1.20), `world` (0.56 to 0.73, 1.01 to 1.06) and the tree shade (0.48 to
+  0.59, 0.99 to 1.02) close together, then the elemental sort and
+  under-layer (0.09 to 0.16 each, 0.21 to 0.26), then the health bars and
+  marks (0.04 to 0.05, 0.08 to 0.09). The top row is not split: every
+  per-enemy lead listed above (the rig frame, `world_to_screen`, the
+  aura colour, the ghost record's copy) sits inside `enemies`' own time,
+  so this breakdown says the enemies' own draw is where to look but not
+  which of those leads costs most. RND-010.3 starts by splitting it.
 
 **Its limits, carried into RND-010.3.**
 
@@ -308,12 +346,17 @@ at p90), since the hero does not attack.
   draw, of every timer's 0.91 and 1.16 ms. At 150 the two measures agree;
   at 250 they do not, which 100 frames a kind on a machine this busy
   cannot settle. The root's timer alone added nothing measurable (14.33
-  against 14.29 ms at 150, 17.37 against 17.36 at 250). So the nested
-  wrappers alone make the crowd's rows read high by 10 % to 13 % at 150
-  (0.51 to 0.52 of 3.97 to 5.06 ms) and less at 250 (0.52 to 0.75
-  of 7.89 to 8.10 ms: 6.4 % to 9.5 %), depending on the run and the
-  measure; the
-  terrain's rows barely at all. Candidates are timed old against new
+  against 14.29 ms at 150, 17.37 against 17.36 at 250). Set against the
+  crowd's part of the main runs as timed (`enemies`, shade, ghost and
+  `world`, 3.97 to 5.06 ms at 150, 7.89 to 8.10 at 250), the nested
+  wrappers' 0.51 to 0.52 ms are 10 % to 13 % of it at 150 and their 0.52
+  to 0.75 ms 6.4 % to 9.5 % at 250; against that part with the overhead
+  taken off, 11 % to 15 % and 6.9 % to 10.5 %. (The probe's own rows,
+  `enemies` with the shade, bars and marks, are not quite that set; most
+  of the overhead lands in `enemies`, which both share.) That is the
+  nested wrappers alone; each enemy wrapper's own bookkeeping, landing in
+  `world`, comes on top and is not separated. The terrain's rows carry
+  barely any of it. Candidates are timed old against new
   without the timers (the constraint above), and this breakdown only aims
   them.
 - **The `--layers` headline against the plain `--render` one.** Sitting
@@ -323,9 +366,10 @@ at p90), since the hero does not attack.
   covers the alternation and the garbage collection `--layers` adds after
   every frame together; two effects that cancelled would not show. At 150
   the bare frames' draw p50 was 13.31 ms against the plain frames' 13.36
-  (640 frames each), and the bare minus plain p50 per block had a median
-  of +0.03 ms, from -0.87 to +0.81 (bare slower in 8 of 16). At 250, the
-  load sampled at 62 % before it, 16.12 against 16.52, a median of -0.12 ms,
+  (640 frames each), and the bare minus plain p50 per block had a p50 of
+  +0.03 ms (nearest-index, the 9th of 16; `da7ab7e` prints it as
+  "median"), from -0.87 to +0.81 (bare slower in 8 of 16). At 250, the
+  load sampled at 62 % before it, 16.12 against 16.52, a p50 of -0.12 ms,
   from -5.12 to +0.58 (7 of 16). The bare frames do not read slower; at
   250 they read 0.40 ms faster over all, inside a block spread of 5.7 ms
   on that machine, so whether they read faster there is not settled. How

@@ -497,6 +497,13 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(len(alt.timer.frames), 2)
         self.assertEqual(len(times) == len(draws) == len(in_view) == 4, True)
         self.assertEqual(len(alt.timer.calls), len(alt.timed))
+        # On the wall clock: each timed frame's parts fit inside the draw
+        # `run` timed around them, so no bare frame's time leaked into a
+        # timed one (a wrapper that cached work would show here).
+        for total, i in zip(alt.timer.totals(), alt.timed, strict=True):
+            with self.subTest(frame=i):
+                self.assertLessEqual(total, draws[i])
+                self.assertGreater(total, 0.0)
 
     def test_layered_run_forwards_its_jitter_pump_and_instruments(self):
         pump = mock.Mock()

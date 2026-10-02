@@ -1,0 +1,9 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the 62 fps cap is 16 ms, pygame counting whole milliseconds)
+  nested: whole draw p50 by kind (100 frames each): bare 17.36, all timers 18.51, all but the nested 17.99, root alone 17.37 ms
+    all timers           enemies with its nested rows p50 6.07 ms, world 1.04 ms
+    all but the nested   enemies with its nested rows p50 5.32 ms, world 1.12 ms
+  the nested wrappers add +0.52 ms to the whole draw, every timer +1.16 ms, at p50
+  and +0.75 ms to enemies with its nested rows: 240.9 enemies drawn a frame, +3.12 us an enemy
+  boss at the end: held back

@@ -1,0 +1,43 @@
+commit da7ab7e  started 2026-10-02 12:24
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb      5764,140625
+deadlock       4119,484375
+chrome          3719,90625
+cam_helper     1877,515625
+chrome         1795,796875
+audiodg          811,46875
+SystemSettings  552,046875
+chrome          530,921875
+
+
+
+=== 150a  cpu load 43%  12:24:49
+=== 200a  cpu load 48%  12:25:09
+=== 250a  cpu load 50%  12:25:31
+=== 150b  cpu load 46%  12:26:01
+=== 200b  cpu load 63%  12:26:24
+=== 250b  cpu load 79%  12:26:48
+=== bias 150  cpu load 80%  12:27:19
+=== nested 150  cpu load 72%  12:28:17
+=== bias 250  cpu load 62%  12:28:35
+=== nested 250  cpu load 47%  12:29:50
+finished 12:30  cpu load 80%
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb       5899,15625
+deadlock           5342,75
+chrome          3783,46875
+cam_helper      1919,34375
+chrome         1811,421875
+audiodg          836,15625
+SystemSettings     571,625
+chrome            530,9375
+
+
+

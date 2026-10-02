@@ -1,0 +1,13 @@
+commit c53225e  started 2026-10-02 11:40
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+=== 150a  cpu load 43%  11:40:18
+=== 200a  cpu load 41%  11:40:39
+=== 250a  cpu load 41%  11:41:01
+=== 150b  cpu load 42%  11:41:31
+=== 200b  cpu load 55%  11:41:54
+=== 250b  cpu load 45%  11:42:20
+=== bias 150  cpu load 39%  11:42:50
+=== nested 150  cpu load 65%  11:43:46
+=== bias 250  cpu load 68%  11:44:04
+=== nested 250  cpu load 40%  11:45:12
+finished 11:45

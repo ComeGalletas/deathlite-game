@@ -30,13 +30,13 @@ SEED = 35
 class FormatTests(unittest.TestCase):
     def test_every_figure_of_the_bias_printout(self):
         # Plain [1, 3, 5]: p50 3; bare [2, 4, 6]: p50 4; per block
-        # [-0.5, -0.25, 0, 0.5, 1.0]: median 0, two of five slower (a tie
+        # [-0.5, -0.25, 0, 0.5, 1.0]: p50 0, two of five slower (a tie
         # is not slower).
         text = LP.format_bias({"plain": [5.0, 1.0, 3.0], "bare": [4.0, 2.0, 6.0],
                                "diffs": [0.5, -0.25, 1.0, 0.0, -0.5]})
         self.assertEqual(text.splitlines(), [
             "  bias: 5 blocks; draw p50 plain 3.00 ms (3 frames), bare 4.00 ms (3 frames)",
-            ("  per block, bare minus plain p50: median +0.00 ms, from -0.50 to +1.00; "
+            ("  per block, bare minus plain p50: p50 +0.00 ms, from -0.50 to +1.00; "
             "bare slower in 2 of 5")])
 
     def test_bias_pairs_each_block_bare_minus_plain_in_abba_order(self):
@@ -209,7 +209,7 @@ class SceneTests(unittest.TestCase):
 class MainTests(unittest.TestCase):
     def test_nested_end_to_end(self):
         with contextlib.redirect_stdout(io.StringIO()) as out:
-            code = LP.main(["nested", "--live", "30", "--elapsed", "300", "--dormant", "0",
+            code = LP.main(["nested", "--seed", str(SEED), "--live", "30", "--elapsed", "300", "--dormant", "0",
                             "--frames", "4"], save_path=TDL._fresh_save())
         self.assertEqual(code, 0)
         text = out.getvalue()
@@ -218,7 +218,7 @@ class MainTests(unittest.TestCase):
 
     def test_bias_end_to_end(self):
         with contextlib.redirect_stdout(io.StringIO()) as out:
-            LP.main(["bias", "--live", "30", "--elapsed", "300", "--dormant", "0",
+            LP.main(["bias", "--seed", str(SEED), "--live", "30", "--elapsed", "300", "--dormant", "0",
                      "--blocks", "2", "--plain", "2", "--layered", "2"], save_path=TDL._fresh_save())
         self.assertIn("  bias: 2 blocks; draw p50 plain", out.getvalue())
 
