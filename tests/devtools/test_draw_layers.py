@@ -390,6 +390,20 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(timed, bare)
         self.assertEqual(self._frame(), bare)                   # and after
 
+    def test_no_timed_layer_runs_from_the_update(self):
+        # Every row is inside the `draw` root: a wrapped entry point the
+        # update called too would add time outside the draw and inflate
+        # the totals without a word.
+        timer = DL.LayerTimer().install(self.ps)
+        try:
+            with mock.patch.object(element_layers, "_shed", lambda *a: None):
+                for _ in range(3):
+                    self.ps.update(1 / 60)
+            self.assertEqual(timer.frame(), {})
+            self.assertEqual(timer.calls[-1], {})
+        finally:
+            timer.uninstall()
+
     def test_uninstall_leaves_every_attribute_as_it_was(self):
         timer = DL.LayerTimer().install(self.ps)
         self.assertNotEqual(self._attributes(self.ps), self.clean)

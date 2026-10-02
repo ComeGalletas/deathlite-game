@@ -221,6 +221,7 @@ class CommandLineTests(unittest.TestCase):
         self._refused(["bias", "--elapsed", "300"])                    # no --live
         self._refused(["bias", "--live", "150", "--elapsed", "300", "--layered", "1"])
         self._refused(["bias", "--live", "150", "--elapsed", "300", "--blocks", "0"])
+        self._refused(["bias", "--live", "150", "--elapsed", "300", "--plain", "0"])
         self._refused(["nested", "--live", "150", "--elapsed", "300", "--frames", "3"])
 
 

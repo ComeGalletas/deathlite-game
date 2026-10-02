@@ -107,7 +107,7 @@ finding, until RND-010.2 times it.
   (90.8 %) and work p50 (21.23 ms) fall, and the 100 to 149 row (23.6 %)
   with them.
 
-## RND-010.2: The draw by layer (2026-09-30)
+## RND-010.2: The draw by layer (2026-09-30, measured again 2026-10-02)
 
 **The tool.** `python -m tools.benchmarks.spawn_stress --live N --elapsed E
 --pack --layers` (`tools/benchmarks/draw_layers.py`). It wraps each layer's
@@ -147,22 +147,32 @@ The harness also changed around it:
   the HUD's boss bar. `build` now holds the boss back unless `--boss` asks
   for it. The display line says which before the frames (`held back`,
   `due now`, `due at N s`) and the harness says it again after timing. In
-  the owner's trace, the play frames with 225 or more alive (2,123 of them)
-  run from 295 to 376 s of run clock, before any boss; 603 of them held more
-  than 250, up to 316.
+  the owner's trace, the play frames (state and shown both
+  `PlayingState`, no overlay opened, the filter of the 150+ row above)
+  with 225 or more alive, 2,118 of them, run from 295 to 376 s of run
+  clock, before any boss; 602 of them held more than 250, up to 316.
 
 **How it was taken.** Windows renderer, the source tree's `save.json`
-(`game/save.py` `DEFAULT_PATH`; display windowed, render 21:9, window
-2560 × 1080, so render scale 1.2, zoom 1.797), seed 35, 400 dormant
-records (the default), the crowd packed round a hero standing still but
-for the harness's 24 px jitter, 600 frames (300 timed, 300 bare,
-alternating), the boss held back. Each run is
+(`game/save.py` `DEFAULT_PATH`, not tracked: the game writes it when the
+Options change). The settings that reach the draw are the display ones:
+mode windowed, window 2560 × 1080, render 21:9, set with the Options
+screen's Display mode row (Windowed) and Resolution row (2560 × 1080; a
+21:9 size gives the 21:9 render), which give render scale 1.2 and zoom
+1.797; the window always asks for
+vsync, and every run's display line prints all of these, so a run on
+another save shows it at once. Seed 35, 400 dormant records (the
+default), the crowd packed round a hero standing still but for the
+harness's 24 px jitter, 600 frames (300 timed, 300 bare, alternating),
+the boss held back. Each run, from the repo root in bash (Git Bash on
+Windows):
 
     SDL_VIDEODRIVER=windows python -m tools.benchmarks.spawn_stress --live N --elapsed E --pack --layers --frames 600
 
-with N 150 at E 300, 200 at 400 and 250 at 600. (Without
-`SDL_VIDEODRIVER=windows` the harness draws headless into the dummy
-driver's surface, which is not the cost on screen.) Two sittings count:
+with N 150 at E 300, 200 at 400 and 250 at 600. (In PowerShell, set the
+driver first: `$env:SDL_VIDEODRIVER = "windows"`, then the same command
+without the prefix. Without the driver the harness draws headless into
+the dummy driver's surface, which is not the cost on screen.) Two
+sittings count:
 
 - **Sitting 5 (2026-10-02, 11:40 to 11:45), commit `c53225e`**, the tool
   as committed: 150, 200 and 250 in that order, twice, then the probes
@@ -173,19 +183,21 @@ driver's surface, which is not the cost on screen.) Two sittings count:
 
   at 150 / 300 and 250 / 600 (`bias`: 16 blocks of 40 plain frames then
   80 layered; `nested`: 400 frames, 100 of each kind; the defaults). The
-  machine was busy: the CPU load sampled before each run was 39 to 68 %,
-  and a game client was running beside it, so its absolute times are
-  inflated, and the second round ran 15.7 % slower than the first at 150
-  and 200 (the same at 250).
-- **Sitting 4 (2026-09-30, 20:00)**, an uncommitted tree, run before
-  `b6f7269` was committed (20:58) and matching no commit: its output
-  already has the items lists' rows and the after-timing boss line that
-  `dba4744` committed. The tree itself was not kept. `dba4744`, the first
-  commit with all of its rows, times the same layers and computes every
-  number as `c53225e` does, except that it collected the young garbage
-  only after the timed frames. 150 and 250 only, two runs each. The load
-  was not recorded; its bare draws are 12 % to 29 % lower than sitting
-  5's at the same crowd, so it is the quieter record.
+  machine was busy: the CPU load sampled before each run was 39 to 68 %
+  (recorded by the sitting's script), and a process list taken a few
+  minutes after it ended, the load still 46 to 58 %, showed a game client
+  running. Its absolute times are inflated, and the second round ran
+  15.7 % slower than the first at 150 and 200 (the same at 250).
+- **Sitting 4 (2026-09-30, 20:00), the tool of `b6f7269`**: its output
+  matches that commit line for line (the same rows, the villagers', huts'
+  and lists' among them; the same printed strings, the after-timing boss
+  line among them; the call count printed whole), and the commit, 58
+  minutes later, says its figures were taken on the tool as committed.
+  `b6f7269` computes every number as `c53225e` does, except that it
+  collected the young garbage only after the timed frames. 150 and 250
+  only, two runs each. The load was not recorded; its bare draws are 12 %
+  to 29 % lower than sitting 5's at the same crowd, so it is the quieter
+  record.
 
 Sittings 1 to 3 (2026-09-30) ran earlier versions of the tool, under
 conditions mostly unrecorded; their tables are dropped, and nothing below
@@ -249,10 +261,12 @@ at p50 (particles up to 0.13 at p90), since the hero does not attack.
   sitting 4).
 - **Per enemy:** the `enemies` row over its calls a frame is 13.7 to
   14.2 µs in sitting 4 and 15.4 to 19.4 µs in sitting 5. The nested
-  wrappers are about 3 µs of each enemy's timed cost (sitting 5's probe,
+  wrappers add 3.4 µs an enemy at 150 and 3.0 at 250 (sitting 5's probe,
   below), but the probe does not separate how much of that lands in the
-  `enemies` row itself, so an enemy's own draw is of the order of 10 to
-  15 µs, for what is one sprite blit and a few lookups each.
+  `enemies` row itself. Taking all of it off or none of it, an enemy's
+  own draw is 10.3 to 14.2 µs on sitting 4's machine and 12.0 to 19.4 µs
+  on sitting 5's busier one: an estimate, for what is one sprite blit and
+  a few lookups each.
 - **Against the budget:** the bare draw alone, with the hero not attacking
   and no boss, is 10.34 and 10.46 ms at 147 in view (62 % and 63 % of the
   16.67 ms) and 12.45 and 11.90 ms at 224 (75 % and 71 %) in sitting 4,
@@ -271,24 +285,31 @@ at p50 (particles up to 0.13 at p90), since the hero does not attack.
   `enemies` with its nested rows at 150 (3.68 against 3.14 ms; 3.4 µs an
   enemy over 159 calls) and 0.73 ms at 250 (5.41 against 4.68 ms; 3.0 µs
   over 244), and 0.25 and 0.70 ms to the whole draw, of every timer's
-  0.92 and 1.10 ms. (That the rows grow more than the whole frame at 150
-  is the spread of 100 frames a kind on a busy machine.) The root's timer
-  alone added nothing measurable (13.65 against 13.65 ms at 150, 14.94
-  against 15.08 at 250). So the crowd's rows read high by about a tenth
-  from the nested wrappers alone (0.54 of 4.12 to 4.98 ms at 150, 0.73 of
-  7.77 to 7.86 at 250: 9 % to 13 %), and the terrain's barely at all;
-  candidates are timed old against new without the timers (the
-  constraint above), and this breakdown only aims them.
-- **The alternation does not show in the bare frames.** Sitting 5's
-  `bias` probe, on the same scenes, put plain and layered blocks side by
-  side over one crowd so its drift cancels in the pairs: at 150 the bare
+  0.92 and 1.10 ms. At 150 the two disagree (the rows grew 0.54 ms, the
+  whole frame 0.25), which 100 frames a kind on a busy machine cannot
+  settle; at 250 they agree (0.73 and 0.70). The root's timer alone added
+  nothing measurable (13.65 against 13.65 ms at 150, 14.94 against 15.08
+  at 250). So the nested wrappers alone make the crowd's rows read high
+  by about 9 % at 250 (0.70 to 0.73 of 7.77 to 7.86 ms), and by 5 % to
+  13 % at 150 depending on which of the two is taken (0.25 to 0.54 of
+  4.12 to 4.98 ms); the terrain's rows barely at all. Candidates are timed
+  old against new without the timers (the constraint above), and this
+  breakdown only aims them.
+- **The `--layers` headline matches the plain `--render` one.** Sitting
+  5's `bias` probe, on the same scenes, put plain and layered blocks side
+  by side over one crowd so its drift cancels in the pairs. It compares
+  what the two commands report, so it covers the alternation and the
+  garbage collection `--layers` adds after every frame together; two
+  effects that cancelled would not show. At 150 the bare
   frames' draw p50 was 13.22 ms against the plain frames' 13.20 (640
   frames each), and the bare minus plain p50 per block had a median of
   -0.05 ms, from -0.44 to +0.80 (bare slower in 7 of 16); at 250, 14.50
   against 14.52, median -0.24 ms, from -3.33 to +1.61 (6 of 16). No bias
-  shows. On a machine this busy the probe cannot rule out one of about
-  0.3 ms either way at 150, and at 250 its blocks spread too far to bound
-  one usefully; the overall p50s agree within 0.02 ms at both.
+  shows: the overall p50s agree within 0.02 ms at both, and the blocks
+  split either way about as a coin would. How small a bias the probe
+  would miss is not computed; the blocks' spread (1.24 ms at 150, about
+  5 ms at 250 on this busy machine) is the scale of what one block can
+  see.
 - **The packed crowd is past what the owner played.** In the owner's
   trace, the play frames with 150 or more alive (4,557) had 90 enemies in
   view at p50, 173 at p99 and 177 at most; none had 200. The harness's

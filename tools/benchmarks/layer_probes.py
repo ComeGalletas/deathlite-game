@@ -8,13 +8,16 @@ Both build the scene `spawn_stress --pack` times (`packed_scene`: the same
 build, the boss held back, the 60-frame warm-up, the crowd packed round
 the hero), so their figures sit beside a `--layers` run's.
 
-* `bias`: does alternating the timers move the bare frames the headline
-  reports? Paired blocks over one crowd: `--plain` frames of the plain
-  `--render` run, then `--layered` frames of `--layers`. The crowd drifts
-  slowly (summons arrive, bodies sleep), so a pair's difference cancels
-  it. Prints the plain and the bare draw p50 over all blocks and the
-  per-block bare minus plain p50: its median, its range and how many
-  blocks had the bare frames slower.
+* `bias`: does the `--layers` headline (its bare frames) report what the
+  plain `--render` headline does? Paired blocks over one crowd: `--plain`
+  frames of the plain `--render` run, then `--layered` frames of
+  `--layers`. The crowd drifts slowly (summons arrive, bodies sleep), so
+  a pair's difference cancels it. It compares the two commands as they
+  stand, so the alternation and the garbage collection `--layers` adds
+  after every frame are covered together; two effects that cancelled
+  would not show. Prints the plain and the bare draw p50 over all blocks
+  and the per-block bare minus plain p50: its median, its range and how
+  many blocks had the bare frames slower.
 * `nested`: what the wrappers nested inside `enemies` (`shade`, `hpbar`,
   `marks`) cost. Frames rotate four ways (`Rotate`): bare, every timer,
   every timer but those three, the root alone. Prints each kind's whole
@@ -22,7 +25,8 @@ the hero), so their figures sit beside a `--layers` run's.
   for the two timed kinds, `enemies` with its nested rows and `world`.
 
 Headless without `SDL_VIDEODRIVER=windows`, like the harness: the dummy
-driver's surface, not the cost on screen.
+driver's surface, not the cost on screen. The prefix above is bash's (Git
+Bash on Windows); in PowerShell, `$env:SDL_VIDEODRIVER = "windows"` first.
 """
 from __future__ import annotations
 
@@ -158,17 +162,24 @@ def parse(argv=None) -> argparse.Namespace:
                        ("nested", ("frames rotating bare, all timers, all but the nested, "
                                   "the root alone"))):
         p = sub.add_parser(name, help=text)
-        p.add_argument("--seed", type=int, default=35)
+        p.add_argument("--seed", type=int, default=35, help="the world's seed")
         p.add_argument("--live", type=int, required=True,
                        help="as spawn_stress --live; needs --elapsed (N - 100) * 4")
-        p.add_argument("--elapsed", type=float, required=True)
-        p.add_argument("--dormant", type=int, default=400)
+        p.add_argument("--elapsed", type=float, required=True,
+                       help="the run clock in seconds, as spawn_stress --elapsed")
+        p.add_argument("--dormant", type=int, default=400,
+                       help="enemy records banked on the other islands, as spawn_stress")
         if name == "bias":
-            p.add_argument("--blocks", type=int, default=16)
-            p.add_argument("--plain", type=int, default=40)
-            p.add_argument("--layered", type=int, default=80)
+            p.add_argument("--blocks", type=int, default=16,
+                           help="pairs of a plain and a layered block")
+            p.add_argument("--plain", type=int, default=40,
+                           help="frames of each plain --render block")
+            p.add_argument("--layered", type=int, default=80,
+                           help="frames of each --layers block, half of them bare")
         else:
-            p.add_argument("--frames", type=int, default=400)
+            p.add_argument("--frames", type=int, default=400,
+                           help="frames in all, rotating bare, all timers, all but the "
+                                "nested, the root alone")
     args = ap.parse_args(argv)
     if args.probe == "bias" and (args.blocks < 1 or args.plain < 1 or args.layered < 2):
         ap.error("bias needs --blocks and --plain of 1 or more and --layered of 2 or more")
