@@ -42,10 +42,13 @@ NAME = "DeathliteGame"                # exe / dist folder name (no space: paths)
 # the two streamed tracks named by `config.MUSIC_TRACKS` (about 8.5 MB, the
 # largest single contribution to the bundle). `sound_effects` holds the cues
 # named by `config.SOUND_EFFECTS`; its `unused/` folder of Freesound originals
-# is skipped by SKIP_DIRS below, like every other `unused/`.
+# is skipped by SKIP_DIRS below, like every other `unused/`. `infused` holds
+# the elemental recolours named by `data/weapons/infused_sprites.json`; it was
+# missing until BLD-005. `tests/systems/test_desktop_bundle.py` runs this spec
+# and fails if any asset the game names is not in `datas`.
 ASSET_DIRS = [
     "buildings", "characters", "effects", "enemies",
-    "fonts", "items", "music", "projectiles", "sound_effects",
+    "fonts", "infused", "items", "music", "projectiles", "sound_effects",
     "terrain", "ui",
 ]
 
