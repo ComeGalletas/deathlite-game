@@ -63,6 +63,14 @@ for n in (150, 200, 250):
 qc = {n: [v["g_crowd"] for (m, _), v in quiet.items() if m == n] for n in (150, 200, 250)}
 print(f"quiet crowd growth 147 to 224 in view: {max(qc[250]) / min(qc[150]):.2f} to "
       f"{min(qc[250]) / max(qc[150]):.2f} times")
+for n in (150, 250):
+    s_ = [S7[n, x]["g_ratio"] for x in "ab" if (n, x) not in quiet]
+    q_ = [S7[n, x]["g_ratio"] for x in "ab" if (n, x) in quiet]
+    print(f"slow against quiet run's ratio at {n}: {s_[0]:.3f} against {q_[0]:.3f}, "
+          f"{100 * (s_[0] / q_[0] - 1):+.1f} %")
+gq = [S7[250, x]["g_ratio"] / S7[150, y]["g_ratio"] for x in "ab" for y in "ab"
+      if (250, x) in quiet and (150, y) in quiet]
+print(f"ratio growth 147 to 224, sitting 7 quiet runs only: {span(gq)}")
 gr = [S7[250, x]["g_ratio"] / S7[150, y]["g_ratio"] for x in "ab" for y in "ab"]
 print(f"ratio growth 147 to 224, sitting 7 runs: {span(gr)}")
 diff = [abs(v[g] / v[s] - 1) for v in S7.values() for g, s in (("g_terrain", "terrain"), ("g_crowd", "crowd"))]
@@ -84,6 +92,9 @@ for n in (150, 200, 250):
           f"{100 * (max(bs) / min(bs) - 1):.1f} % apart")
 g = [R[p, 250, x]["ratio"] / R[p, 150, x]["ratio"] for p, _ in SITTINGS for x in "ab"]
 print("growth 150 to 250 (ratio of ratios), each sitting's a and b:", [round(v, 2) for v in g])
+g_clean = [R[p, 250, x]["ratio"] / R[p, 150, x]["ratio"] for p, _ in SITTINGS for x in "ab"
+           if p != "s7"]
+print(f"growth in sittings 4 to 6, each sitting's a and b: {span(g_clean)}")
 s4t = [R["s4", n, x]["terrain"] for n in (150, 250) for x in "ab"]
 print("sitting 4 terrain (sum of p50s):", span(s4t), " sitting 7 quiet runs (sum of p50s):",
       span([v["terrain"] for v in quiet.values()]))
@@ -121,5 +132,12 @@ for p in ("s5", "s6", "s7"):
             return out
         start, end = cpu(parts[0]), cpu(parts[1])
         gained = sorted(((end[k] - start[k], k) for k in start.keys() & end.keys()), reverse=True)
-        print("   CPU seconds gained over the sitting, top processes in both lists: "
+        print("   CPU seconds gained over the sitting, processes in both top lists: "
               + ", ".join(f"{k} {d:.0f}" for d, k in gained))
+        # A process in only one list was below the other list's cutoff (its
+        # smallest entry) there, so only a bound on what it gained is known.
+        for k in sorted(end.keys() - start.keys()):
+            print(f"   {k}: only in the end list, gained at least {end[k] - min(start.values()):.0f} s "
+                  f"(no upper bound)")
+        for k in sorted(start.keys() - end.keys()):
+            print(f"   {k}: only in the start list, gained at most {min(end.values()) - start[k]:.0f} s")

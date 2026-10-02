@@ -205,7 +205,8 @@ Every raw output below is kept in
 printout, each sitting's log and the script that ran it, and the scripts
 that build the tables and every derived figure from them (`table.py`,
 `derived.py`, `trace_figures.py`). Four sittings count. Sittings 1 to 3
-(2026-09-30) do not: they ran uncommitted, earlier versions of the tool
+(2026-09-30) do not (from here to the end of this paragraph, the
+builder's record): they ran uncommitted, earlier versions of the tool
 (`b6f7269` is the first commit of it), all without the lists' own rows;
 sitting 1 also without the `hud` and `feedback` rows and with a
 calibrated rather than a measured timers' cost, sittings 1 and 2 without
@@ -214,18 +215,26 @@ runs. Their conditions were mostly unrecorded; sittings 1 and 2's outputs
 were not kept, and sitting 3's are left out of the data folder with them.
 
 - **Sitting 7 (2026-10-02, 13:57 to 14:01), commit `bb92e30`**: the runs
-  and both probes (`s7_*.txt`), the conclusions' source. The owner closed
-  the game that ran in sitting 6 (`deadlock`) first; the log
-  (`s7_meta.txt`) records the CPU load before each run, 20 % to 40 %, and
-  the top processes by CPU time at the start and the end. One game
-  process was still open, `NTEGlobalGame`, and gained 8 s of CPU time
-  over the four minutes; no other process in the lists gained more than
-  91 s (`SignalRgb`). `bb92e30` prints the terrain and the crowd's part as
+  and both probes (`s7_*.txt`), the conclusions' source. The owner was
+  asked to close their games first (the builder's record; `deadlock`,
+  which ran in sitting 6, is in neither of sitting 7's process lists).
+  The log (`s7_meta.txt`) records the CPU load before each run, 20 % to
+  40 %, and the top eight processes by CPU time at the start and the end.
+  Of the processes in both lists, none gained more than 91 s
+  (`SignalRgb`); one game process, `NTEGlobalGame`, was still open and
+  gained 8 s. The builder's own session (`claude`) is only in the end
+  list, so it gained at least 89 s, with no upper bound; it was editing
+  files and ran short scripts on the earlier sittings' outputs during the
+  sitting (the builder's record), and may be behind the slow patches
+  below. `bb92e30` prints the terrain and the crowd's part as
   each frame's sum (the groups below) and the bias probe's every block
   and interval. Two of its runs, 150 b and 250 a, ran in slow patches:
   their terrain, the same work in every run, came to 7.79 and 8.22 ms
   against 6.44 to 6.54 in the other four (`derived.py` sets the line at
   7 ms). The four quiet runs are the quiet record on the current tool.
+  Choosing them by their terrain makes their flat terrain no evidence by
+  itself; sitting 4, chosen by nothing, is: its terrain is 6.25 to
+  6.53 ms (summed) at both its crowds.
 - **Sitting 6 (2026-10-02, 12:24 to 12:30), commit `da7ab7e`**: the runs
   (`s6_*.txt`, and its earlier probes, superseded by sitting 7's). The
   log (`s6_meta.txt`) records the load, 43 % to 80 %, and a game
@@ -235,10 +244,11 @@ were not kept, and sitting 3's are left out of the data folder with them.
   (`s5_*.txt`), timed by the same code as `da7ab7e` (no change to
   `draw_layers.py`, `spawn_stress.py` or `stats.py` between them). The
   load was 39 % to 68 % (`s5_meta.txt`); a game client was seen in a
-  process list just after it, not kept in a file. Its probe outputs ran
+  process list just after it (the builder's record, not kept in a file). Its probe outputs ran
   an earlier probe and are not kept.
-- **Sitting 4 (2026-09-30, 20:00), the tool of `b6f7269`** (`s4_*.txt`;
-  no log was kept): its output matches that commit line for line (the
+- **Sitting 4 (2026-09-30, about 20:00, the builder's record from its
+  output files' times), the tool of `b6f7269`** (`s4_*.txt`; no log was
+  kept): its output matches that commit line for line (the
   same rows, the same printed strings, the call count printed whole), and
   the commit, 58 minutes later, says its figures were taken on the tool
   as committed. `b6f7269` computes every number as the later commits do,
@@ -300,7 +310,8 @@ since the hero does not attack.
   from 147 to 224. The terrain is larger at every crowd measured and does
   not grow; the crowd's part does, and so do the small per-enemy rows
   outside it (the elemental sort and under-layer, the bars and the marks,
-  0.26 to 0.34 ms at 147 to 0.39 to 0.57 at 224, and the enemies' shots).
+  together 0.26 ms at 147, 0.29 to 0.32 at 178 and 0.39 at 224 on the
+  same quiet runs, and the enemies' shots).
   RND-009 put the ground bands at the alpha blitter's floor, and the
   owner keeps the terrain as it is.
 - **In play the draw is higher, and that gap is not measured here.** The
@@ -308,14 +319,20 @@ since the hero does not attack.
   trace_figures.py`): its p50 is 8.02 ms at 0 to 29 enemies in view, 10.64
   at 30 to 59, 12.11 at 60 to 89, 13.64 at 90 to 119, 13.96 at 120 to 149
   and 13.78 at 150 to 179, while the particles in those frames rise from
-  a p50 of 11 to 206 and the damage numbers from 2 to 80. Beside the
-  harness's bare draw at about the same counts (10.14 ms at 147 in view,
-  11.01 and 11.09 at 178), play draws about 3 to 4 ms more. That is an
-  estimate across different scenes (the trace's crowd is spread over the
-  map, not packed; the hero fights; the terrain on screen differs; the
-  machine's state during play is not recorded), but it is about as large
-  as the whole crowd's part measured here, and the frames it shows in are
-  the ones full of particles and damage numbers. So the owner's read
+  a p50 of 11 to 206 and the damage numbers from 2 to 80. Matched to the
+  harness's quiet runs, play frames within 7 of the same count in view
+  draw 13.22 ms at 140 to 154 (125 frames) against the harness's 10.14 at
+  147, 3.08 ms more, and 15.09 ms at 171 to 185 (89 frames; the trace's
+  maximum is 177) against 11.01 and 11.09 at 178, 4.00 to 4.08 ms more.
+  That is an estimate across different scenes: the trace's crowd is
+  spread over the map, not packed; the hero fights; the terrain on screen
+  differs; the machine's state during play is not recorded; and the
+  trace's `draw_ms` spans the screen's clear and the debug overlay
+  (`Game._render`, `game/game.py`) as well as the state's draw, which the
+  harness does not time (their cost is not measured here). Even so, the
+  gap is close to the whole crowd's part measured at those counts (3.52
+  and 4.36 to 4.58 ms), and the frames it shows in are the ones full of
+  particles and damage numbers. So the owner's read
   holds for the crowd's own draw, which this breakdown measured and
   ranked; whether the combat effects the crowd brings cost as much is not
   settled by it. It is carried into RND-010.3 as an open item (below).
@@ -325,14 +342,18 @@ since the hero does not attack.
   machine's speed taken out. Two judgements sit in that: the terrain
   (blit-bound) and the crowd (more Python) need not slow alike under
   contention, and the crowd's part as timed carries timer overhead that
-  grows with the crowd (below), so the ratio reads somewhat high. In
-  sitting 7, each frame's ratio has a p50 of 0.543 and 0.580 at 147 in
-  view, 0.670 and 0.711 at 178, 0.863 and 0.913 at 224, slow runs
-  included. As sums of p50s, over all four sittings, it is 0.538 to 0.592
-  at 147 (a spread of 10.0 %), 0.667 to 0.736 at 178 (sittings 5 to 7,
-  10.3 %) and 0.860 to 0.923 at 224 (7.3 %), and it grows 1.51 to 1.67
-  times from 147 to 224 within every sitting, while the bare draw at the
-  same crowd differed by up to 37.4 %, 37.1 % and 44.0 % between sittings
+  grows with the crowd (below), so the ratio reads somewhat high. Sitting
+  7 measures how far contention moves it: each frame's ratio has a p50 of
+  0.543 and 0.580 at 147 in view, 0.670 and 0.711 at 178, 0.863 and 0.913
+  at 224, and the slow run reads 6.8 % and 5.8 % above the quiet one at
+  147 and 224. As sums of p50s, over all four sittings, it is 0.538 to
+  0.592 at 147 (a spread of 10.0 %), 0.667 to 0.736 at 178 (sittings 5 to
+  7, 10.3 %) and 0.860 to 0.923 at 224 (7.3 %). It grows 1.53 to 1.60
+  times from 147 to 224 within each of sittings 4 to 6 (sums of p50s)
+  and 1.59 times between sitting 7's quiet runs (each frame's ratio);
+  sitting 7's a and b pairs, as sums of p50s, give 1.67 and 1.51, each a
+  slow run set against a quiet one. Meanwhile the bare draw at the same
+  crowd differed by up to 37.4 %, 37.1 % and 44.0 % between sittings
   (largest over smallest, the convention of the spreads above).
 - **Per enemy:** the `enemies` row over its calls a frame is 12.9 to
   13.8 µs on sitting 7's quiet runs. The probe puts the nested wrappers at
@@ -410,8 +431,8 @@ since the hero does not attack.
 - **No fight, and the open item it leaves.** The hero does not attack, so
   there are no particles, damage numbers, hit tints or damaged health
   bars, where the owner's trace has 144 to 206 particles and 59 to 80
-  damage numbers at p50 with 120 to 179 enemies in view, and draws about
-  3 to 4 ms more than the harness at those counts (an estimate across
+  damage numbers at p50 with 120 to 179 enemies in view, and draws 3.08
+  to 4.08 ms more than the harness at matched counts (an estimate across
   scenes, above). Open for RND-010.3, for the owner: whether to measure a
   fighting scene before the candidates are chosen, or to take the crowd's
   own draw first as planned. The harness can already stage one:

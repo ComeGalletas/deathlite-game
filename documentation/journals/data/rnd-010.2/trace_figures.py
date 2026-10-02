@@ -36,3 +36,12 @@ for lo, hi in ((0, 30), (30, 60), (60, 90), (90, 120), (120, 150), (150, 180)):
               f"{pct([float(r['draw_ms']) for r in band], 0.9):.2f}; particles p50 "
               f"{pct([int(r['particles']) for r in band], 0.5)}, damage numbers p50 "
               f"{pct([int(r['numbers']) for r in band], 0.5)}")
+# Matched to the harness's quiet runs (sitting 7: 10.14 ms bare at 147 in
+# view, 11.01 and 11.09 at 178): play frames within 7 in view of each.
+HARNESS = ((147, (10.14,)), (178, (11.01, 11.09)))
+for view, bares in HARNESS:
+    band = [float(r["draw_ms"]) for r in play if r["in_view"] and abs(int(r["in_view"]) - view) <= 7]
+    p50 = pct(band, 0.5)
+    print(f"  {view - 7} to {view + 7} in view: {len(band)} frames, draw p50 {p50:.2f} ms; above the "
+          f"harness's bare {', '.join(f'{b:.2f}' for b in bares)} by "
+          + ", ".join(f"{p50 - b:.2f}" for b in bares) + " ms")

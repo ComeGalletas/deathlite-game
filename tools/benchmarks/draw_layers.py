@@ -338,9 +338,10 @@ class Alternate:
         else:
             self.bare.append(self._i)
         # Every frame's young garbage (the wrappers allocate) is collected
-        # here, with no timer on, after both kinds alike: each frame then
-        # starts from the same collector state, and neither kind pays for
-        # the other's allocations.
+        # here, with no timer on, after both kinds alike, so neither kind
+        # pays for the other's allocations. Not quite the same state for
+        # both: a timed frame also starts with `install`'s wrappers and
+        # undo records, allocated after this collection.
         gc.collect(0)
         if not was_timed:
             self.timer.install(self.ps)

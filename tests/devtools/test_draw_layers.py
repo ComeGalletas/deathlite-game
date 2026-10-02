@@ -287,7 +287,8 @@ class SkipTests(unittest.TestCase):
         # `layer_probes` leaves the nested timers off to cost them.
         a, b = RollbackTests._Plain(), RollbackTests._Plain()
         timer = DL.LayerTimer(skip={"b"})
-        with mock.patch.object(DL.LayerTimer, "_targets", staticmethod(lambda ps: {"a": a, "b": b})),                 mock.patch.object(DL, "LAYERS", (("a", "a", "draw"), ("b", "b", "draw"))):
+        with mock.patch.object(DL.LayerTimer, "_targets", staticmethod(lambda ps: {"a": a, "b": b})), \
+                mock.patch.object(DL, "LAYERS", (("a", "a", "draw"), ("b", "b", "draw"))):
             timer.install(object())
         try:
             self.assertIn("draw", vars(a))

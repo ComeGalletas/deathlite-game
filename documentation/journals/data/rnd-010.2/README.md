@@ -3,10 +3,18 @@
 The outputs behind the RND-010.2 section of
 [`crowd_draw_journal.md`](../../crowd_draw_journal.md), kept as printed.
 Every measured figure that section quotes is in one of these files or is
-computed from them by the scripts below. Three things it states are the
-builder's record and in no file: the machine (CPU, GPU, memory), the
-desktop size, and that the owner's own save holds the same display block;
-it labels them so.
+computed from them by the scripts below. What it states from the
+builder's record, in no file here, it labels so:
+
+- the machine (CPU, GPU, memory), the desktop size, and that the owner's
+  own save holds the same display block;
+- sitting 4's time (20:00, from its output files' times when they were
+  written; it kept no log);
+- a game client seen in a process list just after sitting 5;
+- that the owner was asked to close their games before sitting 7, and
+  what the builder's own session did during it;
+- what sittings 1 to 3 ran and that a first 200 and 250 run measured a
+  crowd of 159 to 175 (outputs not kept).
 
 ## Sittings
 

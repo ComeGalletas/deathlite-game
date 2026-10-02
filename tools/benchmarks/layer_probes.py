@@ -100,8 +100,8 @@ def bias(ps, blocks: int, plain: int, layered: int) -> dict:
 def sign_interval(n: int) -> tuple[int, float] | None:
     """The sign test's interval for a median from `n` paired differences:
     `(k, coverage)`, the interval running from the k-th smallest to the
-    k-th largest, the widest-k one covering at least 95 %. None when `n`
-    is too small for any."""
+    k-th largest, with the largest k (so the narrowest interval) that
+    still covers at least 95 %. None when `n` is too small for any."""
     k, coverage = None, 0.0
     for j in range(1, n // 2 + 1):
         tail = sum(math.comb(n, i) for i in range(j)) / 2 ** n
