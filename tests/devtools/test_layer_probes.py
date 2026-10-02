@@ -39,16 +39,28 @@ class FormatTests(unittest.TestCase):
             ("  per block, bare minus plain p50: median +0.00 ms, from -0.50 to +1.00; "
             "bare slower in 2 of 5")])
 
-    def test_bias_pairs_each_block_bare_minus_plain(self):
-        # Block 1: plain [1, 1, 1], layered [3, 99, 3, 99] (bare 0 and 2):
-        # +2. Block 2: plain [5, 5, 5], bare [4, 4]: -1.
+    def test_bias_pairs_each_block_bare_minus_plain_in_abba_order(self):
+        # Block 1, plain first: plain [1, 1, 1], layered [3, 99, 3, 99]
+        # (bare 0 and 2): +2. Block 2, layered first: bare [4, 4], plain
+        # [5, 5, 5]: -1. The order alternates so a drift inside a block
+        # falls on each side alike.
         alt = DL.Alternate(DL.LayerTimer(), ps=None)
         alt.bare, alt.timed = [0, 2], [1, 3]
         plains = iter([[1.0] * 3, [5.0] * 3])
         layered = iter([[3.0, 99.0, 3.0, 99.0], [4.0, 99.0, 4.0, 99.0]])
-        with mock.patch.object(S, "run", lambda ps, n, render: (None, next(plains), None)), \
-                mock.patch.object(S, "layered_run", lambda ps, n: (None, next(layered), None, alt)):
+        order = []
+
+        def run(ps, n, render):
+            order.append(("plain", n))
+            return None, next(plains), None
+
+        def layered_run(ps, n):
+            order.append(("layered", n))
+            return None, next(layered), None, alt
+
+        with mock.patch.object(S, "run", run), mock.patch.object(S, "layered_run", layered_run):
             result = LP.bias(object(), blocks=2, plain=3, layered=4)
+        self.assertEqual(order, [("plain", 3), ("layered", 4), ("layered", 4), ("plain", 3)])
         self.assertEqual(result, {"plain": [1.0, 1.0, 1.0, 5.0, 5.0, 5.0],
                                   "bare": [3.0, 3.0, 4.0, 4.0], "diffs": [2.0, -1.0]})
 
@@ -58,7 +70,8 @@ class FormatTests(unittest.TestCase):
                 self.kinds = ["bare", "all", "no_nested", "root", "bare"]
                 self.timers = {
                     "all": mock.Mock(frames=[{"enemies": 1.0, "enemies/shade": 0.5,
-                                              "enemies/marks": 0.25, "world": 0.2, "ground": 9.0}]),
+                                              "enemies/marks": 0.25, "world": 0.2, "ground": 9.0}],
+                                     **{"calls_per_frame.side_effect": {"enemies": 7.5}.get}),
                     "no_nested": mock.Mock(frames=[{"enemies": 1.25, "ground": 9.0}]),
                     "root": mock.Mock(frames=[{"draw": 12.0}])}
 
@@ -75,19 +88,24 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(result["all_world"], [0.2])
         self.assertEqual(result["no_nested_enemies"], [1.25])
         self.assertEqual(result["no_nested_world"], [0.0])        # absent counts 0
+        self.assertEqual(result["enemies_calls"], 7.5)            # the probe's own count
 
     def test_every_figure_of_the_nested_printout(self):
         text = LP.format_nested({
             "draw": {"bare": [10.0, 11.0, 12.0], "all": [14.0, 15.0, 16.0],
                      "no_nested": [13.0, 14.0, 12.0], "root": [11.5, 11.5, 11.5]},
             "all_enemies": [5.0, 6.0, 7.0], "all_world": [1.0, 2.0, 3.0],
-            "no_nested_enemies": [4.0, 4.5, 5.0], "no_nested_world": [0.5, 1.0, 1.5]})
+            "no_nested_enemies": [4.0, 4.5, 5.0], "no_nested_world": [0.5, 1.0, 1.5],
+            "enemies_calls": 4.0})
         self.assertEqual(text.splitlines(), [
             ("  nested: whole draw p50 by kind (3 frames each): bare 11.00, all timers 15.00, "
             "all but the nested 13.00, root alone 11.50 ms"),
             "    all timers           enemies with its nested rows p50 6.00 ms, world 2.00 ms",
             "    all but the nested   enemies with its nested rows p50 4.50 ms, world 1.00 ms",
-            "  the nested wrappers add +2.00 ms to the whole draw, every timer +4.00 ms, at p50"])
+            "  the nested wrappers add +2.00 ms to the whole draw, every timer +4.00 ms, at p50",
+            # 6.00 - 4.50 = 1.50 ms over 4 enemies a frame: 375 us each.
+            ("  and +1.50 ms to enemies with its nested rows: 4.0 enemies drawn a frame, "
+             "+375.00 us an enemy")])
 
 
 class RotateTests(unittest.TestCase):
@@ -174,6 +192,7 @@ class SceneTests(unittest.TestCase):
                          {"bare": 3, "all": 2, "no_nested": 2, "root": 2})
         self.assertEqual(len(result["all_enemies"]), 2)
         self.assertTrue(all(v > 0 for v in result["all_enemies"]))
+        self.assertGreater(result["enemies_calls"], 0)
 
     def test_each_kind_wraps_what_it_says(self):
         rotate = LP.Rotate(self.ps)
@@ -200,8 +219,8 @@ class MainTests(unittest.TestCase):
     def test_bias_end_to_end(self):
         with contextlib.redirect_stdout(io.StringIO()) as out:
             LP.main(["bias", "--live", "30", "--elapsed", "300", "--dormant", "0",
-                     "--blocks", "1", "--plain", "2", "--layered", "2"], save_path=TDL._fresh_save())
-        self.assertIn("  bias: 1 blocks; draw p50 plain", out.getvalue())
+                     "--blocks", "2", "--plain", "2", "--layered", "2"], save_path=TDL._fresh_save())
+        self.assertIn("  bias: 2 blocks; draw p50 plain", out.getvalue())
 
 
 class CommandLineTests(unittest.TestCase):
@@ -221,6 +240,7 @@ class CommandLineTests(unittest.TestCase):
         self._refused(["bias", "--elapsed", "300"])                    # no --live
         self._refused(["bias", "--live", "150", "--elapsed", "300", "--layered", "1"])
         self._refused(["bias", "--live", "150", "--elapsed", "300", "--blocks", "0"])
+        self._refused(["bias", "--live", "150", "--elapsed", "300", "--blocks", "3"])  # odd: no ABBA
         self._refused(["bias", "--live", "150", "--elapsed", "300", "--plain", "0"])
         self._refused(["nested", "--live", "150", "--elapsed", "300", "--frames", "3"])
 

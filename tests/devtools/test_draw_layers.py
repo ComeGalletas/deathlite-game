@@ -563,6 +563,28 @@ class ShortfallTests(unittest.TestCase):
                               "cap: placement found no room for the rest")
 
 
+class ElementPathTests(unittest.TestCase):
+    """The busy update `--cascade --element-rate` times: infused weapons, a
+    primed packed crowd, the pump and the instruments, seed 35. No timed
+    layer runs from it either, so the totals stay the draw's."""
+
+    def test_no_timed_layer_runs_from_the_cascade_update(self):
+        _game, ps = S.build(SEED, 30, 0, 300.0, config.ENEMY_LOD_SKIP, save_path=_fresh_save())
+        S.infuse(ps, SEED)
+        pump = S.element_pump(ps, 4, SEED)
+        S.run(ps, 5, pump=pump)
+        S.cascade_setup(ps)                                  # primed: reactions chain
+        instruments = S.Instruments(ps)
+        timer = DL.LayerTimer().install(ps)
+        try:
+            S.run(ps, 10, pump=pump, instruments=instruments)
+            self.assertEqual(timer.frame(), {})
+            self.assertEqual(timer.calls[-1], {})
+        finally:
+            timer.uninstall()
+        self.assertGreater(sum(instruments.reactions), 0)    # the busy path really ran
+
+
 class VillagersAndHutsTests(unittest.TestCase):
     """Seed 35's villagers, fish huts and boats, each brought into view by
     standing the hero on it; their draw functions are timed."""

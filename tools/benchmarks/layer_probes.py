@@ -10,9 +10,11 @@ the hero), so their figures sit beside a `--layers` run's.
 
 * `bias`: does the `--layers` headline (its bare frames) report what the
   plain `--render` headline does? Paired blocks over one crowd: `--plain`
-  frames of the plain `--render` run, then `--layered` frames of
-  `--layers`. The crowd drifts slowly (summons arrive, bodies sleep), so
-  a pair's difference cancels it. It compares the two commands as they
+  frames of the plain `--render` run and `--layered` frames of
+  `--layers`, the plain first in even blocks and second in odd ones
+  (ABBA, so `--blocks` is even). The crowd drifts slowly (summons arrive,
+  bodies sleep): pairing cancels the drift between blocks, and the
+  alternating order cancels a steady drift inside them. It compares the two commands as they
   stand, so the alternation and the garbage collection `--layers` adds
   after every frame are covered together; two effects that cancelled
   would not show. Prints the plain and the bare draw p50 over all blocks
@@ -68,10 +70,24 @@ def bias(ps, blocks: int, plain: int, layered: int) -> dict:
     `--layers` run of `layered` frames. Returns the plain draws, the bare
     frames' draws and each block's bare minus plain p50."""
     out = {"plain": [], "bare": [], "diffs": []}
-    for _ in range(blocks):
-        _t, draws, _v = S.run(ps, plain, render=True)
+
+    def plain_part():
+        return S.run(ps, plain, render=True)[1]
+
+    def layered_part():
         _t, ldraws, _v, alternate = S.layered_run(ps, layered)
-        bare = DL.bare_frames(alternate, ldraws)[0]
+        return DL.bare_frames(alternate, ldraws)[0]
+
+    for block in range(blocks):
+        # ABBA: plain first in the even blocks, layered first in the odd
+        # ones, so a drift inside a block (the crowd grows as summons
+        # arrive) falls on each side alike over every two blocks, instead
+        # of always against whichever side runs second.
+        if block % 2 == 0:
+            draws, bare = plain_part(), layered_part()
+        else:
+            bare = layered_part()
+            draws = plain_part()
         out["plain"] += draws
         out["bare"] += bare
         out["diffs"].append(_p50(bare) - _p50(draws))
@@ -139,6 +155,7 @@ def nested(ps, frames: int) -> dict:
         out[f"{k}_enemies"] = [sum(v for key, v in f.items()
                                    if key == "enemies" or key.startswith("enemies/")) for f in rows]
         out[f"{k}_world"] = [f.get("world", 0.0) for f in rows]
+    out["enemies_calls"] = rotate.timers["all"].calls_per_frame("enemies")
     return out
 
 
@@ -152,6 +169,11 @@ def format_nested(result: dict) -> str:
                      f"{_p50(result[f'{k}_enemies']):.2f} ms, world {_p50(result[f'{k}_world']):.2f} ms")
     lines.append(f"  the nested wrappers add {d['all'] - d['no_nested']:+.2f} ms to the whole "
                  f"draw, every timer {d['all'] - d['bare']:+.2f} ms, at p50")
+    calls = result["enemies_calls"]
+    rows = _p50(result["all_enemies"]) - _p50(result["no_nested_enemies"])
+    per_enemy = 1000.0 * rows / calls if calls else 0.0
+    lines.append(f"  and {rows:+.2f} ms to enemies with its nested rows: {calls:.1f} enemies "
+                 f"drawn a frame, {per_enemy:+.2f} us an enemy")
     return "\n".join(lines)
 
 
@@ -171,7 +193,7 @@ def parse(argv=None) -> argparse.Namespace:
                        help="enemy records banked on the other islands, as spawn_stress")
         if name == "bias":
             p.add_argument("--blocks", type=int, default=16,
-                           help="pairs of a plain and a layered block")
+                           help="pairs of a plain and a layered block, an even number: the order alternates")
             p.add_argument("--plain", type=int, default=40,
                            help="frames of each plain --render block")
             p.add_argument("--layered", type=int, default=80,
@@ -181,8 +203,10 @@ def parse(argv=None) -> argparse.Namespace:
                            help="frames in all, rotating bare, all timers, all but the "
                                 "nested, the root alone")
     args = ap.parse_args(argv)
-    if args.probe == "bias" and (args.blocks < 1 or args.plain < 1 or args.layered < 2):
-        ap.error("bias needs --blocks and --plain of 1 or more and --layered of 2 or more")
+    if args.probe == "bias" and (args.blocks < 2 or args.blocks % 2 or args.plain < 1
+                                 or args.layered < 2):
+        ap.error("bias needs an even --blocks of 2 or more (the order alternates), --plain "
+                 "of 1 or more and --layered of 2 or more")
     if args.probe == "nested" and args.frames < len(KINDS):
         ap.error(f"nested needs --frames {len(KINDS)} or more, one of each kind")
     return args

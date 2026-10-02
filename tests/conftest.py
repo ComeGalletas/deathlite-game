@@ -144,6 +144,7 @@ INTEGRATION = (
     "tests/devtools/test_draw_layers.py::MainTests",
     "tests/devtools/test_draw_layers.py::VillagersAndHutsTests",
     "tests/devtools/test_draw_layers.py::BossTests",
+    "tests/devtools/test_draw_layers.py::ElementPathTests",
     "tests/devtools/test_layer_probes.py::PackedSceneTests",
     "tests/devtools/test_layer_probes.py::SceneTests",
     "tests/devtools/test_layer_probes.py::MainTests",
