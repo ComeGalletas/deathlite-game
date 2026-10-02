@@ -61,12 +61,22 @@ which pygbag owns (`build/web`, `build/web-cache`). `build.ps1` sends it to
 `work/` in this folder and deletes it afterwards unless you pass `-KeepWork`.
 
 **Assets are allow-listed, not deny-listed.** `ASSET_DIRS` in the spec names the
-nine folders under `assets/` that the game actually loads; anything else is
+folders under `assets/` that the game actually loads; anything else is
 ignored. This matters more than it sounds: `assets/` also holds `unused/`, the
 reserve art library (hundreds of MB, tens of thousands of files) that the game
 never references. A deny-list would let the next pack dropped in there silently
 join the build. **If you add art in a new top-level folder under `assets/`, add
-it to `ASSET_DIRS` or it will not ship.**
+it to `ASSET_DIRS` or it will not ship.** `tests/systems/test_desktop_bundle.py`
+runs the spec and fails, naming the file, if any asset that `data/`,
+`game/config.py` or `game/fonts.py` names is not in the bundle. Run it before
+a build:
+
+```powershell
+python -m pytest tests/systems/test_desktop_bundle.py
+```
+
+`assets/infused/` is the folder that slipped through before that test existed
+(BLD-005).
 
 The shipped payload is ~320 files and ~7 MB of art and data.
 
