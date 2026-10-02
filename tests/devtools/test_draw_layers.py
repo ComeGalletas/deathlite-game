@@ -85,6 +85,13 @@ class LayerSetTests(unittest.TestCase):
         self.assertEqual(tuple(label for label, _where, _attr in DL.LAYERS), EXPECTED_LAYERS)
         self.assertEqual(DL.ITEMS, frozenset({"scenery", "villagers", "huts"}))
 
+    def test_the_groups_are_the_journals(self):
+        # The terrain and the crowd's part as `crowd_draw_journal.md`
+        # defines them; a row dropped here would shift every group figure.
+        self.assertEqual(DL.GROUPS, (
+            ("terrain", ("ground", "water", "scenery", "scenery_list")),
+            ("crowd", ("enemies", "enemies/shade", "ghost", "world"))))
+
 
 class AccountingTests(unittest.TestCase):
     def _timer(self, *ticks):
