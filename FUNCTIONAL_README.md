@@ -31,7 +31,8 @@ Everything else pygbag needs lives in `dist/web/` (`pygbag.ini`, `build.sh`,
 
 ```bash
 bash dist/web/serve.sh   # rebuild + serve at http://localhost:8000
-bash dist/web/build.sh   # build only -> dist/web/out/  (gitignored)
+bash dist/web/build.sh   # build only -> dist/web/out/ (gitignored), wheel vendored; serve with
+                         # python -m http.server -d dist/web/out 8000, open localhost:8000
 ```
 
 First run downloads a CPython-WASM runtime (cached after). The web release
