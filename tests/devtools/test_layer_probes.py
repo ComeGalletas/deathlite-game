@@ -33,9 +33,11 @@ class FormatTests(unittest.TestCase):
         # [-0.5, -0.25, 0, 0.5, 1.0]: p50 0, two of five slower (a tie
         # is not slower).
         text = LP.format_bias({"plain": [5.0, 1.0, 3.0], "bare": [4.0, 2.0, 6.0],
+                               "plain_view": [150, 140, 160], "bare_view": [141, 151, 161],
                                "diffs": [0.5, -0.25, 1.0, 0.0, -0.5]})
         self.assertEqual(text.splitlines(), [
-            "  bias: 5 blocks; draw p50 plain 3.00 ms (3 frames), bare 4.00 ms (3 frames)",
+            ("  bias: 5 blocks; draw p50 plain 3.00 ms (3 frames, in view p50 150), bare 4.00 ms "
+             "(3 frames, in view p50 151)"),
             ("  per block, bare minus plain p50: p50 +0.00 ms, from -0.50 to +1.00; "
             "bare slower in 2 of 5"),
             "  each block, sorted: -0.50 -0.25 +0.00 +0.50 +1.00",
@@ -47,7 +49,8 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(LP.sign_interval(16), (4, 1 - 2 * 697 / 65536))
         self.assertEqual(LP.sign_interval(8), (1, 1 - 2 / 256))  # the 2nd would cover 93 %
         self.assertIsNone(LP.sign_interval(5))                    # 1 - 2/32 is under 95 %
-        text = LP.format_bias({"plain": [1.0], "bare": [1.0], "diffs": [float(i) for i in range(16)]})
+        text = LP.format_bias({"plain": [1.0], "bare": [1.0], "plain_view": [1], "bare_view": [1],
+                               "diffs": [float(i) for i in range(16)]})
         self.assertEqual(text.splitlines()[-1],
                          "  the median difference lies in +3.00 to +12.00 ms (97.9 % sign-test "
                          "interval, the 4th smallest to the 4th largest)")
@@ -57,25 +60,38 @@ class FormatTests(unittest.TestCase):
         # (bare 0 and 2): +2. Block 2, layered first: bare [4, 4], plain
         # [5, 5, 5]: -1. The order alternates so a drift inside a block
         # falls on each side alike.
+        # Each fake run walks the hero 10 px, as `spawn_stress.run` leaves it
+        # at its last jittered spot; every part must still start on the
+        # anchor, and the hero end there.
+        import pygame
         alt = DL.Alternate(DL.LayerTimer(), ps=None)
         alt.bare, alt.timed = [0, 2], [1, 3]
         plains = iter([[1.0] * 3, [5.0] * 3])
         layered = iter([[3.0, 99.0, 3.0, 99.0], [4.0, 99.0, 4.0, 99.0]])
+        ps = mock.Mock()
+        ps.player.pos = pygame.Vector2(100.0, 200.0)
         order = []
 
-        def run(ps, n, render):
-            order.append(("plain", n))
-            return None, next(plains), None
+        def run(ps_, n, render):
+            order.append(("plain", n, tuple(ps_.player.pos)))
+            ps_.player.pos += (10.0, 10.0)
+            return None, next(plains), [7] * n
 
-        def layered_run(ps, n):
-            order.append(("layered", n))
-            return None, next(layered), None, alt
+        def layered_run(ps_, n):
+            order.append(("layered", n, tuple(ps_.player.pos)))
+            ps_.player.pos += (10.0, 10.0)
+            return None, next(layered), [8, 99, 9, 99], alt
 
         with mock.patch.object(S, "run", run), mock.patch.object(S, "layered_run", layered_run):
-            result = LP.bias(object(), blocks=2, plain=3, layered=4)
-        self.assertEqual(order, [("plain", 3), ("layered", 4), ("layered", 4), ("plain", 3)])
+            result = LP.bias(ps, blocks=2, plain=3, layered=4)
+        home = (100.0, 200.0)
+        self.assertEqual(order, [("plain", 3, home), ("layered", 4, home),
+                                 ("layered", 4, home), ("plain", 3, home)])
+        self.assertEqual(tuple(ps.player.pos), home)
         self.assertEqual(result, {"plain": [1.0, 1.0, 1.0, 5.0, 5.0, 5.0],
-                                  "bare": [3.0, 3.0, 4.0, 4.0], "diffs": [2.0, -1.0]})
+                                  "bare": [3.0, 3.0, 4.0, 4.0],
+                                  "plain_view": [7] * 6, "bare_view": [8, 9, 8, 9],
+                                  "diffs": [2.0, -1.0]})
 
     def test_nested_groups_the_draws_and_sums_the_enemies_rows(self):
         class _Rotate:
@@ -194,7 +210,10 @@ class SceneTests(unittest.TestCase):
         self.assertEqual(self.printed.count("\n"), 1)          # the display line, no shortfall
 
     def test_bias_pairs_plain_and_layered_blocks(self):
+        start = self.ps.player.pos.copy()
         result = LP.bias(self.ps, blocks=2, plain=3, layered=4)
+        self.assertEqual(self.ps.player.pos, start)            # back on its anchor, not walked off
+        self.assertEqual((len(result["plain_view"]), len(result["bare_view"])), (6, 4))
         self.assertEqual(len(result["plain"]), 6)
         self.assertEqual(len(result["bare"]), 4)               # frames 0 and 2 of each layered block
         self.assertEqual(len(result["diffs"]), 2)

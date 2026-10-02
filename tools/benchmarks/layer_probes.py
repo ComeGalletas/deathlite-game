@@ -71,15 +71,26 @@ def packed_scene(seed: int, live: int, dormant: int, elapsed: float,
 def bias(ps, blocks: int, plain: int, layered: int) -> dict:
     """`blocks` pairs of a plain `--render` run of `plain` frames and a
     `--layers` run of `layered` frames. Returns the plain draws, the bare
-    frames' draws and each block's bare minus plain p50."""
-    out = {"plain": [], "bare": [], "diffs": []}
+    frames' draws, each side's enemies in view and each block's bare minus
+    plain p50.
+
+    Every part starts with the hero back on one anchor, where it stood
+    when `bias` was called: `spawn_stress.run` jitters round wherever the
+    hero is and leaves it at its last jittered spot, with the jitter
+    reseeded each call, so part after part would walk the hero (and the
+    view) steadily across the map."""
+    out = {"plain": [], "bare": [], "plain_view": [], "bare_view": [], "diffs": []}
+    anchor = ps.player.pos.copy()
 
     def plain_part():
-        return S.run(ps, plain, render=True)[1]
+        ps.player.pos.update(anchor)
+        _t, draws, in_view = S.run(ps, plain, render=True)
+        return draws, in_view
 
     def layered_part():
-        _t, ldraws, _v, alternate = S.layered_run(ps, layered)
-        return DL.bare_frames(alternate, ldraws)[0]
+        ps.player.pos.update(anchor)
+        _t, ldraws, lview, alternate = S.layered_run(ps, layered)
+        return DL.bare_frames(alternate, ldraws, lview)
 
     for block in range(blocks):
         # ABBA: plain first in the even blocks, layered first in the odd
@@ -87,13 +98,16 @@ def bias(ps, blocks: int, plain: int, layered: int) -> dict:
         # arrive) falls on each side alike over every two blocks, instead
         # of always against whichever side runs second.
         if block % 2 == 0:
-            draws, bare = plain_part(), layered_part()
+            (draws, view), (bare, bview) = plain_part(), layered_part()
         else:
-            bare = layered_part()
-            draws = plain_part()
+            bare, bview = layered_part()
+            draws, view = plain_part()
         out["plain"] += draws
         out["bare"] += bare
+        out["plain_view"] += view
+        out["bare_view"] += bview
         out["diffs"].append(_p50(bare) - _p50(draws))
+    ps.player.pos.update(anchor)
     return out
 
 
@@ -116,8 +130,9 @@ def format_bias(result: dict) -> str:
     slower = sum(1 for d in diffs if d > 0)
     lines = [
         (f"  bias: {len(diffs)} blocks; draw p50 plain {_p50(result['plain']):.2f} ms "
-        f"({len(result['plain'])} frames), bare {_p50(result['bare']):.2f} ms "
-        f"({len(result['bare'])} frames)"),
+        f"({len(result['plain'])} frames, in view p50 {_p50(result['plain_view'])}), bare "
+        f"{_p50(result['bare']):.2f} ms ({len(result['bare'])} frames, in view p50 "
+        f"{_p50(result['bare_view'])})"),
         (f"  per block, bare minus plain p50: p50 {_p50(diffs):+.2f} ms, from "
         f"{diffs[0]:+.2f} to {diffs[-1]:+.2f}; bare slower in {slower} of {len(diffs)}"),
         "  each block, sorted: " + " ".join(f"{d:+.2f}" for d in diffs),
