@@ -16,7 +16,23 @@ for name, rs in (("play (state == shown, opened 0)", play), ("state only", loose
     clock = sorted(float(r["run_time"]) for r in big)
     print(name, "225+:", len(big), " over 250:", sum(int(r["live"]) > 250 for r in big),
           " max", max(int(r["live"]) for r in big), " run clock", clock[0], "to", clock[-1])
-big = sorted(int(r["in_view"]) for r in play if int(r["live"]) >= 150)
-pct = lambda q: big[min(len(big) - 1, round(q * (len(big) - 1)))]   # tools/benchmarks/stats.py's rule
-print(f"play frames with 150+ alive: {len(big)}  in view p50 {pct(0.5)} p99 {pct(0.99)} max {big[-1]}  "
-      f"with 200+ in view: {sum(v >= 200 for v in big)}")
+def pct(vals, q):
+    """tools/benchmarks/stats.py's rule: index round(q * (n - 1)), half to even."""
+    vals = sorted(vals)
+    return vals[min(len(vals) - 1, round(q * (len(vals) - 1)))]
+
+
+big = [int(r["in_view"]) for r in play if int(r["live"]) >= 150]
+print(f"play frames with 150+ alive: {len(big)}  in view p50 {pct(big, 0.5)} p99 {pct(big, 0.99)} "
+      f"max {max(big)}  with 200+ in view: {sum(v >= 200 for v in big)}")
+# The trace's own draw time by enemies in view, beside the harness's
+# packed crowd (147, 178 and 224 in view, no fight).
+print("the trace's draw_ms by enemies in view (play frames):")
+for lo, hi in ((0, 30), (30, 60), (60, 90), (90, 120), (120, 150), (150, 180)):
+    band = [r for r in play if r["in_view"] and lo <= int(r["in_view"]) < hi]
+    if band:
+        print(f"  {lo:3d} to {hi - 1:3d} in view: {len(band):5d} frames, draw p50 "
+              f"{pct([float(r['draw_ms']) for r in band], 0.5):.2f} ms, p90 "
+              f"{pct([float(r['draw_ms']) for r in band], 0.9):.2f}; particles p50 "
+              f"{pct([int(r['particles']) for r in band], 0.5)}, damage numbers p50 "
+              f"{pct([int(r['numbers']) for r in band], 0.5)}")

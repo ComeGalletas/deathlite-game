@@ -78,6 +78,10 @@ for n in (150, 200, 250):
     rs = [v["ratio"] for (p, m, _), v in R.items() if m == n]
     who = sorted({p for (p, m, _) in R if m == n})
     print(f"ratio at {n} over {who}: {span(rs, '.3f')}, spread {100 * (max(rs) / min(rs) - 1):.1f} %")
+for n in (150, 200, 250):
+    bs = [v["bare"] for (p, m, _), v in R.items() if m == n]
+    print(f"bare draw at {n} over the sittings: {span(bs)} ms, max over min "
+          f"{100 * (max(bs) / min(bs) - 1):.1f} % apart")
 g = [R[p, 250, x]["ratio"] / R[p, 150, x]["ratio"] for p, _ in SITTINGS for x in "ab"]
 print("growth 150 to 250 (ratio of ratios), each sitting's a and b:", [round(v, 2) for v in g])
 s4t = [R["s4", n, x]["terrain"] for n in (150, 250) for x in "ab"]

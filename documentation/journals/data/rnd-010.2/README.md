@@ -42,10 +42,15 @@ Run from this folder:
   shares and per-enemy estimates, and the load and CPU time in each
   sitting's log.
 - `python trace_figures.py [trace.csv]`: the owner's frame trace figures
-  (the 225+ and 150+ rows). The trace itself is not here: it lives in the
+  (the 225+ and 150+ rows, and the draw time, particles and damage numbers
+  by enemies in view). The trace itself is not here: it lives in the
   main checkout's ignored `traces/` folder,
   `traces/frames-20260930-141150-52172.csv`.
 
-The `sitting*.sh` scripts write into the session folder they ran from
-(`S=` at their top); to take a sitting again, point `S` at an empty
-folder and run one from the repo root, with a clean tree, in bash.
+To take a sitting again: `bash documentation/journals/data/rnd-010.2/sitting.sh
+OUT_DIR [PREFIX]` from the repo root, in bash, with a clean tree and
+nothing else running; it writes `PREFIX_*.txt` and `PREFIX_meta.txt`
+into `OUT_DIR` (prefix `s8` by default), and `table.py` and the journal's
+commands read them the same way once copied here. The `sitting5.sh` to
+`sitting7.sh` files are the scripts as run, with the session folder they
+wrote into fixed at their top.

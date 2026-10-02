@@ -129,9 +129,8 @@ invulnerability ring; `enemies` each enemy's record for the ghost pass and
 its frame's elemental wash and hit tint (`boss` and `player` hold their own
 hit tint the same way; the wash and the tints cost nothing here, where
 nothing is hit or primed, while the record is paid every frame). The buff
-marks, banners, hurt flash and buff tint are the
-`feedback` row, and
-the scenery's list building its own `scenery_list` row. The set of layers
+marks, banners, hurt flash and buff tint are the `feedback` row, and the
+scenery's list building its own `scenery_list` row. The set of layers
 is pinned by a test. Every other frame is drawn without the timers
 (`Alternate`), the young garbage collected after every frame, bare or
 timed, with no timer on; the draw and update + draw lines are the bare
@@ -149,7 +148,7 @@ The harness also changed around it:
   the crowd: the cap is 100 + 5 per 20 s of run clock on normal, up to the
   live cap of 250, so a crowd of N needs `--elapsed (N - 100) * 4`. (Before
   this, a first 200 and 250 run here silently measured a crowd of 159 to
-  175; seen in those runs' output, which was not kept.)
+  175: the builder's record of those runs' output, which was not kept.)
 - **The boss.** It spawns at 95 % of the run, 570 s on normal, so the
   `--elapsed 600` a crowd of 250 needs brought a boss fight into the
   measurement (the second cold critic's finding): the boss, its shade and
@@ -216,10 +215,12 @@ were not kept, and sitting 3's are left out of the data folder with them.
 
 - **Sitting 7 (2026-10-02, 13:57 to 14:01), commit `bb92e30`**: the runs
   and both probes (`s7_*.txt`), the conclusions' source. The owner closed
-  the games running in sittings 5 and 6 first; the log (`s7_meta.txt`)
-  records the CPU load before each run, 20 % to 40 %, and the top
-  processes by CPU time at the start and the end, where no game gained
-  more than 9 s. `bb92e30` prints the terrain and the crowd's part as
+  the game that ran in sitting 6 (`deadlock`) first; the log
+  (`s7_meta.txt`) records the CPU load before each run, 20 % to 40 %, and
+  the top processes by CPU time at the start and the end. One game
+  process was still open, `NTEGlobalGame`, and gained 8 s of CPU time
+  over the four minutes; no other process in the lists gained more than
+  91 s (`SignalRgb`). `bb92e30` prints the terrain and the crowd's part as
   each frame's sum (the groups below) and the bias probe's every block
   and interval. Two of its runs, 150 b and 250 a, ran in slow patches:
   their terrain, the same work in every run, came to 7.79 and 8.22 ms
@@ -289,16 +290,35 @@ since the hero does not attack.
 
 **What it says.**
 
-- **The owner's read holds for what grows: the enemies are the cost that
+- **For a packed crowd without a fight, the enemies are the cost that
   rises with the crowd; the terrain is a larger, flat floor.** Call the
   terrain the ground, water, scenery and its list, and the crowd's part
   the enemies, the tree shade over them, the ghost pass and the scene's
   lists and sorts (`world`). On sitting 7's quiet runs, each frame's
   terrain is 6.44 to 6.54 ms at every crowd, while the crowd's part is
   3.52 ms at 147 in view, 4.36 to 4.58 at 178 and 5.52 at 224: 1.57 times
-  from 147 to 224. The terrain is larger at every crowd measured; only
-  the crowd's part grows. RND-009 put the ground bands at the alpha
-  blitter's floor, and the owner keeps the terrain as it is.
+  from 147 to 224. The terrain is larger at every crowd measured and does
+  not grow; the crowd's part does, and so do the small per-enemy rows
+  outside it (the elemental sort and under-layer, the bars and the marks,
+  0.26 to 0.34 ms at 147 to 0.39 to 0.57 at 224, and the enemies' shots).
+  RND-009 put the ground bands at the alpha blitter's floor, and the
+  owner keeps the terrain as it is.
+- **In play the draw is higher, and that gap is not measured here.** The
+  owner's trace times the draw too (`draw_ms`, play frames, `python
+  trace_figures.py`): its p50 is 8.02 ms at 0 to 29 enemies in view, 10.64
+  at 30 to 59, 12.11 at 60 to 89, 13.64 at 90 to 119, 13.96 at 120 to 149
+  and 13.78 at 150 to 179, while the particles in those frames rise from
+  a p50 of 11 to 206 and the damage numbers from 2 to 80. Beside the
+  harness's bare draw at about the same counts (10.14 ms at 147 in view,
+  11.01 and 11.09 at 178), play draws about 3 to 4 ms more. That is an
+  estimate across different scenes (the trace's crowd is spread over the
+  map, not packed; the hero fights; the terrain on screen differs; the
+  machine's state during play is not recorded), but it is about as large
+  as the whole crowd's part measured here, and the frames it shows in are
+  the ones full of particles and damage numbers. So the owner's read
+  holds for the crowd's own draw, which this breakdown measured and
+  ranked; whether the combat effects the crowd brings cost as much is not
+  settled by it. It is carried into RND-010.3 as an open item (below).
 - **The shape holds on a busy machine too.** The terrain is the same work
   at every crowd, so it gauges how fast the machine was running, and the
   crowd's part over the terrain reads the crowd's cost with most of the
@@ -311,8 +331,9 @@ since the hero does not attack.
   included. As sums of p50s, over all four sittings, it is 0.538 to 0.592
   at 147 (a spread of 10.0 %), 0.667 to 0.736 at 178 (sittings 5 to 7,
   10.3 %) and 0.860 to 0.923 at 224 (7.3 %), and it grows 1.51 to 1.67
-  times from 147 to 224 within every sitting, while the bare draw moved
-  by up to 31 % between sittings.
+  times from 147 to 224 within every sitting, while the bare draw at the
+  same crowd differed by up to 37.4 %, 37.1 % and 44.0 % between sittings
+  (largest over smallest, the convention of the spreads above).
 - **Per enemy:** the `enemies` row over its calls a frame is 12.9 to
   13.8 µs on sitting 7's quiet runs. The probe puts the nested wrappers at
   2.78 µs an enemy at 150 and 2.66 at 250 (below), without separating how
@@ -323,8 +344,11 @@ since the hero does not attack.
 - **Against the budget:** the bare draw alone, with the hero not attacking
   and no boss, on sitting 7's quiet runs, is 10.14 ms at 147 in view
   (61 % of the 16.67 ms), 11.01 and 11.09 ms at 178 (66 % and 67 %) and
-  12.10 ms at 224 (73 %), before the update. Sitting 4 agrees at 147 and
-  224 (10.34 to 12.45 ms, 62 % to 75 %).
+  12.10 ms at 224 (73 %), before the update. Sitting 4 ran at the same
+  speed (its terrain rows, from the timed frames, sum to 6.25 to 6.53 ms
+  against the quiet runs' 6.36 to 6.46) and its bare draws agree, 10.34
+  to 12.45 ms (62 % to 75 %), though its version's garbage collection may
+  have favoured those bare frames. In play the draw is higher (above).
 - **What it ranks, and what it does not.** Inside the crowd's part, by
   p50 on sitting 7's quiet runs: `enemies`' own row first (2.06 ms at 147
   in view, 2.60 to 2.70 at 178, 3.31 at 224), then the ghost pass (0.54,
@@ -355,8 +379,11 @@ since the hero does not attack.
   13.1 % to 13.3 %. (The probe's own rows, `enemies` with the shade, bars
   and marks, are not quite that set; most of the overhead lands in
   `enemies`, which both share.) Each enemy wrapper's own bookkeeping,
-  landing in `world`, comes on top and is not separated. The terrain's
-  rows carry barely any of it. Candidates are timed old against new
+  landing in `world`, comes on top and is not separated; `world` also
+  holds the scenery items' wrapper closures (about 72 scenery calls a
+  frame) and the scenery's per-terrace filtering, so its row, and the
+  close order of the ghost pass, the shade and `world`, carry overhead
+  that is not the crowd's. The terrain's rows carry barely any of it. Candidates are timed old against new
   without the timers (the constraint above), and this breakdown only aims
   them.
 - **The `--layers` headline against the plain `--render` one.** Sitting
@@ -369,17 +396,29 @@ since the hero does not attack.
   (640 frames each); the 16 blocks' bare minus plain p50s put the median
   difference between -0.25 and +0.29 ms (a 97.9 % sign-test interval, the
   4th smallest to the 4th largest of 16). At 250, 11.50 against 11.66,
-  the median between -0.29 and +0.17 ms. Any bias the headline carries
-  is inside about 0.3 ms either way at both crowds, with no sign of one.
+  the median between -0.29 and +0.17 ms. The intervals bound the median
+  of the blocks' 40-frame p50 differences and treat the blocks as
+  independent; they are not the 300-frame headline's bias itself. Taking
+  them as its measure, a judgement: no sign of a bias, and any there is
+  sits within about 0.3 ms either way at both crowds.
 - **The packed crowd is past what the owner played.** In the owner's
   trace, the play frames with 150 or more alive (4,557) had 90 enemies in
   view at p50, 173 at p99 and 177 at most; none had 200. The harness's
   147 in view at 150 is near that p99, its 178 at 200 at the trace's
   maximum, and its 224 at 250 beyond anything played: the packed runs are
   the worst case of a crowd, not its usual frame.
-- **No fight.** The hero does not attack, so there are no particles, damage
-  numbers or damaged health bars, where the owner's trace had about 120
-  particles at 150+. The combat effects' share is not in these numbers.
+- **No fight, and the open item it leaves.** The hero does not attack, so
+  there are no particles, damage numbers, hit tints or damaged health
+  bars, where the owner's trace has 144 to 206 particles and 59 to 80
+  damage numbers at p50 with 120 to 179 enemies in view, and draws about
+  3 to 4 ms more than the harness at those counts (an estimate across
+  scenes, above). Open for RND-010.3, for the owner: whether to measure a
+  fighting scene before the candidates are chosen, or to take the crowd's
+  own draw first as planned. The harness can already stage one:
+  `--elements` infuses three weapons and turns the hero's attacks on
+  (`spawn_stress.infuse`), and `--element-rate` and `--cascade` add hits
+  and chained reactions; `--layers` runs with all three. No sitting here
+  used them.
 - **The crowd drifts.** Bodies fall asleep in the warm-up and summons arrive
   while timing (135 to 175 at `--live 150`), as the harness's crowd line
   reports.
