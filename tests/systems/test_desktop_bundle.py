@@ -26,7 +26,8 @@ from game.assets import ASSETS_DIR
 
 REPO = Path(__file__).resolve().parents[2]
 SPEC = REPO / "dist" / "desktop" / "DeathliteGame.spec"
-ASSET_SUFFIXES = (".png", ".ttf", ".otf", ".wav", ".ogg", ".mp3")
+ASSET_SUFFIXES = (".png", ".jpg", ".jpeg", ".bmp", ".webp",
+                  ".ttf", ".otf", ".wav", ".ogg", ".mp3")
 
 
 class _Recorder:
@@ -62,11 +63,13 @@ def _run_spec() -> dict:
 
 
 def _strings(node):
-    """Every string inside a nested JSON / config value."""
+    """Every string inside a nested JSON / config value, dict keys included:
+    `data/world/terrain.json` names tilemap sheets as keys."""
     if isinstance(node, str):
         yield node
     elif isinstance(node, dict):
-        for v in node.values():
+        for k, v in node.items():
+            yield from _strings(k)
             yield from _strings(v)
     elif isinstance(node, (list, tuple)):
         for v in node:
@@ -94,10 +97,12 @@ class DesktopBundleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ns = _run_spec()
-        # (source, dest-dir) pairs -> the shipped files, relative to the repo.
+        # What the spec hands PyInstaller, not the variable it builds it in.
+        cls.datas = cls.ns["a"].kwargs["datas"]
+        # (source, dest-dir) pairs -> where each file lands in the bundle,
+        # which is where `ASSETS_DIR` looks for it in the frozen game.
         cls.shipped = {
-            Path(src).resolve().relative_to(REPO).as_posix()
-            for src, _dest in cls.ns["datas"]
+            f"{Path(dest).as_posix()}/{Path(src).name}" for src, dest in cls.datas
         }
         cls.refs = _referenced_assets()
 
@@ -109,6 +114,15 @@ class DesktopBundleTests(unittest.TestCase):
         self.assertIn("music/gameplay-1.mp3", self.refs)       # config dict
         self.assertTrue(any(r.startswith("infused/") for r in self.refs))
         self.assertTrue(any(r.startswith("fonts/") for r in self.refs))
+
+    def test_each_file_lands_at_its_repo_path(self):
+        """The frozen game finds `assets/x/y.png` under the bundle root only
+        if the destination mirrors the source; a wrong dest ships nothing
+        the game can load."""
+        wrong = [(src, dest) for src, dest in self.datas
+                 if Path(dest).as_posix()
+                 != Path(src).resolve().parent.relative_to(REPO).as_posix()]
+        self.assertEqual(wrong, [])
 
     def test_every_named_asset_exists(self):
         missing = sorted(r for r in self.refs if not (ASSETS_DIR / r).is_file())
