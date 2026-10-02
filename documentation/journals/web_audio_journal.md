@@ -59,7 +59,9 @@
   to the owner). In the browser the master, effects and music volume rows,
   the mute row and the M mute key change values that drive nothing. Hiding them is a UI
   change across the Options layout, its fit tests and both languages; it
-  is left for the owner to ask for.
+  is left for the owner to ask for. **Decided by the owner, 2026-10-02:
+  keep them for now; as long as they break nothing they remain** (recorded
+  under BLD-006.1).
 - **BLD-004.D4 — the five nested `unused/` folders leave the bundle too**
   (builder, after critic round 1). Rewriting the `pygbag.ini` comment
   removed its only nested example and left it describing a rule no line
@@ -364,3 +366,4 @@ call-for-call what it was at `8c42196`. The audio folders and the nested
 `serve.sh` build with no flag, and the apk went from 19.6 MB (with audio)
 to 9.5 MB. Seven cold critic rounds; the last passed. Open for the owner:
 D3, the Options audio rows and M key that do nothing in the browser.
+*(D3 decided 2026-10-02: they stay while they break nothing.)*
