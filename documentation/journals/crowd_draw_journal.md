@@ -219,12 +219,14 @@ were not kept, and sitting 3's are left out of the data folder with them.
   fifteenth review found that sitting 7's walked the hero across the map:
   `spawn_stress.run` leaves the hero at its last jittered spot and
   reseeds its jitter each call, so the probe's 32 calls moved it steadily
-  (about 760 px in a headless replay). `f26e422` puts the hero back on
-  one anchor before every part, and prints each side's enemies in view.
-  The owner closed the game running before it (MechaBREAK, the builder's
-  record); the log (`s8_meta.txt`) records a load of 14 % to 21 % and no
-  process in both top lists gaining more than 37 s (`SignalRgb`), the
-  builder's session 12 s.
+  (766 px, from the jitter's arithmetic in `derived.py`). `f26e422` puts
+  the hero back on one anchor before every part, and prints each side's
+  enemies in view. The owner closed the game running before it
+  (MechaBREAK, the builder's record); the log (`s8_meta.txt`) records a
+  load of 14 % to 21 % and no process in both top lists gaining more than
+  37 s (`SignalRgb`), the builder's session 12 s. `NTEGlobalGame`, still
+  open as in sitting 7, is only in the end list: it gained at least 1 s,
+  with no upper bound.
 - **Sitting 7 (2026-10-02, 13:57 to 14:01), commit `bb92e30`**: the runs
   and the `nested` probe (`s7_*.txt`; its `bias` outputs are kept but
   superseded by sitting 8's), the conclusions' source. The owner was
@@ -344,9 +346,9 @@ since the hero does not attack.
   harness does not time (their cost is not measured here). Even so, the
   gap is close to the whole crowd's part measured at those counts (3.52
   and 4.36 to 4.58 ms), and the frames it shows in are the ones full of
-  particles and damage numbers. So the owner's read
-  holds for the crowd's own draw, which this breakdown measured and
-  ranked; whether the combat effects the crowd brings cost as much is not
+  particles and damage numbers. So the owner's read holds for the part
+  that grows, the crowd's own draw, which this breakdown measured and
+  ranked (the terrain stays the larger cost at every count measured); whether the combat effects the crowd brings cost as much is not
   settled by it. It is carried into RND-010.3 as an open item (below).
 - **The shape holds on a busy machine too.** The terrain is the same work
   at every crowd, so it gauges how fast the machine was running, and the
@@ -355,10 +357,12 @@ since the hero does not attack.
   (blit-bound) and the crowd (more Python) need not slow alike under
   contention, and the crowd's part as timed carries timer overhead that
   grows with the crowd (below), so the ratio reads somewhat high. Sitting
-  7 measures how far contention moves it: each frame's ratio has a p50 of
+  7 bounds how far contention moves it: each frame's ratio has a p50 of
   0.543 and 0.580 at 147 in view, 0.670 and 0.711 at 178, 0.863 and 0.913
-  at 224, and the slow run reads 6.8 % and 5.8 % above the quiet one at
-  147 and 224. As sums of p50s, over all four sittings, it is 0.538 to
+  at 224; the slow run reads 6.8 % and 5.8 % above the quiet one at 147
+  and 224, but the two quiet runs at 178 already differ by 6.1 %, so
+  contention and run-to-run spread cannot be told apart, and 6 % to 7 %
+  is an upper bound on what contention did. As sums of p50s, over all four sittings, it is 0.538 to
   0.592 at 147 (a spread of 10.0 %), 0.667 to 0.736 at 178 (sittings 5 to
   7, 10.3 %) and 0.860 to 0.923 at 224 (7.3 %). It grows 1.53 to 1.60
   times from 147 to 224 within each of sittings 4 to 6 (sums of p50s)
@@ -406,7 +410,10 @@ since the hero does not attack.
   to the rows (4.30 against 3.66 ms; 240.9 drawn, 2.66 µs an enemy) and
   0.65 ms to the whole draw, of every timer's 0.79 and 1.09 ms. The root's
   timer alone added nothing measurable (10.16 against 10.08 ms at 150,
-  12.10 against 12.19 at 250). Set against the quiet runs' crowd's part
+  12.10 against 12.19 at 250), which also shows the probe's resolution:
+  p50s over 100 frames a kind move by about 0.1 ms on their own, so at
+  150 the rows' 0.42 ms and the whole draw's 0.33 ms (a part larger than
+  its whole) agree within it. Set against the quiet runs' crowd's part
   (3.52 ms at 150, 5.52 at 250, each frame's sum as timed), the nested
   wrappers are 9.4 % to 11.9 % of it at 150 and 11.6 % to 11.8 % at 250;
   against that part with the overhead taken off, 10.3 % to 13.5 % and

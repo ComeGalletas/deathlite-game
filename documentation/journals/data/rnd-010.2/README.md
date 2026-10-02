@@ -61,7 +61,9 @@ Run from this folder:
 To take a sitting again: `bash documentation/journals/data/rnd-010.2/sitting.sh
 OUT_DIR [PREFIX]` from the repo root, in bash, with a clean tree and
 nothing else running; it writes `PREFIX_*.txt` and `PREFIX_meta.txt`
-into `OUT_DIR` (prefix `s8` by default), and `table.py` and the journal's
-commands read them the same way once copied here. The `sitting5.sh` to
-`sitting7.sh` files are the scripts as run, with the session folder they
-wrote into fixed at their top.
+into `OUT_DIR` (prefix `s9` by default, the first one free here; never
+reuse a prefix already in this folder). `table.py s9` reads such a
+sitting once copied here; `derived.py` reads the sittings named in its
+`SITTINGS` and the files it opens by name, so a new sitting needs adding
+there. The `sitting5.sh` to `sitting8.sh` files are the scripts as run,
+with the session folder they wrote into fixed at their top.

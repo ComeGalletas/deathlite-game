@@ -2,7 +2,7 @@ set -u
 # RND-010.2: a sitting on the committed tool, 150 / 200 / 250 packed, two
 # interleaved rounds, then the two probes on the same scenes.
 # Run from the repo root with a clean tree: bash <this file> OUT_DIR [PREFIX]
-S="${1:?usage: bash sitting.sh OUT_DIR [PREFIX]}"; P="${2:-s8}"; mkdir -p "$S"
+S="${1:?usage: bash sitting.sh OUT_DIR [PREFIX]}"; P="${2:-s9}"; mkdir -p "$S"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then echo "STOP: tracked changes"; exit 1; fi
 # Without the save the window falls back to the default display: stop.
 if [ ! -f save.json ]; then echo "STOP: no save.json in the repo root (see the journal)"; exit 1; fi

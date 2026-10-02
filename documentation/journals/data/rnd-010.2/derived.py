@@ -4,6 +4,8 @@ Sitting 7 (`bb92e30`) prints the groups as each frame's sum; sittings 4 to
 6 do not, so for them (and, to compare, for sitting 7 too) the terrain and
 the crowd's part are sums of their rows' p50s.
 """
+import math
+import random
 import re
 from pathlib import Path
 
@@ -116,6 +118,21 @@ for n in (150, 250):
           [v["us"] for (m_, _), v in quiet.items() if m_ == n]
     print(f"   own draw per enemy, quiet runs at {n}, all of the {us} us off or none: {span(own, '.1f')}")
 print()
+# How far sitting 7's probe walked the hero: `spawn_stress.run` reseeds
+# Random(1) each call, jitters by up to 24 px and leaves the hero at its
+# last frame's offset; 16 blocks each ended a 40-frame and an 80-frame call.
+
+
+def last_offset(frames, jitter=24.0):
+    rng, x, y = random.Random(1), 0.0, 0.0
+    for _ in range(frames):
+        x, y = rng.uniform(-jitter, jitter), rng.uniform(-jitter, jitter)
+    return x, y
+
+
+walk = [16 * (a + b) for a, b in zip(last_offset(40), last_offset(80), strict=True)]
+print(f"sitting 7's bias probe walked the hero ({walk[0]:+.0f}, {walk[1]:+.0f}) px, "
+      f"{math.hypot(*walk):.0f} px in all")
 print("== the bias probe, sitting 8 (sitting 7's walked the hero off its scene) ==")
 for n in (150, 250):
     b = (D / f"s8_bias_{n}.txt").read_text(encoding="utf-8", errors="replace")

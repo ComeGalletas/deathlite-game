@@ -2,7 +2,9 @@
 the main checkout's ignored traces/ folder; pass another path to read a
 copy."""
 import csv
+import re
 import sys
+from pathlib import Path
 
 PATH = sys.argv[1] if len(sys.argv) > 1 else \
     "D:/Documentos/Work/pygame/deathlite-game/traces/frames-20260930-141150-52172.csv"
@@ -36,9 +38,16 @@ for lo, hi in ((0, 30), (30, 60), (60, 90), (90, 120), (120, 150), (150, 180)):
               f"{pct([float(r['draw_ms']) for r in band], 0.9):.2f}; particles p50 "
               f"{pct([int(r['particles']) for r in band], 0.5)}, damage numbers p50 "
               f"{pct([int(r['numbers']) for r in band], 0.5)}")
-# Matched to the harness's quiet runs (sitting 7: 10.14 ms bare at 147 in
-# view, 11.01 and 11.09 at 178): play frames within 7 in view of each.
-HARNESS = ((147, (10.14,)), (178, (11.01, 11.09)))
+# Matched to the harness's quiet runs (sitting 7's 150 a, 200 a and 200 b,
+# read from their files): play frames within 7 in view of each.
+HERE = Path(__file__).parent
+QUIET = {}
+for name in ("s7_150a", "s7_200a", "s7_200b"):
+    text = (HERE / f"{name}.txt").read_text(encoding="utf-8", errors="replace")
+    view = int(re.search(r"in view p50 (\d+)", text).group(1))
+    bare = float(re.search(r"without the timers: draw p50 ([\d.]+)", text).group(1))
+    QUIET.setdefault(view, []).append(bare)
+HARNESS = tuple(sorted(QUIET.items()))
 for view, bares in HARNESS:
     band = [float(r["draw_ms"]) for r in play if r["in_view"] and abs(int(r["in_view"]) - view) <= 7]
     p50 = pct(band, 0.5)
