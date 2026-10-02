@@ -17,4 +17,9 @@ PY="${PYTHON:-../../.venv/Scripts/python.exe}"
 "$PY" -m pygbag --build --ume_block 0 --title "Deathlite Game" ../../main.py
 rm -rf out
 cp -r ../../build/web out
+# The wheels a page on http://localhost:8000 fetches from its own cdn/: pygbag's
+# dev server proxies that path, a static server does not (BLD-006). Wheels are
+# cached in pygbag's build/web-cache/; each build re-reads the index and sends
+# one HEAD for the runtime file (see README.md).
+"$PY" vendor_wheels.py --entry ../../main.py --out out --cache ../../build/web-cache/cdn
 echo "bundle : $(pwd)/out"
