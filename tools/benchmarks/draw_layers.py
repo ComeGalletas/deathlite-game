@@ -258,6 +258,18 @@ class LayerTimer:
         """Each frame's whole draw, the sum of its parts."""
         return [sum(f.values()) for f in self.frames]
 
+    def group_totals(self, keys) -> list[float]:
+        """Each frame's sum over `keys`: a group's own per-frame time, whose
+        p50 is not the sum of its rows' p50s."""
+        return [sum(f.get(k, 0.0) for k in keys) for f in self.frames]
+
+
+# The groups the journal reads (RND-010.2): the terrain, the same work at
+# any crowd, and the crowd's part, which grows with it. Each is printed as
+# the p50 / p90 / mean of its per-frame sum, not a sum of the rows' p50s.
+GROUPS = (("terrain", ("ground", "water", "scenery", "scenery_list")),
+          ("crowd", ("enemies", "enemies/shade", "ghost", "world")))
+
 
 def format_layers(timer: LayerTimer, bare: list[float] | None = None) -> str:
     """The breakdown as text: one line per layer and, when `bare` is given
@@ -279,6 +291,15 @@ def format_layers(timer: LayerTimer, bare: list[float] | None = None) -> str:
                      f"   {per_frame:7.1f}")
     lines.append(f"    {'(all layers)':22s} {percentile(totals, 0.5):6.2f} / "
                  f"{percentile(totals, 0.9):6.2f} / {mean_total:6.2f}")
+    sums = {}
+    for name, keys in GROUPS:
+        sums[name] = timer.group_totals(keys)
+        s = sorted(sums[name])
+        lines.append(f"    {'(' + name + ')':22s} {percentile(s, 0.5):6.2f} / "
+                     f"{percentile(s, 0.9):6.2f} / {sum(s) / len(s):6.2f}   each frame's sum")
+    ratios = sorted(c / t for c, t in zip(sums["crowd"], sums["terrain"], strict=True) if t > 0)
+    lines.append(f"    {'(crowd / terrain)':22s} {percentile(ratios, 0.5):6.3f} / "
+                 f"{percentile(ratios, 0.9):6.3f}            each frame's ratio")
     if bare:
         b = sorted(bare)
         added = percentile(totals, 0.5) - percentile(b, 0.5)

@@ -37,7 +37,20 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(text.splitlines(), [
             "  bias: 5 blocks; draw p50 plain 3.00 ms (3 frames), bare 4.00 ms (3 frames)",
             ("  per block, bare minus plain p50: p50 +0.00 ms, from -0.50 to +1.00; "
-            "bare slower in 2 of 5")])
+            "bare slower in 2 of 5"),
+            "  each block, sorted: -0.50 -0.25 +0.00 +0.50 +1.00",
+            "  too few blocks for a sign-test interval on the median"])
+
+    def test_the_sign_test_interval(self):
+        # 16 blocks: P(at most 3 of 16 below the median) = 697 / 65536, so
+        # the 4th smallest to the 4th largest cover 1 - 2 * 697 / 65536.
+        self.assertEqual(LP.sign_interval(16), (4, 1 - 2 * 697 / 65536))
+        self.assertEqual(LP.sign_interval(8), (1, 1 - 2 / 256))  # the 2nd would cover 93 %
+        self.assertIsNone(LP.sign_interval(5))                    # 1 - 2/32 is under 95 %
+        text = LP.format_bias({"plain": [1.0], "bare": [1.0], "diffs": [float(i) for i in range(16)]})
+        self.assertEqual(text.splitlines()[-1],
+                         "  the median difference lies in +3.00 to +12.00 ms (97.9 % sign-test "
+                         "interval, the 4th smallest to the 4th largest)")
 
     def test_bias_pairs_each_block_bare_minus_plain_in_abba_order(self):
         # Block 1, plain first: plain [1, 1, 1], layered [3, 99, 3, 99]

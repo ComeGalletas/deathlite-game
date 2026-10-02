@@ -181,10 +181,27 @@ class AccountingTests(unittest.TestCase):
         # Totals sorted [3, 5, 7]: p50 5, p90 7, mean 5: three different
         # columns, so none can stand in for another.
         self.assertEqual(lines[3], "    (all layers)             5.00 /   7.00 /   5.00")
+        # No terrain or crowd rows here: the groups read zero (lines 4 to 6).
+        self.assertEqual(lines[6], "    (crowd / terrain)       0.000 /  0.000            each frame's ratio")
         # Timed p50 5 against bare p50 5: +0.00 ms over 4.33 calls a frame.
-        self.assertEqual(lines[4], "  the 3 frames between, drawn without the timers: draw p50 5.00 ms; "
+        self.assertEqual(lines[7], "  the 3 frames between, drawn without the timers: draw p50 5.00 ms; "
                                    "the timers add +0.00 ms at p50, 4.3 timed calls a frame, 0.00 us a call "
                                    "in place")
+
+    def test_the_groups_are_each_frames_sum_not_a_sum_of_p50s(self):
+        # Terrain per frame: 1 + 1 = 2, 3.5, 2 + 2 = 4: p50 3.5, p90 4, mean
+        # 3.17 (the rows' p50s would sum to 2). Crowd: 2 + 1 = 3, 1 + 1 = 2,
+        # 5: p50 3, p90 5, mean 3.33 (the rows' p50s: 2). Each frame's
+        # ratio: 1.5, 0.571, 1.25: p50 1.25, p90 1.5.
+        timer = DL.LayerTimer()
+        timer.frames = [{"ground": 1.0, "water": 1.0, "enemies": 2.0, "world": 1.0},
+                        {"ground": 3.5, "enemies": 1.0, "enemies/shade": 1.0},
+                        {"ground": 2.0, "scenery": 2.0, "enemies": 5.0}]
+        timer.calls = [{}, {}, {}]
+        self.assertEqual(DL.format_layers(timer).splitlines()[-3:], [
+            "    (terrain)                3.50 /   4.00 /   3.17   each frame's sum",
+            "    (crowd)                  3.00 /   5.00 /   3.33   each frame's sum",
+            "    (crowd / terrain)       1.250 /  1.500            each frame's ratio"])
 
     def test_no_timed_frames_is_said_plainly(self):
         self.assertEqual(DL.format_layers(DL.LayerTimer(), bare=[1.0]),

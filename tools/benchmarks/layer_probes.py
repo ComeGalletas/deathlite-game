@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import math
 
 from tools.benchmarks import draw_layers as DL
 from tools.benchmarks import spawn_stress as S
@@ -96,16 +97,40 @@ def bias(ps, blocks: int, plain: int, layered: int) -> dict:
     return out
 
 
+def sign_interval(n: int) -> tuple[int, float] | None:
+    """The sign test's interval for a median from `n` paired differences:
+    `(k, coverage)`, the interval running from the k-th smallest to the
+    k-th largest, the widest-k one covering at least 95 %. None when `n`
+    is too small for any."""
+    k, coverage = None, 0.0
+    for j in range(1, n // 2 + 1):
+        tail = sum(math.comb(n, i) for i in range(j)) / 2 ** n
+        if 1 - 2 * tail < 0.95:
+            break
+        k, coverage = j, 1 - 2 * tail
+    return (k, coverage) if k is not None else None
+
+
 def format_bias(result: dict) -> str:
     diffs = sorted(result["diffs"])
     slower = sum(1 for d in diffs if d > 0)
-    return "\n".join([
+    lines = [
         (f"  bias: {len(diffs)} blocks; draw p50 plain {_p50(result['plain']):.2f} ms "
         f"({len(result['plain'])} frames), bare {_p50(result['bare']):.2f} ms "
         f"({len(result['bare'])} frames)"),
         (f"  per block, bare minus plain p50: p50 {_p50(diffs):+.2f} ms, from "
         f"{diffs[0]:+.2f} to {diffs[-1]:+.2f}; bare slower in {slower} of {len(diffs)}"),
-    ])
+        "  each block, sorted: " + " ".join(f"{d:+.2f}" for d in diffs),
+    ]
+    interval = sign_interval(len(diffs))
+    if interval is None:
+        lines.append("  too few blocks for a sign-test interval on the median")
+    else:
+        k, coverage = interval
+        lines.append(f"  the median difference lies in {diffs[k - 1]:+.2f} to {diffs[-k]:+.2f} ms "
+                     f"({100 * coverage:.1f} % sign-test interval, the {k}th smallest to the "
+                     f"{k}th largest)")
+    return "\n".join(lines)
 
 
 class Rotate:

@@ -624,7 +624,8 @@ def parse(argv=None) -> argparse.Namespace:
     ap.add_argument("--layers", action="store_true",
                     help="RND-010.2: the draw by layer (implies --render); "
                          "every other frame is drawn without the timers, so "
-                         "the bare draw is reported beside (not with --profile)")
+                         "the bare draw is reported beside (not with --profile "
+                         "or --bump)")
     ap.add_argument("--profile", action="store_true")
     args = ap.parse_args(argv)
     if args.bump:
