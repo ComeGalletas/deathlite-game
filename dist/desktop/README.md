@@ -78,7 +78,9 @@ python -m pytest tests/systems/test_desktop_bundle.py
 `assets/infused/` is the folder that slipped through before that test existed
 (BLD-005).
 
-The shipped payload is ~320 files and ~7 MB of art and data.
+The shipped payload is ~490 files and ~19 MB of art, audio and data (the
+two music tracks are ~9 MB of that). The whole bundle is ~54 MB across ~610
+files; the ZIP is ~34 MB (measured for 0.5 on 2026-10-02, BLD-005).
 
 **`onedir`, not onefile.** Deliberate. Onefile re-extracts every asset to
 `%TEMP%` on each launch — seconds of cold start — and its self-extracting stub

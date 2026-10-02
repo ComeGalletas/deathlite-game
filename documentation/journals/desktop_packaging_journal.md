@@ -522,5 +522,55 @@ other referenced folder ships.
 ### Progress
 
 - [x] BLD-005.1 journal and index
-- [ ] BLD-005.2 allow-list fix and regression test
-- [ ] BLD-005.3 build, smoke run, results
+- [x] BLD-005.2 allow-list fix and regression test
+- [x] BLD-005.3 build, smoke run, results
+
+### Results (2026-10-02)
+
+**BLD-005.2.** `test_desktop_bundle.py` failed on the unfixed spec in exactly
+the two tests that cover the gap: 40 `infused/` sheets named but not in
+`datas`, and nothing else. With `infused` added, it passes 7 of 7.
+A cold critic pass tried to break it and returned PASS. It removed each
+shipped folder from `ASSET_DIRS` in turn and every removal failed the test.
+It also swept the runtime loaders and found no asset path the scan misses.
+It named four latent gaps, all closed in the same task: the test now
+reads the `datas` actually handed to `Analysis`, scans JSON keys as well as
+values (`terrain.json` names tilemaps as keys), checks each file's bundle
+destination mirrors its repo path (a mutated destination fails four
+tests), and covers `.jpg`/`.bmp`/`.webp`. Now 8 of 8. The tier
+audit (`tests/devtools/test_tier_audit.py`) and `tests/render` pass too
+(527 passed).
+
+**BLD-005.3.** Built with `build.ps1 -Zip` from `.venv` (pygame 2.6.1,
+PyInstaller 6.22.2):
+
+| | 2026-09-12 | 2026-10-02 |
+|---|---|---|
+| bundle | ~320 payload files | 608 files, 54.2 MB |
+| art, audio and data | ~7 MB | 488 files, 18.9 MB (music 8.9 MB) |
+| ZIP | 22.3 MB | 33.8 MB, `dist/desktop/out/DeathliteGame-0.5.zip` |
+
+The growth is music and sound effects (added after the first build), the
+effects and UI art since then, and `infused/` itself (0.4 MB).
+
+Checked on the built artifact rather than on the spec:
+
+- All 430 asset paths the game names are present under `_internal/assets/`,
+  including all 40 `infused/` sheets. No `unused/` folder, no numpy, no
+  `save.json` inside the bundle.
+- The version resource reads `0.5`, "Deathlite Game", `DeathliteGame.exe`.
+- The `-Console` twin boots to the menu, loads all content (9 weapons,
+  19 enemies, 131 sprite rigs, ...) and logs no missing asset.
+- A fresh unzip of the shipped ZIP runs windowed: it is responsive, titled
+  "Deathlite Game", and draws the title menu (captured with `PrintWindow`).
+  The owner's `%LOCALAPPDATA%\DeathliteGame\save.json` was backed up first;
+  its SHA-256 was the same before and after both runs.
+
+Not exercised in the frozen runtime: an infused attack actually drawing. No
+flag preloads sprites, and the frozen build resolves every asset folder through
+the same `ASSETS_DIR`, so the files being at `_internal/assets/infused/` is the
+evidence.
+
+**Status: done.** Hand over `DeathliteGame-0.5.zip`. The version stays `0.5`;
+bump `config.VERSION` if this build should be told apart from the 2026-09-12
+one.
