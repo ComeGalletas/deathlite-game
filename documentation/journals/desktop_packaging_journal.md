@@ -471,3 +471,56 @@ PyInstaller's intermediates to `dist/desktop/work/` (all gitignored; the old
 `dist/`, `dist_console/` and `build/pyinstaller` locations are gone). The spec
 resolves the repo root as `Path(SPECPATH).parent.parent` and `build.ps1` walks
 two levels up; nothing about what ships changed.
+
+---
+
+## BLD-005 — a fresh .exe, and the allow-list that missed `assets/infused/`
+
+**ID:** BLD-005 · **Systems:** BLD · **Type:** bug · **Branch:** `claude/game-exe-deployment-13dea2`
+
+### Requirement (owner, 2026-10-02)
+
+- **Objective:** produce a new Windows `.exe` deployment of the game as it
+  stands on `main` (`dbde8ac`).
+- **Details:** the same shape as before: PyInstaller onedir, shipped as
+  `DeathliteGame-<version>.zip` from `dist/desktop/build.ps1 -Zip`.
+- **Constraint:** every decision in BLD-002 stands (onedir, allow-listed
+  assets, the save under `%LOCALAPPDATA%`, no crash logging). The version stays
+  `config.VERSION = "0.5"`. Bumping it is the owner's call, and the request
+  did not ask for one.
+
+### Confirmed reading
+
+The last bundle was built on 2026-09-12. Since then the game started loading
+art from a **new top-level folder, `assets/infused/`**: 40 sheets, named 56 times in
+`data/weapons/infused_sprites.json`, the elemental recolours of the bomb, the
+ember and the explosions (`8e6af7b`). `ASSET_DIRS` in `DeathliteGame.spec` was
+never told, so a rebuild on the spec as it stood would have dropped every one
+of them. This is exactly the cost the 2026-09-12 status above warned about.
+
+The failure would not have been visible. `Assets._load_image`
+(`game/assets.py:90`) logs a warning and caches `None` for a missing sheet, and
+a windowed build has no stderr, so infused attacks would have quietly drawn
+without their elemental art on the shipped exe and nowhere else.
+
+A scan of every asset path the game names (data JSON, `game/config.py`, the
+bundled fonts) against the allow-list finds `infused` as the only gap. Every
+other referenced folder ships.
+
+### Plan
+
+- **BLD-005.1** — this section and the `INDEX.md` row.
+- **BLD-005.2** — add `infused` to `ASSET_DIRS`. Regression test
+  `tests/systems/test_desktop_bundle.py` runs the real spec, with
+  PyInstaller stubbed, so it can run on the system Python the suite uses. It
+  asserts every asset path the game names is in the spec's `datas`, so the
+  next new folder fails a test instead of shipping a silent gap.
+- **BLD-005.3** — build with `build.ps1 -Zip`. Smoke-run the shipped exe and a
+  `-Console` twin, confirm `infused/` is in the bundle and the startup log
+  reports no missing asset, then record the results here.
+
+### Progress
+
+- [x] BLD-005.1 journal and index
+- [ ] BLD-005.2 allow-list fix and regression test
+- [ ] BLD-005.3 build, smoke run, results
