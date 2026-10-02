@@ -115,11 +115,15 @@ for n in (150, 250):
     own = [v["us"] - us for (m_, _), v in quiet.items() if m_ == n] + \
           [v["us"] for (m_, _), v in quiet.items() if m_ == n]
     print(f"   own draw per enemy, quiet runs at {n}, all of the {us} us off or none: {span(own, '.1f')}")
-    b = (D / f"s7_bias_{n}.txt").read_text(encoding="utf-8", errors="replace")
-    print("   bias:", re.search(r"the median difference lies in .*", b).group(0))
+print()
+print("== the bias probe, sitting 8 (sitting 7's walked the hero off its scene) ==")
+for n in (150, 250):
+    b = (D / f"s8_bias_{n}.txt").read_text(encoding="utf-8", errors="replace")
+    print(f"{n}:", re.search(r"draw p50 plain .*", b).group(0))
+    print("   ", re.search(r"the median difference lies in .*", b).group(0))
 print()
 print("== the sittings' logs ==")
-for p in ("s5", "s6", "s7"):
+for p in ("s5", "s6", "s7", "s8"):
     meta = (D / f"{p}_meta.txt").read_text(encoding="utf-8", errors="replace")
     loads = [int(v) for v in re.findall(r"cpu load (\d+)%", meta)]
     print(f"{p} cpu load before each run (and at the end, where logged): {span(loads, 'd')} %")
@@ -141,3 +145,19 @@ for p in ("s5", "s6", "s7"):
                   f"(no upper bound)")
         for k in sorted(start.keys() - end.keys()):
             print(f"   {k}: only in the start list, gained at most {min(end.values()) - start[k]:.0f} s")
+
+        # The sitting's length, bounded from its log's stamps (sitting 6
+        # logs whole minutes at the start and the end): the top gainer's
+        # CPU time over it is how many cores it kept busy on average.
+        def secs(hms, last):
+            h, m, *s = (int(x) for x in hms.split(":"))
+            return h * 3600 + m * 60 + (s[0] if s else (59 if last else 0))
+        t0 = re.search(r"started \S+ ([\d:]+)", meta).group(1)
+        t1 = re.search(r"finished ([\d:]+)", meta).group(1)
+        first = re.search(r"=== .*?(\d\d:\d\d:\d\d)", meta).group(1)
+        longest = secs(t1, True) - secs(t0, False)
+        shortest = secs(t1, False) - max(secs(t0, True) if t0.count(":") == 1 else secs(t0, False),
+                                         secs(first, False))
+        top_gain, top = gained[0]
+        print(f"   the sitting ran {shortest} to {longest} s; {top} kept {top_gain / longest:.1f} to "
+              f"{top_gain / shortest:.1f} cores busy on average")

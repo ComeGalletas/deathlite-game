@@ -11,8 +11,9 @@ builder's record, in no file here, it labels so:
 - sitting 4's time (20:00, from its output files' times when they were
   written; it kept no log);
 - a game client seen in a process list just after sitting 5;
-- that the owner was asked to close their games before sitting 7, and
-  what the builder's own session did during it;
+- that the owner was asked to close their games before sittings 7 and 8
+  (MechaBREAK before 8), and what the builder's own session did during
+  sitting 7;
 - what sittings 1 to 3 ran and that a first 200 and 250 run measured a
   crowd of 159 to 175 (outputs not kept).
 
@@ -21,7 +22,9 @@ builder's record, in no file here, it labels so:
 | Files | What | Tool |
 |---|---|---|
 | `s7_150a.txt` … `s7_250b.txt` | Sitting 7 (2026-10-02, 13:57 to 14:01), the conclusions' source: `spawn_stress --layers` at 150, 200 and 250 packed, rounds a and b, with the group rows | `bb92e30` |
-| `s7_bias_150.txt`, `s7_bias_250.txt` | Sitting 7: `layer_probes bias` (ABBA blocks, every block and a sign-test interval) at 150 / 300 and 250 / 600 | `bb92e30` |
+| `s8_bias_150.txt`, `s8_bias_250.txt` | Sitting 8 (2026-10-02, 15:53 to 15:55): `layer_probes bias` (ABBA blocks, the hero on one anchor, every block, a sign-test interval, each side's enemies in view) at 150 / 300 and 250 / 600 | `f26e422` |
+| `s8_meta.txt`, `sitting8.sh` | Sitting 8's log and script | |
+| `s7_bias_150.txt`, `s7_bias_250.txt` | Sitting 7's `bias`, superseded by sitting 8's: its hero walked across the map between blocks; not used | `bb92e30` |
 | `s7_nested_150.txt`, `s7_nested_250.txt` | Sitting 7: `layer_probes nested` on the same scenes | `bb92e30` |
 | `s7_meta.txt`, `sitting7.sh` | Sitting 7's log (the commit, the save's display block, the CPU load before each run, the top processes by CPU time at the start and the end) and the script that ran it, as run | |
 | `s6_150a.txt` … `s6_250b.txt` | Sitting 6 (2026-10-02, 12:24 to 12:30): the same runs, a game running | `da7ab7e` |

@@ -187,8 +187,8 @@ bash (Git Bash on Windows):
     SDL_VIDEODRIVER=windows python -m tools.benchmarks.spawn_stress --live N --elapsed E --pack --layers --frames 600
 
 with N 150 at E 300, 200 at 400 and 250 at 600, in that order, twice
-(rounds a and b; `sitting7.sh` in the data folder runs them all). The probes, on the same scenes, at 150 / 300 and
-250 / 600:
+(rounds a and b; `sitting7.sh` in the data folder runs them all). The
+probes build the same scenes, at 150 / 300 and 250 / 600:
 
     SDL_VIDEODRIVER=windows python -m tools.benchmarks.layer_probes bias --live N --elapsed E
     SDL_VIDEODRIVER=windows python -m tools.benchmarks.layer_probes nested --live N --elapsed E
@@ -204,7 +204,7 @@ Every raw output below is kept in
 [`data/rnd-010.2/`](data/rnd-010.2/README.md): each run's and probe's
 printout, each sitting's log and the script that ran it, and the scripts
 that build the tables and every derived figure from them (`table.py`,
-`derived.py`, `trace_figures.py`). Four sittings count. Sittings 1 to 3
+`derived.py`, `trace_figures.py`). Five sittings count. Sittings 1 to 3
 (2026-09-30) do not (from here to the end of this paragraph, the
 builder's record): they ran uncommitted, earlier versions of the tool
 (`b6f7269` is the first commit of it), all without the lists' own rows;
@@ -214,8 +214,20 @@ garbage collection between frames and with a boss fight in their 250
 runs. Their conditions were mostly unrecorded; sittings 1 and 2's outputs
 were not kept, and sitting 3's are left out of the data folder with them.
 
+- **Sitting 8 (2026-10-02, 15:53 to 15:55), commit `f26e422`**: the
+  `bias` probe alone (`s8_*.txt`, `sitting8.sh`), taken again after the
+  fifteenth review found that sitting 7's walked the hero across the map:
+  `spawn_stress.run` leaves the hero at its last jittered spot and
+  reseeds its jitter each call, so the probe's 32 calls moved it steadily
+  (about 760 px in a headless replay). `f26e422` puts the hero back on
+  one anchor before every part, and prints each side's enemies in view.
+  The owner closed the game running before it (MechaBREAK, the builder's
+  record); the log (`s8_meta.txt`) records a load of 14 % to 21 % and no
+  process in both top lists gaining more than 37 s (`SignalRgb`), the
+  builder's session 12 s.
 - **Sitting 7 (2026-10-02, 13:57 to 14:01), commit `bb92e30`**: the runs
-  and both probes (`s7_*.txt`), the conclusions' source. The owner was
+  and the `nested` probe (`s7_*.txt`; its `bias` outputs are kept but
+  superseded by sitting 8's), the conclusions' source. The owner was
   asked to close their games first (the builder's record; `deadlock`,
   which ran in sitting 6, is in neither of sitting 7's process lists).
   The log (`s7_meta.txt`) records the CPU load before each run, 20 % to
@@ -236,10 +248,10 @@ were not kept, and sitting 3's are left out of the data folder with them.
   itself; sitting 4, chosen by nothing, is: its terrain is 6.25 to
   6.53 ms (summed) at both its crowds.
 - **Sitting 6 (2026-10-02, 12:24 to 12:30), commit `da7ab7e`**: the runs
-  (`s6_*.txt`, and its earlier probes, superseded by sitting 7's). The
-  log (`s6_meta.txt`) records the load, 43 % to 80 %, and a game
-  (`deadlock`) that gained 1,223 s of CPU time over the six minutes,
-  three to four cores' worth.
+  (`s6_*.txt`, and its earlier probes, superseded). The log
+  (`s6_meta.txt`) records the load, 43 % to 80 %, and a game
+  (`deadlock`) that gained 1,223 s of CPU time over the sitting's 301 to
+  419 s, keeping 2.9 to 4.1 cores busy on average.
 - **Sitting 5 (2026-10-02, 11:40 to 11:45), commit `c53225e`**: the runs
   (`s5_*.txt`), timed by the same code as `da7ab7e` (no change to
   `draw_layers.py`, `spawn_stress.py` or `stats.py` between them). The
@@ -353,10 +365,11 @@ since the hero does not attack.
   and 1.59 times between sitting 7's quiet runs (each frame's ratio);
   sitting 7's a and b pairs, as sums of p50s, give 1.67 and 1.51, each a
   slow run set against a quiet one. Meanwhile the bare draw at the same
-  crowd differed by up to 37.4 %, 37.1 % and 44.0 % between sittings
+  crowd differed by up to 37.4 %, 37.1 % and 44.0 % across all runs of
+  sittings 4 to 7, slow patches included
   (largest over smallest, the convention of the spreads above).
-- **Per enemy:** the `enemies` row over its calls a frame is 12.9 to
-  13.8 µs on sitting 7's quiet runs. The probe puts the nested wrappers at
+- **Per enemy:** the `enemies` row's p50 over its mean calls a frame is
+  12.9 to 13.8 µs on sitting 7's quiet runs. The probe puts the nested wrappers at
   2.78 µs an enemy at 150 and 2.66 at 250 (below), without separating how
   much of that lands in the `enemies` row itself; taking all of it off or
   none of it, an enemy's own draw is 10.2 to 13.6 µs at 147 and 224 in
@@ -408,20 +421,26 @@ since the hero does not attack.
   without the timers (the constraint above), and this breakdown only aims
   them.
 - **The `--layers` headline against the plain `--render` one.** Sitting
-  7's `bias` probe put plain and layered blocks side by side over one
-  crowd, the order alternating (ABBA) so a drift inside a block falls on
-  each side alike. It compares what the two commands report, so it
-  covers the alternation and the garbage collection `--layers` adds after
-  every frame together; two effects that cancelled would not show. At 150
-  the bare frames' draw p50 was 9.67 ms against the plain frames' 9.62
-  (640 frames each); the 16 blocks' bare minus plain p50s put the median
-  difference between -0.25 and +0.29 ms (a 97.9 % sign-test interval, the
-  4th smallest to the 4th largest of 16). At 250, 11.50 against 11.66,
-  the median between -0.29 and +0.17 ms. The intervals bound the median
-  of the blocks' 40-frame p50 differences and treat the blocks as
-  independent; they are not the 300-frame headline's bias itself. Taking
-  them as its measure, a judgement: no sign of a bias, and any there is
-  sits within about 0.3 ms either way at both crowds.
+  8's `bias` probe put plain and layered blocks side by side over one
+  crowd, the hero on one anchor, the order alternating (ABBA) so a drift
+  inside a block falls on each side alike. It compares what the two
+  commands report, so it covers the alternation and the garbage
+  collection `--layers` adds after every frame together; two effects that
+  cancelled would not show. Its crowd is the runs' scene a little later:
+  over the probe's 1,920 frames more summons arrive than over a run's
+  600, so it had 161 enemies in view at p50 at `--live 150` (the runs:
+  147) and 228 to 230 at `--live 250` (the runs: 224). At 150 the bare
+  frames' draw p50 was 9.86 ms against the plain frames' 9.91 (640 frames
+  each, both 161 in view); the 16 blocks' bare minus plain p50s put the
+  median difference between -0.22 and +0.22 ms (a 97.9 % sign-test
+  interval, the 4th smallest to the 4th largest of 16). At 250, 11.62
+  against 11.62, the median between -0.13 and +0.24 ms. The intervals
+  bound the median of the blocks' 40-frame p50 differences and treat the
+  blocks as independent; they are not the 300-frame headline's bias
+  itself. Taking them as its measure, a judgement: no sign of a bias, and
+  any there is sits within about a quarter of a millisecond either way at
+  both crowds. (Sitting 7's `bias` outputs, from the walking hero, read
+  about 0.5 ms below its runs' bare draws; they are not used.)
 - **The packed crowd is past what the owner played.** In the owner's
   trace, the play frames with 150 or more alive (4,557) had 90 enemies in
   view at p50, 173 at p99 and 177 at most; none had 200. The harness's
@@ -454,7 +473,8 @@ since the hero does not attack.
   enemies' own draw moves from RND-010.2 to RND-010.3, as its first step.
   RND-010.2 ranks the crowd's layers and leaves `enemies`' own row whole.
   The leads in it are timed old against new, not wrapped: an enemy's
-  whole own draw is about 10 to 14 µs and a timed call costs about 1 µs
+  share of the exclusive `enemies` row (its own draw, without the shade,
+  bars and marks) is about 10 to 14 µs and a timed call costs about 1 µs
   in place, so a wrapper per lead would be a large share of what it
   measures (a judgement from those two figures; the leads themselves are
   not timed yet).

@@ -1,0 +1,35 @@
+commit f26e422  started 2026-10-02 15:53:51
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb      10610,46875
+chrome         6375,109375
+cam_helper     3458,890625
+chrome              2741,5
+audiodg         1654,09375
+SystemSettings  1338,09375
+claude         1135,046875
+Discord              882,5
+
+
+
+=== bias 150  cpu load 21%  15:53:53
+=== bias 250  cpu load 14%  15:54:39
+finished 15:55:33  cpu load 19%
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb      10647,21875
+chrome          6378,65625
+cam_helper     3470,765625
+chrome          2742,84375
+audiodg          1660,8125
+SystemSettings 1339,359375
+claude         1146,828125
+NTEGlobalGame     883,3125
+
+
+

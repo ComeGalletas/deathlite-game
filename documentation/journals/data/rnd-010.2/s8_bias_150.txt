@@ -1,0 +1,8 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the 62 fps cap is 16 ms, pygame counting whole milliseconds)
+  bias: 16 blocks; draw p50 plain 9.91 ms (640 frames, in view p50 161), bare 9.86 ms (640 frames, in view p50 161)
+  per block, bare minus plain p50: p50 -0.01 ms, from -0.73 to +1.66; bare slower in 7 of 16
+  each block, sorted: -0.73 -0.41 -0.25 -0.22 -0.21 -0.16 -0.04 -0.03 -0.01 +0.02 +0.03 +0.15 +0.22 +0.36 +0.62 +1.66
+  the median difference lies in -0.22 to +0.22 ms (97.9 % sign-test interval, the 4th smallest to the 4th largest)
+  boss at the end: held back
