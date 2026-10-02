@@ -1,10 +1,13 @@
 """`PlayingState.draw`, timed layer by layer (RND-010.2, `crowd_draw_journal.md`).
 
-    python -m tools.benchmarks.spawn_stress --live 200 --elapsed 400 --pack --layers
+    SDL_VIDEODRIVER=windows python -m tools.benchmarks.spawn_stress --live 200 --elapsed 400 --pack --layers --frames 600
 
 (`--elapsed`: the director seats 100 + 5 per 20 s of run clock on normal,
 so a crowd of N needs `(N - 100) * 4` s; the harness says when it seated
-fewer.)
+fewer. Without `SDL_VIDEODRIVER=windows` the harness draws headless, into
+the dummy driver's surface, which is not the cost on screen; with it, it
+draws into the real window at the size in the source tree's `save.json`.
+The journal gives the exact commands of each sitting.)
 
 `LayerTimer.install(ps)` wraps each layer's entry point on the live objects
 (the painters `PlayingState` forwards to, the terrain renderer's passes, the
@@ -98,9 +101,12 @@ class LayerTimer:
     """Exclusive draw time per layer, per frame. Install it on a built
     `PlayingState`, call `ps.draw` as usual, then `frame()` after each
     draw; `uninstall` restores every wrapped attribute. A draw that raises
-    leaves nothing behind: its partial times are dropped."""
+    leaves nothing behind: its partial times are dropped. `skip` names
+    layers left unwrapped (`layer_probes`: what the nested timers cost);
+    their time falls to their callers."""
 
-    def __init__(self) -> None:
+    def __init__(self, skip: frozenset = frozenset()) -> None:
+        self.skip = frozenset(skip)
         self.frames: list[dict] = []           # one {layer: ms} per frame
         self.calls: list[dict] = []            # one {layer: calls} per frame
         self._current: dict = defaultdict(float)
@@ -137,6 +143,8 @@ class LayerTimer:
         targets = self._targets(ps)
         try:
             for label, where, attr in LAYERS:
+                if label in self.skip:
+                    continue
                 obj = targets[where]
                 own = attr in vars(obj)
                 original = getattr(obj, attr)
@@ -277,7 +285,7 @@ def format_layers(timer: LayerTimer, bare: list[float] | None = None) -> str:
         per_call = 1000.0 * added / calls if calls else 0.0
         lines.append(f"  the {len(b)} frames between, drawn without the timers: draw p50 "
                      f"{percentile(b, 0.5):.2f} ms; the timers add {added:+.2f} ms at p50, "
-                     f"{calls:.0f} timed calls a frame, {per_call:.2f} us a call in place")
+                     f"{calls:.1f} timed calls a frame, {per_call:.2f} us a call in place")
     return "\n".join(lines)
 
 
@@ -301,16 +309,19 @@ class Alternate:
         self._i = 0
 
     def __call__(self) -> None:
-        if self.timer.installed:
+        was_timed = self.timer.installed
+        if was_timed:
             self.timer.frame()
             self.timer.uninstall()
-            # The timed frame's garbage (the wrappers allocate) is collected
-            # here, outside any timed span, so it does not fall into the
-            # bare frame that follows.
-            gc.collect(0)
             self.timed.append(self._i)
         else:
             self.bare.append(self._i)
+        # Every frame's young garbage (the wrappers allocate) is collected
+        # here, with no timer on, after both kinds alike: each frame then
+        # starts from the same collector state, and neither kind pays for
+        # the other's allocations.
+        gc.collect(0)
+        if not was_timed:
             self.timer.install(self.ps)
         self._i += 1
 

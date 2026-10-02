@@ -37,7 +37,7 @@ SEED = 35
 
 
 def _fresh_save() -> str:
-    """A save of defaults, so the developer's own `save.json` (window size,
+    """A save of defaults, so the owner's own `save.json` (window size,
     tutorials) cannot reach a test. Its folder is removed at exit."""
     import atexit
     import os
@@ -163,7 +163,7 @@ class AccountingTests(unittest.TestCase):
         # Timed p50 3.0 (totals [3, 4]) against bare 2.0: +1.00 ms over
         # 3.5 calls a frame (2 of `a`, 1.5 of `b`).
         self.assertIn("the 2 frames between, drawn without the timers: draw p50 2.00 ms; "
-                      "the timers add +1.00 ms at p50, 4 timed calls a frame, 285.71 us a call "
+                      "the timers add +1.00 ms at p50, 3.5 timed calls a frame, 285.71 us a call "
                       "in place", text)
 
     def test_every_row_and_column_of_the_printout(self):
@@ -183,7 +183,7 @@ class AccountingTests(unittest.TestCase):
         self.assertEqual(lines[3], "    (all layers)             5.00 /   7.00 /   5.00")
         # Timed p50 5 against bare p50 5: +0.00 ms over 4.33 calls a frame.
         self.assertEqual(lines[4], "  the 3 frames between, drawn without the timers: draw p50 5.00 ms; "
-                                   "the timers add +0.00 ms at p50, 4 timed calls a frame, 0.00 us a call "
+                                   "the timers add +0.00 ms at p50, 4.3 timed calls a frame, 0.00 us a call "
                                    "in place")
 
     def test_no_timed_frames_is_said_plainly(self):
@@ -258,6 +258,21 @@ class RollbackTests(unittest.TestCase):
         self.assertFalse(timer.installed)
 
 
+class SkipTests(unittest.TestCase):
+    def test_a_skipped_layer_is_left_unwrapped(self):
+        # `layer_probes` leaves the nested timers off to cost them.
+        a, b = RollbackTests._Plain(), RollbackTests._Plain()
+        timer = DL.LayerTimer(skip={"b"})
+        with mock.patch.object(DL.LayerTimer, "_targets", staticmethod(lambda ps: {"a": a, "b": b})),                 mock.patch.object(DL, "LAYERS", (("a", "a", "draw"), ("b", "b", "draw"))):
+            timer.install(object())
+        try:
+            self.assertIn("draw", vars(a))
+            self.assertNotIn("draw", vars(b))
+        finally:
+            timer.uninstall()
+        self.assertNotIn("draw", vars(a))
+
+
 class BareFramesTests(unittest.TestCase):
     def test_the_bare_frames_of_each_list(self):
         alt = DL.Alternate(DL.LayerTimer(), ps=None)
@@ -294,17 +309,25 @@ class HeadlineTests(unittest.TestCase):
 
 
 class AlternateTests(unittest.TestCase):
-    def test_a_timed_frames_garbage_is_collected_before_the_next_bare_frame(self):
+    def test_every_frames_garbage_is_collected_with_no_timer_on(self):
+        # After both kinds alike, so neither kind of frame starts from a
+        # different collector state: after a bare frame before the timers
+        # go on, after a timed one once they are off.
         timer = DL.LayerTimer()
-        timer.install = mock.Mock(side_effect=lambda ps: timer._undo.append((None, "x", True, 0)))
-        timer.uninstall = mock.Mock(side_effect=timer._undo.clear)
+        events = mock.Mock()
+        timer.install = mock.Mock(side_effect=lambda ps: (
+            events.install(), timer._undo.append((None, "x", True, 0))))
+        timer.uninstall = mock.Mock(side_effect=lambda: (events.uninstall(), timer._undo.clear()))
         timer.frame = mock.Mock()
         alt = DL.Alternate(timer, ps=object())
-        with mock.patch.object(DL.gc, "collect") as collect:
-            alt()                                    # after a bare frame: nothing
-            self.assertEqual(collect.call_count, 0)
-            alt()                                    # after a timed frame: the young generation
-            collect.assert_called_once_with(0)
+        with mock.patch.object(DL.gc, "collect", events.collect):
+            alt()                                    # after a bare frame
+            alt()                                    # after a timed frame
+            alt()                                    # after a bare frame
+        self.assertEqual(events.mock_calls, [
+            mock.call.collect(0), mock.call.install(),
+            mock.call.uninstall(), mock.call.collect(0),
+            mock.call.collect(0), mock.call.install()])
 
     def test_the_timers_are_on_every_other_frame_the_first_bare(self):
         timer = DL.LayerTimer()

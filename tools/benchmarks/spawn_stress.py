@@ -15,6 +15,7 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --pack --bump           # RND-008: the bump pass alone
     python -m tools.benchmarks.spawn_stress --live 250 --elapsed 600 --pack --layers
                                                                     # RND-010: the draw by layer
+                                                                    # (headless; see below for on screen)
 
 What it measures is play, not the run's opening (RND-008.D3):
 
@@ -569,10 +570,16 @@ def parse(argv=None) -> argparse.Namespace:
     apart from `main` so the flags can be checked without booting a run."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--seed", type=int, default=35)
-    ap.add_argument("--live", type=int, default=100)
-    ap.add_argument("--dormant", type=int, default=400)
+    ap.add_argument("--live", type=int, default=100,
+                    help="enemies seated in the active zone; the director seats no "
+                         "more than its cap at --elapsed, and never more than "
+                         "config.ENEMY_LIVE_CAP (the run says when it seated fewer)")
+    ap.add_argument("--dormant", type=int, default=400,
+                    help="enemy records banked on the other islands")
     ap.add_argument("--frames", type=int, default=1200)
-    ap.add_argument("--elapsed", type=float, default=300.0)
+    ap.add_argument("--elapsed", type=float, default=300.0,
+                    help="the run clock in seconds; the director's cap is 100 + 5 "
+                         "per 20 s on normal, so --live N needs (N - 100) * 4")
     ap.add_argument("--lod", type=int, default=None,
                     help="behaviour tick divisor for out-of-aggro, off-view enemies "
                          "(default: config.ENEMY_LOD_SKIP)")
