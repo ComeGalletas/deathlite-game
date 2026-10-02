@@ -658,7 +658,10 @@ def shortfall(ps, asked: int, elapsed: float) -> str | None:
     if most < asked:
         msg += f"; the director seats no more than {most} (the live cap)"
         return msg + ("; raise --elapsed to reach it" if cap < most else "")
-    return msg + ("; raise --elapsed" if cap < asked else "")
+    if cap >= asked:
+        # Not the cap: `build` gave up finding walkable spots for the rest.
+        return msg + ", so not the cap: placement found no room for the rest"
+    return msg + "; raise --elapsed"
 
 
 def build_options(args: argparse.Namespace) -> dict:

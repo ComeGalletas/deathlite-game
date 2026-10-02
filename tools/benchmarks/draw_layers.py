@@ -31,8 +31,9 @@ frame's parts add up to its whole draw time exactly:
 * `enemies`: each enemy's record for the ghost pass (and the copy of a
   shaded frame it keeps), and the elemental wash (`element_fx.washed`) and
   hit tint (`hit_tinted`) of its frame; `boss` and `player` hold their own
-  hit tint the same way. (None of these cost anything in the stress
-  harness's fights, where nothing is hit or primed unless asked.)
+  hit tint the same way. (The wash and the tints cost nothing in the stress
+  harness's fights, where nothing is hit or primed unless asked; the record
+  and the copy are paid every frame.)
 
 The wrappers cost time of their own: a call, two clock reads, the name and
 the bookkeeping, much of it landing in the caller's row (`enemies` carries

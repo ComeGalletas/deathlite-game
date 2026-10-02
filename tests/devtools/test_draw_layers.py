@@ -520,9 +520,10 @@ class ShortfallTests(unittest.TestCase):
         self.assertEqual(S.shortfall(self._ps(175, 175, most=250), 250, 300.0),
                          "  asked for 250 alive, built 175: the cap at 300 s is 175; raise --elapsed")
 
-    def test_a_shortfall_under_the_cap_names_no_fix(self):
+    def test_a_shortfall_under_the_cap_says_it_was_not_the_cap(self):
         msg = S.shortfall(self._ps(240, 250, most=250), 250, 600.0)
-        self.assertEqual(msg, "  asked for 250 alive, built 240: the cap at 600 s is 250")
+        self.assertEqual(msg, "  asked for 250 alive, built 240: the cap at 600 s is 250, so not the "
+                              "cap: placement found no room for the rest")
 
 
 class VillagersAndHutsTests(unittest.TestCase):
@@ -621,6 +622,17 @@ class MainTests(unittest.TestCase):
         patcher = mock.patch.object(save_mod, "DEFAULT_PATH", _fresh_save())
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def test_layers_forwards_the_pump_and_the_instruments(self):
+        # --element-rate makes a pump, --cascade the instruments; under
+        # --layers both must reach the timed run.
+        with mock.patch.object(S, "layered_run", wraps=S.layered_run) as layered, \
+                contextlib.redirect_stdout(io.StringIO()):
+            S.main(["--seed", str(SEED), "--live", "20", "--dormant", "0", "--frames", "2",
+                    "--layers", "--cascade", "--element-rate", "2"])
+        kwargs = layered.call_args.kwargs
+        self.assertIsNotNone(kwargs["pump"])
+        self.assertIsInstance(kwargs["instruments"], S.Instruments)
 
     def test_the_profile_path_reports_the_boss_after_timing_too(self):
         out = io.StringIO()
