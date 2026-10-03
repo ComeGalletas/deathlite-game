@@ -432,7 +432,11 @@ measurement followed as BLD-003.6. On `main` through the landing branch
 
 **The static host works.** The page boots from a plain `http.server` once
 the wheel is beside it: the fix a Vercel or Pages deploy needs, now shown
-end to end. The bundle is a 19.6 MB `.apk` (44.8 MB on 2026-09-03). The
+end to end. *(Corrected 2026-10-02 by BLD-006, `web_wheel_journal.md`: this
+was served on `localhost:8000`, where pygbag fetches wheels from the page's
+`cdn/`; on any other address, a real host included, it takes them from the
+public CDN, so a Vercel or Pages deploy should not need the vendored wheel.
+`dist/web/build.sh` vendors it for the local check.)* The bundle is a 19.6 MB `.apk` (44.8 MB on 2026-09-03). The
 menu was up about 10 s after navigating; the loading screen took about
 3 s (the web plan feared 5-10 s).
 

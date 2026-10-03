@@ -106,6 +106,13 @@ it.
 
 ## GitHub Actions sketch (W9 — not committed yet)
 
+*(Out of date, noted 2026-10-02 by BLD-006: written for the W8 layout. The
+scripts are in `dist/web/` (the entry is `../../main.py`, the title
+"Deathlite Game"), and `dist/web/build.sh` now also vendors the pygame wheel
+into `out/cdn/` through `vendor_wheels.py`. A deployed page off `localhost`
+takes its wheels from the public CDN, so the action needs no vendoring
+step. Revisit all of this when W9 is taken up.)*
+
 Uses `pygame-web/pygbag-action` — its `ini` / `build` inputs, and it can prune
 the bundle (the raw `python -m pygbag` CLI has **no** `--ignore`; it only skips
 dotfiles / `__pycache__` / `build/` and honours `.gitignore`, so `.venv` is out
@@ -264,14 +271,21 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
 
 ## Local test
 
+*(Updated 2026-10-02, BLD-006: the scripts moved to `web/` in W8 and to `dist/web/` on 2026-09-13, and a
+static server must serve `dist/web/out/`, the only folder with the vendored
+wheel; `build/web` served statically 404s on it. `dist/web/README.md` has the
+current commands.)*
+
 ```
-bash web/serve.sh     # rebuild + serve http://localhost:8000
-bash web/build.sh      # build only -> build/web/
+bash dist/web/serve.sh     # rebuild + serve http://localhost:8000 (pygbag's dev server)
+bash dist/web/build.sh     # build only -> dist/web/out/, wheel vendored into out/cdn/
+python -m http.server -d dist/web/out 8000   # then open http://localhost:8000/
 ```
 
-Or by hand: `cd web && python -m pygbag --ume_block 0 --title "Death Lite Die"
-../main.py`. First run downloads a CPython-WASM runtime (cached after). Serve an
-existing build statically with `python -m http.server -d build/web 8000`. Load
+Or by hand: `cd dist/web && python -m pygbag --ume_block 0 --title "Deathlite Game"
+../../main.py`. First run downloads a CPython-WASM runtime (cached after). A
+static server needs port 8000 on `localhost` (or any port on `127.0.0.1`, which
+takes the wheel from the public CDN). Load
 `http://localhost:8000/#debug` to keep pygbag's on-page Python console visible.
 Confirm the menu renders (Fredoka), a run starts, and — expected — progression
 does not survive a reload.
@@ -280,7 +294,7 @@ does not survive a reload.
 
 ## TODO
 
-*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished. The bundle trim is moot since BLD-004, 2026-09-30: the web release has no audio, see the item below.)*
+*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished. The bundle trim is moot since BLD-004, 2026-09-30: the web release has no audio, see the item below. The wheel vendoring is done since BLD-006, 2026-10-02, `web_wheel_journal.md`.)*
 
 - [x] W1 — async loop + `main.py` / `main_web.py` entry points
 - [x] W2 — `config.SAVE_ENABLED`, save read/write skipped when off
@@ -313,7 +327,11 @@ and drove it from an embedded browser. Full findings and the plan:
   pygbag's dev server provides, 404s, and reloads in a loop. W9 (GitHub
   Pages) needs the wheel vendored into `build/web/cdn/cp312/` -- with it
   in place the game boots, starts a run, and the spawn master's overlay
-  lines show.
+  lines show. *(Corrected 2026-10-02 by BLD-006, `web_wheel_journal.md`:
+  this was measured on `http://localhost:8000`. pygbag fetches wheels from
+  `localhost:8000/cdn/` only when the page address starts with `http://localhost:8`; elsewhere,
+  a real host included, from the public CDN. `build.sh` now vendors the
+  wheel for the local static check.)*
 - 670 of 893 asset files (34.7 MB of 45.8) are referenced by neither
   data nor code; 29 MB is `assets/unordered-effects/`.
 - Per-frame WASM readings at a run's start: update 30-58 ms (the
@@ -337,4 +355,5 @@ not ignored, and `.ruff_cache/`, `tools/` and `desktop/` were riding along. The
 list now ignores `/assets/unused`, `/tools`, `/.ruff_cache`, `/dist`, and
 `pytest.ini` / `README.md`; the stale `/journals` and `/web` entries and the
 long-gone `red` / spec-markdown file names are dropped. W9 (Pages) and the
-wheel vendoring are untouched and still open.
+wheel vendoring are untouched and still open. *(Wheel vendoring done
+2026-10-02, BLD-006.)*
