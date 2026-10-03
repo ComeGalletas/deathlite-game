@@ -169,5 +169,6 @@ serve no single requirement.
 | [designs/weapon_blessing_forge_tables.md](../designs/weapon_blessing_forge_tables.md) | PRG-001 |
 | [plans/boss_free_roam_todo.md](../plans/boss_free_roam_todo.md) | ENT-001 |
 | [plans/fluidity_plan.md](../plans/fluidity_plan.md) | SPN-001 |
+| [plans/crowd_performance_plan.md](../plans/crowd_performance_plan.md) | RND-010 |
 | [plans/pending_plans.md](../plans/pending_plans.md) | unassigned |
 | [plans/test_suite_review.md](../plans/test_suite_review.md) | unassigned |

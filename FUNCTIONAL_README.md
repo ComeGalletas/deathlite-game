@@ -429,8 +429,10 @@ kinds of file:
   before and while it is built.
 - **`documentation/plans/`** — what is *to be done*, and in what order:
   `weapon_system_plan.md`, `worldgen_refactor_plan.md`, `spawn_master_todo.md`,
-  `boss_free_roam_todo.md`, `fluidity_plan.md`, `web_plan.md` and
-  `test_suite_review.md`. `pending_plans.md` is the standing list of everything
+  `boss_free_roam_todo.md`, `fluidity_plan.md`, `web_plan.md`,
+  `crowd_performance_plan.md` (the 60 fps at 200 enemies review and its
+  ranked fixes, for RND-010) and `test_suite_review.md`. `pending_plans.md`
+  is the standing list of everything
   designed or built but not yet wired up.
 - **`documentation/designs/`** — design references that describe how the game
   *works*: `death_must_die_lite_game_spec.md` (the spec),

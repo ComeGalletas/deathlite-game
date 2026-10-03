@@ -107,6 +107,16 @@ finding, until RND-010.2 times it.
   (90.8 %) and work p50 (21.23 ms) fall, and the 100 to 149 row (23.6 %)
   with them.
 
+## RND-010: Review of 2026-10-03 (read-only)
+
+A review against the owner's requirement (a stable 60 fps with over 200
+enemies on screen) measured the harness at 100 and 200 live, spread and
+packed, the raw pygame blit floor, and the garbage collector, and ranked
+the exact fixes for the draw and the update. Its findings, numbers, the
+ranked plan and the owner decision it ends in are in
+`../plans/crowd_performance_plan.md`; RND-010.2 is where the work resumes,
+and that plan's section 4 is its task list.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
