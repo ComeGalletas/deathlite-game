@@ -25,6 +25,7 @@ from progression.meta import MetaCatalog
 from systems.audio import AudioManager
 from systems.debug_overlay import DebugOverlay
 from systems.frame_trace import FrameTrace
+from systems.mixer_backend import init_pygame
 from systems.music import MusicPlayer
 from ui.mouse import install_cursor, system_match_scale
 
@@ -39,7 +40,8 @@ class Game:
         # frame then holds ~31 ms (SYS-011). Process-wide, so any order works.
         self.timer_honored = native.honor_timer_resolution()
         log.info("timer resolution request always honored: %s", self.timer_honored)
-        pygame.init()
+        # With audio off (the web release, BLD-004) no mixer device is opened.
+        init_pygame(audio=config.AUDIO_ENABLED)
         pygame.display.set_caption(config.TITLE)
         self._set_icon()                    # before the window: SDL reads it there
         # Persistent progression (spec 4.7). Load is corruption-tolerant. Read
@@ -130,6 +132,11 @@ class Game:
             raise ValueError(f"unknown key layout: {name!r}")
         self.save.settings["key_layout"] = name
         self.persist()
+        # The run's hints spell out the keys, and the pause menu's toggle
+        # changes them under a frozen backdrop (RND-012).
+        machine = getattr(self, "state_machine", None)
+        if machine is not None:
+            machine.invalidate_backdrop()
 
     def set_master_volume(self, v: float, *, persist: bool = True) -> None:
         """The mixer's master, held by both players so each folds it into the
@@ -274,10 +281,12 @@ class Game:
 
     def _step(self) -> None:
         """One iteration of the main loop: timing -> input -> update -> render.
-        Clears `self.running` when the state stack drains. Identical work for
-        both loop drivers so desktop and browser never diverge."""
+        Clears `self.running` when the state stack drains. The same work for
+        both loop drivers, so desktop and browser do not diverge; only the
+        tick's cap differs (`config.HOST_PACES_FRAMES`)."""
         waited = time.perf_counter()
-        dt = self.clock.tick(config.FPS) / 1000.0
+        # No cap when the host paces the loop (the browser, BLD-003.3).
+        dt = self.clock.tick(0 if config.HOST_PACES_FRAMES else config.FPS) / 1000.0
         started = time.perf_counter()               # this frame's work begins (SYS-010)
         dt = min(dt, config.MAX_DT)  # clamp -- see config.MAX_DT
 
@@ -341,7 +350,12 @@ class Game:
     async def run_async(self) -> None:
         """Browser (pygbag / emscripten) entry: the same loop, but it yields to
         the host event loop once per frame with `await asyncio.sleep(0)` so the
-        page stays responsive. Works on desktop too (`asyncio.run`)."""
+        page stays responsive. In the browser that yield is also what paces
+        the frame (pygbag's stepper resumes the loop from
+        `requestAnimationFrame`, measured in Chrome, BLD-003.6), so `_step`
+        drops its own cap there (`config.HOST_PACES_FRAMES`). Works
+        on desktop too (`asyncio.run`), where the yield paces nothing and
+        the cap stays."""
         import asyncio
 
         self._start()

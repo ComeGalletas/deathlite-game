@@ -12,24 +12,36 @@ The game also builds to WebAssembly with [pygbag](https://pygame-web.github.io/)
 The loop is `asyncio`-driven (`Game.run_async`), so one code path serves the
 desktop and web builds. `main.py` is the only entry point; under the emscripten
 runtime (or with `--web` on the desktop) it calls `config.apply_web_profile()` —
-**session-only save** (never reads or writes `save.json`), **60 fps** to match
-the browser compositor, and a **1280×720** render target (pygbag's canvas)
-that cuts per-frame work ~35%. The interface is drawn at 0.8 there (the
-1600×900 design at 80%) and the world at zoom 1.25, a view ~4% tighter than
-the desktop's (1024×576 world px against 1067×600; UI-016).
+**session-only save** (never reads or writes `save.json`), and a **1280×720**
+render target (pygbag's canvas) that cuts per-frame work ~35%. The interface
+is drawn at 0.8 there (the 1600×900 design at 80%) and the world at zoom
+1.25, a view ~4% tighter than the desktop's (1024×576 world px against
+1067×600; UI-016). In the browser the page's refresh paces the loop
+(measured in Chrome; the game's own 60 fps cap is only for `--web` on the
+desktop), and the crowd is the browser's own: the spawn master stops
+spawning at **100 live enemies** (desktop 250; bar dev-menu and dummy
+spawns, and waking enemies can still push past it, as on the desktop),
+off-screen idle enemies tick every third frame, and the flow-field fill is a
+little shorter and less frequent (BLD-003). Measured in Chrome
+(2026-09-30): a run draws at about 22-26 fps, the draw being the cost, not
+the crowd (`documentation/journals/web_frame_time_journal.md`).
 
 Everything else pygbag needs lives in `dist/web/` (`pygbag.ini`, `build.sh`,
 `serve.sh`, and `dist/web/README.md` with the details):
 
 ```bash
 bash dist/web/serve.sh   # rebuild + serve at http://localhost:8000
-bash dist/web/build.sh   # build only -> dist/web/out/  (gitignored)
+bash dist/web/build.sh   # build only -> dist/web/out/ (gitignored), wheel vendored; serve with
+                         # python -m http.server -d dist/web/out 8000, open localhost:8000
 ```
 
-First run downloads a CPython-WASM runtime (cached after). Mixer bring-up is
-platform-specific behind `systems/mixer_backend.py` (desktop re-inits at
-44100 Hz stereo and resamples the 22050 Hz synth cues up to it; the browser
-keeps the WebAudio context it was given and resamples to that instead).
+First run downloads a CPython-WASM runtime (cached after). The web release
+has **no audio** (BLD-004): the browser profile sets `config.AUDIO_ENABLED =
+False`, so no mixer is opened and no cue or track loads, and `pygbag.ini`
+keeps `assets/music/` and `assets/sound_effects/` out of the bundle. On the
+desktop, mixer bring-up sits behind `systems/mixer_backend.py` (it re-inits
+at 44100 Hz stereo and resamples the 22050 Hz synth cues up to it; a browser
+backend that keeps the WebAudio context is still there, unused).
 Fonts are the bundled **Fredoka** face (`assets/fonts/`, via `game/fonts.py`).
 See `documentation/journals/pygbag.md` for the full plan and the GitHub Pages deploy steps.
 
@@ -417,8 +429,10 @@ kinds of file:
   before and while it is built.
 - **`documentation/plans/`** — what is *to be done*, and in what order:
   `weapon_system_plan.md`, `worldgen_refactor_plan.md`, `spawn_master_todo.md`,
-  `boss_free_roam_todo.md`, `fluidity_plan.md`, `web_plan.md` and
-  `test_suite_review.md`. `pending_plans.md` is the standing list of everything
+  `boss_free_roam_todo.md`, `fluidity_plan.md`, `web_plan.md`,
+  `crowd_performance_plan.md` (the 60 fps at 200 enemies review and its
+  ranked fixes, for RND-010) and `test_suite_review.md`. `pending_plans.md`
+  is the standing list of everything
   designed or built but not yet wired up.
 - **`documentation/designs/`** — design references that describe how the game
   *works*: `death_must_die_lite_game_spec.md` (the spec),

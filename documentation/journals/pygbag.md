@@ -12,7 +12,9 @@ Milestones are **W1–W9**. Each ends green — `python -m unittest discover -s
 tests -t .` plus a `pygbag` local run — before the next.
 
 **Status:** W1–W8 done (2026-08-28) — the browser build runs (menu, gameplay,
-audio, session-only save) at 1280×720/60 fps, and all pygbag files live in
+audio, session-only save) at 1280×720/60 fps (the 60 fps cap later removed
+in the browser by BLD-003, below; the audio removed from the web release by
+BLD-004, 2026-09-30, `web_audio_journal.md`), and all pygbag files live in
 `web/`. **W9** (the GitHub Pages workflow + `.nojekyll`) is the only one left and
 is deliberately **not created yet** — owner will add it; the ready-to-paste
 sketch is under "GitHub Actions sketch" below.
@@ -29,7 +31,9 @@ fragile audio context, so the two places the builds legitimately differ are
    session starts clean (owner's call: *no* IndexedDB save for the web version),
    and
 2. **mixer bring-up** — the web build must not tear down and re-open the
-   WebAudio context.
+   WebAudio context. *(Since BLD-004, 2026-09-30, the web release opens no
+   mixer at all: `config.AUDIO_ENABLED` is False under the browser profile.
+   The browser backend stays in `systems/mixer_backend.py`, unused.)*
 
 Both are handled behind flags / an adapter so desktop is untouched.
 
@@ -101,6 +105,13 @@ it.
 ---
 
 ## GitHub Actions sketch (W9 — not committed yet)
+
+*(Out of date, noted 2026-10-02 by BLD-006: written for the W8 layout. The
+scripts are in `dist/web/` (the entry is `../../main.py`, the title
+"Deathlite Game"), and `dist/web/build.sh` now also vendors the pygame wheel
+into `out/cdn/` through `vendor_wheels.py`. A deployed page off `localhost`
+takes its wheels from the public CDN, so the action needs no vendoring
+step. Revisit all of this when W9 is taken up.)*
 
 Uses `pygame-web/pygbag-action` — its `ini` / `build` inputs, and it can prune
 the bundle (the raw `python -m pygbag` CLI has **no** `--ignore`; it only skips
@@ -183,6 +194,8 @@ scripts + `build/` output are not packed. Verified: `bash web/build.sh` packs
   pygbag hook hazard. Moved to a lazy `_get_gfxdraw()` (import inside a
   try/except on first `_draw_cone` call); `None` → a plain translucent
   `pygame.draw.polygon` sector on an SRCALPHA scratch surface, no AA edge.
+  (2026-09-30, RND-012: `pygame.gfxdraw` does load in the browser build,
+  checked in Chrome, so that fallback does not run there.)
 * **Entry point.** pygbag's generated `index.html` runs `appdir/assets/main.py`
   regardless of the CLI arg, and sources it with `__name__` set to the module
   name — so `if __name__ == "__main__": asyncio.run(main())` never fired.
@@ -200,7 +213,11 @@ scripts + `build/` output are not packed. Verified: `bash web/build.sh` packs
 All applied by `config.apply_web_profile()` under emscripten / `--web`:
 
 * **Frame cap 60.** The page composites at ~60 Hz; `FPS = 120` just spends WASM
-  budget on frames that are never presented.
+  budget on frames that are never presented. *Superseded in the browser by
+  BLD-003 (below): the page's refresh paces the loop there (measured in
+  Chrome, BLD-003.6), and a page
+  refreshes at the display's rate, which is not always 60 Hz; the cap stays
+  for `--web` on the desktop. The desktop's own `FPS` is 62 now, not 120.*
 * **Render target 1280×720 @ `CAMERA_ZOOM 1.2`.** That is the pygbag canvas
   size, so there is no CSS downscale, and `1280 / 1.2 == 1600 / 1.5` keeps the
   visible world extent (and on-screen sprite size) identical to the desktop
@@ -219,21 +236,56 @@ All applied by `config.apply_web_profile()` under emscripten / `--web`:
   canvas at 1.0) and compensates `CAMERA_ZOOM = 1.25 / 0.8 = 1.5625`, so
   `config.effective_zoom()` is still exactly 1.25. See
   `web_ui_scale_journal.md`.
+* **BLD-003 (2026-09-29): no frame cap in the browser, and its own crowd.**
+  pygbag already resumes the loop from `requestAnimationFrame` (per a
+  comment in its `aio.run`; the scheduler is in the runtime, not the
+  wheel), so the "frame cap 60" above is a second pacer (measured in
+  Chrome, BLD-003.6). The cap's costs are modelled
+  (`tools/benchmarks/raf_pacing.py`): it is free on a 60 Hz
+  display, and on a faster one with a light frame `clock.tick(60)` fights
+  the refresh: SDL2's `SDL_Delay` busy-waits the page's thread when the
+  runtime has no Asyncify (unconfirmed), 5.0-8.4 ms a light frame at
+  75-165 Hz, and a 75 Hz display drops to 50 fps under a 12 ms frame.
+  Under emscripten the profile now sets `config.HOST_PACES_FRAMES`, and
+  `Game._step` ticks without a cap; `FPS = 60` remains the cap for `--web`
+  on the desktop. The price, in the model: light scenes draw at the
+  display's full rate on a fast display. The profile also sets the
+  browser's crowd: live cap 100 (desktop 250), `ENEMY_LOD_SKIP` 3,
+  `ENEMY_NAV_REBUILD_INTERVAL` 0.6, `NAV_FILL_MAX_COST` 3500 (owner). This
+  relaxes the "zero gameplay divergence" goal above in three ways: crowd
+  size, AI fidelity, and, on a display faster than 60 Hz in a light frame,
+  whatever the game does per step rather than per unit of game time (wakes,
+  fill slices and the reaction budget among what is known; not an
+  exhaustive audit; the bump impulse was per step too until ENT-019 scaled
+  frames shorter than 16 ms to the tuned rate), which host pacing runs
+  more times a second (BLD-003.D4; the refresh pacing itself was measured
+  in Chrome, BLD-003.6). Chrome, 2026-09-30: a run draws at 22-26 fps,
+  update 4 ms and render 32-43 ms, per-pixel-alpha blits the cost (a
+  full-screen one is 8.3 ms). See `web_frame_time_journal.md`.
 * **Mixer runs at the browser's rate** (observed 96000 Hz / 2 ch). `BrowserMixer`
   resamples each of the 8 synth buffers 22050 → device rate and up-mixes to
   stereo once at startup (pure-Python loops) — a one-time ~sub-second cost, no
-  steady-state impact.
+  steady-state impact. *(No longer in the web release since BLD-004,
+  2026-09-30: with `config.AUDIO_ENABLED` False pygame comes up with no mixer
+  device and no cue is synthesised; `BrowserMixer` is kept, unused.)*
 
 ## Local test
 
+*(Updated 2026-10-02, BLD-006: the scripts moved to `web/` in W8 and to `dist/web/` on 2026-09-13, and a
+static server must serve `dist/web/out/`, the only folder with the vendored
+wheel; `build/web` served statically 404s on it. `dist/web/README.md` has the
+current commands.)*
+
 ```
-bash web/serve.sh     # rebuild + serve http://localhost:8000
-bash web/build.sh      # build only -> build/web/
+bash dist/web/serve.sh     # rebuild + serve http://localhost:8000 (pygbag's dev server)
+bash dist/web/build.sh     # build only -> dist/web/out/, wheel vendored into out/cdn/
+python -m http.server -d dist/web/out 8000   # then open http://localhost:8000/
 ```
 
-Or by hand: `cd web && python -m pygbag --ume_block 0 --title "Death Lite Die"
-../main.py`. First run downloads a CPython-WASM runtime (cached after). Serve an
-existing build statically with `python -m http.server -d build/web 8000`. Load
+Or by hand: `cd dist/web && python -m pygbag --ume_block 0 --title "Deathlite Game"
+../../main.py`. First run downloads a CPython-WASM runtime (cached after). A
+static server needs port 8000 on `localhost` (or any port on `127.0.0.1`, which
+takes the wheel from the public CDN). Load
 `http://localhost:8000/#debug` to keep pygbag's on-page Python console visible.
 Confirm the menu renders (Fredoka), a run starts, and — expected — progression
 does not survive a reload.
@@ -242,7 +294,7 @@ does not survive a reload.
 
 ## TODO
 
-*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished)*
+*(DOC-005, 2026-09-24: W9 is **parked** by the owner (DOC-003). The optional bundle trim — pre-baking the 8 synthesised sound buffers — is still **pending**, and so is vendoring the pygame wheel for a static host (`dist/web/README.md`); both wait on the web build being taken up again, which the owner does not yet consider finished. The bundle trim is moot since BLD-004, 2026-09-30: the web release has no audio, see the item below. The wheel vendoring is done since BLD-006, 2026-10-02, `web_wheel_journal.md`.)*
 
 - [x] W1 — async loop + `main.py` / `main_web.py` entry points
 - [x] W2 — `config.SAVE_ENABLED`, save read/write skipped when off
@@ -257,7 +309,7 @@ does not survive a reload.
 - [x] W7 — `config.apply_web_profile()`: 60 fps + 1280×720 @ zoom 1.2 (same FOV); `main_web.py` folded into `main.py --web`
 - [x] W8 — pygbag files moved to `web/` (`pygbag.ini`, `build.sh`, `serve.sh`, README); `build/` gitignored; root clean
 - [-] W9 — `.nojekyll` + `.github/workflows/deploy-web.yml` (sketch above); enable Pages (GitHub Actions source) *(DOC-003: parked — the owner said on 2026-09-22 it is not needed for now; reopen as a new BLD requirement if wanted)*
-- [ ] (optional) trim the browser bundle — audio synth runs at load; measure and, if slow in WASM, pre-bake the 8 buffers
+- [-] (optional) trim the browser bundle — audio synth runs at load; measure and, if slow in WASM, pre-bake the 8 buffers *(moot since BLD-004, 2026-09-30: the web release has no audio, so the synth never runs in the browser and the audio folders are out of the bundle)*
 
 ---
 
@@ -275,7 +327,11 @@ and drove it from an embedded browser. Full findings and the plan:
   pygbag's dev server provides, 404s, and reloads in a loop. W9 (GitHub
   Pages) needs the wheel vendored into `build/web/cdn/cp312/` -- with it
   in place the game boots, starts a run, and the spawn master's overlay
-  lines show.
+  lines show. *(Corrected 2026-10-02 by BLD-006, `web_wheel_journal.md`:
+  this was measured on `http://localhost:8000`. pygbag fetches wheels from
+  `localhost:8000/cdn/` only when the page address starts with `http://localhost:8`; elsewhere,
+  a real host included, from the public CDN. `build.sh` now vendors the
+  wheel for the local static check.)*
 - 670 of 893 asset files (34.7 MB of 45.8) are referenced by neither
   data nor code; 29 MB is `assets/unordered-effects/`.
 - Per-frame WASM readings at a run's start: update 30-58 ms (the
@@ -299,4 +355,5 @@ not ignored, and `.ruff_cache/`, `tools/` and `desktop/` were riding along. The
 list now ignores `/assets/unused`, `/tools`, `/.ruff_cache`, `/dist`, and
 `pytest.ini` / `README.md`; the stale `/journals` and `/web` entries and the
 long-gone `red` / spec-markdown file names are dropped. W9 (Pages) and the
-wheel vendoring are untouched and still open.
+wheel vendoring are untouched and still open. *(Wheel vendoring done
+2026-10-02, BLD-006.)*

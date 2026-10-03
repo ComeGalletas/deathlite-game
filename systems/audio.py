@@ -19,10 +19,12 @@ they sound the instant they are played. A file that is missing or that this
 SDL_mixer build cannot decode is skipped with a warning: the cue is then simply
 absent and `play()` no-ops, exactly as for a synth buffer the mixer rejected.
 
-Mixer bring-up is delegated to `systems/mixer_backend.py` so the same synth code
-runs on desktop SDL and in the browser (pygbag). `AudioManager` subscribes to
+Mixer bring-up is delegated to `systems/mixer_backend.py`, which can run the
+same synth code on desktop SDL and in the browser (pygbag). The web release has
+audio off (`config.AUDIO_ENABLED`, BLD-004), so there the synth never runs and
+the browser path through `BrowserMixer` is kept but unused. `AudioManager` subscribes to
 the event bus and plays the matching cue. If no mixer backend is available
-(e.g. the SDL dummy audio driver in tests) it degrades to a silent no-op --
+(no sound device, or audio switched off) it degrades to a silent no-op --
 audio is never load-bearing.
 """
 from __future__ import annotations
@@ -181,6 +183,23 @@ class AudioManager:
 
         # Mixer bring-up is platform-specific (desktop vs browser vs headless);
         # the backend owns that decision. A silent backend leaves us disabled.
+        # With `config.AUDIO_ENABLED` off (the web release, BLD-004) no device
+        # is probed at all: the silent backend is asked for by name, and the
+        # music player built on it stays disabled too. `Game` brought pygame
+        # up without a device (`mixer_backend.init_pygame`); one opened by
+        # anything else first is released (guarded, as every teardown is), so
+        # none stays open.
+        if not config.AUDIO_ENABLED:
+            self._backend = make_mixer_backend("silent")
+            if pygame.mixer.get_init() is not None:
+                # Not expected: `init_pygame(audio=False)` keeps the device
+                # closed. A warning, so a runtime where that stops holding
+                # (SDL3 renames SDL_AUDIODRIVER) is visible in its console.
+                log.warning("audio off, but a mixer device was open (%s); releasing it",
+                            pygame.mixer.get_init())
+                self._backend.shutdown()
+            log.info("audio off by configuration (AUDIO_ENABLED is False)")
+            return
         self._backend = make_mixer_backend()
         if not self._backend.ready:
             log.warning("audio disabled: no mixer backend")

@@ -466,6 +466,15 @@ since the hero does not attack.
   (`spawn_stress.infuse`), and `--element-rate` and `--cascade` add hits
   and chained reactions; `--layers` runs with all three. No sitting here
   used them.
+- **Taken before RND-011 reached this branch.** Every sitting here ran
+  before `main` (RND-011) moved the elemental aura shed out of the draw
+  and into the update, on its own seeded stream; the branch took that in
+  with the merge of 2026-10-03. In these scenes no enemy is primed, so
+  nothing sheds, and the elemental rows are small (on sitting 7's quiet
+  run at 224 in view, `elemental_sort` 0.13 ms and `flat/elemental` 0.14
+  at p50); the crowd's and the terrain's groups contain neither. The tool's tests now draw
+  without holding the shed still, since the draw no longer draws random
+  numbers.
 - **The crowd drifts.** Bodies fall asleep in the warm-up and summons arrive
   while timing (135 to 175 at `--live 150`), as the harness's crowd line
   reports.
@@ -485,6 +494,21 @@ since the hero does not attack.
   in place, so a wrapper per lead would be a large share of what it
   measures (a judgement from those two figures; the leads themselves are
   not timed yet).
+
+## RND-010: Review of 2026-10-03 (read-only)
+
+A review against the owner's requirement (a stable 60 fps with over 200
+enemies on screen) measured the harness at 100 and 200 live, spread and
+packed, the raw pygame blit floor, and the garbage collector, and ranked
+the exact fixes for the draw and the update. Its findings, numbers, the
+ranked plan and the owner decision it ends in are in
+`../plans/crowd_performance_plan.md`. It was written on `main` while
+RND-010.2 ran on its own branch: that plan's step 4.0 is RND-010.2, done
+above, except for the plan's two appendix probes (`blit_floor.py`,
+`gc_probe.py`), which are not yet under `tools/benchmarks/` and move with
+the next task. The work resumes at the plan's 4.1 onward as RND-010.3 and
+after, with RND-010.D1's ranking inside the enemies' own draw and the open
+item of a fighting scene (above) taken first.
 
 ## RND-010: Tasks
 

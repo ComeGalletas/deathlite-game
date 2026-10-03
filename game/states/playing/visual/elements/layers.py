@@ -53,7 +53,7 @@ def in_band(run, level):
             and not off_band(run, level, body.pos)]
 
 
-def draw_auras(surface, run, visuals, now: float, budget, level=None,
+def draw_auras(surface, run, visuals, now: float, level=None,
                bodies=None) -> int:
     """One pass over the live bodies. Returns how many auras were drawn.
 
@@ -62,8 +62,10 @@ def draw_auras(surface, run, visuals, now: float, budget, level=None,
     `bodies` is that band's `in_band` list when the caller has sorted the
     frame already; without it the pass sorts its own.
 
-    The order matters beyond the picture: an aura's shed draws on
-    `run.rng`, so the bodies are visited in `_bodies` order, band by band.
+    It only paints. The aura's shed of motes used to run here and roll
+    `run.rng` once per drawn aura; it is part of the update now
+    (`elements/shed.py`, RND-011), so drawing a frame changes nothing in
+    the run.
     """
     cam = run.camera
     drawn = 0
@@ -73,7 +75,7 @@ def draw_auras(surface, run, visuals, now: float, budget, level=None,
             continue
         element = state.element(now)
         if element:
-            _aura(surface, cam, body, visuals[element], visuals.aura, budget, run)
+            _aura(surface, cam, body, visuals[element], visuals.aura)
             drawn += 1
         elif state.is_locked(now):
             _locked(surface, cam, body, visuals.aura)
@@ -103,7 +105,7 @@ def draw_statuses(surface, run, visuals, now: float, level=None,
 
 # --- the aura ---------------------------------------------------------------------
 
-def _aura(surface, cam, body, profile, style, budget, run) -> None:
+def _aura(surface, cam, body, profile, style) -> None:
     """The sprite, or the ring and marker where there is no sprite.
 
     Not both. M8 drew the ring under every element and layered the rig on
@@ -125,7 +127,6 @@ def _aura(surface, cam, body, profile, style, budget, run) -> None:
         markers.draw(surface, profile.marker, sx,
                      sy - radius - style.marker_gap * cam.zoom,
                      style.marker_size * cam.zoom, profile.colour, style.alpha)
-    _shed(run, body, profile, budget)
 
 
 def _locked(surface, cam, body, style) -> None:
@@ -135,27 +136,6 @@ def _locked(surface, cam, body, style) -> None:
     radius = int((body.radius + style.ring_pad) * cam.zoom)
     _ring(surface, (int(sx), int(sy)), radius, (190, 190, 200),
           style.locked_alpha, 1)
-
-
-def _shed(run, body, profile, budget) -> None:
-    """A trickle of particles from the aura, inside the elemental budget."""
-    if budget is None:
-        return
-    rate = profile.particles.rate
-    # One chance a frame rather than an accumulator per enemy: with a crowd
-    # this large the average is what matters and a per-body float would cost
-    # more than the particle.
-    if run.rng.random() > rate / 60.0:
-        return
-    if not budget.take(profile.element, 1):
-        return
-    p = profile.particles
-    # `under`: the shed is part of the aura, and the aura draws behind the
-    # body wearing it (M10 rule 3). Without this the one elemental visual
-    # the elements package does not draw itself would be the one visual
-    # still sitting on top of the crowd.
-    run.particles.burst(body.pos, profile.colour, count=1, speed=p.speed,
-                        life=p.life, radius=p.radius, under=True)
 
 
 def _ring(surface, center, radius: int, colour, alpha: int, width: int) -> None:

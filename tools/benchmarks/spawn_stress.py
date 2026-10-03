@@ -13,6 +13,7 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --profile               # cProfile's top entries too
     python -m tools.benchmarks.spawn_stress --cascade --render      # CMB-008: a staged reaction cascade
     python -m tools.benchmarks.spawn_stress --pack --bump           # RND-008: the bump pass alone
+    python -m tools.benchmarks.spawn_stress --web --render          # BLD-003: under the browser profile
     python -m tools.benchmarks.spawn_stress --live 250 --elapsed 600 --pack --layers
                                                                     # RND-010: the draw by layer
                                                                     # (headless; see below for on screen)
@@ -44,7 +45,8 @@ What it measures is play, not the run's opening (RND-008.D3):
 * One budget, `BUDGET_MS`, counts the frames over it.
 
 Every run prints the display it drew into: surface, driver, vsync, render
-scale and zoom, so two runs can be told apart.
+scale and zoom, and the crowd cap and nav knobs (so a `--web` run reads as
+one), so two runs can be told apart.
 
 Headless by default: the dummy SDL drivers are set before pygame is
 imported, so this runs anywhere the tests do. `SDL_VIDEODRIVER=windows`
@@ -507,11 +509,14 @@ def display_line(ps) -> str:
     game = ps.game
     return (f"display {size} ({driver}, vsync {'on' if game.vsync else 'off'})  "
             f"render scale {config.RENDER_SCALE:.3f} zoom {config.effective_zoom():.3f}  |  "
+            f"crowd cap {config.ENEMY_LIVE_CAP} nav {config.ENEMY_NAV_REBUILD_INTERVAL:g} s "
+            f"fill {config.NAV_FILL_MAX_COST}  |  "
             f"hints {'on' if ps.hints.visible else 'off'}  "
             f"director {'frozen' if ps.spawn.master.frozen else 'live'}  "
             f"boss {boss_state(ps)}  |  "
-            f"budget {BUDGET_MS:.2f} ms (the 60 fps target; the {config.FPS} fps cap is "
-            f"{1000 // config.FPS} ms, pygame counting whole milliseconds)")
+            f"budget {BUDGET_MS:.2f} ms (the 60 fps target; the desktop loop's {config.FPS} "
+            f"fps cap is {1000 // config.FPS} ms, pygame counting whole milliseconds; "
+            f"the browser has no cap, its host paces it)")
 
 
 def boss_state(ps) -> str:
@@ -627,6 +632,14 @@ def parse(argv=None) -> argparse.Namespace:
                          "the bare draw is reported beside (not with --profile "
                          "or --bump)")
     ap.add_argument("--profile", action="store_true")
+    ap.add_argument("--web", action="store_true",
+                    help="apply the browser build's profile first "
+                         "(config.apply_web_profile: 1280x720, its crowd cap "
+                         "and AI knobs). The frames still run on the desktop; "
+                         "compare them with Chrome's own figures (BLD-003.6 "
+                         "in journals/web_frame_time_journal.md: update ~4 ms, "
+                         "render 32-43 ms (21-99 live; 38.0 ms at 99); the "
+                         "factor depends on the desktop session)")
     args = ap.parse_args(argv)
     if args.bump:
         clash = [flag for flag, on in (
@@ -680,6 +693,8 @@ def build_options(args: argparse.Namespace) -> dict:
 def main(argv=None) -> int:
     args = parse(argv)
     from game import config
+    if args.web:
+        config.apply_web_profile()
     lod = args.lod if args.lod is not None else config.ENEMY_LOD_SKIP
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod,
                      **build_options(args))

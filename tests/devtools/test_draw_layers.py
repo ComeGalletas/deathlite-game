@@ -29,7 +29,6 @@ from unittest import mock
 import pygame
 
 from game import config
-from game.states.playing.visual.elements import layers as element_layers
 from tools.benchmarks import draw_layers as DL
 from tools.benchmarks import spawn_stress as S
 
@@ -73,10 +72,10 @@ class _Clock:
 
 
 def _picture(ps) -> bytes:
-    """A frame of `ps`, with the aura shed (random) held still."""
+    """A frame of `ps`. The draw draws no random numbers (the aura shed
+    runs in the update since RND-011), so it is a function of the state."""
     s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-    with mock.patch.object(element_layers, "_shed", lambda *a: None):
-        ps.draw(s)
+    ps.draw(s)
     return pygame.image.tobytes(s, "RGBA")
 
 
@@ -371,8 +370,9 @@ class AlternateTests(unittest.TestCase):
 
 class WiringTests(unittest.TestCase):
     """One packed fight, seed 35, 60 alive, shared; the terrain's clock is
-    pinned and the aura shed (random) held still, so a frame is a pure
-    function of the state."""
+    pinned, and the draw draws no random numbers (the aura shed runs in
+    the update since RND-011), so a frame is a pure function of the
+    state."""
 
     @classmethod
     def setUpClass(cls):
@@ -392,8 +392,7 @@ class WiringTests(unittest.TestCase):
 
     def _frame(self, timer=None):
         s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        with mock.patch.object(element_layers, "_shed", lambda *a: None):
-            self.ps.draw(s)
+        self.ps.draw(s)
         if timer is not None:
             timer.frame()
         return pygame.image.tobytes(s, "RGBA")
@@ -421,9 +420,8 @@ class WiringTests(unittest.TestCase):
         # the totals without a word.
         timer = DL.LayerTimer().install(self.ps)
         try:
-            with mock.patch.object(element_layers, "_shed", lambda *a: None):
-                for _ in range(3):
-                    self.ps.update(1 / 60)
+            for _ in range(3):
+                self.ps.update(1 / 60)
             self.assertEqual(timer.frame(), {})
             self.assertEqual(timer.calls[-1], {})
         finally:

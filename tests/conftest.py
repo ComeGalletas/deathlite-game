@@ -57,6 +57,8 @@ WORLD = (
     "tests/playing/test_projectile_elevation.py",
     # TST-006.2: reads the shared worlds; the module's boats boot a run.
     "tests/entities/test_fish_huts.py::PlacementTests",
+    # ENT-021: the 20 px gap routing, on a pinned world's shared nav field.
+    "tests/entities/ai/test_melee_enemies.py::ColliderRoutingTests",
 )
 
 # Modules that boot a real `Game` and drive its states -- the menu into a run,
@@ -155,6 +157,9 @@ INTEGRATION = (
     "tests/playing/test_frame_fonts.py",
     # RND-008.4: the harness's packed, primed fight; the cache checks stay unit.
     "tests/render/test_elemental_draw_cost.py::TerraceSortTests",
+    # RND-011: the draw and the update-time shed in a booted run; the fake
+    # crowds' rate and budget checks stay unit.
+    "tests/render/test_aura_shed.py::BootedRunTests",
     # RND-008.5: seed 35's fight as it plays; the random crowds stay unit.
     "tests/playing/test_bump_exact.py::HarnessFightTests",
     # ENT-018: seed 35's fight as it plays; the random crowds stay unit.
@@ -176,6 +181,15 @@ INTEGRATION = (
     # SYS-010: a real Game stepped with and without a trace, and main.py run.
     "tests/devtools/test_frame_trace.py::GameWiringTests",
     "tests/devtools/test_frame_trace.py::MainTests",
+    # BLD-003: a run booted under the web profile, and the main loop's tick;
+    # the profile's values and the pacing flag boot nothing and stay unit.
+    "tests/flows/test_web_crowd.py::WebCrowdRunTests",
+    "tests/flows/test_frame_pacing.py::StepTickTests",
+    # RND-012: overlays over a booted run.
+    "tests/flows/test_frozen_backdrop.py",
+    # BLD-004: a Game booted silent under the web profile; the switch, the
+    # managers and the bundle check boot nothing and stay unit.
+    "tests/systems/test_web_audio.py::SilentGameTests",
 )
 
 

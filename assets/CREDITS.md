@@ -63,9 +63,10 @@ art from all packs that is kept in the tree but not loaded by the game.
 
 ## Music — Pixabay (`assets/music/`)
 
-The two streamed background tracks are from [Pixabay](https://pixabay.com) and
-are the only audio in the game that is not synthesised at runtime. They are
-named by `config.MUSIC_TRACKS` and played by `systems/music.py`.
+The two streamed background tracks are from [Pixabay](https://pixabay.com).
+With the three recorded cues below, they are the audio in the game that is
+not synthesised at runtime. They are named by `config.MUSIC_TRACKS` and played
+by `systems/music.py`.
 
 | Slot | Track | Author | Pixabay ID |
 |------|-------|--------|------------|
@@ -85,9 +86,9 @@ named by `config.MUSIC_TRACKS` and played by `systems/music.py`.
 The Pixabay Content License prohibits selling or distributing Content **on a
 standalone basis** — that is, in substantially the form it has on the site,
 with no creative effort applied. Shipping the tracks inside the game as its
-score is not a standalone distribution, so both the desktop and the web builds
-are within the licence. Selling the MP3s as files, or releasing a soundtrack
-of them, would not be.
+score is not a standalone distribution, so the desktop build is within the
+licence. (The web build ships no audio at all since 2026-09-30, BLD-004.)
+Selling the MP3s as files, or releasing a soundtrack of them, would not be.
 
 The files ship as downloaded, at 320 kbps, and are streamed rather than
 decoded into memory (see `systems/music.py`).

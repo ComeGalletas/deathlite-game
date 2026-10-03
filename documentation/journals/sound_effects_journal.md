@@ -164,6 +164,11 @@ A `_Footsteps` helper in `systems/audio.py`; the run calls
   5.6 MB of Freesound originals would have shipped to the browser alongside the
   0.46 MB of cues. `/assets/sound_effects/unused` is now listed, with a comment
   explaining that each nested `unused/` has to be added by hand.
+  *(Since BLD-004, 2026-09-30: the web release has no audio, so the whole of
+  `/assets/sound_effects` is excluded in place of its `unused/` entry, and the
+  cues ship only on the desktop. The sizes in this journal are binary:
+  5.6 MiB and 0.46 MiB are 5.9 MB and 0.48 MB in the decimal units the web
+  docs use.)*
 
 ## Verified
 
