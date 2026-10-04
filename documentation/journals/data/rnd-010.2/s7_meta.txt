@@ -1,0 +1,43 @@
+commit bb92e30  started 2026-10-02 13:57
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb      7949,421875
+chrome          4638,34375
+cam_helper     2587,859375
+chrome         2325,703125
+audiodg        1212,015625
+SystemSettings     911,875
+NTEGlobalGame   643,171875
+Discord              627,5
+
+
+
+=== 150a  cpu load 23%  13:57:33
+=== 200a  cpu load 40%  13:57:51
+=== 250a  cpu load 28%  13:58:10
+=== 150b  cpu load 29%  13:58:38
+=== 200b  cpu load 23%  13:58:58
+=== 250b  cpu load 24%  13:59:18
+=== bias 150  cpu load 32%  13:59:40
+=== nested 150  cpu load 20%  14:00:22
+=== bias 250  cpu load 23%  14:00:35
+=== nested 250  cpu load 30%  14:01:29
+finished 14:01  cpu load 29%
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb      8040,234375
+chrome            4652,375
+cam_helper      2617,28125
+chrome         2337,421875
+audiodg         1226,15625
+SystemSettings   931,03125
+claude           716,09375
+NTEGlobalGame   651,484375
+
+
+

@@ -14,6 +14,9 @@ would in play) and reports the update time's p50 / p90 / p99 / max.
     python -m tools.benchmarks.spawn_stress --cascade --render      # CMB-008: a staged reaction cascade
     python -m tools.benchmarks.spawn_stress --pack --bump           # RND-008: the bump pass alone
     python -m tools.benchmarks.spawn_stress --web --render          # BLD-003: under the browser profile
+    python -m tools.benchmarks.spawn_stress --live 250 --elapsed 600 --pack --layers
+                                                                    # RND-010: the draw by layer
+                                                                    # (headless; see below for on screen)
 
 What it measures is play, not the run's opening (RND-008.D3):
 
@@ -33,6 +36,12 @@ What it measures is play, not the run's opening (RND-008.D3):
   and enemy summons arrive while timing (they are behaviour, not the
   director). Every run prints the crowd at the start of timing and what
   arrived, by owner.
+* The boss is held back (RND-010.2): a big crowd needs a late run clock
+  (the director's cap is 100 + 5 per 20 s on normal, up to the live cap),
+  past the boss's time (570 s), and a boss fight would be measured as
+  crowd. `--boss` lets it in. Every run says where the boss stands before
+  the frames, and every run that times frames (not `--bump`) again after;
+  every run says when the cap seated fewer than `--live`.
 * One budget, `BUDGET_MS`, counts the frames over it.
 
 Every run prints the display it drew into: surface, driver, vsync, render
@@ -82,7 +91,7 @@ def _force_hints(ps) -> None:
 
 
 def build(seed: int, live: int, dormant: int, elapsed: float, lod: int, *,
-          hints: bool = False, live_director: bool = False,
+          hints: bool = False, live_director: bool = False, boss: bool = False,
           save_path: str | None = None):
     """A dev run at `elapsed` seconds with the population asked for.
 
@@ -90,9 +99,12 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int, *,
     few steps do; `hints=True` shows them even with the Options
     "Tutorials" row off. `live_director=False` keeps the master frozen
     after the crowd is seated, so the director adds nothing while the
-    frames are timed (see the module doc). `save_path` is the save the
-    `Game` reads; the tests pass a fresh one, so the owner's settings
-    cannot reach them."""
+    frames are timed (see the module doc). `boss=False` keeps the boss
+    out even past its time (95 % of the run, 570 s on normal): the big
+    crowds need a late run clock (the cap is 100 + 5 per 20 s), and a boss
+    fight arriving with them would be measured as crowd. `save_path` is
+    the save the `Game` reads; the tests pass a fresh one, so the owner's
+    settings cannot reach them."""
     import pygame
     from game import config
     from game.game import Game
@@ -107,6 +119,11 @@ def build(seed: int, live: int, dormant: int, elapsed: float, lod: int, *,
         ps.hints.dismiss()
     elif not ps.hints.visible:
         _force_hints(ps)
+    if not boss:
+        # This director only; the tide (`director.update`) is untouched, so
+        # `--live-director` still lands companies, even past the boss's
+        # time, where a real run's tide stops for the fight.
+        ps.director.should_spawn_boss = lambda elapsed: False
     ps.player.invulnerable = True
     ps._dev_no_attack = True                     # the crowd survives the run
     ps.stats["time"] = elapsed
@@ -357,7 +374,7 @@ def element_pump(ps, per_frame: int, seed: int = 3):
 
 
 def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
-        render: bool = False, pump=None, instruments=None) -> tuple:
+        render: bool = False, pump=None, instruments=None, after_draw=None) -> tuple:
     """Frame times in milliseconds for `frames` updates with the hero
     jittering by up to `jitter` px each frame.
 
@@ -365,7 +382,8 @@ def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
     matters since the despawn ring landed: it makes "the whole live
     population packed within `despawn_radius` of the hero" the normal case
     rather than the pessimistic one, and draw cost scales with bodies *in
-    view* where update cost scales with bodies alive.
+    view* where update cost scales with bodies alive. `after_draw` is
+    called after each timed draw (`draw_layers.LayerTimer.frame`).
     """
     import random
     import pygame
@@ -399,7 +417,25 @@ def run(ps, frames: int, jitter: float = 24.0, dt: float = 1 / 60,
             t1 = time.perf_counter()
             ps.draw(surface)
             draws.append((time.perf_counter() - t1) * 1000.0)
+            if after_draw is not None:
+                after_draw()
     return times, draws, in_view
+
+
+def layered_run(ps, frames: int, jitter: float = 24.0, pump=None, instruments=None):
+    """`run` with the draw timed by layer on every other frame
+    (`draw_layers.Alternate`), the timers taken off whatever happens.
+    Returns `(times, draws, in_view, alternate)`; `alternate.bare` and
+    `alternate.timed` index the frames of each kind, `alternate.timer`
+    holds the breakdown."""
+    from tools.benchmarks import draw_layers
+    alternate = draw_layers.Alternate(draw_layers.LayerTimer(), ps)
+    try:
+        times, draws, in_view = run(ps, frames, jitter=jitter, render=True, pump=pump,
+                                    instruments=instruments, after_draw=alternate)
+    finally:
+        alternate.close()
+    return times, draws, in_view, alternate
 
 
 def report(times: list, ps) -> str:
@@ -408,6 +444,29 @@ def report(times: list, ps) -> str:
     return (f"frames {len(s)}: p50 {_percentile(s, 0.5):.2f}  p90 {_percentile(s, 0.9):.2f}  "
             f"p99 {_percentile(s, 0.99):.2f}  max {s[-1]:.2f} ms  |  live {len(ps.enemies)} "
             f"dormant {m.population.total_dormant} recycled {m.recycled}")
+
+
+def draw_headline(times: list, draws: list, in_view: list, alternate=None) -> list[str]:
+    """The draw and update + draw lines. Under `--layers` (`alternate`)
+    they are the bare frames' alone, each frame's update paired with its own
+    draw: the timed frames' draws are slower by the timers' cost."""
+    lines = []
+    if alternate is not None:
+        from tools.benchmarks import draw_layers
+        times, draws, in_view = draw_layers.bare_frames(alternate, times, draws, in_view)
+        lines.append(f"  (the update line above: every frame; the lines below: the "
+                     f"{len(draws)} frames drawn without the timers)")
+    d, v = sorted(draws), sorted(in_view)
+    lines.append(f"  draw   p50 {_percentile(d, 0.5):.2f}  "
+                 f"p90 {_percentile(d, 0.9):.2f}  p99 {_percentile(d, 0.99):.2f}  "
+                 f"max {d[-1]:.2f} ms  |  in view p50 {_percentile(v, 0.5)} "
+                 f"max {v[-1]}")
+    both = sorted(a + b for a, b in zip(times, draws, strict=True))
+    lines.append(f"  update + draw   p50 {_percentile(both, 0.5):.2f}  "
+                 f"p90 {_percentile(both, 0.9):.2f}  p99 {_percentile(both, 0.99):.2f}  "
+                 f"max {both[-1]:.2f} ms  |  over {BUDGET_MS:.2f} ms: "
+                 f"{over_budget(both)} / {len(both)}")
+    return lines
 
 
 def over_budget(frame_times: list) -> int:
@@ -453,10 +512,26 @@ def display_line(ps) -> str:
             f"crowd cap {config.ENEMY_LIVE_CAP} nav {config.ENEMY_NAV_REBUILD_INTERVAL:g} s "
             f"fill {config.NAV_FILL_MAX_COST}  |  "
             f"hints {'on' if ps.hints.visible else 'off'}  "
-            f"director {'frozen' if ps.spawn.master.frozen else 'live'}  |  "
+            f"director {'frozen' if ps.spawn.master.frozen else 'live'}  "
+            f"boss {boss_state(ps)}  |  "
             f"budget {BUDGET_MS:.2f} ms (the 60 fps target; the desktop loop's {config.FPS} "
             f"fps cap is {1000 // config.FPS} ms, pygame counting whole milliseconds; "
             f"the browser has no cap, its host paces it)")
+
+
+def boss_state(ps) -> str:
+    """`fighting` when a boss is on the field, `beaten` when it came and is
+    gone, `held back` when `build` kept it out, otherwise when it is due:
+    `due now` when the run clock is already past its time (it arrives on
+    the next frame), `due at N s` when not."""
+    if ps.run.boss is not None and ps.run.boss.alive:
+        return "fighting"
+    if ps.director.boss_spawned:
+        return "beaten"
+    if "should_spawn_boss" in vars(ps.director):
+        return "held back"
+    due = ps.director.boss_time()
+    return "due now" if ps.stats["time"] >= due else f"due at {due:g} s"
 
 
 def bump_times(ps, frames: int) -> list:
@@ -500,10 +575,16 @@ def parse(argv=None) -> argparse.Namespace:
     apart from `main` so the flags can be checked without booting a run."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--seed", type=int, default=35)
-    ap.add_argument("--live", type=int, default=100)
-    ap.add_argument("--dormant", type=int, default=400)
+    ap.add_argument("--live", type=int, default=100,
+                    help="enemies seated in the active zone; the director seats no "
+                         "more than its cap at --elapsed, and never more than "
+                         "config.ENEMY_LIVE_CAP (the run says when it seated fewer)")
+    ap.add_argument("--dormant", type=int, default=400,
+                    help="enemy records banked on the other islands")
     ap.add_argument("--frames", type=int, default=1200)
-    ap.add_argument("--elapsed", type=float, default=300.0)
+    ap.add_argument("--elapsed", type=float, default=300.0,
+                    help="the run clock in seconds; the director's cap is 100 + 5 "
+                         "per 20 s on normal, so --live N needs (N - 100) * 4")
     ap.add_argument("--lod", type=int, default=None,
                     help="behaviour tick divisor for out-of-aggro, off-view enemies "
                          "(default: config.ENEMY_LOD_SKIP)")
@@ -529,6 +610,10 @@ def parse(argv=None) -> argparse.Namespace:
     ap.add_argument("--hints", action="store_true",
                     help="keep the run's opening hints; the jittered hero "
                          "never clears them, so every frame draws them")
+    ap.add_argument("--boss", action="store_true",
+                    help="let the boss arrive at its time (570 s on normal); "
+                         "without it the boss is held back, so a late run "
+                         "clock measures the crowd alone")
     ap.add_argument("--live-director", action="store_true",
                     help="let the director add companies while the frames "
                          "are timed (the behaviour before RND-008)")
@@ -541,6 +626,11 @@ def parse(argv=None) -> argparse.Namespace:
                          "with nothing moving and the hero out of reach; "
                          "add --pack for the packed crowd (not with "
                          "--render, --profile or the element flags)")
+    ap.add_argument("--layers", action="store_true",
+                    help="RND-010.2: the draw by layer (implies --render); "
+                         "every other frame is drawn without the timers, so "
+                         "the bare draw is reported beside (not with --profile "
+                         "or --bump)")
     ap.add_argument("--profile", action="store_true")
     ap.add_argument("--web", action="store_true",
                     help="apply the browser build's profile first "
@@ -551,23 +641,53 @@ def parse(argv=None) -> argparse.Namespace:
                          "render 32-43 ms (21-99 live; 38.0 ms at 99); the "
                          "factor depends on the desktop session)")
     args = ap.parse_args(argv)
-    if args.frames < 1:
-        ap.error("--frames must be at least 1")
-    if not args.jitter >= 0:                    # also refuses nan
-        ap.error("--jitter must be a number of px, 0 or more")
     if args.bump:
         clash = [flag for flag, on in (
             ("--render", args.render), ("--profile", args.profile),
             ("--elements", args.elements), ("--element-rate", args.element_rate > 0),
-            ("--cascade", args.cascade)) if on]
+            ("--cascade", args.cascade), ("--layers", args.layers)) if on]
         if clash:
             ap.error(f"--bump times the bump pass alone; drop {', '.join(clash)}")
+    if args.layers:
+        if args.profile:
+            ap.error("--layers times the draw itself; drop --profile, which inflates it")
+        if args.frames < 2:
+            ap.error("--layers times every other frame; --frames must be at least 2")
+        args.render = True
+    if args.frames < 1:
+        ap.error("--frames must be at least 1")
+    if not args.jitter >= 0:                    # also refuses nan
+        ap.error("--jitter must be a number of px, 0 or more")
     return args
+
+
+def shortfall(ps, asked: int, elapsed: float) -> str | None:
+    """Why the crowd built is smaller than the one asked for, or None. The
+    director's cap grows with the run clock (`enemy_count_cap`) up to the
+    live cap (`config.ENEMY_LIVE_CAP`), so a big `--live` at a small
+    `--elapsed` is refused in part, and the numbers after it would describe
+    a smaller crowd than the command line says. Checked once, as built: the
+    crowd timed drifts from it (bodies sleep, summons arrive), which the
+    crowd line reports."""
+    built = len(ps.enemies)
+    if built >= asked:
+        return None
+    director = ps.spawn.master.director
+    cap = director.enemy_count_cap(elapsed)
+    most = director.enemy_count_cap(1.0e9)
+    msg = f"  asked for {asked} alive, built {built}: the cap at {elapsed:g} s is {cap}"
+    if most < asked:
+        msg += f"; the director seats no more than {most} (the live cap)"
+        return msg + ("; raise --elapsed to reach it" if cap < most else "")
+    if cap >= asked:
+        # Not the cap: `build` gave up finding walkable spots for the rest.
+        return msg + ", so not the cap: placement found no room for the rest"
+    return msg + "; raise --elapsed"
 
 
 def build_options(args: argparse.Namespace) -> dict:
     """The keywords `main` hands `build`, from the parsed flags."""
-    return {"hints": args.hints, "live_director": args.live_director}
+    return {"hints": args.hints, "live_director": args.live_director, "boss": args.boss}
 
 
 def main(argv=None) -> int:
@@ -579,6 +699,9 @@ def main(argv=None) -> int:
     game, ps = build(args.seed, args.live, args.dormant, args.elapsed, lod,
                      **build_options(args))
     print(display_line(ps))
+    short = shortfall(ps, args.live, args.elapsed)
+    if short:
+        print(short)
     elements = args.elements or args.element_rate > 0 or args.cascade
     pump = None
     instruments = None
@@ -612,31 +735,33 @@ def main(argv=None) -> int:
         prof.disable()
         print(report(times, ps))
         print(arrivals_line(ps, before))
+        print(f"  boss at the end of timing: {boss_state(ps)}")
         if elements:
             print(element_report(ps))
         if instruments is not None:
             print(instruments.report())
         pstats.Stats(prof).sort_stats("cumulative").print_stats(28)
     else:
-        times, draws, in_view = run(ps, args.frames, jitter=args.jitter, render=args.render,
-                                    pump=pump, instruments=instruments)
+        alternate = None
+        if args.layers:
+            times, draws, in_view, alternate = layered_run(
+                ps, args.frames, jitter=args.jitter, pump=pump, instruments=instruments)
+        else:
+            times, draws, in_view = run(ps, args.frames, jitter=args.jitter,
+                                        render=args.render, pump=pump, instruments=instruments)
         print(f"seed {args.seed} lod {lod}  " + report(times, ps))
         print(arrivals_line(ps, before))
+        print(f"  boss at the end of timing: {boss_state(ps)}")
         if elements:
             print(element_report(ps))
         if instruments is not None:
             print(instruments.report())
         if args.render:
-            d, v = sorted(draws), sorted(in_view)
-            print(f"  draw   p50 {_percentile(d, 0.5):.2f}  "
-                  f"p90 {_percentile(d, 0.9):.2f}  p99 {_percentile(d, 0.99):.2f}  "
-                  f"max {d[-1]:.2f} ms  |  in view p50 {_percentile(v, 0.5)} "
-                  f"max {v[-1]}")
-            both = sorted(a + b for a, b in zip(times, draws))
-            print(f"  update + draw   p50 {_percentile(both, 0.5):.2f}  "
-                  f"p90 {_percentile(both, 0.9):.2f}  p99 {_percentile(both, 0.99):.2f}  "
-                  f"max {both[-1]:.2f} ms  |  over {BUDGET_MS:.2f} ms: "
-                  f"{over_budget(both)} / {len(both)}")
+            print("\n".join(draw_headline(times, draws, in_view, alternate)))
+        if alternate is not None:
+            from tools.benchmarks import draw_layers
+            bare = draw_layers.bare_frames(alternate, draws)[0]
+            print(draw_layers.format_layers(alternate.timer, bare))
     return 0
 
 
