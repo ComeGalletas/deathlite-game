@@ -153,6 +153,8 @@ INTEGRATION = (
     "tests/devtools/test_bench_probes.py::GcRunTests",
     "tests/devtools/test_draw_leads.py::SceneTests",
     "tests/devtools/test_draw_leads.py::MainTests",
+    "tests/devtools/test_draw_variants.py::SceneTests",
+    "tests/devtools/test_draw_variants.py::MainTests",
     # SYS-011: the timer eval's command line reads as far as the Game it
     # builds on Windows; its judgment tests stay unit.
     "tests/devtools/test_timer_regime.py::CommandLineTests",
