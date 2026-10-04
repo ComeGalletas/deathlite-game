@@ -554,7 +554,7 @@ RND-010.2's do.
 - [ ] RND-010.3: The leads inside the enemies' own draw ranked (RND-010.D1), then the candidates timed old against new, the results recorded
   - [x] RND-010.3.1: This plan and the index
   - [x] RND-010.3.2: `blit_floor.py` and `gc_probe.py` under `tools/benchmarks/`, tested
-  - [ ] RND-010.3.3: The CPU steps' probe: each lead's cost per call and per frame on the live crowd, tested
+  - [x] RND-010.3.3: The CPU steps' probe: each lead's cost per call and per frame on the live crowd, tested
   - [ ] RND-010.3.4: The variant probe: throwaway pixel-identical variants timed against the draw, the ghost copy and the top candidates among them, tested
   - [ ] RND-010.3.5: The sitting: the probes at 150 and 250 packed, and the draw by layer with the hero fighting, raw outputs kept
   - [ ] RND-010.3.6: The ranking and the candidates' results recorded, and the order for RND-010.4 onward
