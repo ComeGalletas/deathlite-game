@@ -253,7 +253,7 @@ tasks whose packed share is largest.
 
 | # | Task | Where | Expected | Done when |
 |---|---|---|---|---|
-| 4.0 | **RND-010.2: the draw by layer in the harness.** Add a per-layer breakdown of `PlayingState.draw` to `spawn_stress.py --render`: terrain bands, water, enemies (with shade split out), other actors, ghost pass, elemental layers, particles, damage numbers, the rest. Parts must sum to the whole, pinned by a test. Put appendix A's two probes under `tools/benchmarks/` (`blit_floor.py`, `gc_probe.py`) while there. | `tools/benchmarks/spawn_stress.py:359-402` | ranks 4.1 to 4.8 by milliseconds | the table at 150, 200, 250 packed is in `crowd_draw_journal.md`: **done** (RND-010.2), except the two appendix probes, not yet moved |
+| 4.0 | **RND-010.2: the draw by layer in the harness.** Add a per-layer breakdown of `PlayingState.draw` to `spawn_stress.py --render`: terrain bands, water, enemies (with shade split out), other actors, ghost pass, elemental layers, particles, damage numbers, the rest. Parts must sum to the whole, pinned by a test. Put appendix A's two probes under `tools/benchmarks/` (`blit_floor.py`, `gc_probe.py`) while there. | `tools/benchmarks/spawn_stress.py:359-402` | ranks 4.1 to 4.8 by milliseconds | the table at 150, 200, 250 packed is in `crowd_draw_journal.md`: **done** (RND-010.2; the two appendix probes moved under `tools/benchmarks/` in RND-010.3.2) |
 | 4.1 | **Stop `report_debug` when the overlay is hidden.** Compute the debug lines only when F1 is on. | `core/state.py:394`, `devtools/dev_flags.py:116` | 0.2 to 0.5 ms | `test_dev_flags` style test: no `active_auras` call with the overlay off |
 | 4.2 | **GC: freeze after load, raise the gen-2 threshold.** `gc.collect(); gc.freeze()` once the run is built (after `LoadingState` hands over), `gc.set_threshold(700, 10, 1000)`. Un-freeze is not needed; frozen objects are the world and the assets. | `game/states/loading_state.py` hand-over, or `Game` | removes a 13 ms pause every ~10 s | appendix A.2 shows zero gen-2 in 600 frames |
 | 4.3 | **One drawable list per frame.** Build `(level, depth, draw)` once, bucket by level in one pass, sort each bucket once; cache `visible_rect()` per frame on the renderer; replace the per-enemy lambda plus forwarder with a bound method. | `visual/scene.py:37-152`, `core/state.py:755-784`, `systems/camera.py:80` | 0.5 to 1 ms at 150 in view | pixel-identical frame; `test_depth_sort`, `test_render_cull` green |
@@ -331,7 +331,10 @@ pick between 6.1 and 6.2 with the measured gap in hand. Do not start 6.3.
 
 ## Appendix A: the review's probes
 
-Both run headless. Put them under `tools/benchmarks/` in task 4.0.
+Both run headless. They now live under `tools/benchmarks/` (RND-010.3.2), as
+`python -m tools.benchmarks.blit_floor` and `python -m tools.benchmarks.gc_probe`;
+the ported `gc_probe` seats 200 at a run clock of 400 s, where this copy's
+300 s seats 175. The originals stay below as the review ran them.
 
 ### A.1 `blit_floor.py`: what pygame alone costs
 

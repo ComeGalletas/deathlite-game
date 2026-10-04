@@ -505,8 +505,7 @@ ranked plan and the owner decision it ends in are in
 `../plans/crowd_performance_plan.md`. It was written on `main` while
 RND-010.2 ran on its own branch: that plan's step 4.0 is RND-010.2, done
 above, except for the plan's two appendix probes (`blit_floor.py`,
-`gc_probe.py`), which are not yet under `tools/benchmarks/` and move with
-the next task. The work resumes at the plan's 4.1 onward as RND-010.3 and
+`gc_probe.py`), which moved under `tools/benchmarks/` with RND-010.3.2. The work resumes at the plan's 4.1 onward as RND-010.3 and
 after, with RND-010.D1's ranking inside the enemies' own draw and the open
 item of a fighting scene (above) taken first.
 
@@ -554,7 +553,7 @@ RND-010.2's do.
 - [x] RND-010.2: The draw by layer in the stress harness, at 150, 200 and 250 packed
 - [ ] RND-010.3: The leads inside the enemies' own draw ranked (RND-010.D1), then the candidates timed old against new, the results recorded
   - [x] RND-010.3.1: This plan and the index
-  - [ ] RND-010.3.2: `blit_floor.py` and `gc_probe.py` under `tools/benchmarks/`, tested
+  - [x] RND-010.3.2: `blit_floor.py` and `gc_probe.py` under `tools/benchmarks/`, tested
   - [ ] RND-010.3.3: The CPU steps' probe: each lead's cost per call and per frame on the live crowd, tested
   - [ ] RND-010.3.4: The variant probe: throwaway pixel-identical variants timed against the draw, the ghost copy and the top candidates among them, tested
   - [ ] RND-010.3.5: The sitting: the probes at 150 and 250 packed, and the draw by layer with the hero fighting, raw outputs kept
