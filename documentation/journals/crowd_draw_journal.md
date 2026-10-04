@@ -510,10 +510,54 @@ the next task. The work resumes at the plan's 4.1 onward as RND-010.3 and
 after, with RND-010.D1's ranking inside the enemies' own draw and the open
 item of a fighting scene (above) taken first.
 
+## RND-010.3: The leads inside the enemies' own draw (plan, 2026-10-04)
+
+RND-010.2 ranked the crowd's layers and left `enemies`' own row whole
+(RND-010.D1): an enemy's own draw is about 10 to 14 µs, and every lead
+read from the code sits inside it. Its work is of two kinds, and each is
+measured the way it can be without wrappers:
+
+- **CPU steps**, which touch no pixels: the generated forwarder
+  (`core/state.py`, `_delegate`), the spawn-veil check, `rig_frame`
+  (`rendering.py`), `anchor_for`, `sprite_drop`, `world_to_screen`
+  (`systems/camera.py`), `aura_colour`, and in `actor_items` the lambda
+  and the terrace lookup per enemy. Each is called in isolation on the
+  live packed crowd, with the arguments the frame would give it, many
+  times over, and its per-call cost times its calls a frame gives its
+  share of the row. Machine speed moves these as it moves everything, so
+  they are reported beside the same sitting's own row.
+- **Pixel work**: the sprite's blit, and the `drawn.copy()` a shaded body
+  pays every frame for the ghost queue (`rendering.py`, `_blit_character`).
+  These are timed as throwaway variants of the draw, each one pixel-
+  identical to the original (a test compares whole frames), against the
+  unmodified draw in alternating blocks on one scene, as the bias probe
+  does. The same variant machinery times the candidates the ranking puts
+  on top: a variant is the "throwaway version of the change" the plan
+  asks for before anything is built.
+
+Also under RND-010.3, the plan's step 4.0 leftovers and the open item:
+
+- `blit_floor.py` and `gc_probe.py` from `crowd_performance_plan.md`'s
+  appendix A, under `tools/benchmarks/` with tests (the plan's 4.0);
+- one sitting of the draw by layer with the hero fighting
+  (`--layers --elements`), at 150 and 250, so the ranking covers the
+  combat effects the owner's trace is full of. The owner was asked and
+  did not answer before the work began; it is taken as the review
+  recommended, and costs one on-screen sitting.
+
+Every sitting keeps its raw outputs under `data/rnd-010.3/`, as
+RND-010.2's do.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
 - [x] RND-010.2: The draw by layer in the stress harness, at 150, 200 and 250 packed
 - [ ] RND-010.3: The leads inside the enemies' own draw ranked (RND-010.D1), then the candidates timed old against new, the results recorded
+  - [x] RND-010.3.1: This plan and the index
+  - [ ] RND-010.3.2: `blit_floor.py` and `gc_probe.py` under `tools/benchmarks/`, tested
+  - [ ] RND-010.3.3: The CPU steps' probe: each lead's cost per call and per frame on the live crowd, tested
+  - [ ] RND-010.3.4: The variant probe: throwaway pixel-identical variants timed against the draw, the ghost copy and the top candidates among them, tested
+  - [ ] RND-010.3.5: The sitting: the probes at 150 and 250 packed, and the draw by layer with the hero fighting, raw outputs kept
+  - [ ] RND-010.3.6: The ranking and the candidates' results recorded, and the order for RND-010.4 onward
 - [ ] RND-010.4: The largest exact win built, pixel-identical and tested (further winners as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
