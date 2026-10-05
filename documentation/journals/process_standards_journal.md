@@ -1,6 +1,6 @@
 # Process standards — journal
 
-**ID:** DOC-001 (+ DOC-002) · **System:** process · **Type:** process ·
+**ID:** DOC-001 (+ DOC-002, DOC-007, DOC-008) · **System:** process · **Type:** process ·
 **Status:** done · **Branch:** claude/reaction-damage-rework (reaches `main` by PR)
 
 ---
@@ -150,3 +150,79 @@ longer prescribes a skip.
 One commit. No tests run: documentation only. Checked with
 a case-insensitive grep of `CLAUDE.md` for the old name and handle (no
 matches) and a read of the 21 changed lines.
+
+---
+
+## DOC-008 — Requirement (owner, 2026-10-05)
+
+- **Objective:** Repair `CLAUDE.md`: restore the project standard (§1 to
+  §3) next to the general template, and settle where the two disagree.
+- **Details:** `ddd4677` replaced the whole file with a generic template
+  and dropped §1 to §3 (last full copy: `7c72ca4`, 226 lines). `58fdf16`
+  pasted back two fragments in the wrong places: §2's Tests block inside
+  the first bash snippet in "Branching", which broke it (`bash -n`:
+  `syntax error near unexpected token '.'`), and §3's tail under
+  "How "owner" wants to be talked to". `INDEX.md` still pointed at a §1
+  that no longer existed.
+- **Constraint:** Keep both halves. Ask "owner" which wins for each
+  conflict before writing. The template's branching snippets must come out
+  intact.
+
+## DOC-008 — Confirmed reading
+
+`diff ddd4677:CLAUDE.md HEAD` showed only DOC-007's 21 "owner" lines plus
+the two misplaced pastes, so cutting the pastes out restores the template
+exactly. Conflicts, asked and answered on 2026-10-05 (recorded in
+`CLAUDE.md` §4):
+
+- **DOC-008.D1 — Push and PR: the template wins.** Push and open the PR
+  when a requirement is done, without being asked. A human merges. §1.6's
+  "only when the owner asks" line is replaced.
+- **DOC-008.D2 — Branching: §1.5 wins.** Ask "new worktree or current
+  branch?" before a considerable requirement, and name branches
+  `claude/<id>-<slug>`. When the answer is a worktree, the template's setup
+  block still makes it, and the branch is renamed. When the current branch
+  is `main`, the work goes on a new `claude/<id>-<slug>` branch, because
+  "never commit to `main`" still holds. That last part is my reading of how
+  D1 and D2 fit together, flagged for "owner" to confirm in the PR.
+- **DOC-008.D3 — Tests: §2 wins, evals mapped.** No hooks, gates or CI.
+  Gate tests are run by hand before each task commit. "Full suite" means
+  the default pytest tiers, and `sweep` still runs only when asked. An
+  "eval" is a rate measurement or a sweep check where one applies.
+- **DOC-008.D4 — Layout and assets: the project wins.** System
+  sub-packages stand in for `services/`. `assets/` art and audio
+  (493 tracked files) are source. "No binaries" still covers build
+  outputs.
+- **DOC-008.D5 — Task vocabulary.** A template "task" is a requirement:
+  one triage block, one self-rating and one PR each. Commits stay one per
+  §1.2 task. Self-rating fixes become new task IDs.
+- **DOC-008.D6 — Wording and placement.** Part one comes first, under the
+  project title, and keeps the §1 to §3 numbering that `INDEX.md` and older
+  journals cite. Restored prose says `"owner"` (DOC-007.D1) where `7c72ca4`
+  said "the owner". The journal heading token `(owner, date)` is unchanged.
+  Part two is the template verbatim, minus its own `# CLAUDE.md` title. Its
+  conflicts are settled in §4 instead of by editing it, so the snippets
+  stay byte-identical to the template's tested copy.
+
+## DOC-008 — Tasks
+
+- [x] DOC-008.1 — Rebuild `CLAUDE.md` (part one restored with §4 added,
+  part two cleaned); journal entry and index row; memory updated to match
+
+## DOC-008 — Results
+
+One commit. No pytest run, because no code changed. Checks on the result:
+
+1. The template part, compared with `ddd4677` from line 3 on, differs only
+   in the 21 DOC-007 lines (diff filtered for the name, handle and
+   `"owner"`: no other lines).
+2. All five ```` ```bash ```` snippets are byte-identical to `ddd4677`
+   (94 lines total), and each passes `bash -n`. HEAD's first snippet fails
+   `bash -n`, which confirms the break this repairs.
+3. Part one, diffed against `7c72ca4`, shows only the intended hunks: the
+   intro, six `"owner"` rewordings, the §1.5 pointer, the §1.6 push line,
+   and the new §3 bullet and §4. The Tests block and the "must not
+   disagree" bullet each appear exactly once.
+
+Branch: this session's worktree was made by the template's setup block
+before D2 was decided, then renamed to `claude/doc-008-restore-process`.
