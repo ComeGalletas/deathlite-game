@@ -6,9 +6,10 @@ the fight's own requests (RND-010.3, `crowd_draw_journal.md`).
 
 A primed enemy is drawn washed in its element (`element_fx.washed`) and a
 hurt one tinted red (`rendering.hit_tinted`). Each makes its copy of the
-frame once and keeps it, keyed on the frame, in a dict that empties
-itself whole when it is full: 512 washed frames, 128 tinted ones. A
-frame the cache no longer holds is copied again.
+frame once and keeps it, keyed on the frame. The tint cache is a dict
+that empties itself whole when it holds 128. The wash cache was one too,
+at 512, when RND-010.3 measured it; since RND-010.4 it is an LRU of
+1536. A frame the cache no longer holds is copied again.
 
 The scene is `draw_variants --elements`'s: `layer_probes.packed_scene`
 with the hero fighting, every enemy primed. Every request the draw makes
@@ -17,8 +18,8 @@ on its anchor as `spawn_stress.run` does. What the draw asks for does not
 depend on what a cache holds (a hit and a miss give the same pixels, and
 nothing the draw changes feeds back into what it asks of the caches;
 `RequestTests` pins it), so the one recording is replayed through
-each policy: the game's own, emptying whole when full, and an LRU that
-drops only the entry used longest ago, at each of `--wash-caps` and
+each policy, whichever the game now uses: emptying whole when full, and
+an LRU that drops only the entry used longest ago, at each of `--wash-caps` and
 `--tint-caps`. Printed per cache and cap: the misses a frame and the
 worst frame's, over the frames from `--warm` on (the game's caches are
 warm by then), how many times the game's policy emptied the cache in
@@ -133,7 +134,7 @@ def _empty(module, cache: str, cap: str, room: int):
     """`module`'s cache swapped for an empty one with room for `room`, and
     the game's put back after."""
     saved = getattr(module, cache), getattr(module, cap)
-    setattr(module, cache, {})
+    setattr(module, cache, type(saved[0])())     # the game's own kind: the wash cache is an LRU
     setattr(module, cap, room)
     try:
         yield

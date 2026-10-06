@@ -18,6 +18,7 @@ import contextlib
 import io
 import re
 import unittest
+from collections import OrderedDict
 from unittest import mock
 
 import pygame
@@ -79,15 +80,19 @@ class ReplayTests(unittest.TestCase):
     def test_the_replay_counts_what_the_game_s_own_caches_copy(self):
         # The game's real `washed` and `hit_tinted`, on caches of their own
         # with a cap of 3, against the replay of the same requests. A miss
-        # is read off the game's own cache before each call.
+        # is read off the game's own cache before each call. Since RND-010.4
+        # the wash cache is an LRU (8 copies on this order) and the tint
+        # cache still empties whole when full (9): each replays as its own.
         from combat.elements.ids import ElementId
         from game.states.playing.visual import elements as fx
         from game.states.playing.visual import rendering as R
         frames = [_surface(2 + i, 2) for i in range(5)]
-        order = [0, 1, 2, 0, 3, 0, 1, 4, 4, 2, 0]    # the game copies 9, an LRU would 8
-        for name, module, cache, cap in (("wash", fx, "_WASH_CACHE", "_WASH_CACHE_CAP"),
-                                         ("tint", R, "_TINT_CACHE", "_TINT_CACHE_CAP")):
-            with self.subTest(cache=name), mock.patch.object(module, cache, {}), \
+        order = [0, 1, 2, 0, 3, 0, 1, 4, 4, 2, 0]    # emptied whole: 9 copies; an LRU: 8
+        for name, module, cache, cap, lru, copies in (
+                ("wash", fx, "_WASH_CACHE", "_WASH_CACHE_CAP", True, 8),
+                ("tint", R, "_TINT_CACHE", "_TINT_CACHE_CAP", False, 9)):
+            with self.subTest(cache=name), \
+                    mock.patch.object(module, cache, type(getattr(module, cache))()), \
                     mock.patch.object(module, cap, 3):
                 misses, events = [], []
                 for step, i in enumerate(order):
@@ -100,10 +105,10 @@ class ReplayTests(unittest.TestCase):
                     else:
                         R.hit_tinted(f)
                     events.append((step, key, 1))
-                self.assertEqual(SC.replay(events, len(order), 3, lru=False)["per"], misses)  # copy for copy
-                self.assertEqual(sum(misses), 9)
-                lru = SC.replay(events, len(order), 3, lru=True)["per"]
-                self.assertEqual(sum(lru), 8)                      # the order tells them apart
+                self.assertEqual(SC.replay(events, len(order), 3, lru=lru)["per"], misses)  # copy for copy
+                self.assertEqual(sum(misses), copies)
+                other = SC.replay(events, len(order), 3, lru=not lru)["per"]
+                self.assertNotEqual(sum(other), copies)            # the order tells them apart
 
 
 class RecordTests(unittest.TestCase):
@@ -151,7 +156,7 @@ class BytesTests(unittest.TestCase):
         self.assertNotEqual(SC.nbytes(odd), 5 * 3 * 4)       # not four bytes a pixel
         self.assertGreaterEqual(SC.nbytes(odd), 5 * 3 * 3)
         frame = _surface(7, 3)
-        with mock.patch.object(fx, "_WASH_CACHE", {}):
+        with mock.patch.object(fx, "_WASH_CACHE", OrderedDict()):
             out = fx.washed(frame, ElementId.ICE)
         self.assertEqual(SC.nbytes(frame), out.get_pitch() * out.get_height())
 
@@ -324,11 +329,11 @@ class RequestTests(unittest.TestCase):
         from game.states.playing.visual import rendering as R
         frames, small = 8, (16, 4)
         streams, recs = [], []
-        full = ({}, {})
+        full = (OrderedDict(), {})                 # each cache's own kind: the wash is an LRU
         for churn in (True, False):
             with contextlib.redirect_stdout(io.StringIO()):
                 _game, ps = LP.packed_scene(SEED, 40, 0, 300.0, TDL._fresh_save(), elements=True)
-            wash, tint = ({}, {}) if churn else full
+            wash, tint = (OrderedDict(), {}) if churn else full
             caps = small if churn else (10 ** 6, 10 ** 6)
             with mock.patch.object(fx, "_WASH_CACHE", wash), \
                     mock.patch.object(fx, "_WASH_CACHE_CAP", caps[0]), \
