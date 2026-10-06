@@ -67,8 +67,11 @@ FIGURES = (
      "6.97 to 8.60 µs a blit"),
     ("= 175.5 MB, whatever the caps above", "up to 175.5 MB (128 x 2 x 0.69 MB)"),
     (("against the median per-block mean saving 0.30 (-0.11 to 1.04) the gap is -0.80 to 0.35 ms; "
-      "against the pooled 0.58, -0.34 ms"), "the pooled mean saving is 0.58 ms"),
-    ("against the pooled 0.58", "The median's interval there (-0.11 to +1.04)"),
+      "against the pooled 0.58, -0.34 ms"), "The pooled mean saving at 150 is 0.58 ms, one figure with no interval"),
+    ("against the pooled 0.58", "(interval -0.11 to +1.04), so the gap there is -0.80 to +0.35 ms"),
+    (("at the median miss (84.1 us): 140 ms, 0.22 ms over the 640 frames on",
+      "at the slowest pass's miss (102.4 us): 170 ms, 0.27 ms over the 640 frames on"),
+     "140 ms, 0.22 ms over the 640 frames on, or 170 ms and 0.27 ms"),
     (("update   quiet   7.88 /   7.82  fight   7.51 /   7.60  added  -0.29 (from -0.37 to -0.22)",
       "update   quiet  12.27 /  12.30  fight  12.12 /  12.09  added  -0.18 (from -0.21 to -0.15)"),
      "The update falls a little in every pair (-0.37 to -0.15 ms)"),
@@ -162,7 +165,8 @@ class DerivedTests(unittest.TestCase):
         lru = float(re.search(r"cap\s+1536: .*?LRU\s+([\d.]+)", wash).group(1))
         miss = float(re.search(r"a miss ([\d.]+) us", wash).group(1))
         empty = float(re.search(r"emptying a cache of 512: ([\d.]+) ms", wash).group(1))
-        frames = 900 - 300
+        window = re.search(r"frames (\d+) to (\d+)", wash)
+        frames = int(window.group(2)) - int(window.group(1))
         saved = (today - lru) * miss / 1000 + clears * empty / frames
         self.assertIn(f"held at most 80.6 MB; predicts {saved:.2f} ms a frame saved", self.out)
         rigs = json.loads((ROOT / "data" / "enemies" / "enemy_sprites.json").read_text(encoding="utf-8"))
@@ -212,6 +216,10 @@ def _callers(name: str) -> set:
 
 
 class CodeTests(unittest.TestCase):
+    def test_the_variant_timed_is_the_lru_of_1536_the_docs_quote(self):
+        from tools.benchmarks import draw_variants as DV
+        self.assertEqual(DV.WASH_LRU_CAP, 1536)
+
     """The premises D2's bounds rest on: which frames reach which cache."""
 
     RENDERING = "game/states/playing/visual/rendering.py"

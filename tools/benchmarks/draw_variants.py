@@ -16,8 +16,9 @@ anchor, as `layer_probes bias` times the headline: `--blocks` pairs of
 `--frames` frames, off and on, the order alternating, so a drift inside
 a block falls on each side alike. Printed per variant: the draw's p50 off
 and on over every block, and the per-block on minus off p50s with the
-sign test's interval on their median: what the change would save, before
-anything is built.
+sign test's interval on their median; then the draw's mean, p90 and p99
+on each side, and the per-block on minus off means with the same
+interval: what the change would save, before anything is built.
 
 The variants (`VARIANTS`):
 

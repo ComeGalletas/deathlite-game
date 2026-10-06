@@ -150,6 +150,8 @@ INTEGRATION = (
     "tests/devtools/test_layer_probes.py::PackedSceneTests",
     "tests/devtools/test_layer_probes.py::SceneTests",
     "tests/devtools/test_layer_probes.py::MainTests",
+    # RND-010.3: the leads, the variants and the sprite caches each boot a
+    # packed seed-35 scene; the data test runs derived.py in a child process.
     "tests/devtools/test_bench_probes.py::GcRunTests",
     "tests/devtools/test_draw_leads.py::SceneTests",
     "tests/devtools/test_draw_leads.py::MainTests",

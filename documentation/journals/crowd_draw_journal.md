@@ -102,8 +102,10 @@ finding, until RND-010.2 times it.
   change first, and record the result in this journal whether it wins or
   not.
 - **RND-010.4 and on: build the winners**, one task each, largest first
-  (since RND-010.3, in the sequence its results set, which weighs size
-  with how often a cost occurs):
+  (since RND-010.3, the sequence table under its results governs: only
+  RND-010.4 is a measured winner, several entries are measured before
+  anything is built, and the order weighs size with how often a cost
+  occurs):
   each with a whole-frame byte-identity test at 150 and 250 packed (built
   on `tests/render/test_elemental_draw_cost.py`'s frame), the existing
   render tests (`test_render_cull`, `test_ghost`, `test_enemy_sprite`,
@@ -615,10 +617,17 @@ auras and can lock the slot, and the hero's infused hits prime any enemy
 with an empty slot, late arrivals included, with auras that expire in
 seconds.
 
-The billion HP also shapes two layers. Nothing dies, and a bar shows on
-any enemy below full health, so every enemy hit once keeps its bar for
-the rest of the run, where in play a hurt enemy dies. The bars and
-damage numbers below therefore lean high against play.
+The billion HP also shapes the bars, two ways:
+- Nothing dies, and a bar shows on any enemy below full health, so every
+  enemy hit once keeps its bar for the rest of the run, where in play a
+  hurt enemy dies. More bars than play: this leans the bars high.
+- A billion HP clamps every bar to its widest (84 px) with its fill near
+  full, so every bar is the same cached surface. Play's bars vary in
+  width and fill: this leans the bars low.
+
+The net direction is not measured. The damage numbers lean high against
+play for another reason: every enemy is primed and three weapons fire,
+the saturated scene itself.
 
 The two sides do not hold the same crowd. Both start from 135 alive (at
 150) and 225 (at 250), but more arrive in the quiet runs: they end at 175
@@ -718,7 +727,9 @@ copy than a small one, so the weighting is an assumption, not measured.
 Those are the same order as the `enemies` row's +2.12 ms in the fight.
 This is a prediction, not a measurement: nothing here times the two
 caches inside the frame. The replay's scene also ended with 237 alive,
-against the fight's 247. Fewer bodies wash less, so this leans the
+against the fight's 247, end counts only; the replay averages frames
+300 to 900 and the fight its own 600, and the replay's count in view is
+not recorded. Fewer bodies wash less, so this likely leans the
 prediction low against the `enemies` row.
 
 At 150 the fight asks for 52 a frame from 1,027 distinct frames, and 3.41
@@ -752,12 +763,13 @@ a side together. From here on, savings are quoted as positive numbers.
 
 The replay predicts 1.83 ms saved at 250. Measured against the median of
 the blocks' mean savings (1.27, interval 0.74 to 1.56), the gap is 0.27
-to 1.09 ms; against the pooled mean (1.28), it is 0.55 ms. At 150 it runs
-the other way: the replay predicts 0.24 ms saved, and the pooled mean
-saving is 0.58 ms, more than the whole 0.28 ms the replay prices today's
-cache at. The median's interval there (−0.11 to +1.04) still includes
-zero. Measured above the prediction at 150 and below it at 250: the gaps
-are open. Candidates, none of them measured, each with the way it leans:
+to 1.09 ms; against the pooled mean (1.28), it is 0.55 ms. At 150 the
+replay predicts 0.24 ms saved. The blocks' median mean saving is 0.30 ms
+(interval −0.11 to +1.04), so the gap there is −0.80 to +0.35 ms, which
+includes zero: the measurement at 150 is consistent with the prediction.
+The pooled mean saving at 150 is 0.58 ms, one figure with no interval.
+At 250 the gap is open. Candidates, none of them measured, each with the
+way it leans:
 - a miss may cost less inside the frame than in the timing loop (the
   prediction too high);
 - the variant's LRU begins nearly empty, since only `identical`'s two
@@ -786,18 +798,17 @@ are open. Candidates, none of them measured, each with the way it leans:
   `_blit_character` records it uncacheable). So a washed copy remade is
   a ghost remade too, for such a body, and the LRU spares both. The
   replay counts only the wash, so this leans the measured saving above
-  the prediction: a candidate for 150's gap, not for 250's. The fight
-  adds +0.20 ms of `ghost` at 150, the same order as that gap;
+  the prediction. The two sides also share that one ghost cache: an on
+  part inherits ghosts keyed on the game's copies, useless to the LRU's,
+  so its ghosts start cold, which leans against the variant. The net
+  direction is not measured;
 - the timed blocks cover the fight's frames 0 to 1,280 after the warm-up
-  (16 blocks of two 40-frame parts, both the tool's defaults), and the replay
-  covers frames 300 to 900, so they average different stretches of it.
-  The primed share falls as the fight goes on, so the later timed blocks
-  wash less than the replay's frames: this leans the measured saving
-  below the prediction.
-
-At 150 two of these lean the measured saving above the prediction: the
-game's stale cache and the ghost remakes. That fits what was measured
-there, but nothing here shows which, if either, is the cause.
+  (16 blocks of two 40-frame parts, both the tool's defaults), and the
+  replay covers frames 300 to 900, so they average different stretches
+  of it. If the primed share falls as the fight goes on (only its two
+  ends are known: all primed at the start, 37 % and 71 % at the end),
+  the blocks before frame 300 wash more than the replay's frames and
+  those after 900 wash less. The net direction is not determined.
 
 The variant gives the same pixels as the game's cache: a hit returns the
 held copy, and a miss makes the copy the game would. The sitting's
@@ -923,15 +934,14 @@ sitting 5, a different sitting from the variant's.
 3. **The shade walk**: plan 4.4's first half, the skip where no shadow
    falls. In isolation (sitting 1) it is 0.27 / 0.41 ms. Sitting 5's own
    `enemies/shade` row is 0.38 / 0.61 ms quiet and 0.43 / 0.67 ms in the
-   fight, against the fight's bars at 0.58 / 0.56 ms (at 150 / 250). It
-   ranks above item 4, by judgement, for three reasons:
-   - it runs in every frame, and the bars and numbers only once enemies
-     are hurt;
-   - at 250 it is the larger of the two;
-   - the bars lean high against play (the billion HP, above).
+   fight, against the fight's bars at 0.58 / 0.56 ms (at 150 / 250). By
+   size, item 4 as a whole (bars and numbers) is larger at both counts.
+   The shade walk ranks above it by judgement alone, on how often it
+   runs: in every frame, quiet or not, where the bars and numbers appear
+   only once enemies are hurt.
 4. **Bars and damage numbers in a fight.** The fight adds +0.55 / +0.51 ms
-   of bars and +0.24 / +0.29 ms of damage numbers (at 150 / 250), both
-   leaning high against play.
+   of bars and +0.24 / +0.29 ms of damage numbers (at 150 / 250). The
+   numbers lean high against play; the bars lean both ways (above).
    - Damage numbers fall under plan 4.6.
    - The bars had no plan task. Plan 4.6 now carries them, to be split
      and timed first.
@@ -958,19 +968,21 @@ because it is the one exact win measured, not because those were
 dropped.
 
 **The whole sequence, one task an ID, as proposed (a judgement; the
-owner may reorder it):**
+owner may reorder it). Only RND-010.4 is a measured winner; the
+entries marked "measure first" are split and timed before anything is
+built:**
 
 | ID | Plan step | What |
 |---|---|---|
 | RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled |
 | RND-010.5 | 4.1 | `report_debug` only with the overlay on (cheap, the plan's next) |
-| RND-010.6 | 4.5 | the elemental under-layer: split `draw_under`, then variants |
+| RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants |
 | RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
-| RND-010.8 | 4.6 | bars (split and timed first), damage numbers, particles culled and without copies |
-| RND-010.9 | 4.2 | the collector, re-timed interleaved before it is built |
-| RND-010.10 onward | 4.7 to 4.12 | the update tasks, in the plan's order |
-| after those | 5.1 to 5.4 | the second stage, the blit batch first |
-| last | 4.3 | one drawable list; its ceiling is not measured, only bounded by the `world` and `scenery_list` rows (0.55 / 0.54 ms quiet at 150, 0.66 / 0.68 at 250) |
+| RND-010.8 | 4.6 | bars (measure first), damage numbers, particles culled and without copies |
+| RND-010.9 | 4.2 | measure first: the collector, re-timed interleaved before it is built |
+| RND-010.10 to RND-010.15 | 4.7 to 4.12 | the update tasks, one each, in the plan's order |
+| RND-010.16 to RND-010.19 | 5.1 to 5.4 | the second stage, one each, the blit batch first |
+| RND-010.20 | 4.3 | one drawable list; its ceiling is not measured, only bounded by the `world` and `scenery_list` rows (0.55 / 0.54 ms quiet at 150, 0.66 / 0.68 at 250) |
 
 Item 7's other variants have no place in it. `rig_frame` cached and the
 forwarder bypassed are 0.32 and 0.05 ms in isolation at 250, by
@@ -1015,5 +1027,6 @@ plan's §6 decision, which is still the owner's.
   - [x] RND-010.3.18: The sixth review's findings: the unprimed share's causes unmeasured, the cold start an estimate, the stale-cache bias of ABBA and the leads' biases named with their direction, the order's scope (4.1 and the update tasks keep the plan's order), the plan's diagnosis annotated; the callers of both caches pinned
   - [x] RND-010.3.19: The seventh review's findings: sitting 1's own range, the crowd bias from sitting 5's costs (0.17 to 0.37 ms), the 150 prediction against its measurement, the plan's annotations narrowed to what was timed, one merged task sequence, the ghost cache's memory; tested
   - [x] RND-010.3.20: The eighth review's findings: the ghost remakes as a 150 candidate, the bars given a plan task and their billion-HP bias named, §3.1 narrowed, 4.3 kept last with its bound, sitting 5's own shade row, both sides of the stale-cache bias; D2's figures and every reference to the two caches pinned
+  - [x] RND-010.3.21: The ninth review's findings: 150 consistent with its prediction (the gap's interval quoted), the stretch and ghost biases' net direction left open, the shade weighed against item 4 as a whole, the bars' two-way lean, IDs for every row of the sequence; the cap and the cold-start figures pinned
 - [ ] RND-010.4: The wash cache as an LRU, pixel-identical and tested, once RND-010.D2 sets the cap (the rest, in the sequence table under the RND-010.3 results, as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

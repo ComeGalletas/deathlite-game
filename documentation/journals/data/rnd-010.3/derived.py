@@ -127,8 +127,10 @@ for n in COUNTS:
                     wash.group(1))
     lru = float(re.search(r"cap\s+1536: .*?LRU\s+([\d.]+)", wash.group(1)).group(1))
     miss, empty_ms = float(wash.group(2)), float(wash.group(3))
-    predicted = (float(now.group(1)) - lru) * miss / 1000 + int(now.group(2)) * empty_ms / 600
-    today = float(now.group(1)) * miss / 1000 + int(now.group(2)) * empty_ms / 600
+    window = re.search(r"wash: .*?frames (\d+) to (\d+)", caches)
+    replayed = int(window.group(2)) - int(window.group(1))     # the frames the misses average over
+    predicted = (float(now.group(1)) - lru) * miss / 1000 + int(now.group(2)) * empty_ms / replayed
+    today = float(now.group(1)) * miss / 1000 + int(now.group(2)) * empty_ms / replayed
     print(f"    the replay predicts today's wash cache at {today:.2f} ms a frame and the LRU of 1536 to save "
           f"{predicted:.2f}")
     print(f"    the replay predicts {predicted:.2f} ms saved; against the median per-block mean saving "

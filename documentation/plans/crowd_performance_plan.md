@@ -159,11 +159,11 @@ is right. The cost is around the blit (RND-010.3, on the owner's machine,
 in the quiet packed scene: inside `one_enemy`, timed in isolation, the
 blit is 55 % and the lambda, the forwarder, the shade walk and the ghost
 copy below are small or unresolved; the crowd's whole draw is about
-22 µs an enemy in view in sitting 5, of which the blit is about a
-third, so "around the blit" still holds for the crowd's draw as a whole.
-The other items below were not timed apart; in a fight the wash and tint
-caches are too small and empty themselves, see 4.13 and the journal's
-results):
+22 µs an enemy in view in sitting 5, and the blit (sitting 1's figure, a
+different sitting, so by judgement only) is about a third of that:
+"around the blit" still holds for the crowd's draw as a whole.
+The other items below were not timed apart; in a fight the wash cache is
+too small and empties itself, see 4.13 and the journal's results):
 
 - A lambda per enemy per frame (`game/states/playing/visual/scene.py:127-129`),
   then a generated forwarder costing two `getattr` per call
@@ -268,9 +268,9 @@ results):
 ### 3.4 What is already right
 
 Cached sprite transforms; cached tint, wash, ghost, burn-scale and
-health-bar surfaces (but see 4.13: in a fight at 250 the wash and tint
-caches are too small and empty themselves whole, **measured** in
-RND-010.3); a spatial grid for bump, separation, projectiles,
+health-bar surfaces (but see 4.13: in a fight at 250 the wash cache is
+too small and empties itself whole, **measured** in RND-010.3; the tint
+cache's cost there is small, 0.13 ms predicted); a spatial grid for bump, separation, projectiles,
 contact, elements, tree shadows and obstacle art; actor culling at 320 px;
 elemental bands sorted once per frame (RND-008.4); constant-alpha veils
 (RND-012); a frozen backdrop under pause; off-screen tick LOD; the sliced
