@@ -20,9 +20,13 @@ each policy: the game's own, emptying whole when full, and an LRU that
 drops only the entry used longest ago, at each of `--wash-caps` and
 `--tint-caps`. Printed per cache and cap: the misses a frame and the
 worst frame's, over the frames from `--warm` on (the game's caches are
-warm by then), and the memory the cap allows at the median entry's size.
-Then what one miss and one hit cost: every distinct source washed (or
-tinted) again with the cache emptied, and once more with it full.
+warm by then), and the most memory the replayed cache held at any point
+(its copies at 4 bytes a pixel). Then what one miss and one hit cost:
+every distinct source washed (or tinted) with the cache emptied, then
+again with each one held, `--passes` times over, each pass on a fresh
+cache after the last one's copies are dropped; the median pass and the
+range are printed, the first pass (the allocator's first touch) included
+in the range.
 
 The counts depend on what is in view, so they are the screen's only with
 `SDL_VIDEODRIVER=windows` (in bash; in PowerShell set it first); the
@@ -86,10 +90,12 @@ def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> tup
     """`events` through a cache of `cap` entries: the game's (empty it
     whole when full, then add) or an LRU (drop the entry used longest
     ago). Returns the misses a frame, averaged over the frames from
-    `warm` on, and the most in any one of them."""
-    cache: OrderedDict = OrderedDict()
+    `warm` on; the most in any one of them; and the most bytes the cache
+    held at any point of the whole recording."""
+    cache: OrderedDict = OrderedDict()      # key -> the bytes its copy holds
     per = [0] * frames
-    for f, key, _bytes in events:
+    held = peak = 0
+    for f, key, nbytes in events:
         if key in cache:
             if lru:
                 cache.move_to_end(key)
@@ -97,12 +103,15 @@ def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> tup
         per[f] += 1
         if len(cache) >= cap:
             if lru:
-                cache.popitem(last=False)
+                held -= cache.popitem(last=False)[1]
             else:
                 cache.clear()
-        cache[key] = True
+                held = 0
+        cache[key] = nbytes
+        held += nbytes
+        peak = max(peak, held)
     tail = per[warm:]
-    return sum(tail) / len(tail), max(tail)
+    return sum(tail) / len(tail), max(tail), peak
 
 
 @contextlib.contextmanager
@@ -119,11 +128,14 @@ def _empty(module, cache: str, cap: str, room: int):
         setattr(module, cap, saved[1])
 
 
-def miss_cost(name: str, sources: dict) -> tuple | None:
-    """`name`'s ("wash" or "tint") microseconds for a miss and a hit:
-    every source of that cache washed or tinted with the cache empty,
-    then again with each one held. The game's cache is left as found.
-    None when the recording asked nothing of it."""
+def miss_cost(name: str, sources: dict, passes: int = 5) -> dict | None:
+    """`name`'s ("wash" or "tint") microseconds for a miss and a hit,
+    one figure per pass: every source of that cache washed or tinted with
+    the cache empty, then again with each one held. Each pass gets a
+    fresh cache, the last pass's copies dropped with its own, so after the
+    first the allocator has memory to reuse, as it has in play. Returns
+    `{"miss": [...], "hit": [...]}`, the passes in order; the game's
+    cache is left as found. None when the recording asked nothing of it."""
     fx, R = _modules()
     todo = [src for key, src in sources.items() if key[0] == name]
     if not todo:
@@ -134,35 +146,45 @@ def miss_cost(name: str, sources: dict) -> tuple | None:
     else:
         module, call = R, lambda f, el: R.hit_tinted(f)
         names = ("_TINT_CACHE", "_TINT_CACHE_CAP")
-    with _empty(module, *names, len(todo) + 1):
-        t0 = time.perf_counter()
-        for frame, element in todo:
-            call(frame, element)
-        t1 = time.perf_counter()
-        for frame, element in todo:
-            call(frame, element)
-        t2 = time.perf_counter()
-    return (t1 - t0) / len(todo) * 1e6, (t2 - t1) / len(todo) * 1e6
+    out = {"miss": [], "hit": []}
+    for _ in range(passes):
+        with _empty(module, *names, len(todo) + 1):
+            t0 = time.perf_counter()
+            for frame, element in todo:
+                call(frame, element)
+            t1 = time.perf_counter()
+            for frame, element in todo:
+                call(frame, element)
+            t2 = time.perf_counter()
+        out["miss"].append((t1 - t0) / len(todo) * 1e6)
+        out["hit"].append((t2 - t1) / len(todo) * 1e6)
+    return out
+
+
+def _p50(values: list) -> float:
+    s = sorted(values)
+    return s[len(s) // 2]
 
 
 def report(name: str, events: list, frames: int, warm: int, game_cap: int, caps: list,
-           cost: tuple | None) -> list[str]:
-    asked = sum(1 for e in events if e[0] >= warm)
+           cost: dict | None) -> list[str]:
     if not events:
         return [f"  {name}: nothing asked of it"]
-    sizes = sorted(b for *_rest, b in events)
-    size = sizes[len(sizes) // 2]
+    asked = sum(1 for e in events if e[0] >= warm)
+    sizes = {k: b for _f, k, b in events}
     lines = [(f"  {name}: {asked / (frames - warm):.1f} requests a frame, "
-              f"{len({k for _f, k, _b in events})} distinct frames, the median "
-              f"{size / 1000:.1f} KB; the game's cap {game_cap}, frames {warm} to {frames}")]
+              f"{len(sizes)} distinct frames, the median one {_p50(list(sizes.values())) / 1000:.1f} KB; "
+              f"the game's cap {game_cap}, frames {warm} to {frames}")]
     for cap in caps:
-        c_avg, c_max = replay(events, frames, cap, lru=False, warm=warm)
-        l_avg, l_max = replay(events, frames, cap, lru=True, warm=warm)
-        lines.append(f"    cap {cap:5d} ({cap * size / 1e6:5.1f} MB): emptied when full "
-                     f"{c_avg:6.2f} misses a frame, worst {c_max:4d}  |  "
-                     f"LRU {l_avg:6.2f}, worst {l_max:4d}")
+        c_avg, c_max, c_peak = replay(events, frames, cap, lru=False, warm=warm)
+        l_avg, l_max, l_peak = replay(events, frames, cap, lru=True, warm=warm)
+        lines.append(f"    cap {cap:5d}: emptied when full {c_avg:6.2f} misses a frame, worst "
+                     f"{c_max:4d}, held at most {c_peak / 1e6:5.1f} MB  |  LRU {l_avg:6.2f}, "
+                     f"worst {l_max:4d}, held at most {l_peak / 1e6:5.1f} MB")
     if cost is not None:
-        lines.append(f"    a miss {cost[0]:.1f} us, a hit {cost[1]:.2f} us")
+        m, h = cost["miss"], cost["hit"]
+        lines.append(f"    a miss {_p50(m):.1f} us ({min(m):.1f} to {max(m):.1f}), a hit "
+                     f"{_p50(h):.2f} us ({min(h):.2f} to {max(h):.2f}), over {len(m)} passes")
     return lines
 
 
@@ -185,9 +207,12 @@ def parse(argv=None) -> argparse.Namespace:
                     help="frames left out of the averages while the replayed caches fill")
     ap.add_argument("--wash-caps", type=_caps, default=[512, 768, 1024, 1536, 2048])
     ap.add_argument("--tint-caps", type=_caps, default=[128, 256, 512])
+    ap.add_argument("--passes", type=int, default=5, help="passes timing a miss and a hit")
     args = ap.parse_args(argv)
     if not 0 <= args.warm < args.frames:
         ap.error("--warm must be 0 or more and below --frames")
+    if args.passes < 1:
+        ap.error("--passes must be 1 or more")
     return args
 
 
@@ -201,7 +226,7 @@ def main(argv=None, save_path: str | None = None) -> int:
     for name, game_cap, caps in (("wash", fx._WASH_CACHE_CAP, args.wash_caps),
                                  ("tint", R._TINT_CACHE_CAP, args.tint_caps)):
         print("\n".join(report(name, rec[name], args.frames, args.warm, game_cap, caps,
-                               miss_cost(name, rec["sources"]))))
+                               miss_cost(name, rec["sources"], args.passes))))
     print(f"  boss at the end: {S.boss_state(ps)}")
     return 0
 

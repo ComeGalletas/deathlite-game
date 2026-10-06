@@ -182,9 +182,11 @@ def picture(ps, surface) -> bytes:
 def identical(ps, name: str, surface) -> bool:
     """Is the frame with `name` on the frame without it, byte for byte?
     The terrain's clock (the water and foam animate on the wall clock) is
-    held at 0 for the comparison and put back after. Drawn off, on, then
-    off again: the third must equal the first, or the scene itself is not
-    still and the answer would mean nothing."""
+    held at 0 for the comparison and put back after. Drawn off, on twice,
+    then off again: both frames with it on must equal the first (a
+    variant that caches is checked filling its cache and then using it),
+    and the last must too, or the scene itself is not still and the answer
+    would mean nothing."""
     terrain = ps.game_map.renderer
     clock = terrain.clock
     terrain.clock = lambda: 0.0
@@ -192,7 +194,7 @@ def identical(ps, name: str, surface) -> bool:
         before = picture(ps, surface)
         undo = VARIANTS[name](ps)
         try:
-            with_it = picture(ps, surface)
+            with_it = [picture(ps, surface), picture(ps, surface)]
         finally:
             undo()
         after = picture(ps, surface)
@@ -200,7 +202,7 @@ def identical(ps, name: str, surface) -> bool:
         terrain.clock = clock
     if after != before:
         raise RuntimeError("the scene moved between two draws: no comparison possible")
-    return with_it == before
+    return all(frame == before for frame in with_it)
 
 
 def timed(ps, name: str, blocks: int, frames: int) -> dict:

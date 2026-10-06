@@ -198,8 +198,20 @@ class SceneTests(unittest.TestCase):
             self.assertFalse(DV.identical(self.ps, "blot", self.surface))
         self.assertNotIn("one_enemy", vars(self.ps.renderer))
 
+    def test_both_frames_with_the_variant_on_are_compared(self):
+        # The first draw fills a caching variant's cache, the second uses
+        # it: a difference in either is a difference.
+        for drawn in ([b"a", b"x", b"a", b"a"], [b"a", b"a", b"x", b"a"]):
+            frames = iter(drawn)
+            with self.subTest(drawn=drawn), \
+                    mock.patch.object(DV, "picture", lambda ps, s, f=frames: next(f)):
+                self.assertFalse(DV.identical(self.ps, "forwarder_bypassed", self.surface))
+        frames = iter([b"a"] * 4)
+        with mock.patch.object(DV, "picture", lambda ps, s: next(frames)):
+            self.assertTrue(DV.identical(self.ps, "forwarder_bypassed", self.surface))
+
     def test_a_scene_that_moves_is_refused(self):
-        frames = iter([b"a", b"a", b"b"])
+        frames = iter([b"a", b"a", b"a", b"b"])
         with mock.patch.object(DV, "picture", lambda ps, s: next(frames)), \
                 self.assertRaisesRegex(RuntimeError, "moved"):
             DV.identical(self.ps, "forwarder_bypassed", self.surface)
