@@ -1,0 +1,41 @@
+commit 503da6f  started 2026-10-06 11:32:07
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+cam_helper      1561,84375
+chrome         1401,640625
+SignalRgb       1396,15625
+audiodg         784,921875
+chrome           777,78125
+chrome          724,734375
+chrome            660,9375
+SystemSettings  453,328125
+
+
+
+=== leads 150  cpu load 36%  11:32:09
+=== variants 150  cpu load 28%  11:32:17
+=== fight 150  cpu load 25%  11:33:53
+=== leads 250  cpu load 27%  11:34:13
+=== variants 250  cpu load 23%  11:34:21
+=== fight 250  cpu load 40%  11:36:12
+=== gc_probe  cpu load 37%  11:36:40
+=== blit_floor  cpu load 48%  11:37:18
+finished 11:37:21  cpu load 18%
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+cam_helper        1600,125
+SignalRgb      1508,296875
+chrome         1403,890625
+audiodg            802,625
+chrome          794,765625
+chrome          669,953125
+SystemSettings   476,59375
+chrome          367,078125
+
+
+

@@ -1,0 +1,49 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+seed 35 lod 2  frames 600: p50 13.74  p90 15.54  p99 22.25  max 27.92 ms  |  live 247 dormant 425 recycled 0
+  crowd     225 at the start of timing, 247 at the end  |  arrived: summon 22
+  boss at the end of timing: held back
+  elements  auras 176  reactions 113 (29 deferred, 0 held)  areas 5  fx 8
+            particles 411  budget 16/90 used, 0 refused
+            damage numbers peak 173 / 200 (86% of the pool)
+  (the update line above: every frame; the lines below: the 300 frames drawn without the timers)
+  draw   p50 20.42  p90 25.52  p99 36.06  max 51.41 ms  |  in view p50 222 max 244
+  update + draw   p50 33.89  p90 40.83  p99 49.88  max 68.77 ms  |  over 16.67 ms: 300 / 300
+  draw by layer, exclusive ms over 300 timed frames (p50 / p90 / mean, share of the mean draw, calls a frame):
+    enemies                  5.79 /   8.42 /   6.38    28.2 %     240.8
+    ground                   4.02 /   4.44 /   4.04    17.8 %       3.0
+    flat/elemental           3.13 /   4.04 /   3.26    14.4 %       3.0
+    water                    1.37 /   1.75 /   1.45     6.4 %       1.0
+    ghost                    1.15 /   2.12 /   1.34     5.9 %       1.0
+    scenery                  1.26 /   1.57 /   1.32     5.8 %      71.8
+    world                    0.75 /   0.95 /   0.98     4.3 %       1.0
+    enemies/shade            0.79 /   1.00 /   0.82     3.6 %     239.8
+    enemies/hpbar            0.61 /   0.77 /   0.61     2.7 %     239.8
+    flat                     0.46 /   0.75 /   0.54     2.4 %       3.0
+    numbers                  0.34 /   0.57 /   0.35     1.6 %       1.0
+    elemental_sort           0.31 /   0.42 /   0.33     1.5 %       1.0
+    elemental/particles      0.30 /   0.41 /   0.31     1.4 %       3.0
+    scenery_list             0.22 /   0.31 /   0.25     1.1 %       1.0
+    reactions                0.08 /   0.30 /   0.12     0.5 %       1.0
+    hud                      0.10 /   0.13 /   0.11     0.5 %       1.0
+    projectiles              0.08 /   0.18 /   0.09     0.4 %       1.0
+    enemies/marks            0.07 /   0.09 /   0.08     0.3 %     239.8
+    particles                0.04 /   0.14 /   0.06     0.3 %       1.0
+    huts_list                0.01 /   0.01 /   0.05     0.2 %       1.0
+    draw                     0.04 /   0.05 /   0.04     0.2 %       1.0
+    player                   0.02 /   0.03 /   0.03     0.1 %       1.0
+    spawn_fx                 0.00 /   0.11 /   0.03     0.1 %       2.1
+    flat/player_shots        0.01 /   0.05 /   0.02     0.1 %       3.0
+    death_fx                 0.00 /   0.04 /   0.02     0.1 %       1.1
+    key_marker               0.02 /   0.02 /   0.02     0.1 %       1.0
+    feedback                 0.01 /   0.01 /   0.01     0.0 %       1.0
+    villagers_list           0.01 /   0.01 /   0.01     0.0 %       1.0
+    death_fx/shade           0.00 /   0.01 /   0.00     0.0 %       1.1
+    player/shade             0.00 /   0.00 /   0.00     0.0 %       1.0
+    hints                    0.00 /   0.00 /   0.00     0.0 %       1.0
+    (all layers)            21.33 /  27.81 /  22.66
+    (terrain)                6.96 /   7.73 /   7.06   each frame's sum
+    (crowd)                  8.65 /  12.70 /   9.52   each frame's sum
+    (crowd / terrain)       1.251 /  1.757            each frame's ratio
+  the 300 frames between, drawn without the timers: draw p50 20.42 ms; the timers add +0.91 ms at p50, 1069.2 timed calls a frame, 0.85 us a call in place
