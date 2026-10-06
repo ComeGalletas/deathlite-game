@@ -26,8 +26,12 @@ FIGURES = (
      "+3.16 (+3.05 to +3.27)"),
     ("bare     quiet  10.69 /  10.58  fight  17.51 /  17.45  added  +6.85 (from +6.76 to +6.93)",
      "+6.85 (+6.76 to +6.93)"),
-    ("flat/elemental         quiet  0.11 /  0.11  fight  2.81 /  2.82  added +2.71", "+2.71 ms"),
-    ("enemies                quiet  2.97 /  2.94  fight  5.07 /  5.07  added +2.12", "+2.12 ms"),
+    (("flat/elemental         quiet  0.08 /  0.08  fight  1.44 /  1.44  added +1.36",
+      "flat/elemental         quiet  0.11 /  0.11  fight  2.81 /  2.82  added +2.71"),
+     "| `flat/elemental` (auras, status marks, areas, motes under the bodies) | +1.36 ms | +2.71 ms |"),
+    (("enemies                quiet  1.89 /  1.86  fight  2.32 /  2.34  added +0.46",
+      "enemies                quiet  2.97 /  2.94  fight  5.07 /  5.07  added +2.12"),
+     "| `enemies` (an enemy's own draw) | +0.46 ms | +2.12 ms |"),
     ("mean diff median -1.27, interval -1.56 to -0.74 -> faster; p90 19.61 -> 18.08; p99 28.87 -> 23.31",
      "-1.27, -1.56 to -0.74 ms: **faster**"),
     ("the mean falls by 1.28 ms", "pooled, 1.28 ms"),
@@ -36,7 +40,8 @@ FIGURES = (
     ("today's cap holds 0.31 of the distinct frames", "Today's cap holds 0.31 of them"),
     ("predicted 1.85 ms a frame (the emptying 0.003 of it), its worst frame 11.52 ms",
      "1.85 ms a frame, with a worst frame of 11.5 ms"),
-    ("LRU  1536: 0.31 a frame, worst 3, held at most 80.6 MB; predicts 1.83 ms a frame saved", "80.6 MB"),
+    ("LRU  1536: 0.31 a frame, worst 3, held at most 80.6 MB; predicts 1.83 ms a frame saved",
+     "| wash, LRU 1536 | 0.31 | 3 | 80.6 MB |"),
     ("LRU  1024: 2.07 a frame, worst 11, held at most 55.5 MB; predicts 1.68 ms a frame saved",
      "predicts 1.68 ms saved"),
     (("the largest frame is bear's, 203x173, 0.14 MB a copy; full caps: 512 -> 71.9 MB, "
@@ -47,7 +52,8 @@ FIGURES = (
     (("150: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: +0.63 to +1.90 ms",
       "250: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: +0.80 to +2.97 ms"),
      "0.6 to 3.0 ms more than sitting 5's"),
-    ("n=200 sprite only        p50 1.86 ms, less the fill 0.37: 7.45 us a sprite", "0.37 ms"),
+    ("n=200 sprite only        p50 1.86 ms, less the fill 0.37: 7.45 us a sprite",
+     "the fill alone takes 0.37 ms"),
     ("the lambda and the forwarder alone: 0.05 ms",
      "lambda and the forwarder together cost 0.03 ms at 150 and 0.05 at 250"),
 )
@@ -104,32 +110,48 @@ class DerivedTests(unittest.TestCase):
         rigs = json.loads((ROOT / "data" / "enemies" / "enemy_sprites.json").read_text(encoding="utf-8"))
         worn = {e["sprite"] for e in json.loads((ROOT / "data" / "enemies" / "enemies.json")
                                                 .read_text(encoding="utf-8")).values() if e.get("sprite")}
-        zoom = 1.797
+        self.assertEqual([r for r in sorted(worn) if not rigs.get(r, {}).get("scale")], [])  # none skipped
+        display = (DATA / "r5_fight_250a.txt").read_text(encoding="utf-8")
+        zoom = float(re.search(r"zoom ([\d.]+)", display).group(1))
         biggest = max(round(rigs[r]["scale"][0] * zoom) * round(rigs[r]["scale"][1] * zoom) * 4
-                      for r in worn if r in rigs)
+                      for r in worn)
         self.assertIn(f"1536 -> {1536 * biggest / 1e6:.1f} MB", self.out)
 
     def test_a_row_a_run_did_not_print_is_named(self):
         self.assertIn("no row in quiet a (never called there, counted 0): death_fx, death_fx/shade", self.out)
 
 
+def _callers(name: str) -> set:
+    """`(file, function)` for every call of `name` (a bare name or an
+    attribute) inside a function anywhere under `game/`."""
+    import ast
+    callers = set()
+    for path in sorted((ROOT / "game").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Call) and name in (getattr(node.func, "attr", None),
+                                                           getattr(node.func, "id", None)):
+                    callers.add((path.relative_to(ROOT).as_posix(), fn.name))
+    return callers
+
+
 class CodeTests(unittest.TestCase):
+    """The premises D2's bounds rest on: which frames reach which cache."""
+
+    RENDERING = "game/states/playing/visual/rendering.py"
+
     def test_washed_has_one_caller_the_enemy_sprite(self):
-        # D2's bound on the wash cache rests on this: only a regular
-        # enemy's frame is ever washed, never a boss's or the hero's.
-        import ast
-        callers = set()
-        for path in sorted((ROOT / "game").rglob("*.py")):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for fn in ast.walk(tree):
-                if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
-                    continue
-                for node in ast.walk(fn):
-                    if isinstance(node, ast.Call) and (
-                            getattr(node.func, "attr", None) == "washed"
-                            or getattr(node.func, "id", None) == "washed"):
-                        callers.add((path.relative_to(ROOT).as_posix(), fn.name))
-        self.assertEqual(callers, {("game/states/playing/visual/rendering.py", "enemy_sprite")})
+        # Only a regular enemy's frame is ever washed, never a boss's or
+        # the hero's: the wash bound runs over enemies.json's rigs alone.
+        self.assertEqual(_callers("washed"), {(self.RENDERING, "enemy_sprite")})
+
+    def test_hit_tinted_takes_enemies_the_boss_and_the_hero(self):
+        # The tint bound runs over enemy, boss and hero rigs: no other caller.
+        self.assertEqual(_callers("hit_tinted"), {(self.RENDERING, "enemy_sprite"),
+                                                  (self.RENDERING, "boss"), (self.RENDERING, "player")})
 
 
 class ReadmeTests(unittest.TestCase):

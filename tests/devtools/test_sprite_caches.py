@@ -351,6 +351,7 @@ class RequestTests(unittest.TestCase):
         self.assertGreater(len(recs[0]["wash"]), 0)
         self.assertGreater(len(recs[0]["tint"]), 0)            # the hurt branch ran too
         self.assertGreater(SC.replay(recs[0]["wash"], frames, small[0], lru=False)["clears"], 0)
+        self.assertGreater(SC.replay(recs[0]["tint"], frames, small[1], lru=False)["clears"], 0)
         self.assertEqual(streams[0], streams[1])
         self.assertEqual((len(full[0]), len(full[1])), before)    # the full caches served every request
 

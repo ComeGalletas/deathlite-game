@@ -34,7 +34,9 @@ section 2). The frame is lost in Python work around those blits (a lambda,
 a forwarder, a shade walk and a `copy()` per enemy; RND-010.3 **measured**
 these on the owner's machine at 150: the lambda and the forwarder 0.03 ms a
 frame together, the shade walk 0.27, the copy 0.01 for two shaded bodies
-only; see the header), in Python per-enemy
+only, while the sprite blit itself was 55 % of an enemy's own draw; so
+"not the limit" and "lost around the blits" do not hold as stated for
+the draw; see the header), in Python per-enemy
 update work (about 25 to 45 µs per enemy), in two near-quadratic
 enemy-to-enemy passes, in a pure-Python flow-field fill that costs 2 to
 3 ms on most frames, and in a fixed 5.4 ms of terrain per frame before any
@@ -151,7 +153,11 @@ not shown there. See 4.2.)
 Sprites, flips and scales are cached once per `(rig, anim, size, flip,
 tint)` (`game/assets.py:103-157`); frames are shared, not copied; the
 animators hold one float each (`systems/animation.py:11-45`). That part
-is right. The cost is around the blit:
+is right. The cost is around the blit (RND-010.3 **measured** otherwise
+on the owner's machine: the blit itself is 55 % of an enemy's own draw
+in isolation, the Python steps below are small or unresolved, and in a
+fight the wash and tint caches are too small and empty themselves; see
+4.13 and the journal's results):
 
 - A lambda per enemy per frame (`game/states/playing/visual/scene.py:127-129`),
   then a generated forwarder costing two `getattr` per call
@@ -275,9 +281,10 @@ the owner's machine; the measured number replaces them in the journal.
 
 **Order of work, largest first.** Measure (4.0) before cutting, then draw
 tasks (the owner's trace is draw-bound) interleaved with the update
-tasks whose packed share is largest. (Since RND-010.3, the order that
-governs is the journal's "The order for RND-010.4 onward", which starts
-with 4.13.)
+tasks whose packed share is largest. (Since RND-010.3, the draw tasks
+follow the journal's "The order for RND-010.4 onward", which starts with
+4.13; 4.1 and the update tasks, which it did not measure, keep this
+order.)
 
 | # | Task | Where | Expected | Done when |
 |---|---|---|---|---|

@@ -133,9 +133,12 @@ for n in COUNTS:
               f"{predicted + float(mm[1]):.2f} to {predicted + float(mm[2]):.2f} ms; against the pooled "
               f"{pooled:.2f}, {predicted - pooled:.2f} ms")
         distinct = int(re.search(r"wash: .*?(\d+) distinct frames", caches).group(1))
-        fill = distinct * miss / 1000
-        print(f"    the variant's LRU starts nearly empty: filling it once with the {distinct} distinct frames "
-              f"costs at most {fill:.0f} ms, {fill / int(frames):.2f} ms over the {frames} frames on")
+        slowest = float(re.search(r"wash: .*?a miss [\d.]+ us \([\d.]+ to ([\d.]+)\)", caches, re.DOTALL).group(1))
+        for label, cost in (("the median miss", miss), ("the slowest pass's miss", slowest)):
+            fill = distinct * cost / 1000
+            print(f"    the variant's LRU starts nearly empty: an estimate of its fill, the replay's {distinct} "
+                  f"distinct frames at {label} ({cost} us): {fill:.0f} ms, {fill / int(frames):.2f} ms over "
+                  f"the {frames} frames on")
 print("context, sitting 2's wash_lru (another sitting and commit):")
 for n in COUNTS:
     name, off, on, frames, med, lo, hi = re.search(VARIANT, text(f"r2_wash_lru_{n}.txt")).groups()
@@ -240,8 +243,9 @@ bosses = {b["sprite"] for b in load("enemies", "bosses.json").values() if b.get(
 
 
 def largest(rigs: dict, names) -> tuple:
-    sized = [(round(rigs[n]["scale"][0] * zoom), round(rigs[n]["scale"][1] * zoom), n)
-             for n in names if n in rigs and rigs[n].get("scale")]
+    missing = sorted(n for n in names if not rigs.get(n, {}).get("scale"))
+    assert not missing, f"rigs with no size, the bound would skip them: {missing}"
+    sized = [(round(rigs[n]["scale"][0] * zoom), round(rigs[n]["scale"][1] * zoom), n) for n in names]
     return max(sized, key=lambda t: t[0] * t[1])
 
 

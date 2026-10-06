@@ -9,7 +9,9 @@ constant or a tool's default.
 All five sittings ran on the owner's machine on 2026-10-06, on screen
 (`SDL_VIDEODRIVER=windows`), with the owner's save's display block
 (2560x1080 windowed, 21:9), at 150 alive (`--elapsed 300`) and 250
-(`--elapsed 600`), seed 35, packed round the hero. Each `rN_meta.txt`
+(`--elapsed 600`), seed 35, packed round the hero. Two exceptions:
+sitting 1's `gc_probe` ran at its own defaults (200 live, 400 s), and
+`blit_floor` draws no crowd, only its sprites on a bare surface. Each `rN_meta.txt`
 holds its sitting's commit, the save's display block, the CPU load
 before each step and the top processes by CPU time at the start and the
 end.

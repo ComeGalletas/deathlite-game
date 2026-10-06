@@ -527,7 +527,9 @@ above, except for the plan's two appendix probes (`blit_floor.py`,
 The work was to resume at the plan's 4.1 onward as RND-010.3 and after,
 with RND-010.D1's ranking inside the enemies' own draw and the open item
 of a fighting scene (above) taken first. RND-010.3 did those two, and
-its results set a new order: RND-010.4 is the plan's 4.13, not 4.1.
+its results set a new order for the draw: RND-010.4 is the plan's 4.13,
+not 4.1. 4.1 and the update tasks keep their place in the plan's order
+(see the results' "The order for RND-010.4 onward").
 
 ## RND-010.3: The leads inside the enemies' own draw (plan, 2026-10-04)
 
@@ -601,9 +603,11 @@ drew 0.6 to 3.0 ms more than sitting 5's at the same counts.
 worst plausible one by judgement, not an average one. Every enemy is
 primed at the start (for 600 s, with a billion HP: constants in
 `spawn_stress.infuse`) and three infused weapons fire. By the end, 55 of
-150 live (37 %) are still primed, and 176 of 247 (71 %). Two things make
-up the rest: reactions consume auras, and `infuse` primes only the crowd
-present at its call, so the 16 and 22 that arrived later never were.
+150 live (37 %) are still primed, and 176 of 247 (71 %). What makes up
+the rest is not measured. `infuse` primes only the crowd present at its
+call (16 and 22 arrived later); reactions consume auras and can lock the
+slot; and the hero's infused hits prime any enemy with an empty slot,
+late arrivals included, with auras that expire in seconds.
 
 The two sides do not hold the same crowd. Both start from 135 alive (at
 150) and 225 (at 250), but more arrive in the quiet runs: they end at 175
@@ -613,7 +617,9 @@ draws a few more enemies, and what the fight is shown to add is
 understated by that much (8 fewer in view at 150, at the order of 13 µs
 each from the leads below, is about 0.1 ms).
 
-Sitting 5, p50, two runs a side:
+Sitting 5, p50, two runs a side. The range under "Added" runs from the
+lower fight less the higher quiet run to the higher fight less the lower
+quiet run:
 
 | | Quiet | Fight | Added |
 |---|---|---|---|
@@ -698,7 +704,8 @@ copy than a small one, so the weighting is an assumption, not measured.
 
 Those are the same order as the `enemies` row's +2.12 ms in the fight.
 This is a prediction, not a measurement: nothing here times the two
-caches inside the frame. At 150 the fight asks for 52 a frame from 1,027
+caches inside the frame. The replay's scene also ended with 237 alive,
+against the fight's 247. At 150 the fight asks for 52 a frame from 1,027
 distinct frames, which comes to 3.41 misses a frame and 0.28 ms
 predicted.
 
@@ -721,28 +728,38 @@ commit: at 250 the blocks' median p50 saving was 1.08 ms (interval 0.65
 to 1.61), and at 150 again not resolved.
 
 How these are read: a block's figure is its on part's minus its off
-part's, so a saving is negative. The "median" of the 16 is `stats.percentile`'s nearest index,
-the 9th smallest, not the mean of the 8th and 9th. The interval is the
+part's, so a saving is negative. The "median" of the 16 is
+`stats.percentile`'s nearest index, the 9th smallest, not the mean of
+the 8th and 9th. The interval is the
 sign test's 4th to 13th of 16, which treats the blocks as independent.
 The pooled rows put all 640 frames of a side together.
 
 The replay predicts 1.83 ms saved at 250. Measured against the median of
 the blocks' mean savings (1.27, interval 0.74 to 1.56), the gap is 0.27
 to 1.09 ms; against the pooled mean (1.28), it is 0.55 ms. The gap is
-open. Candidates, none of them measured:
-- a miss may cost less inside the frame than in the timing loop;
-- the two caches start unequal. The variant's LRU begins nearly empty
-  (only `identical`'s two draws filled it), while the game's cache on
-  the off side is in its steady churn; and the replay's LRU figure leaves
-  out its own first 300 frames. Filling the LRU once with the 1,665
-  distinct frames costs at most 140 ms, at most 0.22 ms spread over the
-  640 frames on. That works against the variant, so the measured saving
-  is understated by up to that much;
+open. Candidates, none of them measured, each with the way it leans:
+- a miss may cost less inside the frame than in the timing loop (the
+  prediction too high);
+- the variant's LRU begins nearly empty, since only `identical`'s two
+  draws filled it, and the replay's LRU figure leaves out its own first
+  300 frames. An estimate of that fill: the replay's 1,665 distinct
+  frames at the median miss is 140 ms, 0.22 ms over the 640 frames on,
+  or 170 ms and 0.27 ms at the slowest pass's miss. The timed run may ask
+  for more distinct frames than the replay saw, and an LRU of 1536 never
+  holds them all at once. This leans against the variant;
+- each cache stands still while the other side runs: the game's through
+  every on part, the LRU through every off part, while the fight moves
+  on. A cache resuming stale holds frames no longer asked for. For the
+  game's cache that means emptying sooner and missing more. This leans
+  toward the variant, most at 150, where the game's cache empties only
+  about every 150 frames against every 23 at 250;
+- the variant's miss swaps in an empty dict for the game's `washed` to
+  fill, an allocation the game's miss does not make (against the
+  variant), and its hit path, an `OrderedDict` lookup and `move_to_end`,
+  is not timed;
 - the timed blocks cover the fight's frames 0 to 1,280 after the warm-up
   (16 blocks of two 40-frame parts, the tool's defaults), and the replay
-  covers frames 300 to 900, so they average different stretches of it;
-- the variant's hit path (an `OrderedDict` lookup and `move_to_end`) is
-  not timed.
+  covers frames 300 to 900, so they average different stretches of it.
 
 Not a candidate: the ghost cache (`TerrainRenderer._ghost_of`, which
 empties itself at 128) keys on the washed copy's identity. It serves an
@@ -774,6 +791,14 @@ rounds (sitting 1):
 | the glue between them | 0.16 ms | 0.23 ms | |
 | the scene's per-enemy steps (cull, terrace, lambda, forwarder) | 0.09 ms | 0.16 ms | outside |
 
+Two biases sit in these figures, neither one quantified:
+- each piece ran warm and alone, over and over on the same arguments,
+  which is kind to caches and branches, so a piece reads low against its
+  cost inside the frame;
+- sitting 1 ran at 23 to 48 % CPU load, against 3 to 22 % in sitting 5,
+  and its fights drew 0.6 to 1.9 ms more at 150 than sitting 5's, so its
+  figures may read high.
+
 The ghost copy, the one per-frame `copy()` the plan named, runs only for
 the two shaded bodies in this scene and costs 0.01 ms. It gets no
 variant, under the condition RND-010.3.4 set.
@@ -782,8 +807,10 @@ How close the sprite blit is to pygame's own floor is not shown here.
 `blit_floor` (sitting 5), with the screen fill timed alone (0.37 ms) and
 taken out, puts one 112 px sprite at 6.97 to 8.60 µs a blit. The game's
 blit is 7.18 to 7.36 µs, but over the crowd's own rigs (the largest a
-regular enemy wears is 203x173 px at this zoom), and in sitting 1. Different sittings
-and different sprites, so the two are of the same order and no more is
+regular enemy wears is 203x173 px at this zoom), and in sitting 1. The
+floor also places its sprites anywhere on the surface, so some are
+clipped at the edges, which makes it read low. Different sittings and
+different sprites, so the two are of the same order and no more is
 claimed.
 
 The three CPU variants (sitting 1, quiet) resolved none:
@@ -794,8 +821,9 @@ The three CPU variants (sitting 1, quiet) resolved none:
 | `world_bucketed` | −0.05, −1.73 to +2.19 ms | −0.01, −0.89 to +0.29 ms |
 | `forwarder_bypassed` | −0.61, −2.85 to +1.61 ms | +0.18, −0.45 to +0.57 ms |
 
-In isolation `rig_frame` costs at most 0.32 ms a frame (at 250). The
-lambda and the forwarder together cost 0.03 ms at 150 and 0.05 at 250.
+In isolation `rig_frame` costs 0.19 ms a frame at 150 and 0.32 at 250.
+The lambda and the forwarder together cost 0.03 ms at 150 and 0.05 at
+250.
 
 `world_bucketed` removes `draw_world`'s filtering of the lists for each
 terrace, which `draw_leads` does not time. That work lies inside the
@@ -874,13 +902,20 @@ sitting 5, a different sitting from the variant's.
    judgement: the game's blit and the floor's are of the same order.
 7. **The CPU variants:** none resolved a saving. By judgement, not by
    measurement, they are not worth building alone.
-   - In isolation, `rig_frame` is 0.32 ms at most, and the lambda and
-     the forwarder 0.05.
+   - In isolation at 250, `rig_frame` is 0.32 ms, and the lambda and the
+     forwarder 0.05 together.
    - The bucketed world's ceiling is not measured (see above).
 
 The order as a whole is a judgement. It weighs the measured sizes above
 with how often each cost occurs (every frame, or only in a fight), and
 the sizes come from different sittings where noted.
+
+Its scope is the draw RND-010.3 measured, plus the collector (item 5),
+which sitting 1 measured on the side. The plan's other tasks were not
+measured here and keep their place in the plan's own order. Those are
+4.1 (`report_debug`, the plan's next task before this order), the update
+tasks 4.7 to 4.12, and 5.2 to 5.4. RND-010.4 is 4.13 because it is the
+one exact win measured, not because those tasks were dropped.
 
 Two things the plan for RND-010.3 (above) promised were not done:
 - The leads were to be reported beside the same sitting's own `enemies`
@@ -916,5 +951,6 @@ plan's §6 decision, which is still the owner's.
   - [x] RND-010.3.15: The third review's findings: no comparison across sittings, the statistics named as measured, the 150 result and the scope, memory bounds per cap, the plan's stale lines; tested
   - [x] RND-010.3.16: The fourth review's findings: the memory bound over the frames each cache can be asked for (bosses are never washed), the ghost cache's bodies, the order's rule and the plan's promises not kept, the statistics' assumptions; tested
   - [x] RND-010.3.17: The fifth review's findings: the two sides' crowds and the bias they leave, the variant's cold start as a bounded gap candidate, the appendix note's evidence, the plan's order paragraph; the bound's premise and the prediction tested apart
+  - [x] RND-010.3.18: The sixth review's findings: the unprimed share's causes unmeasured, the cold start an estimate, the stale-cache bias of ABBA and the leads' biases named with their direction, the order's scope (4.1 and the update tasks keep the plan's order), the plan's diagnosis annotated; the callers of both caches pinned
 - [ ] RND-010.4: The wash cache as an LRU, pixel-identical and tested, once RND-010.D2 sets the cap (further winners, in the order above, as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
