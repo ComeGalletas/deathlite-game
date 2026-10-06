@@ -155,10 +155,15 @@ for n in COUNTS:
     auras = hf[0]["auras"]
     print(f"{n}: in view quiet {hq[0]['view']} / {hq[1]['view']}, fight {hf[0]['view']} / {hf[1]['view']}; "
           f"auras at the end of a fight {auras[0]} of {auras[1]} live ({100 * auras[0] / auras[1]:.0f} %)")
+    ends = {}
     for label, runs in (("quiet", q), ("fight", f)):
         for r, t in zip("ab", runs, strict=True):
             crowd = re.search(r"crowd\s+(\d+) at the start of timing, (\d+) at the end\s+\|\s+arrived: (.*)", t)
-            print(f"    crowd {label} {r}: {crowd.group(1)} to {crowd.group(2)} alive, arrived {crowd.group(3)}")
+            arrived = sum(int(x) for x in re.findall(r"\d+", crowd.group(3)))
+            ends.setdefault(label, []).append(int(crowd.group(2)))
+            print(f"    crowd {label} {r}: {crowd.group(1)} to {crowd.group(2)} alive, arrived {crowd.group(3)} "
+                  f"({arrived} in all, while timed)")
+    print(f"    the fight ends with {mean(ends['quiet']) - mean(ends['fight']):.0f} fewer alive")
     for key in ("bare", "update", "frame", "terrain", "crowd"):
         a, b = [h[key] for h in hq], [h[key] for h in hf]
         print(f"    {key:8s} quiet {a[0]:6.2f} / {a[1]:6.2f}  fight {b[0]:6.2f} / {b[1]:6.2f}  added "
@@ -194,7 +199,12 @@ for n in COUNTS:
           + ", ".join(f"{k} {1000 * v:.0f} us an enemy" for k, v in per.items())
           + f": {min(worth.values()):.2f} to {max(worth.values()):.2f} ms")
     print("    quiet rows world_bucketed's work lies in (a / b): "
-          + "  ".join(f"{k} {lq[0][k]:.2f} / {lq[1][k]:.2f}" for k in ("world", "scenery_list")))
+          + "  ".join(f"{k} {lq[0][k]:.2f} / {lq[1][k]:.2f}" for k in ("world", "scenery_list"))
+          + f"; together {lq[0]['world'] + lq[0]['scenery_list']:.2f} / "
+          f"{lq[1]['world'] + lq[1]['scenery_list']:.2f}")
+    print(f"    enemies/shade: quiet {lq[0]['enemies/shade']:.2f} / {lq[1]['enemies/shade']:.2f}, fight "
+          f"{lf[0]['enemies/shade']:.2f} / {lf[1]['enemies/shade']:.2f}; enemies/hpbar fight "
+          f"{lf[0]['enemies/hpbar']:.2f} / {lf[1]['enemies/hpbar']:.2f}")
 for row in ("ground", "water"):
     values = [layers(text(f"r5_{k}_{n}{r}.txt"))[row] for k in ("quiet", "fight") for n in COUNTS for r in "ab"]
     print(f"sitting 5, every run at both counts: {row} {min(values):.2f} to {max(values):.2f} ms")
