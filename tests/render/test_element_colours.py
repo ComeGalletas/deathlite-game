@@ -35,6 +35,7 @@ import colorsys
 import math
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -510,6 +511,73 @@ class WashTests(unittest.TestCase):
         first = fx.washed(self.frame, ElementId.FIRE)
         self.assertIs(fx.washed(self.frame, ElementId.FIRE), first)
         self.assertIsNot(fx.washed(self.frame, ElementId.ICE), first)
+
+    def test_the_cache_is_an_lru_of_1536(self):
+        """RND-010.4, the owner's RND-010.D2: the size RND-010.3 timed."""
+        from collections import OrderedDict
+
+        from game.states.playing.visual import elements as fx
+
+        self.assertEqual(fx._WASH_CACHE_CAP, 1536)
+        self.assertIsInstance(fx._WASH_CACHE, OrderedDict)
+
+    def _lru(self, cap):
+        """The wash cache swapped for an empty one of `cap` entries."""
+        from collections import OrderedDict
+
+        from game.states.playing.visual import elements as fx
+        cache = OrderedDict()
+        for patch in (mock.patch.object(fx, "_WASH_CACHE", cache), mock.patch.object(fx, "_WASH_CACHE_CAP", cap)):
+            patch.start()
+            self.addCleanup(patch.stop)
+        return cache
+
+    def _frames(self, n):
+        out = []
+        for i in range(n):
+            f = pygame.Surface((5 + i, 4), pygame.SRCALPHA)
+            f.fill((40 * i, 180, 90, 255))
+            out.append(f)
+        return out
+
+    def test_a_full_cache_drops_only_the_entry_used_longest_ago(self):
+        """The dict this replaced emptied itself whole when full; the LRU
+        keeps every entry but the oldest, and a hit makes an entry the
+        newest."""
+        from combat.elements.ids import ElementId
+        from game.states.playing.visual import elements as fx
+
+        cache = self._lru(3)
+        a, b, c, d = self._frames(4)
+        key = lambda f: (id(f), int(ElementId.FIRE))
+        first = {f: fx.washed(f, ElementId.FIRE) for f in (a, b, c)}
+        self.assertIs(fx.washed(a, ElementId.FIRE), first[a])       # a hit: a is now the newest
+        fx.washed(d, ElementId.FIRE)                                # full: b goes, not all
+        self.assertEqual(list(cache), [key(c), key(a), key(d)])
+        self.assertIs(fx.washed(c, ElementId.FIRE), first[c])       # still held
+        again = fx.washed(b, ElementId.FIRE)                        # washed afresh
+        self.assertIsNot(again, first[b])
+        self.assertEqual(pygame.image.tobytes(again, "RGBA"), pygame.image.tobytes(first[b], "RGBA"))
+        self.assertEqual(len(cache), 3)
+        self.assertEqual(list(cache), [key(d), key(c), key(b)])     # c refreshed, so a went for b
+
+    def test_an_entry_under_another_frame_is_replaced_not_served(self):
+        """The key is the frame's id. The entry keeps its frame alive, so the
+        id cannot be reused while it stands; should another frame ever meet
+        that key, it is washed afresh and replaces the entry in place,
+        dropping nothing else."""
+        from combat.elements.ids import ElementId
+        from game.states.playing.visual import elements as fx
+
+        cache = self._lru(2)
+        frame, other, gone = self._frames(3)
+        fx.washed(other, ElementId.WIND)
+        cache[(id(frame), int(ElementId.WIND))] = (gone, gone)    # a stale entry under frame's key
+        out = fx.washed(frame, ElementId.WIND)
+        self.assertIsNot(out, gone)
+        self.assertEqual(len(cache), 2)                             # replaced, the other kept
+        self.assertIs(cache[(id(frame), int(ElementId.WIND))][0], frame)
+        self.assertIn((id(other), int(ElementId.WIND)), cache)
 
     def test_its_strength_comes_from_the_data(self):
         """No third copy of an element's colour, and no constant buried in

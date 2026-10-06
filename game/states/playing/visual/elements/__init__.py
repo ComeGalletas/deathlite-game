@@ -20,6 +20,7 @@ This package replaces the placeholder `visual/element_fx.py` of M3.
 from __future__ import annotations
 
 import random
+from collections import OrderedDict
 
 import pygame
 
@@ -196,8 +197,12 @@ def sweep(run, now: float) -> None:
     transient.sweep(run, now)
 
 
-_WASH_CACHE: dict[tuple, tuple] = {}
-_WASH_CACHE_CAP = 512
+# (id(frame), element) -> (frame, washed copy), the one used longest ago
+# first. An LRU of 1536 (RND-010.4, the owner's RND-010.D2): a saturated
+# fight at 250 asks for 1,665 distinct washed frames, and the dict this
+# replaced emptied itself whole at 512, about every 23 frames.
+_WASH_CACHE: OrderedDict[tuple, tuple] = OrderedDict()
+_WASH_CACHE_CAP = 1536
 
 
 def washed(frame, element, profiles=None):
@@ -221,13 +226,16 @@ def washed(frame, element, profiles=None):
     its id cannot be recycled under the cache. The frames handed in are the
     asset cache's own surfaces, so the same one comes back for every frame
     of an animation and copying it per draw would be the expensive way to
-    do this.
+    do this. The cache is an LRU of `_WASH_CACHE_CAP`: a hit becomes the
+    newest entry, and a miss into a full cache drops only the entry used
+    longest ago.
     """
     if not element or frame is None:
         return frame
     key = (id(frame), int(element))
     hit = _WASH_CACHE.get(key)
     if hit is not None and hit[0] is frame:
+        _WASH_CACHE.move_to_end(key)
         return hit[1]
     if profiles is None:
         from game.content import get_content
@@ -240,8 +248,10 @@ def washed(frame, element, profiles=None):
     over.set_alpha(style.alpha)
     out = frame.copy()
     out.blit(over, (0, 0))
-    if len(_WASH_CACHE) >= _WASH_CACHE_CAP:
-        _WASH_CACHE.clear()
+    if hit is not None:                     # another frame's entry under this key: replace it
+        del _WASH_CACHE[key]
+    elif len(_WASH_CACHE) >= _WASH_CACHE_CAP:
+        _WASH_CACHE.popitem(last=False)
     _WASH_CACHE[key] = (frame, out)
     return out
 
