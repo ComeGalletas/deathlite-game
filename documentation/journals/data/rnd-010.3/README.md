@@ -59,6 +59,12 @@ tails and the screen fill apart (sitting 5).
 
 ## Taking a sitting again
 
+The scripts are for Windows: they call `powershell` for the CPU load and
+the process lists, and draw on screen through `SDL_VIDEODRIVER=windows`.
+A new sitting's files added here also go into the table above and into
+`FILES` in `tests/devtools/test_rnd_010_3_data.py`, which holds this
+folder to an exact list.
+
 Each script was committed after the sitting it ran, so check out the
 sitting's commit (the table's last column) only after copying the script
 out of this branch. For sitting 5, from the repo root, in bash:

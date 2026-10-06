@@ -132,6 +132,10 @@ for n in COUNTS:
               f"{-float(mm[0]):.2f} ({-float(mm[2]):.2f} to {-float(mm[1]):.2f}) the gap is "
               f"{predicted + float(mm[1]):.2f} to {predicted + float(mm[2]):.2f} ms; against the pooled "
               f"{pooled:.2f}, {predicted - pooled:.2f} ms")
+        distinct = int(re.search(r"wash: .*?(\d+) distinct frames", caches).group(1))
+        fill = distinct * miss / 1000
+        print(f"    the variant's LRU starts nearly empty: filling it once with the {distinct} distinct frames "
+              f"costs at most {fill:.0f} ms, {fill / int(frames):.2f} ms over the {frames} frames on")
 print("context, sitting 2's wash_lru (another sitting and commit):")
 for n in COUNTS:
     name, off, on, frames, med, lo, hi = re.search(VARIANT, text(f"r2_wash_lru_{n}.txt")).groups()
@@ -145,6 +149,10 @@ for n in COUNTS:
     auras = hf[0]["auras"]
     print(f"{n}: in view quiet {hq[0]['view']} / {hq[1]['view']}, fight {hf[0]['view']} / {hf[1]['view']}; "
           f"auras at the end of a fight {auras[0]} of {auras[1]} live ({100 * auras[0] / auras[1]:.0f} %)")
+    for label, runs in (("quiet", q), ("fight", f)):
+        for r, t in zip("ab", runs, strict=True):
+            crowd = re.search(r"crowd\s+(\d+) at the start of timing, (\d+) at the end\s+\|\s+arrived: (.*)", t)
+            print(f"    crowd {label} {r}: {crowd.group(1)} to {crowd.group(2)} alive, arrived {crowd.group(3)}")
     for key in ("bare", "update", "frame", "terrain", "crowd"):
         a, b = [h[key] for h in hq], [h[key] for h in hf]
         print(f"    {key:8s} quiet {a[0]:6.2f} / {a[1]:6.2f}  fight {b[0]:6.2f} / {b[1]:6.2f}  added "

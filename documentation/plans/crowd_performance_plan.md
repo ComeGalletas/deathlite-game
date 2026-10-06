@@ -32,8 +32,9 @@ blitter is not the limit: blitting 200 sprites with a shadow and a health
 bar each costs 4.3 ms at 1600x900 and 5.5 ms at 2560x1080 (**measured**,
 section 2). The frame is lost in Python work around those blits (a lambda,
 a forwarder, a shade walk and a `copy()` per enemy; RND-010.3 **measured**
-these on the owner's machine at 0.03, 0.27 and 0.01 ms a frame at 150, the
-copy for two shaded bodies only, see the header), in Python per-enemy
+these on the owner's machine at 150: the lambda and the forwarder 0.03 ms a
+frame together, the shade walk 0.27, the copy 0.01 for two shaded bodies
+only; see the header), in Python per-enemy
 update work (about 25 to 45 µs per enemy), in two near-quadratic
 enemy-to-enemy passes, in a pure-Python flow-field fill that costs 2 to
 3 ms on most frames, and in a fixed 5.4 ms of terrain per frame before any
@@ -274,7 +275,9 @@ the owner's machine; the measured number replaces them in the journal.
 
 **Order of work, largest first.** Measure (4.0) before cutting, then draw
 tasks (the owner's trace is draw-bound) interleaved with the update
-tasks whose packed share is largest.
+tasks whose packed share is largest. (Since RND-010.3, the order that
+governs is the journal's "The order for RND-010.4 onward", which starts
+with 4.13.)
 
 | # | Task | Where | Expected | Done when |
 |---|---|---|---|---|
@@ -368,7 +371,7 @@ Both run headless. They now live under `tools/benchmarks/` (RND-010.3.2), as
 `python -m tools.benchmarks.blit_floor` and `python -m tools.benchmarks.gc_probe`;
 the ported `gc_probe` defaults to a run clock of 400 s and seats 200
 (`../journals/data/rnd-010.3/r1_gc.txt`), where this copy's 300 s seats
-about 175 (§1; `live 175` in `../journals/data/rnd-010.2/s7_150a.txt`).
+about 175 (§1).
 The originals stay below as the review ran them.
 
 ### A.1 `blit_floor.py`: what pygame alone costs

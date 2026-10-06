@@ -86,8 +86,50 @@ class DerivedTests(unittest.TestCase):
                     self.assertIn(line, self.out)
                 self.assertIn(quoted, self.journal)
 
+    def test_the_prediction_and_the_bound_recomputed_apart(self):
+        # The saving the LRU of 1536 predicts at 250, from the raw caches
+        # file, and the wash cap's bound, from the rig data: worked here
+        # without derived.py's code, then found in its output.
+        import json
+        t = (DATA / "r5_caches_250.txt").read_text(encoding="utf-8")
+        wash = t.split("  wash: ", 1)[1].split("  tint: ", 1)[0]
+        today = float(re.search(r"cap\s+512: emptied when full\s+([\d.]+)", wash).group(1))
+        clears = int(re.search(r"cap\s+512: .*?emptied\s+(\d+) times", wash).group(1))
+        lru = float(re.search(r"cap\s+1536: .*?LRU\s+([\d.]+)", wash).group(1))
+        miss = float(re.search(r"a miss ([\d.]+) us", wash).group(1))
+        empty = float(re.search(r"emptying a cache of 512: ([\d.]+) ms", wash).group(1))
+        frames = 900 - 300
+        saved = (today - lru) * miss / 1000 + clears * empty / frames
+        self.assertIn(f"held at most 80.6 MB; predicts {saved:.2f} ms a frame saved", self.out)
+        rigs = json.loads((ROOT / "data" / "enemies" / "enemy_sprites.json").read_text(encoding="utf-8"))
+        worn = {e["sprite"] for e in json.loads((ROOT / "data" / "enemies" / "enemies.json")
+                                                .read_text(encoding="utf-8")).values() if e.get("sprite")}
+        zoom = 1.797
+        biggest = max(round(rigs[r]["scale"][0] * zoom) * round(rigs[r]["scale"][1] * zoom) * 4
+                      for r in worn if r in rigs)
+        self.assertIn(f"1536 -> {1536 * biggest / 1e6:.1f} MB", self.out)
+
     def test_a_row_a_run_did_not_print_is_named(self):
         self.assertIn("no row in quiet a (never called there, counted 0): death_fx, death_fx/shade", self.out)
+
+
+class CodeTests(unittest.TestCase):
+    def test_washed_has_one_caller_the_enemy_sprite(self):
+        # D2's bound on the wash cache rests on this: only a regular
+        # enemy's frame is ever washed, never a boss's or the hero's.
+        import ast
+        callers = set()
+        for path in sorted((ROOT / "game").rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for fn in ast.walk(tree):
+                if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
+                    continue
+                for node in ast.walk(fn):
+                    if isinstance(node, ast.Call) and (
+                            getattr(node.func, "attr", None) == "washed"
+                            or getattr(node.func, "id", None) == "washed"):
+                        callers.add((path.relative_to(ROOT).as_posix(), fn.name))
+        self.assertEqual(callers, {("game/states/playing/visual/rendering.py", "enemy_sprite")})
 
 
 class ReadmeTests(unittest.TestCase):

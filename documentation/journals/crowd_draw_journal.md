@@ -570,7 +570,8 @@ RND-010.2's do.
 ## RND-010.3: Results (2026-10-06)
 
 Five sittings on the owner's machine, on screen at 2560x1080, at 150 and
-250 alive packed, seed 35, with the owner away from the machine. The raw
+250 alive packed, seed 35, with the owner away from the machine (the
+owner's word; see the README for what the logs show). The raw
 outputs, the scripts as run and `derived.py` are in `data/rnd-010.3/`,
 and the README there lists what ran where. `derived.py` prints every
 figure below unless it is marked as a constant or a tool's default.
@@ -585,8 +586,9 @@ figure below unless it is marked as a constant or a tool's default.
   on both alike; the caches' replay; the `wash_lru` timing; and the blit
   floor.
 
-Every measured comparison below is within sitting 5, except the leads
-and the three CPU variants, which are sitting 1's alone. Where the order
+Every measured comparison below is within sitting 5, except the leads,
+the three CPU variants and the collector's default against frozen, which
+are sitting 1's alone. Where the order
 for RND-010.4 weighs a sitting 1 figure against a sitting 5 one, or the
 game's blit against the floor's, it compares orders of magnitude, by
 judgement, and says so. The other sittings are context. Their
@@ -598,9 +600,20 @@ drew 0.6 to 3.0 ms more than sitting 5's at the same counts.
 `spawn_stress --pack --layers --elements` is the saturated fight, the
 worst plausible one by judgement, not an average one. Every enemy is
 primed at the start (for 600 s, with a billion HP: constants in
-`spawn_stress.infuse`) and three infused weapons fire. Reactions consume
-the auras: by the end, 55 of 150 live (37 %) are still primed, and 176
-of 247 (71 %). Sitting 5, p50, two runs a side:
+`spawn_stress.infuse`) and three infused weapons fire. By the end, 55 of
+150 live (37 %) are still primed, and 176 of 247 (71 %). Two things make
+up the rest: reactions consume auras, and `infuse` primes only the crowd
+present at its call, so the 16 and 22 that arrived later never were.
+
+The two sides do not hold the same crowd. Both start from 135 alive (at
+150) and 225 (at 250), but more arrive in the quiet runs: they end at 175
+and 250, the fights at 150 and 247. The quiet runs also have more in view:
+147 against 139 at 150, and 224 against 222 at 250. So the quiet side
+draws a few more enemies, and what the fight is shown to add is
+understated by that much (8 fewer in view at 150, at the order of 13 µs
+each from the leads below, is about 0.1 ms).
+
+Sitting 5, p50, two runs a side:
 
 | | Quiet | Fight | Added |
 |---|---|---|---|
@@ -609,9 +622,13 @@ of 247 (71 %). Sitting 5, p50, two runs a side:
 | 250: bare draw | 10.69 / 10.58 ms | 17.51 / 17.45 ms | +6.85 (+6.76 to +6.93) |
 | 250: update + draw | 22.90 / 22.77 ms | 29.47 / 29.30 ms | +6.55 |
 
-The update falls a little in every pair (−0.37 to −0.15 ms), unexplained.
-The terrain rises a little in every pair (+0.01 to +0.15 ms). What the fight adds, by layer (the fights'
-mean over the quiet runs' mean):
+The update falls a little in every pair (−0.37 to −0.15 ms). A candidate
+cause, not measured: the fight holds fewer bodies alive (25 fewer at the
+end at 150, 3 at 250). The terrain rises a little in every pair (+0.01 to
++0.15 ms).
+
+What the fight adds, by layer (the fights' mean over the quiet runs'
+mean):
 
 | Layer | Added at 150 | Added at 250 |
 |---|---|---|
@@ -674,10 +691,10 @@ From those costs the replay predicts:
   11.5 ms (the emptying itself is 0.003 ms of the 1.85);
 - today's tint cache: 0.13 ms.
 
-The prediction assumes every miss costs the median miss. That cost is
-timed over the distinct frames, each once. The misses fall more often on
-some frames than others, and a large frame costs more to copy than a
-small one, so the weighting is an assumption, not measured.
+The prediction assumes every miss costs the same: the median pass's mean
+cost a distinct frame, each frame washed once in a pass. The misses fall
+more often on some frames than others, and a large frame costs more to
+copy than a small one, so the weighting is an assumption, not measured.
 
 Those are the same order as the `enemies` row's +2.12 ms in the fight.
 This is a prediction, not a measurement: nothing here times the two
@@ -714,6 +731,13 @@ the blocks' mean savings (1.27, interval 0.74 to 1.56), the gap is 0.27
 to 1.09 ms; against the pooled mean (1.28), it is 0.55 ms. The gap is
 open. Candidates, none of them measured:
 - a miss may cost less inside the frame than in the timing loop;
+- the two caches start unequal. The variant's LRU begins nearly empty
+  (only `identical`'s two draws filled it), while the game's cache on
+  the off side is in its steady churn; and the replay's LRU figure leaves
+  out its own first 300 frames. Filling the LRU once with the 1,665
+  distinct frames costs at most 140 ms, at most 0.22 ms spread over the
+  640 frames on. That works against the variant, so the measured saving
+  is understated by up to that much;
 - the timed blocks cover the fight's frames 0 to 1,280 after the warm-up
   (16 blocks of two 40-frame parts, the tool's defaults), and the replay
   covers frames 300 to 900, so they average different stretches of it;
@@ -836,9 +860,10 @@ sitting 5, a different sitting from the variant's.
    - Then time the candidates as variants.
 3. **The shade walk** (0.27 / 0.41 ms in isolation, sitting 1): the
    first half of plan 4.4, the skip where no shadow falls. It ranks above
-   item 4, by judgement, although bars alone are larger at 150: the shade
-   walk runs in every frame, the bars and numbers only once enemies are
-   hurt.
+   item 4, by judgement, although the bars alone are of the same order
+   or larger at both counts (a sitting 5 figure against a sitting 1 one).
+   The reason: the shade walk runs in every frame, and the bars and
+   numbers only once enemies are hurt.
 4. **Bars and damage numbers in a fight**: plan 4.6. The fight adds
    +0.55 / +0.51 ms of bars and +0.24 / +0.29 ms of damage numbers (at
    150 / 250).
@@ -890,5 +915,6 @@ plan's §6 decision, which is still the owner's.
   - [x] RND-010.3.14: Sitting 5 (everything compared, in one sitting at one commit, ABBA), and the results rewritten on it
   - [x] RND-010.3.15: The third review's findings: no comparison across sittings, the statistics named as measured, the 150 result and the scope, memory bounds per cap, the plan's stale lines; tested
   - [x] RND-010.3.16: The fourth review's findings: the memory bound over the frames each cache can be asked for (bosses are never washed), the ghost cache's bodies, the order's rule and the plan's promises not kept, the statistics' assumptions; tested
+  - [x] RND-010.3.17: The fifth review's findings: the two sides' crowds and the bias they leave, the variant's cold start as a bounded gap candidate, the appendix note's evidence, the plan's order paragraph; the bound's premise and the prediction tested apart
 - [ ] RND-010.4: The wash cache as an LRU, pixel-identical and tested, once RND-010.D2 sets the cap (further winners, in the order above, as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
