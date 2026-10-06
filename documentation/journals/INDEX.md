@@ -1,7 +1,8 @@
 # Requirement index
 
 Every requirement ID, where its journal is, and its state. Rules are in
-`CLAUDE.md` §1 (DOC-001). Search by ID: `git log --grep CMB-007`,
+`CLAUDE.md` §1 (DOC-001); where they meet the general template, §4
+(DOC-008) decides. Search by ID: `git log --grep CMB-007`,
 or grep the ID across `documentation/`.
 
 Journals that existed before 2026-09-22 were given retroactive IDs in
@@ -16,7 +17,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-019 ·
-PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-007 · DOC-008
+PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-007 · DOC-009
 
 ## Requirements
 
@@ -140,6 +141,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-007 · DOC-008
 | DOC-005 | Second documentation review: the narrative open sections, and the owner's answers | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/sys-008-run-determinism | 2026-09-24 |
 | DOC-006 | Third review: the owner's answers on the DOC-005 leftovers, the order of work | DOC | process | done | [docs_cleanup_journal.md](docs_cleanup_journal.md) | claude/doc-006-ui-013-dps-table | 2026-09-24 |
 | DOC-007 | Name no person in `CLAUDE.md`: "owner" replaces the template author's name and handle | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | ComeGalletas/doc-007-owner-neutral-610d3887 | 2026-09-28 |
+| DOC-008 | Restore `CLAUDE.md` §1 to §3 beside the template, fix the broken branching snippet, settle the conflicts (§4) | DOC | process | done | [process_standards_journal.md](process_standards_journal.md) | claude/doc-008-restore-process | 2026-10-05 |
 
 ## Plans and designs
 

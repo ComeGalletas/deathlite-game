@@ -1,4 +1,290 @@
-# CLAUDE.md
+# CLAUDE.md — Death Lite Die (pygame roguelite)
+
+Working rules for Claude in this repository, in two parts. Part one (§1 to
+§4) is this project's own standard: the process every request follows, and
+the standing rules that condense the decisions saved in memory, so the two
+must be kept in step (see "Keeping this file honest"). Part two, from
+"How to work" on, is the general working template. Both apply in full;
+where they disagree, §4 says which wins.
+
+---
+
+## 1. Process standard (DOC-001)
+
+### 1.1 Every requirement gets an ID
+
+A requirement is one request or requirement from "owner". Each gets a
+permanent ID `<SYS>-<NNN>`, numbered in sequence within its system and
+never reused:
+
+| code | system | covers |
+|---|---|---|
+| `CMB` | combat | `combat/` — weapons, damage, elements, reactions, balance, DPS bench |
+| `ENT` | entities | `entities/` — enemies, bosses, NPCs, summons, AI, colliders |
+| `SPN` | spawning | `spawn/` — the spawn master, groups, budgets, despawn |
+| `WLD` | world | `world/` — generation, terrain, elevation, navigation, placement, buildings |
+| `RND` | rendering | drawing, VFX, sprites, asset pipeline, display/resolution |
+| `UI`  | interface | `ui/` — menus, HUD, screens, input, cursor |
+| `PRG` | progression | `progression/` — XP, blessings, items, chests, potions, meta |
+| `AUD` | audio | music, sound effects, mixer |
+| `SYS` | core systems | `game/`, `systems/` — states, save, config, data layout, dev tools, refactors |
+| `TST` | tests | the suite itself — helpers, tiers, seeds, speed |
+| `BLD` | build | packaging (.exe), web build |
+| `DOC` | process | documentation and working standards |
+
+- A request that touches several systems takes the code of the system it
+  mainly changes; the index lists the others it touches.
+- A follow-up request to an existing feature gets a **new** requirement ID
+  and is appended to that feature's journal as a new requirement block, so
+  one journal can hold several IDs. The journal's own ID is the ID of its
+  first requirement.
+- Bugs, balance changes and refactors are requirements too; the index's
+  `type` column tells them apart (`feature`, `bug`, `balance`, `refactor`,
+  `process`).
+
+### 1.2 Tasks and subtasks carry their parent's ID
+
+- Task: `<requirement ID>.<n>` — `CMB-007.1`, `CMB-007.2`.
+- Subtask: `<task ID>.<n>` — `CMB-007.2.1`.
+- Decisions made along the way: `<requirement ID>.D<n>` — `CMB-007.D1`, so
+  a decision can be cited from a comment, a design doc or memory.
+
+### 1.3 Every requirement lives in a journal
+
+Journals are `documentation/journals/<feature>_journal.md`. A new feature
+gets a new journal; a follow-up goes into the existing one. The journal is
+the plan, the todo list and the record, in this order:
+
+```markdown
+# <Feature> — journal
+
+**ID:** CMB-007 · **System:** combat (+ RND) · **Type:** feature ·
+**Status:** in progress · **Branch:** claude/cmb-007-<slug>
+
+---
+
+## CMB-007 — Requirement (owner, YYYY-MM-DD)
+
+- **Objective:** one imperative sentence naming what is to be done.
+- **Details:** the specifics — numbers, scope, files, assets.
+- **Constraint:** what must be confirmed first, left untouched, preserved.
+
+## CMB-007 — Confirmed reading
+
+What the code already does, each item of the request checked against it,
+and every decision the request left open stated as `CMB-007.D<n>`.
+
+## CMB-007 — Plan
+
+Modules, hooks, data, tests, screenshots — the proposal.
+
+## CMB-007 — Tasks
+
+- [ ] CMB-007.1 — <task>
+  - [ ] CMB-007.1.1 — <subtask>
+- [x] CMB-007.2 — <task> → `abc1234`
+
+## CMB-007 — Results
+
+Test counts per tier, screenshots delivered, what was deferred and why.
+```
+
+- The requirement block is a **distilled statement**, never a quote or a
+  retelling of the prompt. A second round of the same request inside one
+  session is introduced with "and then:" in the same block; a later,
+  separate request is a new ID and a new block.
+- The todo list and the plan are written **before** the first code change
+  and kept current: tick tasks as they land, add tasks discovered on the
+  way (with the next free number, never renumbering), and strike through
+  (`~~CMB-007.4~~ dropped: <why>`) rather than delete.
+- "Confirm and propose" is the first section, not a stop: build in the
+  same session unless "owner" asked to wait or a decision is genuinely
+  theirs to make.
+
+### 1.4 The index
+
+`documentation/journals/INDEX.md` lists every requirement ID: title,
+system(s), type, status, journal, branch, date. It also maps plans and
+design documents to the IDs they serve. Add the row when the ID is
+allocated and update its status as it moves
+(`proposed → in progress → done`, or `parked` / `superseded by <ID>`).
+Before allocating an ID, read the index for the next free number.
+
+### 1.5 Branch or worktree — ask first
+
+Before starting any considerable requirement — more than a one-file fix,
+or anything with more than one task — ask "owner" whether to work in a
+**new worktree** or **stay on the current branch**. Name a new branch or
+worktree after the ID: `claude/cmb-007-<slug>`. Record the answer in the
+journal header's `Branch:` field. Small fixes inside an ongoing
+requirement do not need the question again. How this combines with the
+template's "Branching" section is set in §4 (DOC-008.D2).
+
+### 1.6 One commit per task or subtask
+
+- Each finished task or subtask is its own commit, made when it is done,
+  not batched at the end.
+- The subject starts with the ID, then the usual imperative summary:
+  `CMB-007.2: Spread the aura to enemies inside the blast`.
+- The same commit carries that task's journal tick (with the commit's
+  hash filled in by the next commit, or left for the results section) and
+  any index status change.
+- Stage by path. Never sweep unrelated working-tree changes into a task
+  commit.
+- Run the tests that cover the task before committing and note failures
+  honestly in the journal; do not commit a red task as done.
+- When the requirement is done, push its branch and open the PR without
+  being asked, as "After every task" says. A human merges it; never merge
+  your own PR unless "owner" says so (DOC-008.D1).
+- End every commit message with the attribution trailer the harness
+  supplies.
+
+### 1.7 Balance tweaks in `data/` — flag and ask (DOC-002)
+
+"owner" tunes actors by hand in the `data/` JSON (enemies, bosses,
+weapons, elements, reactions, heroes, …), often while other work is in
+flight. When the working tree or a diff shows a change to a `data/` value
+that the current task did not make:
+
+- **Say so** — name the file, the actor and the old → new value.
+- **Ask how to handle it**, with two options:
+  1. **Leave it out** of the current work: not staged, not committed, not
+     reverted.
+  2. **Commit it separately**, in its own commit that is only the balance
+     change. It gets a requirement ID of type `balance` in the actor's
+     system (e.g. `ENT-012.1: Drop Stoutpaw's shield from 41 to 7`) and a
+     row in the index.
+- Until "owner" answers, never fold such a change into a task commit,
+  never revert it, and never "fix" code or tests to agree with it.
+
+---
+
+## 2. Standing rules (condensed from memory)
+
+Feature-specific decisions (weapons, elements, islands, HUD, spawn master,
+chests, music, packaging …) stay in memory and in their journals; these are
+the rules that apply to every change.
+
+**Code and data**
+- Content is data-driven: per-entity numbers and strings live in
+  `data/*.json`; code keeps only taxonomy constants and reads fields
+  without value fallbacks. Invalid spawn data fails soft at run start,
+  never at load.
+- New feature and rendering code goes in focused single-concern modules
+  inside a sub-package behind a thin dispatcher, not more branches in a
+  large file.
+- When a value changes, every copy changes with it — dev/debug duplicates,
+  comments, `_note` fields, `CREDITS.md`, docs, journals and baked assets.
+- The height-map world is the only world. The LD-8 flat generator is
+  retired: no `HEIGHTMAP_ROOMS` branches, no flag-off preservation.
+  `GameMap(seed=None)` and the flat renderer fallback stay.
+
+**Tests**
+- No CI exists or is planned; the suite checks stability locally. Do not
+  propose CI, hooks or gates. The `sweep` tier runs only when asked
+  (`python -m pytest -m sweep`).
+- The suite needs pygame and **numpy**. numpy is for the tests and the
+  `tools/asset_pipeline/` scripts only (they read sheets through
+  `pygame.surfarray`); it is never a game dependency, never imported by game
+  code, and stays out of the desktop and web builds (`dist/README.md`).
+  `coverage` is the same: a test tool, not a declared dependency.
+- A test never skips itself to green; make the check runnable instead.
+- Tests that boot a run or consume a generated world pin a seed
+  (`tests/boot.py: start_run(game, seed=...)`).
+- The generator leads, the tests follow: a sanctioned world change may
+  remove or replace a generation test; re-pin `tests/world/digests.json`
+  with `python -m tools.verification.world_digest --write`. Prefer rates over seed sweeps to
+  single pinned outcomes, recorded in docstrings and the journal.
+- Share cached worlds between tests; avoid per-test rebuilds.
+
+**Art and assets**
+- Look in the `assets/unused/` reserve (and the Super Pixel Effects
+  Gigapack inside it) before concluding art is missing.
+- Derived art stays regenerable: a `tools/asset_pipeline/` script reading
+  its inputs from data, full rewrites, and a `--check` mode a test runs.
+- A spent source sheet is archived in an `unused/` folder beside the strip
+  it was cut into, and must stay reachable so the cut's test still runs;
+  record the cut in `assets_journal.md`.
+- Prefer authored tile/autotile variants over procedural edges; an
+  authored sprite replaces the procedural indicator under it.
+
+**Reporting**
+- Deliver a rendered screenshot whenever a milestone of visual or
+  world-generation work is finished (headless: `SDL_VIDEODRIVER=dummy`).
+- A deviation measured and found not to break functionality is reported
+  once, recorded where it belongs, and then closed — not re-raised.
+- Balance knobs "owner" turns are written down as arithmetic, not
+  flagged as defects.
+
+---
+
+## 3. Keeping this file honest
+
+- This file and the memory must not disagree. When a standing rule
+  changes, change it here and in memory in the same step.
+- Resolved (DOC-001.D4): "a test never skips itself to green" wins over the
+  older spent-source-sheet wording that let a cut's pinning test skip when
+  its source was gone. The imp's archive test was fixed that way in
+  `914039e` (`.gitignore` re-includes editor sources so the check always
+  runs). The three cut-script tests that still carried the old skip —
+  `tests/render/test_spawn_fx.py`, `test_totem_bolt.py`,
+  `test_totem_sprite.py` — were fixed the same way as TST-002 (done).
+- Part two is kept as the template wrote it, apart from DOC-007's
+  "owner" wording. A conflict with part one is settled in §4, not by
+  editing the template text, so the branching snippets stay
+  byte-identical to the template's tested copy.
+
+---
+
+## 4. Where part one and part two disagree (DOC-008)
+
+"owner" decided these on 2026-10-05. Each one beats any part-two
+wording it contradicts.
+
+- **DOC-008.D1 — Push and PR: the template wins.** Push the branch and
+  open the PR when the requirement is done, without being asked
+  ("After every task"). A human merges. §1.6 says the same.
+- **DOC-008.D2 — Branches and worktrees: §1.5 wins.** Before a
+  considerable requirement, ask "owner" "new worktree or current
+  branch?" instead of always making a session worktree. Branches are
+  named `claude/<id>-<slug>` (`claude/cmb-007-aura-spread`), not
+  `<owner>/<slug>-<sid>`. In practice:
+  - **New worktree:** run the "Branching" setup block for its base
+    resolution and session-keyed worktree path, then rename the branch it
+    made: `git branch -m claude/<id>-<slug>`. The guard, bootstrap and
+    cleanup blocks apply unchanged.
+  - **Current branch:** work where you stand, with no setup block, and
+    the guard is not run. "owner" choosing this answer lifts the
+    template's ban on working in the shared checkout. If the current branch is `main`, "current
+    branch" means a new `claude/<id>-<slug>` branch in that checkout,
+    because nothing is committed to or pushed to `main`.
+  - A one-file fix does not get the question. It takes a
+    `claude/<id>-<slug>` branch in the current checkout.
+  - The triage block's `Branch:` line reports the answer, and so does
+    the journal header.
+- **DOC-008.D3 — Tests and evals: §2 wins.** No CI, no pre-commit hook,
+  no gate of any kind. The template's "gate tests" are the tests covering
+  the task, run by hand before each task commit (§1.6). The "full suite"
+  for large tasks is the default pytest tiers (`python -m pytest`); the
+  `sweep` tier still runs only when asked. This game makes no LLM calls,
+  so an "eval" here is a rate measurement or a `sweep`-tier check where
+  one applies (§2: rates over pinned outcomes), and none is required
+  where none applies. The journal's Results section says which.
+- **DOC-008.D4 — Layout and assets: the project wins.** The §1.1 system
+  packages (`combat/`, `entities/`, `world/`, …) play the template's
+  "services", and §2's sub-package rule decides layout; no `services/` or
+  `contracts/` tree is created. Game art and audio under `assets/` are
+  source and are committed. "No binaries" covers build outputs (`dist/`
+  executables and ZIPs, `__pycache__`, generated web bundles) and stays.
+- **DOC-008.D5 — Commits and the task loop.** A "task" in part two is a
+  whole requirement: one triage block, one self-rating and one PR per
+  requirement. Commits stay one per §1.2 task. Fixes the self-rating
+  loop finds become new tasks with the next free number (§1.3), each in
+  its own commit before the push.
+
+---
+
+# Part two: general working template
 
 ## How to work (high-level mindset)
 
@@ -71,23 +357,6 @@ for c in origin/main origin/master main master; do
   git rev-parse -q --verify "$c" >/dev/null && BASE=$c
 done
 [ -n "$BASE" ] || { echo "STOP: cannot find a base branch"; exit 1; }
-**Tests**
-- No CI exists or is planned; the suite checks stability locally. Do not
-  propose CI, hooks or gates. The `sweep` tier runs only when asked
-  (`python -m pytest -m sweep`).
-- The suite needs pygame and **numpy**. numpy is for the tests and the
-  `tools/asset_pipeline/` scripts only (they read sheets through
-  `pygame.surfarray`); it is never a game dependency, never imported by game
-  code, and stays out of the desktop and web builds (`dist/README.md`).
-  `coverage` is the same: a test tool, not a declared dependency.
-- A test never skips itself to green; make the check runnable instead.
-- Tests that boot a run or consume a generated world pin a seed
-  (`tests/boot.py: start_run(game, seed=...)`).
-- The generator leads, the tests follow: a sanctioned world change may
-  remove or replace a generation test; re-pin `tests/world/digests.json`
-  with `python -m tools.verification.world_digest --write`. Prefer rates over seed sweeps to
-  single pinned outcomes, recorded in docstrings and the journal.
-- Share cached worlds between tests; avoid per-test rebuilds.
 
 # solo: no worktree, no owner prefix, no session id, so it also works under
 # agents that set no session variable. switch -c would carry uncommitted work
@@ -422,12 +691,3 @@ STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-of
 - End responses with the next action, not a recap of what was just done.
 
 When "owner" asks for something, the answer is the finished product — not a plan. Tests included. Evals included. Docs included.
-- This file and the memory must not disagree. When a standing rule
-  changes, change it here and in memory in the same step.
-- Resolved (DOC-001.D4): "a test never skips itself to green" wins over the
-  older spent-source-sheet wording that let a cut's pinning test skip when
-  its source was gone. The imp's archive test was fixed that way in
-  `914039e` (`.gitignore` re-includes editor sources so the check always
-  runs). The three cut-script tests that still carried the old skip —
-  `tests/render/test_spawn_fx.py`, `test_totem_bolt.py`,
-  `test_totem_sprite.py` — were fixed the same way as TST-002 (done).
