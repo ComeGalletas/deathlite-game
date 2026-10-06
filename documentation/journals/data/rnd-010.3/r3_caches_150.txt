@@ -1,0 +1,17 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  sprite caches, the hero fighting: 163 alive, 900 frames
+  wash: 51.8 requests a frame, 1027 distinct frames, the median one 47.1 KB; the game's cap 512, frames 300 to 900
+    cap   512: emptied when full   3.41 misses a frame, worst   42, held at most  27.0 MB  |  LRU   1.50, worst    7, held at most  29.7 MB
+    cap   768: emptied when full   1.38 misses a frame, worst   38, held at most  41.0 MB  |  LRU   0.60, worst    5, held at most  41.7 MB
+    cap  1024: emptied when full   0.74 misses a frame, worst   30, held at most  55.2 MB  |  LRU   0.56, worst    5, held at most  55.2 MB
+    cap  1536: emptied when full   0.56 misses a frame, worst    5, held at most  55.4 MB  |  LRU   0.56, worst    5, held at most  55.4 MB
+    cap  2048: emptied when full   0.56 misses a frame, worst    5, held at most  55.4 MB  |  LRU   0.56, worst    5, held at most  55.4 MB
+    a miss 82.0 us (81.8 to 96.6), a hit 0.19 us (0.18 to 0.23), over 5 passes
+  tint: 8.3 requests a frame, 455 distinct frames, the median one 56.3 KB; the game's cap 128, frames 300 to 900
+    cap   128: emptied when full   1.12 misses a frame, worst   14, held at most   7.7 MB  |  LRU   0.71, worst    6, held at most   8.2 MB
+    cap   256: emptied when full   0.63 misses a frame, worst   15, held at most  15.3 MB  |  LRU   0.26, worst    3, held at most  15.9 MB
+    cap   512: emptied when full   0.14 misses a frame, worst    2, held at most  26.8 MB  |  LRU   0.14, worst    2, held at most  26.8 MB
+    a miss 71.1 us (70.6 to 72.3), a hit 0.12 us (0.12 to 0.13), over 5 passes
+  boss at the end: held back

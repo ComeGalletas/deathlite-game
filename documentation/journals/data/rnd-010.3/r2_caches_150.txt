@@ -1,0 +1,17 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  sprite caches, the hero fighting: 163 alive, 900 frames
+  wash: 51.8 requests a frame, 1027 distinct frames, the median 35.6 KB; the game's cap 512, frames 300 to 900
+    cap   512 ( 18.2 MB): emptied when full   3.41 misses a frame, worst   42  |  LRU   1.50, worst    7
+    cap   768 ( 27.4 MB): emptied when full   1.38 misses a frame, worst   38  |  LRU   0.60, worst    5
+    cap  1024 ( 36.5 MB): emptied when full   0.74 misses a frame, worst   30  |  LRU   0.56, worst    5
+    cap  1536 ( 54.7 MB): emptied when full   0.56 misses a frame, worst    5  |  LRU   0.56, worst    5
+    cap  2048 ( 73.0 MB): emptied when full   0.56 misses a frame, worst    5  |  LRU   0.56, worst    5
+    a miss 95.8 us, a hit 0.23 us
+  tint: 8.3 requests a frame, 455 distinct frames, the median 47.1 KB; the game's cap 128, frames 300 to 900
+    cap   128 (  6.0 MB): emptied when full   1.12 misses a frame, worst   14  |  LRU   0.71, worst    6
+    cap   256 ( 12.1 MB): emptied when full   0.63 misses a frame, worst   15  |  LRU   0.26, worst    3
+    cap   512 ( 24.1 MB): emptied when full   0.14 misses a frame, worst    2  |  LRU   0.14, worst    2
+    a miss 77.0 us, a hit 0.16 us
+  boss at the end: held back

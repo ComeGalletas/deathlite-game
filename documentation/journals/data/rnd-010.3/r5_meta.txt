@@ -1,0 +1,68 @@
+commit 59cd622  started 2026-10-06 12:54:31
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- processes with a window at the start, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+Microsoft.Notes
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+WindowsTerminal
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb      3060,265625
+cam_helper          2191,5
+chrome         1461,859375
+audiodg        1052,546875
+chrome         1035,390625
+chrome          792,328125
+SystemSettings  611,390625
+chrome          424,265625
+
+
+
+=== quiet_a 150  cpu load 14%  12:54:33
+=== fight_a 150  cpu load 9%  12:54:50
+=== fight_b 150  cpu load 14%  12:55:09
+=== quiet_b 150  cpu load 12%  12:55:29
+=== caches 150  cpu load 4%  12:55:45
+=== wash_lru 150  cpu load 3%  12:56:11
+=== quiet_a 250  cpu load 14%  12:56:44
+=== fight_a 250  cpu load 14%  12:57:05
+=== fight_b 250  cpu load 9%  12:57:31
+=== quiet_b 250  cpu load 10%  12:57:56
+=== caches 250  cpu load 17%  12:58:17
+=== wash_lru 250  cpu load 22%  12:58:53
+=== blit_floor  cpu load 17%  12:59:38
+finished 12:59:40  cpu load 17%
+--- processes with a window at the end, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+Microsoft.Notes
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+WindowsTerminal
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb         3159,375
+cam_helper     2231,109375
+chrome          1461,96875
+audiodg             1069,5
+chrome          1049,90625
+chrome          799,734375
+SystemSettings  611,390625
+chrome          425,390625
+
+
+

@@ -52,17 +52,21 @@ def _p50(values) -> float:
 
 
 def packed_scene(seed: int, live: int, dormant: int, elapsed: float,
-                 save_path: str | None = None):
+                 save_path: str | None = None, elements: bool = False):
     """`spawn_stress.main`'s `--pack` scene, up to the timing: built, the
     display and any shortfall printed, warmed for 60 drawn frames, the
     crowd packed round the hero. Returns `(game, ps)`. `save_path` as
-    `spawn_stress.build` (the tests' fresh save)."""
+    `spawn_stress.build` (the tests' fresh save). With `elements`, the
+    hero fights as under `spawn_stress --elements`: the crowd infused
+    (`spawn_stress.infuse`) before the warm-up, as `main` does."""
     from game import config
     game, ps = S.build(seed, live, dormant, elapsed, config.ENEMY_LOD_SKIP, save_path=save_path)
     print(S.display_line(ps))
     short = S.shortfall(ps, live, elapsed)
     if short:
         print(short)
+    if elements:
+        S.infuse(ps, seed)
     S.run(ps, 60, render=True)
     S.cascade_setup(ps, prime=False)
     return game, ps
