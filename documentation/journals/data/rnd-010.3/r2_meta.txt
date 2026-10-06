@@ -1,0 +1,39 @@
+commit b26eb7e  started 2026-10-06 11:54:09
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb      1888,296875
+cam_helper       1732,0625
+chrome            1448,875
+chrome          863,453125
+audiodg         857,171875
+chrome          702,609375
+SystemSettings   539,15625
+chrome          403,640625
+
+
+
+=== caches 150  cpu load 23%  11:54:11
+=== wash_lru 150  cpu load 19%  11:54:37
+=== fight 150  cpu load 22%  11:55:10
+=== caches 250  cpu load 29%  11:55:29
+=== wash_lru 250  cpu load 37%  11:56:05
+=== fight 250  cpu load 20%  11:56:51
+finished 11:57:15  cpu load 7%
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb      1954,296875
+cam_helper      1755,84375
+chrome           1454,3125
+chrome          876,734375
+audiodg           866,9375
+chrome               707,5
+SystemSettings       549,5
+chrome           407,28125
+
+
+
