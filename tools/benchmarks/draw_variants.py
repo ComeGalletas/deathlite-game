@@ -30,7 +30,15 @@ The variants (`VARIANTS`):
   once for every terrace;
 * `forwarder_bypassed`: the state's `_draw_one_enemy` bound straight to
   `WorldRenderer.one_enemy`, without the generated forwarder's two
-  `getattr`s.
+  `getattr`s;
+* `wash_lru`: a primed enemy's washed frames (`element_fx.washed`) held
+  in an LRU of `WASH_LRU_CAP` entries, where the game's cache empties
+  itself whole once it holds 512 (`sprite_caches.py` replays both on a
+  fight's own requests). Only a fight washes enough to tell: run it with
+  `--elements`.
+
+`--elements` takes the scene with the hero fighting, as `spawn_stress
+--elements` does: every enemy primed and three infused weapons firing.
 
 Headless without `SDL_VIDEODRIVER=windows` (in bash; in PowerShell set it
 first), like the harness: the dummy driver's surface, not the cost on
@@ -39,6 +47,7 @@ screen.
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
 
 from tools.benchmarks import layer_probes as LP
 from tools.benchmarks import spawn_stress as S
@@ -122,8 +131,45 @@ def _forwarder_bypassed(ps):
     return lambda: delattr(ps, "_draw_one_enemy")
 
 
+WASH_LRU_CAP = 1536
+_WASH_LRU: OrderedDict = OrderedDict()   # (id(frame), element) -> (frame, washed copy)
+
+
+def _wash_lru(ps):
+    """Patch `element_fx.washed` with an LRU of `WASH_LRU_CAP` entries in
+    place of the game's cache, which empties itself whole at 512; returns
+    the undo. The LRU is this module's and outlives the undo, so each
+    side keeps its own warm cache from part to part. A miss is washed by
+    the game's own `washed`, given an empty cache for the call so the
+    game's stays as the side without the variant left it."""
+    from game.states.playing.visual import elements as fx
+    real = fx.washed
+
+    def washed(frame, element, profiles=None):
+        if not element or frame is None:
+            return frame
+        key = (id(frame), int(element))
+        hit = _WASH_LRU.get(key)
+        if hit is not None and hit[0] is frame:
+            _WASH_LRU.move_to_end(key)
+            return hit[1]
+        game_cache = fx._WASH_CACHE
+        fx._WASH_CACHE = {}
+        try:
+            out = real(frame, element, profiles)
+        finally:
+            fx._WASH_CACHE = game_cache
+        if len(_WASH_LRU) >= WASH_LRU_CAP:
+            _WASH_LRU.popitem(last=False)
+        _WASH_LRU[key] = (frame, out)
+        return out
+
+    fx.washed = washed
+    return lambda: setattr(fx, "washed", real)
+
+
 VARIANTS = {"rig_frame_cached": _rig_frame_cached, "world_bucketed": _world_bucketed,
-            "forwarder_bypassed": _forwarder_bypassed}
+            "forwarder_bypassed": _forwarder_bypassed, "wash_lru": _wash_lru}
 
 
 def picture(ps, surface) -> bytes:
@@ -212,6 +258,8 @@ def parse(argv=None) -> argparse.Namespace:
                     help="as spawn_stress --live; needs --elapsed (N - 100) * 4")
     ap.add_argument("--elapsed", type=float, required=True, help="the run clock in seconds")
     ap.add_argument("--dormant", type=int, default=400, help="enemy records on the other islands")
+    ap.add_argument("--elements", action="store_true",
+                    help="the hero fighting, as spawn_stress --elements")
     ap.add_argument("--variants", default=",".join(VARIANTS),
                     help=f"comma separated, of: {', '.join(VARIANTS)}")
     ap.add_argument("--blocks", type=int, default=16,
@@ -230,7 +278,8 @@ def parse(argv=None) -> argparse.Namespace:
 def main(argv=None, save_path: str | None = None) -> int:
     import pygame
     args = parse(argv)
-    _game, ps = LP.packed_scene(args.seed, args.live, args.dormant, args.elapsed, save_path)
+    _game, ps = LP.packed_scene(args.seed, args.live, args.dormant, args.elapsed, save_path,
+                                elements=args.elements)
     surface = pygame.display.get_surface()
     for name in args.variants:
         if not identical(ps, name, surface):

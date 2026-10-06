@@ -45,8 +45,9 @@ class FormatTests(unittest.TestCase):
 
     def test_the_command_line(self):
         a = DV.parse(["--live", "150", "--elapsed", "300"])
-        self.assertEqual((a.seed, a.dormant, a.variants, a.blocks, a.frames),
-                         (SEED, 400, list(DV.VARIANTS), 16, 40))
+        self.assertEqual((a.seed, a.dormant, a.variants, a.blocks, a.frames, a.elements),
+                         (SEED, 400, list(DV.VARIANTS), 16, 40, False))
+        self.assertTrue(DV.parse(["--live", "1", "--elapsed", "0", "--elements"]).elements)
         self.assertEqual(DV.parse(["--live", "1", "--elapsed", "0", "--variants",
                                    "world_bucketed"]).variants, ["world_bucketed"])
         for bad in (["--live", "1", "--elapsed", "0", "--variants", "nope"],
@@ -84,18 +85,97 @@ class TimingTests(unittest.TestCase):
         self.assertEqual((len(result["off"]), len(result["on"])), (6, 6))
 
 
+class WashLruTests(unittest.TestCase):
+    """`wash_lru` against the game's `washed`, on surfaces of its own."""
+
+    def setUp(self):
+        DV._WASH_LRU.clear()
+        self.addCleanup(DV._WASH_LRU.clear)
+        from game.states.playing.visual import elements as fx
+        self.fx = fx
+        self.frames = [pygame.Surface((3 + i, 4), pygame.SRCALPHA) for i in range(3)]
+        for i, f in enumerate(self.frames):
+            f.fill((60 * i, 200, 90, 255))
+
+    def test_the_same_pixels_and_the_game_cache_untouched(self):
+        from combat.elements.ids import ElementId
+        fx, real = self.fx, self.fx.washed
+        with mock.patch.object(fx, "_WASH_CACHE", {}):                      # not the game's
+            expected = [pygame.image.tobytes(real(f, ElementId.FIRE), "RGBA") for f in self.frames]
+        game_cache = fx._WASH_CACHE
+        contents = dict(game_cache)
+        undo = DV.VARIANTS["wash_lru"](None)
+        try:
+            for f, want in zip(self.frames, expected, strict=True):
+                out = fx.washed(f, ElementId.FIRE)
+                self.assertIs(fx.washed(f, ElementId.FIRE), out)            # held
+                self.assertEqual(pygame.image.tobytes(out, "RGBA"), want)
+            self.assertIs(fx.washed(self.frames[0], None), self.frames[0])
+            self.assertIsNone(fx.washed(None, ElementId.FIRE))
+            self.assertIs(fx._WASH_CACHE, game_cache)
+            self.assertEqual(fx._WASH_CACHE, contents)
+        finally:
+            undo()
+        self.assertIs(fx.washed, real)
+
+    def test_an_entry_from_a_recycled_id_is_not_served(self):
+        # The key is the frame's id; a frame freed and its id reused by
+        # another must wash afresh, not get the old frame's copy.
+        from combat.elements.ids import ElementId
+        frame, gone, stale = self.frames
+        DV._WASH_LRU[(id(frame), int(ElementId.FIRE))] = (gone, stale)
+        undo = DV.VARIANTS["wash_lru"](None)
+        try:
+            out = self.fx.washed(frame, ElementId.FIRE)
+        finally:
+            undo()
+        self.assertIsNot(out, stale)
+        self.assertIs(DV._WASH_LRU[(id(frame), int(ElementId.FIRE))][0], frame)
+
+    def test_it_drops_the_entry_used_longest_ago(self):
+        from combat.elements.ids import ElementId
+        a, b, c = self.frames
+        key = lambda f: (id(f), int(ElementId.ICE))
+        with mock.patch.object(DV, "WASH_LRU_CAP", 2):
+            undo = DV.VARIANTS["wash_lru"](None)
+            try:
+                first = self.fx.washed(a, ElementId.ICE)
+                self.fx.washed(b, ElementId.ICE)
+                self.assertIs(self.fx.washed(a, ElementId.ICE), first)     # a is now the newest
+                self.fx.washed(c, ElementId.ICE)                            # so b goes
+            finally:
+                undo()
+        self.assertEqual(list(DV._WASH_LRU), [key(a), key(c)])
+        self.assertIs(DV._WASH_LRU[key(a)][1], first)
+
+
 class SceneTests(unittest.TestCase):
-    """One packed scene, seed 35, 40 alive, shared."""
+    """One packed scene with the hero fighting (every enemy primed, so
+    `wash_lru` has washed frames to draw), seed 35, 40 alive, shared."""
 
     @classmethod
     def setUpClass(cls):
         with contextlib.redirect_stdout(io.StringIO()):
-            cls.game, cls.ps = LP.packed_scene(SEED, 40, 0, 300.0, TDL._fresh_save())
+            cls.game, cls.ps = LP.packed_scene(SEED, 40, 0, 300.0, TDL._fresh_save(),
+                                               elements=True)
         cls.surface = pygame.display.get_surface()
+        DV._WASH_LRU.clear()
+
+    @classmethod
+    def tearDownClass(cls):
+        DV._WASH_LRU.clear()
 
     def _patched_state(self):
+        from game.states.playing.visual import elements as fx
         from game.states.playing.visual import scene
-        return (dict(vars(self.ps)).keys(), dict(vars(self.ps.renderer)).keys(), scene.draw_world)
+        return (dict(vars(self.ps)).keys(), dict(vars(self.ps.renderer)).keys(), scene.draw_world,
+                fx.washed)
+
+    def test_the_scene_is_a_fight_with_primed_enemies_drawn(self):
+        from game.states.playing.visual.rendering import aura_colour
+        primed = [e for e in DLe.drawn_enemies(self.ps)
+                  if e._hurt_t <= 0.0 and aura_colour(self.ps.run, e) is not None]
+        self.assertGreater(len(primed), 0)
 
     def test_every_variant_draws_the_same_frame(self):
         for name in DV.VARIANTS:
@@ -203,6 +283,22 @@ class MainTests(unittest.TestCase):
             with self.subTest(variant=name):
                 self.assertIn(f"  {name}: draw p50 off", text)
         self.assertTrue(text.rstrip().endswith("  boss at the end: held back"))
+
+    def test_elements_asks_for_the_fight(self):
+        class Built(Exception):
+            pass
+
+        asked = []
+
+        def packed(*a, elements=False):
+            asked.append(elements)
+            raise Built
+
+        for argv, want in ((["--elements"], True), ([], False)):
+            with self.subTest(argv=argv), mock.patch.object(DV.LP, "packed_scene", packed), \
+                    self.assertRaises(Built):
+                DV.main(["--live", "30", "--elapsed", "300", *argv])
+        self.assertEqual(asked, [True, False])
 
     def test_a_differing_variant_is_reported_and_not_timed(self):
         with mock.patch.object(DV, "identical", lambda ps, name, s: name != "world_bucketed"), \

@@ -556,7 +556,9 @@ RND-010.2's do.
   - [x] RND-010.3.2: `blit_floor.py` and `gc_probe.py` under `tools/benchmarks/`, tested
   - [x] RND-010.3.3: The CPU steps' probe: each lead's cost per call and per frame on the live crowd, tested
   - [x] RND-010.3.4: The variant probe: throwaway pixel-identical variants timed against the draw (`rig_frame_cached`, `world_bucketed`, `forwarder_bypassed`), tested; the ghost copy is costed by `draw_leads` and gets a variant only if the sitting puts it near the top
-  - [ ] RND-010.3.5: The sitting: the probes at 150 and 250 packed, and the draw by layer with the hero fighting, raw outputs kept
-  - [ ] RND-010.3.6: The ranking and the candidates' results recorded, and the order for RND-010.4 onward
+  - [x] RND-010.3.5: Sitting 1: the probes at 150 and 250 packed, and the draw by layer with the hero fighting, raw outputs kept
+  - [x] RND-010.3.6: The lead sitting 1's fight found, probed: `sprite_caches.py` (the wash and hit-tint caches replayed on a fight's own requests), the `wash_lru` variant and `draw_variants --elements`, tested
+  - [ ] RND-010.3.7: Sitting 2: the caches replayed, `wash_lru` timed and the fight's layers again, at 150 and 250 packed with the hero fighting, raw outputs kept
+  - [ ] RND-010.3.8: The ranking and the candidates' results recorded, and the order for RND-010.4 onward
 - [ ] RND-010.4: The largest exact win built, pixel-identical and tested (further winners as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

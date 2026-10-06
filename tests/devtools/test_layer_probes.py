@@ -179,7 +179,7 @@ class PackedSceneTests(unittest.TestCase):
         calls.display_line.return_value = "display"
         calls.shortfall.return_value = "short"
         with mock.patch.multiple(S, build=calls.build, display_line=calls.display_line,
-                                 shortfall=calls.shortfall, run=calls.run,
+                                 shortfall=calls.shortfall, run=calls.run, infuse=calls.infuse,
                                  cascade_setup=calls.cascade_setup), \
                 contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(LP.packed_scene(7, 150, 400, 300.0, "s.json"), ("game", ps))
@@ -189,6 +189,22 @@ class PackedSceneTests(unittest.TestCase):
             c.display_line(ps), c.shortfall(ps, 150, 300.0),
             c.run(ps, 60, render=True), c.cascade_setup(ps, prime=False)])
         self.assertEqual(out.getvalue(), "display\nshort\n")
+
+    def test_the_fight_infuses_before_the_warm_up(self):
+        # As `spawn_stress.main --pack --elements`: infused, warmed, packed.
+        calls = mock.Mock()
+        ps = mock.Mock()
+        calls.build.return_value = ("game", ps)
+        calls.shortfall.return_value = None
+        with mock.patch.multiple(S, build=calls.build, display_line=calls.display_line,
+                                 shortfall=calls.shortfall, run=calls.run, infuse=calls.infuse,
+                                 cascade_setup=calls.cascade_setup), \
+                contextlib.redirect_stdout(io.StringIO()):
+            LP.packed_scene(7, 150, 400, 300.0, "s.json", elements=True)
+        c = mock.call
+        self.assertEqual(calls.mock_calls[2:], [
+            c.shortfall(ps, 150, 300.0), c.infuse(ps, 7), c.run(ps, 60, render=True),
+            c.cascade_setup(ps, prime=False)])
 
 
 class SceneTests(unittest.TestCase):
