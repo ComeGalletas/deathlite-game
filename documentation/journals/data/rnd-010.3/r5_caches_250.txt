@@ -1,0 +1,19 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  sprite caches, the hero fighting: 237 alive, 900 frames
+  wash: 159.3 requests a frame, 1665 distinct frames, the median one 39.7 KB; the game's cap 512, frames 300 to 900
+    cap   512: emptied when full  21.98 misses a frame, worst  137, emptied  26 times, held at most  28.2 MB  |  LRU  11.97, worst   27, held at most  28.5 MB
+    cap   768: emptied when full   9.87 misses a frame, worst  114, emptied   8 times, held at most  42.6 MB  |  LRU   3.07, worst   12, held at most  43.0 MB
+    cap  1024: emptied when full   5.32 misses a frame, worst   85, emptied   3 times, held at most  55.4 MB  |  LRU   2.07, worst   11, held at most  55.5 MB
+    cap  1536: emptied when full   2.22 misses a frame, worst  125, emptied   1 times, held at most  79.6 MB  |  LRU   0.31, worst    3, held at most  80.6 MB
+    cap  2048: emptied when full   0.29 misses a frame, worst    3, emptied   0 times, held at most  87.3 MB  |  LRU   0.29, worst    3, held at most  87.3 MB
+    a miss 84.1 us (80.7 to 102.4), a hit 0.19 us (0.18 to 0.29), over 5 passes
+    emptying a cache of 512: 0.07 ms (0.06 to 0.09), over 5 passes
+  tint: 9.9 requests a frame, 414 distinct frames, the median one 56.3 KB; the game's cap 128, frames 300 to 900
+    cap   128: emptied when full   1.69 misses a frame, worst   26, emptied   8 times, held at most   8.5 MB  |  LRU   1.09, worst   17, held at most   8.7 MB
+    cap   256: emptied when full   0.94 misses a frame, worst   17, emptied   2 times, held at most  16.3 MB  |  LRU   0.39, worst    5, held at most  16.5 MB
+    cap   512: emptied when full   0.19 misses a frame, worst    4, emptied   0 times, held at most  25.6 MB  |  LRU   0.19, worst    4, held at most  25.6 MB
+    a miss 79.1 us (75.7 to 93.7), a hit 0.13 us (0.13 to 0.24), over 5 passes
+    emptying a cache of 128: 0.02 ms (0.01 to 0.02), over 5 passes
+  boss at the end: held back

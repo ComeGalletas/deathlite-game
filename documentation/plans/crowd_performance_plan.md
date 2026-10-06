@@ -11,8 +11,9 @@
 > 4.3, 4.4, 5.1 and the sum of gains under the table. Two more, here: the
 > per-enemy lambda and forwarder the paragraph below names cost 0.01 to
 > 0.03 ms a frame each, and the ghost `copy()` 0.01 ms (two shaded
-> bodies); and the blit floor on the owner's screen is 2.53 ms for 200
-> with a shadow and a bar, not 5.5 (§2.3 is the review's container). The
+> bodies); and the blit floor on the owner's screen is 2.10 ms for 200
+> with a shadow and a bar, the screen fill (0.37 ms) included, not 5.5
+> (§2.3 is the review's container). The
 > journal's "RND-010.3: Results" has the figures and the order for
 > RND-010.4 onward. Nothing in the code was
 > changed by the review. Measured facts are marked **measured** with the
@@ -280,7 +281,7 @@ tasks whose packed share is largest.
 | 4.10 | **Brute-force scans to the grid.** Summons (`in_ring`), `_within_reach`, `chain_to_next` through `run.grid.query_circle` / `nearest`. | `entities/summon.py:155-164`, `combat/weapons/core.py:445-457`, `core/combat.py:343-356` | 0.2 to 0.8 ms with summons out | same targets chosen (test with a seeded crowd) |
 | 4.11 | **`hibernate` and the watchdog.** Build the survivors list once instead of `remove` per body; one `SimpleNamespace` per tick; the watchdog keeps a dict keyed by `id` updated on spawn and cull instead of a set per frame. | `core/spawning.py:169-177`, `spawn/watchdog.py:93-96` | removes 0.5 s hitches at big sleeps | `test_population*`, `test_watchdog*` green |
 | 4.12 | **LOD pad and phase.** `inflate(2*pad, 2*pad)` so the pad is what the config says; phase the skip by a per-enemy counter, not the list index. | `core/state.py:435-452`, `game/config.py:849-852` | small; correctness | a test that an enemy at pad−1 px ticks every frame |
-| 4.13 | **A wash cache that holds a fight.** `element_fx.washed` as an LRU (1536, the one timed, or 1024; the memory is RND-010.D2, the owner's) in place of a dict that empties itself whole at 512; `hit_tinted` the same at 256 only if the owner wants the two alike (0.10 ms predicted). Added by RND-010.3, first in the order. | `visual/elements/__init__.py:199-246`, `visual/rendering.py:53-74` | **measured** at 250 in the saturated fight: 0.65 to 1.61 ms a frame (`wash_lru`, 1536), 1.90 ms predicted by the replay, the worst frame's misses 137 → 3, at most 80.6 MB held against 28.2 | pixel-identical; `test_element_colours`, `test_render_cull` green; `sprite_caches` replay before and after |
+| 4.13 | **A wash cache that holds a fight.** `element_fx.washed` as an LRU (1536, the one timed, or 1024; the memory is RND-010.D2, the owner's) in place of a dict that empties itself whole at 512; `hit_tinted` the same at 256 only if the owner wants the two alike (0.10 ms predicted). Added by RND-010.3, first in the order. | `visual/elements/__init__.py:199-246`, `visual/rendering.py:53-74` | **measured** at 250 in the saturated fight (RND-010.3, sitting 5): 0.74 to 1.56 ms off the mean frame (`wash_lru`, 1536), p99 28.87 → 23.31 ms; 1.83 ms predicted by the replay, the worst frame's misses 137 → 3, at most 80.6 MB held against 28.2 | pixel-identical; `test_element_colours`, `test_render_cull` green; `sprite_caches` replay before and after |
 
 Sum of expected gains: about 5 to 8 ms per frame at 150 in view on the
 owner's machine, which takes the trace's 100 to 149 row (14.6 ms p50)
@@ -298,7 +299,7 @@ note in the journal before building.
 
 | # | Task | Why | Expected |
 |---|---|---|---|
-| 5.1 | **Batch body blits with `Surface.blits`.** For unshaded, untinted bodies (the common case), collect `(frame, dest)` pairs per terrace and call `screen.blits(pairs, doreturn=False)` once. Shaded or tinted bodies stay on the slow path. | removes the Python call per blit, which is most of the gap between 2.3's floor and the measured draw | 1 to 2 ms at 150 in view; **measured** in RND-010.3: every sprite blit at 150 costs 0.99 ms in all (7.36 µs each, in isolation), and `blit_floor` puts 200 at 2.25 ms on the owner's screen, so the batch can save only part of that |
+| 5.1 | **Batch body blits with `Surface.blits`.** For unshaded, untinted bodies (the common case), collect `(frame, dest)` pairs per terrace and call `screen.blits(pairs, doreturn=False)` once. Shaded or tinted bodies stay on the slow path. | removes the Python call per blit, which is most of the gap between 2.3's floor and the measured draw; **measured** in RND-010.3 on the owner's screen: the game's blit (7.18 to 7.36 µs, in isolation) already costs what `blit_floor` does a sprite with the screen fill taken out (6.97 to 8.60 µs), so the gap this names is not there for the blit itself; only the Python call around it could go, not measured apart | 1 to 2 ms at 150 in view; RND-010.3: unmeasured, and every sprite blit at 150 is 0.99 ms in all, so well under that |
 | 5.2 | **Flow field off the frame path.** Options, measure each: (a) a coarser fill grid (64 px cells, 4x fewer cells) sampled with the existing bilinear `direction_at`; (b) fill only the reachable disc round the hero (the despawn ring is 1400 px, the fill walks the whole island); (c) a longer interval with the two-cell drift kept. `NAV_FILL_MAX_COST` already exists for (b). | a fixed 2 to 3 ms on 80 % of frames | 1.5 to 2.5 ms |
 | 5.3 | **Movement probe with fewer floor scans.** Cache `room_of` per enemy per frame (five probes land in one room almost always), probe once and reuse; ENT-018's rejected index was per-probe, this is per-body. | 14 % of packed update | 0.5 to 1 ms at 200 |
 | 5.4 | **Behaviour machine without per-tick allocation.** `Steering` reused per enemy; transitions checked only for the current state's list (already so?) with predicates that read floats, not Vector2s; `heading` stored as two floats. | 30 % of packed update | 1 to 2 ms at 200 |
