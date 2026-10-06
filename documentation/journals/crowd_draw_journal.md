@@ -504,9 +504,12 @@ since the hero does not attack.
   1024 held 55.5 MB, for a predicted 1.68 ms saved where 1536 predicts
   1.83 (1024 is not timed). A tint LRU of 256 held 16.5 MB against
   today's 8.5. Those are peaks seen in one seed's fight, not bounds: a
-  cap counts copies, and the largest rig frame at the sittings' zoom is
-  0.69 MB, so today's 512 could hold up to 351 MB and 1536 up to
-  1,053 MB. A cap in bytes is the other way to set it. The ghost cache's
+  cap counts copies. The largest frame a regular enemy can be washed in
+  at the sittings' zoom is 0.14 MB (bear; bosses are never washed), so
+  today's 512 could hold up to 71.9 MB, 1024 up to 143.8 MB and 1536 up
+  to 215.8 MB. The tint cache also takes the boss's and the hero's
+  frames, up to 0.69 MB, so a tint cap of 256 could hold up to 175.5 MB.
+  A cap in bytes is the other way to set it. The ghost cache's
   copies are in none of these figures. The web build's memory headroom
   is not measured.
 
@@ -582,9 +585,11 @@ figure below unless it is marked as a constant or a tool's default.
   on both alike; the caches' replay; the `wash_lru` timing; and the blit
   floor.
 
-Every comparison below is within sitting 5, except the leads and the
-three CPU variants: those are sitting 1's alone, and are compared with
-nothing from another sitting. The other sittings are context. Their
+Every measured comparison below is within sitting 5, except the leads
+and the three CPU variants, which are sitting 1's alone. Where the order
+for RND-010.4 weighs a sitting 1 figure against a sitting 5 one, or the
+game's blit against the floor's, it compares orders of magnitude, by
+judgement, and says so. The other sittings are context. Their
 absolute times moved with the machine's state: sittings 1 and 2's fights
 drew 0.6 to 3.0 ms more than sitting 5's at the same counts.
 
@@ -669,6 +674,11 @@ From those costs the replay predicts:
   11.5 ms (the emptying itself is 0.003 ms of the 1.85);
 - today's tint cache: 0.13 ms.
 
+The prediction assumes every miss costs the median miss. That cost is
+timed over the distinct frames, each once. The misses fall more often on
+some frames than others, and a large frame costs more to copy than a
+small one, so the weighting is an assumption, not measured.
+
 Those are the same order as the `enemies` row's +2.12 ms in the fight.
 This is a prediction, not a measurement: nothing here times the two
 caches inside the frame. At 150 the fight asks for 52 a frame from 1,027
@@ -690,8 +700,14 @@ anchor.
 
 At 250, the intervals exclude zero; it is the only variant so far whose
 do. At 150 the saving is not resolved. Sitting 2 measured it at another
-commit and found a p50 saving at 250 of 0.65 to 1.61 ms, with 150 again
-not resolved.
+commit: at 250 the blocks' median p50 saving was 1.08 ms (interval 0.65
+to 1.61), and at 150 again not resolved.
+
+How these are read: a block's figure is its on part's minus its off
+part's, so a saving is negative. The "median" of the 16 is `stats.percentile`'s nearest index,
+the 9th smallest, not the mean of the 8th and 9th. The interval is the
+sign test's 4th to 13th of 16, which treats the blocks as independent.
+The pooled rows put all 640 frames of a side together.
 
 The replay predicts 1.83 ms saved at 250. Measured against the median of
 the blocks' mean savings (1.27, interval 0.74 to 1.56), the gap is 0.27
@@ -705,10 +721,12 @@ open. Candidates, none of them measured:
   not timed.
 
 Not a candidate: the ghost cache (`TerrainRenderer._ghost_of`, which
-empties itself at 128) keys on the washed copy's identity. Every washed
-copy remade is therefore a ghost remade too, for a shaded body. The
-replay leaves that out, which would make the measured saving larger
-than predicted, not smaller.
+empties itself at 128) keys on the washed copy's identity. It serves an
+unshaded body behind obstacle art; a shaded body's ghost is never cached
+(`_blit_character` records it uncacheable). So a washed copy remade is a
+ghost remade too, for an unshaded body behind obstacle art. The replay
+leaves that out, which would make the measured saving larger than
+predicted, not smaller.
 
 The variant gives the same pixels as the game's cache: a hit returns the
 held copy, and a miss makes the copy the game would. The sitting's
@@ -739,8 +757,8 @@ variant, under the condition RND-010.3.4 set.
 How close the sprite blit is to pygame's own floor is not shown here.
 `blit_floor` (sitting 5), with the screen fill timed alone (0.37 ms) and
 taken out, puts one 112 px sprite at 6.97 to 8.60 µs a blit. The game's
-blit is 7.18 to 7.36 µs, but over its own rigs, whose frames run from
-small to 467x367 px at this zoom, and in sitting 1. Different sittings
+blit is 7.18 to 7.36 µs, but over the crowd's own rigs (the largest a
+regular enemy wears is 203x173 px at this zoom), and in sitting 1. Different sittings
 and different sprites, so the two are of the same order and no more is
 claimed.
 
@@ -784,34 +802,43 @@ sitting 5, a different sitting from the variant's.
 
 1. **RND-010.4: the wash cache as an LRU.**
    - It is exact, and helps only where enemies are primed: a fight.
-   - It is resolved only at 250 alive (222 in view) in the saturated
-     fight, where it saves 0.74 to 1.56 ms (the blocks' median mean
-     saving; pooled, 1.28 ms) and the pooled p99 falls from 28.87 to
-     23.31 ms.
-   - At 150 (139 in view) it is not resolved. The owner's trace never
-     shows more than 177 in view (above), so whether it moves the
-     trace's rows is not shown.
+   - It is resolved only at 250 alive in the saturated fight. There, the
+     blocks' median mean saving is 1.27 ms (97.9 % interval 0.74 to
+     1.56; pooled, 1.28 ms), and the pooled p99 falls from 28.87 to
+     23.31 ms (one figure a side, no interval).
+   - At 150 alive it is not resolved.
+   - `draw_variants` prints no count in view. The fight at the same
+     `--live` shows 222 and 139 in view. The owner's trace never shows
+     more than 177 (above), so whether it moves the trace's rows is not
+     shown.
    - It costs memory. In the replay at 250, the LRU of 1536 (the one
      timed) held up to 80.6 MB, against 28.2 MB for today's cache. An
      LRU of 1024 held 55.5 MB, and the replay predicts 1.68 ms saved for
      it against 1536's 1.83; it is not timed.
-   - Neither is a bound. A cap counts copies, not bytes, and the largest
-     rig frame at this zoom is 0.69 MB (pig_rider, 467x367). So today's
-     512 could hold up to 351 MB, and 1536 up to 1,053 MB. A cap in
-     bytes would bound it; that is a design choice for RND-010.4.
+   - Neither is a bound. A cap counts copies, not bytes. The largest
+     frame a regular enemy can be washed in at this zoom is 0.14 MB
+     (bear, 203x173; bosses are never washed). So today's 512 could hold
+     up to 71.9 MB, 1024 up to 143.8 MB and 1536 up to 215.8 MB. A cap
+     in bytes would bound it directly; that is a design choice for
+     RND-010.4.
    - The ghost cache's own copies, which outlive the wash cache's, are
      in none of these figures.
    - The tint cache as an LRU of 256 (16.5 against 8.5 MB held) is
      predicted at 0.10 ms. That is below what a sitting resolves, so it
-     goes in only if the owner wants the two caches alike.
+     goes in only if the owner wants the two caches alike. It also takes
+     the boss's and the hero's frames, up to 0.69 MB a copy (pig_rider,
+     467x367), so a full 256 could hold up to 175.5 MB.
    - The memory is the owner's call (RND-010.D2, open).
 2. **The elemental under-layer in a fight.** It is the largest layer the
    fight adds (+1.36 / +2.71 ms); plan 4.5 covers it.
    - First split `draw_under` (auras, status marks, areas, motes) the
      way RND-010.2 split the draw.
    - Then time the candidates as variants.
-3. **The shade walk** (0.27 / 0.41 ms in isolation): the first half of
-   plan 4.4, the skip where no shadow falls.
+3. **The shade walk** (0.27 / 0.41 ms in isolation, sitting 1): the
+   first half of plan 4.4, the skip where no shadow falls. It ranks above
+   item 4, by judgement, although bars alone are larger at 150: the shade
+   walk runs in every frame, the bars and numbers only once enemies are
+   hurt.
 4. **Bars and damage numbers in a fight**: plan 4.6. The fight adds
    +0.55 / +0.51 ms of bars and +0.24 / +0.29 ms of damage numbers (at
    150 / 250).
@@ -825,6 +852,17 @@ sitting 5, a different sitting from the variant's.
    - In isolation, `rig_frame` is 0.32 ms at most, and the lambda and
      the forwarder 0.05.
    - The bucketed world's ceiling is not measured (see above).
+
+The order as a whole is a judgement. It weighs the measured sizes above
+with how often each cost occurs (every frame, or only in a fight), and
+the sizes come from different sittings where noted.
+
+Two things the plan for RND-010.3 (above) promised were not done:
+- The leads were to be reported beside the same sitting's own `enemies`
+  row. Sitting 1 ran no quiet `--layers` run, so they stand alone.
+- The sprite blit was to be timed as a throwaway variant. No exact
+  variant of a blit exists short of plan 5.1's batch, which is a build,
+  not a throwaway, so none was made.
 
 Even with all of this, the saturated fight at 250 stays well over the
 budget. In sitting 5 its update and draw take 29.30 to 29.47 ms, and
@@ -851,5 +889,6 @@ plan's §6 decision, which is still the owner's.
   - [x] RND-010.3.13: The plan's 4.2, 4.3 and header, the journal header and the appendix note
   - [x] RND-010.3.14: Sitting 5 (everything compared, in one sitting at one commit, ABBA), and the results rewritten on it
   - [x] RND-010.3.15: The third review's findings: no comparison across sittings, the statistics named as measured, the 150 result and the scope, memory bounds per cap, the plan's stale lines; tested
+  - [x] RND-010.3.16: The fourth review's findings: the memory bound over the frames each cache can be asked for (bosses are never washed), the ghost cache's bodies, the order's rule and the plan's promises not kept, the statistics' assumptions; tested
 - [ ] RND-010.4: The wash cache as an LRU, pixel-identical and tested, once RND-010.D2 sets the cap (further winners, in the order above, as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

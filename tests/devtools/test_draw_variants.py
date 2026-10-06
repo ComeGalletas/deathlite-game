@@ -132,6 +132,32 @@ class WashLruTests(unittest.TestCase):
             undo()
         self.assertIs(fx.washed, real)
 
+    def test_its_cache_outlives_the_undo(self):
+        # Each side keeps its own warm cache from part to part: a frame
+        # washed while the variant was on is served again, the same
+        # object and without washing, after an undo and a second apply.
+        from combat.elements.ids import ElementId
+        real, calls = self.fx.washed, []
+
+        def counted(frame, element, profiles=None):
+            calls.append(frame)
+            return real(frame, element, profiles)
+
+        frame = self.frames[0]
+        with mock.patch.object(self.fx, "washed", counted):
+            undo = DV.VARIANTS["wash_lru"](None)
+            try:
+                first = self.fx.washed(frame, ElementId.WIND)
+            finally:
+                undo()
+            undo = DV.VARIANTS["wash_lru"](None)
+            try:
+                again = self.fx.washed(frame, ElementId.WIND)
+            finally:
+                undo()
+        self.assertIs(again, first)
+        self.assertEqual(len(calls), 1)
+
     def test_an_entry_from_a_recycled_id_is_not_served(self):
         # The key is the frame's id; a frame freed and its id reused by
         # another must wash afresh, not get the old frame's copy.

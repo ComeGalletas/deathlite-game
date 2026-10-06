@@ -13,8 +13,9 @@ Headless by default, like the stress harness: the dummy driver's surface,
 not the cost on screen (in bash; in PowerShell set
 `$env:SDL_VIDEODRIVER = "windows"` first). The sprite is the blue
 warrior's first run frame at 112 px, one size among the many the rigs are
-drawn at (from small to 467x367 at the owner's zoom), so the floor is
-one sprite's; the crowd's positions are seeded (`random.Random(1)`).
+drawn at (a regular enemy's up to 203x173 at the owner's zoom), so the
+floor is one sprite's; the crowd's positions are seeded
+(`random.Random(1)`).
 Percentiles follow `tools/benchmarks/stats.py` (nearest index, half to
 even), where the plan's appendix took `int(q * n)`: the same samples can
 read one index apart.

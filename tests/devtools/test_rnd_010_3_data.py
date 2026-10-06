@@ -1,12 +1,12 @@
 """RND-010.3: the results' figures come out of the raw sittings
 (`documentation/journals/data/rnd-010.3/derived.py`, `crowd_draw_journal.md`).
 
-What is pinned:
-* `derived.py` runs on the committed outputs and prints the figures the
-  journal's results lean on, so a raw file edited or a parser gone wrong
-  shows here rather than in a stale journal;
-* the journal quotes those same figures (a figure retyped by hand and
-  wrong fails here);
+What is pinned, and no more:
+* `derived.py` runs on the committed outputs and prints the figures in
+  `FIGURES`, so a raw file edited or a parser gone wrong shows here;
+* for each of those, the journal's results carry the quoted text beside
+  it, so those figures, if retyped by hand and wrong, fail here. The
+  tables and the plan's annotations are not pinned figure by figure;
 * the folder holds exactly the files the README accounts for, no more.
 """
 import re
@@ -39,10 +39,13 @@ FIGURES = (
     ("LRU  1536: 0.31 a frame, worst 3, held at most 80.6 MB; predicts 1.83 ms a frame saved", "80.6 MB"),
     ("LRU  1024: 2.07 a frame, worst 11, held at most 55.5 MB; predicts 1.68 ms a frame saved",
      "predicts 1.68 ms saved"),
-    ("pig_rider's, 467x367, 0.69 MB a copy", "0.69 MB (pig_rider, 467x367)"),
-    ("a cap of   512 full of them:   351.0 MB", "351 MB"),
-    ("a cap of  1536 full of them:  1053.0 MB", "1,053 MB"),
-    ("250: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: +0.80 to +2.97 ms",
+    (("the largest frame is bear's, 203x173, 0.14 MB a copy; full caps: 512 -> 71.9 MB, "
+      "1024 -> 143.8 MB, 1536 -> 215.8 MB"), "0.14 MB (bear, 203x173; bosses are never washed)"),
+    ("1536 -> 215.8 MB", "1536 up to 215.8 MB"),
+    (("the largest frame is pig_rider's, 467x367, 0.69 MB a copy; full caps: 128 -> 87.8 MB, "
+      "256 -> 175.5 MB"), "a full 256 could hold up to 175.5 MB"),
+    (("150: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: +0.63 to +1.90 ms",
+      "250: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: +0.80 to +2.97 ms"),
      "0.6 to 3.0 ms more than sitting 5's"),
     ("n=200 sprite only        p50 1.86 ms, less the fill 0.37: 7.45 us a sprite", "0.37 ms"),
     ("the lambda and the forwarder alone: 0.05 ms",
@@ -78,8 +81,9 @@ class DerivedTests(unittest.TestCase):
 
     def test_the_figures_come_out_and_the_journal_quotes_them(self):
         for printed, quoted in FIGURES:
-            with self.subTest(figure=printed):
-                self.assertIn(printed, self.out)
+            with self.subTest(figure=quoted):
+                for line in (printed if isinstance(printed, tuple) else (printed,)):
+                    self.assertIn(line, self.out)
                 self.assertIn(quoted, self.journal)
 
     def test_a_row_a_run_did_not_print_is_named(self):

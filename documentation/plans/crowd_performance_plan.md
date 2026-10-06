@@ -31,7 +31,9 @@ about 30 fps above 220 (`../journals/crowd_draw_journal.md:21-31`). Pygame's
 blitter is not the limit: blitting 200 sprites with a shadow and a health
 bar each costs 4.3 ms at 1600x900 and 5.5 ms at 2560x1080 (**measured**,
 section 2). The frame is lost in Python work around those blits (a lambda,
-a forwarder, a shade walk and a `copy()` per enemy), in Python per-enemy
+a forwarder, a shade walk and a `copy()` per enemy; RND-010.3 **measured**
+these on the owner's machine at 0.03, 0.27 and 0.01 ms a frame at 150, the
+copy for two shaded bodies only, see the header), in Python per-enemy
 update work (about 25 to 45 µs per enemy), in two near-quadratic
 enemy-to-enemy passes, in a pure-Python flow-field fill that costs 2 to
 3 ms on most frames, and in a fixed 5.4 ms of terrain per frame before any
@@ -289,7 +291,7 @@ tasks whose packed share is largest.
 | 4.10 | **Brute-force scans to the grid.** Summons (`in_ring`), `_within_reach`, `chain_to_next` through `run.grid.query_circle` / `nearest`. | `entities/summon.py:155-164`, `combat/weapons/core.py:445-457`, `core/combat.py:343-356` | 0.2 to 0.8 ms with summons out | same targets chosen (test with a seeded crowd) |
 | 4.11 | **`hibernate` and the watchdog.** Build the survivors list once instead of `remove` per body; one `SimpleNamespace` per tick; the watchdog keeps a dict keyed by `id` updated on spawn and cull instead of a set per frame. | `core/spawning.py:169-177`, `spawn/watchdog.py:93-96` | removes 0.5 s hitches at big sleeps | `test_population*`, `test_watchdog*` green |
 | 4.12 | **LOD pad and phase.** `inflate(2*pad, 2*pad)` so the pad is what the config says; phase the skip by a per-enemy counter, not the list index. | `core/state.py:435-452`, `game/config.py:849-852` | small; correctness | a test that an enemy at pad−1 px ticks every frame |
-| 4.13 | **A wash cache that holds a fight.** `element_fx.washed` as an LRU (1536, the one timed, or 1024; the memory is RND-010.D2, the owner's) in place of a dict that empties itself whole at 512; `hit_tinted` the same at 256 only if the owner wants the two alike (0.10 ms predicted). Added by RND-010.3, first in the order. | `visual/elements/__init__.py:199-246`, `visual/rendering.py:53-74` | **measured** (RND-010.3, sitting 5, `wash_lru` at 1536), in the saturated fight only: at 250 alive (222 in view) the blocks' median mean saving is 0.74 to 1.56 ms (pooled 1.28), the pooled p99 28.87 → 23.31 ms, against 1.83 ms predicted by the replay (the worst frame's misses 137 → 3); at 150 (139 in view) not resolved. Peaks held in the replay 80.6 MB against 28.2; a count cap is no bound (the largest frame is 0.69 MB, so 1536 could hold 1,053 MB), hence D2 | pixel-identical; `test_element_colours`, `test_render_cull` green; `sprite_caches` replay before and after |
+| 4.13 | **A wash cache that holds a fight.** `element_fx.washed` as an LRU (1536, the one timed, or 1024; the memory is RND-010.D2, the owner's) in place of a dict that empties itself whole at 512; `hit_tinted` the same at 256 only if the owner wants the two alike (0.10 ms predicted). Added by RND-010.3, first in the order. | `visual/elements/__init__.py:199-246`, `visual/rendering.py:53-74` | **measured** (RND-010.3, sitting 5, `wash_lru` at 1536), in the saturated fight only: at 250 alive the blocks' median mean saving is 1.27 ms (97.9 % interval 0.74 to 1.56; pooled 1.28), the pooled p99 28.87 → 23.31 ms (one figure a side), against 1.83 ms predicted by the replay (the worst frame's misses 137 → 3); at 150 alive not resolved (the fight at the same `--live` shows 222 and 139 in view). Peaks held in the replay 80.6 MB against 28.2; a count cap is no bound (the largest washable frame is 0.14 MB, so 1536 could hold 215.8 MB), hence D2 | pixel-identical; `test_element_colours`, `test_render_cull` green; `sprite_caches` replay before and after |
 
 Sum of expected gains: about 5 to 8 ms per frame at 150 in view on the
 owner's machine, which takes the trace's 100 to 149 row (14.6 ms p50)
@@ -313,7 +315,10 @@ note in the journal before building.
 | 5.4 | **Behaviour machine without per-tick allocation.** `Steering` reused per enemy; transitions checked only for the current state's list (already so?) with predicates that read floats, not Vector2s; `heading` stored as two floats. | 30 % of packed update | 1 to 2 ms at 200 |
 
 With 4 and 5 done, 200 in view on the owner's machine is estimated at
-about 18 to 20 ms. Still over. Section 6 is where that goes.
+about 18 to 20 ms. Still over. Section 6 is where that goes. (This rests
+on section 4's 5 to 8 ms sum, which RND-010.3's measurements put lower
+for the draw tasks and which is not re-estimated; see under the §4
+table.)
 
 ## 6. The decision for the owner: 200 on screen at 60
 

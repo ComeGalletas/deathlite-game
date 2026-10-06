@@ -21,6 +21,7 @@ commit. The other sittings are printed as context only.
 5. The appendix probes: sitting 1's `gc_probe`; sitting 5's `blit_floor`
    with the screen fill taken out, per sprite.
 """
+import json
 import re
 from pathlib import Path
 
@@ -213,21 +214,37 @@ for n in COUNTS:
             print(f"    LRU {cap:5d}: {lr:.2f} a frame, worst {lw}, held at most {lm} MB; predicts "
                   f"{today - lr * miss / 1000:.2f} ms a frame saved")
 
-print("\n== 4b. what a cap can hold at most: the largest rig frame at the sittings' zoom ==")
-# The washed copy is the rig's frame at round(base x zoom) on each side
-# (`WorldRenderer.rig_frame`), 4 bytes a pixel at 32 bits. The base sizes
-# are `scale` in data/enemies/enemy_sprites.json; that file also holds
-# rigs no enemy wears (projectiles), so the largest is an upper bound.
+print("\n== 4b. what a cap can hold at most: the largest frame each cache can be asked for ==")
+# A copy is the rig's frame at round(base x zoom) on each side
+# (`WorldRenderer.rig_frame`), 4 bytes a pixel at 32 bits; the base sizes
+# are each rig's `scale`. Which rigs reach which cache, from the code:
+# `washed` has one caller, `enemy_sprite`, so only the rigs regular enemies
+# wear (the `sprite` of each entry in data/enemies/enemies.json);
+# `hit_tinted` is called for enemies, the boss (`boss`, bosses.json) and
+# the hero (`player`; every rig in data/heroes/character_sprites.json, an
+# upper bound since that file holds more than the hero).
+DATA_DIR = D.parents[3] / "data"
 zoom = float(re.search(r"zoom ([\d.]+)", text("r5_fight_250a.txt")).group(1))
-rigs = __import__("json").loads((D.parents[3] / "data" / "enemies" / "enemy_sprites.json")
-                                .read_text(encoding="utf-8"))
-sized = sorted(((round(s["scale"][0] * zoom), round(s["scale"][1] * zoom), name)
-                for name, s in rigs.items() if s.get("scale")), key=lambda t: -t[0] * t[1])
-w, h, name = sized[0]
-one = w * h * 4
-print(f"zoom {zoom}: the largest rig frame is {name}'s, {w}x{h}, {one / 1e6:.2f} MB a copy")
-for cap in (128, 256, 512, 1024, 1536):
-    print(f"    a cap of {cap:5d} full of them: {cap * one / 1e6:7.1f} MB")
+load = lambda *p: json.loads(DATA_DIR.joinpath(*p).read_text(encoding="utf-8"))
+enemy_rigs, hero_rigs = load("enemies", "enemy_sprites.json"), load("heroes", "character_sprites.json")
+worn = {e["sprite"] for e in load("enemies", "enemies.json").values() if e.get("sprite")}
+bosses = {b["sprite"] for b in load("enemies", "bosses.json").values() if b.get("sprite")}
+
+
+def largest(rigs: dict, names) -> tuple:
+    sized = [(round(rigs[n]["scale"][0] * zoom), round(rigs[n]["scale"][1] * zoom), n)
+             for n in names if n in rigs and rigs[n].get("scale")]
+    return max(sized, key=lambda t: t[0] * t[1])
+
+
+wash = largest(enemy_rigs, worn)
+tint = max(largest(enemy_rigs, worn | bosses), largest(hero_rigs, hero_rigs), key=lambda t: t[0] * t[1])
+print(f"zoom {zoom}; {len(worn)} rigs worn by regular enemies, {len(bosses)} by bosses")
+for label, (w, h, name), caps in (("wash (regular enemies)", wash, (512, 1024, 1536)),
+                                  ("tint (enemies, bosses, hero)", tint, (128, 256))):
+    one = w * h * 4
+    print(f"    {label}: the largest frame is {name}'s, {w}x{h}, {one / 1e6:.2f} MB a copy; full caps: "
+          + ", ".join(f"{c} -> {c * one / 1e6:.1f} MB" for c in caps))
 
 print("\n== 5. the appendix probes ==")
 print("sitting 1, gc_probe --pack:")
