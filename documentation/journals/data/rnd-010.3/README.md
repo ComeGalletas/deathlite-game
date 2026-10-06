@@ -57,6 +57,8 @@ tails and the screen fill apart (sitting 5).
 - sitting 5's fight against its quiet runs, layer by layer, naming any
   row a run did not print;
 - the caches' misses, memory, costs and the savings they predict;
+- what each cache, and the ghost cache, can hold at most at the
+  sittings' zoom (section 4b, the bounds D2 rests on);
 - the appendix probes, the blit floor per sprite with the fill taken out.
 
 ## Taking a sitting again

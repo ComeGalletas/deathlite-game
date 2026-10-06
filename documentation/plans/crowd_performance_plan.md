@@ -8,8 +8,9 @@
 > the owner's machine. Where its numbers revise this review they are
 > written into the row as **measured** in RND-010.3: §3.4 and the new
 > step 4.13 (in a fight the wash cache thrashes; first in the order), 4.2,
-> 4.3, 4.4, 5.1, the sum of gains under the table, §2.5, the paragraph
-> below and the note above appendix A's probes. Two more, here: the
+> 4.3, 4.4, 5.1, the sum of gains under the table, §2.5, §3.1, the order
+> paragraph above the §4 table, the paragraph below and the note above
+> appendix A's probes. Two more, here: the
 > per-enemy lambda and forwarder the paragraph below names cost 0.01 to
 > 0.03 ms a frame each, and the ghost `copy()` 0.01 ms (two shaded
 > bodies); and the blit floor on the owner's screen is 2.10 ms for 200
@@ -34,9 +35,9 @@ section 2). The frame is lost in Python work around those blits (a lambda,
 a forwarder, a shade walk and a `copy()` per enemy; RND-010.3 **measured**
 these on the owner's machine at 150: the lambda and the forwarder 0.03 ms a
 frame together, the shade walk 0.27, the copy 0.01 for two shaded bodies
-only, while the sprite blit itself was 55 % of an enemy's own draw; so
-"not the limit" and "lost around the blits" do not hold as stated for
-the draw; see the header), in Python per-enemy
+only, while the sprite blit itself was 55 % of an enemy's own draw; so,
+for those four steps in the quiet packed scene, "lost around the blits"
+does not hold as stated; see the header), in Python per-enemy
 update work (about 25 to 45 µs per enemy), in two near-quadratic
 enemy-to-enemy passes, in a pure-Python flow-field fill that costs 2 to
 3 ms on most frames, and in a fixed 5.4 ms of terrain per frame before any
@@ -154,10 +155,12 @@ Sprites, flips and scales are cached once per `(rig, anim, size, flip,
 tint)` (`game/assets.py:103-157`); frames are shared, not copied; the
 animators hold one float each (`systems/animation.py:11-45`). That part
 is right. The cost is around the blit (RND-010.3 **measured** otherwise
-on the owner's machine: the blit itself is 55 % of an enemy's own draw
-in isolation, the Python steps below are small or unresolved, and in a
-fight the wash and tint caches are too small and empty themselves; see
-4.13 and the journal's results):
+on the owner's machine, in the quiet packed scene: the blit itself is
+55 % of an enemy's own draw in isolation, and the lambda, the forwarder,
+the shade walk and the ghost copy below are small or unresolved. The
+other items below were not timed apart; in a fight the wash and tint
+caches are too small and empty themselves, see 4.13 and the journal's
+results):
 
 - A lambda per enemy per frame (`game/states/playing/visual/scene.py:127-129`),
   then a generated forwarder costing two `getattr` per call
@@ -188,7 +191,9 @@ fight the wash and tint caches are too small and empty themselves; see
 - Fixed per frame on the owner's machine: ground bands 3.4 ms
   (`../journals/frame_time_journal.md:734`, RND-009 found them at the
   alpha blitter's floor), water about 2 ms. Together a third of the
-  budget before any enemy.
+  budget before any enemy. (RND-010.3's sitting 5 measured `water` at
+  1.00 to 1.08 ms and `ground` at 3.33 to 3.41 ms, packed, on the owner's
+  machine.)
 
 ### 3.2 Per enemy, update
 
@@ -281,10 +286,11 @@ the owner's machine; the measured number replaces them in the journal.
 
 **Order of work, largest first.** Measure (4.0) before cutting, then draw
 tasks (the owner's trace is draw-bound) interleaved with the update
-tasks whose packed share is largest. (Since RND-010.3, the draw tasks
-follow the journal's "The order for RND-010.4 onward", which starts with
-4.13; 4.1 and the update tasks, which it did not measure, keep this
-order.)
+tasks whose packed share is largest. (Since RND-010.3, the sequence is
+the table under the journal's "The order for RND-010.4 onward": 4.13,
+4.1, 4.5, 4.4, 4.6, 4.2, then the update tasks 4.7 to 4.12 in this
+order, then section 5; 4.3 is left out. A proposal the owner may
+reorder.)
 
 | # | Task | Where | Expected | Done when |
 |---|---|---|---|---|

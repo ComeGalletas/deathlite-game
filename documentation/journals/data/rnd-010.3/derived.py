@@ -119,26 +119,29 @@ for n in COUNTS:
           f" -> {verdict(mm[1], mm[2])}; p90 {tails[2]} -> {tails[3]}; p99 {tails[4]} -> {tails[5]}")
     pooled = float(tails[0]) - float(tails[1])
     print(f"    pooled over all 640 frames a side, the mean falls by {pooled:.2f} ms (one figure, no interval)")
-    if n == 250:
-        caches = text("r5_caches_250.txt")
-        wash = re.search(r"wash: .*?\n((?:    cap.*\n)+)    a miss ([\d.]+) us.*?\n    emptying a cache of "
-                         r"\d+: ([\d.]+) ms", caches)
-        now = re.search(r"cap\s+512: emptied when full\s+([\d.]+) misses a frame, worst\s+\d+, emptied\s+(\d+)",
-                        wash.group(1))
-        lru = float(re.search(r"cap\s+1536: .*?LRU\s+([\d.]+)", wash.group(1)).group(1))
-        miss, empty_ms = float(wash.group(2)), float(wash.group(3))
-        predicted = (float(now.group(1)) - lru) * miss / 1000 + int(now.group(2)) * empty_ms / 600
-        print(f"    the replay predicts {predicted:.2f} ms saved; against the median per-block mean saving "
-              f"{-float(mm[0]):.2f} ({-float(mm[2]):.2f} to {-float(mm[1]):.2f}) the gap is "
-              f"{predicted + float(mm[1]):.2f} to {predicted + float(mm[2]):.2f} ms; against the pooled "
-              f"{pooled:.2f}, {predicted - pooled:.2f} ms")
-        distinct = int(re.search(r"wash: .*?(\d+) distinct frames", caches).group(1))
-        slowest = float(re.search(r"wash: .*?a miss [\d.]+ us \([\d.]+ to ([\d.]+)\)", caches, re.DOTALL).group(1))
-        for label, cost in (("the median miss", miss), ("the slowest pass's miss", slowest)):
-            fill = distinct * cost / 1000
-            print(f"    the variant's LRU starts nearly empty: an estimate of its fill, the replay's {distinct} "
-                  f"distinct frames at {label} ({cost} us): {fill:.0f} ms, {fill / int(frames):.2f} ms over "
-                  f"the {frames} frames on")
+    # The replay's prediction at this count, against the measurement.
+    caches = text(f"r5_caches_{n}.txt")
+    wash = re.search(r"wash: .*?\n((?:    cap.*\n)+)    a miss ([\d.]+) us.*?\n    emptying a cache of "
+                     r"\d+: ([\d.]+) ms", caches)
+    now = re.search(r"cap\s+512: emptied when full\s+([\d.]+) misses a frame, worst\s+\d+, emptied\s+(\d+)",
+                    wash.group(1))
+    lru = float(re.search(r"cap\s+1536: .*?LRU\s+([\d.]+)", wash.group(1)).group(1))
+    miss, empty_ms = float(wash.group(2)), float(wash.group(3))
+    predicted = (float(now.group(1)) - lru) * miss / 1000 + int(now.group(2)) * empty_ms / 600
+    today = float(now.group(1)) * miss / 1000 + int(now.group(2)) * empty_ms / 600
+    print(f"    the replay predicts today's wash cache at {today:.2f} ms a frame and the LRU of 1536 to save "
+          f"{predicted:.2f}")
+    print(f"    the replay predicts {predicted:.2f} ms saved; against the median per-block mean saving "
+          f"{-float(mm[0]):.2f} ({-float(mm[2]):.2f} to {-float(mm[1]):.2f}) the gap is "
+          f"{predicted + float(mm[1]):.2f} to {predicted + float(mm[2]):.2f} ms; against the pooled "
+          f"{pooled:.2f}, {predicted - pooled:.2f} ms")
+    distinct = int(re.search(r"wash: .*?(\d+) distinct frames", caches).group(1))
+    slowest = float(re.search(r"wash: .*?a miss [\d.]+ us \([\d.]+ to ([\d.]+)\)", caches, re.DOTALL).group(1))
+    for label, cost in (("the median miss", miss), ("the slowest pass's miss", slowest)):
+        fill = distinct * cost / 1000
+        print(f"    the variant's LRU starts nearly empty: an estimate of its fill, the replay's {distinct} "
+              f"distinct frames at {label} ({cost} us): {fill:.0f} ms, {fill / int(frames):.2f} ms over "
+              f"the {frames} frames on")
 print("context, sitting 2's wash_lru (another sitting and commit):")
 for n in COUNTS:
     name, off, on, frames, med, lo, hi = re.search(VARIANT, text(f"r2_wash_lru_{n}.txt")).groups()
@@ -179,19 +182,34 @@ for n in COUNTS:
     summed = sum(v for k, v in added.items() if k not in ("draw", "(all layers)"))
     print(f"    the layers' added p50s, summed: {summed:+.2f}; the '(all layers)' row's p50, added: "
           f"{added['(all layers)']:+.2f}")
+    # The quiet side draws more enemies: what that is worth, per enemy in
+    # view, three ways from sitting 5's own rows (the crowd's group on each
+    # side, and the fight's bare draw less its terrain).
+    vq, vf = mean([h["view"] for h in hq]), mean([h["view"] for h in hf])
+    per = {"the quiet crowd's group": mean([h["crowd"] for h in hq]) / vq,
+           "the fight's crowd group": mean([h["crowd"] for h in hf]) / vf,
+           "the fight's bare draw less terrain": mean([h["bare"] - h["terrain"] for h in hf]) / vf}
+    worth = {k: (vq - vf) * v for k, v in per.items()}
+    print(f"    the quiet side has {vq - vf:.0f} more in view; at "
+          + ", ".join(f"{k} {1000 * v:.0f} us an enemy" for k, v in per.items())
+          + f": {min(worth.values()):.2f} to {max(worth.values()):.2f} ms")
     print("    quiet rows world_bucketed's work lies in (a / b): "
           + "  ".join(f"{k} {lq[0][k]:.2f} / {lq[1][k]:.2f}" for k in ("world", "scenery_list")))
+for row in ("ground", "water"):
+    values = [layers(text(f"r5_{k}_{n}{r}.txt"))[row] for k in ("quiet", "fight") for n in COUNTS for r in "ab"]
+    print(f"sitting 5, every run at both counts: {row} {min(values):.2f} to {max(values):.2f} ms")
 print("context, other sittings' fights and quiet runs (bare draw, terrain):")
 for n in COUNTS:
     for name in (f"r1_fight_{n}.txt", f"r2_fight_{n}.txt", f"r4_quiet_{n}a.txt", f"r4_fight_{n}a.txt",
                  f"r4_quiet_{n}b.txt", f"r4_fight_{n}b.txt", f"r3_quiet_{n}a.txt", f"r3_quiet_{n}b.txt"):
         h = headline(text(name))
         print(f"    {name:20s} bare {h['bare']:6.2f}  terrain {h['terrain']:5.2f}")
-    early = [headline(text(f"r{s}_fight_{n}.txt"))["bare"] for s in (1, 2)]
     later = [headline(text(f"r5_fight_{n}{r}.txt"))["bare"] for r in "ab"]
-    gaps = [e - x for e in early for x in later]
-    print(f"    {n}: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: "
-          f"{min(gaps):+.2f} to {max(gaps):+.2f} ms")
+    for label, sittings in (("sittings 1 and 2's", (1, 2)), ("sitting 1's", (1,)), ("sitting 2's", (2,))):
+        early = [headline(text(f"r{s}_fight_{n}.txt"))["bare"] for s in sittings]
+        gaps = [e - x for e in early for x in later]
+        print(f"    {n}: {label} fights' bare draw over sitting 5's, every pairing: "
+              f"{min(gaps):+.2f} to {max(gaps):+.2f} ms")
 
 print("\n== 4. the caches, sitting 5 ==")
 for n in COUNTS:
@@ -257,6 +275,13 @@ for label, (w, h, name), caps in (("wash (regular enemies)", wash, (512, 1024, 1
     one = w * h * 4
     print(f"    {label}: the largest frame is {name}'s, {w}x{h}, {one / 1e6:.2f} MB a copy; full caps: "
           + ", ".join(f"{c} -> {c * one / 1e6:.1f} MB" for c in caps))
+# The ghost cache (`TerrainRenderer._ghost_of`, 128 entries) keeps each
+# entry's source frame alive beside its ghost, and a source can be a washed
+# or tinted copy the caches above have already dropped: two copies an entry,
+# of any frame a character is drawn in.
+w, h, name = tint
+print(f"    ghost (128 entries, the source kept beside the ghost): up to 128 x 2 x {w * h * 4 / 1e6:.2f} MB "
+      f"({name}) = {128 * 2 * w * h * 4 / 1e6:.1f} MB, whatever the caps above")
 
 print("\n== 5. the appendix probes ==")
 print("sitting 1, gc_probe --pack:")

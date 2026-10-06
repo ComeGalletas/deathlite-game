@@ -509,8 +509,10 @@ since the hero does not attack.
   today's 512 could hold up to 71.9 MB, 1024 up to 143.8 MB and 1536 up
   to 215.8 MB. The tint cache also takes the boss's and the hero's
   frames, up to 0.69 MB, so a tint cap of 256 could hold up to 175.5 MB.
-  A cap in bytes is the other way to set it. The ghost cache's
-  copies are in none of these figures. The web build's memory headroom
+  A cap in bytes is the other way to set it. The ghost cache is in none
+  of these: its 128 entries keep their source frames (washed or tinted
+  copies included) alive beside their ghosts, up to 175.5 MB whatever the
+  caps, so it does not change between the choices here. The web build's memory headroom
   is not measured.
 
 ## RND-010: Review of 2026-10-03 (read-only)
@@ -527,9 +529,9 @@ above, except for the plan's two appendix probes (`blit_floor.py`,
 The work was to resume at the plan's 4.1 onward as RND-010.3 and after,
 with RND-010.D1's ranking inside the enemies' own draw and the open item
 of a fighting scene (above) taken first. RND-010.3 did those two, and
-its results set a new order for the draw: RND-010.4 is the plan's 4.13,
-not 4.1. 4.1 and the update tasks keep their place in the plan's order
-(see the results' "The order for RND-010.4 onward").
+its results set a new order: RND-010.4 is the plan's 4.13, not 4.1. The
+whole sequence, 4.1 and the update tasks included, is the table under
+the results' "The order for RND-010.4 onward".
 
 ## RND-010.3: The leads inside the enemies' own draw (plan, 2026-10-04)
 
@@ -614,8 +616,10 @@ The two sides do not hold the same crowd. Both start from 135 alive (at
 and 250, the fights at 150 and 247. The quiet runs also have more in view:
 147 against 139 at 150, and 224 against 222 at 250. So the quiet side
 draws a few more enemies, and what the fight is shown to add is
-understated by that much (8 fewer in view at 150, at the order of 13 µs
-each from the leads below, is about 0.1 ms).
+understated by that much. By sitting 5's own per-enemy costs (the crowd's
+group on either side, or the fight's bare draw less its terrain, over
+the count in view), the 8 more in view at 150 are worth 0.17 to 0.37 ms,
+and the 2 at 250 are worth 0.04 to 0.11 ms.
 
 Sitting 5, p50, two runs a side. The range under "Added" runs from the
 lower fight less the higher quiet run to the higher fight less the lower
@@ -705,9 +709,12 @@ copy than a small one, so the weighting is an assumption, not measured.
 Those are the same order as the `enemies` row's +2.12 ms in the fight.
 This is a prediction, not a measurement: nothing here times the two
 caches inside the frame. The replay's scene also ended with 237 alive,
-against the fight's 247. At 150 the fight asks for 52 a frame from 1,027
-distinct frames, which comes to 3.41 misses a frame and 0.28 ms
-predicted.
+against the fight's 247. Fewer bodies wash less, so this leans the
+prediction low against the `enemies` row.
+
+At 150 the fight asks for 52 a frame from 1,027 distinct frames. That is
+3.41 misses a frame, which the replay prices at 0.28 ms a frame for
+today's cache and 0.24 ms saved by the LRU of 1536.
 
 Timed as a throwaway variant: `draw_variants --elements --variants
 wash_lru`, an LRU of 1536 (`draw_variants.WASH_LRU_CAP`), the tool's
@@ -736,8 +743,12 @@ The pooled rows put all 640 frames of a side together.
 
 The replay predicts 1.83 ms saved at 250. Measured against the median of
 the blocks' mean savings (1.27, interval 0.74 to 1.56), the gap is 0.27
-to 1.09 ms; against the pooled mean (1.28), it is 0.55 ms. The gap is
-open. Candidates, none of them measured, each with the way it leans:
+to 1.09 ms; against the pooled mean (1.28), it is 0.55 ms. At 150 it runs
+the other way: the replay predicts 0.24 ms saved, and the pooled mean
+saving is 0.58 ms, more than the whole 0.28 ms the replay prices today's
+cache at. The median's interval there (−0.11 to +1.04) still includes
+zero. Measured above the prediction at 150 and below it at 250: the gaps
+are open. Candidates, none of them measured, each with the way it leans:
 - a miss may cost less inside the frame than in the timing loop (the
   prediction too high);
 - the variant's LRU begins nearly empty, since only `identical`'s two
@@ -760,6 +771,13 @@ open. Candidates, none of them measured, each with the way it leans:
 - the timed blocks cover the fight's frames 0 to 1,280 after the warm-up
   (16 blocks of two 40-frame parts, the tool's defaults), and the replay
   covers frames 300 to 900, so they average different stretches of it.
+  The primed share falls as the fight goes on, so the later timed blocks
+  wash less than the replay's frames: this leans the measured saving
+  below the prediction.
+
+The stale-cache bias leans toward the variant most where the game's
+cache empties least often, which is 150. That fits a measured saving
+above the prediction at 150, but nothing here shows it is the cause.
 
 Not a candidate: the ghost cache (`TerrainRenderer._ghost_of`, which
 empties itself at 128) keys on the washed copy's identity. It serves an
@@ -796,7 +814,8 @@ Two biases sit in these figures, neither one quantified:
   which is kind to caches and branches, so a piece reads low against its
   cost inside the frame;
 - sitting 1 ran at 23 to 48 % CPU load, against 3 to 22 % in sitting 5,
-  and its fights drew 0.6 to 1.9 ms more at 150 than sitting 5's, so its
+  and its fights drew 1.8 to 1.9 ms more at 150 than sitting 5's (2.9 to
+  3.0 at 250), so its
   figures may read high.
 
 The ghost copy, the one per-frame `copy()` the plan named, runs only for
@@ -873,8 +892,11 @@ sitting 5, a different sitting from the variant's.
      up to 71.9 MB, 1024 up to 143.8 MB and 1536 up to 215.8 MB. A cap
      in bytes would bound it directly; that is a design choice for
      RND-010.4.
-   - The ghost cache's own copies, which outlive the wash cache's, are
-     in none of these figures.
+   - The ghost cache is in none of these figures. Its 128 entries each
+     keep a source frame alive beside its ghost, and a source can be a
+     washed or tinted copy the caches above have already dropped. That
+     is up to 175.5 MB (128 x 2 x 0.69 MB) whatever the caps, so it does
+     not change between the choices in D2.
    - The tint cache as an LRU of 256 (16.5 against 8.5 MB held) is
      predicted at 0.10 ms. That is below what a sitting resolves, so it
      goes in only if the owner wants the two caches alike. It also takes
@@ -898,8 +920,8 @@ sitting 5, a different sitting from the variant's.
 5. **GC freeze** (plan 4.2): the 8.6 ms spike is real but rare, and the
    one frozen run was no better. Re-time it interleaved before building.
 6. **The blit batch** (plan 5.1): what a batch would save, the Python
-   call per blit, is not measured. It comes last among these by
-   judgement: the game's blit and the floor's are of the same order.
+   call per blit, is not measured, so it comes last among these, by
+   judgement.
 7. **The CPU variants:** none resolved a saving. By judgement, not by
    measurement, they are not worth building alone.
    - In isolation at 250, `rig_frame` is 0.32 ms, and the lambda and the
@@ -912,10 +934,28 @@ the sizes come from different sittings where noted.
 
 Its scope is the draw RND-010.3 measured, plus the collector (item 5),
 which sitting 1 measured on the side. The plan's other tasks were not
-measured here and keep their place in the plan's own order. Those are
-4.1 (`report_debug`, the plan's next task before this order), the update
-tasks 4.7 to 4.12, and 5.2 to 5.4. RND-010.4 is 4.13 because it is the
-one exact win measured, not because those tasks were dropped.
+measured here: 4.1 (`report_debug`, the plan's next task before this
+order), the update tasks 4.7 to 4.12, and 5.2 to 5.4. RND-010.4 is 4.13
+because it is the one exact win measured, not because those were
+dropped.
+
+**The whole sequence, one task an ID, as proposed (a judgement; the
+owner may reorder it):**
+
+| ID | Plan step | What |
+|---|---|---|
+| RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled |
+| RND-010.5 | 4.1 | `report_debug` only with the overlay on (cheap, the plan's next) |
+| RND-010.6 | 4.5 | the elemental under-layer: split `draw_under`, then variants |
+| RND-010.7 | 4.4 | the shade walk's skip, and the ghost without copies |
+| RND-010.8 | 4.6 | bars, damage numbers, particles culled and without copies |
+| RND-010.9 | 4.2 | the collector, re-timed interleaved before it is built |
+| RND-010.10 onward | 4.7 to 4.12 | the update tasks, in the plan's order |
+| after those | 5.1 to 5.4 | the second stage, the blit batch first |
+
+Item 7, the CPU variants, has no place in it: none is worth building
+alone. That leaves out 4.3 too, since what it removes is the same small
+or unresolved work (the lambda, the forwarder, the bucketing).
 
 Two things the plan for RND-010.3 (above) promised were not done:
 - The leads were to be reported beside the same sitting's own `enemies`
@@ -952,5 +992,6 @@ plan's §6 decision, which is still the owner's.
   - [x] RND-010.3.16: The fourth review's findings: the memory bound over the frames each cache can be asked for (bosses are never washed), the ghost cache's bodies, the order's rule and the plan's promises not kept, the statistics' assumptions; tested
   - [x] RND-010.3.17: The fifth review's findings: the two sides' crowds and the bias they leave, the variant's cold start as a bounded gap candidate, the appendix note's evidence, the plan's order paragraph; the bound's premise and the prediction tested apart
   - [x] RND-010.3.18: The sixth review's findings: the unprimed share's causes unmeasured, the cold start an estimate, the stale-cache bias of ABBA and the leads' biases named with their direction, the order's scope (4.1 and the update tasks keep the plan's order), the plan's diagnosis annotated; the callers of both caches pinned
+  - [x] RND-010.3.19: The seventh review's findings: sitting 1's own range, the crowd bias from sitting 5's costs (0.17 to 0.37 ms), the 150 prediction against its measurement, the plan's annotations narrowed to what was timed, one merged task sequence, the ghost cache's memory; tested
 - [ ] RND-010.4: The wash cache as an LRU, pixel-identical and tested, once RND-010.D2 sets the cap (further winners, in the order above, as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

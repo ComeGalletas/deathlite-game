@@ -16,6 +16,7 @@ What is pinned:
 """
 import contextlib
 import io
+import re
 import unittest
 from unittest import mock
 
@@ -368,6 +369,12 @@ class MainTests(unittest.TestCase):
         self.assertRegex(text, r"\n  wash: [\d.]+ requests a frame")     # the hero fights
         self.assertIn("    cap    64: emptied when full ", text)
         self.assertRegex(text, r"a miss [\d.]+ us \([\d.]+ to [\d.]+\), a hit .* over 2 passes")
+        # The emptying is timed at the game's own cap, not the replayed caps
+        # (64 here): as many copies as there are distinct frames, up to it.
+        wash = text.split("  wash: ", 1)[1].split("\n  tint: ", 1)[0]   # asked of above, so present
+        distinct = int(re.search(r"(\d+) distinct frames", wash).group(1))
+        emptied = int(re.search(r"emptying a cache of (\d+):", wash).group(1))
+        self.assertEqual(emptied, min(512, distinct))
         self.assertTrue(text.rstrip().endswith("  boss at the end: held back"))
 
 

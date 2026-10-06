@@ -15,7 +15,8 @@ with the hero fighting, every enemy primed. Every request the draw makes
 to either cache over `--frames` frames is recorded, the hero jittering
 on its anchor as `spawn_stress.run` does. What the draw asks for does not
 depend on what a cache holds (a hit and a miss give the same pixels, and
-the draw changes no state), so the one recording is replayed through
+nothing the draw changes feeds back into what it asks of the caches;
+`RequestTests` pins it), so the one recording is replayed through
 each policy: the game's own, emptying whole when full, and an LRU that
 drops only the entry used longest ago, at each of `--wash-caps` and
 `--tint-caps`. Printed per cache and cap: the misses a frame and the
@@ -23,7 +24,8 @@ worst frame's, over the frames from `--warm` on (the game's caches are
 warm by then), how many times the game's policy emptied the cache in
 those frames, and the most memory the replayed cache held at any point
 (each copy's rows times its height). Then what emptying a full cache
-costs (the game's frees its every copy at once), and what one miss and one hit cost:
+costs (the game's drops its every copy at once; in the game the ghost
+cache may still hold some), and what one miss and one hit cost:
 every distinct source washed (or tinted) with the cache emptied, then
 again with each one held, `--passes` times over, each pass on a fresh
 cache after the last one's copies are dropped; the median pass and the
@@ -177,7 +179,8 @@ def clear_cost(name: str, sources: dict, entries: int, passes: int = 5) -> dict 
     """Milliseconds to empty a full cache, as the game's does when it
     reaches its cap: `entries` copies made (from as many distinct sources
     as there are, up to `entries`) in a fresh cache, then the dict cleared,
-    which frees every copy at once. One figure per pass; `entries` is how
+    which frees every copy at once here, where nothing else holds them
+    (in the game the ghost cache may). One figure per pass; `entries` is how
     many it held. The game's cache is left as found. None when the
     recording asked nothing of it."""
     fx, R = _modules()

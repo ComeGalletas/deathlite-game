@@ -56,7 +56,27 @@ FIGURES = (
      "the fill alone takes 0.37 ms"),
     ("the lambda and the forwarder alone: 0.05 ms",
      "lambda and the forwarder together cost 0.03 ms at 150 and 0.05 at 250"),
+    (("150: sitting 1's fights' bare draw over sitting 5's, every pairing: +1.84 to +1.90 ms",
+      "250: sitting 1's fights' bare draw over sitting 5's, every pairing: +2.91 to +2.97 ms"),
+     "1.8 to 1.9 ms more at 150 than sitting 5's (2.9 to 3.0 at 250)"),
+    ("the replay predicts today's wash cache at 0.28 ms a frame and the LRU of 1536 to save 0.24",
+     "0.28 ms a frame for today's cache and 0.24 ms saved by the LRU of 1536"),
+    ("the fight's bare draw less terrain 46 us an enemy: 0.17 to 0.37 ms", "are worth 0.17 to 0.37 ms"),
+    (("n=300 sprite only        p50 2.46 ms, less the fill 0.37: 6.97 us a sprite",
+      "n=100 sprite only        p50 1.23 ms, less the fill 0.37: 8.60 us a sprite"),
+     "6.97 to 8.60 µs a blit"),
+    ("= 175.5 MB, whatever the caps above", "up to 175.5 MB (128 x 2 x 0.69 MB)"),
 )
+
+# The same for a few of the plan's RND-010.3 annotations.
+PLAN_FIGURES = (
+    ("sitting 5, every run at both counts: ground 3.33 to 3.41 ms", "`ground` at 3.33 to 3.41 ms"),
+    ("sitting 5, every run at both counts: water 1.00 to 1.08 ms", "`water` at 1.00 to 1.08 ms"),
+    ("mean diff median -1.27, interval -1.56 to -0.74",
+     "the blocks' median mean saving is 1.27 ms (97.9 % interval 0.74 to 1.56"),
+    ("1536 -> 215.8 MB", "so 1536 could hold 215.8 MB"),
+)
+PLAN = ROOT / "documentation" / "plans" / "crowd_performance_plan.md"
 
 FILES = {"README.md", "derived.py"} | {f"sitting{n}.sh" for n in range(1, 6)} | {
     f"r{n}_meta.txt" for n in range(1, 6)} | {
@@ -91,6 +111,13 @@ class DerivedTests(unittest.TestCase):
                 for line in (printed if isinstance(printed, tuple) else (printed,)):
                     self.assertIn(line, self.out)
                 self.assertIn(quoted, self.journal)
+
+    def test_the_plan_quotes_them_too(self):
+        plan = " ".join(PLAN.read_text(encoding="utf-8").replace("−", "-").split())
+        for printed, quoted in PLAN_FIGURES:
+            with self.subTest(figure=quoted):
+                self.assertIn(printed, self.out)
+                self.assertIn(quoted, plan)
 
     def test_the_prediction_and_the_bound_recomputed_apart(self):
         # The saving the LRU of 1536 predicts at 250, from the raw caches
