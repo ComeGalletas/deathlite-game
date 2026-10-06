@@ -465,7 +465,8 @@ since the hero does not attack.
   `--elements` infuses three weapons and turns the hero's attacks on
   (`spawn_stress.infuse`), and `--element-rate` and `--cascade` add hits
   and chained reactions; `--layers` runs with all three. No sitting here
-  used them.
+  used them. (Settled since: RND-010.3 measured the fight, with no answer
+  from the owner, as the review recommended. See "RND-010.3: Results".)
 - **Taken before RND-011 reached this branch.** Every sitting here ran
   before `main` (RND-011) moved the elemental aura shed out of the draw
   and into the update, on its own seeded stream; the branch took that in
@@ -492,8 +493,9 @@ since the hero does not attack.
   share of the exclusive `enemies` row (its own draw, without the shade,
   bars and marks) is about 10 to 14 µs and a timed call costs about 1 µs
   in place, so a wrapper per lead would be a large share of what it
-  measures (a judgement from those two figures; the leads themselves are
-  not timed yet).
+  measures (a judgement from those two figures; the leads were not timed
+  then; RND-010.3 timed them in isolation and as variants, see its
+  results).
 - **RND-010.D2 (open, for the owner, 2026-10-06):** how much memory the
   sprite caches may hold, which sets RND-010.4's caps. The washed frames
   hold up to 20 MB today (512 at a 40 KB median entry). The LRU of 1536,

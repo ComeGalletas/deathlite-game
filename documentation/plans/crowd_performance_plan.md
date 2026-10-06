@@ -3,12 +3,16 @@
 > Read-only review, 2026-10-03. Serves RND-010 (`../journals/crowd_draw_journal.md`),
 > whose step RND-010.2 (4.0 below) is done; the work resumes at 4.1, as
 > RND-010.3 and after. RND-010.3 (done, 2026-10-06) measured the leads on
-> the owner's machine and revises three things here: in a fight the wash
-> cache thrashes (§3.4, new step 4.13, first in the order); the per-enemy
-> lambda and forwarder cost little (4.3); and the blit floor on the
-> owner's screen is 2.53 ms for 200, not 5.5 (§2.3 is the review's
-> container). The journal's "RND-010.3: Results" has the figures and the
-> order for RND-010.4 onward. Nothing in the code was
+> the owner's machine. Where its numbers revise this review they are
+> written into the row as **measured** in RND-010.3: §3.4 and the new
+> step 4.13 (in a fight the wash cache thrashes; first in the order), 4.2,
+> 4.3, 4.4, 5.1 and the sum of gains under the table. Two more, here: the
+> per-enemy lambda and forwarder the paragraph below names cost 0.01 to
+> 0.03 ms a frame each, and the ghost `copy()` 0.01 ms (two shaded
+> bodies); and the blit floor on the owner's screen is 2.53 ms for 200
+> with a shadow and a bar, not 5.5 (§2.3 is the review's container). The
+> journal's "RND-010.3: Results" has the figures and the order for
+> RND-010.4 onward. Nothing in the code was
 > changed by the review. Measured facts are marked **measured** with the
 > machine they came from; everything else is read from the code and cites
 > `file:line` on `main` at `6384fa3`.
@@ -263,9 +267,9 @@ tasks whose packed share is largest.
 |---|---|---|---|---|
 | 4.0 | **RND-010.2: the draw by layer in the harness.** Add a per-layer breakdown of `PlayingState.draw` to `spawn_stress.py --render`: terrain bands, water, enemies (with shade split out), other actors, ghost pass, elemental layers, particles, damage numbers, the rest. Parts must sum to the whole, pinned by a test. Put appendix A's two probes under `tools/benchmarks/` (`blit_floor.py`, `gc_probe.py`) while there. | `tools/benchmarks/spawn_stress.py:359-402` | ranks 4.1 to 4.8 by milliseconds | the table at 150, 200, 250 packed is in `crowd_draw_journal.md`: **done** (RND-010.2; the two appendix probes moved under `tools/benchmarks/` in RND-010.3.2) |
 | 4.1 | **Stop `report_debug` when the overlay is hidden.** Compute the debug lines only when F1 is on. | `core/state.py:394`, `devtools/dev_flags.py:116` | 0.2 to 0.5 ms | `test_dev_flags` style test: no `active_auras` call with the overlay off |
-| 4.2 | **GC: freeze after load, raise the gen-2 threshold.** `gc.collect(); gc.freeze()` once the run is built (after `LoadingState` hands over), `gc.set_threshold(700, 10, 1000)`. Un-freeze is not needed; frozen objects are the world and the assets. | `game/states/loading_state.py` hand-over, or `Game` | removes a 13 ms pause every ~10 s | appendix A.2 shows zero gen-2 in 600 frames |
+| 4.2 | **GC: freeze after load, raise the gen-2 threshold.** `gc.collect(); gc.freeze()` once the run is built (after `LoadingState` hands over), `gc.set_threshold(700, 10, 1000)`. Un-freeze is not needed; frozen objects are the world and the assets. | `game/states/loading_state.py` hand-over, or `Game` | removes a 13 ms pause every ~10 s; **measured** in RND-010.3 on the owner's machine: one gen-2 of 8.6 ms in 600 frames, none frozen, but the frozen run's tail was worse (p99 38.51 against 33.74 ms; the two runs one after the other, not interleaved), so the gain is not shown yet | appendix A.2 shows zero gen-2 in 600 frames |
 | 4.3 | **One drawable list per frame.** Build `(level, depth, draw)` once, bucket by level in one pass, sort each bucket once; cache `visible_rect()` per frame on the renderer; replace the per-enemy lambda plus forwarder with a bound method. | `visual/scene.py:37-152`, `core/state.py:755-784`, `systems/camera.py:80` | 0.5 to 1 ms at 150 in view; **measured** in RND-010.3 on the owner's machine: the per-enemy steps it removes are 0.09 ms at 150 and 0.16 at 250, and the bucketed list's variant shows no saving | pixel-identical frame; `test_depth_sort`, `test_render_cull` green |
-| 4.4 | **Shade and ghost without per-frame copies.** Skip the shade walk when the body's cell block holds no shadow (one index lookup, already available); record the shaded scratch into a per-frame arena instead of `drawn.copy()`; cache the shaded ghost per `(frame id, shade key)` with a bounded cache like `_ghost_of`. | `visual/rendering.py:136-147`, `world/terrain/render.py:365-416, 500-550` | 1 to 2 ms at 150 in view, more under trees | pixel-identical; `test_ghost`, `test_enemy_sprite` green |
+| 4.4 | **Shade and ghost without per-frame copies.** Skip the shade walk when the body's cell block holds no shadow (one index lookup, already available); record the shaded scratch into a per-frame arena instead of `drawn.copy()`; cache the shaded ghost per `(frame id, shade key)` with a bounded cache like `_ghost_of`. | `visual/rendering.py:136-147`, `world/terrain/render.py:365-416, 500-550` | 1 to 2 ms at 150 in view, more under trees; **measured** in RND-010.3 in the packed scene (few trees): the shade walk 0.27 ms at 150 and 0.41 at 250, the ghost copy 0.01 ms (two shaded bodies) | pixel-identical; `test_ghost`, `test_enemy_sprite` green |
 | 4.5 | **No SRCALPHA allocation per frame.** Bounded caches keyed by `(radius, colour, alpha)` for `_ring`, `_shape`, markers, hazards and the transient effects; the RND-008 appendix measured the ring cache at 0.30 → 0.20 ms per 100 rings. | `visual/elements/layers.py:132-148, 248-257`, `elements/markers.py:47-53`, `rendering.py:377-383`, `elements/transient.py:259-312` | 0.5 to 1.5 ms in an elemental fight | pixel-identical; `test_element_layers` green |
 | 4.6 | **Cull particles and damage numbers to the view**, and stop `copy()`+`set_alpha` per frame for fading marks and trails (cache per alpha step of 1/16). | `systems/particles.py:100-109`, `ui/damage_numbers.py:190-213`, `status_marks.py:127-130`, `rendering.py:590-594` | 0.3 to 1 ms at 1200 particles | pixel-identical inside the view |
 | 4.7 | **One grid rebuild per frame.** Bump builds its grid from post-move positions and changes only `_knock`; make `run.grid` that grid (check `buffs.update`'s Pinball throws, which move bodies between bump and combat; if they do, rebuild only the moved bodies' cells). Then `Separation` is no longer a frame stale. | `core/physics.py:117, 129`, `core/state.py:495` | 0.3 to 0.6 ms at 200 | `test_enemy_bump`, `test_enemy_nav`, element spread tests green; a test that the two grids answer the same query |
@@ -279,7 +283,11 @@ tasks whose packed share is largest.
 Sum of expected gains: about 5 to 8 ms per frame at 150 in view on the
 owner's machine, which takes the trace's 100 to 149 row (14.6 ms p50)
 comfortably under budget and the 150+ row (21.2 ms) to about the budget.
-Not to 200 in view.
+Not to 200 in view. RND-010.3's measurements put the draw tasks' share of
+that well lower: 4.3 removes 0.09 ms of per-enemy steps at 150, 4.4's shade
+walk is 0.27 ms in the packed scene, and 4.13 (not in the review) is a
+fight's alone; the sum is not re-estimated until each task is measured
+before and after.
 
 ## 5. Second stage: data-oriented hot loops, still Python, still exact
 
@@ -288,7 +296,7 @@ note in the journal before building.
 
 | # | Task | Why | Expected |
 |---|---|---|---|
-| 5.1 | **Batch body blits with `Surface.blits`.** For unshaded, untinted bodies (the common case), collect `(frame, dest)` pairs per terrace and call `screen.blits(pairs, doreturn=False)` once. Shaded or tinted bodies stay on the slow path. | removes the Python call per blit, which is most of the gap between 2.3's floor and the measured draw | 1 to 2 ms at 150 in view |
+| 5.1 | **Batch body blits with `Surface.blits`.** For unshaded, untinted bodies (the common case), collect `(frame, dest)` pairs per terrace and call `screen.blits(pairs, doreturn=False)` once. Shaded or tinted bodies stay on the slow path. | removes the Python call per blit, which is most of the gap between 2.3's floor and the measured draw | 1 to 2 ms at 150 in view; **measured** in RND-010.3: every sprite blit at 150 costs 0.99 ms in all (7.36 µs each, in isolation), and `blit_floor` puts 200 at 2.25 ms on the owner's screen, so the batch can save only part of that |
 | 5.2 | **Flow field off the frame path.** Options, measure each: (a) a coarser fill grid (64 px cells, 4x fewer cells) sampled with the existing bilinear `direction_at`; (b) fill only the reachable disc round the hero (the despawn ring is 1400 px, the fill walks the whole island); (c) a longer interval with the two-cell drift kept. `NAV_FILL_MAX_COST` already exists for (b). | a fixed 2 to 3 ms on 80 % of frames | 1.5 to 2.5 ms |
 | 5.3 | **Movement probe with fewer floor scans.** Cache `room_of` per enemy per frame (five probes land in one room almost always), probe once and reuse; ENT-018's rejected index was per-probe, this is per-body. | 14 % of packed update | 0.5 to 1 ms at 200 |
 | 5.4 | **Behaviour machine without per-tick allocation.** `Steering` reused per enemy; transitions checked only for the current state's list (already so?) with predicates that read floats, not Vector2s; `heading` stored as two floats. | 30 % of packed update | 1 to 2 ms at 200 |
