@@ -70,7 +70,12 @@ bash /tmp/sitting5.sh /tmp/rnd-010.3-again
 git switch -
 ```
 
-Run it with a clean tree, `save.json` in place and nothing else running.
+Run it with a clean tree and nothing else running. `save.json` (ignored
+by git, so absent in a fresh worktree) must be in the repo root with the
+display block the sittings used, which each `rN_meta.txt` records on its
+second line: `{'mode': 'windowed', 'render': '21:9', 'window': [2560,
+1080]}` under `settings.display`. Another display gives another zoom,
+another crowd in view and other numbers.
 The output folder may be anywhere outside the tree. The scripts are kept
 as run, so the usage lines of the first two name the scratch file they
 ran from (`r3_sitting.sh`, `r3_sitting2.sh`); the argument is the same.

@@ -87,6 +87,11 @@ class TimingTests(unittest.TestCase):
             result = DV.timed(ps, "probe", blocks=2, frames=3)
         home = (10.0, 20.0)
         self.assertEqual(log, [(False, home), (True, home), (True, home), (False, home)])
+        log.clear()
+        with mock.patch.dict(DV.VARIANTS, {"probe": variant}), mock.patch.object(DV.S, "run", run):
+            DV.timed(ps, "probe", blocks=4, frames=3)
+        self.assertEqual([on for on, _pos in log],                 # off-on, on-off, off-on, on-off
+                         [False, True, True, False, False, True, True, False])
         self.assertFalse(state["on"])
         self.assertEqual(tuple(ps.player.pos), home)
         self.assertEqual(result["diffs"], [-1.0, -1.0])
@@ -156,6 +161,17 @@ class WashLruTests(unittest.TestCase):
                 undo()
         self.assertEqual(list(DV._WASH_LRU), [key(a), key(c)])
         self.assertIs(DV._WASH_LRU[key(a)][1], first)
+        # b, dropped, washes afresh to the game's pixels.
+        with mock.patch.object(self.fx, "_WASH_CACHE", {}):
+            want = pygame.image.tobytes(self.fx.washed(b, ElementId.ICE), "RGBA")
+        with mock.patch.object(DV, "WASH_LRU_CAP", 2):
+            undo = DV.VARIANTS["wash_lru"](None)
+            try:
+                again = self.fx.washed(b, ElementId.ICE)
+            finally:
+                undo()
+        self.assertEqual(pygame.image.tobytes(again, "RGBA"), want)
+        self.assertNotIn(key(a), DV._WASH_LRU)                     # and a went for it
 
 
 class SceneTests(unittest.TestCase):

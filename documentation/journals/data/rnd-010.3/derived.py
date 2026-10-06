@@ -35,6 +35,11 @@ def text(name: str) -> str:
 def layers(t: str) -> dict:
     rows = {m.group(1): float(m.group(2)) for m in re.finditer(
         r"^    ([a-z_/]+)\s+([\d.]+) /\s+[\d.]+ /\s+[\d.]+\s+[\d.]+ %\s+[\d.]+$", t, re.MULTILINE)}
+    # Every line of the table must parse: a row the pattern misses would
+    # otherwise vanish from every run alike, with no "no row" notice.
+    table = t.split("draw by layer", 1)[1].split("    (all layers)", 1)[0]
+    lines = [ln for ln in table.splitlines()[1:] if ln.startswith("    ") and ln.strip()]
+    assert len(lines) == len(rows), f"{len(lines)} layer lines, {len(rows)} parsed"
     rows["(all layers)"] = float(re.search(r"^    \(all layers\)\s+([\d.]+)", t, re.MULTILINE).group(1))
     return rows
 
@@ -111,6 +116,21 @@ for n in COUNTS:
           f"p50 diff median {med}, interval {lo} to {hi} -> {verdict(lo, hi)}")
     print(f"    mean off {tails[0]} on {tails[1]}; mean diff median {mm[0]}, interval {mm[1]} to {mm[2]}"
           f" -> {verdict(mm[1], mm[2])}; p90 {tails[2]} -> {tails[3]}; p99 {tails[4]} -> {tails[5]}")
+    pooled = float(tails[0]) - float(tails[1])
+    print(f"    pooled over all 640 frames a side, the mean falls by {pooled:.2f} ms (one figure, no interval)")
+    if n == 250:
+        caches = text("r5_caches_250.txt")
+        wash = re.search(r"wash: .*?\n((?:    cap.*\n)+)    a miss ([\d.]+) us.*?\n    emptying a cache of "
+                         r"\d+: ([\d.]+) ms", caches)
+        now = re.search(r"cap\s+512: emptied when full\s+([\d.]+) misses a frame, worst\s+\d+, emptied\s+(\d+)",
+                        wash.group(1))
+        lru = float(re.search(r"cap\s+1536: .*?LRU\s+([\d.]+)", wash.group(1)).group(1))
+        miss, empty_ms = float(wash.group(2)), float(wash.group(3))
+        predicted = (float(now.group(1)) - lru) * miss / 1000 + int(now.group(2)) * empty_ms / 600
+        print(f"    the replay predicts {predicted:.2f} ms saved; against the median per-block mean saving "
+              f"{-float(mm[0]):.2f} ({-float(mm[2]):.2f} to {-float(mm[1]):.2f}) the gap is "
+              f"{predicted + float(mm[1]):.2f} to {predicted + float(mm[2]):.2f} ms; against the pooled "
+              f"{pooled:.2f}, {predicted - pooled:.2f} ms")
 print("context, sitting 2's wash_lru (another sitting and commit):")
 for n in COUNTS:
     name, off, on, frames, med, lo, hi = re.search(VARIANT, text(f"r2_wash_lru_{n}.txt")).groups()
@@ -155,6 +175,11 @@ for n in COUNTS:
                  f"r4_quiet_{n}b.txt", f"r4_fight_{n}b.txt", f"r3_quiet_{n}a.txt", f"r3_quiet_{n}b.txt"):
         h = headline(text(name))
         print(f"    {name:20s} bare {h['bare']:6.2f}  terrain {h['terrain']:5.2f}")
+    early = [headline(text(f"r{s}_fight_{n}.txt"))["bare"] for s in (1, 2)]
+    later = [headline(text(f"r5_fight_{n}{r}.txt"))["bare"] for r in "ab"]
+    gaps = [e - x for e in early for x in later]
+    print(f"    {n}: sittings 1 and 2's fights' bare draw over sitting 5's, every pairing: "
+          f"{min(gaps):+.2f} to {max(gaps):+.2f} ms")
 
 print("\n== 4. the caches, sitting 5 ==")
 for n in COUNTS:
@@ -174,7 +199,9 @@ for n in COUNTS:
         miss, empty_ms = float(g[5]), float(g[13])
         now = caps[game_cap]
         today = now[0] * miss / 1000 + now[2] * empty_ms / frames
+        distinct = int(re.search(r"(\d+) distinct frames", g[0]).group(1))
         print(f"{n} {cache}: {g[0]}")
+        print(f"    today's cap holds {game_cap / distinct:.2f} of the distinct frames")
         print(f"    a miss {miss} us ({g[6]} to {g[7]}), a hit {g[8]} us ({g[9]} to {g[10]}), over {g[11]} "
               f"passes; emptying {g[12]}: {empty_ms} ms ({g[14]} to {g[15]})")
         print(f"    today (cap {game_cap}): {now[0]:.2f} misses a frame, worst {now[1]}, emptied {now[2]} times "
@@ -185,6 +212,22 @@ for n in COUNTS:
         for cap, (_a, _w, _e, _gm, lr, lw, lm) in sorted(caps.items()):
             print(f"    LRU {cap:5d}: {lr:.2f} a frame, worst {lw}, held at most {lm} MB; predicts "
                   f"{today - lr * miss / 1000:.2f} ms a frame saved")
+
+print("\n== 4b. what a cap can hold at most: the largest rig frame at the sittings' zoom ==")
+# The washed copy is the rig's frame at round(base x zoom) on each side
+# (`WorldRenderer.rig_frame`), 4 bytes a pixel at 32 bits. The base sizes
+# are `scale` in data/enemies/enemy_sprites.json; that file also holds
+# rigs no enemy wears (projectiles), so the largest is an upper bound.
+zoom = float(re.search(r"zoom ([\d.]+)", text("r5_fight_250a.txt")).group(1))
+rigs = __import__("json").loads((D.parents[3] / "data" / "enemies" / "enemy_sprites.json")
+                                .read_text(encoding="utf-8"))
+sized = sorted(((round(s["scale"][0] * zoom), round(s["scale"][1] * zoom), name)
+                for name, s in rigs.items() if s.get("scale")), key=lambda t: -t[0] * t[1])
+w, h, name = sized[0]
+one = w * h * 4
+print(f"zoom {zoom}: the largest rig frame is {name}'s, {w}x{h}, {one / 1e6:.2f} MB a copy")
+for cap in (128, 256, 512, 1024, 1536):
+    print(f"    a cap of {cap:5d} full of them: {cap * one / 1e6:7.1f} MB")
 
 print("\n== 5. the appendix probes ==")
 print("sitting 1, gc_probe --pack:")
