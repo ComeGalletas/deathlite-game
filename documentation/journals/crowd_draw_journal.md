@@ -3,7 +3,9 @@
 **ID:** RND-010 · **System:** rendering · **Type:** performance ·
 **Status:** in progress · **Branch:** ComeGalletas/crowd-draw-levelup-9ec11fc6
 (from `main`, owner, 2026-09-30; shared with UI-018; RND-010.1 and .2, merged),
-then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3)
+then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3),
+then claude/rnd-010-4-wash-lru (from `main`, 2026-10-06; RND-010.4; in the
+session's worktree, as the owner chose under CLAUDE.md §1.5)
 
 ---
 
@@ -501,7 +503,10 @@ since the hero does not attack.
   measures (a judgement from those two figures; the leads were not timed
   then; RND-010.3 timed them in isolation, and three of them as
   variants, see its results).
-- **RND-010.D2 (open, for the owner, 2026-10-06):** how much memory the
+- **RND-010.D2 (owner, 2026-10-06): the wash cache is an LRU of 1536.**
+  The owner chose the size RND-010.3 timed, not 1024 and not a cap in
+  bytes. The tint cache was not part of the choice and stays as it is.
+  RND-010.4 builds it. The question as it was put: how much memory the
   sprite caches may hold, which sets RND-010.4's caps. In the replay of
   the saturated fight at 250 (sitting 5), today's wash cache held at most
   28.2 MB. The LRU of 1536, the one timed, held at most 80.6 MB; one of
@@ -1002,6 +1007,41 @@ budget. In sitting 5 its update and draw take 29.30 to 29.47 ms, and
 these fixes reach a few milliseconds of that. Closing the rest is the
 plan's §6 decision, which is still the owner's.
 
+## RND-010.4: The wash cache as an LRU of 1536 (plan, 2026-10-06)
+
+The owner settled RND-010.D2 on 2026-10-06: an LRU of 1536, the size
+RND-010.3 timed. This is the plan's 4.13 and the first row of RND-010.3's
+sequence. The tint cache is not part of it.
+
+- **The change** (`game/states/playing/visual/elements/__init__.py`):
+  - `_WASH_CACHE` becomes an `OrderedDict` with `_WASH_CACHE_CAP = 1536`;
+  - a hit moves its entry to the newest end;
+  - a miss into a full cache drops only the entry used longest ago,
+    where the dict it replaces emptied itself whole at 512;
+  - an entry found under the key for another frame is replaced in
+    place and drops nothing else (the entry keeps its frame alive, so
+    this cannot happen while it stands; the check is kept as it was).
+- **Exactness:** pixel-identical, since a hit returns the held copy and
+  a miss makes the same copy as before. Pinned two ways:
+  - in `tests/render/test_element_colours.py`, on the cache's own
+    behaviour (the cap, the order of drops, a refresh, a re-wash's
+    pixels, a stale entry);
+  - in `tests/render/test_elemental_draw_cost.py`'s primed, packed seed
+    35 fight, on a whole frame: drawn from a warm cache, an empty one,
+    and one of 3 that drops entries while the frame is drawn, the frame
+    is one picture byte for byte.
+- **The probes follow the game.** They swap the cache for one of its own
+  kind, and the replay's test now matches the wash cache against the
+  LRU policy and the tint cache against emptying whole.
+- **Measured before and after,** as the plan's §4 asks for each task:
+  - one on-screen sitting, `main` against this branch, in ABBA order at
+    150 and 250 packed with the hero fighting, and quiet at the same
+    counts;
+  - `sprite_caches` on this branch, which shows the game's wash cache now
+    replaying as the LRU's figures.
+  
+  The owner asked to be asked before the sitting runs.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1028,5 +1068,10 @@ plan's §6 decision, which is still the owner's.
   - [x] RND-010.3.19: The seventh review's findings: sitting 1's own range, the crowd bias from sitting 5's costs (0.17 to 0.37 ms), the 150 prediction against its measurement, the plan's annotations narrowed to what was timed, one merged task sequence, the ghost cache's memory; tested
   - [x] RND-010.3.20: The eighth review's findings: the ghost remakes as a 150 candidate, the bars given a plan task and their billion-HP bias named, §3.1 narrowed, 4.3 kept last with its bound, sitting 5's own shade row, both sides of the stale-cache bias; D2's figures and every reference to the two caches pinned
   - [x] RND-010.3.21: The ninth review's findings: 150 consistent with its prediction (the gap's interval quoted), the stretch and ghost biases' net direction left open, the shade weighed against item 4 as a whole, the bars' two-way lean, IDs for every row of the sequence; the cap and the cold-start figures pinned
-- [ ] RND-010.4: The wash cache as an LRU, pixel-identical and tested, once RND-010.D2 sets the cap (the rest, in the sequence table under the RND-010.3 results, as RND-010.5 onward)
+- [ ] RND-010.4: The wash cache as an LRU of 1536 (RND-010.D2), pixel-identical and tested (the rest, in the sequence table under the RND-010.3 results, as RND-010.5 onward)
+  - [x] RND-010.4.1: RND-010.D2 recorded, this plan and the index
+  - [x] RND-010.4.2: `washed`'s cache an LRU of 1536, with its tests (the cache's behaviour; a whole frame from a warm, an empty and a too-small cache)
+  - [x] RND-010.4.3: The probes and their tests follow the game's LRU
+  - [ ] RND-010.4.4: The sitting: `main` against this branch, ABBA, at 150 and 250 packed, fighting and quiet; `sprite_caches` after; raw outputs kept
+  - [ ] RND-010.4.5: The results, and the plan's 4.13 marked done
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
