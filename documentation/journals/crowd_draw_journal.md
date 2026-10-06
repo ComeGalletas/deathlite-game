@@ -2,7 +2,8 @@
 
 **ID:** RND-010 · **System:** rendering · **Type:** performance ·
 **Status:** in progress · **Branch:** ComeGalletas/crowd-draw-levelup-9ec11fc6
-(from `main`, owner, 2026-09-30; shared with UI-018)
+(from `main`, owner, 2026-09-30; shared with UI-018; RND-010.1 and .2, merged),
+then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3)
 
 ---
 
