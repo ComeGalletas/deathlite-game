@@ -494,6 +494,12 @@ since the hero does not attack.
   in place, so a wrapper per lead would be a large share of what it
   measures (a judgement from those two figures; the leads themselves are
   not timed yet).
+- **RND-010.D2 (open, for the owner, 2026-10-06):** how much memory the
+  sprite caches may hold, which sets RND-010.4's caps. The washed frames
+  hold up to 20 MB today (512 at a 40 KB median entry). The LRU of 1536,
+  the one timed, holds up to 61 MB; 1024 holds 41 MB, for a predicted
+  2.04 ms where 1536 predicts 2.22. The tints go from 6 to 12 MB at 256.
+  The web build's memory headroom is not measured.
 
 ## RND-010: Review of 2026-10-03 (read-only)
 
@@ -547,18 +553,175 @@ Also under RND-010.3, the plan's step 4.0 leftovers and the open item:
 Every sitting keeps its raw outputs under `data/rnd-010.3/`, as
 RND-010.2's do.
 
+## RND-010.3: Results (2026-10-06)
+
+Two sittings on the owner's machine, on screen at 2560x1080, the owner
+away from it and no game running, 150 and 250 alive packed, seed 35. Raw
+outputs, the scripts as run and `derived.py`, which prints every figure
+below, are in `data/rnd-010.3/` (its README lists what ran where).
+Sitting 1 ran the planned probes. Its fight showed a lead none of them
+covered, so a second sitting, with a probe built for that lead, followed
+17 minutes after the first ended.
+
+### The fight
+
+`spawn_stress --pack --layers --elements` is the saturated fight: every
+enemy primed with an aura that lasts the run and given a billion HP, and
+three infused weapons firing. It is the worst plausible fight, not an
+average one. Two rounds (sittings 1 and 2), against sitting 7's quiet
+run at the same count (150a and 250b, the runs outside a slow patch):
+
+| | Quiet | Fight, round 1 / 2 |
+|---|---|---|
+| 150: bare draw p50 | 10.14 ms | 13.97 / 12.76 ms (+3.83 / +2.62) |
+| 150: update + draw p50 | 18.65 ms | 22.21 / 20.73 ms |
+| 250: bare draw p50 | 12.10 ms | 20.42 / 18.31 ms (+8.32 / +6.21) |
+| 250: update + draw p50 | 25.38 ms | 33.89 / 31.06 ms |
+
+The terrain does not move (5.96 to 6.96 ms against 6.44 to 6.49). What
+the fight adds, by layer, the two rounds' mean over the quiet p50:
+
+| Layer | Added at 150 | Added at 250 |
+|---|---|---|
+| `flat/elemental` (auras, status marks, areas, motes under the bodies) | +1.50 ms | +2.88 ms |
+| `enemies` (an enemy's own draw) | +0.47 ms | +2.27 ms |
+| `enemies/hpbar` (bars appear once hurt) | +0.58 ms | +0.53 ms |
+| `numbers` (damage numbers) | +0.25 ms | +0.33 ms |
+| `ghost` | +0.21 ms | +0.29 ms |
+| `elemental/particles` | +0.09 ms | +0.28 ms |
+
+All layers together add +3.11 ms at 150 and +7.12 ms at 250. The
+`enemies` row's growth from 150 to 250 (+0.47 to +2.27 ms) is far faster
+than the crowd's (139 to 222 in view), which is what sent sitting 2 after
+it.
+
+### The lead the fight found: the wash cache thrashes
+
+A primed enemy is drawn washed in its element (`element_fx.washed`), a
+hurt one tinted red (`rendering.hit_tinted`). Each copies the frame once
+and keeps the copy in a dict that empties itself whole when full: 512
+washed frames, 128 tinted. `sprite_caches.py` recorded every request a
+fight's draw makes, 900 frames, and replayed it through the game's policy
+and through an LRU (the frames from 300 on):
+
+| 250 fighting | Misses a frame | Worst frame | Memory at the cap |
+|---|---|---|---|
+| wash, today (512, emptied when full) | 21.98 | 137 | 20.3 MB |
+| wash, LRU 1024 | 2.07 | 11 | 40.7 MB |
+| wash, LRU 1536 | 0.31 | 3 | 61.0 MB |
+| tint, today (128) | 1.69 | 26 | 6.0 MB |
+| tint, LRU 256 | 0.39 | 5 | 12.1 MB |
+
+The fight asks for 159 washed frames a frame from 1,665 distinct ones
+(the frames of every animation an enemy plays, at both facings, in four
+elements). A cap of 512 holds about a third of them, so the cache fills,
+empties and refills about every 23 frames. A miss costs 102 µs (a hit
+1.55 µs, 0.23 µs at 150), which makes today's wash cache 2.25 ms a frame
+at 250, and its worst frame 14 ms. Today's tint cache adds 0.21 ms. Those
+two, 2.46 ms, cover the `enemies` row's +2.27 ms. At 150 the fight asks
+for 52 a frame from 1,027 distinct ones: 3.41 misses a frame, 0.33 ms.
+
+Timed as a throwaway variant (`draw_variants --elements --variants
+wash_lru`, an LRU of 1536, 16 ABBA blocks of 40 frames, the hero on one
+anchor):
+
+| `wash_lru` | Draw p50 off / on | Median saving, 97.9 % interval |
+|---|---|---|
+| 150 fighting | 13.09 / 12.81 ms | −0.05 ms, −0.97 to +0.41: not resolved |
+| 250 fighting | 16.96 / 15.62 ms | −1.08 ms, −1.61 to −0.65: **faster** |
+
+The only variant so far whose interval excludes zero. The replay
+predicts 2.22 ms at 250 and the sitting measured 0.65 to 1.61. The gap
+is open. The likely candidates, none of them measured: the variant's
+Python wrapper and `move_to_end` on each of the 159 hits a frame; its
+LRU starting empty at the first block; and a miss timed in a loop of
+fresh copies costing more there than in the frame. Pixel-identical by
+construction (a hit and a miss give the same surface), and checked frame
+against frame in the fight by `draw_variants`.
+
+### Inside an enemy's own draw (no fight)
+
+`draw_leads`, each piece timed in isolation over the drawn crowd, 200
+rounds:
+
+| Piece | At 150 (135 drawn) | At 250 (225 drawn) | Share of `one_enemy` |
+|---|---|---|---|
+| `one_enemy`, whole | 13.47 µs, 1.82 ms | 12.95 µs, 2.91 ms | |
+| sprite blit | 7.36 µs, 0.99 ms | 7.18 µs, 1.62 ms | 55 % |
+| shade walk | 1.97 µs, 0.27 ms | 1.83 µs, 0.41 ms | 14 % |
+| `rig_frame` | 1.43 µs, 0.19 ms | 1.44 µs, 0.32 ms | 11 % |
+| every other piece, summed | 0.21 ms | 0.34 ms | 11.5 % |
+| the glue between them | 0.16 ms | 0.23 ms | |
+| the scene's per-enemy steps (cull, terrace, lambda, forwarder) | 0.09 ms | 0.16 ms | outside |
+
+The ghost copy, the one per-frame `copy()` the plan named, runs for the
+two shaded bodies only: 0.01 ms. It gets no variant (RND-010.3.4's
+condition). The blit is the pixel floor: `blit_floor` puts 200 sprites
+alone at 2.25 ms on this screen, and 200 with a shadow and a bar at
+2.53 ms.
+
+The three CPU variants, quiet, none resolved:
+
+| Variant | 150: median, interval | 250: median, interval |
+|---|---|---|
+| `rig_frame_cached` | +0.07, −0.34 to +0.40 ms | −0.17, −0.81 to +0.63 ms |
+| `world_bucketed` | −0.05, −1.73 to +2.19 ms | −0.01, −0.89 to +0.29 ms |
+| `forwarder_bypassed` | −0.61, −2.85 to +1.61 ms | +0.18, −0.45 to +0.57 ms |
+
+Their whole costs are below what the sitting can resolve. In isolation
+`rig_frame` is 0.32 ms a frame at 250 at most, and the forwarder 0.03 ms.
+The plan's 4.3 expected 0.5 to 1 ms at 150 from the per-enemy list work.
+The pieces it would remove sum to 0.09 ms at 150, and bucketing the world
+shows no saving.
+
+### The appendix probes, on this screen
+
+- `gc_probe --pack` (200 live, 600 frames): one gen-2 collection of
+  8.6 ms with the default collector, none frozen. It costs a spike, not
+  the average: the frozen run's p50 is 22.26 ms against 21.25.
+- `blit_floor` at 2560x1080: 100, 200 and 300 sprites alone 1.44, 2.25
+  and 3.00 ms; with a shadow and a bar 1.59, 2.53 and 3.23 ms.
+
+### The order for RND-010.4 onward
+
+1. **RND-010.4: the wash and tint caches as LRUs** (wash 1536, tint 256).
+   Exact, fight only, measured at 250: 0.65 to 1.61 ms a frame, with the
+   worst frame's misses cut from 137 to 3 in the replay. It costs memory:
+   up to 61 MB for the washed frames at 250's median entry, against
+   20 MB today, and 12 against 6 for the tints. That is an owner call
+   (RND-010.D2, open). An LRU of 1024 would hold 41 MB and the replay
+   predicts nearly the same saving (2.04 against 2.22 ms). The one
+   timed, though, is 1536.
+2. **The elemental under-layer in a fight**, the largest layer the fight
+   adds (+1.50 / +2.88 ms): plan 4.5. First split `draw_under` (auras,
+   status marks, areas, motes) the way RND-010.2 split the draw, then
+   time the candidates as variants.
+3. **GC freeze** (plan 4.2): an 8.6 ms spike every few hundred frames,
+   gone frozen; a pause, not a throughput gain.
+4. **The sprite blit** (55 % of an enemy's own draw): plan 5.1's
+   `Surface.blits` batch for unshaded, untinted bodies.
+5. **The shade walk** (0.27 / 0.41 ms): plan 4.4's first half, the skip
+   where no shadow falls.
+6. **Bars and damage numbers in a fight** (+0.5 and +0.3 ms): plan 4.6.
+7. Not worth building alone: the `rig_frame` cache, the bypassed
+   forwarder and the bucketed world. Their measured ceiling is 0.3 ms.
+
+Even all of it leaves the saturated fight at 250 well over the budget:
+its update and draw are 31 to 34 ms, of which these fixes reach a few
+milliseconds. That is the plan's §6 decision, still the owner's.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
 - [x] RND-010.2: The draw by layer in the stress harness, at 150, 200 and 250 packed
-- [ ] RND-010.3: The leads inside the enemies' own draw ranked (RND-010.D1), then the candidates timed old against new, the results recorded
+- [x] RND-010.3: The leads inside the enemies' own draw ranked (RND-010.D1), then the candidates timed old against new, the results recorded
   - [x] RND-010.3.1: This plan and the index
   - [x] RND-010.3.2: `blit_floor.py` and `gc_probe.py` under `tools/benchmarks/`, tested
   - [x] RND-010.3.3: The CPU steps' probe: each lead's cost per call and per frame on the live crowd, tested
   - [x] RND-010.3.4: The variant probe: throwaway pixel-identical variants timed against the draw (`rig_frame_cached`, `world_bucketed`, `forwarder_bypassed`), tested; the ghost copy is costed by `draw_leads` and gets a variant only if the sitting puts it near the top
   - [x] RND-010.3.5: Sitting 1: the probes at 150 and 250 packed, and the draw by layer with the hero fighting, raw outputs kept
   - [x] RND-010.3.6: The lead sitting 1's fight found, probed: `sprite_caches.py` (the wash and hit-tint caches replayed on a fight's own requests), the `wash_lru` variant and `draw_variants --elements`, tested
-  - [ ] RND-010.3.7: Sitting 2: the caches replayed, `wash_lru` timed and the fight's layers again, at 150 and 250 packed with the hero fighting, raw outputs kept
-  - [ ] RND-010.3.8: The ranking and the candidates' results recorded, and the order for RND-010.4 onward
-- [ ] RND-010.4: The largest exact win built, pixel-identical and tested (further winners as RND-010.5 onward)
+  - [x] RND-010.3.7: Sitting 2: the caches replayed, `wash_lru` timed and the fight's layers again, at 150 and 250 packed with the hero fighting, raw outputs kept
+  - [x] RND-010.3.8: The ranking and the candidates' results recorded, and the order for RND-010.4 onward
+- [ ] RND-010.4: The wash and tint caches as LRUs, pixel-identical and tested, once RND-010.D2 sets the caps (further winners, in the order above, as RND-010.5 onward)
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
