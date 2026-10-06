@@ -20,8 +20,10 @@ each policy: the game's own, emptying whole when full, and an LRU that
 drops only the entry used longest ago, at each of `--wash-caps` and
 `--tint-caps`. Printed per cache and cap: the misses a frame and the
 worst frame's, over the frames from `--warm` on (the game's caches are
-warm by then), and the most memory the replayed cache held at any point
-(its copies at 4 bytes a pixel). Then what one miss and one hit cost:
+warm by then), how many times the game's policy emptied the cache in
+those frames, and the most memory the replayed cache held at any point
+(each copy's rows times its height). Then what emptying a full cache
+costs (the game's frees its every copy at once), and what one miss and one hit cost:
 every distinct source washed (or tinted) with the cache emptied, then
 again with each one held, `--passes` times over, each pass on a fresh
 cache after the last one's copies are dropped; the median pass and the
@@ -49,11 +51,17 @@ def _modules():
     return fx, R
 
 
+def nbytes(frame) -> int:
+    """The pixel memory a copy of `frame` holds: `Surface.copy` keeps the
+    format, so its rows are as long as the source's (`get_pitch`)."""
+    return frame.get_pitch() * frame.get_height()
+
+
 def record(ps, frames: int) -> dict:
     """Every request the draw makes to the two caches over `frames` frames
     of `spawn_stress.run`. Returns `{"wash": events, "tint": events,
     "sources": {...}}`: an event is `(frame, key, bytes)`, the key the
-    cache's own, the bytes the frame's at 4 a pixel; `sources` maps each
+    cache's own, the bytes a copy of the frame holds (`nbytes`); `sources` maps each
     key to the `(frame, element)` it was asked for, which also keeps the
     frame alive so its id stays its own. The caches are called through:
     the game draws as it would."""
@@ -64,14 +72,14 @@ def record(ps, frames: int) -> dict:
 
     def tint(frame):
         key = ("tint", id(frame))
-        out["tint"].append((now[0], key, frame.get_width() * frame.get_height() * 4))
+        out["tint"].append((now[0], key, nbytes(frame)))
         out["sources"].setdefault(key, (frame, None))
         return real_tint(frame)
 
     def wash(frame, element, profiles=None):
         if element and frame is not None:
             key = ("wash", id(frame), int(element))
-            out["wash"].append((now[0], key, frame.get_width() * frame.get_height() * 4))
+            out["wash"].append((now[0], key, nbytes(frame)))
             out["sources"].setdefault(key, (frame, element))
         return real_wash(frame, element, profiles)
 
@@ -86,14 +94,16 @@ def record(ps, frames: int) -> dict:
     return out
 
 
-def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> tuple:
+def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> dict:
     """`events` through a cache of `cap` entries: the game's (empty it
     whole when full, then add) or an LRU (drop the entry used longest
-    ago). Returns the misses a frame, averaged over the frames from
-    `warm` on; the most in any one of them; and the most bytes the cache
-    held at any point of the whole recording."""
+    ago). Returns `per`, the misses in each frame; `avg` and `worst`,
+    their mean and most over the frames from `warm` on; `clears`, the
+    times the cache emptied whole in those frames; and `peak`, the most
+    bytes the cache held at any point of the whole recording."""
     cache: OrderedDict = OrderedDict()      # key -> the bytes its copy holds
     per = [0] * frames
+    emptied = [0] * frames
     held = peak = 0
     for f, key, nbytes in events:
         if key in cache:
@@ -106,12 +116,14 @@ def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> tup
                 held -= cache.popitem(last=False)[1]
             else:
                 cache.clear()
+                emptied[f] += 1
                 held = 0
         cache[key] = nbytes
         held += nbytes
         peak = max(peak, held)
     tail = per[warm:]
-    return sum(tail) / len(tail), max(tail), peak
+    return {"per": per, "avg": sum(tail) / len(tail), "worst": max(tail),
+            "clears": sum(emptied[warm:]), "peak": peak}
 
 
 @contextlib.contextmanager
@@ -161,13 +173,42 @@ def miss_cost(name: str, sources: dict, passes: int = 5) -> dict | None:
     return out
 
 
+def clear_cost(name: str, sources: dict, entries: int, passes: int = 5) -> dict | None:
+    """Milliseconds to empty a full cache, as the game's does when it
+    reaches its cap: `entries` copies made (from as many distinct sources
+    as there are, up to `entries`) in a fresh cache, then the dict cleared,
+    which frees every copy at once. One figure per pass; `entries` is how
+    many it held. The game's cache is left as found. None when the
+    recording asked nothing of it."""
+    fx, R = _modules()
+    todo = [src for key, src in sources.items() if key[0] == name][:entries]
+    if not todo:
+        return None
+    if name == "wash":
+        module, call = fx, lambda f, el: fx.washed(f, el)
+        names = ("_WASH_CACHE", "_WASH_CACHE_CAP")
+    else:
+        module, call = R, lambda f, el: R.hit_tinted(f)
+        names = ("_TINT_CACHE", "_TINT_CACHE_CAP")
+    out = {"ms": [], "entries": len(todo)}
+    for _ in range(passes):
+        with _empty(module, *names, len(todo) + 1):
+            for frame, element in todo:
+                call(frame, element)
+            cache = getattr(module, names[0])
+            t0 = time.perf_counter()
+            cache.clear()
+            out["ms"].append((time.perf_counter() - t0) * 1000.0)
+    return out
+
+
 def _p50(values: list) -> float:
     s = sorted(values)
     return s[len(s) // 2]
 
 
 def report(name: str, events: list, frames: int, warm: int, game_cap: int, caps: list,
-           cost: dict | None) -> list[str]:
+           cost: dict | None, clear: dict | None = None) -> list[str]:
     if not events:
         return [f"  {name}: nothing asked of it"]
     asked = sum(1 for e in events if e[0] >= warm)
@@ -176,15 +217,20 @@ def report(name: str, events: list, frames: int, warm: int, game_cap: int, caps:
               f"{len(sizes)} distinct frames, the median one {_p50(list(sizes.values())) / 1000:.1f} KB; "
               f"the game's cap {game_cap}, frames {warm} to {frames}")]
     for cap in caps:
-        c_avg, c_max, c_peak = replay(events, frames, cap, lru=False, warm=warm)
-        l_avg, l_max, l_peak = replay(events, frames, cap, lru=True, warm=warm)
-        lines.append(f"    cap {cap:5d}: emptied when full {c_avg:6.2f} misses a frame, worst "
-                     f"{c_max:4d}, held at most {c_peak / 1e6:5.1f} MB  |  LRU {l_avg:6.2f}, "
-                     f"worst {l_max:4d}, held at most {l_peak / 1e6:5.1f} MB")
+        c = replay(events, frames, cap, lru=False, warm=warm)
+        lr = replay(events, frames, cap, lru=True, warm=warm)
+        lines.append(f"    cap {cap:5d}: emptied when full {c['avg']:6.2f} misses a frame, worst "
+                     f"{c['worst']:4d}, emptied {c['clears']:3d} times, held at most "
+                     f"{c['peak'] / 1e6:5.1f} MB  |  LRU {lr['avg']:6.2f}, worst {lr['worst']:4d}, "
+                     f"held at most {lr['peak'] / 1e6:5.1f} MB")
     if cost is not None:
         m, h = cost["miss"], cost["hit"]
         lines.append(f"    a miss {_p50(m):.1f} us ({min(m):.1f} to {max(m):.1f}), a hit "
                      f"{_p50(h):.2f} us ({min(h):.2f} to {max(h):.2f}), over {len(m)} passes")
+    if clear is not None:
+        ms = clear["ms"]
+        lines.append(f"    emptying a cache of {clear['entries']}: {_p50(ms):.2f} ms "
+                     f"({min(ms):.2f} to {max(ms):.2f}), over {len(ms)} passes")
     return lines
 
 
@@ -226,7 +272,8 @@ def main(argv=None, save_path: str | None = None) -> int:
     for name, game_cap, caps in (("wash", fx._WASH_CACHE_CAP, args.wash_caps),
                                  ("tint", R._TINT_CACHE_CAP, args.tint_caps)):
         print("\n".join(report(name, rec[name], args.frames, args.warm, game_cap, caps,
-                               miss_cost(name, rec["sources"], args.passes))))
+                               miss_cost(name, rec["sources"], args.passes),
+                               clear_cost(name, rec["sources"], game_cap, args.passes))))
     print(f"  boss at the end: {S.boss_state(ps)}")
     return 0
 

@@ -209,10 +209,12 @@ def timed(ps, name: str, blocks: int, frames: int) -> dict:
     """ABBA blocks of `frames` frames, the variant off then on in even
     blocks and on then off in odd ones, the hero put back on one anchor
     before every part. Returns both sides' draw times and each block's
-    on minus off p50."""
+    on minus off p50 (`diffs`) and mean (`mean_diffs`): a change whose
+    cost comes in bursts, a cache emptying every few dozen frames, shows
+    in the mean and the tail before it shows in a p50."""
     from tools.benchmarks.stats import percentile
     anchor = ps.player.pos.copy()
-    out = {"off": [], "on": [], "diffs": []}
+    out = {"off": [], "on": [], "diffs": [], "mean_diffs": []}
 
     def part(on: bool):
         ps.player.pos.update(anchor)
@@ -232,6 +234,7 @@ def timed(ps, name: str, blocks: int, frames: int) -> dict:
         out["off"] += off
         out["on"] += on
         out["diffs"].append(percentile(sorted(on), 0.5) - percentile(sorted(off), 0.5))
+        out["mean_diffs"].append(sum(on) / len(on) - sum(off) / len(off))
     ps.player.pos.update(anchor)
     return out
 
@@ -239,7 +242,9 @@ def timed(ps, name: str, blocks: int, frames: int) -> dict:
 def format_timed(name: str, result: dict) -> str:
     from tools.benchmarks.stats import percentile
     diffs = sorted(result["diffs"])
-    p = lambda v: percentile(sorted(v), 0.5)
+    means = sorted(result["mean_diffs"])
+    p = lambda v, q=0.5: percentile(sorted(v), q)
+    mean = lambda v: sum(v) / len(v)
     lines = [(f"  {name}: draw p50 off {p(result['off']):.2f} ms, on {p(result['on']):.2f} ms "
              f"({len(result['off'])} frames each); per block, on minus off p50: p50 "
              f"{percentile(diffs, 0.5):+.2f} ms, from {diffs[0]:+.2f} to {diffs[-1]:+.2f}")]
@@ -250,6 +255,13 @@ def format_timed(name: str, result: dict) -> str:
         k, coverage = interval
         lines.append(f"    the median saving lies in {diffs[k - 1]:+.2f} to {diffs[-k]:+.2f} ms "
                      f"({100 * coverage:.1f} % sign-test interval; negative is faster)")
+    lines.append(f"    the draw's mean off {mean(result['off']):.2f} ms, on {mean(result['on']):.2f} ms; "
+                 f"p90 off {p(result['off'], 0.9):.2f}, on {p(result['on'], 0.9):.2f}; "
+                 f"p99 off {p(result['off'], 0.99):.2f}, on {p(result['on'], 0.99):.2f}")
+    if interval is not None:
+        k, coverage = interval
+        lines.append(f"    per block, on minus off mean: p50 {percentile(means, 0.5):+.2f} ms; the median "
+                     f"lies in {means[k - 1]:+.2f} to {means[-k]:+.2f} ms ({100 * coverage:.1f} %)")
     return "\n".join(lines)
 
 

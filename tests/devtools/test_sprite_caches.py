@@ -44,6 +44,10 @@ def _events(*frames):
     return [(f, k, SIZES[k]) for f, keys in enumerate(frames) for k in keys]
 
 
+def _figures(r: dict) -> tuple:
+    return r["per"], r["avg"], r["worst"], r["clears"], r["peak"]
+
+
 class ReplayTests(unittest.TestCase):
     """Misses a frame, the worst frame, and the most bytes held."""
 
@@ -52,23 +56,24 @@ class ReplayTests(unittest.TestCase):
         # cache is full at c and empties (then holds c, 40), so b misses
         # again (60); the LRU drops only a (20 + 40) and keeps b.
         events = _events("ab", "c", "b")
-        self.assertEqual(SC.replay(events, 3, 2, lru=False), (4 / 3, 2, 60))
-        self.assertEqual(SC.replay(events, 3, 2, lru=True), (1.0, 2, 60))
-        self.assertEqual(SC.replay(events, 3, 2, lru=False, warm=1), (1.0, 1, 60))
-        self.assertEqual(SC.replay(events, 3, 2, lru=True, warm=1), (0.5, 1, 60))
+        self.assertEqual(_figures(SC.replay(events, 3, 2, lru=False)), ([2, 1, 1], 4 / 3, 2, 1, 60))
+        self.assertEqual(_figures(SC.replay(events, 3, 2, lru=True)), ([2, 1, 0], 1.0, 2, 0, 60))
+        self.assertEqual(_figures(SC.replay(events, 3, 2, lru=False, warm=1)), ([2, 1, 1], 1.0, 1, 1, 60))
+        self.assertEqual(_figures(SC.replay(events, 3, 2, lru=True, warm=1)), ([2, 1, 0], 0.5, 1, 0, 60))
+        self.assertEqual(SC.replay(events, 3, 2, lru=False, warm=2)["clears"], 0)   # it emptied in frame 1
 
     def test_a_hit_refreshes_the_lru(self):
         # a, b, a, c, a at cap 2: the hit on a makes b the oldest, so c
         # drops b (10 + 40 held) and the last a hits. Dropping by age of
         # entry would drop a (20 + 40) and miss it.
         events = _events("a", "b", "a", "c", "a")
-        self.assertEqual(SC.replay(events, 5, 2, lru=True), (3 / 5, 1, 50))
-        self.assertEqual(SC.replay(events, 5, 2, lru=False), (4 / 5, 1, 50))
+        self.assertEqual(_figures(SC.replay(events, 5, 2, lru=True)), ([1, 1, 0, 1, 0], 3 / 5, 1, 0, 50))
+        self.assertEqual(_figures(SC.replay(events, 5, 2, lru=False)), ([1, 1, 0, 1, 1], 4 / 5, 1, 1, 50))
 
     def test_the_game_checks_the_cap_before_it_adds(self):
         # Cap 1: a fills it, b empties it first, then a misses again.
         events = _events("a", "a", "b", "a")
-        self.assertEqual(SC.replay(events, 4, 1, lru=False), (3 / 4, 1, 20))
+        self.assertEqual(_figures(SC.replay(events, 4, 1, lru=False)), ([1, 0, 1, 1], 3 / 4, 1, 2, 20))
 
     def test_the_replay_counts_what_the_game_s_own_caches_copy(self):
         # The game's real `washed` and `hit_tinted`, on caches of their own
@@ -94,12 +99,10 @@ class ReplayTests(unittest.TestCase):
                     else:
                         R.hit_tinted(f)
                     events.append((step, key, 1))
-                avg, worst, _peak = SC.replay(events, len(order), 3, lru=False)
-                self.assertAlmostEqual(avg * len(order), sum(misses))
-                self.assertEqual(worst, max(misses))
+                self.assertEqual(SC.replay(events, len(order), 3, lru=False)["per"], misses)  # copy for copy
                 self.assertEqual(sum(misses), 9)
-                lru_avg = SC.replay(events, len(order), 3, lru=True)[0]
-                self.assertAlmostEqual(lru_avg * len(order), 8)   # the order tells them apart
+                lru = SC.replay(events, len(order), 3, lru=True)["per"]
+                self.assertEqual(sum(lru), 8)                      # the order tells them apart
 
 
 class RecordTests(unittest.TestCase):
@@ -133,6 +136,53 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(rec["sources"], {wkey: (a, 2), tkey: (b, None)})
         self.assertEqual(returned, ["washed", "washed", "tinted"] * 2)
         self.assertEqual(len(seen), 6)
+
+
+class BytesTests(unittest.TestCase):
+    def test_a_copy_holds_its_rows_times_its_height(self):
+        from combat.elements.ids import ElementId
+        from game.states.playing.visual import elements as fx
+        odd = pygame.Surface((5, 3), depth=24)               # rows of 15 bytes, padded
+        for frame in (_surface(5, 4), odd):
+            with self.subTest(size=frame.get_size(), depth=frame.get_bitsize()):
+                copy = frame.copy()
+                self.assertEqual(SC.nbytes(frame), copy.get_pitch() * copy.get_height())
+        self.assertNotEqual(SC.nbytes(odd), 5 * 3 * 4)       # not four bytes a pixel
+        self.assertGreaterEqual(SC.nbytes(odd), 5 * 3 * 3)
+        frame = _surface(7, 3)
+        with mock.patch.object(fx, "_WASH_CACHE", {}):
+            out = fx.washed(frame, ElementId.ICE)
+        self.assertEqual(SC.nbytes(frame), out.get_pitch() * out.get_height())
+
+
+class ClearCostTests(unittest.TestCase):
+    def test_a_full_cache_emptied_and_the_game_s_left_as_found(self):
+        from combat.elements.ids import ElementId
+        from game.states.playing.visual import elements as fx
+        frames = [_surface(3 + i, 3) for i in range(5)]
+        sources = {("wash", id(f), int(ElementId.FIRE)): (f, ElementId.FIRE) for f in frames}
+        game_cache, cap = fx._WASH_CACHE, fx._WASH_CACHE_CAP
+        held = _surface(9, 9)
+        game_cache[("held", 1)] = (held, held)                # must survive the emptying
+        self.addCleanup(game_cache.pop, ("held", 1), None)
+        contents = dict(game_cache)
+        real, sizes = fx.washed, []
+
+        def spy(frame, element, profiles=None):
+            out = real(frame, element, profiles)
+            sizes.append((len(fx._WASH_CACHE), fx._WASH_CACHE_CAP))
+            return out
+
+        with mock.patch.object(fx, "washed", spy):
+            cost = SC.clear_cost("wash", sources, 3, passes=2)
+        self.assertEqual(cost["entries"], 3)
+        self.assertEqual(len(cost["ms"]), 2)
+        self.assertEqual([n for n, _c in sizes], [1, 2, 3] * 2)    # filled afresh each pass
+        self.assertTrue(all(c > 3 for _n, c in sizes))             # never emptied while filling
+        self.assertIs(fx._WASH_CACHE, game_cache)
+        self.assertEqual((fx._WASH_CACHE, fx._WASH_CACHE_CAP), (contents, cap))
+        self.assertEqual(SC.clear_cost("wash", sources, 10, passes=1)["entries"], 5)
+        self.assertIsNone(SC.clear_cost("tint", sources, 3))
 
 
 class MissCostTests(unittest.TestCase):
@@ -202,12 +252,14 @@ class ReportTests(unittest.TestCase):
         # c and then b (1.0 MB) after emptying; the LRU drops a for c.
         events = [(0, "a", 400_000), (0, "b", 200_000), (1, "c", 800_000), (2, "b", 200_000)]
         cost = {"miss": [120.0, 90.0, 100.0], "hit": [0.9, 0.5, 0.4]}    # the first pass is slowest
-        self.assertEqual(SC.report("wash", events, 3, 0, 2, [2], cost), [
+        clear = {"ms": [3.0, 1.0, 2.0], "entries": 2}
+        self.assertEqual(SC.report("wash", events, 3, 0, 2, [2], cost, clear), [
             ("  wash: 1.3 requests a frame, 3 distinct frames, the median one 400.0 KB; "
              "the game's cap 2, frames 0 to 3"),
-            ("    cap     2: emptied when full   1.33 misses a frame, worst    2, held at most"
-             "   1.0 MB  |  LRU   1.00, worst    2, held at most   1.0 MB"),
-            "    a miss 100.0 us (90.0 to 120.0), a hit 0.50 us (0.40 to 0.90), over 3 passes"])
+            ("    cap     2: emptied when full   1.33 misses a frame, worst    2, emptied   1 times, "
+             "held at most   1.0 MB  |  LRU   1.00, worst    2, held at most   1.0 MB"),
+            "    a miss 100.0 us (90.0 to 120.0), a hit 0.50 us (0.40 to 0.90), over 3 passes",
+            "    emptying a cache of 2: 2.00 ms (1.00 to 3.00), over 3 passes"])
         self.assertEqual(SC.report("tint", [], 3, 0, 2, [2], None), ["  tint: nothing asked of it"])
         warm = SC.report("wash", events, 3, 1, 2, [2, 4], None)
         self.assertEqual(len(warm), 3)
@@ -253,35 +305,54 @@ class SceneTests(unittest.TestCase):
                 self.assertTrue(all(k in rec["sources"] for _f, k, _b in events))
                 distinct = len({k for _f, k, _b in events})
                 for lru in (False, True):
-                    avg, _worst, peak = SC.replay(events, 6, distinct + 1, lru=lru)
-                    self.assertAlmostEqual(avg * 6, distinct)
-                    self.assertEqual(peak, sum({k: b for _f, k, b in events}.values()))
+                    r = SC.replay(events, 6, distinct + 1, lru=lru)
+                    self.assertEqual(sum(r["per"]), distinct)
+                    self.assertEqual(r["peak"], sum({k: b for _f, k, b in events}.values()))
 
 
 class RequestTests(unittest.TestCase):
     """The replay's premise: what the draw asks of the caches does not
     depend on what they hold."""
 
-    def test_the_same_scene_asks_the_same_of_an_empty_and_a_full_cache(self):
+    def test_the_same_scene_asks_the_same_of_a_churning_and_a_full_cache(self):
+        # Two builds of one scene, 8 frames each. The first runs on caches
+        # small enough to empty themselves over and over; the second on
+        # caches already holding every frame the first asked for, so it
+        # never misses. Both ask for the same frames in the same order.
         from game.states.playing.visual import elements as fx
         from game.states.playing.visual import rendering as R
-        held = ({}, {})
-        streams, sizes = [], []
-        for full in (False, True):
+        frames, small = 8, (16, 4)
+        streams, recs = [], []
+        full = ({}, {})
+        for churn in (True, False):
             with contextlib.redirect_stdout(io.StringIO()):
                 _game, ps = LP.packed_scene(SEED, 40, 0, 300.0, TDL._fresh_save(), elements=True)
-            wash, tint = held if full else ({}, {})
+            wash, tint = ({}, {}) if churn else full
+            caps = small if churn else (10 ** 6, 10 ** 6)
             with mock.patch.object(fx, "_WASH_CACHE", wash), \
-                    mock.patch.object(fx, "_WASH_CACHE_CAP", 10 ** 6), \
+                    mock.patch.object(fx, "_WASH_CACHE_CAP", caps[0]), \
                     mock.patch.object(R, "_TINT_CACHE", tint), \
-                    mock.patch.object(R, "_TINT_CACHE_CAP", 10 ** 6):
-                rec = SC.record(ps, 4)
-            held = (wash, tint)
+                    mock.patch.object(R, "_TINT_CACHE_CAP", caps[1]):
+                if not churn:
+                    before = (len(wash), len(tint))
+                rec = SC.record(ps, frames)
+                if churn:                          # every frame it asked for, held
+                    with mock.patch.object(fx, "_WASH_CACHE", full[0]), \
+                            mock.patch.object(fx, "_WASH_CACHE_CAP", 10 ** 6), \
+                            mock.patch.object(R, "_TINT_CACHE", full[1]), \
+                            mock.patch.object(R, "_TINT_CACHE_CAP", 10 ** 6):
+                        for key, (frame, element) in rec["sources"].items():
+                            if key[0] == "wash":
+                                fx.washed(frame, element)
+                            else:
+                                R.hit_tinted(frame)
+            recs.append(rec)
             streams.append([(name, f, k) for name in ("wash", "tint") for f, k, _b in rec[name]])
-            sizes.append((len(wash), len(tint)))
-        self.assertGreater(len(streams[0]), 0)
+        self.assertGreater(len(recs[0]["wash"]), 0)
+        self.assertGreater(len(recs[0]["tint"]), 0)            # the hurt branch ran too
+        self.assertGreater(SC.replay(recs[0]["wash"], frames, small[0], lru=False)["clears"], 0)
         self.assertEqual(streams[0], streams[1])
-        self.assertEqual(sizes[0], sizes[1])        # the full caches served every request
+        self.assertEqual((len(full[0]), len(full[1])), before)    # the full caches served every request
 
 
 class MainTests(unittest.TestCase):

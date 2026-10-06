@@ -29,7 +29,8 @@ class BlitFloorTests(unittest.TestCase):
         self.assertEqual((a.sizes, a.counts, a.frames), ([(1600, 900), (2560, 1080)], [100, 200, 300], 120))
         b = BF.parse(["--sizes", "640x360", "--counts", "5,7", "--frames", "2"])
         self.assertEqual((b.sizes, b.counts, b.frames), ([(640, 360)], [5, 7], 2))
-        for bad in (["--sizes", "640"], ["--counts", "x"], ["--frames", "0"], ["--counts", "0"]):
+        self.assertEqual(BF.parse(["--counts", "0,100"]).counts, [0, 100])     # the fill alone
+        for bad in (["--sizes", "640"], ["--counts", "x"], ["--frames", "0"], ["--counts", "-1"]):
             with self.subTest(argv=bad), contextlib.redirect_stderr(io.StringIO()), \
                     self.assertRaises(SystemExit):
                 BF.parse(bad)

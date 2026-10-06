@@ -32,16 +32,23 @@ SEED = 35
 class FormatTests(unittest.TestCase):
     def test_every_figure_of_the_printout(self):
         result = {"off": [5.0, 1.0, 3.0], "on": [4.0, 2.0, 2.5],
-                  "diffs": [float(i) - 8 for i in range(16)]}
+                  "diffs": [float(i) - 8 for i in range(16)],
+                  "mean_diffs": [i / 2 - 3 for i in range(16)]}
         # off p50 3, on p50 2.5; diffs -8 .. +7: p50 index round(7.5) = 8 -> 0, the
-        # 4th smallest -5 and the 4th largest +4.
+        # 4th smallest -5 and the 4th largest +4. Means 3 and 8.5 / 3; p90 and
+        # p99 of three the largest. Mean diffs -3 .. +4.5 by halves: p50 +1,
+        # the 4th smallest -1.5, the 4th largest +3.
         self.assertEqual(DV.format_timed("x", result).splitlines(), [
             ("  x: draw p50 off 3.00 ms, on 2.50 ms (3 frames each); per block, on minus off p50: "
              "p50 +0.00 ms, from -8.00 to +7.00"),
             ("    the median saving lies in -5.00 to +4.00 ms (97.9 % sign-test interval; "
-             "negative is faster)")])
-        short = DV.format_timed("x", {"off": [1.0], "on": [1.0], "diffs": [0.0, 0.1]})
-        self.assertTrue(short.endswith("    too few blocks for a sign-test interval on the median"))
+             "negative is faster)"),
+            "    the draw's mean off 3.00 ms, on 2.83 ms; p90 off 5.00, on 4.00; p99 off 5.00, on 4.00",
+            "    per block, on minus off mean: p50 +1.00 ms; the median lies in -1.50 to +3.00 ms (97.9 %)"])
+        short = DV.format_timed("x", {"off": [1.0], "on": [1.0], "diffs": [0.0, 0.1],
+                                      "mean_diffs": [0.0, 0.1]}).splitlines()
+        self.assertEqual(short[1], "    too few blocks for a sign-test interval on the median")
+        self.assertEqual(len(short), 3)                    # no interval on the mean either
 
     def test_the_command_line(self):
         a = DV.parse(["--live", "150", "--elapsed", "300"])
@@ -73,7 +80,8 @@ class TimingTests(unittest.TestCase):
         def run(ps_, n, render):
             log.append((state["on"], tuple(ps_.player.pos)))
             ps_.player.pos += (5.0, 5.0)                   # the jitter leaves it elsewhere
-            return None, [2.0 if state["on"] else 3.0] * n, None
+            # On: faster at the p50 but with a burst that makes its mean slower.
+            return None, ([2.0] * (n - 1) + [8.0]) if state["on"] else [3.0] * n, None
 
         with mock.patch.dict(DV.VARIANTS, {"probe": variant}), mock.patch.object(DV.S, "run", run):
             result = DV.timed(ps, "probe", blocks=2, frames=3)
@@ -82,6 +90,7 @@ class TimingTests(unittest.TestCase):
         self.assertFalse(state["on"])
         self.assertEqual(tuple(ps.player.pos), home)
         self.assertEqual(result["diffs"], [-1.0, -1.0])
+        self.assertEqual(result["mean_diffs"], [1.0, 1.0])            # (2 + 2 + 8) / 3 - 3
         self.assertEqual((len(result["off"]), len(result["on"])), (6, 6))
 
 
@@ -178,11 +187,13 @@ class SceneTests(unittest.TestCase):
         self.assertGreater(len(primed), 0)
 
     def test_every_variant_draws_the_same_frame(self):
+        DV._WASH_LRU.clear()
         for name in DV.VARIANTS:
             with self.subTest(variant=name):
                 before = self._patched_state()
                 self.assertTrue(DV.identical(self.ps, name, self.surface))
                 self.assertEqual(self._patched_state(), before)       # undone
+        self.assertGreater(len(DV._WASH_LRU), 0)       # the draw went through wash_lru
 
     def test_a_variant_that_changes_a_pixel_is_caught(self):
         def blot(ps):
@@ -315,7 +326,7 @@ class MainTests(unittest.TestCase):
     def test_a_differing_variant_is_reported_and_not_timed(self):
         with mock.patch.object(DV, "identical", lambda ps, name, s: name != "world_bucketed"), \
                 mock.patch.object(DV, "timed", lambda ps, name, b, f: {
-                    "off": [1.0], "on": [1.0], "diffs": [0.0, 0.0]}), \
+                    "off": [1.0], "on": [1.0], "diffs": [0.0, 0.0], "mean_diffs": [0.0, 0.0]}), \
                 contextlib.redirect_stdout(io.StringIO()) as out:
             DV.main(["--seed", str(SEED), "--live", "30", "--elapsed", "300", "--dormant", "0"],
                     save_path=TDL._fresh_save())

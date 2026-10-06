@@ -2,7 +2,9 @@
 `crowd_performance_plan.md` appendix A.1): `n` enemy-sized sprites blitted
 onto a surface of the given size, with no game logic, sprite only and then
 with a shadow under and a bar over each. The floor the draw can be cut
-toward, whatever the game's own code costs on top.
+toward, whatever the game's own code costs on top. Every frame starts by
+filling the whole surface, as the appendix did, so each row includes that
+fill; `--counts 0` times the fill alone, to take it back out.
 
     python -m tools.benchmarks.blit_floor                         # 1600x900 and 2560x1080, 100 to 300
     SDL_VIDEODRIVER=windows python -m tools.benchmarks.blit_floor --sizes 2560x1080
@@ -90,8 +92,8 @@ def parse(argv=None) -> argparse.Namespace:
         args.counts = [int(c) for c in args.counts.split(",")]
     except ValueError:
         ap.error("--sizes takes WxH,WxH and --counts N,N")
-    if any(len(s) != 2 or min(s) < 1 for s in args.sizes) or min(args.counts) < 1 or args.frames < 1:
-        ap.error("sizes, counts and frames must be positive")
+    if any(len(s) != 2 or min(s) < 1 for s in args.sizes) or min(args.counts) < 0 or args.frames < 1:
+        ap.error("sizes and frames must be positive, counts 0 or more")
     return args
 
 
