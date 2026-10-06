@@ -1,0 +1,39 @@
+commit 42782e4  started 2026-10-06 12:19:05
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb      2382,671875
+cam_helper      1918,59375
+chrome         1458,046875
+chrome          940,765625
+audiodg           937,8125
+chrome             742,125
+SystemSettings  611,390625
+chrome          415,390625
+
+
+
+=== quiet 150a  cpu load 11%  12:19:07
+=== quiet 150b  cpu load 9%  12:19:24
+=== caches 150  cpu load 12%  12:19:41
+=== quiet 250a  cpu load 14%  12:20:06
+=== quiet 250b  cpu load 12%  12:20:27
+=== caches 250  cpu load 7%  12:20:48
+finished 12:21:22  cpu load 12%
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb        2426,1875
+cam_helper     1936,203125
+chrome           1458,0625
+chrome          947,078125
+audiodg         945,046875
+chrome          745,296875
+SystemSettings  611,390625
+chrome          415,765625
+
+
+
