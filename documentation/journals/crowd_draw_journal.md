@@ -979,7 +979,7 @@ built:**
 
 | ID | Plan step | What |
 |---|---|---|
-| RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled |
+| RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled (done 2026-10-07) |
 | RND-010.5 | 4.1 | `report_debug` only with the overlay on (cheap, the plan's next) |
 | RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants |
 | RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
@@ -1042,6 +1042,62 @@ sequence. The tint cache is not part of it.
   
   The owner asked to be asked before the sitting runs.
 
+## RND-010.4: Results (2026-10-07)
+
+The owner freed the machine for the sitting (2026-10-07, 10:48 to 10:57).
+It ran `main` (`2c6865a`, the wash cache emptying whole at 512) against
+this branch (`f4f0079`, the LRU of 1536) in one sitting, in ABBA order
+(before, after, after, before), at 150, 200 and 250 packed, seed 35. It
+ran each count with the hero fighting and then quiet. The raw outputs,
+the script and `derived.py`, which prints every figure below, are in
+`data/rnd-010.4/`.
+
+With the hero fighting, p50 ms. "Change" is the two afters' mean less
+the two befores'; the range runs from the lower after less the higher
+before to the higher after less the lower before:
+
+| | Before | After | Change |
+|---|---|---|---|
+| 250: bare draw | 17.93 / 18.27 | 16.16 / 16.24 | −1.90 (−2.11 to −1.69) |
+| 250: `enemies` row | 5.31 / 5.40 | 3.72 / 3.72 | −1.64 (−1.68 to −1.59) |
+| 250: update + draw | 30.30 / 30.64 | 28.66 / 28.73 | −1.77 (−1.98 to −1.57) |
+| 250: draw p90 | 22.07 / 23.65 | 18.89 / 18.43 | −4.20 (−5.22 to −3.18) |
+| 250: draw p99 | 32.36 / 33.14 | 29.95 / 30.17 | −2.69 (−3.19 to −2.19) |
+| 200: bare draw | 16.23 / 15.89 | 15.42 / 14.99 | −0.86 (−1.24 to −0.47) |
+| 200: `enemies` row | 3.99 / 3.83 | 3.14 / 3.07 | −0.81 (−0.92 to −0.69) |
+| 150: bare draw | 14.43 / 15.09 | 14.55 / 15.85 | +0.44 (−0.54 to +1.42): not resolved |
+| 150: `enemies` row | 2.81 / 2.93 | 2.69 / 2.92 | −0.07 (−0.24 to +0.11): not resolved |
+
+- **At 250 and 200, every pairing is faster.** The saving sits in the
+  `enemies` row, an enemy's own draw, where the washes happen. The other
+  rows move by 0.06 ms or less, and the update does not move at those
+  counts (−0.20 to +0.28 ms).
+- **At 250, the measured saving (1.64 ms on the row, 1.90 on the bare
+  draw) lies between RND-010.3's throwaway variant (1.27, median of
+  blocks) and the replay's prediction (1.83).**
+- **At 150 the change is not resolved,** as RND-010.3 found. These runs
+  came first in the sitting, under the highest load readings (59, 44,
+  28 and 99 % before their four steps), and their draws ran 2 to 3 ms
+  above sitting 5's at the same count. The update rose there too (+0.16
+  to +0.71 ms), which the change cannot reach (it touches only the draw),
+  so these runs read the machine as much as the code.
+- **Quiet, the control,** moves by −0.11 to +0.09 ms on the bare draw at
+  every count. Nothing is washed there, and nothing changed.
+- **Frames over the budget stay at 300 of 300** in the fight at every
+  count. The fix takes 1.8 ms off a frame of about 30 ms at 250, and the
+  saturated fight stays over the 16.67 ms budget (the plan's §6).
+- **The replay** (`sprite_caches`, on the branch) asks for the same
+  1,665 distinct frames, and now prints the game's cap as 1536. Its
+  figures are RND-010.3's, since the requests do not depend on the
+  cache.
+
+Exactness: the whole-frame test (a warm, an empty and a too-small cache
+draw one picture) and the cache's own tests pass; mutation checks on the
+LRU caught 7 of 7. The full suite ran on the branch (see the PR).
+
+Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
+250, against 28.2 MB before, as D2 accepted.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1068,10 +1124,10 @@ sequence. The tint cache is not part of it.
   - [x] RND-010.3.19: The seventh review's findings: sitting 1's own range, the crowd bias from sitting 5's costs (0.17 to 0.37 ms), the 150 prediction against its measurement, the plan's annotations narrowed to what was timed, one merged task sequence, the ghost cache's memory; tested
   - [x] RND-010.3.20: The eighth review's findings: the ghost remakes as a 150 candidate, the bars given a plan task and their billion-HP bias named, §3.1 narrowed, 4.3 kept last with its bound, sitting 5's own shade row, both sides of the stale-cache bias; D2's figures and every reference to the two caches pinned
   - [x] RND-010.3.21: The ninth review's findings: 150 consistent with its prediction (the gap's interval quoted), the stretch and ghost biases' net direction left open, the shade weighed against item 4 as a whole, the bars' two-way lean, IDs for every row of the sequence; the cap and the cold-start figures pinned
-- [ ] RND-010.4: The wash cache as an LRU of 1536 (RND-010.D2), pixel-identical and tested (the rest, in the sequence table under the RND-010.3 results, as RND-010.5 onward)
+- [x] RND-010.4: The wash cache as an LRU of 1536 (RND-010.D2), pixel-identical and tested (the rest, in the sequence table under the RND-010.3 results, as RND-010.5 onward)
   - [x] RND-010.4.1: RND-010.D2 recorded, this plan and the index
   - [x] RND-010.4.2: `washed`'s cache an LRU of 1536, with its tests (the cache's behaviour; a whole frame from a warm, an empty and a too-small cache)
   - [x] RND-010.4.3: The probes and their tests follow the game's LRU
-  - [ ] RND-010.4.4: The sitting: `main` against this branch, ABBA, at 150 and 250 packed, fighting and quiet; `sprite_caches` after; raw outputs kept
-  - [ ] RND-010.4.5: The results, and the plan's 4.13 marked done
+  - [x] RND-010.4.4: The sitting: `main` against this branch, ABBA, at 150, 200 and 250 packed, fighting and quiet; `sprite_caches` after; raw outputs kept
+  - [x] RND-010.4.5: The results, and the plan's 4.13 marked done
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
