@@ -125,10 +125,12 @@ def rig_lift(assets, rig: str) -> float:
 
 
 def sprite_top(renderer, e, sy: float, z: float) -> float:
-    """Screen y of the top of `e`'s body -- where the bar hangs from. A
-    primitive-fallback enemy has no rig, so its collider is its body."""
+    """Screen y of the top of `e`'s body -- where the bar hangs from. The
+    collider is the body for a primitive-fallback enemy, which has no rig,
+    and for every enemy the dev menu's "Enemy shapes" switch draws as its
+    circle (RND-013)."""
     rig = getattr(e.anim, "rig", None) if getattr(e, "anim", None) else None
-    if rig is None:
+    if rig is None or renderer.enemy_shapes():
         return sy - e.radius * z
     assets = renderer.ps.game.assets
     return sy - rig_lift(assets, rig) * z + renderer.sprite_drop(e.radius)

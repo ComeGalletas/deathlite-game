@@ -17,7 +17,8 @@ against it. It is drawn as raspberry lock-on brackets framing the body
 Drawn right after the body's own sprite (`WorldRenderer.one_enemy` /
 `boss`), so it depth-sorts with the body: a body standing in front still
 covers it. The authored brackets replace the procedural status ring, which
-stays for the primitive fallback in the data's `colour`.
+stays for the primitive fallback (and the dev menu's "Enemy shapes", RND-013)
+in the data's `colour`, under the same "only while it matters" rule.
 """
 from __future__ import annotations
 

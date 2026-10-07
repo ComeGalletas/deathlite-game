@@ -1,9 +1,9 @@
 """The developer run's switches and readouts (structure review, D3).
 
 `DevFlags` holds the toggles the dev menu and the F-keys flip -- unlimited
-HP, silenced weapons, zero-damage hits, the three overlays -- and the rules
-behind them: the HP ratchet, the debug key table, the live difficulty
-switch, and the F1 overlay's metrics. All of it is a developer run's
+HP, silenced weapons, zero-damage hits, the overlays, enemies drawn as their
+collider circles -- and the rules behind them: the HP ratchet, the debug key
+table, the live difficulty switch, and the F1 overlay's metrics. All of it is a developer run's
 business, so it sits with the other developer tooling.
 
 `PlayingState` keeps the `_dev_*` names as properties over this object
@@ -27,6 +27,7 @@ class DevFlags:
         self.no_damage = False          # weapons still fire, hits deal 0 (dev menu)
         self.hp_floor = 0.0
         self.show_colliders = False     # F7 / dev menu: true collider overlay
+        self.enemy_shapes = False       # dev menu: enemies as circles (RND-013)
         self.show_spawn_points = False  # F8 / dev menu: generated spawn points
         self.show_aim = False           # dev menu: CB-5 manual-aim line
         self.show_auras = False         # dev menu: elemental aura inspector

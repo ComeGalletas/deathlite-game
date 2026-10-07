@@ -663,6 +663,7 @@ class PlayingState(State):
     _dev_no_damage = _forward("dev", "no_damage")
     _dev_hp_floor = _forward("dev", "hp_floor")
     _dev_show_colliders = _forward("dev", "show_colliders")
+    _dev_enemy_shapes = _forward("dev", "enemy_shapes")
     _dev_show_spawn_points = _forward("dev", "show_spawn_points")
     _dev_show_aim = _forward("dev", "show_aim")
     _dev_show_auras = _forward("dev", "show_auras")

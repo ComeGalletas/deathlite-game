@@ -16,7 +16,7 @@ with a `Legacy ID:` line because it was written before DOC-001 landed on
 its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
-**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-019 ·
+**Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-014 · UI-019 ·
 PRG-004 · AUD-004 · SYS-014 · TST-010 · BLD-007 · DOC-009
 
 ## Requirements
@@ -83,6 +83,7 @@ PRG-004 · AUD-004 · SYS-014 · TST-010 · BLD-007 · DOC-009
 | RND-010 | Drawing big crowds: the draw measured by layer at 150 to 250 enemies, then cut where the crowd costs it, pixel-identical | RND | performance | in progress | [crowd_draw_journal.md](crowd_draw_journal.md) | ComeGalletas/crowd-draw-levelup-9ec11fc6, ComeGalletas/rnd-010-3-leads-9ec11fc6, claude/rnd-010-4-wash-lru, claude/rnd-010-5-debug-lines | 2026-09-30 |
 | RND-011 | The aura shed moves from the draw to the update: its own RNG, a chance of `rate * dt` per step, the budget scaled to the step | RND, CMB | bug | done | [aura_shed_journal.md](aura_shed_journal.md) | ComeGalletas/aura-shed-update-a10d79ed | 2026-09-30 |
 | RND-012 | Web draw, the cheap wins: constant-alpha full-screen overlays and the frozen backdrop under level-up, pause and TAB | RND, UI, BLD | performance | done (D6 approved and play-tested; D7 superseded by RND-011; landed on main by PR #62) | [web_draw_journal.md](web_draw_journal.md) | ComeGalletas/web-draw-cheap-5be9212c | 2026-09-30 |
+| RND-013 | Dev-menu "Enemy shapes" switch: every enemy and the boss drawn as its collider circle instead of its sprite, draw-only, dev runs only | RND, SYS | feature | done | [enemy_shape_toggle_journal.md](enemy_shape_toggle_journal.md) | claude/rnd-013-enemy-shape-toggle | 2026-10-07 |
 | UI-001 | Game over screen | UI | feature | legacy | [game_over_journal.md](game_over_journal.md) | — | 2026-09-12 |
 | UI-002 | Hero-select sprite preview | UI | feature | legacy | [hero_select_preview_journal.md](hero_select_preview_journal.md) | — | 2026-09-12 |
 | UI-003 | HUD rework | UI | feature | legacy | [hud_rework_journal.md](hud_rework_journal.md) | — | 2026-09-12 |

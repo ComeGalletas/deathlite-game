@@ -113,6 +113,45 @@ class WorldRenderer:
         self.ps = ps
         self.run = getattr(ps, "run", ps)
         self._glow = GlowCache()      # XP orb glow discs, pre-rendered per size / alpha
+        self._discs: dict = {}        # (radius px, colour) -> the circle body's ghost (RND-013)
+
+    # --- the dev menu's "Enemy shapes" switch (RND-013) -------------
+    def enemy_shapes(self) -> bool:
+        """Draw the enemies and the boss as their collider circles rather
+        than their sprites? Only in a dev run with the switch on. Read-only
+        and draw-only: the art stays loaded and the animators keep ticking,
+        so turning it off shows the right frame at once. A renderer built
+        over a bare namespace (the headless draw tests) has neither the
+        flags nor a dev run, and draws sprites."""
+        dev = getattr(self.ps, "dev", None)
+        return bool(dev is not None and dev.enemy_shapes
+                    and getattr(self.run, "dev_mode", False))
+
+    def status_tint(self, body):
+        """The first status `body` carries that the circle body shows, as
+        its tint, or None. The `mark` counts only while a held weapon reads
+        it -- the rule its brackets follow on a sprite (RND-007,
+        `status_marks.shown`) -- so the shape and the sprite agree."""
+        for sid, tint in _STATUS_TINT.items():
+            if sid in body.status and (sid != status_marks.STATUS
+                                       or status_marks.shown(self.run)):
+                return tint
+        return None
+
+    def record_disc(self, colour, centre, radius: int, character_y: float) -> None:
+        """Queue a circle body for the ghost pass, so it shows through a
+        crown in front of it the way a sprite does. One disc per radius and
+        colour, kept and cached by identity like an animation frame."""
+        key = (radius, colour)
+        disc = self._discs.get(key)
+        if disc is None:
+            if len(self._discs) >= 256:
+                self._discs.clear()
+            disc = pygame.Surface((2 * radius + 1, 2 * radius + 1), pygame.SRCALPHA)
+            pygame.draw.circle(disc, colour, (radius, radius), radius)
+            self._discs[key] = disc
+        self.run.game_map.renderer.record_character(
+            disc, (centre[0] - radius, centre[1] - radius), character_y)
 
     # --- geometry helper --------------------------------------------
     def sprite_drop(self, radius: float) -> float:
@@ -605,16 +644,17 @@ class WorldRenderer:
         sx, sy = run.camera.world_to_screen(e.pos)
         er = e.radius * z
 
-        sprited = e.anim is not None
+        # RND-013: the dev switch sends a sprited enemy down the rig-less
+        # branch, so the shape carries the same cues the fallback always had.
+        sprited = e.anim is not None and not self.enemy_shapes()
         if sprited:
             self.enemy_sprite(surface, e)
             status_marks.draw(self, surface, e)      # RND-007: over the body
         else:
             colour = (255, 255, 255) if e.hit_flash > 0 else e.color
-            for sid, tint in _STATUS_TINT.items():
-                if sid in e.status:
-                    colour = tint
-                    break
+            tint = self.status_tint(e)
+            if tint is not None:
+                colour = tint
             else:
                 # No status of its own: show the aura instead, so the
                 # primitive fallback carries the same information the
@@ -623,16 +663,16 @@ class WorldRenderer:
                 if primed is not None and e.hit_flash <= 0:
                     colour = primed[1]
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(er))
+            self.record_disc(colour, (int(sx), int(sy)), round(er), e.pos.y)
 
         # Thin state rings at the collider edge -- always for the primitive
         # fallback (the only cue with no art); for a sprited enemy only when
         # config.SHOW_ENEMY_STATE_RINGS is on (else it just reads as a collider).
         if not sprited or config.SHOW_ENEMY_STATE_RINGS:
-            for sid, tint in _STATUS_TINT.items():
-                if sid in e.status:
-                    pygame.draw.circle(surface, tint, (int(sx), int(sy)),
-                                       round(er) + 2, 2)
-                    break
+            tint = self.status_tint(e)
+            if tint is not None:
+                pygame.draw.circle(surface, tint, (int(sx), int(sy)),
+                                   round(er) + 2, 2)
             if e.is_elite:
                 pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
                                    round(er) + 3, 2)
@@ -682,14 +722,15 @@ class WorldRenderer:
         itself uses, so a bottom-anchored body is wrapped at its middle, not
         its feet -- with the diameter `over_sprite` x its larger drawn side.
         A rig-less body gets the collider: its centre, and `over_sprite` x
-        its diameter."""
+        its diameter -- and so does every body while the dev menu's "Enemy
+        shapes" switch draws it as its circle (RND-013)."""
         ps = self.ps
         run = getattr(self, "run", ps)
         assets = ps.game.assets
         z = run.camera.zoom
         sx, sy = run.camera.world_to_screen(body.pos)
         over = float((assets.rig(self._SPAWN_RIG) or {}).get("over_sprite", 1.0))
-        anim = getattr(body, "anim", None)
+        anim = None if self.enemy_shapes() else getattr(body, "anim", None)
         scale = assets.scale_for(anim.rig) if anim is not None else None
         if scale:
             bw, bh = scale
@@ -751,7 +792,7 @@ class WorldRenderer:
         sx, sy = run.camera.world_to_screen(b.pos)
         br = b.radius * z
         frame = None
-        if b.anim is not None:
+        if b.anim is not None and not self.enemy_shapes():    # RND-013
             frame, flip = self.rig_frame(b.anim, b._facing, z)
         if frame is not None:
             if b._hurt_t > 0.0:
@@ -763,6 +804,7 @@ class WorldRenderer:
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
             pygame.draw.circle(surface, (255, 210, 210), (int(sx), int(sy)),
                                round(br), 3)
+            self.record_disc(colour, (int(sx), int(sy)), round(br), b.pos.y)
         if b.phase == "telegraph" and not b.closing:
             pid = b.pattern.get("id")
             frac = b.telegraph_fraction

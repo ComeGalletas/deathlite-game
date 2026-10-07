@@ -85,6 +85,7 @@ INTEGRATION = (
     "tests/flows/test_smoke.py",
     "tests/render/test_damage_numbers.py",
     "tests/render/test_enemy_sprite.py",
+    "tests/render/test_enemy_shapes.py",
     "tests/render/test_gem_glow.py",
     "tests/render/test_ghost.py",
     "tests/render/test_hostile_glow.py",
