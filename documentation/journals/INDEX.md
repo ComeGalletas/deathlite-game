@@ -17,7 +17,7 @@ its branch, but the work finished under the standard and is tracked as
 `done` (DOC-003).
 
 **Next free:** CMB-011 · ENT-022 · SPN-004 · WLD-015 · RND-013 · UI-019 ·
-PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-007 · DOC-009
+PRG-004 · AUD-004 · SYS-014 · TST-010 · BLD-007 · DOC-009
 
 ## Requirements
 
@@ -119,6 +119,7 @@ PRG-004 · AUD-004 · SYS-013 · TST-010 · BLD-007 · DOC-009
 | SYS-010 | A frame-time trace of real play (`--trace`) and its report | SYS | feature | done | [frame_trace_journal.md](frame_trace_journal.md) | ComeGalletas/sys-010-frame-trace-9ec11fc6 | 2026-09-29 |
 | SYS-011 | `clock.tick` held at ~31 ms on Windows 11: the timer request ignored for a hidden, silent process; opt out at startup | SYS | bug | done | [timer_resolution_journal.md](timer_resolution_journal.md) | ComeGalletas/sys-011-timer-resolution-26b3a82b | 2026-09-29 |
 | SYS-012 | The frame budget stays the 60 fps target (16.67 ms, `BUDGET_MS`) on a 174 Hz display: text brought in line, no behaviour change | SYS | process | done | [frame_trace_journal.md](frame_trace_journal.md) | ComeGalletas/sys-012-budget-decided-c17f955f | 2026-09-30 |
+| SYS-013 | `PlayingState` defined `_apply_dev_unlimited_hp`, `_set_difficulty` and `_report_debug` twice; the dead second copy removed | SYS | refactor | done | [playing_state_refactor.md](playing_state_refactor.md) | claude/sys-013-dedupe-dev-methods | 2026-10-07 |
 | TST-001 | Test seed stability | TST | refactor | legacy | [test_seed_stability_journal.md](test_seed_stability_journal.md) | — | 2026-09-17 |
 | TST-002 | Remove the exit-2 skip from the cut-script tests | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/optimistic-poincare-e34af9 | 2026-09-22 |
 | TST-003 | A missing tileset fails the biome tests instead of skipping (owner decision, 2026-09-22) | TST, RND | bug | done | [cut_script_skips_journal.md](cut_script_skips_journal.md) | claude/doc-004-proposal-journals | 2026-09-22 |

@@ -374,3 +374,7 @@ This block follows the DOC-001 layout; the entries above predate it.
 - `tests/render` + `tests/playing` + the hero-select preview: **747 passed**
   after .4.
 
+
+## SYS-013 — `PlayingState`'s duplicated dev methods (owner, 2026-10-07)
+
+- SYS-013 — `2102821` left `_apply_dev_unlimited_hp`, `_set_difficulty` and `_report_debug` defined twice in `core/state.py` (byte-identical, Python kept the second); the second copy is deleted and the copy under "the developer switches" kept, its old section's header trimmed to "rewards and the run's end"; no behaviour change: `tests/playing` 421 passed (1509 subtests), the dev-menu callers' tests 211 passed.
