@@ -7,7 +7,9 @@ then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3),
 then claude/rnd-010-4-wash-lru (from `main`, 2026-10-06; RND-010.4; in the
 session's worktree, as the owner chose under CLAUDE.md §1.5),
 then claude/rnd-010-5-debug-lines (from `main`, 2026-10-07; RND-010.5; in
-the same worktree, a task inside the ongoing requirement)
+the same worktree, a task inside the ongoing requirement), then
+claude/rnd-010-6-under-layer (from `main`, 2026-10-07; RND-010.6; the
+same worktree)
 
 ---
 
@@ -1252,6 +1254,78 @@ first two in the integration tier), and one in
 matches its pin. No eval applies: the saving is measured directly by the
 probe, and nothing here is a rate.
 
+## RND-010.6: The elemental under-layer, split and measured first (plan, 2026-10-07)
+
+The owner asked for RND-010.6 on 2026-10-07, after #73 merged. This is
+the third row of RND-010.3's sequence and the plan's 4.5 ("No SRCALPHA
+allocation per frame", expected 0.5 to 1.5 ms in an elemental fight).
+RND-010.3 put the under-layer as the largest layer the fight adds:
+`flat/elemental` +1.36 / +2.71 ms at 150 / 250 in sitting 5. The order
+says split `draw_under` first, then time the candidates as variants, and
+build only what a sitting resolves.
+
+What `draw_under` does (`visual/elements/__init__.py:125`), once per
+terrace band:
+- **motes:** the aura shed's particles, already the row
+  `elemental/particles`;
+- **areas** (`transient.draw_areas`): each live Wind tornado, a ring at
+  its true radius (`_ring`: a new SRCALPHA surface the ring's size, a
+  circle, a blit) and three arcs turning inside it (`_arc_ring`: the
+  same, at the spin's angle);
+- **auras** (`layers.draw_auras`): every primed body's aura. All four
+  elements have an authored rig (`data/weapons/element_visuals.json`),
+  so in the game an aura is a blit of a frame `game/assets.py` already
+  caches per size; the ring and the marker, with their SRCALPHA surfaces,
+  only draw where the art is missing;
+- **statuses** (`layers.draw_statuses`): burn, the authored flame
+  (scaled copies cached in `_SCALED`); chill, the slow chevron (`_shape`:
+  a new SRCALPHA surface, two polygons, a blit, per body); freeze, the
+  authored ice block;
+- **transient** (`transient.draw_transient`, `over=False`): the jump arcs
+  and the effects under the bodies.
+
+A first look, headless (the dummy driver, not the cost on screen), at
+150 packed in the fight, one run: `elemental/auras` 0.99 ms p50,
+`elemental/statuses` 0.44, `elemental/areas` 0.41 (p90 0.91),
+`elemental/particles` 0.14, `elemental/transient` 0.00. If the screen
+agrees, plan 4.5's SRCALPHA caches reach the statuses and the areas, and
+the largest part, the auras, is blits of cached frames, which no cache
+removes.
+
+The plan:
+- **The split** (RND-010.6.2): `draw_layers` times `draw_under`'s four
+  passes as their own rows, `elemental/areas`, `/auras`, `/statuses`,
+  `/transient` (and `reactions/transient` for the bursts over the
+  bodies). Parts still add up to the whole.
+- **The leads probe** (RND-010.6.3): as `draw_leads` does for an enemy,
+  each piece of the three passes timed alone over the frame's own bodies
+  and areas, so the rows split into lookups and pixels: per aura the
+  state, `world_to_screen`, the size, the frame lookup and the blit; per
+  status mark the slow chevron's surface, polygons and blit against the
+  cached flame's blit; per area the ring's and the arcs' surface, drawing
+  and blit.
+- **The candidates, as throwaway exact variants** (RND-010.6.4), timed
+  against the draw as `draw_variants` does:
+  - `_shape` cached per `(shape, size, colour)`: its layer does not depend
+    on where it is drawn (the polygon's local points are `(x - 0.5) *
+    size` plus half the box), so a kept copy is the same picture;
+  - `_ring` (and `_disc`) cached per `(radius, colour, alpha, width)`: a
+    tornado's ring only changes while it fades or the zoom changes;
+  - the aura's frame looked up once per element and size in a pass,
+    rather than once per body: the animator's index is shared by every
+    body of an element, so the frame is too.
+  `_arc_ring` turns every frame, so a cache keyed on its angle would
+  miss every frame; it is timed but not varied.
+- **One sitting on screen** (RND-010.6.5), at 150 and 250 packed in the
+  fight: the split by layer, the leads and the variants. The owner asks
+  to be asked first.
+- **Build what the sitting resolves** (RND-010.6.6), each with a
+  pixel-identity test on the fight's whole frame and a mutation check,
+  then measured before and after in one ABBA sitting; then the results.
+- **Measured outcome:** the fight's `flat/elemental` total (the sum of
+  its rows now) at 150 and 250, before and after. A part the sitting
+  cannot resolve is recorded as such and not built.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1293,4 +1367,12 @@ probe, and nothing here is a rate.
   - [x] RND-010.5.4: The results, and the plan's 4.1 marked done
   - [x] RND-010.5.5: The cold review's findings: the shared percentile and the outputs taken again, every quoted figure pinned, the exactness argued from no run state written and held by a hidden-against-shown run digest, the real F1 path tested, "infused" for `--elements`, the line references, D1's alternative named
   - [x] RND-010.5.6: The full suite's counts in the results; the owner's confirmation of D1
+- [ ] RND-010.6: The elemental under-layer (plan 4.5): split, measured, and the exact caches a sitting resolves built
+  - [x] RND-010.6.1: This plan and the index
+  - [ ] RND-010.6.2: `draw_layers` times `draw_under`'s passes as their own rows, tested
+  - [ ] RND-010.6.3: The under-layer's leads probe, tested
+  - [ ] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element), tested
+  - [ ] RND-010.6.5: The sitting: the split, the leads and the variants at 150 and 250 packed in the fight, raw outputs kept
+  - [ ] RND-010.6.6: What the sitting resolves, built pixel-identical, measured before and after
+  - [ ] RND-010.6.7: The results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
