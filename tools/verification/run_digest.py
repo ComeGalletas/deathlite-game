@@ -20,6 +20,10 @@ change to the run's wiring.
 `--fps N` steps the same frames at 1/N s. The pin is taken at 60, so it
 only prints: it is for comparing a change by hand at another rate, as
 ENT-019 did at 62 to show a frame-rate fix leaves the 62 fps run as it was.
+
+`run_digest(seed, overlay=True)` plays the run with the F1 overlay shown,
+so its lines are computed every frame: RND-010.5's test holds that the
+digest is the same either way (`tests/flows/test_debug_lines_exact.py`).
 """
 from __future__ import annotations
 
@@ -53,12 +57,13 @@ def _vec(v):
     return [_num(v.x), _num(v.y)]
 
 
-def run_digest(seed: int, fps: int = 60) -> str:
+def run_digest(seed: int, fps: int = 60, overlay: bool = False) -> str:
     import pygame
     from game.game import Game
     from tests.boot import start_run
 
     game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+    game.debug.visible = overlay
     game.state_machine.change(_menu(game))
     ps = start_run(game, seed=seed)
     dt = 1 / fps

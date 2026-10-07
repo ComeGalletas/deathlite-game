@@ -5,7 +5,9 @@
 (from `main`, owner, 2026-09-30; shared with UI-018; RND-010.1 and .2, merged),
 then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3),
 then claude/rnd-010-4-wash-lru (from `main`, 2026-10-06; RND-010.4; in the
-session's worktree, as the owner chose under CLAUDE.md §1.5)
+session's worktree, as the owner chose under CLAUDE.md §1.5),
+then claude/rnd-010-5-debug-lines (from `main`, 2026-10-07; RND-010.5; in
+the same worktree, a task inside the ongoing requirement)
 
 ---
 
@@ -980,7 +982,7 @@ built:**
 | ID | Plan step | What |
 |---|---|---|
 | RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled (done 2026-10-07) |
-| RND-010.5 | 4.1 | `report_debug` only with the overlay on (cheap, the plan's next) |
+| RND-010.5 | 4.1 | `report_debug` only with the overlay on (done 2026-10-07: 0.016 to 0.026 ms a frame, 3 to 13 % of the plan's estimate) |
 | RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants |
 | RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
 | RND-010.8 | 4.6 | bars (measure first), damage numbers, particles culled and without copies |
@@ -1135,6 +1137,121 @@ Exactness:
 Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
 250, against 28.2 MB before, as D2 accepted.
 
+## RND-010.5: The F1 overlay's lines only while it is shown (plan, 2026-10-07)
+
+The owner asked for RND-010.5 on 2026-10-07, after #71 merged. This is
+the plan's 4.1 and the second row of RND-010.3's sequence. Done when: no
+`active_auras` call with the overlay off.
+
+What the code did before this change:
+- `PlayingState.update` ended with `self.dev.report_debug(self)`
+  (`core/state.py:394` then, `:397` now), every frame, F1 or not.
+- `report_debug` (`devtools/dev_flags.py:94`) sets about 25 overlay
+  metrics. One of them, `auras` (`:116`), is `active_auras`, which walks
+  the whole crowd. The rest are counts and f-strings.
+- `DebugOverlay.draw` returns at once while hidden, so nothing reads
+  those metrics until F1 is pressed.
+
+The change:
+- **The gate.** `report_debug` runs only while `game.debug.visible`.
+  Pixel-identical while hidden, since a hidden overlay draws nothing;
+  while shown, the same lines are filled every frame as before.
+- **Hiding drops the lines (RND-010.5.D1).** Without this, the metrics
+  set while F1 was last on would stay in the overlay. Shown again while
+  the run is not updating (under the pause menu, for one), it would print
+  them as if current, for as long as the run stays stopped.
+  `DebugOverlay.toggle` now clears them on hide, so the overlay shows
+  only FPS and the two timings until the next update refills them. Before
+  RND-010.5 the overlay opened under the pause menu showed the last frame
+  before the pause; that one frame's lines are what is given up. The
+  owner confirmed D1 on 2026-10-07.
+- **Tests:**
+  - `tests/playing/test_debug_lines.py` on a booted seed-35 run: three
+    updates hidden call neither `report_debug` nor `active_auras` and
+    leave the overlay empty; three shown call each three times and fill
+    the lines (integration tier);
+  - `tests/systems/test_debug_overlay.py`: hiding clears the lines,
+    showing keeps them;
+  - a mutation check of each change.
+- **Measured:** `tools/benchmarks/debug_lines.py` times `report_debug`,
+  and `active_auras` alone, on the packed scene at 150 and 250, quiet and
+  infused. The work is CPU only (no pixels), so it runs headless and
+  needs no on-screen sitting. With F1 off, the whole of it is the saving.
+
+## RND-010.5: Results (2026-10-07)
+
+`debug_lines.py` on this branch, seed 35, headless, 2000 calls a run;
+p50 and p90 by `tools/benchmarks/stats.percentile`, as every other probe
+in this journal. "Infused" is `--elements`: the crowd primed and the
+weapons infused, as `spawn_stress --elements`, then frozen while timed,
+so it differs from quiet only in how many enemies hold an aura. The raw
+outputs are in `data/rnd-010.5/`, and
+`tests/devtools/test_debug_lines_probe.py` checks every row and every
+figure quoted below against them:
+
+| Scene | Alive | `report_debug`, p50 (p90) | A frame | `active_auras` alone, p50 |
+|---|---|---|---|---|
+| 150 packed, quiet | 138 | 16.4 µs (p90 16.7) | 0.016 ms | 11.5 µs |
+| 150 packed, infused | 138 | 18.1 µs (p90 18.6) | 0.018 ms | 13.2 µs |
+| 250 packed, quiet | 226 | 24.6 µs (p90 25.5) | 0.025 ms | 19.6 µs |
+| 250 packed, infused | 226 | 26.4 µs (p90 27.2) | 0.026 ms | 21.2 µs |
+
+- **The saving, F1 off:** 0.016 to 0.026 ms a frame, the whole of
+  `report_debug`, which no longer runs. The plan's 4.1 estimated 0.2 to
+  0.5 ms; the measured cost is 3 to 13 % of that. `active_auras` is
+  most of it (11.5 of 16.4 µs at 150 quiet, 21.2 of 26.4 µs at 250
+  infused) and grows with the crowd as the plan said; the counts and
+  f-strings are the remaining 4.9 to 5.2 µs.
+- **Against the frame:** in RND-010.3's sitting 5 the saturated fight at
+  250 takes 29.30 to 29.47 ms to update and draw, so 0.026 ms is 0.09 %
+  of it. Too small for an on-screen sitting to resolve, which is why
+  none was run: the probe times the work removed directly, and the
+  booted-run test proves it is removed.
+- **F1 on:** unchanged. The same lines are computed every frame.
+- **Biases:** the probe calls `report_debug` 2000 times on one frozen
+  scene, so the crowd and its auras stay in cache between calls; inside
+  a real frame they are colder, and the true cost is likely somewhat
+  higher. Not by the factor of ten to the estimate: the walk is a
+  `getattr` per enemy and, for an enemy with elemental state, one
+  `has_aura` call (`combat/elements/resolve.py:468`).
+
+Exactness. Skipping `report_debug` is exact because it changes no run
+state: every call it makes reads (`active_auras` and `has_aura`, the
+pool lengths, the element stats, `vis.report()`, the DPS summary,
+`enemy_count_cap`, the spawn master's and the nav's counters) and its
+only write is the overlay's own metrics.
+`tests/flows/test_debug_lines_exact.py` holds that for good: seed 123
+played by `run_digest` (720 frames, debug spawns and a level-up) gives
+the same digest with the overlay hidden and shown, so a side effect added
+to `report_debug` later fails it. The overlay's own pixels are unchanged
+too: hidden it draws nothing, and shown it fills the same lines every
+frame. The one visible difference is RND-010.5.D1: F1 pressed under a
+stopped run (the pause menu, a level-up card, the end banner, where
+`update` returns early) shows FPS and the two timings only, until the
+run updates again. Refilling the lines on show would have kept the old
+behaviour instead, at the cost of a hook from `Game`'s F1 key into the
+state; the owner kept D1, clearing on hide (2026-10-07).
+
+Mutation check (scratch scripts, not kept), each mutant caught:
+- the gate removed (`if True:`):
+  `test_hidden_the_lines_are_never_computed` and
+  `test_f1_fills_the_lines_on_the_next_update_and_hides_them_again` fail;
+- the clear on hide removed:
+  `test_hiding_drops_the_lines_so_none_shows_stale` fails;
+- `report_debug` given a side effect (one draw from the run RNG):
+  `test_the_run_is_the_same_with_the_overlay_hidden_or_shown` fails on
+  the digest.
+
+Tests: the full suite (`python -m pytest`, the default tiers) on
+`2cfebc1`, rebased on `main` after SYS-013: 4,501 passed, 11 deselected
+(the `sweep` tier, run only when asked), none failed. The new tests are
+`tests/playing/test_debug_lines.py`, `tests/flows/test_debug_lines_exact.py`
+and `tests/devtools/test_debug_lines_probe.py` (its `MainTests` and the
+first two in the integration tier), and one in
+`tests/systems/test_debug_overlay.py`. `run_digest --check` still
+matches its pin. No eval applies: the saving is measured directly by the
+probe, and nothing here is a rate.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1169,4 +1286,11 @@ Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
   - [x] RND-010.4.5: The results, and the plan's 4.13 marked done
   - [x] RND-010.4.6: The cold review's findings: the two savings placed against RND-010.3's two figures, the 250 update bias, the quiet and 150 figures from derived.py, the design's biases, the mutants listed; the probes' docstrings, two tests tightened, every quoted figure pinned
   - [x] RND-010.4.7: The full suite's counts in the results
+- [x] RND-010.5: The F1 overlay's lines only while it is shown (plan 4.1), tested and measured
+  - [x] RND-010.5.1: This plan and the index
+  - [x] RND-010.5.2: `report_debug` gated on the overlay, its lines dropped on hide (RND-010.5.D1); tested, mutation-checked
+  - [x] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
+  - [x] RND-010.5.4: The results, and the plan's 4.1 marked done
+  - [x] RND-010.5.5: The cold review's findings: the shared percentile and the outputs taken again, every quoted figure pinned, the exactness argued from no run state written and held by a hidden-against-shown run digest, the real F1 path tested, "infused" for `--elements`, the line references, D1's alternative named
+  - [x] RND-010.5.6: The full suite's counts in the results; the owner's confirmation of D1
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

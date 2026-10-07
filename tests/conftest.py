@@ -162,6 +162,11 @@ INTEGRATION = (
     "tests/devtools/test_rnd_010_3_data.py::DerivedTests",
     "tests/devtools/test_rnd_010_4_data.py::DerivedTests",
     "tests/devtools/test_sprite_caches.py::MainTests",
+    # RND-010.5: a booted run, the probe's own packed scene, and two runs
+    # in child processes (the overlay hidden and shown).
+    "tests/playing/test_debug_lines.py::DebugLinesTests",
+    "tests/devtools/test_debug_lines_probe.py::MainTests",
+    "tests/flows/test_debug_lines_exact.py::DebugLinesExactTests",
     # SYS-011: the timer eval's command line reads as far as the Game it
     # builds on Windows; its judgment tests stay unit.
     "tests/devtools/test_timer_regime.py::CommandLineTests",

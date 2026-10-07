@@ -391,7 +391,10 @@ class PlayingState(State):
             self.fx.spawn_death_fx(run.player.pos, getattr(run.player, "_facing", 1),
                                    radius=run.player.radius)
             self.run_end.begin(victory=False)
-        self.dev.report_debug(self)
+        # The F1 overlay's lines, only while it is shown (RND-010.5): its
+        # `active_auras` walks the whole crowd every frame for nobody.
+        if self.game.debug.visible:
+            self.dev.report_debug(self)
 
     def _phase_input(self) -> None:
         run = self.run
