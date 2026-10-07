@@ -1214,6 +1214,6 @@ The change:
 - [ ] RND-010.5: The F1 overlay's lines only while it is shown (plan 4.1), tested and measured
   - [x] RND-010.5.1: This plan and the index
   - [x] RND-010.5.2: `report_debug` gated on the overlay, its lines dropped on hide (RND-010.5.D1); tested, mutation-checked
-  - [ ] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
+  - [x] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
   - [ ] RND-010.5.4: The results, and the plan's 4.1 marked done
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
