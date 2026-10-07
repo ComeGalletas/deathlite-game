@@ -322,7 +322,8 @@ class RequestTests(unittest.TestCase):
 
     def test_the_same_scene_asks_the_same_of_a_churning_and_a_full_cache(self):
         # Two builds of one scene, 8 frames each. The first runs on caches
-        # small enough to empty themselves over and over; the second on
+        # small enough to churn (the tint cache emptying whole, the wash
+        # cache, an LRU since RND-010.4, dropping entries); the second on
         # caches already holding every frame the first asked for, so it
         # never misses. Both ask for the same frames in the same order.
         from game.states.playing.visual import elements as fx

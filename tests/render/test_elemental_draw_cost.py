@@ -213,7 +213,7 @@ class TerraceSortTests(unittest.TestCase):
 
         def counted(frame, element, profiles=None):
             if element and frame is not None:
-                washes.append(1)
+                washes.append((id(frame), int(element)))
             return real(frame, element, profiles)
 
         def frame(cache=None, cap=None):
@@ -235,7 +235,8 @@ class TerraceSortTests(unittest.TestCase):
         frame()
         washes.clear()
         warm = frame()                                  # every wash now a hit
-        self.assertGreater(len(washes), 3, "one frame must wash more than the small cap holds")
+        self.assertGreater(len(set(washes)), 3,
+                           "one frame must ask for more distinct washes than the small cap holds")
         self.assertEqual(frame(cache=OrderedDict()), warm)
         self.assertEqual(frame(cache=OrderedDict(), cap=3), warm)
 

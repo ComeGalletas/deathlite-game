@@ -578,6 +578,7 @@ class WashTests(unittest.TestCase):
         self.assertEqual(len(cache), 2)                             # replaced, the other kept
         self.assertIs(cache[(id(frame), int(ElementId.WIND))][0], frame)
         self.assertIn((id(other), int(ElementId.WIND)), cache)
+        self.assertEqual(list(cache)[-1], (id(frame), int(ElementId.WIND)))   # now the newest
 
     def test_its_strength_comes_from_the_data(self):
         """No third copy of an element's colour, and no constant buried in

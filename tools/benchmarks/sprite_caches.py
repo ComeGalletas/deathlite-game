@@ -22,11 +22,13 @@ each policy, whichever the game now uses: emptying whole when full, and
 an LRU that drops only the entry used longest ago, at each of `--wash-caps` and
 `--tint-caps`. Printed per cache and cap: the misses a frame and the
 worst frame's, over the frames from `--warm` on (the game's caches are
-warm by then), how many times the game's policy emptied the cache in
-those frames, and the most memory the replayed cache held at any point
-(each copy's rows times its height). Then what emptying a full cache
-costs (the game's drops its every copy at once; in the game the ghost
-cache may still hold some), and what one miss and one hit cost:
+warm by then), how many times the empty-whole policy (the tint cache's,
+and the wash cache's before RND-010.4) emptied the cache in those
+frames, and the most memory the replayed cache held at any point (each
+copy's rows times its height). Then what emptying a full cache costs (a
+cache that empties whole drops its every copy at once; in the game the
+ghost cache may still hold some; for the wash cache since RND-010.4 a
+cost the game no longer pays), and what one miss and one hit cost:
 every distinct source washed (or tinted) with the cache emptied, then
 again with each one held, `--passes` times over, each pass on a fresh
 cache after the last one's copies are dropped; the median pass and the
@@ -98,7 +100,8 @@ def record(ps, frames: int) -> dict:
 
 
 def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> dict:
-    """`events` through a cache of `cap` entries: the game's (empty it
+    """`events` through a cache of `cap` entries: the tint cache's (and
+    the wash cache's before RND-010.4) policy (empty it
     whole when full, then add) or an LRU (drop the entry used longest
     ago). Returns `per`, the misses in each frame; `avg` and `worst`,
     their mean and most over the frames from `warm` on; `clears`, the
@@ -177,8 +180,9 @@ def miss_cost(name: str, sources: dict, passes: int = 5) -> dict | None:
 
 
 def clear_cost(name: str, sources: dict, entries: int, passes: int = 5) -> dict | None:
-    """Milliseconds to empty a full cache, as the game's does when it
-    reaches its cap: `entries` copies made (from as many distinct sources
+    """Milliseconds to empty a full cache, as the tint cache does when it
+    reaches its cap (and the wash cache did before RND-010.4; for it, at
+    1536 now, a cost the game no longer pays): `entries` copies made (from as many distinct sources
     as there are, up to `entries`) in a fresh cache, then the dict cleared,
     which frees every copy at once here, where nothing else holds them
     (in the game the ghost cache may). One figure per pass; `entries` is how

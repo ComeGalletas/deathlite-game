@@ -72,9 +72,22 @@ for kind in KINDS:
         for k in sorted(names, key=lambda k: abs(change[k]), reverse=True)[:4]:
             print(f"    layer {k:20s} " + compare([x.get(k, (0, 0))[0] for x in lay["before"]],
                                                   [x.get(k, (0, 0))[0] for x in lay["after"]]))
+        others = {k: v for k, v in change.items() if k not in ("enemies", "(all layers)", "draw")}
+        top = max(others, key=lambda k: abs(others[k]))
+        print(f"    every layer but enemies moves {abs(others[top]):.2f} ms or less (largest: {top})")
+        if kind == "fight" and n == 150:
+            # Against RND-010.3's sitting 5, the same scene at the same count
+            # on the code before this change, a day earlier.
+            s5 = [headline((D.parent / "rnd-010.3" / f"r5_fight_150{r}.txt")
+                           .read_text(encoding="utf-8"))["bare"] for r in "ab"]
+            here = [x["bare"] for x in h["before"] + h["after"]]
+            print(f"    150's fight bare draw here {min(here):.2f} to {max(here):.2f}, against RND-010.3's "
+                  f"sitting 5 {min(s5):.2f} to {max(s5):.2f}: {min(here) - max(s5):+.2f} to "
+                  f"{max(here) - min(s5):+.2f} ms above")
 
-print("\n== the cache replay at 250, on the branch ==")
-for line in text("s1_caches_250_after.txt").splitlines():
+print("\n== the cache replay at 250, on the branch: the wash cache ==")
+wash_block = text("s1_caches_250_after.txt").split("  wash: ", 1)[1].split("\n  tint: ", 1)[0]
+for line in ("  wash: " + wash_block).splitlines():
     if re.match(r"  wash: |    cap  1536: |    cap   512: ", line):
         print(line)
 

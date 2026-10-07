@@ -20,8 +20,9 @@ them.
 | `s1_meta.txt`, `sitting1.sh` | The sitting's log (the two commits, the display block, the CPU load before each step, the processes) and the script that ran it, as run |
 
 The script switches the worktree between the two commits for each run,
-with `git switch --detach`, and back to the branch when it ends. To run
-it again: from the repo root, with a clean tree and `save.json` in
+with `git switch --detach`, and back to the branch when it ends. It is
+kept as run, so its usage line names it `sitting.sh`; the arguments are
+the same. To run it again: from the repo root, with a clean tree and `save.json` in
 place, `bash documentation/journals/data/rnd-010.4/sitting1.sh OUT_DIR
 <before sha> <after sha>`, in bash on Windows (it calls `powershell` for
 the load and the process lists).
