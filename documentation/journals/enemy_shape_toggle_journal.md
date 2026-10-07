@@ -101,12 +101,14 @@ Decisions the request left open:
 
 - [x] RND-013.1 — Journal, index row
 - [x] RND-013.2 — The flag and the shape path in the renderer (enemies, boss,
-  HP bar, spawn burst), with tests → `2ea8caa`
-- [x] RND-013.3 — The dev-menu row, with tests → `519a617`
+  HP bar, spawn burst), with tests → `d48cea5`
+- [x] RND-013.3 — The dev-menu row, with tests → `1baa2bf`
 - [x] RND-013.4 — Screenshots, results
 - [x] RND-013.5 — The cold review's findings: the ghost and the mark on the
   circle (D6), two tests that did not test what they named, the boss test on
-  its own run, docstring and line-length nits → `049f139`
+  its own run, docstring and line-length nits → `10ed9d9`
+- [x] RND-013.6 — The task hashes after the rebase, and the re-run on the new
+  main
 
 ## RND-013 — Results
 
@@ -148,5 +150,10 @@ dev-run frame with the switch off and on, and the menu with the row on.
 not test what they named, the boss test leaking state into a shared run, the
 lost ghost, the mark rule, and three nits. All fixed in RND-013.5 or recorded
 as D6.
+
+After the rebase onto main (RND-010.5, the F1 overlay, came in beside the
+same dev tooling): `test_enemy_shapes.py`, `test_tier_audit.py`,
+`test_dev_mode.py`, `test_enemy_sprite.py`, `test_mark_overlay.py`,
+`test_spawn_fx.py`, `test_enemy_hp_bar.py` re-run, 193 passed, 0 failed.
 
 **Deferred.** None.
