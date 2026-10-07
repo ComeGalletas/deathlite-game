@@ -114,6 +114,18 @@ class WorldRenderer:
         self.run = getattr(ps, "run", ps)
         self._glow = GlowCache()      # XP orb glow discs, pre-rendered per size / alpha
 
+    # --- the dev menu's "Enemy shapes" switch (RND-013) -------------
+    def enemy_shapes(self) -> bool:
+        """Draw the enemies and the boss as their collider circles rather
+        than their sprites? Only in a dev run with the switch on. Read-only
+        and draw-only: the art stays loaded and the animators keep ticking,
+        so turning it off shows the right frame at once. A renderer built
+        over a bare namespace (the headless draw tests) has neither the
+        flags nor a dev run, and draws sprites."""
+        dev = getattr(self.ps, "dev", None)
+        return bool(dev is not None and dev.enemy_shapes
+                    and getattr(self.run, "dev_mode", False))
+
     # --- geometry helper --------------------------------------------
     def sprite_drop(self, radius: float) -> float:
         """Downward render offset (screen px) that seats a rig's feet-anchor
@@ -605,7 +617,9 @@ class WorldRenderer:
         sx, sy = run.camera.world_to_screen(e.pos)
         er = e.radius * z
 
-        sprited = e.anim is not None
+        # RND-013: the dev switch sends a sprited enemy down the rig-less
+        # branch, so the shape carries the same cues the fallback always had.
+        sprited = e.anim is not None and not self.enemy_shapes()
         if sprited:
             self.enemy_sprite(surface, e)
             status_marks.draw(self, surface, e)      # RND-007: over the body
@@ -682,14 +696,15 @@ class WorldRenderer:
         itself uses, so a bottom-anchored body is wrapped at its middle, not
         its feet -- with the diameter `over_sprite` x its larger drawn side.
         A rig-less body gets the collider: its centre, and `over_sprite` x
-        its diameter."""
+        its diameter -- and so does every body while the dev menu's "Enemy
+        shapes" switch draws it as its circle (RND-013)."""
         ps = self.ps
         run = getattr(self, "run", ps)
         assets = ps.game.assets
         z = run.camera.zoom
         sx, sy = run.camera.world_to_screen(body.pos)
         over = float((assets.rig(self._SPAWN_RIG) or {}).get("over_sprite", 1.0))
-        anim = getattr(body, "anim", None)
+        anim = None if self.enemy_shapes() else getattr(body, "anim", None)
         scale = assets.scale_for(anim.rig) if anim is not None else None
         if scale:
             bw, bh = scale
@@ -751,7 +766,7 @@ class WorldRenderer:
         sx, sy = run.camera.world_to_screen(b.pos)
         br = b.radius * z
         frame = None
-        if b.anim is not None:
+        if b.anim is not None and not self.enemy_shapes():    # RND-013
             frame, flip = self.rig_frame(b.anim, b._facing, z)
         if frame is not None:
             if b._hurt_t > 0.0:

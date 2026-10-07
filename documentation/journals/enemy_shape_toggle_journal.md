@@ -84,7 +84,7 @@ Decisions the request left open:
 ## RND-013 — Tasks
 
 - [x] RND-013.1 — Journal, index row
-- [ ] RND-013.2 — The flag and the shape path in the renderer (enemies, boss,
+- [x] RND-013.2 — The flag and the shape path in the renderer (enemies, boss,
   HP bar, spawn burst), with tests
 - [ ] RND-013.3 — The dev-menu row, with tests
 - [ ] RND-013.4 — Screenshots, results
