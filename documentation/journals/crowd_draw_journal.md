@@ -1163,7 +1163,8 @@ The change:
   `DebugOverlay.toggle` now clears them on hide, so the overlay shows
   only FPS and the two timings until the next update refills them. Before
   RND-010.5 the overlay opened under the pause menu showed the last frame
-  before the pause; that one frame's lines are what is given up.
+  before the pause; that one frame's lines are what is given up. The
+  owner confirmed D1 on 2026-10-07.
 - **Tests:**
   - `tests/playing/test_debug_lines.py` on a booted seed-35 run: three
     updates hidden call neither `report_debug` nor `active_auras` and
@@ -1227,9 +1228,9 @@ too: hidden it draws nothing, and shown it fills the same lines every
 frame. The one visible difference is RND-010.5.D1: F1 pressed under a
 stopped run (the pause menu, a level-up card, the end banner, where
 `update` returns early) shows FPS and the two timings only, until the
-run updates again. Refilling the lines on show would keep the old
+run updates again. Refilling the lines on show would have kept the old
 behaviour instead, at the cost of a hook from `Game`'s F1 key into the
-state; D1 is offered to the owner in the PR.
+state; the owner kept D1, clearing on hide (2026-10-07).
 
 Mutation check (scratch scripts, not kept), each mutant caught:
 - the gate removed (`if True:`):
@@ -1240,6 +1241,16 @@ Mutation check (scratch scripts, not kept), each mutant caught:
 - `report_debug` given a side effect (one draw from the run RNG):
   `test_the_run_is_the_same_with_the_overlay_hidden_or_shown` fails on
   the digest.
+
+Tests: the full suite (`python -m pytest`, the default tiers) on
+`2cfebc1`, rebased on `main` after SYS-013: 4,501 passed, 11 deselected
+(the `sweep` tier, run only when asked), none failed. The new tests are
+`tests/playing/test_debug_lines.py`, `tests/flows/test_debug_lines_exact.py`
+and `tests/devtools/test_debug_lines_probe.py` (its `MainTests` and the
+first two in the integration tier), and one in
+`tests/systems/test_debug_overlay.py`. `run_digest --check` still
+matches its pin. No eval applies: the saving is measured directly by the
+probe, and nothing here is a rate.
 
 ## RND-010: Tasks
 
@@ -1275,11 +1286,11 @@ Mutation check (scratch scripts, not kept), each mutant caught:
   - [x] RND-010.4.5: The results, and the plan's 4.13 marked done
   - [x] RND-010.4.6: The cold review's findings: the two savings placed against RND-010.3's two figures, the 250 update bias, the quiet and 150 figures from derived.py, the design's biases, the mutants listed; the probes' docstrings, two tests tightened, every quoted figure pinned
   - [x] RND-010.4.7: The full suite's counts in the results
-- [ ] RND-010.5: The F1 overlay's lines only while it is shown (plan 4.1), tested and measured
+- [x] RND-010.5: The F1 overlay's lines only while it is shown (plan 4.1), tested and measured
   - [x] RND-010.5.1: This plan and the index
   - [x] RND-010.5.2: `report_debug` gated on the overlay, its lines dropped on hide (RND-010.5.D1); tested, mutation-checked
   - [x] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
   - [x] RND-010.5.4: The results, and the plan's 4.1 marked done
   - [x] RND-010.5.5: The cold review's findings: the shared percentile and the outputs taken again, every quoted figure pinned, the exactness argued from no run state written and held by a hidden-against-shown run digest, the real F1 path tested, "infused" for `--elements`, the line references, D1's alternative named
-  - [ ] RND-010.5.6: The full suite's counts in the results
+  - [x] RND-010.5.6: The full suite's counts in the results; the owner's confirmation of D1
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
