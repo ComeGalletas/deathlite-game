@@ -113,6 +113,7 @@ class WorldRenderer:
         self.ps = ps
         self.run = getattr(ps, "run", ps)
         self._glow = GlowCache()      # XP orb glow discs, pre-rendered per size / alpha
+        self._discs: dict = {}        # (radius px, colour) -> the circle body's ghost (RND-013)
 
     # --- the dev menu's "Enemy shapes" switch (RND-013) -------------
     def enemy_shapes(self) -> bool:
@@ -125,6 +126,32 @@ class WorldRenderer:
         dev = getattr(self.ps, "dev", None)
         return bool(dev is not None and dev.enemy_shapes
                     and getattr(self.run, "dev_mode", False))
+
+    def status_tint(self, body):
+        """The first status `body` carries that the circle body shows, as
+        its tint, or None. The `mark` counts only while a held weapon reads
+        it -- the rule its brackets follow on a sprite (RND-007,
+        `status_marks.shown`) -- so the shape and the sprite agree."""
+        for sid, tint in _STATUS_TINT.items():
+            if sid in body.status and (sid != status_marks.STATUS
+                                       or status_marks.shown(self.run)):
+                return tint
+        return None
+
+    def record_disc(self, colour, centre, radius: int, character_y: float) -> None:
+        """Queue a circle body for the ghost pass, so it shows through a
+        crown in front of it the way a sprite does. One disc per radius and
+        colour, kept and cached by identity like an animation frame."""
+        key = (radius, colour)
+        disc = self._discs.get(key)
+        if disc is None:
+            if len(self._discs) >= 256:
+                self._discs.clear()
+            disc = pygame.Surface((2 * radius + 1, 2 * radius + 1), pygame.SRCALPHA)
+            pygame.draw.circle(disc, colour, (radius, radius), radius)
+            self._discs[key] = disc
+        self.run.game_map.renderer.record_character(
+            disc, (centre[0] - radius, centre[1] - radius), character_y)
 
     # --- geometry helper --------------------------------------------
     def sprite_drop(self, radius: float) -> float:
@@ -625,10 +652,9 @@ class WorldRenderer:
             status_marks.draw(self, surface, e)      # RND-007: over the body
         else:
             colour = (255, 255, 255) if e.hit_flash > 0 else e.color
-            for sid, tint in _STATUS_TINT.items():
-                if sid in e.status:
-                    colour = tint
-                    break
+            tint = self.status_tint(e)
+            if tint is not None:
+                colour = tint
             else:
                 # No status of its own: show the aura instead, so the
                 # primitive fallback carries the same information the
@@ -637,16 +663,16 @@ class WorldRenderer:
                 if primed is not None and e.hit_flash <= 0:
                     colour = primed[1]
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(er))
+            self.record_disc(colour, (int(sx), int(sy)), round(er), e.pos.y)
 
         # Thin state rings at the collider edge -- always for the primitive
         # fallback (the only cue with no art); for a sprited enemy only when
         # config.SHOW_ENEMY_STATE_RINGS is on (else it just reads as a collider).
         if not sprited or config.SHOW_ENEMY_STATE_RINGS:
-            for sid, tint in _STATUS_TINT.items():
-                if sid in e.status:
-                    pygame.draw.circle(surface, tint, (int(sx), int(sy)),
-                                       round(er) + 2, 2)
-                    break
+            tint = self.status_tint(e)
+            if tint is not None:
+                pygame.draw.circle(surface, tint, (int(sx), int(sy)),
+                                   round(er) + 2, 2)
             if e.is_elite:
                 pygame.draw.circle(surface, (255, 220, 120), (int(sx), int(sy)),
                                    round(er) + 3, 2)
@@ -778,6 +804,7 @@ class WorldRenderer:
             pygame.draw.circle(surface, colour, (int(sx), int(sy)), round(br))
             pygame.draw.circle(surface, (255, 210, 210), (int(sx), int(sy)),
                                round(br), 3)
+            self.record_disc(colour, (int(sx), int(sy)), round(br), b.pos.y)
         if b.phase == "telegraph" and not b.closing:
             pid = b.pattern.get("id")
             frac = b.telegraph_fraction

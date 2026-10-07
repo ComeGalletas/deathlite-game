@@ -164,6 +164,46 @@ class DevRunTests(unittest.TestCase):
         self.assertGreater(d.frame.call_count, 0)
         self.assertNotIn(self._collider(e), d.circles())
 
+    def test_a_shape_behind_a_crown_still_ghosts_through_it(self):
+        """The circle is queued for the ghost pass like a sprite frame, so
+        a body behind a tree or a roof still shows through it."""
+        p = self.p
+        r = p.game_map.renderer
+        e = _beside(p, "skull")
+        p._dev_enemy_shapes = True
+        with mock.patch.dict(p.game_map._ghost, {"alpha": 70}):
+            r._ghost_queue.clear()
+            p.renderer.one_enemy(self.surface, e)
+            queued = list(r._ghost_queue)
+            r._ghost_queue.clear()
+        self.assertEqual(len(queued), 1)
+        disc, dest, character_y, cacheable = queued[0]
+        (cx, cy), radius = self._collider(e)
+        self.assertEqual(dest, (cx - radius, cy - radius))
+        self.assertEqual(disc.get_size(), (2 * radius + 1, 2 * radius + 1))
+        self.assertEqual(tuple(disc.get_at((radius, radius)))[:3], e.color)
+        self.assertEqual(character_y, e.pos.y)
+        self.assertTrue(cacheable)
+
+    def test_the_mark_shows_on_the_shape_only_while_it_matters(self):
+        """RND-007's rule for the brackets holds for the circle: the mark
+        tints it only while a held weapon reads the mark."""
+        from game.states.playing.visual import status_marks
+        p = self.p
+        e = _beside(p, "skull")
+        e.status.apply("mark", 5.0, 1.0)
+        raspberry = tuple(status_marks.spec()["colour"])
+        p._dev_enemy_shapes = True
+
+        def colours(shown):
+            with (mock.patch.object(status_marks, "shown", return_value=shown),
+                  _Draws(p) as d):
+                p.renderer.one_enemy(self.surface, e)
+            return {c.args[1] for c in d.circle.call_args_list}
+
+        self.assertNotIn(raspberry, colours(False))
+        self.assertIn(raspberry, colours(True))
+
     def test_the_whole_frame_draws_headless_with_it_on(self):
         p = self.p
         for dx in (60, -60, 0):

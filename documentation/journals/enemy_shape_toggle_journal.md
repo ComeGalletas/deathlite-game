@@ -65,6 +65,22 @@ Decisions the request left open:
   beside the others, so a fresh or reset dev run starts with sprites, and a
   regular run draws sprites whatever the flag holds. Menu only: no F-key (the
   request names the dev menu).
+- **RND-013.D6 — Found by the cold review: what the circle still owed the
+  sprite.** Three cues the old fallback never had, settled here:
+  - *The ghost.* A sprite behind a tree crown or a roof shows through it at
+    the data's ghost alpha; the circle did not, so a debug view meant to show
+    the crowd hid part of it. The circle is now queued for the ghost pass as
+    a cached disc (`WorldRenderer.record_disc`), the boss's too.
+  - *The mark.* The circle took the raspberry tint and ring whenever `mark`
+    was held; the brackets show only while a held weapon reads the mark
+    (RND-007). The circle now follows the same rule
+    (`WorldRenderer.status_tint`). This also reaches the rig-less fallback,
+    which no shipped enemy takes.
+  - *The tree shade.* Not applied to the circle: a shade over a flat debug
+    disc says nothing, and the shaded copy is the per-frame cost the switch
+    takes away. Recorded, not changed.
+  The boss's circle keeps the cues it always had (hit flash, pale ring); its
+  status and mark show on the sprite only.
 
 ## RND-013 — Plan
 
@@ -86,8 +102,11 @@ Decisions the request left open:
 - [x] RND-013.1 — Journal, index row
 - [x] RND-013.2 — The flag and the shape path in the renderer (enemies, boss,
   HP bar, spawn burst), with tests → `2ea8caa`
-- [x] RND-013.3 — The dev-menu row, with tests
+- [x] RND-013.3 — The dev-menu row, with tests → `519a617`
 - [ ] RND-013.4 — Screenshots, results
+- [x] RND-013.5 — The cold review's findings: the ghost and the mark on the
+  circle (D6), two tests that did not test what they named, the boss test on
+  its own run, docstring and line-length nits
 
 ## RND-013 — Results
 
