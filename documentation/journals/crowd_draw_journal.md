@@ -1369,7 +1369,7 @@ The plan:
   - [x] RND-010.5.6: The full suite's counts in the results; the owner's confirmation of D1
 - [ ] RND-010.6: The elemental under-layer (plan 4.5): split, measured, and the exact caches a sitting resolves built
   - [x] RND-010.6.1: This plan and the index
-  - [ ] RND-010.6.2: `draw_layers` times `draw_under`'s passes as their own rows, tested
+  - [x] RND-010.6.2: `draw_layers` times `draw_under`'s passes as their own rows, tested
   - [ ] RND-010.6.3: The under-layer's leads probe, tested
   - [ ] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element), tested
   - [ ] RND-010.6.5: The sitting: the split, the leads and the variants at 150 and 250 packed in the fight, raw outputs kept
