@@ -6,6 +6,8 @@ action operates on the `PlayingState` passed in as `playing`.
 
 Pages:
   root       -- toggles + Reset / Exit / Close, and links into the sub-pages
+                (one toggle, "Enemy shapes", draws every enemy and the boss
+                as its collider circle instead of its sprite -- RND-013)
   enemies    -- (D3) pick an enemy id; ENTER spawns one next to the hero
   blessings  -- (D4) pick a blessing; ENTER grants a stack to the hero
   items      -- (D5) every weapon + every item base, straight off the loaded
@@ -56,9 +58,9 @@ def _english_name(obj, default: str = "?") -> str:
 
 MAX_VISIBLE = 12          # rows shown at once before the list scrolls
 
-_ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "spawn_points",
-              "aim_line", "auras", "reaction_log", "all_rooms", "freeze", "difficulty",
-              "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
+_ROOT_ROWS = ("unlimited_hp", "no_attack", "no_damage", "colliders", "enemy_shapes",
+              "spawn_points", "aim_line", "auras", "reaction_log", "all_rooms", "freeze",
+              "difficulty", "dummy", "spawn", "blessings", "items", "forges", "remove_weapon",
               "force_aura", "infuse", "element_building", "game_over", "victory",
               "reset", "exit", "close")
 
@@ -67,6 +69,7 @@ _LABELS = {
     "no_attack":    "Stop attacking",
     "no_damage":    "Attacks deal 0 damage",
     "colliders":    "Collision shapes",
+    "enemy_shapes": "Enemy shapes",
     "spawn_points": "Spawn points",
     "aim_line":     "Aim line",
     "auras":        "Aura inspector",
@@ -268,6 +271,12 @@ class DevMenuState(State):
         elif rid == "colliders":
             p._dev_show_colliders = not p._dev_show_colliders
             self._status = f"Collision shapes {'ON' if p._dev_show_colliders else 'off'}"
+        elif rid == "enemy_shapes":
+            # RND-013: enemies and the boss drawn as their collider circles
+            # instead of their sprites; draw-only (WorldRenderer.enemy_shapes).
+            p._dev_enemy_shapes = not p._dev_enemy_shapes
+            self._status = ("Enemies drawn as shapes" if p._dev_enemy_shapes
+                            else "Enemies drawn as sprites")
         elif rid == "spawn_points":
             p._dev_show_spawn_points = not p._dev_show_spawn_points
             self._status = f"Spawn points {'ON' if p._dev_show_spawn_points else 'off'}"
@@ -713,6 +722,8 @@ class DevMenuState(State):
             label += "   [ON]" if p._dev_no_damage else "   [  ]"
         elif rid == "colliders" and p is not None:
             label += "   [ON]" if p._dev_show_colliders else "   [  ]"
+        elif rid == "enemy_shapes" and p is not None:
+            label += "   [ON]" if p._dev_enemy_shapes else "   [  ]"
         elif rid == "spawn_points" and p is not None:
             label += "   [ON]" if p._dev_show_spawn_points else "   [  ]"
         elif rid == "aim_line" and p is not None:

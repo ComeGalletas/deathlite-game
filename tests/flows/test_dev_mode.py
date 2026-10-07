@@ -329,6 +329,43 @@ class DevMenuTests(unittest.TestCase):
         menu._activate("colliders")                     # via the menu again
         self.assertFalse(playing._dev_show_colliders)
 
+    def test_enemy_shapes_row_toggles_the_shape_draw(self):
+        """RND-013: the row flips the flag the renderer reads, shows its
+        state, and the frame draws headless either way."""
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        self.assertFalse(playing._dev_enemy_shapes)
+        self.assertIn("[  ]", menu._row_label("enemy_shapes"))
+        menu._activate("enemy_shapes")
+        self.assertTrue(playing._dev_enemy_shapes)
+        self.assertTrue(playing.renderer.enemy_shapes())
+        self.assertIn("[ON]", menu._row_label("enemy_shapes"))
+        self.assertEqual(menu._status, "Enemies drawn as shapes")
+        _key(game, pygame.K_BACKQUOTE)                  # close, resume
+        from unittest import mock
+        skull = playing._spawn_enemy("skull", at=playing.player.pos + pygame.Vector2(60, 0))
+        playing.fx.update_spawn_fx(5.0)                 # out of its spawn burst
+        playing.camera.snap_to(playing.player.pos)
+        sx, sy = playing.camera.world_to_screen(skull.pos)
+        collider = ((int(sx), int(sy)), round(skull.radius * playing.camera.zoom))
+        with mock.patch.object(pygame.draw, "circle", wraps=pygame.draw.circle) as m:
+            playing.draw(game.screen)                   # the whole frame, shape path
+        self.assertIn(collider, [(tuple(c.args[2]), c.args[3]) for c in m.call_args_list])
+        menu._activate("enemy_shapes")                  # via the menu again
+        self.assertFalse(playing._dev_enemy_shapes)
+        self.assertFalse(playing.renderer.enemy_shapes())
+        self.assertEqual(menu._status, "Enemies drawn as sprites")
+
+    def test_a_reset_run_starts_with_sprites(self):
+        game = _game()
+        playing, menu = _open_dev_menu(game)
+        menu._activate("enemy_shapes")
+        menu._activate("reset")
+        fresh = settle(game)
+        self.assertIsInstance(fresh, PlayingState)
+        self.assertIsNot(fresh, playing)
+        self.assertFalse(fresh._dev_enemy_shapes)
+
     def test_f7_toggles_the_overlay_only_in_a_dev_run(self):
         # regular run: F7 (routed through the game-loop debug-key handler) is inert
         game = _game()

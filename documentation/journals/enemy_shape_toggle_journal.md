@@ -85,8 +85,8 @@ Decisions the request left open:
 
 - [x] RND-013.1 — Journal, index row
 - [x] RND-013.2 — The flag and the shape path in the renderer (enemies, boss,
-  HP bar, spawn burst), with tests
-- [ ] RND-013.3 — The dev-menu row, with tests
+  HP bar, spawn burst), with tests → `2ea8caa`
+- [x] RND-013.3 — The dev-menu row, with tests
 - [ ] RND-013.4 — Screenshots, results
 
 ## RND-013 — Results

@@ -133,7 +133,7 @@ There is no CI and none is planned: the suite is run locally, for stability.
 | F7 | Toggle the **collision-shape overlay** — *developer runs only*; also a dev-menu row |
 | F8 | Toggle the generated **spawn points** overlay — developer runs only |
 | F9 | **Reload the element data** (`data/weapons/elements.json`, `reactions.json`) into the live run; bad data is refused and the old values kept — developer runs only |
-| ` / ~ | The **dev menu** in a developer run: HP / attack / overlay toggles, spawn any enemy, grant any blessing, item or weapon, apply any Forging, remove owned weapons, switch difficulty live, freeze spawns, activate every room, place the training dummy, reset the run |
+| ` / ~ | The **dev menu** in a developer run: HP / attack / overlay toggles, enemies drawn as plain shapes instead of sprites, spawn any enemy, grant any blessing, item or weapon, apply any Forging, remove owned weapons, switch difficulty live, freeze spawns, activate every room, place the training dummy, reset the run |
 
 Debug keys are never required for normal play. To see the real circular
 colliders, start a developer run and press **F7**: hero / enemy / boss /
