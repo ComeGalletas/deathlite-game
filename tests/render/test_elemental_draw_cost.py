@@ -201,6 +201,45 @@ class TerraceSortTests(unittest.TestCase):
         self.assertEqual(frame(False), first)
         self.assertEqual(frame(True), first)        # and the frame is stable
 
+    def test_a_whole_frame_is_the_same_picture_whatever_the_wash_cache_holds(self):
+        # RND-010.4: the wash cache is an LRU. A frame drawn from it warm,
+        # from it empty, and from one too small to hold the frame's own
+        # washes (so it drops entries while the frame is drawn) is one
+        # picture, byte for byte.
+        from collections import OrderedDict
+        ps = self.ps
+        washes = []
+        real = element_fx.washed
+
+        def counted(frame, element, profiles=None):
+            if element and frame is not None:
+                washes.append((id(frame), int(element)))
+            return real(frame, element, profiles)
+
+        def frame(cache=None, cap=None):
+            s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+            patches = [mock.patch.object(element_fx, "washed", counted)]
+            if cache is not None:
+                patches.append(mock.patch.object(element_fx, "_WASH_CACHE", cache))
+            if cap is not None:
+                patches.append(mock.patch.object(element_fx, "_WASH_CACHE_CAP", cap))
+            for p in patches:
+                p.start()
+            try:
+                ps.draw(s)
+            finally:
+                for p in reversed(patches):
+                    p.stop()
+            return _pixels(s)
+
+        frame()
+        washes.clear()
+        warm = frame()                                  # every wash now a hit
+        self.assertGreater(len(set(washes)), 3,
+                           "one frame must ask for more distinct washes than the small cap holds")
+        self.assertEqual(frame(cache=OrderedDict()), warm)
+        self.assertEqual(frame(cache=OrderedDict(), cap=3), warm)
+
 
 class BurnFlameTests(unittest.TestCase):
     @classmethod

@@ -15,6 +15,7 @@ What is pinned:
 import contextlib
 import io
 import unittest
+from collections import OrderedDict
 from unittest import mock
 
 import pygame
@@ -114,7 +115,7 @@ class WashLruTests(unittest.TestCase):
     def test_the_same_pixels_and_the_game_cache_untouched(self):
         from combat.elements.ids import ElementId
         fx, real = self.fx, self.fx.washed
-        with mock.patch.object(fx, "_WASH_CACHE", {}):                      # not the game's
+        with mock.patch.object(fx, "_WASH_CACHE", OrderedDict()):           # not the game's
             expected = [pygame.image.tobytes(real(f, ElementId.FIRE), "RGBA") for f in self.frames]
         game_cache = fx._WASH_CACHE
         contents = dict(game_cache)
@@ -188,7 +189,7 @@ class WashLruTests(unittest.TestCase):
         self.assertEqual(list(DV._WASH_LRU), [key(a), key(c)])
         self.assertIs(DV._WASH_LRU[key(a)][1], first)
         # b, dropped, washes afresh to the game's pixels.
-        with mock.patch.object(self.fx, "_WASH_CACHE", {}):
+        with mock.patch.object(self.fx, "_WASH_CACHE", OrderedDict()):
             want = pygame.image.tobytes(self.fx.washed(b, ElementId.ICE), "RGBA")
         with mock.patch.object(DV, "WASH_LRU_CAP", 2):
             undo = DV.VARIANTS["wash_lru"](None)

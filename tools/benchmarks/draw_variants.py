@@ -33,10 +33,11 @@ The variants (`VARIANTS`):
   `WorldRenderer.one_enemy`, without the generated forwarder's two
   `getattr`s;
 * `wash_lru`: a primed enemy's washed frames (`element_fx.washed`) held
-  in an LRU of `WASH_LRU_CAP` entries, where the game's cache empties
-  itself whole once it holds 512 (`sprite_caches.py` replays both on a
+  in an LRU of `WASH_LRU_CAP` entries, where the game's cache emptied
+  itself whole once it held 512 (`sprite_caches.py` replays both on a
   fight's own requests). Only a fight washes enough to tell: run it with
-  `--elements`.
+  `--elements`. RND-010.4 built it into the game, so against the game
+  since then it compares an LRU with an LRU of the same size.
 
 `--elements` takes the scene with the hero fighting, as `spawn_stress
 --elements` does: every enemy primed and three infused weapons firing.
@@ -138,8 +139,8 @@ _WASH_LRU: OrderedDict = OrderedDict()   # (id(frame), element) -> (frame, washe
 
 def _wash_lru(ps):
     """Patch `element_fx.washed` with an LRU of `WASH_LRU_CAP` entries in
-    place of the game's cache, which empties itself whole at 512; returns
-    the undo. The LRU is this module's and outlives the undo, so each
+    place of the game's cache (which emptied itself whole at 512 until
+    RND-010.4 made it this same LRU); returns the undo. The LRU is this module's and outlives the undo, so each
     side keeps its own warm cache from part to part. A miss is washed by
     the game's own `washed`, given an empty cache for the call so the
     game's stays as the side without the variant left it."""
@@ -155,7 +156,7 @@ def _wash_lru(ps):
             _WASH_LRU.move_to_end(key)
             return hit[1]
         game_cache = fx._WASH_CACHE
-        fx._WASH_CACHE = {}
+        fx._WASH_CACHE = type(game_cache)()
         try:
             out = real(frame, element, profiles)
         finally:

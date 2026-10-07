@@ -6,9 +6,10 @@ the fight's own requests (RND-010.3, `crowd_draw_journal.md`).
 
 A primed enemy is drawn washed in its element (`element_fx.washed`) and a
 hurt one tinted red (`rendering.hit_tinted`). Each makes its copy of the
-frame once and keeps it, keyed on the frame, in a dict that empties
-itself whole when it is full: 512 washed frames, 128 tinted ones. A
-frame the cache no longer holds is copied again.
+frame once and keeps it, keyed on the frame. The tint cache is a dict
+that empties itself whole when it holds 128. The wash cache was one too,
+at 512, when RND-010.3 measured it; since RND-010.4 it is an LRU of
+1536. A frame the cache no longer holds is copied again.
 
 The scene is `draw_variants --elements`'s: `layer_probes.packed_scene`
 with the hero fighting, every enemy primed. Every request the draw makes
@@ -17,15 +18,17 @@ on its anchor as `spawn_stress.run` does. What the draw asks for does not
 depend on what a cache holds (a hit and a miss give the same pixels, and
 nothing the draw changes feeds back into what it asks of the caches;
 `RequestTests` pins it), so the one recording is replayed through
-each policy: the game's own, emptying whole when full, and an LRU that
-drops only the entry used longest ago, at each of `--wash-caps` and
+each policy, whichever the game now uses: emptying whole when full, and
+an LRU that drops only the entry used longest ago, at each of `--wash-caps` and
 `--tint-caps`. Printed per cache and cap: the misses a frame and the
 worst frame's, over the frames from `--warm` on (the game's caches are
-warm by then), how many times the game's policy emptied the cache in
-those frames, and the most memory the replayed cache held at any point
-(each copy's rows times its height). Then what emptying a full cache
-costs (the game's drops its every copy at once; in the game the ghost
-cache may still hold some), and what one miss and one hit cost:
+warm by then), how many times the empty-whole policy (the tint cache's,
+and the wash cache's before RND-010.4) emptied the cache in those
+frames, and the most memory the replayed cache held at any point (each
+copy's rows times its height). Then what emptying a full cache costs (a
+cache that empties whole drops its every copy at once; in the game the
+ghost cache may still hold some; for the wash cache since RND-010.4 a
+cost the game no longer pays), and what one miss and one hit cost:
 every distinct source washed (or tinted) with the cache emptied, then
 again with each one held, `--passes` times over, each pass on a fresh
 cache after the last one's copies are dropped; the median pass and the
@@ -97,7 +100,8 @@ def record(ps, frames: int) -> dict:
 
 
 def replay(events: list, frames: int, cap: int, lru: bool, warm: int = 0) -> dict:
-    """`events` through a cache of `cap` entries: the game's (empty it
+    """`events` through a cache of `cap` entries: the tint cache's (and
+    the wash cache's before RND-010.4) policy (empty it
     whole when full, then add) or an LRU (drop the entry used longest
     ago). Returns `per`, the misses in each frame; `avg` and `worst`,
     their mean and most over the frames from `warm` on; `clears`, the
@@ -133,7 +137,7 @@ def _empty(module, cache: str, cap: str, room: int):
     """`module`'s cache swapped for an empty one with room for `room`, and
     the game's put back after."""
     saved = getattr(module, cache), getattr(module, cap)
-    setattr(module, cache, {})
+    setattr(module, cache, type(saved[0])())     # the game's own kind: the wash cache is an LRU
     setattr(module, cap, room)
     try:
         yield
@@ -176,8 +180,9 @@ def miss_cost(name: str, sources: dict, passes: int = 5) -> dict | None:
 
 
 def clear_cost(name: str, sources: dict, entries: int, passes: int = 5) -> dict | None:
-    """Milliseconds to empty a full cache, as the game's does when it
-    reaches its cap: `entries` copies made (from as many distinct sources
+    """Milliseconds to empty a full cache, as the tint cache does when it
+    reaches its cap (and the wash cache did before RND-010.4; for it, at
+    1536 now, a cost the game no longer pays): `entries` copies made (from as many distinct sources
     as there are, up to `entries`) in a fresh cache, then the dict cleared,
     which frees every copy at once here, where nothing else holds them
     (in the game the ghost cache may). One figure per pass; `entries` is how
