@@ -18,4 +18,5 @@ so the display driver does not change it.
 
 Each line prints the median of 2000 `report_debug` calls in microseconds
 (with the p90), that median in milliseconds a frame, and the median of
-2000 `active_auras` calls alone.
+2000 `active_auras` calls alone. `tests/devtools/test_debug_lines_probe.py`
+checks the journal's results table against these files.

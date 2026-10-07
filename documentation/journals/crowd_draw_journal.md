@@ -982,7 +982,7 @@ built:**
 | ID | Plan step | What |
 |---|---|---|
 | RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled (done 2026-10-07) |
-| RND-010.5 | 4.1 | `report_debug` only with the overlay on (cheap, the plan's next) |
+| RND-010.5 | 4.1 | `report_debug` only with the overlay on (done 2026-10-07: 0.016 to 0.026 ms a frame, a tenth of the plan's estimate) |
 | RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants |
 | RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
 | RND-010.8 | 4.6 | bars (measure first), damage numbers, particles culled and without copies |
@@ -1177,6 +1177,49 @@ The change:
   fighting. The work is CPU only (no pixels), so it runs headless and
   needs no on-screen sitting. With F1 off, the whole of it is the saving.
 
+## RND-010.5: Results (2026-10-07)
+
+`debug_lines.py` on this branch, seed 35, headless, 2000 calls a run.
+The raw outputs are in `data/rnd-010.5/`, and
+`tests/devtools/test_debug_lines_probe.py` checks every row below
+against them:
+
+| Scene | Alive | `report_debug`, median (p90) | A frame | `active_auras` alone, median |
+|---|---|---|---|---|
+| 150 packed, quiet | 138 | 16.4 µs (p90 23.0) | 0.016 ms | 11.6 µs |
+| 150 packed, fighting | 138 | 17.9 µs (p90 20.5) | 0.018 ms | 13.1 µs |
+| 250 packed, quiet | 226 | 23.6 µs (p90 28.1) | 0.024 ms | 19.2 µs |
+| 250 packed, fighting | 226 | 26.1 µs (p90 28.3) | 0.026 ms | 21.3 µs |
+
+- **The saving, F1 off:** 0.016 to 0.026 ms a frame, the whole of
+  `report_debug`, which no longer runs. The plan's 4.1 estimated 0.2 to
+  0.5 ms; the measured cost is about a tenth of that. `active_auras` is
+  most of it (11.6 of 16.4 µs at 150 quiet, 21.3 of 26.1 at 250
+  fighting) and grows with the crowd as the plan said; the f-strings
+  are the remaining 5 µs or so.
+- **Against the frame:** in RND-010.3's sitting 5 the saturated fight at
+  250 takes 29.30 to 29.47 ms to update and draw, so 0.026 ms is about
+  0.1 % of it. Too small for an on-screen sitting to resolve, which is why
+  none was run: the probe times the work removed directly, and the
+  booted-run test proves it is removed.
+- **F1 on:** unchanged. The same lines are computed every frame.
+- **Biases:** the probe calls `report_debug` 2000 times on one frozen
+  scene, so the crowd and its auras stay in cache between calls; inside
+  a real frame they are colder, and the true cost is likely somewhat
+  higher. Not by the factor of ten to the estimate: the walk is a
+  `getattr` per enemy and, for an enemy with elemental state, one
+  `has_aura` call (`combat/elements/resolve.py:468`).
+
+Exactness: a hidden overlay draws nothing, so frames with F1 off are
+unchanged pixel for pixel; with F1 on, the lines are filled as before.
+The one visible difference is RND-010.5.D1: F1 pressed under a stopped
+run shows FPS and the two timings only, until the run updates.
+
+Mutation check (`scratchpad/mutate.py`, not kept): with the gate removed
+(`if True:`), `test_hidden_the_lines_are_never_computed` fails; with the
+clear on hide removed, `test_hiding_drops_the_lines_so_none_shows_stale`
+fails.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1215,5 +1258,5 @@ The change:
   - [x] RND-010.5.1: This plan and the index
   - [x] RND-010.5.2: `report_debug` gated on the overlay, its lines dropped on hide (RND-010.5.D1); tested, mutation-checked
   - [x] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
-  - [ ] RND-010.5.4: The results, and the plan's 4.1 marked done
+  - [x] RND-010.5.4: The results, and the plan's 4.1 marked done
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

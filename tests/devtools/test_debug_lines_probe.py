@@ -7,7 +7,9 @@ small packed scene.
 """
 import contextlib
 import io
+import re
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -17,6 +19,15 @@ from tests.devtools import (
 from tools.benchmarks import debug_lines as DLn
 
 SEED = 35
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "documentation" / "journals" / "data" / "rnd-010.5"
+JOURNAL = ROOT / "documentation" / "journals" / "crowd_draw_journal.md"
+SCENES = {"live_150_elapsed_200": "150 packed, quiet",
+          "live_150_elapsed_200_elements": "150 packed, fighting",
+          "live_250_elapsed_600": "250 packed, quiet",
+          "live_250_elapsed_600_elements": "250 packed, fighting"}
+LINE = re.compile(r"  report_debug: ([\d.]+) us a call \(p90 ([\d.]+)\), ([\d.]+) ms a frame; "
+                  r"of it active_auras ([\d.]+) us; (\d+) alive, (\d+) calls")
 
 
 class MeasureTests(unittest.TestCase):
@@ -50,6 +61,26 @@ class ReportTests(unittest.TestCase):
             with self.subTest(argv=bad), contextlib.redirect_stderr(io.StringIO()), \
                     self.assertRaises(SystemExit):
                 DLn.parse(bad)
+
+
+class JournalTests(unittest.TestCase):
+    """The RND-010.5 results table is the kept outputs, row for row."""
+
+    def test_every_row_is_its_file(self):
+        journal = JOURNAL.read_text(encoding="utf-8")
+        results = journal.split("## RND-010.5: Results", 1)[1].split("\n## ", 1)[0]
+        self.assertEqual(sorted(p.stem for p in DATA.glob("*.txt")), sorted(SCENES))
+        for stem, scene in SCENES.items():
+            text = (DATA / f"{stem}.txt").read_text(encoding="utf-8")
+            with self.subTest(file=stem):
+                flags = stem.replace("_", " ").replace("live", "--live").replace("elapsed", "--elapsed")
+                self.assertEqual(text.splitlines()[0],
+                                 "python -m tools.benchmarks.debug_lines --seed 35 "
+                                 + flags.replace("elements", "--elements"))
+                med, p90, ms, auras, alive, calls = LINE.search(text).groups()
+                self.assertEqual(calls, "2000")
+                self.assertIn(f"| {scene} | {alive} | {med} µs (p90 {p90}) | {ms} ms | {auras} µs |",
+                              results)
 
 
 class MainTests(unittest.TestCase):
