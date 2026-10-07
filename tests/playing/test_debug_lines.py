@@ -8,16 +8,19 @@ neither `report_debug` nor `active_auras`; shown, it calls each once a
 frame and the overlay's lines are filled.
 """
 import os
-import tempfile
 import unittest
 from unittest import mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
+from game import config
 from game.game import Game
 from game.states.menu_state import MenuState
 from tests.boot import start_run
+from tests.devtools import (
+    test_draw_layers as TDL,  # an alias: its classes are not collected twice
+)
 
 SEED = 35
 FRAMES = 3
@@ -28,7 +31,7 @@ class DebugLinesTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.game = Game(save_path=os.path.join(tempfile.mkdtemp(), "save.json"))
+        cls.game = Game(save_path=TDL._fresh_save())
         cls.game.state_machine.change(MenuState(cls.game))
         cls.ps = start_run(cls.game, SEED)
 
@@ -57,6 +60,20 @@ class DebugLinesTests(unittest.TestCase):
         self.assertEqual(metrics["state"], "PLAYING")
         self.assertEqual(metrics["enemies"], str(len(self.ps.run.enemies)))
         self.assertIn("auras", metrics)
+
+    def test_f1_fills_the_lines_on_the_next_update_and_hides_them_again(self):
+        """Through the real key: `Game` handles input before the update, so
+        F1 pressed in play shows filled lines on that same frame."""
+        f1, ps, debug = config.DEBUG_KEYS["toggle_overlay"], self.ps, self.game.debug
+        self.assertTrue(self.game._handle_debug_key(f1))
+        self.assertTrue(debug.visible)
+        ps.update(1 / 60)
+        self.assertEqual(debug._metrics["enemies"], str(len(ps.run.enemies)))
+        self.assertTrue(self.game._handle_debug_key(f1))
+        self.assertFalse(debug.visible)
+        self.assertEqual(debug._metrics, {})
+        ps.update(1 / 60)
+        self.assertEqual(debug._metrics, {})
 
 
 if __name__ == "__main__":

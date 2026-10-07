@@ -22,10 +22,13 @@ SEED = 35
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "documentation" / "journals" / "data" / "rnd-010.5"
 JOURNAL = ROOT / "documentation" / "journals" / "crowd_draw_journal.md"
+PLAN = ROOT / "documentation" / "plans" / "crowd_performance_plan.md"
 SCENES = {"live_150_elapsed_200": "150 packed, quiet",
-          "live_150_elapsed_200_elements": "150 packed, fighting",
+          "live_150_elapsed_200_elements": "150 packed, infused",
           "live_250_elapsed_600": "250 packed, quiet",
-          "live_250_elapsed_600_elements": "250 packed, fighting"}
+          "live_250_elapsed_600_elements": "250 packed, infused"}
+ESTIMATE = (0.2, 0.5)            # the plan's 4.1, ms a frame
+SITTING_5_FIGHT_250 = 29.30      # RND-010.3 sitting 5, update and draw, ms (its lower end)
 LINE = re.compile(r"  report_debug: ([\d.]+) us a call \(p90 ([\d.]+)\), ([\d.]+) ms a frame; "
                   r"of it active_auras ([\d.]+) us; (\d+) alive, (\d+) calls")
 
@@ -45,12 +48,20 @@ class MeasureTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
+    def test_it_uses_the_shared_percentile(self):
+        # An even count tells it from statistics.median: [1, 2, 3, 4] has
+        # p50 3 by stats.percentile, 2.5 by the median.
+        result = {"whole": [4.0, 1.0, 3.0, 2.0], "auras": [1.0, 2.0, 3.0, 4.0], "alive": 1}
+        self.assertIn("report_debug: 3.0 us a call (p90 4.0), 0.003 ms a frame; of it active_auras 3.0 us",
+                      DLn.report(result))
+
     def test_every_figure(self):
         result = {"whole": [10.0, 30.0, 20.0, 40.0, 50.0], "auras": [7.0, 9.0, 8.0, 6.0, 5.0], "alive": 136}
-        # median 30, p90 index int(0.9 * 4) = 3 of the sorted list -> 40,
-        # 0.030 ms a frame, auras median 7.
+        # stats.percentile on the sorted lists: p50 index round(0.5 * 4) = 2
+        # -> 30, p90 index round(0.9 * 4) = 4 -> 50; 0.030 ms a frame; auras
+        # p50 7.
         self.assertEqual(DLn.report(result),
-                         "  report_debug: 30.0 us a call (p90 40.0), 0.030 ms a frame; of it "
+                         "  report_debug: 30.0 us a call (p90 50.0), 0.030 ms a frame; of it "
                          "active_auras 7.0 us; 136 alive, 5 calls")
 
     def test_the_command_line(self):
@@ -63,8 +74,43 @@ class ReportTests(unittest.TestCase):
                 DLn.parse(bad)
 
 
+def _rows() -> dict:
+    """Each kept output's figures, by file stem: p50, p90, ms, auras, alive."""
+    out = {}
+    for stem in SCENES:
+        med, p90, ms, auras, alive, _ = LINE.search((DATA / f"{stem}.txt").read_text(encoding="utf-8")).groups()
+        out[stem] = {"p50": float(med), "p90": float(p90), "ms": ms, "auras": float(auras), "alive": alive}
+    return out
+
+
 class JournalTests(unittest.TestCase):
-    """The RND-010.5 results table is the kept outputs, row for row."""
+    """The RND-010.5 results, and every figure the journal and the plan
+    quote from them, are the kept outputs."""
+
+    def test_every_quoted_figure_is_derived_from_the_files(self):
+        rows = _rows()
+        ms = sorted(float(r["ms"]) for r in rows.values())
+        lo, hi = f"{ms[0]:.3f}", f"{ms[-1]:.3f}"
+        rest = sorted(r["p50"] - r["auras"] for r in rows.values())
+        q150, i250 = rows["live_150_elapsed_200"], rows["live_250_elapsed_600_elements"]
+        self.assertEqual((lo, hi), (q150["ms"], i250["ms"]), "the range runs 150 quiet to 250 infused")
+        share = (f"{round(100 * ms[0] / ESTIMATE[1])} to {round(100 * ms[-1] / ESTIMATE[0])} %")
+        journal = JOURNAL.read_text(encoding="utf-8")
+        plan = PLAN.read_text(encoding="utf-8")
+        for text in (f"{lo} to {hi} ms a frame, {share} of the plan's estimate",
+                     f"{lo} to {hi} ms a frame, the whole of",
+                     f"the measured cost is {share} of that",
+                     (f"({q150['auras']:.1f} of {q150['p50']:.1f} µs at 150 quiet, "
+                      f"{i250['auras']:.1f} of {i250['p50']:.1f} µs at 250\n  infused)"),
+                     f"f-strings are the remaining {rest[0]:.1f} to {rest[-1]:.1f} µs",
+                     f"so {hi} ms is {100 * ms[-1] / SITTING_5_FIGHT_250:.2f} %"):
+            with self.subTest(journal=text):
+                self.assertIn(text, journal)
+        for text in (f"**Measured** in RND-010.5: {lo} to {hi} ms a\n  frame at 150 to 250 packed",
+                     f"{lo} ms at 150 packed quiet to {hi} ms at 250 infused",
+                     f"4.1 is {lo} to {hi} ms"):
+            with self.subTest(plan=text):
+                self.assertIn(text, plan)
 
     def test_every_row_is_its_file(self):
         journal = JOURNAL.read_text(encoding="utf-8")

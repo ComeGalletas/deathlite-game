@@ -982,7 +982,7 @@ built:**
 | ID | Plan step | What |
 |---|---|---|
 | RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled (done 2026-10-07) |
-| RND-010.5 | 4.1 | `report_debug` only with the overlay on (done 2026-10-07: 0.016 to 0.026 ms a frame, a tenth of the plan's estimate) |
+| RND-010.5 | 4.1 | `report_debug` only with the overlay on (done 2026-10-07: 0.016 to 0.026 ms a frame, 3 to 13 % of the plan's estimate) |
 | RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants |
 | RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
 | RND-010.8 | 4.6 | bars (measure first), damage numbers, particles culled and without copies |
@@ -1143,12 +1143,12 @@ The owner asked for RND-010.5 on 2026-10-07, after #71 merged. This is
 the plan's 4.1 and the second row of RND-010.3's sequence. Done when: no
 `active_auras` call with the overlay off.
 
-What the code does today:
-- `PlayingState.update` ends with `self.dev.report_debug(self)`
-  (`core/state.py:394`), every frame, F1 or not.
-- `report_debug` (`devtools/dev_flags.py:116`) sets about 25 overlay
-  metrics. One of them, `auras`, is `active_auras`, which walks the
-  whole crowd. The rest are counts and f-strings.
+What the code did before this change:
+- `PlayingState.update` ended with `self.dev.report_debug(self)`
+  (`core/state.py:394` then, `:397` now), every frame, F1 or not.
+- `report_debug` (`devtools/dev_flags.py:94`) sets about 25 overlay
+  metrics. One of them, `auras` (`:116`), is `active_auras`, which walks
+  the whole crowd. The rest are counts and f-strings.
 - `DebugOverlay.draw` returns at once while hidden, so nothing reads
   those metrics until F1 is pressed.
 
@@ -1174,32 +1174,36 @@ The change:
   - a mutation check of each change.
 - **Measured:** `tools/benchmarks/debug_lines.py` times `report_debug`,
   and `active_auras` alone, on the packed scene at 150 and 250, quiet and
-  fighting. The work is CPU only (no pixels), so it runs headless and
+  infused. The work is CPU only (no pixels), so it runs headless and
   needs no on-screen sitting. With F1 off, the whole of it is the saving.
 
 ## RND-010.5: Results (2026-10-07)
 
-`debug_lines.py` on this branch, seed 35, headless, 2000 calls a run.
-The raw outputs are in `data/rnd-010.5/`, and
-`tests/devtools/test_debug_lines_probe.py` checks every row below
-against them:
+`debug_lines.py` on this branch, seed 35, headless, 2000 calls a run;
+p50 and p90 by `tools/benchmarks/stats.percentile`, as every other probe
+in this journal. "Infused" is `--elements`: the crowd primed and the
+weapons infused, as `spawn_stress --elements`, then frozen while timed,
+so it differs from quiet only in how many enemies hold an aura. The raw
+outputs are in `data/rnd-010.5/`, and
+`tests/devtools/test_debug_lines_probe.py` checks every row and every
+figure quoted below against them:
 
-| Scene | Alive | `report_debug`, median (p90) | A frame | `active_auras` alone, median |
+| Scene | Alive | `report_debug`, p50 (p90) | A frame | `active_auras` alone, p50 |
 |---|---|---|---|---|
-| 150 packed, quiet | 138 | 16.4 µs (p90 23.0) | 0.016 ms | 11.6 µs |
-| 150 packed, fighting | 138 | 17.9 µs (p90 20.5) | 0.018 ms | 13.1 µs |
-| 250 packed, quiet | 226 | 23.6 µs (p90 28.1) | 0.024 ms | 19.2 µs |
-| 250 packed, fighting | 226 | 26.1 µs (p90 28.3) | 0.026 ms | 21.3 µs |
+| 150 packed, quiet | 138 | 16.4 µs (p90 16.7) | 0.016 ms | 11.5 µs |
+| 150 packed, infused | 138 | 18.1 µs (p90 18.6) | 0.018 ms | 13.2 µs |
+| 250 packed, quiet | 226 | 24.6 µs (p90 25.5) | 0.025 ms | 19.6 µs |
+| 250 packed, infused | 226 | 26.4 µs (p90 27.2) | 0.026 ms | 21.2 µs |
 
 - **The saving, F1 off:** 0.016 to 0.026 ms a frame, the whole of
   `report_debug`, which no longer runs. The plan's 4.1 estimated 0.2 to
-  0.5 ms; the measured cost is about a tenth of that. `active_auras` is
-  most of it (11.6 of 16.4 µs at 150 quiet, 21.3 of 26.1 at 250
-  fighting) and grows with the crowd as the plan said; the f-strings
-  are the remaining 5 µs or so.
+  0.5 ms; the measured cost is 3 to 13 % of that. `active_auras` is
+  most of it (11.5 of 16.4 µs at 150 quiet, 21.2 of 26.4 µs at 250
+  infused) and grows with the crowd as the plan said; the counts and
+  f-strings are the remaining 4.9 to 5.2 µs.
 - **Against the frame:** in RND-010.3's sitting 5 the saturated fight at
-  250 takes 29.30 to 29.47 ms to update and draw, so 0.026 ms is about
-  0.1 % of it. Too small for an on-screen sitting to resolve, which is why
+  250 takes 29.30 to 29.47 ms to update and draw, so 0.026 ms is 0.09 %
+  of it. Too small for an on-screen sitting to resolve, which is why
   none was run: the probe times the work removed directly, and the
   booted-run test proves it is removed.
 - **F1 on:** unchanged. The same lines are computed every frame.
@@ -1210,15 +1214,32 @@ against them:
   `getattr` per enemy and, for an enemy with elemental state, one
   `has_aura` call (`combat/elements/resolve.py:468`).
 
-Exactness: a hidden overlay draws nothing, so frames with F1 off are
-unchanged pixel for pixel; with F1 on, the lines are filled as before.
-The one visible difference is RND-010.5.D1: F1 pressed under a stopped
-run shows FPS and the two timings only, until the run updates.
+Exactness. Skipping `report_debug` is exact because it changes no run
+state: every call it makes reads (`active_auras` and `has_aura`, the
+pool lengths, the element stats, `vis.report()`, the DPS summary,
+`enemy_count_cap`, the spawn master's and the nav's counters) and its
+only write is the overlay's own metrics.
+`tests/flows/test_debug_lines_exact.py` holds that for good: seed 123
+played by `run_digest` (720 frames, debug spawns and a level-up) gives
+the same digest with the overlay hidden and shown, so a side effect added
+to `report_debug` later fails it. The overlay's own pixels are unchanged
+too: hidden it draws nothing, and shown it fills the same lines every
+frame. The one visible difference is RND-010.5.D1: F1 pressed under a
+stopped run (the pause menu, a level-up card, the end banner, where
+`update` returns early) shows FPS and the two timings only, until the
+run updates again. Refilling the lines on show would keep the old
+behaviour instead, at the cost of a hook from `Game`'s F1 key into the
+state; D1 is offered to the owner in the PR.
 
-Mutation check (`scratchpad/mutate.py`, not kept): with the gate removed
-(`if True:`), `test_hidden_the_lines_are_never_computed` fails; with the
-clear on hide removed, `test_hiding_drops_the_lines_so_none_shows_stale`
-fails.
+Mutation check (scratch scripts, not kept), each mutant caught:
+- the gate removed (`if True:`):
+  `test_hidden_the_lines_are_never_computed` and
+  `test_f1_fills_the_lines_on_the_next_update_and_hides_them_again` fail;
+- the clear on hide removed:
+  `test_hiding_drops_the_lines_so_none_shows_stale` fails;
+- `report_debug` given a side effect (one draw from the run RNG):
+  `test_the_run_is_the_same_with_the_overlay_hidden_or_shown` fails on
+  the digest.
 
 ## RND-010: Tasks
 
@@ -1259,4 +1280,6 @@ fails.
   - [x] RND-010.5.2: `report_debug` gated on the overlay, its lines dropped on hide (RND-010.5.D1); tested, mutation-checked
   - [x] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
   - [x] RND-010.5.4: The results, and the plan's 4.1 marked done
+  - [x] RND-010.5.5: The cold review's findings: the shared percentile and the outputs taken again, every quoted figure pinned, the exactness argued from no run state written and held by a hidden-against-shown run digest, the real F1 path tested, "infused" for `--elements`, the line references, D1's alternative named
+  - [ ] RND-010.5.6: The full suite's counts in the results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

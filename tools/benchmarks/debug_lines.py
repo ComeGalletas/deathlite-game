@@ -6,9 +6,10 @@
 `PlayingState`'s update fills the F1 overlay's metrics (`dev_flags.report_debug`)
 every frame. Since RND-010.5 it does that only while the overlay is shown, so
 with F1 off the whole of this cost is what the change removes. The scene is
-`layer_probes.packed_scene`'s (`--elements`: the hero fighting, as
-`spawn_stress --elements`). `report_debug` is then called `--rounds` times on
-it, timed per call, and the median and p90 are printed. `active_auras`, the
+`layer_probes.packed_scene`'s (`--elements`: infused, as `spawn_stress
+--elements`, so the warm-up fights and the crowd holds auras). The scene is
+then frozen: `report_debug` is called `--rounds` times on it, timed per
+call, and the median and p90 (`stats.percentile`) are printed. `active_auras`, the
 one line that walks the whole crowd, is then timed alone the same way, and
 its median printed as the part of the whole it accounts for.
 
@@ -18,10 +19,10 @@ it, and the display driver does not matter.
 from __future__ import annotations
 
 import argparse
-import statistics
 import time
 
 from tools.benchmarks import layer_probes as LP
+from tools.benchmarks.stats import percentile
 
 
 def per_call(fn, rounds: int) -> list[float]:
@@ -44,11 +45,12 @@ def measure(ps, rounds: int) -> dict:
 
 
 def report(result: dict) -> str:
-    med = lambda v: statistics.median(v)
-    return (f"  report_debug: {med(result['whole']):.1f} us a call (p90 "
-            f"{sorted(result['whole'])[int(0.9 * (len(result['whole']) - 1))]:.1f}), "
-            f"{med(result['whole']) / 1000:.3f} ms a frame; of it active_auras "
-            f"{med(result['auras']):.1f} us; {result['alive']} alive, {len(result['whole'])} calls")
+    """The p50 and p90 are `stats.percentile`'s, as every other probe's."""
+    whole, auras = sorted(result["whole"]), sorted(result["auras"])
+    p50 = percentile(whole, 0.5)
+    return (f"  report_debug: {p50:.1f} us a call (p90 {percentile(whole, 0.9):.1f}), "
+            f"{p50 / 1000:.3f} ms a frame; of it active_auras "
+            f"{percentile(auras, 0.5):.1f} us; {result['alive']} alive, {len(whole)} calls")
 
 
 def parse(argv=None) -> argparse.Namespace:
@@ -58,7 +60,7 @@ def parse(argv=None) -> argparse.Namespace:
                     help="as spawn_stress --live; needs --elapsed (N - 100) * 4")
     ap.add_argument("--elapsed", type=float, required=True, help="the run clock in seconds")
     ap.add_argument("--dormant", type=int, default=400, help="enemy records on the other islands")
-    ap.add_argument("--elements", action="store_true", help="the hero fighting, as spawn_stress --elements")
+    ap.add_argument("--elements", action="store_true", help="infused, as spawn_stress --elements")
     ap.add_argument("--rounds", type=int, default=2000, help="calls timed")
     args = ap.parse_args(argv)
     if args.rounds < 1:

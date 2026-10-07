@@ -13,10 +13,13 @@ so the display driver does not change it.
 |---|---|
 | `live_150_elapsed_200.txt` | 150 packed, quiet |
 | `live_250_elapsed_600.txt` | 250 packed, quiet |
-| `live_150_elapsed_200_elements.txt` | 150 packed, the hero fighting (`--elements`) |
-| `live_250_elapsed_600_elements.txt` | 250 packed, the hero fighting |
+| `live_150_elapsed_200_elements.txt` | 150 packed, infused (`--elements`: primed and infused, then frozen) |
+| `live_250_elapsed_600_elements.txt` | 250 packed, infused |
 
-Each line prints the median of 2000 `report_debug` calls in microseconds
-(with the p90), that median in milliseconds a frame, and the median of
-2000 `active_auras` calls alone. `tests/devtools/test_debug_lines_probe.py`
+Each line prints the p50 of 2000 `report_debug` calls in microseconds
+(with the p90; both `tools/benchmarks/stats.percentile`), that p50 in
+milliseconds a frame, and the p50 of 2000 `active_auras` calls alone.
+These are the second run of the four, after the cold review (RND-010.5.5)
+moved the probe from its own median and p90 to the shared percentile; the
+first run's files were replaced. `tests/devtools/test_debug_lines_probe.py`
 checks the journal's results table against these files.
