@@ -1,7 +1,7 @@
 # Enemy shapes toggle — journal
 
 **ID:** RND-013 · **System:** rendering (+ SYS dev tools) · **Type:** feature ·
-**Status:** in progress · **Branch:** claude/rnd-013-enemy-shape-toggle (the
+**Status:** done · **Branch:** claude/rnd-013-enemy-shape-toggle (the
 session's own worktree, `.claude/worktrees/enemy-asset-shape-toggle-9a7dea`)
 
 A developer-menu switch that draws every enemy as a plain shape instead of its
@@ -103,11 +103,50 @@ Decisions the request left open:
 - [x] RND-013.2 — The flag and the shape path in the renderer (enemies, boss,
   HP bar, spawn burst), with tests → `2ea8caa`
 - [x] RND-013.3 — The dev-menu row, with tests → `519a617`
-- [ ] RND-013.4 — Screenshots, results
+- [x] RND-013.4 — Screenshots, results
 - [x] RND-013.5 — The cold review's findings: the ghost and the mark on the
   circle (D6), two tests that did not test what they named, the boss test on
-  its own run, docstring and line-length nits
+  its own run, docstring and line-length nits → `049f139`
 
 ## RND-013 — Results
 
-Pending.
+**Tests.** `tests/render/test_enemy_shapes.py` (13, `integration` tier):
+off by default; every enemy id draws its collider circle and fetches no
+frame; the data colour at the collider; the hit flash and the elite ring;
+the HP bar off the circle; the spawn burst round the collider; the ghost of
+a circle; the mark only while it matters; turning it off brings the sprite
+back; the whole frame draws headless; the boss on its own run; a regular run
+ignores the flag; a pinned run played 180 frames with it off and on ends
+identical (enemies, animator frames, hero, clock, kills). In
+`tests/flows/test_dev_mode.py`: the row flips the flag, shows its state, and
+the whole frame then draws the circle; a reset run starts with sprites.
+
+Proof the tests bite: against the renderer without the switch, the six
+feature tests fail and the five invariants (off by default, regular run,
+draw-only, turn-off, headless frame) pass; against the pre-review renderer,
+the ghost and mark tests fail.
+
+Lanes run (medium, DOC-008.D3: the tests covering the task):
+`tests/render tests/devtools tests/flows/test_dev_mode.py`, 1057 passed,
+0 failed, 768 subtests. The first run of the two directories caught one
+miss: the new module boots a run and had to be registered in the
+`integration` tier (`tests/devtools/test_tier_audit.py`), done in RND-013.2.
+The `sweep` tier was not run (not asked). No eval applies: this is a
+debug-view switch with no rate to measure.
+
+**Measured outcome.** The enemy draw alone (`one_enemy` over every body),
+212 enemies on the pinned dev world, median of 60 frames, best of three:
+sprites 2.25 ms, shapes 0.78 ms (0.61 ms before the ghost recording of
+RND-013.5). A scratch measurement, not a benchmark: it shows the switch takes
+the sprite fetch, scale, tint, wash and shade out of the frame, which is what
+it is for.
+
+**Screenshots** (headless, delivered in the session, not committed): the same
+dev-run frame with the switch off and on, and the menu with the row on.
+
+**Cold review.** One critic pass (medium). Its findings: two tests that did
+not test what they named, the boss test leaking state into a shared run, the
+lost ghost, the mark rule, and three nits. All fixed in RND-013.5 or recorded
+as D6.
+
+**Deferred.** None.
