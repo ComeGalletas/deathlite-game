@@ -1128,7 +1128,9 @@ Exactness:
   `test_the_cache_is_an_lru_of_1536`, the stale and identity mutants by
   `test_an_entry_under_another_frame_is_replaced_not_served`, and the
   dict by `test_it_is_cached_per_frame_and_element`.
-- Tests: pending (the full suite on the branch)
+- Tests: the full suite (`python -m pytest`, the default tiers) on
+  `f1e502f`: 4,488 passed, 11 deselected (the `sweep` tier, run only when
+  asked), none failed.
 
 Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
 250, against 28.2 MB before, as D2 accepted.
@@ -1166,5 +1168,5 @@ Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
   - [x] RND-010.4.4: The sitting: `main` against this branch, ABBA, at 150, 200 and 250 packed, fighting and quiet; `sprite_caches` after; raw outputs kept
   - [x] RND-010.4.5: The results, and the plan's 4.13 marked done
   - [x] RND-010.4.6: The cold review's findings: the two savings placed against RND-010.3's two figures, the 250 update bias, the quiet and 150 figures from derived.py, the design's biases, the mutants listed; the probes' docstrings, two tests tightened, every quoted figure pinned
-  - [ ] RND-010.4.7: The full suite's counts in the results
+  - [x] RND-010.4.7: The full suite's counts in the results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
