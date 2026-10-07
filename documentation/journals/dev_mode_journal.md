@@ -64,6 +64,12 @@ Plus: the mode **doesn't save**, and it can be exited to the main menu from
 
 ## Later additions (post-D5, outside the original D1–D6 plan)
 
+### "Enemy shapes" toggle — RND-013, 2026-10-07
+
+Draws every enemy and the boss as its collider circle instead of its sprite.
+Tracked under the ID standard in
+[enemy_shape_toggle_journal.md](enemy_shape_toggle_journal.md).
+
 ### "Attacks deal 0 damage" toggle — done 2026-08-29
 
 A third root toggle, between **Stop attacking** and **Collision shapes**:
