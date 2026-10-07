@@ -5,7 +5,9 @@
 (from `main`, owner, 2026-09-30; shared with UI-018; RND-010.1 and .2, merged),
 then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3),
 then claude/rnd-010-4-wash-lru (from `main`, 2026-10-06; RND-010.4; in the
-session's worktree, as the owner chose under CLAUDE.md §1.5)
+session's worktree, as the owner chose under CLAUDE.md §1.5),
+then claude/rnd-010-5-debug-lines (from `main`, 2026-10-07; RND-010.5; in
+the same worktree, a task inside the ongoing requirement)
 
 ---
 
@@ -1135,6 +1137,46 @@ Exactness:
 Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
 250, against 28.2 MB before, as D2 accepted.
 
+## RND-010.5: The F1 overlay's lines only while it is shown (plan, 2026-10-07)
+
+The owner asked for RND-010.5 on 2026-10-07, after #71 merged. This is
+the plan's 4.1 and the second row of RND-010.3's sequence. Done when: no
+`active_auras` call with the overlay off.
+
+What the code does today:
+- `PlayingState.update` ends with `self.dev.report_debug(self)`
+  (`core/state.py:394`), every frame, F1 or not.
+- `report_debug` (`devtools/dev_flags.py:116`) sets about 25 overlay
+  metrics. One of them, `auras`, is `active_auras`, which walks the
+  whole crowd. The rest are counts and f-strings.
+- `DebugOverlay.draw` returns at once while hidden, so nothing reads
+  those metrics until F1 is pressed.
+
+The change:
+- **The gate.** `report_debug` runs only while `game.debug.visible`.
+  Pixel-identical while hidden, since a hidden overlay draws nothing;
+  while shown, the same lines are filled every frame as before.
+- **Hiding drops the lines (RND-010.5.D1).** Without this, the metrics
+  set while F1 was last on would stay in the overlay. Shown again while
+  the run is not updating (under the pause menu, for one), it would print
+  them as if current, for as long as the run stays stopped.
+  `DebugOverlay.toggle` now clears them on hide, so the overlay shows
+  only FPS and the two timings until the next update refills them. Before
+  RND-010.5 the overlay opened under the pause menu showed the last frame
+  before the pause; that one frame's lines are what is given up.
+- **Tests:**
+  - `tests/playing/test_debug_lines.py` on a booted seed-35 run: three
+    updates hidden call neither `report_debug` nor `active_auras` and
+    leave the overlay empty; three shown call each three times and fill
+    the lines (integration tier);
+  - `tests/systems/test_debug_overlay.py`: hiding clears the lines,
+    showing keeps them;
+  - a mutation check of each change.
+- **Measured:** `tools/benchmarks/debug_lines.py` times `report_debug`,
+  and `active_auras` alone, on the packed scene at 150 and 250, quiet and
+  fighting. The work is CPU only (no pixels), so it runs headless and
+  needs no on-screen sitting. With F1 off, the whole of it is the saving.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1169,4 +1211,9 @@ Memory: the wash cache now holds up to 80.6 MB in the replayed fight at
   - [x] RND-010.4.5: The results, and the plan's 4.13 marked done
   - [x] RND-010.4.6: The cold review's findings: the two savings placed against RND-010.3's two figures, the 250 update bias, the quiet and 150 figures from derived.py, the design's biases, the mutants listed; the probes' docstrings, two tests tightened, every quoted figure pinned
   - [x] RND-010.4.7: The full suite's counts in the results
+- [ ] RND-010.5: The F1 overlay's lines only while it is shown (plan 4.1), tested and measured
+  - [x] RND-010.5.1: This plan and the index
+  - [ ] RND-010.5.2: `report_debug` gated on the overlay, its lines dropped on hide (RND-010.5.D1); tested, mutation-checked
+  - [ ] RND-010.5.3: `debug_lines.py` under `tools/benchmarks/`, tested; its outputs at 150 and 250, quiet and fighting, kept
+  - [ ] RND-010.5.4: The results, and the plan's 4.1 marked done
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
