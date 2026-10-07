@@ -1383,7 +1383,7 @@ The plan:
 - [ ] RND-010.6: The elemental under-layer (plan 4.5): split, measured, and the exact caches a sitting resolves built
   - [x] RND-010.6.1: This plan and the index
   - [x] RND-010.6.2: `draw_layers` times `draw_under`'s passes as their own rows, tested
-  - [ ] RND-010.6.3: The under-layer's leads probe, tested
+  - [x] RND-010.6.3: The under-layer's leads probe, tested
   - [x] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element, and, found on the way, the aura blit RLE-encoded for binary-alpha frames), tested
   - [ ] RND-010.6.5: The sitting: the split, the leads and the variants at 150 and 250 packed in the fight, raw outputs kept
   - [ ] RND-010.6.6: What the sitting resolves, built pixel-identical, measured before and after
