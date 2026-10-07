@@ -678,18 +678,9 @@ class PlayingState(State):
     def _spawn_enemy(self, enemy_id, at=None, owner="direct"):
         return self.spawn.spawn_enemy(enemy_id, at, owner=owner)
 
-    # --- rewards, the run's end, the dev switches: flags the tests read ---
+    # --- rewards and the run's end: flags the tests read -----------------
     _awaiting_level_up = _forward("rewards", "awaiting_level_up")
     _ending = _forward("run_end", "ending")
-
-    def _apply_dev_unlimited_hp(self) -> None:
-        self.dev.apply_unlimited_hp(self.run)
-
-    def _set_difficulty(self, name: str) -> None:
-        self.dev.set_difficulty(self, name)
-
-    def _report_debug(self) -> None:
-        self.dev.report_debug(self)
 
     # --- scene composition (see visual/scene.py) --------------------------
     def _depth_items(self) -> list:
