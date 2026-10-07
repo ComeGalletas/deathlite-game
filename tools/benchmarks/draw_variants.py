@@ -39,6 +39,19 @@ The variants (`VARIANTS`):
   `--elements`. RND-010.4 built it into the game, so against the game
   since then it compares an LRU with an LRU of the same size.
 
+RND-010.6's, the elemental under-layer's (`under_leads.py` splits it); run
+them with `--elements`, since only a fight draws auras, marks and
+tornadoes:
+
+* `shape_cached`: the slow chevron and the freeze bracket (`layers._shape`)
+  drawn once per `(shape, size, colour)` and blitted from the kept copy;
+* `ring_cached`: the tornado's ring (`transient._ring`) the same, per
+  `(radius, colour, alpha, width)`;
+* `aura_rle`: each aura frame blitted from an RLE-accelerated copy that
+  keeps its per-pixel alpha, so SDL skips its transparent runs;
+* `aura_lookup_once`: `draw_auras` looking each element's frame up once a
+  pass per size, not once per body.
+
 `--elements` takes the scene with the hero fighting, as `spawn_stress
 --elements` does: every enemy primed and three infused weapons firing.
 
@@ -170,8 +183,176 @@ def _wash_lru(ps):
     return lambda: setattr(fx, "washed", real)
 
 
+# --- RND-010.6: the elemental under-layer's candidates ---------------------------
+# Each cache is this module's, bounded, and cleared by its undo so the side
+# without the variant pays nothing for it.
+UNDER_CAP = 256
+
+
+def _bounded(cache: dict, key, make):
+    hit = cache.get(key)
+    if hit is None:
+        if len(cache) >= UNDER_CAP:
+            cache.clear()
+        hit = cache[key] = make()
+    return hit
+
+
+def _shape_cached(ps):
+    """`layers._shape` (the slow chevron, the freeze bracket) drawn once per
+    `(shape, size, colour)` and blitted from the kept copy. The layer does
+    not depend on where it lands: its points are `(x - 0.5) * size` plus
+    half the box, and the box is `int(size) + 4` square."""
+    import pygame
+
+    from game.states.playing.visual.elements import layers
+    real = layers._shape
+    cache: dict = {}
+
+    def shape(surface, shp, cx, cy, size, colour):
+        if size < 2:
+            return
+        side = int(size) + 4
+
+        def make():
+            layer = pygame.Surface((side, side), pygame.SRCALPHA)
+            local = [((x - 0.5) * size + side / 2, (y - 0.5) * size + side / 2) for x, y in shp]
+            pygame.draw.polygon(layer, (*colour, layers._STATUS_ALPHA), local)
+            pygame.draw.polygon(layer, (18, 16, 24, layers._STATUS_ALPHA), local, 1)
+            return layer
+
+        surface.blit(_bounded(cache, (shp, size, colour), make),
+                     (int(cx - side / 2), int(cy - side / 2)))
+
+    layers._shape = shape
+
+    def undo():
+        layers._shape = real
+        cache.clear()
+    return undo
+
+
+def _ring_cached(ps):
+    """The tornado's ring (`transient._ring`) drawn once per `(radius,
+    colour, alpha, width)` and blitted from the kept copy."""
+    import pygame
+
+    from game.states.playing.visual.elements import transient
+    real = transient._ring
+    cache: dict = {}
+
+    def ring(surface, center, radius, colour, alpha, width):
+        alpha = min(255, int(alpha))
+        if alpha <= 0 or radius <= 0:
+            return
+        size = radius * 2 + width * 2 + 2
+
+        def make():
+            layer = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.circle(layer, (*colour, alpha), (size // 2, size // 2), radius, max(1, width))
+            return layer
+
+        surface.blit(_bounded(cache, (radius, tuple(colour), alpha, width), make),
+                     (center[0] - size // 2, center[1] - size // 2))
+
+    transient._ring = ring
+
+    def undo():
+        transient._ring = real
+        cache.clear()
+    return undo
+
+
+def binary_alpha(frame) -> bool:
+    """Is every pixel of `frame` either clear (alpha 0) or opaque (255)?
+    The pixels over alpha 0 counted against those over 254, by
+    `pygame.mask` (no numpy in the game)."""
+    import pygame
+    return (pygame.mask.from_surface(frame, 0).count()
+            == pygame.mask.from_surface(frame, 254).count())
+
+
+def _aura_rle(ps):
+    """Each aura frame blitted from an RLE-accelerated copy
+    (`set_alpha(255, RLEACCEL)`, which keeps the per-pixel alpha): SDL skips
+    the frame's transparent runs instead of blending them. Exact only for a
+    frame whose alpha is all 0 or 255: SDL's RLE path blends a translucent
+    pixel by its own formula, off by one in a channel against the plain
+    blit, so a frame with any is left to the plain blit (`binary_alpha`).
+    Every aura frame shipped is binary. The copies are kept per frame, the
+    frame held in the entry so its id is not reused."""
+    import pygame
+
+    from game.states.playing.visual.elements.profiles import ElementVisualProfile
+    real = ElementVisualProfile.aura_frame          # the class's: profiles have slots
+    copies: dict = {}
+
+    def aura_frame(self, size=None):
+        frame = real(self, size=size)
+        if frame is None:
+            return None
+
+        def make():
+            if not binary_alpha(frame):
+                return (frame, frame)                # translucent pixels: the plain blit
+            out = frame.copy()
+            out.set_alpha(255, pygame.RLEACCEL)
+            return (frame, out)
+
+        hit = _bounded(copies, id(frame), make)
+        return hit[1] if hit[0] is frame else frame
+
+    ElementVisualProfile.aura_frame = aura_frame
+
+    def undo():
+        ElementVisualProfile.aura_frame = real
+        copies.clear()
+    return undo
+
+
+def _aura_lookup_once(ps):
+    """`layers.draw_auras` with each element's frame looked up once per size
+    in a pass instead of once per body: every body of an element shares its
+    profile's animator, so the frame at a size is the same for all of them."""
+    from game.states.playing.visual.elements import layers
+    real = layers.draw_auras
+
+    def draw_auras(surface, run, visuals, now, level=None, bodies=None):
+        cam = run.camera
+        style = visuals.aura
+        frames: dict = {}
+        drawn = 0
+        for body in layers.in_band(run, level) if bodies is None else bodies:
+            state = getattr(body, "elemental", None)
+            if state is None:
+                continue
+            element = state.element(now)
+            if element:
+                profile = visuals[element]
+                sx, sy = cam.world_to_screen(body.pos)
+                radius = (body.radius + style.ring_pad) * cam.zoom
+                size = profile.aura_size(radius * 2.0 * style.rig_scale)
+                key = (element, size)
+                frame = frames.get(key, frames)
+                if frame is frames:
+                    frame = frames[key] = profile.aura_frame(size=size) if size else None
+                if frame is not None:
+                    surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
+                else:
+                    layers._aura(surface, cam, body, profile, style)
+                drawn += 1
+            elif state.is_locked(now):
+                layers._locked(surface, cam, body, style)
+        return drawn
+
+    layers.draw_auras = draw_auras
+    return lambda: setattr(layers, "draw_auras", real)
+
+
 VARIANTS = {"rig_frame_cached": _rig_frame_cached, "world_bucketed": _world_bucketed,
-            "forwarder_bypassed": _forwarder_bypassed, "wash_lru": _wash_lru}
+            "forwarder_bypassed": _forwarder_bypassed, "wash_lru": _wash_lru,
+            "shape_cached": _shape_cached, "ring_cached": _ring_cached,
+            "aura_rle": _aura_rle, "aura_lookup_once": _aura_lookup_once}
 
 
 def picture(ps, surface) -> bytes:

@@ -1316,6 +1316,19 @@ The plan:
     body of an element, so the frame is too.
   `_arc_ring` turns every frame, so a cache keyed on its angle would
   miss every frame; it is timed but not varied.
+- **Found while building the probes: the aura blit RLE-encoded**
+  (`aura_rle`). The leads probe, headless, put the aura's blit at 79 % of
+  the auras' pass, the lookups at about 15 %. A copy of each aura frame
+  with `set_alpha(255, RLEACCEL)` keeps its per-pixel alpha and lets SDL
+  skip the frame's transparent runs: headless, about 1.1 against 7.7 µs a
+  blit. It is exact only for a frame whose alpha is all 0 or 255. SDL's
+  RLE path blends a translucent pixel by its own formula, a channel off
+  by one against the plain blit (pinned in `test_draw_variants`). Every
+  shipped aura frame is binary at every size (pinned too), and a frame
+  that is not keeps the plain blit, checked once per frame with
+  `pygame.mask` (no numpy in the game). The same may hold for other
+  sprites, the enemies' own above all; that is a lead for after this
+  task, not part of it.
 - **One sitting on screen** (RND-010.6.5), at 150 and 250 packed in the
   fight: the split by layer, the leads and the variants. The owner asks
   to be asked first.
@@ -1371,7 +1384,7 @@ The plan:
   - [x] RND-010.6.1: This plan and the index
   - [x] RND-010.6.2: `draw_layers` times `draw_under`'s passes as their own rows, tested
   - [ ] RND-010.6.3: The under-layer's leads probe, tested
-  - [ ] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element), tested
+  - [x] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element, and, found on the way, the aura blit RLE-encoded for binary-alpha frames), tested
   - [ ] RND-010.6.5: The sitting: the split, the leads and the variants at 150 and 250 packed in the fight, raw outputs kept
   - [ ] RND-010.6.6: What the sitting resolves, built pixel-identical, measured before and after
   - [ ] RND-010.6.7: The results
