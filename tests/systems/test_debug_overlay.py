@@ -52,6 +52,20 @@ class DebugOverlayTests(unittest.TestCase):
         o.toggle()
         self.assertEqual(o.visible, config.DEBUG_OVERLAY_DEFAULT)
 
+    def test_hiding_drops_the_lines_so_none_shows_stale(self):
+        # RND-010.5: the run refills the lines only while the overlay is
+        # shown, so hidden ones would go stale; shown again (say under the
+        # pause menu, before the run updates) they would read as current.
+        o = DebugOverlay()
+        o.visible = True
+        o.set_metric("enemies", 42)
+        o.toggle()                                       # hidden: dropped
+        self.assertFalse(o.visible)
+        self.assertEqual(o._metrics, {})
+        o.set_metric("enemies", 7)
+        o.toggle()                                       # shown: kept as they are
+        self.assertEqual(o._metrics, {"enemies": "7"})
+
     def test_metrics_are_kept_as_text(self):
         o = DebugOverlay()
         o.set_metric("enemies", 42)

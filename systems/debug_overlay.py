@@ -27,6 +27,12 @@ class DebugOverlay:
 
     def toggle(self) -> None:
         self.visible = not self.visible
+        if not self.visible:
+            # The run fills these only while the overlay is shown (RND-010.5),
+            # so hidden they would go stale: shown again under the pause menu,
+            # before the run updates, they would read as now. Dropped instead,
+            # the overlay shows what it knows until the next update refills them.
+            self._metrics.clear()
 
     def set_metric(self, key: str, value) -> None:
         self._metrics[key] = str(value)

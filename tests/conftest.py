@@ -161,6 +161,8 @@ INTEGRATION = (
     "tests/devtools/test_sprite_caches.py::RequestTests",
     "tests/devtools/test_rnd_010_3_data.py::DerivedTests",
     "tests/devtools/test_rnd_010_4_data.py::DerivedTests",
+    # RND-010.5: a booted run.
+    "tests/playing/test_debug_lines.py::DebugLinesTests",
     "tests/devtools/test_sprite_caches.py::MainTests",
     # SYS-011: the timer eval's command line reads as far as the Game it
     # builds on Windows; its judgment tests stay unit.
