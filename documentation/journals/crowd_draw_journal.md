@@ -9,7 +9,8 @@ session's worktree, as the owner chose under CLAUDE.md §1.5),
 then claude/rnd-010-5-debug-lines (from `main`, 2026-10-07; RND-010.5; in
 the same worktree, a task inside the ongoing requirement), then
 claude/rnd-010-6-under-layer (from `main`, 2026-10-07; RND-010.6; the
-same worktree)
+same worktree), then claude/rnd-010-7-shade-skip (from `main`,
+2026-10-08; RND-010.7; the same worktree)
 
 ---
 
@@ -1532,6 +1533,47 @@ the same way, and the `enemies` row is the draw's largest. If their art is
 binary too, the same encoding may apply; it would need its own split,
 since washed, tinted and shaded copies are made from those frames.
 
+## RND-010.7: The shade walk's skip (plan, 2026-10-08)
+
+The owner asked to continue with the next plan step after #75 merged
+(2026-10-08). This is the fourth row of RND-010.3's sequence: plan 4.4's
+first half, "skip the shade walk when the body's cell block holds no
+shadow". The second half (the shaded scratch kept in a per-frame arena,
+the shaded ghost cached) is not part of it: RND-010.3 measured the ghost
+copy at 0.01 ms in the packed scene.
+
+What the code does today (`world/terrain/render.py:365`,
+`shade_character_frame`, called for every character drawn from
+`rendering._blit_character`):
+- it builds the frame's screen rect, its world footprint and a `seen`
+  set, then walks every 256 px index cell the footprint touches, and for
+  each shadow in those cells tests the depth order and the overlap;
+- for a body under no tree, every cell it touches is empty in the index,
+  and the walk returns `frame` itself having done all of that for
+  nothing. Most bodies in the packed scene are such a body.
+- RND-010.3 timed the walk alone at 1.97 µs a call at 150 (0.27 ms a
+  frame) and 1.83 µs at 250 (0.41 ms), every body counted.
+
+The change: work out the cells first, from the frame's size and `dest`
+alone, and return `frame` when none of them is a key of the shadow index.
+Otherwise the walk runs as before. It is exact by construction: where it
+returns early, the walk would have found no shadow and returned the same
+object.
+
+Measured: the walk is CPU only for an unshaded body (no pixels), so it is
+timed headless, as RND-010.5's lines were:
+- `draw_leads`' `shade walk` piece (every drawn body, shaded or not) and
+  a new piece for the unshaded bodies alone, `main` against the branch,
+  ABBA, at 150 and 250;
+- the `enemies/shade` row of `spawn_stress --layers`, ABBA, at the same
+  counts, so the saving is seen inside a frame too.
+
+Tests: the walk returns the very object it did for every drawn body of a
+packed seed-35 scene and across a sweep of camera positions; a body under
+a shadow is still shaded, byte for byte; a body whose cells hold only
+shadows it must not take (sorted after it, or not overlapping) is
+unchanged; a mutation check.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1586,4 +1628,9 @@ since washed, tinted and shaded copies are made from those frames.
   - [x] RND-010.6.7: The results, every quoted figure pinned to `derived.py`; the plan's 4.5 marked done
   - [x] RND-010.6.11: The full suite's counts in the results
   - [x] RND-010.6.10: The cold review's findings: the destination and surface-alpha guards (`rle.fits`), the web marked unverified, the outcome quoted as the under-layer's rows with the whole draw inside the sitting's noise, the scope not measured (hazards) and 4.5 done in part, the copies' memory measured, D1 recorded, provenance by sitting, `aura_lookup_once` through the game's copies, every figure pinned
+- [ ] RND-010.7: The shade walk's skip (plan 4.4, its first half), exact, measured before and after
+  - [x] RND-010.7.1: This plan and the index
+  - [ ] RND-010.7.2: The skip in `shade_character_frame`, with its tests and a mutation check
+  - [ ] RND-010.7.3: `draw_leads` times the walk over the unshaded bodies alone, tested
+  - [ ] RND-010.7.4: `main` against the branch, ABBA, headless: the walk's pieces and the `enemies/shade` row; the results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
