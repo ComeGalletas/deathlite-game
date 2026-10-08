@@ -171,6 +171,7 @@ INTEGRATION = (
     # RND-010.6: the under-layer's leads probe on a packed seed-35 fight.
     "tests/devtools/test_under_leads.py::SceneTests",
     "tests/devtools/test_under_leads.py::MainTests",
+    "tests/devtools/test_rnd_010_6_data.py::DerivedTests",
     # SYS-011: the timer eval's command line reads as far as the Game it
     # builds on Windows; its judgment tests stay unit.
     "tests/devtools/test_timer_regime.py::CommandLineTests",

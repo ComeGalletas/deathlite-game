@@ -1,0 +1,2 @@
+python documentation/journals/data/rnd-010.6/rle_bytes.py 250 600
+250: 443 entries, 443 RLE copies, 23.6 MB as pixels (largest 116 kB); cap 1024 x largest = 118.4 MB

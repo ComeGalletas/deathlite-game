@@ -1,0 +1,2 @@
+python documentation/journals/data/rnd-010.6/aura_keys.py 250 600
+250: distinct aura frames 456; auras drawn a frame by block of 40: 206 203 191 191 190 165 149 151 148 143 139 132 127 124 119 116

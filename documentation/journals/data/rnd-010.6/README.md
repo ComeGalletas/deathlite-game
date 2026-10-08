@@ -19,7 +19,8 @@ processes with a window and the CPU load before each step.
 | `s2_aura_rle_<count>.txt` | Sitting 2 (`c24465b`): `aura_rle` with its cap raised, still emptied at every undo, so every "on" block started cold. Kept, not quoted |
 | `s3_variants_<count>.txt` | Sitting 3 (`21ed117`): `aura_rle`, `shape_cached` and `ring_cached`, their caches warm from block to block. The variants' figures quoted are these |
 | `s4_<kind>_<count>_<side>_<round>.txt` | Sitting 4: `main` (before) against this branch with the RLE blit built (after), ABBA, at 150, 200 and 250, fighting and quiet |
-| `sN_meta.txt`, `sittingN.sh` | Each sitting's log and the script that ran it, as run |
+| `sN_meta.txt`, `sittingN.sh` | Each sitting's log and the script that ran it, as run (sitting 4's also logs the GPU's use: the owner's agent team ran through it) |
+| `keys_<count>.txt`, `bytes_<count>.txt` | Headless counts by `counts.sh` (`aura_keys.py`, `rle_bytes.py`): the distinct aura frames a fight asks for, run as the variants run it (16 blocks of 40 frames), and what the RLE copies hold after one straight run of 640 |
 
 Sittings 1 to 3 ran from the repo root with
 `bash documentation/journals/data/rnd-010.6/sittingN.sh documentation/journals/data/rnd-010.6`.

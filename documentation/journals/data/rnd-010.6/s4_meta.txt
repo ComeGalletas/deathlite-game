@@ -1,0 +1,75 @@
+before 24009a2  after 6b8ca92  started 2026-10-08 11:31:04
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- processes with a window at the start, by name
+ApplicationFrameHost
+chrome
+claude
+Discord
+explorer
+NVIDIA Overlay
+TextInputHost
+WindowsTerminal
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb       5018,46875
+chrome         3521,078125
+cam_helper     1668,078125
+chrome         1059,890625
+audiodg         862,703125
+SystemSettings         731
+steam           666,234375
+chrome            532,4375
+
+
+
+=== fight 150 before a (24009a2)  cpu load 67%  gpu 19 %, 3372 MiB  11:31:09
+=== fight 150 after a (6b8ca92)  cpu load 48%  gpu 1 %, 3674 MiB  11:31:34
+=== fight 150 after b (6b8ca92)  cpu load 74%  gpu 19 %, 3123 MiB  11:31:57
+=== fight 150 before b (24009a2)  cpu load 31%  gpu 19 %, 3016 MiB  11:32:20
+=== fight 200 before a (24009a2)  cpu load 42%  gpu 20 %, 3117 MiB  11:32:45
+=== fight 200 after a (6b8ca92)  cpu load 41%  gpu 20 %, 3022 MiB  11:33:11
+=== fight 200 after b (6b8ca92)  cpu load 74%  gpu 20 %, 3021 MiB  11:33:37
+=== fight 200 before b (24009a2)  cpu load 50%  gpu 18 %, 3099 MiB  11:34:03
+=== fight 250 before a (24009a2)  cpu load 29%  gpu 19 %, 3099 MiB  11:34:29
+=== fight 250 after a (6b8ca92)  cpu load 69%  gpu 18 %, 3125 MiB  11:34:58
+=== fight 250 after b (6b8ca92)  cpu load 41%  gpu 0 %, 3028 MiB  11:35:27
+=== fight 250 before b (24009a2)  cpu load 71%  gpu 10 %, 3251 MiB  11:35:55
+=== quiet 150 before a (24009a2)  cpu load 51%  gpu 0 %, 3059 MiB  11:36:27
+=== quiet 150 after a (6b8ca92)  cpu load 54%  gpu 11 %, 3315 MiB  11:36:45
+=== quiet 150 after b (6b8ca92)  cpu load 42%  gpu 4 %, 3191 MiB  11:37:04
+=== quiet 150 before b (24009a2)  cpu load 37%  gpu 10 %, 3506 MiB  11:37:25
+=== quiet 200 before a (24009a2)  cpu load 55%  gpu 10 %, 3505 MiB  11:37:44
+=== quiet 200 after a (6b8ca92)  cpu load 55%  gpu 8 %, 3349 MiB  11:38:03
+=== quiet 200 after b (6b8ca92)  cpu load 52%  gpu 17 %, 3720 MiB  11:38:23
+=== quiet 200 before b (24009a2)  cpu load 36%  gpu 3 %, 3013 MiB  11:38:44
+=== quiet 250 before a (24009a2)  cpu load 20%  gpu 3 %, 3188 MiB  11:39:03
+=== quiet 250 after a (6b8ca92)  cpu load 34%  gpu 1 %, 2972 MiB  11:39:24
+=== quiet 250 after b (6b8ca92)  cpu load 6%  gpu 0 %, 2704 MiB  11:39:45
+=== quiet 250 before b (24009a2)  cpu load 45%  gpu 0 %, 2704 MiB  11:40:07
+finished 11:40:27  cpu load 31%  gpu 0 %, 2704 MiB
+--- processes with a window at the end, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+SystemSettings
+TextInputHost
+WindowsTerminal
+--- top processes by CPU time at the end
+
+Name                   CPU
+----                   ---
+SignalRgb         5198,875
+chrome         3621,578125
+cam_helper     1739,390625
+chrome                1069
+audiodg         869,609375
+SystemSettings  732,140625
+chrome          713,703125
+steam           667,296875
+
+
+

@@ -6,8 +6,10 @@ with the hero fighting, the draw by layer twice (`s1_layers_*`), the leads
 probe (`s1_leads_*`) and the four variants (`s1_variants_*`). Sittings 2
 and 3 timed the variants again after two faults in the variant tool were
 fixed (RND-010.6.8, .9); sitting 2's `aura_rle` was still cold in every
-block, so only sitting 3's variants are quoted. Sitting 4 (once run) is
-`main` against the branch with the RLE blit built, ABBA.
+block, so only sitting 3's variants are quoted. Sitting 4 is `main`
+against the branch with the RLE blit built, ABBA. `keys_*` and `bytes_*`
+(`counts.sh`, headless) count the aura frames a fight asks for and what
+the RLE copies hold.
 """
 import re
 from pathlib import Path
@@ -135,3 +137,21 @@ if (D / "s4_meta.txt").exists():
             under = {s: [sum(v[0] for k, v in run.items() if k == "flat/elemental" or k.startswith("elemental/"))
                          for run in lay[s]] for s in lay}
             print(f"    {'under-layer':9s} " + compare(under["before"], under["after"]))
+
+if (D / "s4_meta.txt").exists():
+    steps = re.findall(r"cpu load (\d+)%  gpu (\d+) %", text("s4_meta.txt"))
+    cpu, gpu = [int(c) for c, _g in steps], [int(g) for _c, g in steps]
+    print(f"sitting 4's load at its steps: cpu {min(cpu)} to {max(cpu)} %, gpu {min(gpu)} to {max(gpu)} %")
+    p99 = {kind: [headline(text(f"s4_{kind}_{n}_{s}_{r}.txt"))["draw p99"] for n in (150, 200, 250)
+                  for s in ("before", "after") for r in "ab"] for kind in ("fight", "quiet")}
+    print(f"sitting 4's draw p99s: fight {min(p99['fight']):.2f} to {max(p99['fight']):.2f} ms, "
+          f"quiet {min(p99['quiet']):.2f} to {max(p99['quiet']):.2f} ms")
+
+print("\n== the RLE cache: frames asked for, and what the copies hold (headless) ==")
+for n in COUNTS:
+    keys = re.search(r"distinct aura frames (\d+)", text(f"keys_{n}.txt")).group(1)
+    held = re.search(r"(\d+) entries, (\d+) RLE copies, ([\d.]+) MB as pixels \(largest (\d+) kB\); "
+                     r"cap (\d+) x largest = ([\d.]+) MB", text(f"bytes_{n}.txt"))
+    print(f"{n}: {keys} distinct aura frames over 640 fight frames; after the warm-up and those 640, "
+          f"{held.group(1)} copies, {held.group(3)} MB as pixels, largest {held.group(4)} kB, "
+          f"cap {held.group(5)} x largest = {held.group(6)} MB")
