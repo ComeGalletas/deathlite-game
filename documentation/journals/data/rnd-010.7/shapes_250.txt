@@ -1,0 +1,6 @@
+python documentation/journals/data/rnd-010.7/walk_shapes.py 250 600
+250: 224 unshaded bodies, 400 rounds
+    before     1.45 us a call, 0.324 ms a frame
+    any_skip   2.32 us a call, 0.521 ms a frame
+    one_cell   1.93 us a call, 0.433 ms a frame
+    bare       0.59 us a call, 0.133 ms a frame

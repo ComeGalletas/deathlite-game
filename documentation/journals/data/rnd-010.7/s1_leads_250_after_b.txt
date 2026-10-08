@@ -1,0 +1,26 @@
+C:\Users\juanp\.claude-worktrees\deathlite-game-1206442178\9ec11fc6\game\display\window.py:132: Warning: no fast renderer available
+  surf = pygame.display.set_mode(
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 1600x900 (dummy, vsync on)  render scale 1.000 zoom 1.500  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  draw leads: 226 alive, 226 drawn, 2 of them shaded, 2.0 world_to_screen calls an enemy; 400 rounds
+    one_enemy, whole           10.07 us a call  x  226.0  =   2.28 ms a frame
+    sprite blit                 4.48 us a call  x  226.0  =   1.01 ms a frame    44.5 % of the whole
+    shade walk                  2.07 us a call  x  226.0  =   0.47 ms a frame    20.5 % of the whole
+    rig_frame                   1.42 us a call  x  226.0  =   0.32 ms a frame    14.1 % of the whole
+    ghost record                0.34 us a call  x  226.0  =   0.08 ms a frame     3.3 % of the whole
+    anchor_for                  0.32 us a call  x  226.0  =   0.07 ms a frame     3.2 % of the whole
+    world_to_screen             0.12 us a call  x  452.0  =   0.06 ms a frame     2.5 % of the whole
+    marks                       0.12 us a call  x  226.0  =   0.03 ms a frame     1.2 % of the whole
+    aura_colour                 0.12 us a call  x  226.0  =   0.03 ms a frame     1.2 % of the whole
+    health bar                  0.12 us a call  x  226.0  =   0.03 ms a frame     1.2 % of the whole
+    sprite_drop                 0.08 us a call  x  226.0  =   0.02 ms a frame     0.8 % of the whole
+    spawn_veiled                0.06 us a call  x  226.0  =   0.01 ms a frame     0.6 % of the whole
+    ghost copy                  2.50 us a call  x    2.0  =   0.00 ms a frame     0.2 % of the whole
+    (the glue between them)                              =   0.15 ms a frame
+    scene: cull test            0.09 us a call  x  226.0  =   0.02 ms a frame
+    scene: terrace lookup       0.39 us a call  x  226.0  =   0.09 ms a frame
+    scene: lambda               0.07 us a call  x  226.0  =   0.02 ms a frame
+    scene: forwarder            0.14 us a call  x  226.0  =   0.03 ms a frame
+    subset: shade walk, unshaded    1.86 us a call  x  224.0  =   0.42 ms a frame
+  boss at the end: held back

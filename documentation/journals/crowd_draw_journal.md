@@ -987,7 +987,7 @@ built:**
 | RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled (done 2026-10-07) |
 | RND-010.5 | 4.1 | `report_debug` only with the overlay on (done 2026-10-07: 0.016 to 0.026 ms a frame, 3 to 13 % of the plan's estimate) |
 | RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants (done 2026-10-08: the aura's RLE blit, -1.66 ms on the under-layer at 250 in the fight; the caches not resolved, not built; the hazards left open) |
-| RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
+| RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) (closed 2026-10-08: built exact, measured slower than the walk, taken out; nothing worth building) |
 | RND-010.8 | 4.6 | bars (measure first), damage numbers, particles culled and without copies |
 | RND-010.9 | 4.2 | measure first: the collector, re-timed interleaved before it is built |
 | RND-010.10 to RND-010.15 | 4.7 to 4.12 | the update tasks, one each, in the plan's order |
@@ -1574,6 +1574,52 @@ a shadow is still shaded, byte for byte; a body whose cells hold only
 shadows it must not take (sorted after it, or not overlapping) is
 unchanged; a mutation check.
 
+## RND-010.7: Results (2026-10-08)
+
+**The skip was built, measured slower than the walk, and taken out.**
+Plan 4.4's first half has nothing worth building.
+
+The skip (RND-010.7.2, `0450ac9`) was exact: against a reference copy of
+the walk, every drawn body of the packed seed-35 scene and a sweep across
+the island got back the very object or the same bytes, and six mutants
+were caught. But headless, ABBA, `main` against the branch at 150 / 300
+and 250 / 600 packed (`data/rnd-010.7/`, `derived.py` prints every figure
+here, `tests/devtools/test_rnd_010_7_data.py` pins them), it was slower in
+every pairing:
+
+| | 150 | 250 |
+|---|---|---|
+| the walk (`draw_leads`), µs a call | 1.80 / 1.78 → 2.11 / 2.19, +0.36 (+0.31 to +0.41) | 1.67 / 1.69 → 2.16 / 2.07, +0.44 (+0.38 to +0.49) |
+| `enemies/shade` row, p50 ms | 0.36 / 0.37 → 0.44 / 0.44, +0.08 (+0.07 to +0.08) | 0.57 / 0.56 → 0.67 / 0.67, +0.11 (+0.10 to +0.11) |
+
+Why: for a body under no tree, the walk already is the skip. Its cells are
+empty in the index, so its loop is one lookup per cell and nothing more;
+the skip did those lookups once in its own loop and then the setup the
+walk needs anyway. In the packed scene 2 of 136 drawn bodies at 150 and
+2 of 226 at 250 are shaded.
+
+How much any skip could save at most (`walk_shapes.py`, one process
+each, over the unshaded bodies): the walk is 1.44 µs a call at 150 and
+1.45 at 250, against a floor of 0.61 and 0.59 that every shape pays (the
+call, the zoom, the camera and the cell arithmetic). The room above the
+floor is 0.11 ms a frame at 150 and 0.19 at 250. Neither shape tried gets
+into it: the skip as built is 2.30 and 2.32 µs, a one-cell fast path 1.91
+and 1.93. The rest of the walk's cost is the index call and the loop,
+which a skip cannot avoid without the walk's own work.
+
+The plan's second half (the shaded scratch kept in an arena, the shaded
+ghost cached) is not built either: RND-010.3 measured the ghost copy at
+0.01 ms, and 2 bodies in a frame are shaded.
+
+What stays: the walk is as `main` has it, with a comment saying the skip
+was tried; `tests/render/test_shade_skip.py` pins the walk against its
+reference copy for whatever reworks it next; `draw_leads` times the walk
+over the unshaded bodies alone (`subset: shade walk, unshaded`).
+
+Tests: the shade, ghost, depth-sort, cull, terrain and enemy-sprite render
+tests and `draw_leads`' own pass on the branch; the full suite's counts
+are below in RND-010.7.6.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1628,10 +1674,10 @@ unchanged; a mutation check.
   - [x] RND-010.6.7: The results, every quoted figure pinned to `derived.py`; the plan's 4.5 marked done
   - [x] RND-010.6.11: The full suite's counts in the results
   - [x] RND-010.6.10: The cold review's findings: the destination and surface-alpha guards (`rle.fits`), the web marked unverified, the outcome quoted as the under-layer's rows with the whole draw inside the sitting's noise, the scope not measured (hazards) and 4.5 done in part, the copies' memory measured, D1 recorded, provenance by sitting, `aura_lookup_once` through the game's copies, every figure pinned
-- [ ] RND-010.7: The shade walk's skip (plan 4.4, its first half), exact, measured before and after
+- [x] RND-010.7: The shade walk's skip (plan 4.4, its first half), exact, measured before and after: closed, nothing worth building
   - [x] RND-010.7.1: This plan and the index
   - [x] RND-010.7.2: The skip in `shade_character_frame`, with its tests and a mutation check
   - [x] RND-010.7.3: `draw_leads` times the walk over the unshaded bodies alone, tested
-  - [ ] RND-010.7.4: `main` against the branch, ABBA, headless: the walk's pieces and the `enemies/shade` row; the results
+  - [x] RND-010.7.4: `main` against the branch, ABBA, headless: the walk's pieces and the `enemies/shade` row; the results
   - [x] RND-010.7.5: The skip taken out, measured slower than the walk; the walk pinned against a reference copy for whatever reworks it next
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
