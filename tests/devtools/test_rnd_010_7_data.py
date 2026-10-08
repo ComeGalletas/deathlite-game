@@ -28,20 +28,39 @@ FIGURES = (
      "0.57 / 0.56 → 0.67 / 0.67, +0.11 (+0.10 to +0.11) |"),
     ("136 drawn, 2 of them shaded", "2 of 136 drawn bodies at 150 and 2 of 226 at 250 are shaded"),
     ("226 drawn, 2 of them shaded", "2 of 226 at 250 are shaded"),
-    (("150: 134 unshaded; before 1.44, any_skip 2.30, one_cell 1.91, bare 0.61; room above the floor 0.83 us, "
-     "0.11 ms a frame"),
-     "the walk is 1.44 µs a call at 150 and 1.45 at 250, against a floor of 0.61 and 0.59"),
-    (("250: 224 unshaded; before 1.45, any_skip 2.32, one_cell 1.93, bare 0.59; room above the floor 0.86 us, "
-     "0.19 ms a frame"),
-     "The room above the floor is 0.11 ms a frame at 150 and 0.19 at 250"),
-    ("any_skip 2.30", "the skip as built is 2.30 and 2.32 µs, a one-cell fast path 1.91 and 1.93"),
+    (("150: 134 unshaded of 136 drawn; 51 with every index cell empty, 83 touching an occupied one; "
+     "the 64 px grid returns early for 84"),
+     "of the 134 unshaded at 150, 51 touch only empty cells and 83 an occupied one"),
+    (("250: 224 unshaded of 226 drawn; 83 with every index cell empty, 141 touching an occupied one; "
+     "the 64 px grid returns early for 143"),
+     "of the 224 at 250, 83 and 141"),
+    ("the 64 px grid returns early for 84", "returns early for 84 of the 134 at 150 and 143 of the 224 at 250"),
+    ("before    1.42 / 1.41 us a call", "| the walk | 1.42 / 1.41 | 1.41 / 1.41 |"),
+    ("before    1.41 / 1.41 us a call", "| the walk | 1.42 / 1.41 | 1.41 / 1.41 |"),
+    ("any_skip  2.24 / 2.26 us a call", "| the skip as built | 2.24 / 2.26 | 2.25 / 2.26 |"),
+    ("any_skip  2.25 / 2.26 us a call", "| the skip as built | 2.24 / 2.26 | 2.25 / 2.26 |"),
+    ("one_cell  1.86 / 1.84 us a call", "| a one-cell fast path | 1.86 / 1.84 | 1.88 / 1.87 |"),
+    ("one_cell  1.88 / 1.87 us a call", "| a one-cell fast path | 1.86 / 1.84 | 1.88 / 1.87 |"),
+    ("fine      1.30 / 1.29 us a call", "| an exact skip on a 64 px occupancy grid | 1.30 / 1.29 | 1.29 / 1.29 |"),
+    ("fine      1.29 / 1.29 us a call", "| an exact skip on a 64 px occupancy grid | 1.30 / 1.29 | 1.29 / 1.29 |"),
+    ("bare      0.58 / 0.57 us a call", "| the call and the cell arithmetic alone | 0.58 / 0.57 | 0.56 / 0.57 |"),
+    ("bare      0.56 / 0.57 us a call", "| the call and the cell arithmetic alone | 0.58 / 0.57 | 0.56 / 0.57 |"),
+    ("room above the floor 0.113 / 0.112 ms a frame; the fine skip saves 0.016 / 0.014 ms a frame",
+     "Above it lies 0.113 / 0.112 ms a frame at 150 and 0.190 / 0.186 at 250"),
+    ("room above the floor 0.190 / 0.186 ms a frame; the fine skip saves 0.028 / 0.027 ms a frame",
+     "It saves 0.016 / 0.014 ms a frame at 150 and 0.028 / 0.027 at 250"),
+    ("the unshaded alone, after: 1.81 / 1.84 us a call",
+     "The same skip reads 1.81 / 1.84 µs in sitting 1's `draw_leads` subset at 150, against 2.24 / 2.26 here"),
+    ("the fine skip saves 0.016 / 0.014", "It saves 0.014 to 0.028 ms a frame, inside what a sitting resolves"),
 )
 PLAN_FIGURES = (
     ("change +0.36 (+0.31 to +0.41)", "+0.36 / +0.44 µs a call, `enemies/shade` +0.08 / +0.11 ms at 150 / 250"),
-    ("room above the floor 0.83 us, 0.11 ms a frame", "the most any skip could save is 0.11 / 0.19 ms"),
+    ("83 with every index cell empty, 141 touching an occupied one",
+     "83 of 134 and 141 of 224 unshaded bodies still touch an occupied cell"),
+    ("the fine skip saves 0.028 / 0.027", "saves 0.014 to 0.028 ms a frame and is not built (RND-010.7.D1)"),
 )
 FILES = {"README.md", "derived.py", "sitting1.sh", "s1_meta.txt", "shapes.sh", "walk_shapes.py",
-         "shapes_150.txt", "shapes_250.txt"} | {
+         "shapes_150_a.txt", "shapes_150_b.txt", "shapes_250_a.txt", "shapes_250_b.txt"} | {
     f"s1_{tool}_{n}_{side}_{r}.txt" for tool in ("leads", "layers") for n in (150, 250)
     for side in ("before", "after") for r in "ab"}
 

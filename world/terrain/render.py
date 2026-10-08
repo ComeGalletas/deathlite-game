@@ -381,9 +381,10 @@ class TerrainRenderer:
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         # The frame's footprint in world space, then the index cells it spans.
-        # For a body under no tree this is already the cheap path: one lookup
-        # per cell, each empty. A skip ahead of it was built and measured
-        # slower (RND-010.7, `crowd_draw_journal.md`).
+        # A skip ahead of this loop was built and measured slower: the cells
+        # are coarse, so most bodies under no tree still touch one holding a
+        # shade, and the best exact skip (a finer grid) saved 0.03 ms a frame
+        # at most (RND-010.7, `crowd_draw_journal.md`).
         c = self._SHADE_CELL
         wx0, wy0 = ox + frame_rect.left / z, oy + frame_rect.top / z
         wx1, wy1 = ox + frame_rect.right / z, oy + frame_rect.bottom / z

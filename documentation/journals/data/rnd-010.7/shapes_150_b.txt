@@ -1,0 +1,8 @@
+python documentation/journals/data/rnd-010.7/walk_shapes.py 150 300
+commit 512b983  cpu load 15%  2026-10-08 13:42:05
+150: 134 unshaded bodies of 136 drawn: 51 with every index cell empty, 83 touching an occupied one; the 64 px grid returns early for 84; 400 rounds
+    before     1.41 us a call, 0.188 ms a frame
+    any_skip   2.26 us a call, 0.303 ms a frame
+    one_cell   1.84 us a call, 0.247 ms a frame
+    fine       1.29 us a call, 0.174 ms a frame
+    bare       0.57 us a call, 0.076 ms a frame
