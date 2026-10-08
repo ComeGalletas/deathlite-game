@@ -48,7 +48,9 @@ tornadoes:
 * `ring_cached`: the tornado's ring (`transient._ring`) the same, per
   `(radius, colour, alpha, width)`;
 * `aura_rle`: each aura frame blitted from an RLE-accelerated copy that
-  keeps its per-pixel alpha, so SDL skips its transparent runs;
+  keeps its per-pixel alpha, so SDL skips its transparent runs.
+  RND-010.6.6 built it into the game (`elements.rle`), so against the
+  game since then it adds a second RLE copy over the game's;
 * `aura_lookup_once`: `draw_auras` looking each element's frame up once a
   pass per size, not once per body.
 
@@ -267,12 +269,10 @@ def _ring_cached(ps):
 
 
 def binary_alpha(frame) -> bool:
-    """Is every pixel of `frame` either clear (alpha 0) or opaque (255)?
-    The pixels over alpha 0 counted against those over 254, by
-    `pygame.mask` (no numpy in the game)."""
-    import pygame
-    return (pygame.mask.from_surface(frame, 0).count()
-            == pygame.mask.from_surface(frame, 254).count())
+    """Is every pixel of `frame` either clear or opaque? The game's own
+    check (`elements.rle.binary_alpha`, RND-010.6.6), one definition."""
+    from game.states.playing.visual.elements.rle import binary_alpha as game_check
+    return game_check(frame)
 
 
 def _aura_rle(ps):
