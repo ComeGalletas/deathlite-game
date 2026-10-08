@@ -1,0 +1,51 @@
+C:\Users\juanp\.claude-worktrees\deathlite-game-1206442178\9ec11fc6\game\display\window.py:132: Warning: no fast renderer available
+  surf = pygame.display.set_mode(
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 1600x900 (dummy, vsync on)  render scale 1.000 zoom 1.500  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+seed 35 lod 2  frames 600: p50 8.05  p90 8.80  p99 11.81  max 14.89 ms  |  live 175 dormant 414 recycled 0
+  crowd     136 at the start of timing, 175 at the end  |  arrived: summon 39
+  boss at the end of timing: held back
+  (the update line above: every frame; the lines below: the 300 frames drawn without the timers)
+  draw   p50 5.36  p90 5.81  p99 12.57  max 58.56 ms  |  in view p50 149 max 159
+  update + draw   p50 13.35  p90 14.40  p99 21.21  max 61.94 ms  |  over 16.67 ms: 8 / 300
+  draw by layer, exclusive ms over 300 timed frames (p50 / p90 / mean, share of the mean draw, calls a frame):
+    enemies                  1.62 /   1.76 /   1.73    27.9 %     160.0
+    ground                   1.34 /   1.42 /   1.34    21.6 %       3.0
+    scenery                  0.52 /   0.54 /   0.52     8.4 %      56.7
+    water                    0.48 /   0.59 /   0.51     8.2 %       1.0
+    ghost                    0.43 /   0.60 /   0.46     7.3 %       1.0
+    world                    0.37 /   0.41 /   0.43     7.0 %       1.0
+    enemies/shade            0.37 /   0.48 /   0.38     6.2 %     158.9
+    flat                     0.19 /   0.32 /   0.22     3.6 %       3.0
+    scenery_list             0.16 /   0.18 /   0.16     2.6 %       1.0
+    elemental_sort           0.09 /   0.09 /   0.09     1.4 %       1.0
+    hud                      0.06 /   0.06 /   0.06     0.9 %       1.0
+    elemental/statuses       0.05 /   0.06 /   0.05     0.9 %       3.0
+    projectiles              0.03 /   0.07 /   0.03     0.6 %       1.0
+    enemies/marks            0.03 /   0.04 /   0.03     0.5 %     158.9
+    enemies/hpbar            0.03 /   0.04 /   0.03     0.5 %     158.9
+    spawn_fx                 0.00 /   0.10 /   0.02     0.3 %       2.3
+    flat/elemental           0.02 /   0.02 /   0.02     0.3 %       3.0
+    elemental/auras          0.02 /   0.02 /   0.02     0.3 %       3.0
+    draw                     0.02 /   0.02 /   0.02     0.3 %       1.0
+    particles                0.00 /   0.06 /   0.01     0.2 %       1.0
+    player                   0.01 /   0.01 /   0.01     0.2 %       1.0
+    key_marker               0.01 /   0.01 /   0.01     0.2 %       1.0
+    huts_list                0.01 /   0.01 /   0.01     0.1 %       1.0
+    flat/player_shots        0.01 /   0.01 /   0.01     0.1 %       3.0
+    villagers_list           0.00 /   0.00 /   0.00     0.1 %       1.0
+    feedback                 0.00 /   0.00 /   0.00     0.1 %       1.0
+    elemental/particles      0.00 /   0.00 /   0.00     0.0 %       3.0
+    player/shade             0.00 /   0.00 /   0.00     0.0 %       1.0
+    reactions                0.00 /   0.00 /   0.00     0.0 %       1.0
+    numbers                  0.00 /   0.00 /   0.00     0.0 %       1.0
+    elemental/transient      0.00 /   0.00 /   0.00     0.0 %       3.0
+    elemental/areas          0.00 /   0.00 /   0.00     0.0 %       3.0
+    hints                    0.00 /   0.00 /   0.00     0.0 %       1.0
+    reactions/transient      0.00 /   0.00 /   0.00     0.0 %       1.0
+    (all layers)             6.03 /   6.61 /   6.20
+    (terrain)                2.51 /   2.65 /   2.53   each frame's sum
+    (crowd)                  2.81 /   3.27 /   3.00   each frame's sum
+    (crowd / terrain)       1.108 /  1.278            each frame's ratio
+  the 300 frames between, drawn without the timers: draw p50 5.36 ms; the timers add +0.67 ms at p50, 741.6 timed calls a frame, 0.91 us a call in place

@@ -65,6 +65,16 @@ class ArithmeticTests(unittest.TestCase):
         self.assertEqual(lines[5], "    (the glue between them)                              =   0.43 ms a frame")
         self.assertEqual(lines[6], "    scene: cull test            0.50 us a call  x  120.0  =   0.06 ms a frame")
 
+    def test_the_unshaded_subset_is_counted_apart_and_left_out_of_the_glue(self):
+        # RND-010.7: the shade walk over the unshaded bodies alone, 100 - 10.
+        result = {**self.RESULT,
+                  "samples": {**self.RESULT["samples"], "subset: walk, unshaded": [2.0, 1.0, 1.5]},
+                  "per": {**self.RESULT["per"], "subset: walk, unshaded": "unshaded"}}
+        self.assertEqual(DL.per_frame(result)["subset: walk, unshaded"], (1.5, 90, 0.135))
+        lines = DL.report(result).splitlines()
+        self.assertEqual(lines[5], "    (the glue between them)                              =   0.43 ms a frame")
+        self.assertEqual(lines[7], "    subset: walk, unshaded      1.50 us a call  x   90.0  =   0.14 ms a frame")
+
     def test_the_command_line(self):
         a = DL.parse(["--live", "150", "--elapsed", "300"])
         self.assertEqual((a.seed, a.dormant, a.rounds), (SEED, 400, 200))
@@ -153,10 +163,30 @@ class SceneTests(unittest.TestCase):
         result = DL.measure(self.ps, rounds=2)
         self.assertEqual(result["enemies"], len(DL.drawn_enemies(self.ps)))
         self.assertEqual(result["live"], len(self.ps.run.enemies))
+        unshaded = result["enemies"] - result["shaded"]
         for name, vals in result["samples"].items():
             per = result["per"][name]
+            empty = (per == "shaded" and not result["shaded"]) or (per == "unshaded" and not unshaded)
             with self.subTest(piece=name):
-                self.assertEqual(len(vals), 0 if per == "shaded" and not result["shaded"] else 2)
+                self.assertEqual(len(vals), 0 if empty else 2)
+
+    def test_the_unshaded_are_the_drawn_less_the_shaded(self):
+        # The subset's list, as `measure` builds it, by the walk's own answer.
+        drawn = DL.drawn_enemies(self.ps)
+        seen = []
+        real = DL.pieces
+
+        def pieces(ps, surface):
+            table = real(ps, surface)
+            _fn, per = table["subset: walk, unshaded"]
+            table["subset: walk, unshaded"] = (lambda e: seen.append(e), per)
+            return table
+
+        with mock.patch.object(DL, "pieces", pieces):
+            result = DL.measure(self.ps, rounds=1)
+        shaded = [e for e in drawn if DL._shaded(self.ps, e)]
+        self.assertEqual(seen, [e for e in drawn if e not in shaded])
+        self.assertEqual(len(seen), result["enemies"] - result["shaded"])
 
 
 class MainTests(unittest.TestCase):

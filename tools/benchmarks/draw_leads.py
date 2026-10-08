@@ -23,6 +23,9 @@ The pieces, in the order the draw runs them:
   copy a shaded sprite pays for the ghost queue, and the queue's record
   itself (`record_character`; all `_blit_character`);
 * the marks (`status_marks.draw`) and the health bar (`health_bars.draw`);
+* a subset, not a piece of its own (RND-010.7): the shade walk again over
+  the drawn enemies no shade falls on, the bodies its skip is for; listed
+  after the scene's rows and left out of the glue;
 
 and outside `one_enemy`, the scene's per-enemy work that the layer tool
 puts in `world`: the cull test (over every live enemy, not only the drawn
@@ -135,6 +138,7 @@ def pieces(ps, surface) -> dict:
         "anchor_for": (lambda e: ren.anchor_for(e.anim.rig, args[id(e)][1]), "enemy"),
         "sprite_drop": (lambda e: ren.sprite_drop(e.radius), "enemy"),
         "shade walk": (shade, "enemy"),
+        "subset: walk, unshaded": (shade, "unshaded"),
         "sprite blit": (blit, "enemy"),
         "ghost copy": (copy, "shaded"),
         "ghost record": (record, "enemy"),
@@ -181,6 +185,7 @@ def measure(ps, rounds: int) -> dict:
     enemies = drawn_enemies(ps)
     table = pieces(ps, surface)
     shaded = [e for e in enemies if _shaded(ps, e)]
+    unshaded = [e for e in enemies if e not in shaded]
     live = list(ps.run.enemies)
     names = list(table)
     samples = {n: [] for n in names}
@@ -189,7 +194,7 @@ def measure(ps, rounds: int) -> dict:
         order = names[r % len(names):] + names[:r % len(names)]
         for name in order:
             fn, per = table[name]
-            over = shaded if per == "shaded" else live if per == "live" else enemies
+            over = {"shaded": shaded, "live": live, "unshaded": unshaded}.get(per, enemies)
             if not over:
                 continue
             terrain.begin_frame()                # the ghost queue, as each frame starts it
@@ -221,6 +226,7 @@ def per_frame(result: dict) -> dict:
         us = percentile(sorted(vals), 0.5)
         per = result["per"][name]
         calls = {"shaded": result["shaded"], "live": result["live"],
+                 "unshaded": result["enemies"] - result["shaded"],
                  "call": result["enemies"] * result["w2s"]}.get(per, result["enemies"])
         out[name] = (us, calls, us * calls / 1000.0)
     return out
@@ -233,8 +239,10 @@ def report(result: dict) -> str:
              f"{result['shaded']} of them shaded, "
              f"{result['w2s']:.1f} world_to_screen calls an enemy; "
              f"{max(len(v) for v in result['samples'].values())} rounds")]
-    parts = [(n, v) for n, v in rows.items() if n != "one_enemy, whole" and not n.startswith("scene:")]
+    parts = [(n, v) for n, v in rows.items()
+             if n != "one_enemy, whole" and not n.startswith(("scene:", "subset:"))]
     scene = [(n, v) for n, v in rows.items() if n.startswith("scene:")]
+    subset = [(n, v) for n, v in rows.items() if n.startswith("subset:")]
     if whole:
         lines.append(f"    {'one_enemy, whole':24s} {whole[0]:7.2f} us a call  x {whole[1]:6.1f}  "
                      f"= {whole[2]:6.2f} ms a frame")
@@ -244,7 +252,7 @@ def report(result: dict) -> str:
     if whole:
         rest = whole[2] - sum(ms for _n, (_u, _c, ms) in parts)
         lines.append(f"    {'(the glue between them)':24s} {'':27s} = {rest:6.2f} ms a frame")
-    for name, (us, calls, ms) in scene:
+    for name, (us, calls, ms) in scene + subset:
         lines.append(f"    {name:24s} {us:7.2f} us a call  x {calls:6.1f}  = {ms:6.2f} ms a frame")
     return "\n".join(lines)
 

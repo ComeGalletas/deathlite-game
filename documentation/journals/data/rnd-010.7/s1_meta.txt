@@ -1,0 +1,18 @@
+before 6069c3a  after 6e0bd09  started 2026-10-08 13:25:57  headless
+=== leads 150 before a (6069c3a)  cpu load 36%  13:25:59
+=== leads 150 after a (6e0bd09)  cpu load 19%  13:26:06
+=== leads 150 after b (6e0bd09)  cpu load 4%  13:26:13
+=== leads 150 before b (6069c3a)  cpu load 16%  13:26:20
+=== leads 250 before a (6069c3a)  cpu load 23%  13:26:27
+=== leads 250 after a (6e0bd09)  cpu load 17%  13:26:35
+=== leads 250 after b (6e0bd09)  cpu load 27%  13:26:43
+=== leads 250 before b (6069c3a)  cpu load 19%  13:26:51
+=== layers 150 before a (6069c3a)  cpu load 26%  13:26:59
+=== layers 150 after a (6e0bd09)  cpu load 13%  13:27:13
+=== layers 150 after b (6e0bd09)  cpu load 71%  13:27:27
+=== layers 150 before b (6069c3a)  cpu load 27%  13:27:41
+=== layers 250 before a (6069c3a)  cpu load 14%  13:27:54
+=== layers 250 after a (6e0bd09)  cpu load 18%  13:28:12
+=== layers 250 after b (6e0bd09)  cpu load 9%  13:28:30
+=== layers 250 before b (6069c3a)  cpu load 16%  13:28:48
+finished 13:29:04  cpu load 18%
