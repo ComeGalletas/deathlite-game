@@ -1,0 +1,53 @@
+commit c24465b  started 2026-10-07 20:42:54
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- processes with a window at the start, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+--- top processes by CPU time at the start
+
+Name                CPU
+----                ---
+SignalRgb    13119,9375
+chrome     11278,265625
+audiodg       7010,0625
+cam_helper   5988,15625
+chrome       2354,09375
+Discord     1109,921875
+chrome       911,921875
+chrome       823,578125
+
+
+
+=== aura_rle 150  cpu load 22%  20:42:56
+=== aura_rle 250  cpu load 30%  20:43:28
+finished 20:44:17  cpu load 28%
+--- processes with a window at the end, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+--- top processes by CPU time at the end
+
+Name                CPU
+----                ---
+SignalRgb  13146,953125
+chrome      11322,40625
+audiodg     7014,546875
+cam_helper  5998,515625
+chrome      2362,140625
+Discord     1110,921875
+chrome         912,9375
+chrome        836,28125
+
+
+

@@ -1,0 +1,20 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  shape_cached: draw p50 off 14.33 ms, on 13.76 ms (640 frames each); per block, on minus off p50: p50 -0.36 ms, from -4.12 to +1.73
+    the median saving lies in -1.38 to +0.45 ms (97.9 % sign-test interval; negative is faster)
+    the draw's mean off 14.71 ms, on 14.02 ms; p90 off 16.72, on 15.87; p99 off 21.15, on 18.99
+    per block, on minus off mean: p50 -0.36 ms; the median lies in -1.31 to +0.33 ms (97.9 %)
+  ring_cached: draw p50 off 13.92 ms, on 14.01 ms (640 frames each); per block, on minus off p50: p50 -0.06 ms, from -1.50 to +1.28
+    the median saving lies in -0.48 to +0.91 ms (97.9 % sign-test interval; negative is faster)
+    the draw's mean off 14.25 ms, on 14.26 ms; p90 off 16.26, on 16.15; p99 off 19.70, on 19.02
+    per block, on minus off mean: p50 -0.09 ms; the median lies in -0.60 to +0.60 ms (97.9 %)
+  aura_rle: draw p50 off 13.82 ms, on 14.12 ms (640 frames each); per block, on minus off p50: p50 +0.32 ms, from -1.29 to +1.57
+    the median saving lies in -0.10 to +1.02 ms (97.9 % sign-test interval; negative is faster)
+    the draw's mean off 13.95 ms, on 14.27 ms; p90 off 15.63, on 16.30; p99 off 17.34, on 18.79
+    per block, on minus off mean: p50 +0.33 ms; the median lies in -0.01 to +0.93 ms (97.9 %)
+  aura_lookup_once: draw p50 off 13.72 ms, on 13.55 ms (640 frames each); per block, on minus off p50: p50 -0.09 ms, from -1.79 to +0.96
+    the median saving lies in -0.89 to +0.48 ms (97.9 % sign-test interval; negative is faster)
+    the draw's mean off 13.88 ms, on 13.74 ms; p90 off 15.50, on 15.27; p99 off 17.38, on 17.75
+    per block, on minus off mean: p50 -0.21 ms; the median lies in -0.54 to +0.37 ms (97.9 %)
+  boss at the end: held back
