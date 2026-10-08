@@ -187,12 +187,17 @@ def _wash_lru(ps):
 # Each cache is this module's, bounded, and cleared by its undo so the side
 # without the variant pays nothing for it.
 UNDER_CAP = 256
+# `aura_rle`'s own cap. A packed fight asks for 342 distinct aura frames at
+# 150 and 456 at 250 (four elements, their animation frames, a size per body
+# radius); at 256 the variant emptied itself over and over in sitting 1 and
+# timed its own re-encoding, not the RLE blit.
+RLE_CAP = 2048
 
 
-def _bounded(cache: dict, key, make):
+def _bounded(cache: dict, key, make, cap: int = UNDER_CAP):
     hit = cache.get(key)
     if hit is None:
-        if len(cache) >= UNDER_CAP:
+        if len(cache) >= cap:
             cache.clear()
         hit = cache[key] = make()
     return hit
@@ -299,7 +304,7 @@ def _aura_rle(ps):
             out.set_alpha(255, pygame.RLEACCEL)
             return (frame, out)
 
-        hit = _bounded(copies, id(frame), make)
+        hit = _bounded(copies, id(frame), make, RLE_CAP)
         return hit[1] if hit[0] is frame else frame
 
     ElementVisualProfile.aura_frame = aura_frame

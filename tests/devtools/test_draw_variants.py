@@ -267,6 +267,13 @@ class UnderVariantTests(unittest.TestCase):
         for i in range(DV.UNDER_CAP + 1):
             DV._bounded(cache, i, lambda: 0)
         self.assertEqual(len(cache), 1)                 # emptied whole when full, then the new one
+        # aura_rle's own cap holds a fight's aura frames (456 at 250 in
+        # sitting 1's count), where 256 emptied itself over and over.
+        self.assertGreater(DV.RLE_CAP, 456)
+        cache = {}
+        for i in range(DV.RLE_CAP):
+            DV._bounded(cache, i, lambda: 0, DV.RLE_CAP)
+        self.assertEqual(len(cache), DV.RLE_CAP)
 
     @staticmethod
     def _frame(alphas):

@@ -1386,6 +1386,7 @@ The plan:
   - [x] RND-010.6.3: The under-layer's leads probe, tested
   - [x] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element, and, found on the way, the aura blit RLE-encoded for binary-alpha frames), tested
   - [ ] RND-010.6.5: The sitting: the split, the leads and the variants at 150 and 250 packed in the fight, raw outputs kept
+  - [x] RND-010.6.8: `aura_rle`'s cache made to hold the fight's aura frames (342 at 150, 456 at 250, against its 256), so sitting 2 times the RLE blit and not the variant's re-encoding
   - [ ] RND-010.6.6: What the sitting resolves, built pixel-identical, measured before and after
   - [ ] RND-010.6.7: The results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
