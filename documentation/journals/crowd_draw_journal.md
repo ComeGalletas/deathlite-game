@@ -7,7 +7,9 @@ then ComeGalletas/rnd-010-3-leads-9ec11fc6 (from `main`, 2026-10-04; RND-010.3),
 then claude/rnd-010-4-wash-lru (from `main`, 2026-10-06; RND-010.4; in the
 session's worktree, as the owner chose under CLAUDE.md §1.5),
 then claude/rnd-010-5-debug-lines (from `main`, 2026-10-07; RND-010.5; in
-the same worktree, a task inside the ongoing requirement)
+the same worktree, a task inside the ongoing requirement), then
+claude/rnd-010-6-under-layer (from `main`, 2026-10-07; RND-010.6; the
+same worktree)
 
 ---
 
@@ -983,7 +985,7 @@ built:**
 |---|---|---|
 | RND-010.4 | 4.13 | the wash cache as an LRU, once D2 is settled (done 2026-10-07) |
 | RND-010.5 | 4.1 | `report_debug` only with the overlay on (done 2026-10-07: 0.016 to 0.026 ms a frame, 3 to 13 % of the plan's estimate) |
-| RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants |
+| RND-010.6 | 4.5 | measure first: the elemental under-layer, `draw_under` split, then variants (done 2026-10-08: the aura's RLE blit, -1.66 ms on the under-layer at 250 in the fight; the caches not resolved, not built; the hazards left open) |
 | RND-010.7 | 4.4 | the shade walk's skip (its first half; the ghost copy is 0.01 ms here) |
 | RND-010.8 | 4.6 | bars (measure first), damage numbers, particles culled and without copies |
 | RND-010.9 | 4.2 | measure first: the collector, re-timed interleaved before it is built |
@@ -1252,6 +1254,284 @@ first two in the integration tier), and one in
 matches its pin. No eval applies: the saving is measured directly by the
 probe, and nothing here is a rate.
 
+## RND-010.6: The elemental under-layer, split and measured first (plan, 2026-10-07)
+
+The owner asked for RND-010.6 on 2026-10-07, after #73 merged. This is
+the third row of RND-010.3's sequence and the plan's 4.5 ("No SRCALPHA
+allocation per frame", expected 0.5 to 1.5 ms in an elemental fight).
+RND-010.3 put the under-layer as the largest layer the fight adds:
+`flat/elemental` +1.36 / +2.71 ms at 150 / 250 in sitting 5. The order
+says split `draw_under` first, then time the candidates as variants, and
+build only what a sitting resolves.
+
+What `draw_under` does (`visual/elements/__init__.py:125`), once per
+terrace band:
+- **motes:** the aura shed's particles, already the row
+  `elemental/particles`;
+- **areas** (`transient.draw_areas`): each live Wind tornado, a ring at
+  its true radius (`_ring`: a new SRCALPHA surface the ring's size, a
+  circle, a blit) and three arcs turning inside it (`_arc_ring`: the
+  same, at the spin's angle);
+- **auras** (`layers.draw_auras`): every primed body's aura. All four
+  elements have an authored rig (`data/weapons/element_visuals.json`),
+  so in the game an aura is a blit of a frame `game/assets.py` already
+  caches per size; the ring and the marker, with their SRCALPHA surfaces,
+  only draw where the art is missing;
+- **statuses** (`layers.draw_statuses`): burn, the authored flame
+  (scaled copies cached in `_SCALED`); chill, the slow chevron (`_shape`:
+  a new SRCALPHA surface, two polygons, a blit, per body); freeze, the
+  authored ice block;
+- **transient** (`transient.draw_transient`, `over=False`): the jump arcs
+  and the effects under the bodies.
+
+A first look, headless (the dummy driver, not the cost on screen), at
+150 packed in the fight, one run: `elemental/auras` 0.99 ms p50,
+`elemental/statuses` 0.44, `elemental/areas` 0.41 (p90 0.91),
+`elemental/particles` 0.14, `elemental/transient` 0.00. (This run and
+the headless probe figures below were working looks, not kept; the
+results quote the sittings' kept outputs instead.) If the screen
+agrees, plan 4.5's SRCALPHA caches reach the statuses and the areas, and
+the largest part, the auras, is blits of cached frames, which no cache
+removes.
+
+The plan:
+- **The split** (RND-010.6.2): `draw_layers` times `draw_under`'s four
+  passes as their own rows, `elemental/areas`, `/auras`, `/statuses`,
+  `/transient` (and `reactions/transient` for the bursts over the
+  bodies). Parts still add up to the whole.
+- **The leads probe** (RND-010.6.3): as `draw_leads` does for an enemy,
+  each piece of the three passes timed alone over the frame's own bodies
+  and areas, so the rows split into lookups and pixels: per aura the
+  state, `world_to_screen`, the size, the frame lookup and the blit; per
+  status mark the slow chevron's surface, polygons and blit against the
+  cached flame's blit; per area the ring's and the arcs' surface, drawing
+  and blit.
+- **The candidates, as throwaway exact variants** (RND-010.6.4), timed
+  against the draw as `draw_variants` does:
+  - `_shape` cached per `(shape, size, colour)`: its layer does not depend
+    on where it is drawn (the polygon's local points are `(x - 0.5) *
+    size` plus half the box), so a kept copy is the same picture;
+  - `_ring` (and `_disc`) cached per `(radius, colour, alpha, width)`: a
+    tornado's ring only changes while it fades or the zoom changes;
+  - the aura's frame looked up once per element and size in a pass,
+    rather than once per body: the animator's index is shared by every
+    body of an element, so the frame is too.
+  `_arc_ring` turns every frame, so a cache keyed on its angle would
+  miss every frame; it is timed but not varied.
+- **Found while building the probes: the aura blit RLE-encoded**
+  (`aura_rle`). The leads probe, headless, put the aura's blit at 79 % of
+  the auras' pass, the lookups at about 15 %. A copy of each aura frame
+  with `set_alpha(255, RLEACCEL)` keeps its per-pixel alpha and lets SDL
+  skip the frame's transparent runs: headless, about 1.1 against 7.7 µs a
+  blit. It is exact only for a frame whose alpha is all 0 or 255. SDL's
+  RLE path blends a translucent pixel by its own formula, a channel off
+  by one against the plain blit (pinned in `test_draw_variants` and
+  `test_aura_rle`). Every
+  shipped aura frame is binary at every size (pinned too), and a frame
+  that is not keeps the plain blit, checked once per frame with
+  `pygame.mask` (no numpy in the game). The same may hold for other
+  sprites, the enemies' own above all; that is a lead for after this
+  task, not part of it.
+- **One sitting on screen** (RND-010.6.5), at 150 and 250 packed in the
+  fight: the split by layer, the leads and the variants. The owner asks
+  to be asked first.
+- **Build what the sitting resolves** (RND-010.6.6), each with a
+  pixel-identity test on the fight's whole frame and a mutation check,
+  then measured before and after in one ABBA sitting; then the results.
+- **Measured outcome:** the fight's `flat/elemental` total (the sum of
+  its rows now) at 150 and 250, before and after. A part the sitting
+  cannot resolve is recorded as such and not built.
+
+## RND-010.6: Results (2026-10-08)
+
+Four sittings on the owner's machine, on screen with the owner's save
+(2560x1080 windowed), seed 35, packed with the hero fighting. The raw
+outputs, the scripts and `derived.py`, which prints every figure below,
+are in `data/rnd-010.6/`; `tests/devtools/test_rnd_010_6_data.py` pins
+each quoted figure to it.
+
+**The split (sitting 1, 2026-10-07, two rounds, p50 ms):**
+
+| Row | 150 | 250 |
+|---|---|---|
+| `elemental/auras` | 0.82 / 0.79 | 2.35 / 2.33 |
+| `elemental/areas` | 0.45 / 0.40 | 0.47 / 0.46 |
+| `elemental/statuses` | 0.36 / 0.31 | 0.31 / 0.31 |
+| `elemental/particles` | 0.10 / 0.09 | 0.28 / 0.27 |
+| `elemental/transient` | 0.00 / 0.00 | 0.00 / 0.00 |
+| the under-layer, summed | 1.76 / 1.62 | 3.44 / 3.41 |
+
+At 250 the auras are two thirds of the under-layer.
+
+**The leads (sitting 1, ms a frame, a mean over 10 fight frames 30
+apart):**
+- Auras, 51.6 drawn at 150 and 183.7 at 250 (reactions consume the
+  primes, so fewer than the bodies in view): the blit 0.640 and 2.077 ms,
+  its RLE copy 0.063 and 0.235 ms, a predicted saving of 0.577 and
+  1.842 ms. Every lookup together (state, `world_to_screen`, size, frame)
+  0.100 and 0.289 ms.
+- The chill chevron's surface and polygons, what `shape_cached` removes:
+  0.146 ms at 150, 0.032 at 250.
+- The tornado ring's surface and circle, what `ring_cached` removes:
+  0.104 and 0.153 ms.
+
+**The variants (the draw p50 per block, on minus off, with the 97.9 %
+sign-test interval; negative is faster):**
+
+| Variant, sitting | 150 | 250 |
+|---|---|---|
+| `aura_rle`, 3 | -0.42 (-1.19 to +0.20), not resolved; the mean -0.37 (-1.18 to -0.04), resolved | -1.14 (-1.71 to -0.26), resolved; the mean -0.95 (-1.79 to -0.46) |
+| `shape_cached`, 3 | -0.03 (-0.56 to +0.23), not resolved | +0.15 (-1.01 to +0.65), not resolved |
+| `ring_cached`, 3 | +0.03 (-0.37 to +0.24), not resolved | +0.10 (-1.12 to +0.36), not resolved |
+| `aura_lookup_once`, 1 | -0.09 (-0.89 to +0.48), not resolved | +0.04 (-0.26 to +0.38), not resolved |
+
+Two faults in the variant tool were found and fixed on the way, and the
+sittings they spoiled are kept but not quoted:
+- **Sitting 1:** the three caching variants shared a cap of 256 and
+  emptied themselves whole when full. A packed fight asks for 342
+  distinct aura frames at 150 and 456 at 250, so `aura_rle` timed its own
+  copying and re-encoding (RND-010.6.8).
+- **Sitting 2:** each variant's undo emptied its cache, and `timed` undoes
+  it after every 40-frame block, so every "on" block started cold
+  (RND-010.6.9). Sitting 3 kept the caches warm from block to block, as
+  `wash_lru` always did.
+
+So only `aura_rle` resolved, and only it was built (RND-010.6.6.1). The
+two caches plan 4.5 named remove 0.03 to 0.15 ms each in the leads, which
+no sitting here resolves; by the plan's rule they are recorded and not
+built. Neither is `aura_lookup_once`, whose lookups total 0.289 ms at 250.
+
+**The build: the auras blitted from RLE copies** (`visual/elements/rle.py`,
+called from `layers._aura`). Each aura frame's copy is marked
+`set_alpha(255, RLEACCEL)`: it keeps its per-pixel alpha, and SDL encodes
+its clear runs on the first blit and skips them after. Exact under two
+conditions, and where either fails the frame is blitted plain:
+- **the frame** has every pixel's alpha at 0 or 255 and no surface alpha
+  of its own (SDL's RLE path blends a translucent pixel a channel off).
+  Every shipped aura frame is binary at every size; checked once per
+  frame with `pygame.mask`;
+- **the destination** is 32 bits a pixel with no per-pixel alpha, as the
+  display and the game's scratch surfaces are (`rle.fits`). Onto a surface
+  with alpha, pygame's blitter writes a clear source pixel's colour into
+  a clear destination pixel and the RLE path skips it: the same picture,
+  not the same bytes. Onto fewer bits, SDL re-encodes the copy in that
+  format and it no longer blits exactly anywhere. No path of the game
+  blits an aura onto either today; the check keeps a future one exact.
+  (Both found by the cold review, RND-010.6.10.)
+
+The copies are an LRU of 1024 (RND-010.6.D1, below). Counted headless
+(`counts.sh`):
+- the fight run as the variants run it, 16 blocks of 40 frames, asks
+  for 342 distinct aura frames at 150 and 456 at 250, so the cap is over
+  twice the larger;
+- one straight run of 640 fight frames after the scene's warm-up (a
+  different fight: `spawn_stress.run` restarts the hero's jitter at every
+  call) leaves 380 copies at 150 and 443 at 250, 18.8 and 23.6 MB as
+  pixels, at the headless zoom of 1.5;
+- what they cost the process (`rle_memory.py`): making the same copies
+  afresh raises its resident memory by 16.6 and 19.3 MB, and +17.3 and
+  +20.3 MB once each is encoded. SDL frees an encoded copy's pixel buffer,
+  but for buffers this small the heap keeps the freed blocks, so the cost
+  stays about the pixels' size;
+- the bound is the cap times the largest copy, 116 kB there, so
+  118.4 MB as pixels; a larger display raises it, as it does the wash
+  cache's.
+
+**RND-010.6.D1: the RLE cache's cap is 1024, as a code constant.** Like
+the wash cache's 1536 (RND-010.D2), it trades memory for frame time; unlike
+it, a fight uses well under half of it, so in play it holds what the
+fight asks for (about 17 to 20 MB here) and the cap only bounds the worst
+case. Left to the owner to revise; the cap's precedent as a code constant
+is `_WASH_CACHE_CAP`, `_SCALED_CAP` and the tint cache's.
+
+**Before and after (sitting 4, 2026-10-08):** `main` (`24009a2`, after
+RND-013 merged) against this branch rebased on it (`6b8ca92`), ABBA at
+150, 200 and 250, fighting and then quiet. "Change" is the two afters'
+mean less the two befores', with the range from the lower after less the
+higher before to the higher after less the lower before.
+
+**The measured outcome: the under-layer's rows** (`flat/elemental` and
+every `elemental/` row: two on `main`, six here), in the fight, p50 ms:
+
+| | 150 | 200 | 250 |
+|---|---|---|---|
+| the under-layer's rows | -0.67 (-0.78 to -0.57) | -1.20 (-1.25 to -1.15) | -1.66 (-1.70 to -1.63) |
+
+In every pairing of an after with a before, at every count, the rows are
+faster. At 250 they fall from 3.62 / 3.61 to 1.92 / 1.98 ms, against
+sitting 3's -1.14 ms for the variant and the leads' 1.842 ms predicted.
+In the quiet control, which draws no aura, so `rle.ready` never runs, the
+same rows move +0.01 to +0.02 ms.
+
+**Inside this sitting's noise: the whole draw and the frame.** The
+owner's agent team ran on the same machine through it (CPU load 6 to 74 %
+at the steps, GPU 0 to 20 %, in `s4_meta.txt`), and the quiet control,
+where the change does nothing, moved too: at 200 its bare draw +0.42
+(+0.22 to +0.62), its draw p90 +0.99 (+0.31 to +1.67), its update + draw
++0.76 (+0.42 to +1.11) and its update, untouched, +0.38 ms. So this
+sitting's floor is about 0.4 ms at the p50 and 1 ms at the p90, and the
+fight's figures below are recorded, not claimed:
+
+| Fight, p50 ms | 150 | 200 | 250 |
+|---|---|---|---|
+| bare draw | -1.46 (-1.85 to -1.07) | -1.26 (-1.95 to -0.56) | -2.46 (-2.77 to -2.16) |
+| draw p90 | -2.86 (-3.18 to -2.53) | -1.84 (-2.77 to -0.92) | -3.30 (-4.38 to -2.22) |
+| update + draw | -2.52 (-3.34 to -1.69) | -1.21 (-2.51 to +0.09) | -3.24 (-4.18 to -2.29) |
+
+The bare draw falls further than the rows the change touches, by 0.79 ms
+at 150 and 0.80 at 250 (-1.46 against -0.67, -2.46 against -1.66; 0.06
+at 200), and
+the fight's update, which the change does not touch, moved -0.60, -0.14
+and -0.34 ms. That excess is unexplained. Load is one candidate; another
+is less memory traffic once the copies are encoded, which would speed
+other layers too. This sitting cannot tell them apart; a sitting on a
+quiet machine could.
+
+**The tails are not read.** The draw's p99s run from 30.20 to 84.08 ms in
+the fight and from 18.99 to 49.31 ms in the quiet runs, on both sides,
+quiet included.
+
+**Not measured, so plan 4.5 is done only in part:**
+- the hazards' SRCALPHA surface per hazard per frame
+  (`visual/rendering.py`), which draws in the `flat` row, not the
+  under-layer; the stress fight was never split there;
+- the markers, which draw only where an aura has no art, so never in the
+  shipped game;
+- the reaction bursts over the bodies, `reactions/transient`, split in
+  sitting 1 at 0.05 / 0.05 ms at 150 and 0.07 / 0.07 at 250: too small to
+  pursue.
+The hazards stay in plan 4.5 as its open part.
+
+**The web build is not verified.** Every check above ran on pygame 2.5.2
+(SDL 2.28.3) on the desktop; the web build runs pygame-ce, whose display
+format comes from the browser. Where that display is not a 32-bit surface
+without alpha, `rle.fits` turns the copies off and the blit is the plain
+one, exact by construction; where it is, the same SDL RLE path should
+draw the same bytes, but that is not shown. What would settle it: the
+whole-frame test (`test_elemental_draw_cost`) run under pygame-ce, or a
+byte comparison in the browser build.
+
+Exactness, on the desktop:
+- The whole fight frame (seed 35, 100 packed, primed) is one picture
+  drawn plain, from the copies warm, from an empty cache and from one too
+  small to hold the frame's auras (`test_elemental_draw_cost`).
+- `draw_variants`' byte comparison passed on screen in sittings 1 to 3,
+  so the display surface's format blits the copies alike too.
+- Ten mutants of `rle.py` and its call were each caught: no binary
+  guard, the plain frame blitted, a hit that does not refresh, the newest
+  entry dropped, a stale entry served, the copy not encoded, the mask
+  threshold off, the destination check dropped, a destination with alpha
+  let through, the surface-alpha check dropped.
+- Tests: the full suite (`python -m pytest`, the default tiers) on
+  `a3abd7b`: 4,548 passed, 11 deselected (the `sweep` tier, run only when
+  asked), none failed. No eval applies: the saving is measured in the
+  sittings, and the exactness is a byte comparison.
+
+A lead for later, outside this task: the enemies' own sprites are blitted
+the same way, and the `enemies` row is the draw's largest. If their art is
+binary too, the same encoding may apply; it would need its own split,
+since washed, tinted and shaded copies are made from those frames.
+
 ## RND-010: Tasks
 
 - [x] RND-010.1: This journal, the plan and the index row
@@ -1293,4 +1573,17 @@ probe, and nothing here is a rate.
   - [x] RND-010.5.4: The results, and the plan's 4.1 marked done
   - [x] RND-010.5.5: The cold review's findings: the shared percentile and the outputs taken again, every quoted figure pinned, the exactness argued from no run state written and held by a hidden-against-shown run digest, the real F1 path tested, "infused" for `--elements`, the line references, D1's alternative named
   - [x] RND-010.5.6: The full suite's counts in the results; the owner's confirmation of D1
+- [x] RND-010.6: The elemental under-layer (plan 4.5): split, measured, and the exact caches a sitting resolves built
+  - [x] RND-010.6.1: This plan and the index
+  - [x] RND-010.6.2: `draw_layers` times `draw_under`'s passes as their own rows, tested
+  - [x] RND-010.6.3: The under-layer's leads probe, tested
+  - [x] RND-010.6.4: The candidates as throwaway exact variants (`_shape` and `_ring` cached, the aura frame looked up once per element, and, found on the way, the aura blit RLE-encoded for binary-alpha frames), tested
+  - [x] RND-010.6.5: The sitting: the split, the leads and the variants at 150 and 250 packed in the fight, raw outputs kept (sittings 1 to 3), and sitting 4's before and after
+  - [x] RND-010.6.8: `aura_rle`'s cache made to hold the fight's aura frames (342 at 150, 456 at 250, against its 256), so sitting 2 times the RLE blit and not the variant's re-encoding
+  - [x] RND-010.6.9: The under-layer variants' caches kept warm from block to block, as `wash_lru`'s (sitting 2's `aura_rle` re-encoded every frame in each 40-frame "on" block); sitting 3
+  - [x] RND-010.6.6: What the sitting resolves, built pixel-identical, measured before and after
+    - [x] RND-010.6.6.1: The aura blit from RLE copies (`elements/rle.py`), the one candidate sitting 3 resolved; the whole fight frame byte-identical plain, warm, cold and from a too-small cache; seven mutants caught
+  - [x] RND-010.6.7: The results, every quoted figure pinned to `derived.py`; the plan's 4.5 marked done
+  - [x] RND-010.6.11: The full suite's counts in the results
+  - [x] RND-010.6.10: The cold review's findings: the destination and surface-alpha guards (`rle.fits`), the web marked unverified, the outcome quoted as the under-layer's rows with the whole draw inside the sitting's noise, the scope not measured (hazards) and 4.5 done in part, the copies' memory measured, D1 recorded, provenance by sitting, `aura_lookup_once` through the game's copies, every figure pinned
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

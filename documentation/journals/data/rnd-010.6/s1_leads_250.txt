@@ -1,0 +1,25 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  under leads, a mean over 10 fight frame(s): 183.7 auras, 230.9 with a status (15.7 chilled, 38.0 burning), 4.2 tornadoes; 50 rounds a frame
+    candidate aura: blit, RLE copy      1.28 us an item  x  183.7  =  0.235 ms a frame
+    auras, whole               13.46 us an item  x  183.7  =  2.472 ms a frame
+      aura: blit               11.31 us an item  x  183.7  =  2.077 ms a frame    84.0 %
+      aura: frame lookup        1.04 us an item  x  183.7  =  0.192 ms a frame     7.7 %
+      aura: size                0.27 us an item  x  183.7  =  0.050 ms a frame     2.0 %
+      aura: world_to_screen     0.14 us an item  x  183.7  =  0.026 ms a frame     1.1 %
+      aura: state               0.11 us an item  x  183.7  =  0.021 ms a frame     0.8 %
+      (the glue)                                           =  0.107 ms a frame
+    statuses, whole             1.36 us an item  x  230.9  =  0.313 ms a frame
+      burn: lookup              1.12 us an item  x   38.0  =  0.043 ms a frame    13.6 %
+      burn: blit                0.75 us an item  x   38.0  =  0.028 ms a frame     9.1 %
+      chill: polygons           1.65 us an item  x   15.7  =  0.026 ms a frame     8.3 %
+      chill: blit               0.45 us an item  x   15.7  =  0.007 ms a frame     2.2 %
+      chill: new surface        0.38 us an item  x   15.7  =  0.006 ms a frame     1.9 %
+      (the glue)                                           =  0.203 ms a frame
+    areas, whole              112.41 us an item  x    4.2  =  0.472 ms a frame
+      ring: blit               36.79 us an item  x    4.2  =  0.155 ms a frame    32.7 %
+      ring: new surface        31.69 us an item  x    4.2  =  0.133 ms a frame    28.2 %
+      arcs: whole ring         26.48 us an item  x    4.2  =  0.111 ms a frame    23.6 %
+      ring: circle              4.70 us an item  x    4.2  =  0.020 ms a frame     4.2 %
+      (the glue)                                           =  0.054 ms a frame

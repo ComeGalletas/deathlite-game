@@ -72,6 +72,14 @@ LAYERS = (
     ("flat", "scene", "draw_flat_effects"),
     ("player_shots", "ps", "_draw_player_projectiles"),
     ("elemental", "element_fx", "draw_under"),
+    # RND-010.6: `draw_under` split into its passes. What is left in
+    # `elemental` itself is the band lookup; the shed's motes are
+    # `elemental/particles`. `transient` is also `draw_reactions`' one pass,
+    # so the reaction bursts read `reactions/transient`.
+    ("areas", "el_transient", "draw_areas"),
+    ("auras", "el_layers", "draw_auras"),
+    ("statuses", "el_layers", "draw_statuses"),
+    ("transient", "el_transient", "draw_transient"),
     ("enemies", "ps", "_draw_one_enemy"),
     ("boss", "ps", "_draw_boss"),
     ("player", "ps", "_draw_player"),
@@ -126,8 +134,11 @@ class LayerTimer:
             status_marks,
         )
         from game.states.playing.visual import hints as hints_draw
+        from game.states.playing.visual.elements import layers as el_layers
+        from game.states.playing.visual.elements import transient as el_transient
         return {"ps": ps, "terrain": ps.game_map.renderer, "renderer": ps.renderer,
-                "element_fx": element_fx, "scene": scene, "health_bars": health_bars,
+                "element_fx": element_fx, "el_layers": el_layers, "el_transient": el_transient,
+                "scene": scene, "health_bars": health_bars,
                 "status_marks": status_marks, "particles": ps.run.particles,
                 "numbers": ps.run.damage_numbers, "key_marker": key_marker,
                 "hints_draw": hints_draw, "hud": ps.hud, "npcs": ps.npc_manager,

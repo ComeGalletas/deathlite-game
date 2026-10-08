@@ -56,7 +56,7 @@ def _fresh_save() -> str:
 # the reports lose without a word.
 EXPECTED_LAYERS = (
     "draw", "world", "water", "ground", "scenery", "villagers", "huts", "elemental_sort",
-    "flat", "player_shots", "elemental", "enemies", "boss", "player", "summons", "death_fx",
+    "flat", "player_shots", "elemental", "areas", "auras", "statuses", "transient", "enemies", "boss", "player", "summons", "death_fx",
     "spawn_fx", "shade", "hpbar", "marks", "ghost", "projectiles", "particles", "numbers",
     "reactions", "key_marker", "hints", "hud", "feedback")
 
@@ -449,7 +449,9 @@ class WiringTests(unittest.TestCase):
             timer.uninstall()
         # Every layer a crowd frame calls whatever happens in it.
         for layer in ("draw", "world", "water", "ground", "scenery", "scenery_list", "flat",
-                      "flat/player_shots", "flat/elemental", "elemental_sort", "enemies",
+                      "flat/player_shots", "flat/elemental", "elemental/areas", "elemental/auras",
+                      "elemental/statuses", "elemental/transient", "reactions/transient",
+                      "elemental_sort", "enemies",
                       "enemies/shade", "enemies/hpbar", "enemies/marks", "player", "ghost",
                       "projectiles", "particles", "numbers", "reactions", "key_marker",
                       "hints", "hud", "feedback"):

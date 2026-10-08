@@ -240,6 +240,48 @@ class TerraceSortTests(unittest.TestCase):
         self.assertEqual(frame(cache=OrderedDict()), warm)
         self.assertEqual(frame(cache=OrderedDict(), cap=3), warm)
 
+    def test_a_whole_frame_is_the_same_picture_with_the_auras_rle_blitted_or_plain(self):
+        # RND-010.6: the auras are blitted from RLE copies. A frame drawn
+        # plain (`rle.ready` handing every frame back), from the copies
+        # warm, from an empty cache, and from one too small to hold the
+        # frame's own auras (so it drops copies mid-frame) is one picture.
+        from collections import OrderedDict
+
+        from game.states.playing.visual.elements import rle
+        ps = self.ps
+        asked = []
+        real = rle.ready
+
+        def counted(frame, dest):
+            asked.append(id(frame))
+            return real(frame, dest)
+
+        def frame(plain=False, cache=None, cap=None):
+            s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+            patches = [mock.patch.object(rle, "ready", (lambda f, dest: f) if plain else counted)]
+            if cache is not None:
+                patches.append(mock.patch.object(rle, "_COPIES", cache))
+            if cap is not None:
+                patches.append(mock.patch.object(rle, "_CAP", cap))
+            for p in patches:
+                p.start()
+            try:
+                ps.draw(s)
+            finally:
+                for p in reversed(patches):
+                    p.stop()
+            return _pixels(s)
+
+        plain = frame(plain=True)
+        frame()
+        asked.clear()
+        warm = frame()
+        self.assertGreater(len(set(asked)), 3,
+                           "one frame must blit more distinct aura frames than the small cap holds")
+        self.assertEqual(warm, plain)
+        self.assertEqual(frame(cache=OrderedDict()), plain)
+        self.assertEqual(frame(cache=OrderedDict(), cap=3), plain)
+
 
 class BurnFlameTests(unittest.TestCase):
     @classmethod

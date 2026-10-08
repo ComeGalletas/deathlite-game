@@ -1,0 +1,53 @@
+commit 21ed117  started 2026-10-07 20:45:42
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- processes with a window at the start, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+--- top processes by CPU time at the start
+
+Name                CPU
+----                ---
+SignalRgb  13170,734375
+chrome     11374,765625
+audiodg     7019,109375
+cam_helper       6007,5
+chrome      2369,515625
+Discord     1111,359375
+chrome         913,5625
+chrome        846,53125
+
+
+
+=== variants 150  cpu load 22%  20:45:44
+=== variants 250  cpu load 6%  20:47:11
+finished 20:49:16  cpu load 20%
+--- processes with a window at the end, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+--- top processes by CPU time at the end
+
+Name                CPU
+----                ---
+SignalRgb  13237,140625
+chrome       11434,9375
+audiodg     7030,796875
+cam_helper  6032,484375
+chrome       2385,46875
+Discord     1112,671875
+chrome              915
+chrome        876,28125
+
+
+

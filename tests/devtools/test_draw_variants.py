@@ -201,6 +201,162 @@ class WashLruTests(unittest.TestCase):
         self.assertNotIn(key(a), DV._WASH_LRU)                     # and a went for it
 
 
+class UnderVariantTests(unittest.TestCase):
+    """RND-010.6's variants on surfaces of their own: each draws what the
+    game's code draws, goes through its cache, and is undone."""
+
+    @classmethod
+    def setUpClass(cls):
+        pygame.display.init()
+        if pygame.display.get_surface() is None:
+            pygame.display.set_mode((64, 64))
+
+    def setUp(self):
+        for cache in (DV._SHAPES, DV._RINGS, DV._RLE_COPIES):
+            cache.clear()
+
+    def tearDown(self):
+        self.setUp()
+
+    @staticmethod
+    def _canvas():
+        s = pygame.Surface((120, 120))
+        for i in range(0, 120, 7):
+            s.fill(((i * 37) % 256, (i * 11) % 256, (i * 5) % 256), (i, 0, 7, 120))
+        return s
+
+    def _same(self, draw, name):
+        """`draw(surface)` with the variant off and on (twice, so a cache
+        is filled and then used) draws the same bytes."""
+        want = self._canvas()
+        draw(want)
+        undo = DV.VARIANTS[name](None)
+        try:
+            for _ in range(2):
+                got = self._canvas()
+                draw(got)
+                self.assertEqual(pygame.image.tobytes(got, "RGB"), pygame.image.tobytes(want, "RGB"))
+        finally:
+            undo()
+
+    def test_shape_cached_draws_the_chevron_and_the_bracket_as_the_game_does(self):
+        from game.states.playing.visual.elements import layers
+        real = layers._shape
+        for shape, colour in ((layers._SLOW_SHAPE, layers._SLOW_COLOUR),
+                              (layers._FREEZE_SHAPE, layers._FREEZE_COLOUR)):
+            for cx, cy, size in ((40.3, 50.7, 12.6), (61.0, 20.5, 7.0), (10.9, 99.2, 1.5)):
+                with self.subTest(shape=shape[:2], at=(cx, cy, size)):
+                    self._same(lambda s, a=(shape, cx, cy, size, colour): layers._shape(s, *a), "shape_cached")
+        self.assertIs(layers._shape, real)
+
+    def test_ring_cached_draws_the_ring_as_the_game_does(self):
+        from game.states.playing.visual.elements import transient
+        real = transient._ring
+        for args in (((60, 60), 40, (120, 200, 255), 110, 3), ((30, 70), 9, (255, 140, 60), 300, 1),
+                     ((60, 60), 0, (1, 2, 3), 50, 3), ((60, 60), 20, (1, 2, 3), 0, 3)):
+            with self.subTest(args=args):
+                self._same(lambda s, a=args: transient._ring(s, *a), "ring_cached")
+        self.assertIs(transient._ring, real)
+
+    def test_the_caches_hit_on_a_repeat_and_are_bounded(self):
+        from game.states.playing.visual.elements import transient
+        made = []
+        real = pygame.Surface
+        undo = DV.VARIANTS["ring_cached"](None)
+        try:
+            with mock.patch.object(pygame, "Surface", lambda *a, **k: made.append(a) or real(*a, **k)):
+                for _ in range(3):
+                    transient._ring(self._canvas(), (60, 60), 30, (9, 9, 9), 100, 3)
+            self.assertEqual(len([m for m in made if m[0] == (68, 68)]), 1)   # drawn once, then kept
+        finally:
+            undo()
+        cache = {}
+        for i in range(DV.UNDER_CAP + 1):
+            DV._bounded(cache, i, lambda: 0)
+        self.assertEqual(len(cache), 1)                 # emptied whole when full, then the new one
+        # aura_rle's own cap holds a fight's aura frames (456 at 250 in
+        # sitting 1's count), where 256 emptied itself over and over.
+        self.assertGreater(DV.RLE_CAP, 456)
+        cache = {}
+        for i in range(DV.RLE_CAP):
+            DV._bounded(cache, i, lambda: 0, DV.RLE_CAP)
+        self.assertEqual(len(cache), DV.RLE_CAP)
+
+    @staticmethod
+    def _frame(alphas):
+        """A 40x30 frame, column `i` of alpha `alphas[i % len(alphas)]`."""
+        frame = pygame.Surface((40, 30), pygame.SRCALPHA)
+        for i in range(40):
+            frame.fill((200, 100 + i * 3, 50, alphas[i % len(alphas)]), (i, 0, 1, 30))
+        return frame
+
+    @staticmethod
+    def _profile(frame):
+        from game.states.playing.visual.elements.profiles import ElementVisualProfile
+
+        class _Anim:
+            def frame(self, size=None):
+                return frame
+
+        profile = ElementVisualProfile.__new__(ElementVisualProfile)
+        profile._aura_anim = _Anim()
+        return profile
+
+    def _blitted(self, frame):
+        s = self._canvas()
+        s.blit(frame, (17, 33))
+        return pygame.image.tobytes(s, "RGB")
+
+    def test_aura_rle_keeps_the_alpha_and_the_picture_of_a_binary_frame(self):
+        from game.states.playing.visual.elements.profiles import ElementVisualProfile
+        frame = self._frame((0, 255, 255, 0, 255))
+        profile = self._profile(frame)
+        real = ElementVisualProfile.aura_frame
+        undo = DV.VARIANTS["aura_rle"](None)
+        try:
+            got = profile.aura_frame()
+            self.assertIsNot(got, frame)
+            self.assertIs(profile.aura_frame(), got)                    # kept per frame
+            self.assertTrue(got.get_flags() & pygame.SRCALPHA)
+            self.assertTrue(got.get_flags() & pygame.RLEACCELOK)
+            self.assertEqual(self._blitted(got), self._blitted(frame))
+        finally:
+            undo()
+        self.assertIs(ElementVisualProfile.aura_frame, real)
+        # The copy outlives the undo: the next "on" block starts warm.
+        undo = DV.VARIANTS["aura_rle"](None)
+        try:
+            self.assertIs(profile.aura_frame(), got)
+        finally:
+            undo()
+
+    def test_a_translucent_frame_keeps_the_plain_blit(self):
+        # Why the guard: SDL's RLE path blends a translucent pixel by its own
+        # formula, a channel off by one against the plain blit.
+        frame = self._frame((0, 40, 128, 200, 255))
+        rle = frame.copy()
+        rle.set_alpha(255, pygame.RLEACCEL)
+        self.assertNotEqual(self._blitted(rle), self._blitted(frame))
+        self.assertFalse(DV.binary_alpha(frame))
+        self.assertTrue(DV.binary_alpha(self._frame((0, 255))))
+        undo = DV.VARIANTS["aura_rle"](None)
+        try:
+            self.assertIs(self._profile(frame).aura_frame(), frame)
+        finally:
+            undo()
+
+    def test_every_shipped_aura_frame_is_binary(self):
+        # The variant's saving rests on it: a translucent frame would fall
+        # back to the plain blit (exact, but no faster).
+        from game.assets import get_assets
+        assets = get_assets()
+        for rig in ("element_fire", "element_ice", "element_thunder", "element_wind"):
+            for i in range(assets.frame_count(rig, "loop")):
+                for size in (None, (60, 58), (140, 135)):
+                    with self.subTest(rig=rig, frame=i, size=size):
+                        self.assertTrue(DV.binary_alpha(assets.frame(rig, "loop", i, size=size)))
+
+
 class SceneTests(unittest.TestCase):
     """One packed scene with the hero fighting (every enemy primed, so
     `wash_lru` has washed frames to draw), seed 35, 40 alive, shared."""
@@ -220,8 +376,11 @@ class SceneTests(unittest.TestCase):
     def _patched_state(self):
         from game.states.playing.visual import elements as fx
         from game.states.playing.visual import scene
+        from game.states.playing.visual.elements import layers, transient
+        from game.states.playing.visual.elements.profiles import ElementVisualProfile
         return (dict(vars(self.ps)).keys(), dict(vars(self.ps.renderer)).keys(), scene.draw_world,
-                fx.washed)
+                fx.washed, layers._shape, layers.draw_auras, transient._ring,
+                ElementVisualProfile.aura_frame)
 
     def test_the_scene_is_a_fight_with_primed_enemies_drawn(self):
         from game.states.playing.visual.rendering import aura_colour

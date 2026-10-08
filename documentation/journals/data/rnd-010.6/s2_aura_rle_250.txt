@@ -1,0 +1,8 @@
+pygame 2.5.2 (SDL 2.28.3, Python 3.12.0)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+display 2560x1080 (windows, vsync on)  render scale 1.200 zoom 1.797  |  crowd cap 250 nav 0.4 s fill 4500  |  hints off  director frozen  boss held back  |  budget 16.67 ms (the 60 fps target; the desktop loop's 62 fps cap is 16 ms, pygame counting whole milliseconds; the browser has no cap, its host paces it)
+  aura_rle: draw p50 off 17.91 ms, on 17.86 ms (640 frames each); per block, on minus off p50: p50 +0.46 ms, from -3.07 to +1.31
+    the median saving lies in -0.42 to +0.72 ms (97.9 % sign-test interval; negative is faster)
+    the draw's mean off 18.29 ms, on 18.38 ms; p90 off 21.22, on 22.05; p99 off 28.28, on 27.54
+    per block, on minus off mean: p50 +0.47 ms; the median lies in -0.79 to +0.90 ms (97.9 %)
+  boss at the end: held back

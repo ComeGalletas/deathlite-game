@@ -1,0 +1,59 @@
+commit a5dd5c8  started 2026-10-07 20:33:38
+save {'mode': 'windowed', 'render': '21:9', 'window': [2560, 1080]}
+--- processes with a window at the start, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+--- top processes by CPU time at the start
+
+Name                   CPU
+----                   ---
+SignalRgb       12951,9375
+chrome        11007,703125
+audiodg        6979,953125
+cam_helper     5923,390625
+chrome         2309,515625
+NTEGlobalGame  1318,203125
+Discord          1105,9375
+chrome          907,265625
+
+
+
+=== layers 150 a  cpu load 42%  20:33:41
+=== layers 150 b  cpu load 21%  20:34:03
+=== leads 150  cpu load 19%  20:34:23
+=== variants 150  cpu load 20%  20:34:37
+=== layers 250 a  cpu load 45%  20:36:53
+=== layers 250 b  cpu load 23%  20:37:19
+=== leads 250  cpu load 17%  20:37:45
+=== variants 250  cpu load 17%  20:38:04
+finished 20:40:53  cpu load 27%
+--- processes with a window at the end, by name
+ApplicationFrameHost
+chrome
+claude
+explorer
+NVIDIA Overlay
+steamwebhelper
+SystemSettings
+TextInputHost
+--- top processes by CPU time at the end
+
+Name                CPU
+----                ---
+SignalRgb  13085,421875
+chrome     11227,453125
+audiodg      7003,28125
+cam_helper   5974,84375
+chrome       2343,46875
+Discord            1109
+chrome       911,046875
+chrome         807,4375
+
+
+

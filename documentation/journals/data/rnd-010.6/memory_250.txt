@@ -1,0 +1,2 @@
+python documentation/journals/data/rnd-010.6/rle_memory.py 250 600
+250: 443 copies, 23.6 MB of pixels; resident memory +19.3 MB as plain copies, +20.3 MB once encoded

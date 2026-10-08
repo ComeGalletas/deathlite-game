@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pygame
 
-from game.states.playing.visual.elements import markers
+from game.states.playing.visual.elements import markers, rle
 
 # Status marks, above the head so they never sit on the aura ring.
 _STATUS_LIFT = 12
@@ -120,7 +120,8 @@ def _aura(surface, cam, body, profile, style) -> None:
     size = profile.aura_size(radius * 2.0 * style.rig_scale)
     frame = profile.aura_frame(size=size) if size else None
     if frame is not None:
-        surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
+        # Its RLE copy (RND-010.6): the same pixels, the clear runs skipped.
+        surface.blit(rle.ready(frame, surface), frame.get_rect(center=(int(sx), int(sy))))
     else:
         _ring(surface, (int(sx), int(sy)), int(radius), profile.colour,
               style.alpha, style.ring_width)
