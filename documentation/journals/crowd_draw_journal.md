@@ -1633,4 +1633,5 @@ unchanged; a mutation check.
   - [x] RND-010.7.2: The skip in `shade_character_frame`, with its tests and a mutation check
   - [x] RND-010.7.3: `draw_leads` times the walk over the unshaded bodies alone, tested
   - [ ] RND-010.7.4: `main` against the branch, ABBA, headless: the walk's pieces and the `enemies/shade` row; the results
+  - [x] RND-010.7.5: The skip taken out, measured slower than the walk; the walk pinned against a reference copy for whatever reworks it next
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace

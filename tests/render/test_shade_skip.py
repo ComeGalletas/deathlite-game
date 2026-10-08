@@ -1,23 +1,23 @@
-"""RND-010.7: the shade walk returns early where no shade can fall
+"""RND-010.7: the shade walk, pinned against a reference copy
 (`world/terrain/render.py`, `shade_character_frame`; `crowd_draw_journal.md`).
 
-The walk now works out the index cells a frame spans first and hands the
-frame back at once when none holds a shadow. Pinned against the walk as it
-was before (`_walk_before`, kept here word for word), on seed 35's packed
-fight scene:
-* every drawn body gets back the very object it did;
-* over a sweep of camera positions across the island, frames of three sizes
-  laid on a grid over the view, standing in front of and behind the trees,
-  get back the very object where the old walk returned the frame, and the
-  same bytes where it shaded it; the sweep must meet both cases, and the
-  early return, many times;
-* the skip is what returns them: the walk's own loop never runs for a
-  frame whose cells hold no shadow.
+RND-010.7 built an early return ahead of the walk, measured it slower than
+the walk itself (which is already one index lookup per cell for a body
+under no tree), and took it out. What it left is this pin, for whatever
+next reworks the walk: `_walk_before` is the walk as it stands, word for
+word, and on seed 35's packed fight scene
+* every drawn body gets back the very object the reference returns;
+* over a sweep of camera positions across the island, frames of three
+  sizes laid on a grid over the view, standing in front of and behind the
+  trees, get back the very object where the reference returns the frame,
+  and the same bytes where it shades it; the sweep must meet both cases
+  many times.
+`documentation/journals/data/rnd-010.7/walk_shapes.py` times shapes of the
+walk against the reference.
 """
 import contextlib
 import io
 import unittest
-from unittest import mock
 
 import pygame
 
@@ -31,7 +31,7 @@ SEED = 35
 
 
 def _walk_before(self, frame, dest, camera, character_y):
-    """`TerrainRenderer.shade_character_frame` before RND-010.7."""
+    """`TerrainRenderer.shade_character_frame`, word for word (RND-010.7's reference)."""
     shadows = self.gm._tree_shadows
     if not shadows:
         return frame
@@ -82,8 +82,8 @@ class ShadeSkipTests(unittest.TestCase):
         cls.cam = cls.ps.run.camera
 
     def _both(self, frame, dest, character_y):
-        """(the walk now, the walk before) on the same arguments; the
-        before's shaded result copied, since both share the scratch."""
+        """(the walk, the reference) on the same arguments; the walk's
+        shaded result copied, since both share the scratch."""
         t = self.terrain
         now = t.shade_character_frame(frame, dest, self.cam, character_y)
         now = now if now is frame else now.copy()
@@ -143,25 +143,6 @@ class ShadeSkipTests(unittest.TestCase):
             cam.pos.update(home)
         self.assertGreater(tally["shaded"], 100, tally)
         self.assertGreater(tally["plain"], 1000, tally)
-
-    def test_the_skip_is_what_returns_a_frame_with_no_shade_in_its_cells(self):
-        # Under no tree: the index is asked for no shadow list at all.
-        cam, t = self.cam, self.terrain
-        shadows = list(t.gm._tree_shadows.values())
-        far = (min(s[0] for s in shadows) - 5000, min(s[1] for s in shadows) - 5000)
-        home = cam.pos.copy()
-        frame = pygame.Surface((60, 60), pygame.SRCALPHA)
-        index = t._shadow_index()
-        try:
-            cam.pos.update(far)
-            with mock.patch.object(t, "_shadow_index", return_value=mock.MagicMock(wraps=index)) as m:
-                spy = m.return_value
-                spy.__contains__.side_effect = index.__contains__
-                self.assertIs(t.shade_character_frame(frame, (100, 100), cam, far[1] + 10), frame)
-            spy.get.assert_not_called()                      # the walk's loop never ran
-            self.assertGreater(spy.__contains__.call_count, 0)
-        finally:
-            cam.pos.update(home)
 
 
 if __name__ == "__main__":

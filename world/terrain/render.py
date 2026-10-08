@@ -377,28 +377,21 @@ class TerrainRenderer:
         shadows = self.gm._tree_shadows
         if not shadows:
             return frame
+        frame_rect = frame.get_rect(topleft=(int(dest[0]), int(dest[1])))
         z = self.gm._render_zoom
         ox, oy = camera.pos.x, camera.pos.y
         # The frame's footprint in world space, then the index cells it spans.
-        left, top = int(dest[0]), int(dest[1])
-        w, h = frame.get_size()
+        # For a body under no tree this is already the cheap path: one lookup
+        # per cell, each empty. A skip ahead of it was built and measured
+        # slower (RND-010.7, `crowd_draw_journal.md`).
         c = self._SHADE_CELL
-        gx0, gx1 = int((ox + left / z) // c), int((ox + (left + w) / z) // c)
-        gy0, gy1 = int((oy + top / z) // c), int((oy + (top + h) / z) // c)
+        wx0, wy0 = ox + frame_rect.left / z, oy + frame_rect.top / z
+        wx1, wy1 = ox + frame_rect.right / z, oy + frame_rect.bottom / z
         index = self._shadow_index()
-        # The skip (RND-010.7): most bodies stand where no shade falls, and
-        # the walk below would find nothing and hand `frame` back. One
-        # lookup per cell says so first.
-        for gx in range(gx0, gx1 + 1):
-            if any((gx, gy) in index for gy in range(gy0, gy1 + 1)):
-                break
-        else:
-            return frame
-        frame_rect = pygame.Rect(left, top, w, h)
         overlay = shaded = None
         seen: set = set()
-        for gx in range(gx0, gx1 + 1):
-            for gy in range(gy0, gy1 + 1):
+        for gx in range(int(wx0 // c), int(wx1 // c) + 1):
+            for gy in range(int(wy0 // c), int(wy1 // c) + 1):
                 for shadow in index.get((gx, gy), ()):
                     key = id(shadow)
                     if key in seen:
