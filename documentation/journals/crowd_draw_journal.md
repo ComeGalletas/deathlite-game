@@ -1522,6 +1522,10 @@ Exactness, on the desktop:
   entry dropped, a stale entry served, the copy not encoded, the mask
   threshold off, the destination check dropped, a destination with alpha
   let through, the surface-alpha check dropped.
+- Tests: the full suite (`python -m pytest`, the default tiers) on
+  `a3abd7b`: 4,548 passed, 11 deselected (the `sweep` tier, run only when
+  asked), none failed. No eval applies: the saving is measured in the
+  sittings, and the exactness is a byte comparison.
 
 A lead for later, outside this task: the enemies' own sprites are blitted
 the same way, and the `enemies` row is the draw's largest. If their art is
@@ -1580,5 +1584,6 @@ since washed, tinted and shaded copies are made from those frames.
   - [x] RND-010.6.6: What the sitting resolves, built pixel-identical, measured before and after
     - [x] RND-010.6.6.1: The aura blit from RLE copies (`elements/rle.py`), the one candidate sitting 3 resolved; the whole fight frame byte-identical plain, warm, cold and from a too-small cache; seven mutants caught
   - [x] RND-010.6.7: The results, every quoted figure pinned to `derived.py`; the plan's 4.5 marked done
+  - [x] RND-010.6.11: The full suite's counts in the results
   - [x] RND-010.6.10: The cold review's findings: the destination and surface-alpha guards (`rle.fits`), the web marked unverified, the outcome quoted as the under-layer's rows with the whole draw inside the sitting's noise, the scope not measured (hazards) and 4.5 done in part, the copies' memory measured, D1 recorded, provenance by sitting, `aura_lookup_once` through the game's copies, every figure pinned
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
