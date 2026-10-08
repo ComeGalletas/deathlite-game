@@ -184,14 +184,20 @@ def _wash_lru(ps):
 
 
 # --- RND-010.6: the elemental under-layer's candidates ---------------------------
-# Each cache is this module's, bounded, and cleared by its undo so the side
-# without the variant pays nothing for it.
+# Each cache is this module's and bounded, and it outlives the undo, as
+# `_WASH_LRU` does: `timed` turns a variant on and off for every block, and
+# a cache emptied at each undo would make every "on" block start cold and
+# time the filling (sitting 2's `aura_rle` re-encoded all its frames in
+# each 40-frame block). The side without the variant does not call them.
 UNDER_CAP = 256
 # `aura_rle`'s own cap. A packed fight asks for 342 distinct aura frames at
 # 150 and 456 at 250 (four elements, their animation frames, a size per body
 # radius); at 256 the variant emptied itself over and over in sitting 1 and
 # timed its own re-encoding, not the RLE blit.
 RLE_CAP = 2048
+_SHAPES: dict = {}          # (shape, size, colour) -> layer
+_RINGS: dict = {}           # (radius, colour, alpha, width) -> layer
+_RLE_COPIES: dict = {}      # id(frame) -> (frame, RLE copy or the frame itself)
 
 
 def _bounded(cache: dict, key, make, cap: int = UNDER_CAP):
@@ -212,7 +218,7 @@ def _shape_cached(ps):
 
     from game.states.playing.visual.elements import layers
     real = layers._shape
-    cache: dict = {}
+    cache = _SHAPES
 
     def shape(surface, shp, cx, cy, size, colour):
         if size < 2:
@@ -230,11 +236,7 @@ def _shape_cached(ps):
                      (int(cx - side / 2), int(cy - side / 2)))
 
     layers._shape = shape
-
-    def undo():
-        layers._shape = real
-        cache.clear()
-    return undo
+    return lambda: setattr(layers, "_shape", real)
 
 
 def _ring_cached(ps):
@@ -244,7 +246,7 @@ def _ring_cached(ps):
 
     from game.states.playing.visual.elements import transient
     real = transient._ring
-    cache: dict = {}
+    cache = _RINGS
 
     def ring(surface, center, radius, colour, alpha, width):
         alpha = min(255, int(alpha))
@@ -261,11 +263,7 @@ def _ring_cached(ps):
                      (center[0] - size // 2, center[1] - size // 2))
 
     transient._ring = ring
-
-    def undo():
-        transient._ring = real
-        cache.clear()
-    return undo
+    return lambda: setattr(transient, "_ring", real)
 
 
 def binary_alpha(frame) -> bool:
@@ -290,7 +288,7 @@ def _aura_rle(ps):
 
     from game.states.playing.visual.elements.profiles import ElementVisualProfile
     real = ElementVisualProfile.aura_frame          # the class's: profiles have slots
-    copies: dict = {}
+    copies = _RLE_COPIES
 
     def aura_frame(self, size=None):
         frame = real(self, size=size)
@@ -308,11 +306,7 @@ def _aura_rle(ps):
         return hit[1] if hit[0] is frame else frame
 
     ElementVisualProfile.aura_frame = aura_frame
-
-    def undo():
-        ElementVisualProfile.aura_frame = real
-        copies.clear()
-    return undo
+    return lambda: setattr(ElementVisualProfile, "aura_frame", real)
 
 
 def _aura_lookup_once(ps):

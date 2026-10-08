@@ -211,6 +211,13 @@ class UnderVariantTests(unittest.TestCase):
         if pygame.display.get_surface() is None:
             pygame.display.set_mode((64, 64))
 
+    def setUp(self):
+        for cache in (DV._SHAPES, DV._RINGS, DV._RLE_COPIES):
+            cache.clear()
+
+    def tearDown(self):
+        self.setUp()
+
     @staticmethod
     def _canvas():
         s = pygame.Surface((120, 120))
@@ -316,6 +323,12 @@ class UnderVariantTests(unittest.TestCase):
         finally:
             undo()
         self.assertIs(ElementVisualProfile.aura_frame, real)
+        # The copy outlives the undo: the next "on" block starts warm.
+        undo = DV.VARIANTS["aura_rle"](None)
+        try:
+            self.assertIs(profile.aura_frame(), got)
+        finally:
+            undo()
 
     def test_a_translucent_frame_keeps_the_plain_blit(self):
         # Why the guard: SDL's RLE path blends a translucent pixel by its own
