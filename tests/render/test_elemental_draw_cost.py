@@ -252,13 +252,13 @@ class TerraceSortTests(unittest.TestCase):
         asked = []
         real = rle.ready
 
-        def counted(frame):
+        def counted(frame, dest):
             asked.append(id(frame))
-            return real(frame)
+            return real(frame, dest)
 
         def frame(plain=False, cache=None, cap=None):
             s = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-            patches = [mock.patch.object(rle, "ready", (lambda f: f) if plain else counted)]
+            patches = [mock.patch.object(rle, "ready", (lambda f, dest: f) if plain else counted)]
             if cache is not None:
                 patches.append(mock.patch.object(rle, "_COPIES", cache))
             if cap is not None:

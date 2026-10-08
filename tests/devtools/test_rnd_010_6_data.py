@@ -59,52 +59,79 @@ FIGURES = (
     # Before and after, sitting 4: the fight.
     ("bare      before  15.61 /  16.36  after  14.54 /  14.51  change  -1.46 (-1.85 to -1.07)",
      "| bare draw | -1.46 (-1.85 to -1.07) | -1.26 (-1.95 to -0.56) | -2.46 (-2.77 to -2.16) |"),
-    ("change  -1.26 (-1.95 to -0.56)", "-1.26 (-1.95 to -0.56)"),
-    ("change  -2.46 (-2.77 to -2.16)", "-2.46 (-2.77 to -2.16) |"),
+    ("change  -1.26 (-1.95 to -0.56)", "| bare draw | -1.46 (-1.85 to -1.07) | -1.26 (-1.95 to -0.56) |"),
+    ("change  -2.46 (-2.77 to -2.16)", "| -1.26 (-1.95 to -0.56) | -2.46 (-2.77 to -2.16) |"),
     ("under-layer before   1.94 /   2.07  after   1.37 /   1.29  change  -0.67 (-0.78 to -0.57)",
      "| -0.67 (-0.78 to -0.57) | -1.20 (-1.25 to -1.15) | -1.66 (-1.70 to -1.63) |"),
     ("under-layer before   3.22 /   3.31  after   2.06 /   2.07  change  -1.20 (-1.25 to -1.15)",
-     "-1.20 (-1.25 to -1.15)"),
+     "| the under-layer's rows | -0.67 (-0.78 to -0.57) | -1.20 (-1.25 to -1.15) |"),
     ("under-layer before   3.62 /   3.61  after   1.92 /   1.98  change  -1.66 (-1.70 to -1.63)",
-     "at 250 its rows fall from 3.62 / 3.61 to 1.92 / 1.98 ms"),
+     "At 250 they fall from 3.62 / 3.61 to 1.92 / 1.98 ms"),
     ("change  -2.86 (-3.18 to -2.53)",
      "| draw p90 | -2.86 (-3.18 to -2.53) | -1.84 (-2.77 to -0.92) | -3.30 (-4.38 to -2.22) |"),
-    ("change  -1.84 (-2.77 to -0.92)", "-1.84 (-2.77 to -0.92)"),
-    ("change  -3.30 (-4.38 to -2.22)", "-3.30 (-4.38 to -2.22)"),
+    ("change  -1.84 (-2.77 to -0.92)", "| -2.86 (-3.18 to -2.53) | -1.84 (-2.77 to -0.92) |"),
+    ("change  -3.30 (-4.38 to -2.22)", "| -1.84 (-2.77 to -0.92) | -3.30 (-4.38 to -2.22) |"),
     ("frame     before  24.78 /  26.18  after  22.84 /  23.09  change  -2.52 (-3.34 to -1.69)",
      "| update + draw | -2.52 (-3.34 to -1.69) | -1.21 (-2.51 to +0.09) | -3.24 (-4.18 to -2.29) |"),
-    ("change  -1.21 (-2.51 to +0.09)", "-1.21 (-2.51 to +0.09)"),
-    ("change  -3.24 (-4.18 to -2.29)", "-3.24 (-4.18 to -2.29)"),
-    ("update    before   9.11 /   9.49  after   8.64 /   8.76  change  -0.60", "moved -0.60, -0.14 and -0.34 ms"),
-    ("update    before  10.59 /  11.53  after  10.86 /  10.97  change  -0.14", "-0.14"),
-    ("update    before  14.17 /  14.18  after  13.57 /  14.11  change  -0.34", "-0.34 ms in the fight"),
+    ("change  -1.21 (-2.51 to +0.09)", "| -2.52 (-3.34 to -1.69) | -1.21 (-2.51 to +0.09) |"),
+    ("change  -3.24 (-4.18 to -2.29)", "| -1.21 (-2.51 to +0.09) | -3.24 (-4.18 to -2.29) |"),
+    ("update    before   9.11 /   9.49  after   8.64 /   8.76  change  -0.60",
+     "the fight's update, which the change does not touch, moved -0.60, -0.14 and -0.34 ms"),
+    ("update    before  10.59 /  11.53  after  10.86 /  10.97  change  -0.14", "moved -0.60, -0.14 and -0.34 ms"),
+    ("update    before  14.17 /  14.18  after  13.57 /  14.11  change  -0.34", "moved -0.60, -0.14 and -0.34 ms"),
+    ("the bare draw's change beyond the under-layer's: -0.79",
+     "by 0.79 ms at 150 and 0.80 at 250 (-1.46 against -0.67, -2.46 against -1.66; 0.06 at 200)"),
+    ("the bare draw's change beyond the under-layer's: -0.80", "0.80 at 250"),
+    ("the bare draw's change beyond the under-layer's: -0.06", "0.06 at 200"),
     # The quiet control.
-    ("under-layer before   0.09 /   0.10  after   0.10 /   0.10  change  +0.01", "rows move +0.01 to +0.02 ms"),
-    ("under-layer before   0.10 /   0.10  after   0.11 /   0.12  change  +0.02", "+0.01 to +0.02 ms"),
-    ("bare      before  10.40 /  10.47  after  10.44 /  10.59  change  +0.08", "moves +0.08, +0.42 and +0.03 ms"),
-    ("bare      before  10.34 /  10.51  after  10.96 /  10.73  change  +0.42 (+0.22 to +0.62)", "+0.42"),
-    ("bare      before  10.94 /  11.37  after  11.13 /  11.23  change  +0.03", "+0.03 ms"),
-    ("update    before  10.06 /  10.10  after  10.52 /  10.39  change  +0.38", "untouched, moved +0.38 ms too"),
+    ("under-layer before   0.09 /   0.10  after   0.10 /   0.10  change  +0.01",
+     "the same rows move +0.01 to +0.02 ms"),
+    ("under-layer before   0.10 /   0.10  after   0.11 /   0.12  change  +0.02",
+     "the same rows move +0.01 to +0.02 ms"),
+    ("under-layer before   0.12 /   0.12  after   0.13 /   0.13  change  +0.01",
+     "the same rows move +0.01 to +0.02 ms"),
+    ("bare      before  10.34 /  10.51  after  10.96 /  10.73  change  +0.42 (+0.22 to +0.62)",
+     "at 200 its bare draw +0.42 (+0.22 to +0.62)"),
+    ("draw p90  before  11.58 /  12.39  after  12.70 /  13.25  change  +0.99 (+0.31 to +1.67)",
+     "its draw p90 +0.99 (+0.31 to +1.67)"),
+    ("frame     before  20.34 /  20.53  after  21.45 /  20.95  change  +0.76 (+0.42 to +1.11)",
+     "its update + draw +0.76 (+0.42 to +1.11)"),
+    ("update    before  10.06 /  10.10  after  10.52 /  10.39  change  +0.38", "its update, untouched, +0.38 ms"),
     ("sitting 4's load at its steps: cpu 6 to 74 %, gpu 0 to 20 %", "(CPU load 6 to 74 % at the steps, GPU 0 to 20 %"),
     ("sitting 4's draw p99s: fight 30.20 to 84.08 ms, quiet 18.99 to 49.31 ms",
      "run from 30.20 to 84.08 ms in the fight and from 18.99 to 49.31 ms in the quiet runs"),
+    ("reactions/transient    0.05 / 0.05", "at 0.05 / 0.05 ms at 150 and 0.07 / 0.07 at 250"),
+    ("reactions/transient    0.07 / 0.07", "0.07 / 0.07 at 250: too small to pursue"),
+    ("the two caches' parts, each count: 0.03 to 0.15 ms", "remove 0.03 to 0.15 ms each in the leads"),
     # The cache.
     ("150: 342 distinct aura frames", "asks for 342 distinct aura frames at 150 and 456 at 250"),
     ("250: 456 distinct aura frames", "456 at 250, so the cap is over twice the larger"),
     ("380 copies, 18.8 MB as pixels", "leaves 380 copies at 150 and 443 at 250, 18.8 and 23.6 MB"),
-    ("443 copies, 23.6 MB as pixels", "18.8 and 23.6 MB counted as plain pixels"),
-    ("largest 116 kB, cap 1024 x largest = 118.4 MB", "the largest copy, 116 kB there, so 118.4 MB"),
+    ("443 copies, 23.6 MB as pixels", "18.8 and 23.6 MB as pixels, at the headless zoom of 1.5"),
+    ("largest 116 kB, cap 1024 x largest = 118.4 MB", "the largest copy, 116 kB there, so 118.4 MB as pixels"),
+    ("150: resident memory +16.6 MB as plain copies, +17.3 MB once encoded",
+     "raises its resident memory by 16.6 and 19.3 MB, and +17.3 and +20.3 MB once each is encoded"),
+    ("250: resident memory +19.3 MB as plain copies, +20.3 MB once encoded", "+17.3 and +20.3 MB once"),
 )
 PLAN_FIGURES = (
     ("aura blit 2.077, its RLE copy 0.235", "the aura's blit (2.077 ms at 250 in the fight), which an RLE copy"),
     ("its RLE copy 0.235", "cuts to 0.235"),
     ("change  -0.67 (-0.78 to -0.57)", "the under-layer's rows -0.67 / -1.20 / -1.66 ms"),
-    ("change  -1.46 (-1.85 to -1.07)", "the bare draw -1.46 / -1.26 / -2.46 ms at 150 / 200 / 250"),
+    ("the two caches' parts, each count: 0.03 to 0.15 ms", "the caches named here remove 0.03 to 0.15 ms each"),
+)
+# Outside the results: the sequence table's row and the cache's docstring.
+JOURNAL_FIGURES = (
+    ("change  -1.66 (-1.70 to -1.63)", "the aura's RLE blit, -1.66 ms on the under-layer at 250 in the fight"),
+)
+RLE_FIGURES = (
+    ("change  -1.66 (-1.70 to -1.63)", "the under-layer's rows fell by 1.66 ms"),
+    ("150: 342 distinct aura frames", "asks for 342 distinct aura frames at 150 and 456 at 250"),
+    ("250: 456 distinct aura frames", "asks for 342 distinct aura frames at 150 and 456 at 250"),
 )
 SITTING_4 = {f"s4_{kind}_{n}_{side}_{r}.txt" for kind in ("fight", "quiet") for n in (150, 200, 250)
              for side in ("before", "after") for r in "ab"}
-FILES = {"README.md", "derived.py", "counts.sh", "aura_keys.py", "rle_bytes.py",
-         "keys_150.txt", "keys_250.txt", "bytes_150.txt", "bytes_250.txt",
+FILES = {"README.md", "derived.py", "counts.sh", "aura_keys.py", "rle_bytes.py", "rle_memory.py",
+         "keys_150.txt", "keys_250.txt", "bytes_150.txt", "bytes_250.txt", "memory_150.txt", "memory_250.txt",
          "sitting1.sh", "sitting2.sh", "sitting3.sh", "sitting4.sh",
          "s1_meta.txt", "s2_meta.txt", "s3_meta.txt", "s4_meta.txt",
          "s1_layers_150_a.txt", "s1_layers_150_b.txt", "s1_layers_250_a.txt", "s1_layers_250_b.txt",
@@ -141,11 +168,17 @@ class DerivedTests(unittest.TestCase):
                 self.assertIn(printed, self.out)
                 self.assertIn(_flat(quoted), self.plan)
 
-    def test_the_cap_rests_on_the_counts(self):
+    def test_the_sequence_row_and_the_cache_quote_it_too(self):
+        journal = _flat(JOURNAL.read_text(encoding="utf-8"))
         doc = _flat(RLE.read_text(encoding="utf-8"))
-        self.assertIn("150: 342 distinct aura frames", self.out)
-        self.assertIn("250: 456 distinct aura frames", self.out)
-        self.assertIn("asks for 342 distinct aura frames at 150 and 456 at 250", doc)
+        for printed, quoted in JOURNAL_FIGURES:
+            with self.subTest(journal=quoted):
+                self.assertIn(printed, self.out)
+                self.assertIn(_flat(quoted), journal)
+        for printed, quoted in RLE_FIGURES:
+            with self.subTest(rle=quoted):
+                self.assertIn(printed, self.out)
+                self.assertIn(_flat(quoted), doc)
 
 
 class FolderTests(unittest.TestCase):

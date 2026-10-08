@@ -33,6 +33,11 @@ def _frame(alphas, size=(40, 30)):
     return frame
 
 
+# A destination as the display and the game's scratch surfaces are: 32 bits,
+# no per-pixel alpha.
+_DEST = pygame.Surface((8, 8))
+
+
 def _canvas():
     s = pygame.Surface((120, 120))
     for i in range(0, 120, 7):
@@ -63,7 +68,7 @@ class RleTests(unittest.TestCase):
 
     def test_a_binary_frame_is_blitted_from_an_rle_copy_with_the_same_pixels(self):
         frame = _frame((0, 255, 255, 0, 255))
-        out = rle.ready(frame)
+        out = rle.ready(frame, _DEST)
         self.assertIsNot(out, frame)
         self.assertTrue(out.get_flags() & pygame.SRCALPHA)        # the alpha kept
         self.assertTrue(out.get_flags() & pygame.RLEACCELOK)
@@ -73,11 +78,43 @@ class RleTests(unittest.TestCase):
     def test_a_translucent_frame_is_handed_back_as_it_is(self):
         frame = _frame((0, 40, 128, 200, 255))
         self.assertFalse(rle.binary_alpha(frame))
-        self.assertIs(rle.ready(frame), frame)
+        self.assertIs(rle.ready(frame, _DEST), frame)
         # Why: SDL's RLE path blends a translucent pixel by its own formula.
         copy = frame.copy()
         copy.set_alpha(255, pygame.RLEACCEL)
         self.assertNotEqual(_blitted(copy), _blitted(frame))
+
+    def test_a_destination_that_does_not_fit_gets_the_frame_itself(self):
+        # Onto a surface with alpha the RLE path skips what pygame's blitter
+        # writes; onto fewer bits SDL re-encodes the copy for good. Neither
+        # ever sees a copy, and neither fills the cache.
+        frame = _frame((0, 255))
+        for dest in (pygame.Surface((8, 8), pygame.SRCALPHA), pygame.Surface((8, 8), 0, 24),
+                     pygame.Surface((8, 8), 0, 16)):
+            with self.subTest(bits=dest.get_bitsize(), alpha=bool(dest.get_flags() & pygame.SRCALPHA)):
+                self.assertFalse(rle.fits(dest))
+                self.assertIs(rle.ready(frame, dest), frame)
+        self.assertEqual(len(rle._COPIES), 0)
+        self.assertTrue(rle.fits(_DEST))
+        self.assertTrue(rle.fits(pygame.display.get_surface()))
+
+    def test_why_a_destination_with_alpha_does_not_fit(self):
+        frame = _frame((0, 255))
+        copy = frame.copy()
+        copy.set_alpha(255, pygame.RLEACCEL)
+
+        def onto(src):
+            s = pygame.Surface((60, 60), pygame.SRCALPHA)
+            s.fill((10, 20, 30, 0))
+            s.blit(src, (5, 7))
+            return pygame.image.tobytes(s, "RGBA")
+        self.assertNotEqual(onto(copy), onto(frame))
+
+    def test_surface_alpha_is_not_binary(self):
+        frame = _frame((0, 255))
+        frame.set_alpha(128)
+        self.assertFalse(rle.binary_alpha(frame))
+        self.assertIs(rle.ready(frame, _DEST), frame)
 
     def test_binary_alpha(self):
         self.assertTrue(rle.binary_alpha(_frame((0, 255))))
@@ -88,37 +125,37 @@ class RleTests(unittest.TestCase):
                 self.assertFalse(rle.binary_alpha(_frame((0, 255, alpha))))
 
     def test_none_is_none(self):
-        self.assertIsNone(rle.ready(None))
+        self.assertIsNone(rle.ready(None, _DEST))
 
     def test_one_copy_per_frame_checked_once(self):
         frame = _frame((0, 255))
         with mock.patch.object(rle, "binary_alpha", wraps=rle.binary_alpha) as check:
-            first = rle.ready(frame)
+            first = rle.ready(frame, _DEST)
             for _ in range(5):
-                self.assertIs(rle.ready(frame), first)
+                self.assertIs(rle.ready(frame, _DEST), first)
         self.assertEqual(check.call_count, 1)
         translucent = _frame((0, 128))
         with mock.patch.object(rle, "binary_alpha", wraps=rle.binary_alpha) as check:
             for _ in range(3):
-                self.assertIs(rle.ready(translucent), translucent)
+                self.assertIs(rle.ready(translucent, _DEST), translucent)
         self.assertEqual(check.call_count, 1)                      # the "no" is kept too
 
     def test_a_full_cache_drops_only_the_entry_used_longest_ago(self):
         frames = [_frame((0, 255), (8, 8)) for _ in range(4)]
         with mock.patch.object(rle, "_CAP", 3):
-            copies = [rle.ready(f) for f in frames[:3]]
-            rle.ready(frames[0])                                  # 0 now the newest
-            rle.ready(frames[3])                                  # drops 1, used longest ago
+            copies = [rle.ready(f, _DEST) for f in frames[:3]]
+            rle.ready(frames[0], _DEST)                                  # 0 now the newest
+            rle.ready(frames[3], _DEST)                                  # drops 1, used longest ago
             self.assertEqual([e[0] for e in rle._COPIES.values()],
                              [frames[2], frames[0], frames[3]])
-            self.assertIs(rle.ready(frames[0]), copies[0])        # kept
-            self.assertIs(rle.ready(frames[2]), copies[2])
+            self.assertIs(rle.ready(frames[0], _DEST), copies[0])        # kept
+            self.assertIs(rle.ready(frames[2], _DEST), copies[2])
 
     def test_an_entry_under_another_frames_id_is_replaced_not_served(self):
         frame, other = _frame((0, 255)), _frame((255,))
         stale = pygame.Surface((3, 3), pygame.SRCALPHA)
         rle._COPIES[id(frame)] = (other, stale)                  # as if the id was recycled
-        out = rle.ready(frame)
+        out = rle.ready(frame, _DEST)
         self.assertIsNot(out, stale)
         self.assertEqual(_blitted(out), _blitted(frame))
         self.assertEqual(len(rle._COPIES), 1)
@@ -164,9 +201,15 @@ class RleTests(unittest.TestCase):
         class _Body:
             pos, radius = (50, 50), 10
 
-        target = mock.Mock()
-        layers._aura(target, _Cam(), _Body(), _Profile(), _Style())
-        blitted = target.blit.call_args.args[0]
+        blits = []
+
+        class _Target(pygame.Surface):
+            def blit(self, source, *a, **k):
+                blits.append(source)
+                return super().blit(source, *a, **k)
+
+        layers._aura(_Target((100, 100)), _Cam(), _Body(), _Profile(), _Style())
+        blitted = blits[0]
         self.assertIs(blitted, rle._COPIES[id(frame)][1])
         self.assertIsNot(blitted, frame)
 

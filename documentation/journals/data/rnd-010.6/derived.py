@@ -1,15 +1,20 @@
 """Every figure RND-010.6's results quote, from the raw outputs here:
 `python derived.py`, from anywhere.
 
+Sittings 1 to 3 ran on commits made before the branch was rebased onto
+RND-013 (`a5dd5c8`, `c24465b`, `21ed117`); the same commits after the
+rebase are `2d15351`, `d245315` and `261aeb0`, whose trees add only
+RND-013's files.
+
 Sitting 1 (this branch at `a5dd5c8`): at 150 / 300 and 250 / 600 packed
 with the hero fighting, the draw by layer twice (`s1_layers_*`), the leads
 probe (`s1_leads_*`) and the four variants (`s1_variants_*`). Sittings 2
 and 3 timed the variants again after two faults in the variant tool were
 fixed (RND-010.6.8, .9); sitting 2's `aura_rle` was still cold in every
 block, so only sitting 3's variants are quoted. Sitting 4 is `main`
-against the branch with the RLE blit built, ABBA. `keys_*` and `bytes_*`
-(`counts.sh`, headless) count the aura frames a fight asks for and what
-the RLE copies hold.
+against the branch with the RLE blit built, ABBA. `keys_*`, `bytes_*` and
+`memory_*` (`counts.sh`, headless) count the aura frames a fight asks for,
+what the RLE copies hold as pixels, and what they cost the process.
 """
 import re
 from pathlib import Path
@@ -84,6 +89,8 @@ for n in COUNTS:
     for k in UNDER:
         print(f"    {k:22s} {' / '.join(f'{run[k][0]:.2f}' for run in runs)}")
     print(f"    {'the under-layer, summed':22s} {' / '.join(f'{x:.2f}' for x in total)}")
+    bursts = " / ".join(f"{run['reactions/transient'][0]:.2f}" for run in runs)
+    print(f"    {'reactions/transient':22s} {bursts}  (the bursts over the bodies, not the under-layer)")
 
 print("\n== sitting 1: the leads, ms a frame (mean over 10 fight frames) ==")
 for n in COUNTS:
@@ -97,6 +104,12 @@ for n in COUNTS:
           f"{r['aura: frame lookup']:.3f}")
     print(f"    chill surface + polygons {r['chill: new surface'] + r['chill: polygons']:.3f}; "
           f"ring surface + circle {r['ring: new surface'] + r['ring: circle']:.3f}")
+
+caches = []
+for n in COUNTS:
+    r = leads(text(f"s1_leads_{n}.txt"))["rows"]
+    caches += [r["chill: new surface"] + r["chill: polygons"], r["ring: new surface"] + r["ring: circle"]]
+print(f"the two caches' parts, each count: {min(caches):.2f} to {max(caches):.2f} ms a frame")
 
 print("\n== the variants, the draw p50 per block, on minus off (97.9 % interval) ==")
 for sitting, names in (("s1", ("aura_lookup_once",)), ("s3", ("aura_rle", "shape_cached", "ring_cached"))):
@@ -137,6 +150,10 @@ if (D / "s4_meta.txt").exists():
             under = {s: [sum(v[0] for k, v in run.items() if k == "flat/elemental" or k.startswith("elemental/"))
                          for run in lay[s]] for s in lay}
             print(f"    {'under-layer':9s} " + compare(under["before"], under["after"]))
+            if kind == "fight":
+                bare = mean([x["bare"] for x in h["after"]]) - mean([x["bare"] for x in h["before"]])
+                rows = mean(under["after"]) - mean(under["before"])
+                print(f"    the bare draw's change beyond the under-layer's: {bare - rows:+.2f}")
 
 if (D / "s4_meta.txt").exists():
     steps = re.findall(r"cpu load (\d+)%  gpu (\d+) %", text("s4_meta.txt"))
@@ -155,3 +172,6 @@ for n in COUNTS:
     print(f"{n}: {keys} distinct aura frames over 640 fight frames; after the warm-up and those 640, "
           f"{held.group(1)} copies, {held.group(3)} MB as pixels, largest {held.group(4)} kB, "
           f"cap {held.group(5)} x largest = {held.group(6)} MB")
+    mem = re.search(r"resident memory \+([\d.]+) MB as plain copies, \+([\d.]+) MB once encoded",
+                    text(f"memory_{n}.txt"))
+    print(f"{n}: resident memory +{mem.group(1)} MB as plain copies, +{mem.group(2)} MB once encoded")

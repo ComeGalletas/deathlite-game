@@ -313,7 +313,7 @@ def _aura_lookup_once(ps):
     """`layers.draw_auras` with each element's frame looked up once per size
     in a pass instead of once per body: every body of an element shares its
     profile's animator, so the frame at a size is the same for all of them."""
-    from game.states.playing.visual.elements import layers
+    from game.states.playing.visual.elements import layers, rle
     real = layers.draw_auras
 
     def draw_auras(surface, run, visuals, now, level=None, bodies=None):
@@ -336,7 +336,8 @@ def _aura_lookup_once(ps):
                 if frame is frames:
                     frame = frames[key] = profile.aura_frame(size=size) if size else None
                 if frame is not None:
-                    surface.blit(frame, frame.get_rect(center=(int(sx), int(sy))))
+                    # As the game blits it since RND-010.6.6: from its RLE copy.
+                    surface.blit(rle.ready(frame, surface), frame.get_rect(center=(int(sx), int(sy))))
                 else:
                     layers._aura(surface, cam, body, profile, style)
                 drawn += 1

@@ -121,7 +121,7 @@ def _aura(surface, cam, body, profile, style) -> None:
     frame = profile.aura_frame(size=size) if size else None
     if frame is not None:
         # Its RLE copy (RND-010.6): the same pixels, the clear runs skipped.
-        surface.blit(rle.ready(frame), frame.get_rect(center=(int(sx), int(sy))))
+        surface.blit(rle.ready(frame, surface), frame.get_rect(center=(int(sx), int(sy))))
     else:
         _ring(surface, (int(sx), int(sy)), int(radius), profile.colour,
               style.alpha, style.ring_width)
