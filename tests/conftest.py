@@ -172,6 +172,8 @@ INTEGRATION = (
     "tests/devtools/test_under_leads.py::SceneTests",
     "tests/devtools/test_under_leads.py::MainTests",
     "tests/devtools/test_rnd_010_6_data.py::DerivedTests",
+    # RND-010.7: the shade walk's skip against the walk before, on a packed scene.
+    "tests/render/test_shade_skip.py::ShadeSkipTests",
     # SYS-011: the timer eval's command line reads as far as the Game it
     # builds on Windows; its judgment tests stay unit.
     "tests/devtools/test_timer_regime.py::CommandLineTests",

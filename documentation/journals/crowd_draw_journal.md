@@ -1630,7 +1630,7 @@ unchanged; a mutation check.
   - [x] RND-010.6.10: The cold review's findings: the destination and surface-alpha guards (`rle.fits`), the web marked unverified, the outcome quoted as the under-layer's rows with the whole draw inside the sitting's noise, the scope not measured (hazards) and 4.5 done in part, the copies' memory measured, D1 recorded, provenance by sitting, `aura_lookup_once` through the game's copies, every figure pinned
 - [ ] RND-010.7: The shade walk's skip (plan 4.4, its first half), exact, measured before and after
   - [x] RND-010.7.1: This plan and the index
-  - [ ] RND-010.7.2: The skip in `shade_character_frame`, with its tests and a mutation check
+  - [x] RND-010.7.2: The skip in `shade_character_frame`, with its tests and a mutation check
   - [ ] RND-010.7.3: `draw_leads` times the walk over the unshaded bodies alone, tested
   - [ ] RND-010.7.4: `main` against the branch, ABBA, headless: the walk's pieces and the `enemies/shade` row; the results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
