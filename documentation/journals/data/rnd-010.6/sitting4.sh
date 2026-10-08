@@ -15,7 +15,8 @@ trap 'git switch -q "$HOME_REF"' EXIT
 load() { powershell -NoProfile -Command "(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average"; }
 procs() { powershell -NoProfile -Command "Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 Name, CPU | Format-Table -AutoSize | Out-String -Width 120"; }
 windows() { powershell -NoProfile -Command "Get-Process | Where-Object { \$_.MainWindowHandle -ne 0 } | Sort-Object Name | Select-Object -ExpandProperty Name | Get-Unique"; }
-stamp() { echo "=== $1  cpu load $(load)%  $(date +%H:%M:%S)" >> "$S/s4_meta.txt"; }
+gpu() { nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader 2>/dev/null || echo "n/a"; }
+stamp() { echo "=== $1  cpu load $(load)%  gpu $(gpu)  $(date +%H:%M:%S)" >> "$S/s4_meta.txt"; }
 {
   echo "before $BEFORE  after $AFTER  started $(date '+%Y-%m-%d %H:%M:%S')"
   python -c "import json;print('save', json.load(open('save.json'))['settings']['display'])"
@@ -40,6 +41,6 @@ for kind in fight quiet; do
     run before "$kind" "$1" "$2" b
   done
 done
-{ echo "finished $(date '+%H:%M:%S')  cpu load $(load)%"
+{ echo "finished $(date +%H:%M:%S)  cpu load $(load)%  gpu $(gpu)"
   echo "--- processes with a window at the end, by name"; windows
   echo "--- top processes by CPU time at the end"; procs; } >> "$S/s4_meta.txt"
