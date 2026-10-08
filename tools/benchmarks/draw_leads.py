@@ -138,7 +138,7 @@ def pieces(ps, surface) -> dict:
         "anchor_for": (lambda e: ren.anchor_for(e.anim.rig, args[id(e)][1]), "enemy"),
         "sprite_drop": (lambda e: ren.sprite_drop(e.radius), "enemy"),
         "shade walk": (shade, "enemy"),
-        "subset: shade walk, unshaded": (shade, "unshaded"),
+        "subset: walk, unshaded": (shade, "unshaded"),
         "sprite blit": (blit, "enemy"),
         "ghost copy": (copy, "shaded"),
         "ghost record": (record, "enemy"),

@@ -31,7 +31,8 @@ SEED = 35
 
 
 def _walk_before(self, frame, dest, camera, character_y):
-    """`TerrainRenderer.shade_character_frame`, word for word (RND-010.7's reference)."""
+    """`TerrainRenderer.shade_character_frame` as it stands, its code word for word
+    with the comments left out (RND-010.7's reference)."""
     shadows = self.gm._tree_shadows
     if not shadows:
         return frame
@@ -73,7 +74,7 @@ def _walk_before(self, frame, dest, camera, character_y):
     return shaded
 
 
-class ShadeSkipTests(unittest.TestCase):
+class ShadeWalkPinTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         with contextlib.redirect_stdout(io.StringIO()):

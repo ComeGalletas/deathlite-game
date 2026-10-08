@@ -1680,4 +1680,7 @@ are below in RND-010.7.6.
   - [x] RND-010.7.3: `draw_leads` times the walk over the unshaded bodies alone, tested
   - [x] RND-010.7.4: `main` against the branch, ABBA, headless: the walk's pieces and the `enemies/shade` row; the results
   - [x] RND-010.7.5: The skip taken out, measured slower than the walk; the walk pinned against a reference copy for whatever reworks it next
+  - [x] RND-010.7.6: The cold review's tool findings: `walk_shapes` splits the unshaded bodies by empty and occupied index cells and times an exact fine-grid skip, `bare` named an approximate floor; `shapes.sh` runs twice a count with the load and the commit stamped; the pin test renamed; `draw_leads`' subset fits its column, its list tested
+  - [ ] RND-010.7.7: The shapes run again on the tools as committed; the results rewritten on the cell-size diagnosis, the bar for building named, the mutants listed
+  - [ ] RND-010.7.8: The full suite's counts in the results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
