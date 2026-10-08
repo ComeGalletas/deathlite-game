@@ -1653,8 +1653,11 @@ bodies alone (`subset: walk, unshaded`; `subset: shade walk, unshaded` in
 sitting 1's files, its name when they ran).
 
 Tests: the shade, ghost, depth-sort, cull, terrain and enemy-sprite render
-tests and `draw_leads`' own pass on the branch; the full suite's counts
-follow (RND-010.7.8).
+tests and `draw_leads`' own pass on the branch. The full suite
+(`python -m pytest`, the default tiers) on `1d2e919`: 4,556 passed, 11
+deselected (the `sweep` tier, run only when asked), none failed. No eval
+applies: the result is a measurement, and the exactness a comparison
+against the walk.
 
 ## RND-010: Tasks
 
@@ -1718,5 +1721,5 @@ follow (RND-010.7.8).
   - [x] RND-010.7.5: The skip taken out, measured slower than the walk; the walk pinned against a reference copy for whatever reworks it next
   - [x] RND-010.7.6: The cold review's tool findings: `walk_shapes` splits the unshaded bodies by empty and occupied index cells and times an exact fine-grid skip, `bare` named an approximate floor; `shapes.sh` runs twice a count with the load and the commit stamped; the pin test renamed; `draw_leads`' subset fits its column, its list tested
   - [x] RND-010.7.7: The shapes run again on the tools as committed; the results rewritten on the cell-size diagnosis, the bar for building named, the mutants listed
-  - [ ] RND-010.7.8: The full suite's counts in the results
+  - [x] RND-010.7.8: The full suite's counts in the results
 - [ ] RND-010.n: Results: the harness before and after, and the owner's re-trace
